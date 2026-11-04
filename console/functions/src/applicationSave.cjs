@@ -2,8 +2,7 @@
 
 /**
  * saveApplicationStep (ADR 0007 §3): one step's answers, saved as the
- * client types. A member saves while the request is a draft or has
- * changes requested.
+ * client types. A member saves while the request is a draft.
  *
  * Every step but the web address saves what it gets, even when a check
  * fails, so a half-typed answer is not lost; the reply carries the step's
@@ -16,9 +15,9 @@ const { ConsoleError } = require('./http.cjs');
 const { ANSWER_STEPS, MAX_DAYS, cleanStep, withDefaults } = require('./answers.cjs');
 const { checkAnswers, stepErrors } = require('./checks.cjs');
 const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames, siteNameProblem } = require('./siteNames.cjs');
-const { EDITABLE, readApplication, requireMember } = require('./applications.cjs');
+const { readApplication, requireMember } = require('./applications.cjs');
 
-const LOCKED = 'This request is with the hosting team, so you cannot change it now.';
+const LOCKED = 'You accepted the agreement or closed this request, so you cannot change it now.';
 const TOO_MANY_DAYS = `Add ${MAX_DAYS} days or fewer.`;
 
 /** More days than the limit are refused, not cut short, so no day is lost without a word. */
@@ -50,7 +49,7 @@ async function reserveSiteName(tx, db, { appId, orgId, name, at }) {
   return null;
 }
 
-async function saveApplicationStep({ db, now = Date.now }, { body, user }) {
+async function saveApplicationStep({ db, now = Date.now, consoleTestMode: testMode }, { body, user }) {
   const { orgId, appId, step } = body;
   if (!ANSWER_STEPS.includes(step)) throw new ConsoleError(400, 'bad-request', 'Choose a step.');
   await requireMember(db, orgId, user);
@@ -60,14 +59,14 @@ async function saveApplicationStep({ db, now = Date.now }, { body, user }) {
 
   const outcome = await db.runTransaction(async (tx) => {
     const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
-    if (!EDITABLE.includes(data.status)) throw new ConsoleError(409, 'locked', LOCKED);
+    if (data.status !== 'draft') throw new ConsoleError(409, 'locked', LOCKED);
     if (step === 'webAddress') {
       const refusal = await reserveSiteName(tx, db, { appId, orgId, name: clean.name, at });
       if (refusal) return { saved: false, errors: refusal };
     }
     const answers = { ...withDefaults(data.answers), [step]: clean };
     tx.update(ref, { answers, updatedAt: at, updatedBy: user.uid });
-    return { saved: true, errors: stepErrors(checkAnswers(answers), step) };
+    return { saved: true, errors: stepErrors(checkAnswers(answers, data.connections, { testMode }), step) };
   });
 
   return {

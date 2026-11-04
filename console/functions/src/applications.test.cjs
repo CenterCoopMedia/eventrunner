@@ -2,17 +2,14 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { createApplication, getApplication, listApplications } = require('./applications.cjs');
-const { NOW, ana, applicationDoc, ben, cy, ops, seededDb, zed } = require('./testData.cjs');
+const { getApplication, listApplications, newApplicationData } = require('./applications.cjs');
+const { NOW, ana, applicationDoc, ben, cy, ops, seededDb, signupTerms, zed } = require('./testData.cjs');
 
 const deps = (db) => ({ db, now: () => NOW });
 
-test('an Owner starts a draft, with the organization name and the browser time zone preset', async () => {
-  const db = seededDb();
-  const result = await createApplication(deps(db), { body: { orgId: 'o1', timezone: 'America/New_York' }, user: ana });
-  assert.equal(result.status, 201);
-  const { id } = result.body.application;
-  const stored = db.read(`applications/${id}`);
+test('a new draft has the organization name and the browser time zone preset', () => {
+  const at = new Date(NOW);
+  const stored = newApplicationData({ orgId: 'o1', organizationName: 'NC Local', timezone: ' America/New_York ', uid: 'ana', at });
   assert.equal(stored.orgId, 'o1');
   assert.equal(stored.status, 'draft');
   assert.equal(stored.frozen, null);
@@ -21,36 +18,12 @@ test('an Owner starts a draft, with the organization name and the browser time z
   assert.equal(stored.updatedBy, 'ana');
   assert.equal(stored.submittedAt, null);
   assert.equal(stored.submittedBy, null);
-  assert.deepEqual(stored.createdAt, new Date(NOW));
+  assert.deepEqual(stored.createdAt, at);
   assert.equal(stored.answers.organization.name, 'NC Local');
   assert.equal(stored.answers.event.timezone, 'America/New_York');
   assert.deepEqual(stored.answers.tickets, { choice: null });
-  assert.deepEqual(stored.history, [{ status: 'draft', at: new Date(NOW), by: 'ana', note: null }]);
-});
-
-test('only an Owner starts one; an Editor, an operator and a stranger cannot', async () => {
-  const db = seededDb();
-  await assert.rejects(createApplication(deps(db), { body: { orgId: 'o1' }, user: ben }), {
-    status: 403, message: 'Only an Owner can start a new event site.',
-  });
-  await assert.rejects(createApplication(deps(db), { body: { orgId: 'o1' }, user: ops }), { status: 404 });
-  await assert.rejects(createApplication(deps(db), { body: { orgId: 'o1' }, user: zed }), { status: 404 });
-  assert.deepEqual(db.paths('applications/'), []);
-});
-
-test('an organization has at most 3 open requests; withdrawn and declined ones do not count', async () => {
-  const db = seededDb({
-    'applications/a1': applicationDoc({ status: 'submitted' }),
-    'applications/a2': applicationDoc({ status: 'withdrawn' }),
-    'applications/a3': applicationDoc({ status: 'declined' }),
-    'applications/a4': applicationDoc({ status: 'ready' }),
-    'applications/b1': applicationDoc({ orgId: 'o2' }),
-  });
-  await createApplication(deps(db), { body: { orgId: 'o1' }, user: ana });
-  await assert.rejects(createApplication(deps(db), { body: { orgId: 'o1' }, user: ana }), {
-    status: 409, code: 'too-many-open',
-  });
-  assert.equal(db.paths('applications/').length, 6);
+  assert.deepEqual(stored.history, [{ status: 'draft', at, by: 'ana', note: null }]);
+  assert.equal(newApplicationData({ orgId: 'o1', organizationName: 'NC Local', uid: 'ana', at }).answers.event.timezone, '');
 });
 
 test('a member and an operator read a request; a stranger and another organization cannot', async () => {
@@ -60,12 +33,15 @@ test('a member and an operator read a request; a stranger and another organizati
   assert.equal(forAna.status, 'draft');
   assert.equal(forAna.address, 'nclocal.eventrunner.org');
   assert.deepEqual(forAna.errors, {});
-  assert.equal(forAna.ownersNeeded, 1);
-  assert.equal(forAna.progress.team, false);
+  assert.equal(forAna.ownersNeeded, 1, 'still shown, for launch');
+  assert.equal(forAna.progress.team, true, 'a second Owner does not hold the setup');
   assert.equal(forAna.progress.event, true);
-  assert.equal(forAna.progress.review, false);
+  assert.equal(forAna.progress.review, true);
+  assert.equal(forAna.progress.agreement, false);
+  assert.deepEqual(forAna.signups, { open: false }, 'nothing set: closed');
+  assert.deepEqual(forAna.build, { failed: false, needsReconnect: false });
   assert.equal(forAna.canEdit, true);
-  assert.equal(forAna.canSubmit, true);
+  assert.equal(forAna.canAccept, true);
   assert.equal(forAna.canWithdraw, true);
   assert.equal(forAna.frozen, undefined, 'a client does not get the operator fields');
   assert.equal(forAna.review, undefined);
@@ -73,7 +49,7 @@ test('a member and an operator read a request; a stranger and another organizati
 
   const forBen = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ben })).body.application;
   assert.equal(forBen.canEdit, true);
-  assert.equal(forBen.canSubmit, false);
+  assert.equal(forBen.canAccept, false);
   assert.equal(forBen.canWithdraw, false);
 
   const forOps = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ops })).body.application;
@@ -88,37 +64,85 @@ test('a member and an operator read a request; a stranger and another organizati
   await assert.rejects(getApplication(deps(db), { body: { orgId: 'o1', appId: 'a/b' }, user: ana }), { status: 400 });
 });
 
-test('getApplication shows the note of a change request, from the history or the review', async () => {
+test('an accepted request is locked, and tells the client who accepted', async () => {
+  const db = seededDb({
+    ...signupTerms(),
+    'applications/a1': applicationDoc({
+      status: 'approved',
+      agreementAcceptance: { id: 'r1', version: 1, sha256: 'x', name: 'Ana Owner', email: 'ana@example.org', at: new Date(NOW) },
+    }),
+  });
+  const forAna = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ana })).body.application;
+  assert.equal(forAna.canEdit, false);
+  assert.equal(forAna.canAccept, false);
+  assert.equal(forAna.canWithdraw, false);
+  assert.equal(forAna.progress.agreement, true);
+  assert.deepEqual(forAna.signups, { open: true });
+  assert.deepEqual(forAna.acceptance, { version: 1, name: 'Ana Owner', at: new Date(NOW).toISOString() });
+});
+
+test('a declined request shows its note, from the history or the review', async () => {
   const at = new Date(NOW);
   const db = seededDb({
     'applications/a1': applicationDoc({
-      status: 'changes_requested',
+      status: 'declined',
       history: [
         { status: 'draft', at, by: 'ana', note: null },
-        { status: 'submitted', at, by: 'ana', note: null },
-        { status: 'changes_requested', at, by: 'ops@ccm.example', note: 'Add the venue address.' },
+        { status: 'declined', at, by: 'ops@ccm.example', note: 'Not an event.' },
       ],
     }),
     'applications/a2': applicationDoc({
-      status: 'changes_requested',
-      review: { note: 'Pick another name.', by: 'ops@ccm.example', at, settings: { region: 'us-central1' } },
+      status: 'declined',
+      review: { note: 'A duplicate.', by: 'ops@ccm.example', at, settings: null },
     }),
   });
   const a1 = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ana })).body.application;
-  assert.equal(a1.note, 'Add the venue address.');
-  assert.equal(a1.canEdit, true);
+  assert.equal(a1.note, 'Not an event.');
   const a2 = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a2' }, user: ana })).body.application;
-  assert.equal(a2.note, 'Pick another name.');
-  const a2ops = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a2' }, user: ops })).body.application;
-  assert.deepEqual(a2ops.review.settings, { region: 'us-central1' });
+  assert.equal(a2.note, 'A duplicate.');
 });
 
-test('a sent request is locked for editing but can still be withdrawn', async () => {
-  const db = seededDb({ 'applications/a1': applicationDoc({ status: 'submitted' }) });
-  const app = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ana })).body.application;
-  assert.equal(app.canEdit, false);
-  assert.equal(app.canSubmit, false);
-  assert.equal(app.canWithdraw, true);
+test('a failed build says only that: never the error, the run or the step detail', async () => {
+  const at = new Date(NOW);
+  const failed = (failedStep) => seededDb({
+    'applications/a1': applicationDoc({ status: 'building', buildStart: { state: 'started', at } }),
+    'console_builds/a1': {
+      state: 'failed', failedStep, error: 'secret-error-text', runUrl: 'https://github.example/run/1',
+      steps: [{ id: failedStep, state: 'failed', detail: 'secret-step-detail' }],
+    },
+  });
+  const read = async (db) => (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ana })).body.application;
+
+  const tickets = await read(failed('tickets'));
+  assert.deepEqual(tickets.build, { failed: true, needsReconnect: true });
+  assert.equal(tickets.connections.canChange, true, 'an Owner can reconnect');
+  assert.equal(tickets.connections.canDisconnect, false);
+  const text = JSON.stringify(tickets);
+  for (const hidden of ['secret-error-text', 'secret-step-detail', 'github.example']) assert.ok(!text.includes(hidden), hidden);
+
+  const other = await read(failed('web-address'));
+  assert.deepEqual(other.build, { failed: true, needsReconnect: false });
+
+  const forBen = (await getApplication(deps(failed('tickets')), { body: { orgId: 'o1', appId: 'a1' }, user: ben })).body.application;
+  assert.equal(forBen.connections.canChange, false, 'an Editor cannot');
+
+  const running = seededDb({
+    'applications/a1': applicationDoc({ status: 'building', buildStart: { state: 'started', at } }),
+    'console_builds/a1': { state: 'running' },
+  });
+  const quiet = await read(running);
+  assert.deepEqual(quiet.build, { failed: false, needsReconnect: false });
+  assert.equal(quiet.connections.canChange, false);
+});
+
+test('listApplications says when a build failed, so an Owner opens the request and finds Retry', async () => {
+  const db = seededDb({
+    'applications/a1': applicationDoc({ status: 'approved', buildStart: { state: 'started', at: new Date(NOW) } }),
+    'console_builds/a1': { state: 'failed', error: 'secret detail' },
+  });
+  const { body } = await listApplications(deps(db), { body: { orgId: 'o1' }, user: ben });
+  assert.equal(body.applications[0].buildFailed, true);
+  assert.ok(!JSON.stringify(body).includes('secret detail'));
 });
 
 test('listApplications lists the organization\'s own requests, newest first', async () => {
@@ -132,9 +156,7 @@ test('listApplications lists the organization\'s own requests, newest first', as
   assert.equal(result.body.applications[1].eventName, 'NC Local News Summit');
   assert.equal(result.body.applications[1].address, 'nclocal.eventrunner.org');
   assert.equal(result.body.applications[0].address, null);
-  assert.equal(result.body.canCreate, false, 'an Editor cannot start one');
-  const forAna = await listApplications(deps(db), { body: { orgId: 'o1' }, user: ana });
-  assert.equal(forAna.body.canCreate, true);
+  assert.equal(result.body.applications[1].buildFailed, false);
   const forOps = await listApplications(deps(db), { body: { orgId: 'o1' }, user: ops });
   assert.equal(forOps.body.applications.length, 2);
   await assert.rejects(listApplications(deps(db), { body: { orgId: 'o1' }, user: zed }), { status: 404 });

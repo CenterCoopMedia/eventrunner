@@ -206,6 +206,17 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
 }
 .steps a[aria-current="step"] { font-weight: 700; background: rgb(var(--surface-alt)); box-shadow: inset 4px 0 0 rgb(var(--accent)); }
 @media (hover: hover) { .steps a:hover { text-decoration: underline; } }
+.step-locked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+  padding: 0.25rem var(--space-xs);
+  color: rgb(var(--ink-muted));
+}
+.agreement { padding: var(--space-md); border: 1px solid rgb(var(--rule)); border-radius: var(--radius); overflow-wrap: anywhere; }
+.agreement h2 { margin-top: 0; }
+.agreement-text-field textarea { min-height: 20rem; }
 .step-number {
   display: inline-grid;
   place-items: center;

@@ -131,8 +131,8 @@ const CARDS = [
     file: 'console/web/public/og-console.png',
     line: 'Console',
     title: 'Event Runner',
-    blurb: 'Sign up, name your organization and invite your team. We review your request '
-      + 'and then build your event site.',
+    blurb: 'Answer a few questions, accept the agreement and start building your event site.',
+    foot: 'console.eventrunner.org',
     accent: true,
   },
 ];

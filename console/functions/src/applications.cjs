@@ -1,35 +1,41 @@
 'use strict';
 
 /**
- * Applications (ADR 0007 §3 and §5): start one, read one, list them.
+ * Applications (ADR 0007 §3 and §5): read one, list them. One starts only when
+ * a signup link is redeemed (signupLinks.cjs).
  *
  * `applications/{appId}` {
- *   orgId, status, answers, frozen (a copy of answers at submit, else null),
+ *   orgId, status, answers, frozen (a copy of answers at acceptance, else null),
+ *   connections (connected accounts, see connectionState.cjs; absent until one is connected),
  *   createdBy, createdAt, updatedAt, updatedBy, submittedAt, submittedBy,
  *   history: [{ status, at, by, note }]  // oldest first
  *   review: null | { note, by, at, settings }  // written by operator review only
+ *   agreementAcceptance: null | { id, version, sha256, name, email, at }  // the current acceptance
+ *   buildStart: { state: 'pending'|'started'|'failed', at }  // from acceptance on, no detail
  * }
+ *
+ * The browser can read this document (console/firestore.rules), so error
+ * text stays in the logs. The signed record is in agreement_acceptances.
  *
  * One application is one event and one site. The client calls it "your
  * request"; the console never shows the word application.
  */
 
 const { ConsoleError } = require('./http.cjs');
-const { requireMemberOrOperator, requireOwner, toIso, toMillis, validOrgId } = require('./access.cjs');
+const { requireMemberOrOperator, toIso, toMillis, validOrgId } = require('./access.cjs');
 const { emptyAnswers, withDefaults } = require('./answers.cjs');
+const { RETRY_STATUSES, buildForClient, readBuild } = require('./buildState.cjs');
 const { checkAnswers } = require('./checks.cjs');
+const { connectionsForClient } = require('./connectionState.cjs');
 const { siteAddress } = require('./siteNames.cjs');
 const { LAUNCH_OWNERS } = require('./organizations.cjs');
+const { readSignupTerms } = require('./consoleSettings.cjs');
 
 const COLLECTION = 'applications';
-const STATUSES = Object.freeze([
-  'draft', 'submitted', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined',
-]);
+const STATUSES = Object.freeze(['draft', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined']);
 const CLOSED = Object.freeze(['withdrawn', 'declined']);
-const EDITABLE = Object.freeze(['draft', 'changes_requested']);
-const WITHDRAWABLE = Object.freeze(['draft', 'submitted', 'changes_requested']);
-const MAX_OPEN_PER_ORG = 3;
-const STEP_IDS = Object.freeze(['organization', 'event', 'webAddress', 'team', 'tickets', 'email', 'review']);
+const WITHDRAWABLE = Object.freeze(['draft']);
+const STEP_IDS = Object.freeze(['organization', 'event', 'webAddress', 'team', 'tickets', 'email', 'review', 'agreement']);
 
 const NOT_FOUND = 'We could not find that request.';
 
@@ -68,28 +74,31 @@ function currentNote(data) {
   const history = Array.isArray(data.history) ? data.history : [];
   const last = [...history].reverse().find((entry) => entry.status === data.status);
   if (last && typeof last.note === 'string' && last.note) return last.note;
-  if (['changes_requested', 'declined'].includes(data.status) && data.review && typeof data.review.note === 'string') {
+  if (data.status === 'declined' && data.review && typeof data.review.note === 'string') {
     return data.review.note || null;
   }
   return null;
 }
 
 /** Which steps are complete, for the step list. */
-function stepProgress(errors, ownersNeeded) {
+function stepProgress(errors, data) {
   const done = Object.fromEntries(STEP_IDS.map((step) => [
     step,
     !Object.keys(errors).some((path) => path === step || path.startsWith(`${step}.`)),
   ]));
-  done.team = ownersNeeded === 0;
-  done.review = Object.keys(errors).length === 0 && ownersNeeded === 0;
+  // The second Owner is a launch check, so the team step never holds the setup.
+  done.team = true;
+  done.review = Object.keys(errors).length === 0;
+  done.agreement = Boolean(data.agreementAcceptance);
   return done;
 }
 
 /** What the browser gets. The operator also gets who did each change and the review. */
-function applicationForClient(id, data, { role, operator, ownersNeeded }) {
+function applicationForClient(id, data, { role, operator, ownersNeeded, signups, available, build, testMode = false }) {
   const answers = withDefaults(data.answers);
-  const errors = checkAnswers(answers);
-  const editable = EDITABLE.includes(data.status);
+  const errors = checkAnswers(answers, data.connections, { testMode });
+  const draft = data.status === 'draft';
+  const owner = role === 'owner';
   const body = {
     id,
     orgId: data.orgId,
@@ -107,13 +116,19 @@ function applicationForClient(id, data, { role, operator, ownersNeeded }) {
       ...(operator ? { by: entry.by || null } : {}),
     })),
     errors,
-    progress: stepProgress(errors, ownersNeeded),
+    progress: stepProgress(errors, data),
     ownersNeeded,
+    signups,
+    acceptance: data.agreementAcceptance
+      ? { version: data.agreementAcceptance.version, name: data.agreementAcceptance.name, at: toIso(data.agreementAcceptance.at) }
+      : null,
+    build,
     myRole: role,
     operator,
-    canEdit: Boolean(role) && editable,
-    canSubmit: role === 'owner' && editable,
-    canWithdraw: role === 'owner' && WITHDRAWABLE.includes(data.status),
+    canEdit: Boolean(role) && draft,
+    canAccept: owner && draft,
+    canWithdraw: owner && WITHDRAWABLE.includes(data.status),
+    connections: connectionsForClient(data.connections, { available, status: data.status, role, reconnect: build.failed }),
   };
   if (operator) {
     body.frozen = data.frozen || null;
@@ -124,92 +139,83 @@ function applicationForClient(id, data, { role, operator, ownersNeeded }) {
   return body;
 }
 
-async function createApplication({ db, now = Date.now }, { body, user }) {
-  const { orgId } = body;
-  await requireOwner(db, orgId, user, 'Only an Owner can start a new event site.');
-  const org = (await db.collection('organizations').doc(orgId).get()).data();
-  const timezone = typeof body.timezone === 'string' ? body.timezone.trim().slice(0, 64) : '';
-  const ref = db.collection(COLLECTION).doc();
-  const at = new Date(now());
-  const data = {
+/** A new draft request, with nothing answered but what the signup form gave. */
+function newApplicationData({ orgId, organizationName, timezone, uid, at }) {
+  return {
     orgId,
     status: 'draft',
-    answers: emptyAnswers({ organizationName: org.name, timezone }),
+    answers: emptyAnswers({ organizationName, timezone: typeof timezone === 'string' ? timezone.trim().slice(0, 64) : '' }),
     frozen: null,
-    createdBy: user.uid,
+    createdBy: uid,
     createdAt: at,
     updatedAt: at,
-    updatedBy: user.uid,
+    updatedBy: uid,
     submittedAt: null,
     submittedBy: null,
-    history: [historyEntry('draft', at, user.uid)],
+    history: [historyEntry('draft', at, uid)],
     review: null,
+    agreementAcceptance: null,
   };
-  await db.runTransaction(async (tx) => {
-    const existing = await tx.get(db.collection(COLLECTION).where('orgId', '==', orgId));
-    const open = existing.docs.filter((doc) => !CLOSED.includes(doc.data().status)).length;
-    if (open >= MAX_OPEN_PER_ORG) {
-      throw new ConsoleError(409, 'too-many-open',
-        `An organization can have ${MAX_OPEN_PER_ORG} open requests. Finish or withdraw one first.`);
-    }
-    tx.create(ref, data);
-  });
-  return { status: 201, body: { application: { id: ref.id, orgId, status: 'draft' } } };
 }
 
-async function getApplication({ db }, { body, user }) {
+async function getApplication({ db, connectionsAvailable, consoleTestMode, now = Date.now }, { body, user }) {
   const { orgId, appId } = body;
   const access = await requireMemberOrOperator(db, orgId, user);
   const { ref, data } = await readApplication((r) => r.get(), db, orgId, appId);
   const ownersNeeded = Math.max(0, LAUNCH_OWNERS - await countOwners(db, orgId));
-  return { body: { application: applicationForClient(ref.id, data, { ...access, ownersNeeded }) } };
+  const { open } = await readSignupTerms((r) => r.get(), db);
+  const record = RETRY_STATUSES.includes(data.status) ? await readBuild((r) => r.get(), db, ref.id) : null;
+  return {
+    body: {
+      application: applicationForClient(ref.id, data, {
+        ...access,
+        ownersNeeded,
+        signups: { open },
+        available: connectionsAvailable,
+        build: buildForClient(data, record, now(), { testMode: consoleTestMode }),
+        testMode: consoleTestMode,
+      }),
+    },
+  };
 }
 
-async function listApplications({ db }, { body, user }) {
+async function listApplications({ db, now = Date.now }, { body, user }) {
   const { orgId } = body;
   const access = await requireMemberOrOperator(db, orgId, user);
   const snap = await db.collection(COLLECTION).where('orgId', '==', orgId).get();
-  const applications = snap.docs
-    .map((doc) => {
-      const data = doc.data();
-      const answers = withDefaults(data.answers);
-      return {
-        id: doc.id,
-        status: data.status,
-        eventName: answers.event.name,
-        address: answers.webAddress.name ? siteAddress(answers.webAddress.name) : null,
-        createdAt: toIso(data.createdAt),
-        updatedAt: toIso(data.updatedAt),
-        sortKey: toMillis(data.createdAt),
-      };
-    })
+  const rows = await Promise.all(snap.docs.map(async (doc) => {
+    const data = doc.data();
+    const answers = withDefaults(data.answers);
+    const record = RETRY_STATUSES.includes(data.status) ? await readBuild((r) => r.get(), db, doc.id) : null;
+    return {
+      id: doc.id,
+      status: data.status,
+      eventName: answers.event.name,
+      address: answers.webAddress.name ? siteAddress(answers.webAddress.name) : null,
+      createdAt: toIso(data.createdAt),
+      updatedAt: toIso(data.updatedAt),
+      buildFailed: buildForClient(data, record, now()).failed,
+      sortKey: toMillis(data.createdAt),
+    };
+  }));
+  const applications = rows
     .sort((a, b) => (b.sortKey || 0) - (a.sortKey || 0))
     .map(({ sortKey, ...rest }) => rest);
-  const open = applications.filter((app) => !CLOSED.includes(app.status)).length;
-  return {
-    body: {
-      applications,
-      myRole: access.role,
-      operator: access.operator,
-      canCreate: access.role === 'owner' && open < MAX_OPEN_PER_ORG,
-    },
-  };
+  return { body: { applications, myRole: access.role, operator: access.operator } };
 }
 
 module.exports = {
   CLOSED,
   COLLECTION,
-  EDITABLE,
-  MAX_OPEN_PER_ORG,
   STATUSES,
   STEP_IDS,
   WITHDRAWABLE,
   applicationForClient,
   countOwners,
-  createApplication,
   getApplication,
   historyEntry,
   listApplications,
+  newApplicationData,
   readApplication,
   requireMember,
 };

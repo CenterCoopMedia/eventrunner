@@ -4,8 +4,9 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
   approvalDefaults, checkSettings, environmentFor, getConsoleSettings, normalizeBilling, normalizeFolder,
-  normalizeProjectId, projectIdFor, saveConsoleSettings, APPROVAL_FIELDS,
+  normalizeProjectId, projectIdFor, readSignupTerms, saveAgreement, saveConsoleSettings, APPROVAL_FIELDS,
 } = require('./consoleSettings.cjs');
+const { siteNameProblem } = require('./siteNames.cjs');
 const { NOW, ana, ops, seeded } = require('./fakeReview.cjs');
 
 const PROJECT_ID_RULE = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
@@ -20,6 +21,9 @@ test('projectIdFor makes er-<name> and always meets the project-id rules', () =>
     assert.ok(!id.endsWith('-'), id);
   }
   assert.equal(projectIdFor('ab'), 'er-ab-site');
+  const longest = 'a'.repeat(27);
+  assert.equal(siteNameProblem(longest), null);
+  assert.equal(projectIdFor(longest), `er-${longest}`);
 });
 
 test('normalizeProjectId follows the GCP rules', () => {
@@ -86,4 +90,69 @@ test('saveConsoleSettings checks each value, stores only the three fields, and a
     { status: 400, field: 'billingAccount' },
   );
   assert.deepEqual(db.read('console_config/settings'), stored);
+});
+
+const AGREEMENT = { title: 'Test agreement', body: 'First test paragraph.\n\nSecond test paragraph.' };
+const dep = (db) => ({ db, now: () => NOW });
+const audits = (db) => db.paths('console_audit/').map((path) => db.read(path));
+
+test('each saved agreement is a new version, and an old version never changes', async () => {
+  const db = seeded();
+  const first = await saveAgreement(dep(db), { body: { agreement: AGREEMENT }, user: ops });
+  assert.equal(first.body.created, true);
+  assert.equal(first.body.agreement.version, 1);
+  const kept = db.read('console_config/agreement/versions/1');
+  assert.equal(kept.body, AGREEMENT.body);
+
+  const second = await saveAgreement(dep(db), { body: { agreement: { ...AGREEMENT, body: 'A changed test paragraph.' } }, user: ops });
+  assert.equal(second.body.agreement.version, 2);
+  assert.deepEqual(db.read('console_config/agreement/versions/1'), kept, 'version 1 is unchanged');
+  assert.equal(db.read('console_config/agreement/versions/2').body, 'A changed test paragraph.');
+  assert.equal(db.read('console_config/agreement').version, 2);
+  assert.deepEqual(audits(db).map((a) => [a.action, a.version]).sort(), [['save-agreement', 1], ['save-agreement', 2]]);
+});
+
+test('the same text saves nothing, and line endings do not make a new version', async () => {
+  const db = seeded();
+  await saveAgreement(dep(db), { body: { agreement: AGREEMENT }, user: ops });
+  const again = await saveAgreement(dep(db), {
+    body: { agreement: { title: ` ${AGREEMENT.title} `, body: `${AGREEMENT.body.replace('\n\n', '\r\n\r\n')}\n` } }, user: ops,
+  });
+  assert.equal(again.body.created, false);
+  assert.equal(again.body.agreement.version, 1);
+  assert.deepEqual(db.paths('console_config/agreement/versions/'), ['console_config/agreement/versions/1']);
+  assert.equal(audits(db).length, 1);
+});
+
+test('an agreement needs a title and a text, and only an operator saves one', async () => {
+  const db = seeded();
+  await assert.rejects(saveAgreement(dep(db), { body: { agreement: { title: '', body: 'x' } }, user: ops }), { field: 'agreementTitle' });
+  await assert.rejects(saveAgreement(dep(db), { body: { agreement: { title: 't', body: ' ' } }, user: ops }), { field: 'agreementBody' });
+  await assert.rejects(saveAgreement(dep(db), { body: { agreement: AGREEMENT }, user: ana }), { status: 403 });
+  assert.equal(db.read('console_config/agreement'), undefined);
+});
+
+test('sign-ups open only with every build setting and an agreement that matches its hash', async () => {
+  const get = (r) => r.get();
+  const db = seeded();
+  assert.deepEqual(await readSignupTerms(get, db), { open: false, agreement: null, missing: ['the agreement'] });
+  await saveAgreement(dep(db), { body: { agreement: AGREEMENT }, user: ops });
+  const open = await readSignupTerms(get, db);
+  assert.equal(open.open, true);
+  assert.deepEqual(open.missing, []);
+  await db.collection('console_config').doc('settings').update({ billingAccount: '', region: 'mars' });
+  const unset = await readSignupTerms(get, db);
+  assert.equal(unset.open, false);
+  assert.deepEqual(unset.missing, ['the billing account', 'the region']);
+  assert.ok(unset.agreement, 'the agreement is still read');
+  await db.collection('console_config').doc('settings').update({ billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' });
+  await db.collection('console_config').doc('agreement').update({ body: 'Changed outside the console.' });
+  const closed = await readSignupTerms(get, db);
+  assert.equal(closed.open, false);
+  assert.equal(closed.agreement, null);
+});
+
+test('the console settings answer carries no fee', async () => {
+  const { body } = await getConsoleSettings(dep(seeded()), { body: {}, user: ops });
+  assert.deepEqual(Object.keys(body).sort(), ['agreement', 'settings']);
 });

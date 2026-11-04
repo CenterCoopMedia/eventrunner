@@ -14,7 +14,7 @@ const meta = (selector) => doc.head.querySelector(selector)?.getAttribute('conte
 describe('index.html', () => {
   it('has a title, a description and the console favicon', () => {
     expect(doc.title).toBe('Event Runner console | Set up your event site');
-    expect(meta('meta[name="description"]')).toMatch(/invite your team/);
+    expect(meta('meta[name="description"]')).toMatch(/signup link/);
     expect(doc.head.querySelector('link[rel="icon"]').getAttribute('href')).toBe('/favicon.svg');
     expect(doc.head.querySelector('link[rel="icon"]').getAttribute('type')).toBe('image/svg+xml');
     expect(doc.documentElement.getAttribute('lang')).toBe('en');

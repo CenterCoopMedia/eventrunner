@@ -17,12 +17,12 @@ describe('Setup', () => {
     });
     renderSetup('event');
     expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
-    expect(screen.getByText('Step 2 of 7')).toBeInTheDocument();
+    expect(screen.getByText('Step 2 of 8')).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Setup steps' });
-    expect(within(nav).getByText('2 of 7 steps done')).toBeInTheDocument();
+    expect(within(nav).getByText('2 of 8 steps done')).toBeInTheDocument();
     const links = within(nav).getAllByRole('link');
     expect(links.map((l) => l.textContent.replace(' (done)', '').replace(/^[✓\d]+/, ''))).toEqual([
-      'Your organization', 'Your event', 'Your web address', 'Your team', 'Tickets', 'Email', 'Review',
+      'Your organization', 'Your event', 'Your web address', 'Your team', 'Tickets', 'Email', 'Review', 'Agreement',
     ]);
     expect(links[1]).toHaveAttribute('aria-current', 'step');
     expect(links[0]).toHaveTextContent('(done)');
@@ -132,16 +132,8 @@ describe('Setup', () => {
     expect(address).toHaveFocus();
   });
 
-  it('shows the note when the hosting team asked for changes', async () => {
-    serveApi({ getApplication: { application: application({ status: 'changes_requested', note: 'Add the venue address.' }) } });
-    renderSetup('event');
-    const note = await screen.findByRole('note');
-    expect(note).toHaveTextContent('The hosting team asked for changes');
-    expect(note).toHaveTextContent('Add the venue address.');
-  });
-
   it('sends a request the reader cannot change to its status page', async () => {
-    serveApi({ getApplication: { application: application({ status: 'submitted', canEdit: false }) } });
+    serveApi({ getApplication: { application: application({ status: 'approved', canEdit: false }) } });
     renderSetup('event');
     expect(await screen.findByText('Status page')).toBeInTheDocument();
   });
@@ -160,12 +152,12 @@ describe('Setup', () => {
   it('says when a save fails', async () => {
     serveApi({
       getApplication: { application: application({ answers: emptyAnswers() }) },
-      saveApplicationStep: () => { throw new Error('This request is with the hosting team, so you cannot change it now.'); },
+      saveApplicationStep: () => { throw new Error('Your site is being built, so you cannot change this now.'); },
     });
     renderSetup('organization');
     fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'x.org' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(await screen.findByText(/Not saved. This request is with the hosting team/)).toBeInTheDocument();
+    expect(await screen.findByText(/Not saved. Your site is being built/)).toBeInTheDocument();
   });
 
   it('holds the request while the server kept an older web address, until a name saves', async () => {
@@ -180,19 +172,16 @@ describe('Setup', () => {
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken' } });
     fireEvent.click(screen.getByRole('link', { name: /Review/ }));
     await screen.findByRole('heading', { level: 1, name: 'Review' });
-    expect(screen.getByRole('button', { name: 'Create my site' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
     const held = screen.getByText(/is not saved/);
-    expect(held).toHaveTextContent('Your web address is not saved. Fix it before you send the request.');
+    expect(held).toHaveTextContent('Your web address is not saved. Fix it before you continue.');
     expect(within(held).getByRole('link', { name: 'Your web address' }))
       .toHaveAttribute('href', '/organizations/o1/applications/a1/web-address?check=1');
-    fireEvent.click(screen.getByRole('button', { name: 'Create my site' }));
-    expect(callsTo('submitApplication')).toHaveLength(0);
-
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Setup steps' })).getByRole('link', { name: /Your web address/ }));
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'nclocal2' } });
     fireEvent.click(screen.getByRole('link', { name: /Review/ }));
     await screen.findByRole('heading', { level: 1, name: 'Review' });
-    expect(screen.getByRole('button', { name: 'Create my site' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
     expect(screen.queryByText(/is not saved/)).not.toBeInTheDocument();
   });
 
@@ -214,5 +203,47 @@ describe('Setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
     expect(callsTo('saveApplicationStep').map((b) => b.answers.website)).toEqual(['x.org', 'x.org']);
+  });
+
+  describe('the agreement', () => {
+    const NAV = { name: 'Setup steps' };
+
+    it('Next on Review opens the agreement', async () => {
+      serveApi({ getAgreement: { agreement: { version: 1, title: 'Test agreement', body: 'Test text.' }, accepted: null } });
+      renderSetup('review');
+      fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
+      expect(await screen.findByRole('heading', { level: 1, name: 'Agreement' })).toBeInTheDocument();
+      expect(screen.getByText('Step 8 of 8')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    });
+
+    it('with an answer that needs attention, the agreement stays closed and its address goes to Review', async () => {
+      serveApi({ getApplication: { application: application({ errors: { 'event.name': 'Enter the event name.' } }) } });
+      renderSetup('agreement');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+      expect(within(screen.getByRole('navigation', NAV)).queryByRole('link', { name: /Agreement/ })).not.toBeInTheDocument();
+    });
+
+    it('when sign-ups are closed, the request stays at Review and the page says why', async () => {
+      serveApi({ getApplication: { application: application({ signups: { open: false } }) } });
+      renderSetup('agreement');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
+      expect(screen.getByText('This site is not taking sign-ups right now. We saved your answers. Try again later.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    });
+
+    it('after acceptance every step goes to the status page, for a member too', async () => {
+      serveApi({ getApplication: { application: application({ status: 'approved', canEdit: false, canAccept: false, canWithdraw: false }) } });
+      renderSetup('agreement');
+      expect(await screen.findByText('Status page')).toBeInTheDocument();
+    });
+
+    it('an operator who is not on the team goes to the status page', async () => {
+      serveApi({ getApplication: { application: application({ myRole: null, canEdit: false, canAccept: false, operator: true }) } });
+      renderSetup('agreement');
+      expect(await screen.findByText('Status page')).toBeInTheDocument();
+    });
   });
 });

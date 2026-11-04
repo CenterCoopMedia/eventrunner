@@ -1,3 +1,4 @@
+import { hostName } from './text.js';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -57,14 +58,47 @@ describe('AppRoutes', () => {
   });
 
   it('forgets the saved page once a signed-in reader is past sign-in', async () => {
-    window.localStorage.setItem(RETURN_KEY, '/organizations/new');
+    window.localStorage.setItem(RETURN_KEY, '/organizations/o1');
     renderApp('/');
     await waitFor(() => expect(window.localStorage.getItem(RETURN_KEY)).toBeNull());
   });
 
+  it('keeps the signup link while a reader confirms their email, and forgets it once they are back', async () => {
+    window.localStorage.removeItem(RETURN_KEY);
+    const unconfirmed = { uid: 'm', email: 'mo@example.org', emailVerified: false };
+    const first = render(
+      <AuthContext.Provider value={fakeAuth({ user: unconfirmed })}>
+        <MemoryRouter initialEntries={['/start/l1#token=abc']}><AppRoutes /></MemoryRouter>
+      </AuthContext.Provider>,
+    );
+    expect(screen.getByText(/We could not confirm your email address/)).toBeInTheDocument();
+    expect(window.localStorage.getItem(RETURN_KEY)).toBe('/start/l1#token=abc');
+    first.unmount();
+
+    callApi.mockResolvedValueOnce({ organizationName: 'Org', status: 'open' });
+    renderApp('/signin/finish');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Start your event site' })).toBeInTheDocument();
+    await waitFor(() => expect(window.localStorage.getItem(RETURN_KEY)).toBeNull());
+  });
+
+  it('shows how to reach the hosting team only when an address is set', () => {
+    renderApp('/nowhere');
+    expect(screen.queryByText(/Need the hosting team/)).not.toBeInTheDocument();
+    cleanup();
+    vi.stubEnv('VITE_CONSOLE_HELP_EMAIL', 'help@example.org');
+    renderApp('/nowhere');
+    expect(screen.getByRole('link', { name: 'help@example.org' })).toHaveAttribute('href', 'mailto:help@example.org');
+    cleanup();
+    vi.stubEnv('VITE_CONSOLE_HELP_NAME', 'Sam Host');
+    renderApp('/nowhere');
+    expect(screen.getByText(/Need a hand\? Email Sam Host at/)).toBeInTheDocument();
+    expect(hostName()).toBe('Sam Host');
+    vi.unstubAllEnvs();
+  });
+
   it('routes the review pages, and a client gets the hosting-team message', async () => {
     const notOperator = Object.assign(new Error('This page is for the hosting team.'), { code: 'not-operator' });
-    for (const path of ['/review', '/review/settings', '/review/a1']) {
+    for (const path of ['/review', '/review/settings', '/review/links', '/review/a1']) {
       callApi.mockRejectedValueOnce(notOperator);
       const { unmount } = render(
         <AuthContext.Provider value={fakeAuth()}>
@@ -76,13 +110,19 @@ describe('AppRoutes', () => {
     }
   });
 
+  it('sends a signed-out reader to sign in and remembers the signup link, token included', () => {
+    renderApp('/start/l1#token=abc', fakeAuth({ user: null }));
+    expect(screen.getByRole('heading', { level: 1, name: 'Sign in to Event Runner' })).toBeInTheDocument();
+    expect(window.localStorage.getItem(RETURN_KEY)).toBe('/start/l1#token=abc');
+  });
+
   it('has a page for an address it does not know', () => {
     renderApp('/nowhere');
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
   });
 
   it('routes the organization page, the setup steps and the status page', async () => {
-    serveApi({ listApplications: { applications: [], myRole: 'owner', operator: false, canCreate: true }, getTeam: team() });
+    serveApi({ listApplications: { applications: [], myRole: 'owner', operator: false }, getTeam: team() });
     renderApp('/organizations/o1');
     expect(await screen.findByRole('heading', { level: 1, name: 'NC Local' })).toBeInTheDocument();
     cleanup();
@@ -90,8 +130,16 @@ describe('AppRoutes', () => {
     renderApp('/organizations/o1/applications/a1/web-address');
     expect(await screen.findByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
     cleanup();
-    serveApi({ getApplication: { application: application({ status: 'submitted', canEdit: false }) } });
+    serveApi({ getApplication: { application: application({ status: 'approved', canEdit: false }) } });
     renderApp('/organizations/o1/applications/a1');
     expect(await screen.findByRole('heading', { level: 1, name: 'NC Local News Summit' })).toBeInTheDocument();
+  });
+
+  it('keeps the setup agreement step apart from the page that rereads an accepted agreement', async () => {
+    serveApi({ getAgreement: { agreement: { version: 1, title: 'Test agreement', body: 'Test text.' }, accepted: null } });
+    renderApp('/organizations/o1/applications/a1/agreement');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Agreement' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Test agreement' })).toBeInTheDocument();
+    expect(screen.queryByText('Nobody has accepted the agreement on this request yet.')).not.toBeInTheDocument();
   });
 });

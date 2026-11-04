@@ -51,15 +51,11 @@ test('more days than the limit are refused with a field error, not cut short', a
   assert.equal(db.read('applications/a1').answers.event.days.length, 14);
 });
 
-test('a step saves only while the request is a draft or has changes requested', async () => {
-  for (const status of ['submitted', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined']) {
+test('a step saves only while the request is a draft', async () => {
+  for (const status of ['approved', 'building', 'ready', 'launched', 'withdrawn', 'declined']) {
     const db = seededDb({ 'applications/a1': applicationDoc({ status }) });
     await assert.rejects(save(db, ana, 'tickets', { choice: 'none' }), { status: 409, code: 'locked' }, status);
   }
-  const db = seededDb({ 'applications/a1': applicationDoc({ status: 'changes_requested' }) });
-  const result = await save(db, ana, 'tickets', { choice: 'none' });
-  assert.equal(result.body.saved, true);
-  assert.equal(db.read('applications/a1').status, 'changes_requested');
 });
 
 test('saving the web address reserves the name and releases the old one', async () => {

@@ -7,8 +7,8 @@ title = "Run of Show gitleaks config"
 [extend]
 useDefault = true
 
-# Three unit-test fixtures trip the default `generic-api-key` and `jwt` rules on
-# shape alone. Neither is a live credential:
+# Four unit-test fixtures trip the default `generic-api-key`, `jwt` and
+# `stripe-access-token` rules on shape alone. None is a live credential:
 #
 #   - functions/src/admin/feedback.test.cjs: `a1b2c3d4e5f6g7h8` is a literal
 #     placeholder string used to assert a redaction/masking code path, not a
@@ -21,6 +21,9 @@ useDefault = true
 #     `an-older-secret-0123456789abcdef0123` is a made-up previous webhook
 #     URL secret, used to assert that a subscription carrying another secret
 #     is reported as stale (#356).
+#   - console/functions/src/connections.test.cjs: `sk_test_THEsecretTOKEN` is a
+#     made-up token, used to assert that a connected account's token reaches the
+#     secret store and nothing else.
 #
 # Scoped to the exact literal fixture values, not to the files they live in
 # (a file-level path allowlist would exempt anything ELSE dropped into the
@@ -33,4 +36,5 @@ regexes = [
   '''^a1b2c3d4e5f6g7h8$''',
   '''^eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.SflKxwRJSMeKKF2QT4fwpM$''',
   '''^an-older-secret-0123456789abcdef0123$''',
+  '''^sk_test_THEsecretTOKEN$''',
 ]

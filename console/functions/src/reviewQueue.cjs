@@ -9,12 +9,11 @@
 const { ConsoleError } = require('./http.cjs');
 const { toIso, toMillis } = require('./access.cjs');
 const { STATUSES, readApplication, requireOperator, reviewedAnswers, siteNameOf } = require('./reviewAccess.cjs');
-const { approvalDefaults, readConsoleSettings } = require('./consoleSettings.cjs');
+const { connectionForReview } = require('./connectionState.cjs');
+const { canRetryBuild, readBuild, readableBuild } = require('./buildRetry.cjs');
 
 const QUEUE_LIMIT = 200;
 const ROLE_ORDER = { owner: 0, editor: 1 };
-// The account connections arrive in P6. Until then the state is fixed.
-const CONNECTION_PLACEHOLDER = Object.freeze({ state: 'not_connected', label: 'Not connected yet' });
 
 /** Names of the given organizations, read once each. */
 async function organizationNames(db, orgIds) {
@@ -29,7 +28,7 @@ async function organizationNames(db, orgIds) {
 
 async function listApplicationsForReview({ db }, { body, user }) {
   await requireOperator(db, user);
-  const status = body.status === undefined ? 'submitted' : body.status;
+  const status = body.status === undefined ? 'approved' : body.status;
   if (!STATUSES.includes(status)) throw new ConsoleError(400, 'bad-request', 'Choose a status.');
   // Newest change first. console/firestore.indexes.json holds the index.
   const snap = await db.collection('applications')
@@ -50,6 +49,7 @@ async function listApplicationsForReview({ db }, { body, user }) {
       status: app.status,
       submittedAt: toIso(app.submittedAt),
       updatedAt: toIso(app.updatedAt),
+      buildStartFailed: app.buildStart?.state === 'failed',
     };
   });
   return { body: { status, applications } };
@@ -89,38 +89,50 @@ function readableReview(review) {
   return { note: review.note || null, by: review.by || null, at: toIso(review.at), settings: review.settings || null };
 }
 
+/** The acceptance and the build start, for the hosting team. */
+function readableProgress(app) {
+  const accepted = app.agreementAcceptance;
+  return {
+    acceptance: accepted ? { id: accepted.id, version: accepted.version, sha256: accepted.sha256, name: accepted.name, email: accepted.email, at: toIso(accepted.at) } : null,
+    buildStart: app.buildStart ? { state: app.buildStart.state, at: toIso(app.buildStart.at) } : null,
+  };
+}
+
 async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
   await requireOperator(db, user);
   const app = await readApplication(db, body.appId);
-  const [orgSnap, team, settings] = await Promise.all([
+  const [orgSnap, team, build] = await Promise.all([
     db.collection('organizations').doc(String(app.orgId)).get(),
     readTeam(db, String(app.orgId), now()),
-    readConsoleSettings(db),
+    readBuild((r) => r.get(), db, app.id),
   ]);
-  const name = siteNameOf(app);
+  const answers = reviewedAnswers(app);
   return {
     body: {
       application: {
         id: app.id,
         orgId: app.orgId,
         status: app.status,
-        answers: app.frozen || null,
-        ticketChoice: app.frozen?.tickets?.choice || null,
-        webAddressName: name,
+        // A draft has no frozen copy, and a draft is what an operator can decline.
+        answers: app.frozen || app.answers || null,
+        ticketChoice: answers?.tickets?.choice || null,
+        webAddressName: siteNameOf(app),
         // Sent back with a decision, so a page opened before a change is refused.
         revision: Array.isArray(app.history) ? app.history.length : 0,
         history: readableHistory(app.history, team.members),
         review: readableReview(app.review),
+        ...readableProgress(app),
         createdAt: toIso(app.createdAt),
         submittedAt: toIso(app.submittedAt),
         updatedAt: toIso(app.updatedAt),
       },
       organization: { id: app.orgId, name: orgSnap.exists ? orgSnap.data().name : '' },
       team,
-      connection: { ...CONNECTION_PLACEHOLDER },
-      approvalDefaults: approvalDefaults(settings, name),
+      connection: connectionForReview(answers?.tickets?.choice, app.connections),
+      build: readableBuild(build),
+      canRetryBuild: canRetryBuild(app, build, now()),
     },
   };
 }
 
-module.exports = { CONNECTION_PLACEHOLDER, getApplicationForReview, listApplicationsForReview };
+module.exports = { getApplicationForReview, listApplicationsForReview };

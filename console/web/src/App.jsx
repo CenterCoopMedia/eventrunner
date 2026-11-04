@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, forgetReturn, rememberReturn, signInErrorMessage, useAuth } from './auth.jsx';
 import AcceptInvite from './pages/AcceptInvite.jsx';
+import AcceptedAgreement from './pages/AcceptedAgreement.jsx';
 import ApplicationStatus from './pages/ApplicationStatus.jsx';
+import ConnectReturn from './pages/ConnectReturn.jsx';
 import OrganizationHome from './pages/OrganizationHome.jsx';
 import Setup from './pages/setup/Setup.jsx';
-import CreateOrganization from './pages/CreateOrganization.jsx';
+import StartEvent from './pages/StartEvent.jsx';
 import Organizations from './pages/Organizations.jsx';
 import SignIn from './pages/SignIn.jsx';
 import SignInFinish from './pages/SignInFinish.jsx';
@@ -13,6 +15,7 @@ import Team from './pages/Team.jsx';
 import ConsoleSettings from './pages/review/ConsoleSettings.jsx';
 import ReviewApplication from './pages/review/ReviewApplication.jsx';
 import ReviewQueue from './pages/review/ReviewQueue.jsx';
+import SignupLinks from './pages/review/SignupLinks.jsx';
 
 const MARK = (
   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="mark">
@@ -37,12 +40,15 @@ function useFocusHeadingOnNavigate() {
 }
 
 function Layout() {
+  const helpEmail = import.meta.env.VITE_CONSOLE_HELP_EMAIL;
+  const helpName = import.meta.env.VITE_CONSOLE_HELP_NAME?.trim();
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
   useFocusHeadingOnNavigate();
 
   useEffect(() => {
-    if (user && !pathname.startsWith('/signin')) forgetReturn();
+    // An unconfirmed reader still has to come back here from the emailed link.
+    if (user?.emailVerified && !pathname.startsWith('/signin')) forgetReturn();
   }, [user, pathname]);
 
   return (
@@ -61,6 +67,7 @@ function Layout() {
       </header>
       <main id="main" tabIndex={-1} className="page">
         <Outlet />
+        {helpEmail ? <p className="muted section">{helpName ? `Need a hand? Email ${helpName} at ` : 'Need the hosting team? Email '}<a href={`mailto:${helpEmail}`}>{helpEmail}</a>.</p> : null}
       </main>
     </>
   );
@@ -99,10 +106,8 @@ function RequireAuth() {
   const { user, ready } = useAuth();
   const location = useLocation();
   if (!ready) return <p role="status">Loading.</p>;
-  if (!user) {
-    rememberReturn(`${location.pathname}${location.search}${location.hash}`);
-    return <Navigate to="/signin" replace />;
-  }
+  if (!user?.emailVerified) rememberReturn(`${location.pathname}${location.search}${location.hash}`);
+  if (!user) return <Navigate to="/signin" replace />;
   if (!user.emailVerified) return <ConfirmEmail user={user} />;
   return <Outlet />;
 }
@@ -124,14 +129,17 @@ export function AppRoutes() {
         <Route path="/signin/finish" element={<SignInFinish />} />
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Organizations />} />
-          <Route path="/organizations/new" element={<CreateOrganization />} />
           <Route path="/organizations/:orgId" element={<OrganizationHome />} />
           <Route path="/organizations/:orgId/team" element={<Team />} />
           <Route path="/organizations/:orgId/applications/:appId" element={<ApplicationStatus />} />
+          <Route path="/organizations/:orgId/applications/:appId/accepted-agreement" element={<AcceptedAgreement />} />
           <Route path="/organizations/:orgId/applications/:appId/:step" element={<Setup />} />
+          <Route path="/connect/:provider/return" element={<ConnectReturn />} />
           <Route path="/invite/:inviteId" element={<AcceptInvite />} />
+          <Route path="/start/:linkId" element={<StartEvent />} />
           <Route path="/review" element={<ReviewQueue />} />
           <Route path="/review/settings" element={<ConsoleSettings />} />
+          <Route path="/review/links" element={<SignupLinks />} />
           <Route path="/review/:appId" element={<ReviewApplication />} />
         </Route>
         <Route path="*" element={<NotFound />} />

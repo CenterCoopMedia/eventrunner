@@ -46,15 +46,41 @@ beforeEach(async () => {
     await setDoc(doc(db, 'invites/i1'), { orgId: 'o1', email: 'dee@example.org', role: 'editor', tokenHash: 'h', status: 'pending' });
     await setDoc(doc(db, 'console_rate_limits/invite-org-o1'), { count: 1 });
     await setDoc(doc(db, 'applications/a1'), { orgId: 'o1', status: 'draft', answers: {} });
-    await setDoc(doc(db, 'applications/a2'), { orgId: 'o2', status: 'submitted', answers: {} });
+    await setDoc(doc(db, 'applications/a2'), { orgId: 'o2', status: 'approved', answers: {} });
     await setDoc(doc(db, 'site_names/nclocal'), { appId: 'a1', orgId: 'o1' });
+    await setDoc(doc(db, 'console_connections/a1'), { stripe: { accountId: 'acct_client1', connectedBy: 'ana' } });
+    await setDoc(doc(db, 'console_builds/a1'), { state: 'failed' });
+    await setDoc(doc(db, 'console_connection_states/h1'), { uid: 'ana', appId: 'a1', provider: 'stripe' });
+    await setDoc(doc(db, 'console_token_deletions/a1'), { connected: [] });
     await setDoc(doc(db, 'console_config/settings'), { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' });
     await setDoc(doc(db, 'console_audit/e1'), { action: 'delete-spam', appId: 'a9', by: 'ops' });
+    await setDoc(doc(db, 'console_config/agreement'), { version: 1, title: 'Test agreement', body: 'Test text.', sha256: 'h' });
+    await setDoc(doc(db, 'console_config/agreement/versions/1'), { version: 1, title: 'Test agreement', body: 'Test text.', sha256: 'h' });
+    await setDoc(doc(db, 'agreement_acceptances/r1'), { version: 1, sha256: 'h', typedName: 'Ana Owner', email: 'ana@example.org', uid: 'ana', orgId: 'o1', appId: 'a1' });
+    await setDoc(doc(db, 'signup_links/l1'), { organizationName: 'NC Local', tokenHash: 'h', status: 'open', createdBy: 'ops' });
   });
 });
 
 afterAll(async () => {
   await testEnv?.cleanup();
+});
+
+describe('connected accounts', () => {
+  it('nobody reads or writes the account ids or the half-finished connections from the browser, operators included', async () => {
+    for (const db of [ana(), ben(), stranger(), operator()]) {
+      await assertFails(getDoc(doc(db, 'console_connections/a1')));
+      await assertFails(getDocs(collection(db, 'console_connections')));
+      await assertFails(setDoc(doc(db, 'console_connections/a1'), { stripe: { accountId: 'acct_other' } }));
+      await assertFails(deleteDoc(doc(db, 'console_connections/a1')));
+      await assertFails(getDoc(doc(db, 'console_builds/a1')));
+      await assertFails(getDocs(collection(db, 'console_builds')));
+      await assertFails(setDoc(doc(db, 'console_builds/a1'), { state: 'done' }));
+      await assertFails(getDoc(doc(db, 'console_connection_states/h1')));
+      await assertFails(getDoc(doc(db, 'console_token_deletions/a1')));
+      await assertFails(getDocs(collection(db, 'console_connection_states')));
+      await assertFails(setDoc(doc(db, 'console_connection_states/h2'), { uid: 'zed' }));
+    }
+  });
 });
 
 describe('members read their own organization', () => {
@@ -190,7 +216,7 @@ describe('operator review (P7)', () => {
   it('an operator reads every application and the audit log', async () => {
     const db = operator();
     await assertSucceeds(getDoc(doc(db, 'applications/a1')));
-    await assertSucceeds(getDocs(query(collection(db, 'applications'), where('status', '==', 'submitted'))));
+    await assertSucceeds(getDocs(query(collection(db, 'applications'), where('status', '==', 'approved'))));
     await assertSucceeds(getDoc(doc(db, 'console_audit/e1')));
     await assertSucceeds(getDocs(collection(db, 'console_audit')));
   });
@@ -214,11 +240,46 @@ describe('operator review (P7)', () => {
   it('nobody writes applications, the audit log or the settings from the browser, operators included', async () => {
     for (const db of [ana(), operator(), stranger()]) {
       await assertFails(updateDoc(doc(db, 'applications/a1'), { status: 'approved' }));
-      await assertFails(setDoc(doc(db, 'applications/a2'), { orgId: 'o1', status: 'submitted' }));
+      await assertFails(setDoc(doc(db, 'applications/a2'), { orgId: 'o1', status: 'approved' }));
       await assertFails(deleteDoc(doc(db, 'applications/a1')));
       await assertFails(setDoc(doc(db, 'console_audit/e2'), { action: 'delete-spam', appId: 'a1', by: 'ops' }));
       await assertFails(deleteDoc(doc(db, 'console_audit/e1')));
       await assertFails(setDoc(doc(db, 'console_config/settings'), { gcpFolder: 'folders/1', billingAccount: 'x', region: 'x' }));
     }
+  });
+});
+
+describe('the agreement and the signup links', () => {
+  const PATHS = [
+    'console_config/agreement',
+    'console_config/agreement/versions/1',
+    'agreement_acceptances/r1',
+    'signup_links/l1',
+  ];
+
+  it('nobody reads the agreement, an acceptance record or a signup link from the browser, operators included', async () => {
+    for (const db of [ana(), ben(), stranger(), operator()]) {
+      for (const path of PATHS) await assertFails(getDoc(doc(db, path)));
+      await assertFails(getDocs(collection(db, 'agreement_acceptances')));
+      await assertFails(getDocs(collection(db, 'signup_links')));
+    }
+  });
+
+  it('nobody writes, changes or deletes them from the browser, operators included', async () => {
+    for (const db of [ana(), stranger(), operator()]) {
+      for (const path of PATHS) {
+        await assertFails(setDoc(doc(db, path), { version: 9 }));
+        await assertFails(updateDoc(doc(db, path), { version: 9 }));
+        await assertFails(deleteDoc(doc(db, path)));
+      }
+      await assertFails(setDoc(doc(db, 'agreement_acceptances/forged'), { version: 1, typedName: 'Forged', uid: 'ana' }));
+      await assertFails(setDoc(doc(db, 'console_config/agreement/versions/2'), { version: 2, body: 'Forged.' }));
+      await assertFails(setDoc(doc(db, 'signup_links/forged'), { organizationName: 'Forged', status: 'open' }));
+    }
+  });
+
+  it('nobody starts a build from the browser', async () => {
+    await assertFails(updateDoc(doc(ana(), 'applications/a1'), { status: 'approved' }));
+    await assertFails(updateDoc(doc(operator(), 'applications/a1'), { agreementAcceptance: null }));
   });
 });
