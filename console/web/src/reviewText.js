@@ -3,6 +3,7 @@
 
 export const STATUS_LABELS = Object.freeze({
   draft: 'Draft',
+  awaiting_payment: 'Waiting for payment',
   submitted: 'Waiting for review',
   changes_requested: 'Changes requested',
   approved: 'Approved',
@@ -15,7 +16,7 @@ export const STATUS_LABELS = Object.freeze({
 
 /** The queue filters, in the order the hosting team works through them. */
 export const STATUS_FILTERS = Object.freeze([
-  'submitted', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'declined', 'withdrawn', 'draft',
+  'submitted', 'awaiting_payment', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'declined', 'withdrawn', 'draft',
 ]);
 
 export const TICKET_LABELS = Object.freeze({
@@ -64,6 +65,18 @@ export const SETTING_FIELDS = Object.freeze({
     hint: 'The GitHub Environment for the deploy. Lowercase letters, digits and hyphens.',
     error: 'Enter an environment name of up to 63 characters: lowercase letters, digits and hyphens.',
     valid: (v) => /^[a-z0-9][a-z0-9-]{0,62}$/.test(v.trim()),
+  },
+  feeAmount: {
+    label: 'Amount',
+    hint: 'A whole number in the smallest unit of the currency, for example cents.',
+    error: 'Enter the amount as a whole number in the smallest unit of the currency.',
+    valid: (v) => /^[1-9]\d{0,7}$/.test(v.trim()),
+  },
+  feeCurrency: {
+    label: 'Currency',
+    hint: 'The three-letter code, for example usd.',
+    error: 'Enter a three-letter currency code.',
+    valid: (v) => /^[a-z]{3}$/i.test(v.trim()),
   },
 });
 

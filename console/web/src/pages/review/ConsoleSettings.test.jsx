@@ -67,4 +67,79 @@ describe('ConsoleSettings', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'This page is for the hosting team' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Region')).not.toBeInTheDocument();
   });
+
+  describe('the event fee and the agreement', () => {
+    const FEE = { amount: 12345, currency: 'usd' };
+    const AGREEMENT = { version: 2, title: 'Test agreement', body: 'Test text.', sha256: 'h', savedAt: '2026-11-04T15:00:00.000Z' };
+
+    it('says sign-ups are closed until both are saved', async () => {
+      page();
+      expect(await screen.findByRole('note')).toHaveTextContent('Sign-ups are closed');
+    });
+
+    it('does not say so when both are saved, and shows them', async () => {
+      serve({ getConsoleSettings: () => ({ settings: SAVED, fee: FEE, agreement: AGREEMENT }) });
+      page();
+      expect(await screen.findByLabelText('Amount')).toHaveValue('12345');
+      expect(screen.getByLabelText('Currency')).toHaveValue('usd');
+      expect(screen.getByText('Clients pay $123.45.')).toBeInTheDocument();
+      expect(screen.getByLabelText('Title')).toHaveValue('Test agreement');
+      expect(screen.getByLabelText('Text')).toHaveValue('Test text.');
+      expect(screen.getByText(/The current text is version 2/)).toBeInTheDocument();
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    });
+
+    it('saves the fee as a whole number and checks it first', async () => {
+      serve({ saveEventFee: (body) => ({ fee: { ...body.fee, currency: 'usd' } }) });
+      page();
+      const amount = await screen.findByLabelText('Amount');
+      fireEvent.change(amount, { target: { value: '10.50' } });
+      fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save the fee' }));
+      expect(await screen.findByText('Enter the amount as a whole number in the smallest unit of the currency.')).toBeInTheDocument();
+      expect(amount).toHaveFocus();
+      expect(callApi).not.toHaveBeenCalledWith('saveEventFee', expect.anything());
+
+      fireEvent.change(amount, { target: { value: '12345' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save the fee' }));
+      expect(await screen.findByText('The fee is saved. New payment pages use it.')).toBeInTheDocument();
+      expect(callApi).toHaveBeenCalledWith('saveEventFee', { fee: { amount: 12345, currency: 'USD' } });
+      expect(screen.getByLabelText('Currency')).toHaveValue('usd');
+    });
+
+    it('saves a changed text as a new version', async () => {
+      serve({
+        getConsoleSettings: () => ({ settings: SAVED, fee: FEE, agreement: AGREEMENT }),
+        saveAgreement: (body) => ({ created: true, agreement: { ...AGREEMENT, ...body.agreement, version: 3 } }),
+      });
+      page();
+      fireEvent.change(await screen.findByLabelText('Text'), { target: { value: 'A changed text.' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save as a new version' }));
+      expect(await screen.findByText('Version 3 is saved. New acceptances use it.')).toBeInTheDocument();
+      expect(callApi).toHaveBeenCalledWith('saveAgreement', { agreement: { title: 'Test agreement', body: 'A changed text.' } });
+      expect(screen.getByText(/The current text is version 3/)).toBeInTheDocument();
+    });
+
+    it('says when the same text saved nothing', async () => {
+      serve({
+        getConsoleSettings: () => ({ settings: SAVED, fee: FEE, agreement: AGREEMENT }),
+        saveAgreement: () => ({ created: false, agreement: AGREEMENT }),
+      });
+      page();
+      await screen.findByLabelText('Text');
+      fireEvent.click(screen.getByRole('button', { name: 'Save as a new version' }));
+      expect(await screen.findByText('This is the same text as version 2, so nothing changed.')).toBeInTheDocument();
+    });
+
+    it('shows a refusal at the agreement field it names', async () => {
+      serve({
+        saveAgreement: () => { throw Object.assign(new Error('Enter the agreement text, up to 200,000 characters.'), { field: 'agreementBody' }); },
+      });
+      page();
+      await screen.findByLabelText('Text');
+      fireEvent.click(screen.getByRole('button', { name: 'Save as a new version' }));
+      expect(await screen.findByText('Enter the agreement text, up to 200,000 characters.')).toBeInTheDocument();
+      expect(screen.getByLabelText('Text')).toHaveAttribute('aria-invalid', 'true');
+    });
+  });
 });

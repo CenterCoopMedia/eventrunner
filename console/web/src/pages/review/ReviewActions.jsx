@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import ApproveForm from './ApproveForm.jsx';
 import NoteForm from './NoteForm.jsx';
 
-const SPAM_STATUSES = ['draft', 'submitted', 'changes_requested', 'withdrawn', 'declined'];
+const SPAM_STATUSES = ['draft', 'awaiting_payment', 'submitted', 'changes_requested', 'withdrawn', 'declined'];
 
 /** The decisions open to the hosting team for a request with this status. */
 export function decisionsFor(status) {
   return {
     requestChanges: status === 'submitted',
     approve: status === 'submitted',
-    decline: status === 'submitted' || status === 'changes_requested',
+    decline: ['submitted', 'changes_requested', 'awaiting_payment'].includes(status),
     deleteSpam: SPAM_STATUSES.includes(status),
   };
 }

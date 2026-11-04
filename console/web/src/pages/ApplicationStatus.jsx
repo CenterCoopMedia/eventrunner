@@ -1,28 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../api.js';
-import { STATUS_LABELS, STEPS, setupPath } from '../setup/steps.js';
-import { formatDate } from '../text.js';
+import { STATUS_LABELS, STEPS, setupPath, stepById } from '../setup/steps.js';
+import { formatDate, formatFee } from '../text.js';
 
 const REFRESH_MS = 30000;
+// Sooner while the reader waits to hear about a payment they just made.
+const WAITING_REFRESH_MS = 5000;
 
-/** The plain steps after the setup (ADR 0007 §3), and the statuses that reach each one. */
+/** The plain steps after the setup (ADR 0007, amendment 2026-11-04), and the statuses that reach each one. */
 const STAGES = [
-  { label: 'Answer the setup questions', reached: ['draft', 'changes_requested'] },
-  { label: 'We are reviewing your request', reached: ['submitted'] },
+  { label: 'Answer the setup questions', reached: ['draft'] },
+  { label: 'Accept the agreement and pay the event fee', reached: ['awaiting_payment'] },
   { label: 'We are building your site', reached: ['approved', 'building'] },
   { label: 'Your site is ready', reached: ['ready', 'launched'] },
 ];
 
-function stageIndex(status) {
-  return STAGES.findIndex((stage) => stage.reached.includes(status));
+/** The same steps for a request the hosting team reviews, which has no payment. */
+const REVIEW_STAGES = [
+  { label: 'Answer the setup questions', reached: ['draft', 'changes_requested'] },
+  { label: 'We are reviewing your request', reached: ['submitted'] },
+  STAGES[2],
+  STAGES[3],
+];
+
+function stagesFor(app) {
+  const reviewed = ['submitted', 'changes_requested'].includes(app.status)
+    || (STAGES.slice(2).some((stage) => stage.reached.includes(app.status)) && !app.payment);
+  return reviewed ? REVIEW_STAGES : STAGES;
 }
 
-function Stages({ status }) {
-  const at = stageIndex(status);
+function Stages({ app }) {
+  const stages = stagesFor(app);
+  const at = stages.findIndex((stage) => stage.reached.includes(app.status));
   return (
     <ol className="stages">
-      {STAGES.map((stage, i) => {
+      {stages.map((stage, i) => {
         let state = 'Not started';
         if (i < at) state = 'Done';
         if (i === at) state = 'Now';
@@ -66,6 +79,11 @@ export default function ApplicationStatus() {
   const [app, setApp] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [search] = useSearchParams();
+  const payment = search.get('payment');
+  // Coming back from the payment page proves nothing, so this only changes
+  // the words. Only the server's confirmation moves the request on.
+  const waiting = app?.status === 'awaiting_payment' && payment === 'done';
 
   const load = useCallback(async () => {
     try {
@@ -76,12 +94,12 @@ export default function ApplicationStatus() {
     }
   }, [orgId, appId]);
 
-  // Live state: read again every 30 seconds while the page is open.
+  // Live state: read again while the page is open.
   useEffect(() => {
     load();
-    const timer = setInterval(load, REFRESH_MS);
+    const timer = setInterval(load, waiting ? WAITING_REFRESH_MS : REFRESH_MS);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, waiting]);
 
   async function withdraw() {
     setNotice('');
@@ -98,16 +116,30 @@ export default function ApplicationStatus() {
 
   const title = app.answers.event.name || 'New event site';
   const closed = ['withdrawn', 'declined'].includes(app.status);
+  const feeLink = setupPath(orgId, appId, stepById('fee'));
   return (
     <section aria-labelledby="status-title">
       <h1 id="status-title" tabIndex={-1}>{title}</h1>
-      <p className="lead">{STATUS_LABELS[app.status]}</p>
+      <p className="lead">{waiting ? 'Waiting for payment confirmation' : STATUS_LABELS[app.status]}</p>
       {app.address ? <p>Web address: <strong>{app.address}</strong></p> : null}
 
       <div aria-live="polite" className="live">
         {notice ? <p className="message success">{notice}</p> : null}
       </div>
       {error ? <p className="message error" role="alert">{error}</p> : null}
+
+      {waiting ? (
+        <aside className="note" role="note">
+          <p className="note-title">We are waiting for confirmation of your payment</p>
+          <p>This page updates on its own, and we email the Owners when it is confirmed. If nothing changes after a few minutes, <Link to={feeLink}>open the event fee step</Link>. You will not be charged twice.</p>
+        </aside>
+      ) : null}
+      {app.status === 'awaiting_payment' && payment === 'cancelled' ? (
+        <aside className="note" role="note">
+          <p className="note-title">You did not finish paying</p>
+          <p>We took no money. Your answers and your acceptance are saved, so you can pay when you are ready.</p>
+        </aside>
+      ) : null}
 
       {app.status === 'changes_requested' ? (
         <aside className="note" role="note">
@@ -124,7 +156,7 @@ export default function ApplicationStatus() {
 
       {closed ? (
         <p>{app.status === 'withdrawn' ? 'This request is withdrawn. We will not build this site.' : 'This request is closed.'}</p>
-      ) : <Stages status={app.status} />}
+      ) : <Stages app={app} />}
 
       {app.canEdit ? (
         <p>
@@ -133,7 +165,17 @@ export default function ApplicationStatus() {
           </Link>
         </p>
       ) : null}
-      {app.submittedAt ? <p className="muted">Sent on {formatDate(app.submittedAt)}. We email the Owners when the status changes.</p> : null}
+      {app.status === 'awaiting_payment' && !waiting && app.canPay ? (
+        <p><Link className="button primary" to={feeLink}>Pay the event fee</Link></p>
+      ) : null}
+      {app.status === 'awaiting_payment' && !app.canPay && app.myRole ? (
+        <p className="muted">Only an Owner can pay the event fee. Ask an Owner on your team to open this request.</p>
+      ) : null}
+      {app.payment ? <p className="muted">We received your event fee of {formatFee(app.payment)} on {formatDate(app.payment.paidAt)}.</p> : null}
+      {app.acceptance && app.status === 'awaiting_payment' ? (
+        <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. We email the Owners when the status changes.</p>
+      ) : null}
+      {app.submittedAt && app.status !== 'awaiting_payment' ? <p className="muted">Sent on {formatDate(app.submittedAt)}. We email the Owners when the status changes.</p> : null}
       {app.canWithdraw ? <div className="section"><Withdraw onWithdraw={withdraw} /></div> : null}
       <p className="section"><Link to={`/organizations/${orgId}`}>Back to your event sites</Link></p>
     </section>

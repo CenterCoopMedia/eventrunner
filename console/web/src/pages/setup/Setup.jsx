@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
 import {
-  ANSWER_STEPS, STEPS, errorsOfStep, setupPath, statusPath, stepByPath,
+  ANSWER_STEPS, STEPS, errorsOfStep, openStepIds, setupPath, statusPath, stepById, stepByPath,
 } from '../../setup/steps.js';
 import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
+import AgreementStep from './AgreementStep.jsx';
 import EmailStep from './EmailStep.jsx';
 import EventStep from './EventStep.jsx';
+import FeeStep from './FeeStep.jsx';
 import OrganizationStep from './OrganizationStep.jsx';
 import ReviewStep from './ReviewStep.jsx';
 import TeamStep from './TeamStep.jsx';
@@ -21,8 +23,8 @@ const STEP_VIEWS = {
   email: EmailStep,
 };
 
-/** The step list: where the reader is, and which steps are done. */
-function StepList({ step, progress, orgId, appId, onGo }) {
+/** The step list: where the reader is, which steps are done, and which are open now. */
+function StepList({ step, progress, open, orgId, appId, onGo }) {
   const done = STEPS.filter((s) => progress[s.id]).length;
   return (
     <nav aria-label="Setup steps" className="step-nav">
@@ -30,6 +32,17 @@ function StepList({ step, progress, orgId, appId, onGo }) {
       <ol className="steps" aria-describedby="step-progress">
         {STEPS.map((s, i) => {
           const current = s.id === step.id;
+          if (!open.includes(s.id)) {
+            return (
+              <li key={s.id}>
+                <span className="step-locked">
+                  <span className="step-number" aria-hidden="true">{progress[s.id] ? '✓' : i + 1}</span>
+                  <span>{s.title}</span>
+                  <span className="visually-hidden"> {progress[s.id] ? '(done)' : '(not open yet)'}</span>
+                </span>
+              </li>
+            );
+          }
           return (
             <li key={s.id} className={current ? 'current' : undefined}>
               <Link
@@ -65,7 +78,10 @@ function useApplication(orgId, appId) {
       .catch((err) => { if (live) setError(err.message); });
     return () => { live = false; };
   }, [orgId, appId]);
-  return { app, setApp, error };
+  const reload = useCallback(async () => {
+    setApp((await callApi('getApplication', { orgId, appId })).application);
+  }, [orgId, appId]);
+  return { app, setApp, error, reload };
 }
 
 /**
@@ -79,7 +95,7 @@ export default function Setup() {
   const navigate = useNavigate();
   const location = useLocation();
   const step = stepByPath(stepPath);
-  const { app, setApp, error } = useApplication(orgId, appId);
+  const { app, setApp, error, reload } = useApplication(orgId, appId);
   const [touched, setTouched] = useState(() => new Set());
   // Steps whose last save the server refused (saved: false), for example a
   // taken web address. The server keeps the older answer, so the review
@@ -114,9 +130,7 @@ export default function Setup() {
   }, [step, touch, setApp, queue]);
 
   const onOwnersNeeded = useCallback((ownersNeeded) => {
-    setApp((prev) => (prev.ownersNeeded === ownersNeeded ? prev : {
-      ...prev, ownersNeeded, progress: { ...prev.progress, team: ownersNeeded === 0 },
-    }));
+    setApp((prev) => (prev.ownersNeeded === ownersNeeded ? prev : { ...prev, ownersNeeded }));
   }, [setApp]);
 
   // With ?check=1 the first field with an error takes the focus, once for
@@ -140,11 +154,15 @@ export default function Setup() {
   if (!step) return <Navigate to={setupPath(orgId, appId, STEPS[0])} replace />;
   if (error) return <p className="message error" role="alert">{error}</p>;
   if (!app) return <p role="status">Loading your setup.</p>;
-  if (!app.canEdit) return <Navigate to={statusPath(orgId, appId)} replace />;
+  // A member waiting to pay still reads the agreement and the fee here.
+  const paying = app.status === 'awaiting_payment' && Boolean(app.myRole);
+  if (!app.canEdit && !paying) return <Navigate to={statusPath(orgId, appId)} replace />;
+  const open = openStepIds(app, refused);
+  if (!open.includes(step.id)) return <Navigate to={setupPath(orgId, appId, stepById(open.at(-1)))} replace />;
 
   const index = STEPS.indexOf(step);
-  const previous = STEPS[index - 1];
-  const next = STEPS[index + 1];
+  const previous = open.includes(STEPS[index - 1]?.id) ? STEPS[index - 1] : null;
+  const next = open.includes(STEPS[index + 1]?.id) ? STEPS[index + 1] : null;
   const View = STEP_VIEWS[step.id];
   const shownErrors = visibleErrors(stepErrors, touched, showAll);
 
@@ -153,6 +171,7 @@ export default function Setup() {
       <StepList
         step={step}
         progress={app.progress}
+        open={open}
         orgId={orgId}
         appId={appId}
         onGo={(e, target) => { e.preventDefault(); go(target); }}
@@ -188,6 +207,30 @@ export default function Setup() {
             appId={appId}
             flush={flush}
             onSubmitted={() => navigate(statusPath(orgId, appId))}
+          />
+        ) : null}
+        {step.id === 'agreement' ? (
+          <AgreementStep
+            app={app}
+            orgId={orgId}
+            appId={appId}
+            onRefresh={reload}
+            onAccepted={async (result) => {
+              await reload();
+              navigate(setupPath(orgId, appId, stepById('fee')), { state: { copyFailed: result.copySent === false } });
+            }}
+          />
+        ) : null}
+        {step.id === 'fee' ? (
+          <FeeStep
+            app={app}
+            orgId={orgId}
+            appId={appId}
+            copyFailed={Boolean(location.state?.copyFailed)}
+            onReopened={async () => {
+              await reload();
+              navigate(setupPath(orgId, appId, stepById('review')));
+            }}
           />
         ) : null}
         <p className="save-status" role="status" aria-live="polite">{saveStatusText(saveStatus, saveError)}</p>

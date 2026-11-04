@@ -29,7 +29,9 @@ export function fullAnswers() {
   };
 }
 
-const ALL_DONE = { organization: true, event: true, webAddress: true, team: true, tickets: true, email: true, review: true };
+const ALL_DONE = {
+  organization: true, event: true, webAddress: true, team: true, tickets: true, email: true, review: true, agreement: false, fee: false,
+};
 
 export function application(overrides = {}) {
   return {
@@ -46,10 +48,15 @@ export function application(overrides = {}) {
     errors: {},
     progress: ALL_DONE,
     ownersNeeded: 0,
+    signups: { open: true, fee: { amount: 12345, currency: 'usd' } },
+    acceptance: null,
+    payment: null,
     myRole: 'owner',
     operator: false,
     canEdit: true,
-    canSubmit: true,
+    canAccept: true,
+    canSubmit: false,
+    canPay: false,
     canWithdraw: true,
     ...overrides,
   };

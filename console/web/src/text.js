@@ -17,6 +17,16 @@ export function withArticle(role) {
   return `an ${ROLE_LABELS[role] || 'Editor'}`;
 }
 
+/**
+ * A fee for people. `amount` is in the currency's smallest unit, as the
+ * server stores it.
+ * @param {{ amount: number, currency: string }} fee
+ */
+export function formatFee({ amount, currency }) {
+  const format = new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.trim().toUpperCase() });
+  return format.format(amount / 10 ** format.resolvedOptions().maximumFractionDigits);
+}
+
 /** A date for people, for example "10 November 2026". */
 export function formatDate(iso) {
   const date = new Date(iso);

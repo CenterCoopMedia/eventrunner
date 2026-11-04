@@ -219,4 +219,47 @@ describe('ReviewApplication', () => {
     page();
     expect(await screen.findByRole('heading', { level: 1, name: 'This page is for the hosting team' })).toBeInTheDocument();
   });
+
+  describe('the agreement and the event fee', () => {
+    const ACCEPTANCE = { id: 'r1', version: 2, sha256: 'abc123', name: 'Ana Owner', email: 'ana@example.org', at: '2026-11-03T15:00:00.000Z' };
+    const PAYMENT = { sessionId: 'cs_1', paymentIntentId: 'pi_1', amount: 12345, currency: 'usd', paidAt: '2026-11-04T15:00:00.000Z' };
+
+    it('shows the acceptance and the payment as recorded', async () => {
+      serve(request({ status: 'approved', acceptance: ACCEPTANCE, payment: PAYMENT }));
+      page();
+      expect(await screen.findByRole('heading', { level: 2, name: 'Agreement and event fee' })).toBeInTheDocument();
+      expect(screen.getByText(/Ana Owner \(ana@example.org\)/)).toBeInTheDocument();
+      expect(screen.getByText('abc123')).toBeInTheDocument();
+      expect(screen.getByText(/\$123\.45/)).toBeInTheDocument();
+      expect(screen.getByText('cs_1')).toBeInTheDocument();
+      expect(screen.getByText('pi_1')).toBeInTheDocument();
+    });
+
+    it('says when the build did not start, and that the payment stands', async () => {
+      serve(request({ status: 'approved', payment: PAYMENT, buildStart: { state: 'failed', at: '2026-11-04T15:00:00.000Z' } }));
+      page();
+      const note = await screen.findByRole('note');
+      expect(note).toHaveTextContent('The build did not start');
+      expect(note).toHaveTextContent('The payment stands');
+    });
+
+    it('names the payment to refund when one did not approve the request', async () => {
+      serve(request({ status: 'withdrawn', feeProblem: { code: 'wrong-status', sessionId: 'cs_9', paymentIntentId: 'pi_9', at: '2026-11-04T15:00:00.000Z' } }));
+      page();
+      const note = await screen.findByRole('note');
+      expect(note).toHaveTextContent('A payment needs attention');
+      expect(note).toHaveTextContent('wrong-status');
+      expect(note).toHaveTextContent('cs_9');
+      expect(note).toHaveTextContent('pi_9');
+    });
+
+    it('a request waiting for payment can be declined or deleted, and not approved', async () => {
+      serve(request({ status: 'awaiting_payment', acceptance: ACCEPTANCE }));
+      page();
+      expect(await screen.findByRole('button', { name: 'Decline' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Delete as spam' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+      expect(screen.getByText(/The client can go back and change them until they pay/)).toBeInTheDocument();
+    });
+  });
 });

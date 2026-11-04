@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { callApi } from '../../api.js';
-import { ROLE_LABELS, formatDate } from '../../text.js';
-import { STATUS_LABELS, TICKET_LABELS } from '../../reviewText.js';
+import { ROLE_LABELS, formatDate, formatFee } from '../../text.js';
+import { STATUS_LABELS, TICKET_LABELS, formatDateTime } from '../../reviewText.js';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
 import ReviewActions from './ReviewActions.jsx';
 import ReviewAnswers from './ReviewAnswers.jsx';
@@ -45,6 +45,53 @@ function Team({ team }) {
           </ul>
         </>
       ) : null}
+    </>
+  );
+}
+
+/** What the hosting team must act on after a payment. */
+function PaymentNotes({ app }) {
+  return (
+    <>
+      {app.buildStart?.state === 'failed' ? (
+        <aside className="note" role="note">
+          <p className="note-title">The build did not start</p>
+          <p>The payment stands and the request stays approved. Read the function logs, then start the build.</p>
+        </aside>
+      ) : null}
+      {app.feeProblem ? (
+        <aside className="note" role="note">
+          <p className="note-title">A payment needs attention</p>
+          <p>A paid session did not approve this request. Reason: {app.feeProblem.code}. Session: <span className="break">{app.feeProblem.sessionId}</span>. Payment intent: <span className="break">{app.feeProblem.paymentIntentId || 'not given'}</span>. Compare it with the payment in Stripe, and refund it if it should not stand.</p>
+        </aside>
+      ) : null}
+    </>
+  );
+}
+
+/** The current acceptance and the payment, as the server recorded them. */
+function AgreementAndFee({ acceptance, payment }) {
+  if (!acceptance && !payment) return null;
+  return (
+    <>
+      <h2 id="agreement-fee-title">Agreement and event fee</h2>
+      <dl className="answers">
+        {acceptance ? (
+          <>
+            <div className="answer"><dt>Accepted by</dt><dd>{acceptance.name} ({acceptance.email}), {formatDateTime(acceptance.at)}</dd></div>
+            <div className="answer"><dt>Agreement version</dt><dd>{acceptance.version}</dd></div>
+            <div className="answer"><dt>SHA-256 of the text</dt><dd className="break">{acceptance.sha256}</dd></div>
+            <div className="answer"><dt>Acceptance record</dt><dd className="break">{acceptance.id}</dd></div>
+          </>
+        ) : null}
+        {payment ? (
+          <>
+            <div className="answer"><dt>Event fee paid</dt><dd>{formatFee(payment)}, {formatDateTime(payment.paidAt)}</dd></div>
+            <div className="answer"><dt>Checkout session</dt><dd className="break">{payment.sessionId}</dd></div>
+            <div className="answer"><dt>Payment intent</dt><dd className="break">{payment.paymentIntentId || 'Not given'}</dd></div>
+          </>
+        ) : null}
+      </dl>
     </>
   );
 }
@@ -108,6 +155,7 @@ export default function ReviewApplication() {
         {notice ? <p className="message success">{notice}</p> : null}
       </div>
       {error ? <p className="message error" role="alert">{error}</p> : null}
+      <PaymentNotes app={app} />
 
       <h2 id="decision-title">Decision</h2>
       {app.review?.note ? (
@@ -119,8 +167,14 @@ export default function ReviewApplication() {
       <ReviewActions key={app.status} status={app.status} defaults={data.approvalDefaults} onDecide={decide} />
 
       <h2 id="answers-title">Answers</h2>
-      <p className="muted">These are the answers the client sent. The client cannot change them during review.</p>
+      <p className="muted">
+        {app.status === 'awaiting_payment'
+          ? 'These are the answers the client accepted. The client can go back and change them until they pay.'
+          : 'These are the answers the client sent. The client cannot change them during review.'}
+      </p>
       <ReviewAnswers answers={app.answers} />
+
+      <AgreementAndFee acceptance={app.acceptance} payment={app.payment} />
 
       <h2 id="tickets-title">Ticket sales</h2>
       <dl className="answers">
