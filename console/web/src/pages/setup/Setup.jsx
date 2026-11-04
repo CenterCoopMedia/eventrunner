@@ -81,15 +81,25 @@ export default function Setup() {
   const step = stepByPath(stepPath);
   const { app, setApp, error } = useApplication(orgId, appId);
   const [touched, setTouched] = useState(() => new Set());
+  // Steps whose last save the server refused (saved: false), for example a
+  // taken web address. The server keeps the older answer, so the review
+  // holds the request until a new answer saves.
+  const [refused, setRefused] = useState(() => []);
   const showAll = search.get('check') === '1';
 
   const { queue, flush, status: saveStatus, error: saveError } = useAutosave({
     save: (value) => callApi('saveApplicationStep', { orgId, appId, step: value.step, answers: value.answers }),
-    onResult: (result) => setApp((prev) => {
-      const others = Object.fromEntries(Object.entries(prev.errors).filter(([path]) => !(path === result.step || path.startsWith(`${result.step}.`))));
-      const errors = { ...others, ...result.errors };
-      return { ...prev, errors, progress: { ...prev.progress, [result.step]: Object.keys(result.errors).length === 0 } };
-    }),
+    onResult: (result) => {
+      setRefused((prev) => {
+        const others = prev.filter((id) => id !== result.step);
+        return result.saved === false ? [...others, result.step] : others;
+      });
+      setApp((prev) => {
+        const others = Object.fromEntries(Object.entries(prev.errors).filter(([path]) => !(path === result.step || path.startsWith(`${result.step}.`))));
+        const errors = { ...others, ...result.errors };
+        return { ...prev, errors, progress: { ...prev.progress, [result.step]: Object.keys(result.errors).length === 0 } };
+      });
+    },
   });
 
   const touch = useCallback((path) => {
@@ -173,6 +183,7 @@ export default function Setup() {
             answers={app.answers}
             errors={app.errors}
             ownersNeeded={app.ownersNeeded}
+            refusedSteps={refused}
             orgId={orgId}
             appId={appId}
             flush={flush}

@@ -168,6 +168,34 @@ describe('Setup', () => {
     expect(await screen.findByText(/Not saved. This request is with the hosting team/)).toBeInTheDocument();
   });
 
+  it('holds the request while the server kept an older web address, until a name saves', async () => {
+    const TAKEN = 'Another event already uses this name. Choose another name.';
+    serveApi({
+      checkWebAddress: (body) => ({ name: body.name, address: `${body.name}.eventrunner.org`, available: body.name !== 'taken' }),
+      saveApplicationStep: (body) => (body.answers.name === 'taken'
+        ? { step: body.step, saved: false, answers: body.answers, errors: { 'webAddress.name': TAKEN } }
+        : { step: body.step, saved: true, answers: body.answers, errors: {} }),
+    });
+    renderSetup('web-address');
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken' } });
+    fireEvent.click(screen.getByRole('link', { name: /Review/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Review' });
+    expect(screen.getByRole('button', { name: 'Create my site' })).toBeDisabled();
+    const held = screen.getByText(/is not saved/);
+    expect(held).toHaveTextContent('Your web address is not saved. Fix it before you send the request.');
+    expect(within(held).getByRole('link', { name: 'Your web address' }))
+      .toHaveAttribute('href', '/organizations/o1/applications/a1/web-address?check=1');
+    fireEvent.click(screen.getByRole('button', { name: 'Create my site' }));
+    expect(callsTo('submitApplication')).toHaveLength(0);
+
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Setup steps' })).getByRole('link', { name: /Your web address/ }));
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'nclocal2' } });
+    fireEvent.click(screen.getByRole('link', { name: /Review/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Review' });
+    expect(screen.getByRole('button', { name: 'Create my site' })).toBeEnabled();
+    expect(screen.queryByText(/is not saved/)).not.toBeInTheDocument();
+  });
+
   it('stays on the step when a save fails, and Next tries the same answers again', async () => {
     let calls = 0;
     serveApi({

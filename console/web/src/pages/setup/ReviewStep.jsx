@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { callApi } from '../../api.js';
-import { STEPS, SITE_DOMAIN, TICKET_CHOICES, CONNECT_LATER, setupPath, stepOfField } from '../../setup/steps.js';
+import { STEPS, SITE_DOMAIN, TICKET_CHOICES, CONNECT_LATER, setupPath, stepById, stepOfField } from '../../setup/steps.js';
 import { senderPreview } from './EmailStep.jsx';
 
 function Row({ label, children }) {
@@ -99,16 +99,33 @@ function Problems({ fields, ownersNeeded, orgId, appId, titleRef }) {
   );
 }
 
+/** The steps whose last change the server did not save. Each one holds the request. */
+function NotSaved({ steps, orgId, appId }) {
+  if (steps.length === 0) return null;
+  return (
+    <div className="message error">
+      {steps.map((step) => (
+        <p key={step.id}>
+          <Link to={`${setupPath(orgId, appId, step)}?check=1`}>{step.title}</Link> is not saved. Fix it before you send the request.
+        </p>
+      ))}
+    </div>
+  );
+}
+
 /** Step 7: read the answers and send them with Create my site. */
-export default function ReviewStep({ app, answers, errors, ownersNeeded, orgId, appId, flush, onSubmitted }) {
+export default function ReviewStep({ app, answers, errors, ownersNeeded, refusedSteps = [], orgId, appId, flush, onSubmitted }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [fields, setFields] = useState(null);
   const titleRef = useRef(null);
   const shown = fields || errors;
   const ready = Object.keys(errors).length === 0 && ownersNeeded === 0;
+  const notSaved = refusedSteps.map(stepById).filter(Boolean);
+  const held = notSaved.length > 0;
 
   async function submit() {
+    if (held) return;
     setBusy(true);
     setError('');
     if (!(await flush())) {
@@ -131,12 +148,13 @@ export default function ReviewStep({ app, answers, errors, ownersNeeded, orgId, 
     <div className="stack">
       <p className="lead">Read your answers. When you select Create my site, we review your request. We email you at each step.</p>
       {error ? <p className="message error" role="alert">{error}</p> : null}
+      <NotSaved steps={notSaved} orgId={orgId} appId={appId} />
       <Problems fields={shown} ownersNeeded={ownersNeeded} orgId={orgId} appId={appId} titleRef={titleRef} />
       <Summary answers={answers} ownersNeeded={ownersNeeded} orgId={orgId} appId={appId} />
       {app.canSubmit ? (
         <div className="section">
-          <button type="button" className="button primary" onClick={submit} disabled={busy}>Create my site</button>
-          {!ready ? <p className="muted">Finish the answers above first. You can select the button to check them again.</p> : null}
+          <button type="button" className="button primary" onClick={submit} disabled={busy || held}>Create my site</button>
+          {!ready && !held ? <p className="muted">Finish the answers above first. You can select the button to check them again.</p> : null}
         </div>
       ) : (
         <p className="muted">Only an Owner can send the request. Ask an Owner on your team to select Create my site.</p>
