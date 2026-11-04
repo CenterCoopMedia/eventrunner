@@ -107,4 +107,4 @@ synthetic snapshot in `apps/web/src/generated/` and syncs the result into `docs/
   the link checker read the same value. A move to a custom domain or a repository rename changes
   that one value: the `PAGES_BASE_URL` repository variable for a deploy, or the committed default.
   The Pages workflow refuses to deploy when the address does not match the URL Pages reports. The
-  switch to `docs.eventrunner.org` is in `docs/DEPLOY_RUNBOOK.md` §10.
+  switch to `eventrunner.org` is in `docs/DEPLOY_RUNBOOK.md` §10.

@@ -989,8 +989,9 @@
           and costs a build a day whether or not anything changed (spec §8.4, §10 Q7). Nothing in this repo
           implements it: the refresh went straight from &quot;next deploy&quot; to this on-demand job.</p>
           <h2 id="10-project-site-on-github-pages">10. Project site on GitHub Pages<a class="heading-anchor" href="#10-project-site-on-github-pages" aria-label="Link to this section">#</a></h2>
-          <p>This section is not per client. It covers the project&#39;s own site: the landing page, the
-          documentation under <code>docs/docs/</code>, and the static demo under <code>docs/demo/</code>.
+          <p>This section is not per client. It covers the project&#39;s own site: the homepage, the support,
+          privacy and terms pages, the project status page, the documentation under <code>docs/docs/</code>, and the
+          static demo under <code>docs/demo/</code>.
           <code>.github/workflows/pages.yml</code> builds the site and deploys it on every push to <code>main</code>.</p>
           <p><strong>One value sets the address.</strong> <code>scripts/lib/pages-site.cjs</code> holds the public address of the site:
           an https origin and a path base. <code>scripts/build-pages.cjs</code>, <code>scripts/build-demo.cjs</code>, and
@@ -1003,11 +1004,11 @@
           </thead>
           <tbody>
           <tr><td><code>https://centercoopmedia.github.io/eventrunner/</code></td><td><code>/eventrunner/</code></td><td>the committed default</td></tr>
-          <tr><td><code>https://docs.eventrunner.org/</code></td><td><code>/</code></td><td>the <code>PAGES_BASE_URL</code> repository variable, after the switch below</td></tr>
+          <tr><td><code>https://eventrunner.org/</code></td><td><code>/</code></td><td>the <code>PAGES_BASE_URL</code> repository variable, after the switch below</td></tr>
           </tbody>
           </table>
           </div>
-          <p>The committed <code>docs/docs/</code> and the landing pages (<code>docs/index.html</code>, <code>docs/videos/index.html</code>) are
+          <p>The committed <code>docs/docs/</code> and the hand-written pages (<code>LANDING_PAGES</code> in <code>scripts/build-pages.cjs</code>) are
           built for the committed default. When the <code>PAGES_BASE_URL</code> repository variable is set, the
           workflow renders the pages again for that address before it builds the demo and checks the links.
           The workflow commits nothing.</p>
@@ -1018,18 +1019,23 @@
           domain root. While the site is served at the github.io project path, those links break. A site
           built for <code>/eventrunner/</code> breaks in the same way when it is served from the custom domain. Do the
           steps below in this order.</p>
-          <h3 id="101-switch-the-site-to-docseventrunnerorg">10.1 Switch the site to docs.eventrunner.org<a class="heading-anchor" href="#101-switch-the-site-to-docseventrunnerorg" aria-label="Link to this section">#</a></h3>
+          <h3 id="101-switch-the-site-to-eventrunnerorg">10.1 Switch the site to eventrunner.org<a class="heading-anchor" href="#101-switch-the-site-to-eventrunnerorg" aria-label="Link to this section">#</a></h3>
           <ol>
-          <li><strong>DNS.</strong> Add <code>CNAME docs → centercoopmedia.github.io</code> for <code>eventrunner.org</code>. On Cloudflare, set
-          the record to <strong>DNS only</strong> (grey cloud). If the record is proxied, GitHub cannot issue the
-          certificate. Wait until <code>dig +short docs.eventrunner.org CNAME</code> returns
-          <code>centercoopmedia.github.io.</code>.</li>
+          <li><strong>DNS.</strong> For <code>eventrunner.org</code>, add <code>A</code> records to <code>185.199.108.153</code>, <code>185.199.109.153</code>,
+          <code>185.199.110.153</code> and <code>185.199.111.153</code>, <code>AAAA</code> records to <code>2606:50c0:8000::153</code>,
+          <code>2606:50c0:8001::153</code>, <code>2606:50c0:8002::153</code> and <code>2606:50c0:8003::153</code>, and
+          <code>CNAME www → centercoopmedia.github.io</code>. On Cloudflare, set each record to <strong>DNS only</strong> (grey
+          cloud). If a record is proxied, GitHub cannot issue the certificate. Leave the <code>MX</code> and <code>TXT</code>
+          records alone: they carry the domain&#39;s email. Wait until <code>dig +short eventrunner.org A</code> returns
+          the four addresses.</li>
           <li><strong>Optional: verify the domain.</strong> In the organization settings, go to Pages → Verified domains
           and verify <code>eventrunner.org</code>. This prevents a domain takeover.</li>
-          <li><strong>Variable.</strong> Go to Settings → Secrets and variables → Actions → Variables. Add the repository
-          variable <code>PAGES_BASE_URL</code> with the value <code>https://docs.eventrunner.org/</code>. Until step 4, a Pages
+          <li><strong>Variables.</strong> Go to Settings → Secrets and variables → Actions → Variables. Add the repository
+          variables <code>PAGES_SUPPORT_NAME</code> and <code>PAGES_SUPPORT_EMAIL</code>, which fill in who clients reach on the
+          homepage and the support, privacy and terms pages, and <code>PAGES_BASE_URL</code> with the value
+          <code>https://eventrunner.org/</code>. Until step 4, a Pages
           run fails at the address check and deploys nothing. The live site does not change.</li>
-          <li><strong>Custom domain.</strong> Go to Settings → Pages → Custom domain. Enter <code>docs.eventrunner.org</code> and
+          <li><strong>Custom domain.</strong> Go to Settings → Pages → Custom domain. Enter <code>eventrunner.org</code> and
           save. With a workflow-deployed site, GitHub ignores a <code>CNAME</code> file in the artifact, so this
           setting is the only place for the domain. From now until step 5 ends, the live site has broken
           links, so do step 5 immediately. The DNS check can finish while step 5 runs.</li>
@@ -1039,17 +1045,20 @@
           Settings → Pages.</li>
           </ol>
           <p>To check the result:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">curl -sI https://docs.eventrunner.org/ | head -1           # 200
-          curl -sI https://docs.eventrunner.org/demo/ | head -1      # 200
-          curl -sI https://docs.eventrunner.org/docs/ | head -1      # 200
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">curl -sI https://eventrunner.org/ | head -1           # 200
+          curl -sIL https://eventrunner.org/support | grep &#39;^HTTP&#39; | tail -1            # 200
+          curl -sIL https://eventrunner.org/privacy | grep &#39;^HTTP&#39; | tail -1            # 200
+          curl -sIL https://eventrunner.org/terms-of-service | grep &#39;^HTTP&#39; | tail -1   # 200
+          curl -sI https://eventrunner.org/demo/ | head -1      # 200
+          curl -sI https://eventrunner.org/docs/ | head -1      # 200
           curl -sI https://centercoopmedia.github.io/eventrunner/ | grep -i &#39;^location&#39;   # the new host
-          curl -s https://docs.eventrunner.org/ | grep canonical     # https://docs.eventrunner.org/
+          curl -s https://eventrunner.org/ | grep canonical     # https://eventrunner.org/
           </code></pre>
           <p>Open a documentation page and the demo, and make sure that the styles, fonts, favicon, and links
           load from the new host.</p>
           <p><strong>Later, in a pull request.</strong> When the domain works, make the custom domain the committed default:</p>
           <ol>
-          <li>In <code>scripts/lib/pages-site.cjs</code>, set <code>DEFAULT_PAGES_BASE_URL = &#39;https://docs.eventrunner.org/&#39;</code>.
+          <li>In <code>scripts/lib/pages-site.cjs</code>, set <code>DEFAULT_PAGES_BASE_URL = &#39;https://eventrunner.org/&#39;</code>.
           This is the one line to change.</li>
           <li>Run <code>node scripts/build-pages.cjs</code>. It renders <code>docs/docs/</code> again and moves the landing pages to
           the new address. Commit the output.</li>
@@ -1063,7 +1072,7 @@
           the <code>PAGES_BASE_URL</code> variable, or set it to <code>https://centercoopmedia.github.io/eventrunner/</code>. Run
           the Pages workflow again.</p>
           <p>To see what an address changes, without writing a file:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">PAGES_BASE_URL=https://docs.eventrunner.org/ node scripts/build-pages.cjs --check   # shows what would change
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">PAGES_BASE_URL=https://eventrunner.org/ node scripts/build-pages.cjs --check   # shows what would change
           node scripts/lib/pages-site.cjs                                                    # prints the address in use
           </code></pre>
           <h2 id="11-client-console">11. Client console<a class="heading-anchor" href="#11-client-console" aria-label="Link to this section">#</a></h2>

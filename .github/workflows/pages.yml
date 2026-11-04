@@ -6,7 +6,7 @@ name: Pages
 #
 # The site's public address is one value (scripts/lib/pages-site.cjs). The
 # repository variable PAGES_BASE_URL overrides it for the deploy, for example
-# https://docs.eventrunner.org/ for the custom domain. When the variable is
+# https://eventrunner.org/ for the custom domain. When the variable is
 # unset or empty, the committed default (the github.io project path) is used.
 # The deploy stops when the address does not match where Pages serves the
 # site, so links never point at a path the site is not served from. The order
@@ -60,7 +60,10 @@ jobs:
           PAGES_BASE_URL: ""
         run: node scripts/build-pages.cjs --check
       - name: Render the documentation pages for the site address
-        # Does not change a file when PAGES_BASE_URL is unset.
+        # Does not change a file when these variables are unset.
+        env:
+          PAGES_SUPPORT_NAME: ${{ vars.PAGES_SUPPORT_NAME }}
+          PAGES_SUPPORT_EMAIL: ${{ vars.PAGES_SUPPORT_EMAIL }}
         run: node scripts/build-pages.cjs
       - name: Read the site address
         id: address

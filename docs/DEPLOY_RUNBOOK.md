@@ -993,8 +993,9 @@ implements it: the refresh went straight from "next deploy" to this on-demand jo
 
 ## 10. Project site on GitHub Pages
 
-This section is not per client. It covers the project's own site: the landing page, the
-documentation under `docs/docs/`, and the static demo under `docs/demo/`.
+This section is not per client. It covers the project's own site: the homepage, the support,
+privacy and terms pages, the project status page, the documentation under `docs/docs/`, and the
+static demo under `docs/demo/`.
 `.github/workflows/pages.yml` builds the site and deploys it on every push to `main`.
 
 **One value sets the address.** `scripts/lib/pages-site.cjs` holds the public address of the site:
@@ -1005,9 +1006,9 @@ link, the demo's Vite base, and how the link checker maps a path to a file under
 | Address | Path base | Where it comes from |
 |---|---|---|
 | `https://centercoopmedia.github.io/eventrunner/` | `/eventrunner/` | the committed default |
-| `https://docs.eventrunner.org/` | `/` | the `PAGES_BASE_URL` repository variable, after the switch below |
+| `https://eventrunner.org/` | `/` | the `PAGES_BASE_URL` repository variable, after the switch below |
 
-The committed `docs/docs/` and the landing pages (`docs/index.html`, `docs/videos/index.html`) are
+The committed `docs/docs/` and the hand-written pages (`LANDING_PAGES` in `scripts/build-pages.cjs`) are
 built for the committed default. When the `PAGES_BASE_URL` repository variable is set, the
 workflow renders the pages again for that address before it builds the demo and checks the links.
 The workflow commits nothing.
@@ -1021,18 +1022,23 @@ domain root. While the site is served at the github.io project path, those links
 built for `/eventrunner/` breaks in the same way when it is served from the custom domain. Do the
 steps below in this order.
 
-### 10.1 Switch the site to docs.eventrunner.org
+### 10.1 Switch the site to eventrunner.org
 
-1. **DNS.** Add `CNAME docs → centercoopmedia.github.io` for `eventrunner.org`. On Cloudflare, set
-   the record to **DNS only** (grey cloud). If the record is proxied, GitHub cannot issue the
-   certificate. Wait until `dig +short docs.eventrunner.org CNAME` returns
-   `centercoopmedia.github.io.`.
+1. **DNS.** For `eventrunner.org`, add `A` records to `185.199.108.153`, `185.199.109.153`,
+   `185.199.110.153` and `185.199.111.153`, `AAAA` records to `2606:50c0:8000::153`,
+   `2606:50c0:8001::153`, `2606:50c0:8002::153` and `2606:50c0:8003::153`, and
+   `CNAME www → centercoopmedia.github.io`. On Cloudflare, set each record to **DNS only** (grey
+   cloud). If a record is proxied, GitHub cannot issue the certificate. Leave the `MX` and `TXT`
+   records alone: they carry the domain's email. Wait until `dig +short eventrunner.org A` returns
+   the four addresses.
 2. **Optional: verify the domain.** In the organization settings, go to Pages → Verified domains
    and verify `eventrunner.org`. This prevents a domain takeover.
-3. **Variable.** Go to Settings → Secrets and variables → Actions → Variables. Add the repository
-   variable `PAGES_BASE_URL` with the value `https://docs.eventrunner.org/`. Until step 4, a Pages
+3. **Variables.** Go to Settings → Secrets and variables → Actions → Variables. Add the repository
+   variables `PAGES_SUPPORT_NAME` and `PAGES_SUPPORT_EMAIL`, which fill in who clients reach on the
+   homepage and the support, privacy and terms pages, and `PAGES_BASE_URL` with the value
+   `https://eventrunner.org/`. Until step 4, a Pages
    run fails at the address check and deploys nothing. The live site does not change.
-4. **Custom domain.** Go to Settings → Pages → Custom domain. Enter `docs.eventrunner.org` and
+4. **Custom domain.** Go to Settings → Pages → Custom domain. Enter `eventrunner.org` and
    save. With a workflow-deployed site, GitHub ignores a `CNAME` file in the artifact, so this
    setting is the only place for the domain. From now until step 5 ends, the live site has broken
    links, so do step 5 immediately. The DNS check can finish while step 5 runs.
@@ -1044,11 +1050,14 @@ steps below in this order.
 To check the result:
 
 ```sh
-curl -sI https://docs.eventrunner.org/ | head -1           # 200
-curl -sI https://docs.eventrunner.org/demo/ | head -1      # 200
-curl -sI https://docs.eventrunner.org/docs/ | head -1      # 200
+curl -sI https://eventrunner.org/ | head -1           # 200
+curl -sIL https://eventrunner.org/support | grep '^HTTP' | tail -1            # 200
+curl -sIL https://eventrunner.org/privacy | grep '^HTTP' | tail -1            # 200
+curl -sIL https://eventrunner.org/terms-of-service | grep '^HTTP' | tail -1   # 200
+curl -sI https://eventrunner.org/demo/ | head -1      # 200
+curl -sI https://eventrunner.org/docs/ | head -1      # 200
 curl -sI https://centercoopmedia.github.io/eventrunner/ | grep -i '^location'   # the new host
-curl -s https://docs.eventrunner.org/ | grep canonical     # https://docs.eventrunner.org/
+curl -s https://eventrunner.org/ | grep canonical     # https://eventrunner.org/
 ```
 
 Open a documentation page and the demo, and make sure that the styles, fonts, favicon, and links
@@ -1056,7 +1065,7 @@ load from the new host.
 
 **Later, in a pull request.** When the domain works, make the custom domain the committed default:
 
-1. In `scripts/lib/pages-site.cjs`, set `DEFAULT_PAGES_BASE_URL = 'https://docs.eventrunner.org/'`.
+1. In `scripts/lib/pages-site.cjs`, set `DEFAULT_PAGES_BASE_URL = 'https://eventrunner.org/'`.
    This is the one line to change.
 2. Run `node scripts/build-pages.cjs`. It renders `docs/docs/` again and moves the landing pages to
    the new address. Commit the output.
@@ -1073,7 +1082,7 @@ the Pages workflow again.
 To see what an address changes, without writing a file:
 
 ```sh
-PAGES_BASE_URL=https://docs.eventrunner.org/ node scripts/build-pages.cjs --check   # shows what would change
+PAGES_BASE_URL=https://eventrunner.org/ node scripts/build-pages.cjs --check   # shows what would change
 node scripts/lib/pages-site.cjs                                                    # prints the address in use
 ```
 

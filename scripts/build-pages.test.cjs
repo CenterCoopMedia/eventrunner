@@ -27,6 +27,8 @@ const {
   landingSiteUrl,
   linkResolver,
   rebaseLandingPage,
+  supportContact,
+  withSupportContact,
   themeColorProblems,
   themeColorTags,
   internals,
@@ -168,11 +170,11 @@ test('no link keeps a stale /run-of-show/ path', () => {
   }
 });
 
-test('the landing page links into the documentation site', () => {
-  const landing = fs.readFileSync(path.join(ROOT, 'docs', 'index.html'), 'utf8');
-  assert.match(landing, /href="\.\/docs\/"/);
+test('the project page links into the documentation site', () => {
+  const landing = fs.readFileSync(path.join(ROOT, 'docs', 'project', 'index.html'), 'utf8');
+  assert.match(landing, /href="\.\.\/docs\/"/);
   for (const route of ['admin-guide/', 'contributing/', 'roadmap/', 'security/']) {
-    assert.ok(landing.includes(`./docs/${route}`), `the landing page should link to ${route}`);
+    assert.ok(landing.includes(`../docs/${route}`), `the project page should link to ${route}`);
   }
   assert.ok(
     !/blob\/main\/(docs\/ADMIN_GUIDE|CONTRIBUTING|SECURITY|docs\/ROADMAP)\.md/.test(landing),
@@ -184,7 +186,7 @@ test('the landing page links into the documentation site', () => {
 
 test('demo entry points distinguish the historical preview and hosted admin/client demo', () => {
   const entries = [
-    ['landing', fs.readFileSync(path.join(ROOT, 'docs/index.html'), 'utf8')],
+    ['project page', fs.readFileSync(path.join(ROOT, 'docs/project/index.html'), 'utf8')],
     ['README', fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8')],
     ['FAQ', fs.readFileSync(path.join(ROOT, 'docs/handbook/faq.md'), 'utf8')],
     ['generated overview', site.files.get('overview/index.html')],
@@ -210,9 +212,9 @@ test('demo entry points distinguish the historical preview and hosted admin/clie
 
 test('landing and README link to the same canonical static preview and specimen', () => {
   const origin = 'https://centercoopmedia.github.io/eventrunner/';
-  const landing = fs.readFileSync(path.join(ROOT, 'docs/index.html'), 'utf8');
+  const landing = fs.readFileSync(path.join(ROOT, 'docs/project/index.html'), 'utf8');
   const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
-  const landingLinks = [...landing.matchAll(/href="([^"]+)"/g)].map((match) => new URL(match[1], origin).href);
+  const landingLinks = [...landing.matchAll(/href="([^"]+)"/g)].map((match) => new URL(match[1], `${origin}project/`).href);
   const readmeLinks = [...readme.matchAll(/\]\((https:\/\/[^)]+)\)/g)].map((match) => match[1]);
   for (const href of [`${origin}demo/`, `${origin}demo/#/specimen`, 'https://eventrunner-demo.web.app/', 'https://eventrunner-demo.web.app/admin']) {
     assert.ok(landingLinks.includes(href), `landing is missing ${href}`);
@@ -995,8 +997,25 @@ test('the landing pages move to the configured address and nothing else changes'
   assert.deepEqual(compareLandingPages(site.landingPages, path.join(ROOT, 'docs')), []);
   assert.deepEqual(
     compareLandingPages(custom.landingPages, path.join(ROOT, 'docs')),
-    ['index.html', 'videos/index.html'],
+    [...internals.LANDING_PAGES],
   );
+});
+
+test('the support name and address come from settings, and are refused when incomplete', () => {
+  const page = '<span data-support-name>Team</span> <a data-support-email href="mailto:a@b.co">a@b.co</a>';
+  assert.deepEqual(supportContact({}), { contact: null, errors: [] });
+  assert.equal(supportContact({ PAGES_SUPPORT_NAME: 'A Person' }).errors.length, 1);
+  assert.equal(supportContact({ PAGES_SUPPORT_NAME: 'A Person', PAGES_SUPPORT_EMAIL: 'not an address' }).errors.length, 1);
+  const { contact } = supportContact({ PAGES_SUPPORT_NAME: 'A & B', PAGES_SUPPORT_EMAIL: 'help@example.org' });
+  assert.equal(
+    withSupportContact(page, contact),
+    '<span data-support-name>A &amp; B</span> <a data-support-email href="mailto:help@example.org">help@example.org</a>',
+  );
+  assert.equal(withSupportContact(page, null), page);
+  for (const name of ['index.html', 'support/index.html', 'privacy/index.html', 'terms-of-service/index.html']) {
+    const text = fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8');
+    assert.match(text, /data-support-email/, `${name} should take the support address from settings`);
+  }
 });
 
 test('a landing page without a canonical address is an error', () => {

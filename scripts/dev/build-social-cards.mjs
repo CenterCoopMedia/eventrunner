@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Renders the social cards that pages link from their meta tags:
 //
-//   docs/social-preview.png               the product landing page
+//   docs/social-preview.png               the homepage
 //   docs/og-default.png                   any documentation page
 //   console/web/public/og-console.png     the client console (ADR 0007 §1)
 //
@@ -65,10 +65,10 @@ const MARK = `<svg viewBox="0 0 24 24" aria-hidden="true">
  * The console card carries the accent: the top rule, the folio and a tile
  * behind the mark, the same tile as console/web/public/favicon.svg.
  *
- * @param {{ line: string, title: string, blurb: string, accent?: boolean }} card
+ * @param {{ line: string, title: string, blurb: string, foot?: string, accent?: boolean }} card
  * @returns {string} a complete document
  */
-function page({ line, title, blurb, accent = false }) {
+function page({ line, title, blurb, foot = 'An initiative of the Center for Cooperative Media at Montclair State University', accent = false }) {
   const { surface, ink, inkMuted, rule, accent: accentRgb } = palette();
   const lead = accent ? accentRgb : ink;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
@@ -107,17 +107,18 @@ p { max-width: 22em; margin-block-start: 32px; font-size: 30px; line-height: 1.4
   <div class="lockup">${accent ? `<div class="tile">${MARK}</div>` : MARK}<h1>${title}</h1></div>
   <p>${blurb}</p>
 </div>
-<div class="foot">An initiative of the Center for Cooperative Media at Montclair State University</div>
+<div class="foot">${foot}</div>
 </body></html>`;
 }
 
 const CARDS = [
   {
     file: 'docs/social-preview.png',
-    line: 'Event CMS',
+    line: 'Conference websites',
     title: 'Event Runner',
-    blurb: 'A white-label event CMS. One Firebase project per event. Your staff run the site '
-      + 'from the admin panel, without a developer in the room.',
+    blurb: 'Conference websites your team can run, with direct help from the person who '
+      + 'runs the service.',
+    foot: 'eventrunner.org',
   },
   {
     file: 'docs/og-default.png',

@@ -14,7 +14,7 @@
  * The committed default is the project path on github.io. A deploy can serve
  * the site from another address without a code change: set PAGES_BASE_URL
  * (in the Pages workflow, the repository variable of the same name). For the
- * custom domain that value is `https://docs.eventrunner.org/`, which serves
+ * custom domain that value is `https://eventrunner.org/`, which serves
  * from `/`. docs/DEPLOY_RUNBOOK.md §10 gives the order of the switch; setting
  * it before the domain is connected breaks every link on the live site.
  *
@@ -28,7 +28,7 @@
 /** The project's own GitHub Pages address. GitHub redirects it to a custom domain once one is set. */
 const GITHUB_PAGES_URL = 'https://centercoopmedia.github.io/eventrunner/';
 
-/** The address the committed site is built for. The custom domain is `https://docs.eventrunner.org/`. */
+/** The address the committed site is built for. The custom domain is `https://eventrunner.org/`. */
 const DEFAULT_PAGES_BASE_URL = GITHUB_PAGES_URL;
 
 /**
