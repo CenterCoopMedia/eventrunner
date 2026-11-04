@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import EditorDisclosure from './EditorDisclosure.jsx';
@@ -23,5 +24,24 @@ describe('editor disclosure', () => {
     rerender(<EditorDisclosure title="Hero" reveal>{children}</EditorDisclosure>);
     expect(screen.getByRole('button', { name: 'Hero' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByLabelText('Title')).toBeVisible();
+  });
+  it('opens in the same commit that reveals it, with no frame where the error shows and the section is shut', () => {
+    const seen = [];
+    function Probe({ reveal }) {
+      const ref = useRef(null);
+      useLayoutEffect(() => {
+        seen.push({ reveal, open: ref.current.closest('.admin-editor-disclosure').dataset.open });
+      });
+      return <span ref={ref} />;
+    }
+    const { rerender } = render(<EditorDisclosure title="Hero"><Probe reveal={false} /></EditorDisclosure>);
+    rerender(<EditorDisclosure title="Hero" reveal><Probe reveal /></EditorDisclosure>);
+    expect(seen.find((commit) => commit.reveal)).toEqual({ reveal: true, open: 'true' });
+  });
+  it('can still be closed by hand while the error stands', () => {
+    render(<EditorDisclosure title="Hero" reveal><span>Body</span></EditorDisclosure>);
+    const button = screen.getByRole('button', { name: 'Hero' });
+    fireEvent.click(button);
+    expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 });
