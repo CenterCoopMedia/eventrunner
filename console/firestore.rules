@@ -70,7 +70,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    match /console_config/{docId} {
+    // Includes console_config/agreement/versions/{version}.
+    match /console_config/{document=**} {
+      allow read, write: if false;
+    }
+
+    // The signed record of each acceptance (ADR 0007, amendment 2026-11-04).
+    match /agreement_acceptances/{id} {
+      allow read, write: if false;
+    }
+
+    // One record for each paid session the server has handled.
+    match /console_fee_events/{sessionId} {
       allow read, write: if false;
     }
 

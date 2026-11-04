@@ -50,6 +50,10 @@ beforeEach(async () => {
     await setDoc(doc(db, 'site_names/nclocal'), { appId: 'a1', orgId: 'o1' });
     await setDoc(doc(db, 'console_config/settings'), { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' });
     await setDoc(doc(db, 'console_audit/e1'), { action: 'delete-spam', appId: 'a9', by: 'ops' });
+    await setDoc(doc(db, 'console_config/agreement'), { version: 1, title: 'Test agreement', body: 'Test text.', sha256: 'h' });
+    await setDoc(doc(db, 'console_config/agreement/versions/1'), { version: 1, title: 'Test agreement', body: 'Test text.', sha256: 'h' });
+    await setDoc(doc(db, 'agreement_acceptances/r1'), { version: 1, sha256: 'h', typedName: 'Ana Owner', email: 'ana@example.org', uid: 'ana', orgId: 'o1', appId: 'a1' });
+    await setDoc(doc(db, 'console_fee_events/cs_1'), { sessionId: 'cs_1', appId: 'a1', outcome: 'approved' });
   });
 });
 
@@ -220,5 +224,41 @@ describe('operator review (P7)', () => {
       await assertFails(deleteDoc(doc(db, 'console_audit/e1')));
       await assertFails(setDoc(doc(db, 'console_config/settings'), { gcpFolder: 'folders/1', billingAccount: 'x', region: 'x' }));
     }
+  });
+});
+
+describe('the agreement and the event fee', () => {
+  const PATHS = [
+    'console_config/agreement',
+    'console_config/agreement/versions/1',
+    'agreement_acceptances/r1',
+    'console_fee_events/cs_1',
+  ];
+
+  it('nobody reads the agreement, an acceptance record or a fee event from the browser, operators included', async () => {
+    for (const db of [ana(), ben(), stranger(), operator()]) {
+      for (const path of PATHS) await assertFails(getDoc(doc(db, path)));
+      await assertFails(getDocs(collection(db, 'agreement_acceptances')));
+      await assertFails(getDocs(collection(db, 'console_fee_events')));
+    }
+  });
+
+  it('nobody writes, changes or deletes them from the browser, operators included', async () => {
+    for (const db of [ana(), stranger(), operator()]) {
+      for (const path of PATHS) {
+        await assertFails(setDoc(doc(db, path), { version: 9 }));
+        await assertFails(updateDoc(doc(db, path), { version: 9 }));
+        await assertFails(deleteDoc(doc(db, path)));
+      }
+      await assertFails(setDoc(doc(db, 'agreement_acceptances/forged'), { version: 1, typedName: 'Forged', uid: 'ana' }));
+      await assertFails(setDoc(doc(db, 'console_config/agreement/versions/2'), { version: 2, body: 'Forged.' }));
+      await assertFails(setDoc(doc(db, 'console_fee_events/cs_forged'), { outcome: 'approved' }));
+    }
+  });
+
+  it('nobody moves a request to paid from the browser', async () => {
+    await assertFails(updateDoc(doc(ana(), 'applications/a1'), { status: 'approved' }));
+    await assertFails(updateDoc(doc(ana(), 'applications/a1'), { payment: { amount: 0 } }));
+    await assertFails(updateDoc(doc(operator(), 'applications/a1'), { agreementAcceptance: null }));
   });
 });
