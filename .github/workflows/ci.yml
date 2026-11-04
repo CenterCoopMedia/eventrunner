@@ -224,10 +224,15 @@ jobs:
         run: npm test
 
   unit-web:
-    name: Web unit tests
+    name: Web unit tests (shard ${{ matrix.shard }} of 2)
     needs: changes
     if: needs.changes.outputs.unitWeb == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
+    # About 4,000 tests; Vitest splits the files across two runners.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -239,7 +244,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run web unit tests
-        run: npm run test:web
+        run: npm run test -w apps/web -- --shard=${{ matrix.shard }}/2
 
   build:
     name: Web build
@@ -352,14 +357,22 @@ jobs:
         run: npm run test:rules
 
   e2e:
-    name: E2E on emulators
+    name: E2E on emulators (shard ${{ matrix.shard }} of 3)
     needs: changes
     if: needs.changes.outputs.e2e == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
+    # The suite was the long pole (about 13 minutes in one job). Playwright
+    # splits the spec files across three runners, each with its own emulator
+    # suite. All three must pass: the gate reads the matrix's one result.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       # Install the helper from the pinned Playwright browser below. Chromium
       # can use it while Ubuntu keeps its user-namespace restrictions enabled.
       CHROME_DEVEL_SANDBOX: /opt/eventrunner-chromium-sandbox
+      PLAYWRIGHT_SHARD: ${{ matrix.shard }}/3
     # Credential-free (spec §8.1, issue #38): Playwright drives the real app
     # against the full emulator suite (auth, firestore, storage, functions)
     # with the console email provider and manual ticketing — no secrets, no
@@ -426,7 +439,8 @@ jobs:
         run: bash scripts/dev/run-e2e.sh
       - name: Build the public demo for visual evidence
         id: demo_builds
-        if: ${{ !cancelled() && steps.e2e_journeys.outcome != 'skipped' }}
+        # One shard builds the demo evidence; the other two only run specs.
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.e2e_journeys.outcome != 'skipped' }}
         timeout-minutes: 15
         env:
           DEMO_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -441,7 +455,7 @@ jobs:
           fi
       - name: Capture public demo visual evidence
         id: demo_visuals
-        if: ${{ !cancelled() && steps.demo_builds.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.demo_builds.outcome == 'success' }}
         timeout-minutes: 15
         env:
           DEMO_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -460,7 +474,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: admin-visual-evidence
+          name: admin-visual-evidence-${{ matrix.shard }}
           path: test-results/admin-visual-evidence/*.png
           if-no-files-found: ignore
           retention-days: 7
@@ -468,7 +482,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           # e2e/.tmp carries the captured-mail file every OTP/invite journey
           # reads plus the full emulator log, which is what a mail-related
           # failure actually needs to be diagnosed from the artifact alone.

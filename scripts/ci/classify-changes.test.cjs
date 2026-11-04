@@ -189,3 +189,37 @@ test('unknown paths fail open to the full matrix', () => {
   assert.equal(result.mode, 'full');
   assert.deepEqual(selected(result), JOB_NAMES);
 });
+
+test('a rules test file selects the rules suite and lint, not the full matrix', () => {
+  const result = classifyPaths(['tests/firestore.rules.test.js']);
+  assert.equal(result.mode, 'rules');
+  assert.deepEqual(selected(result), ['lint', 'rules']);
+  // Anything else under tests/ is unknown and still fails open.
+  assert.equal(classifyPaths(['tests/helpers/new.js']).mode, 'full');
+});
+
+test('the two longest suites run in shards, and each shard is told its slice', () => {
+  const workflow = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'ci.yml'), 'utf8');
+  const job = (name, next) => workflow.slice(workflow.indexOf(`\n  ${name}:`), workflow.indexOf(`\n  ${next}:`));
+
+  const e2e = job('e2e', 'gate');
+  assert.match(e2e, /strategy:\s+fail-fast: false\s+matrix:\s+shard: \[1, 2, 3\]/);
+  assert.match(e2e, /PLAYWRIGHT_SHARD: \$\{\{ matrix\.shard \}\}\/3/);
+  // The demo evidence is one job's work, not three.
+  for (const step of ['demo_builds', 'demo_visuals']) {
+    const at = e2e.indexOf(`id: ${step}`);
+    assert.match(e2e.slice(at, at + 200), /matrix\.shard == 1/, step);
+  }
+  // Artifact names must differ per shard, or the uploads collide.
+  assert.match(e2e, /name: admin-visual-evidence-\$\{\{ matrix\.shard \}\}/);
+  assert.match(e2e, /name: playwright-report-\$\{\{ matrix\.shard \}\}/);
+
+  const web = job('unit-web', 'build');
+  assert.match(web, /strategy:\s+fail-fast: false\s+matrix:\s+shard: \[1, 2\]/);
+  assert.match(web, /npm run test -w apps\/web -- --shard=\$\{\{ matrix\.shard \}\}\/2/);
+});
+
+test('the browser suite runner passes a shard to Playwright only when one is set', () => {
+  const runner = fs.readFileSync(path.resolve(__dirname, '..', 'dev', 'run-e2e.sh'), 'utf8');
+  assert.match(runner, /"npx playwright test\$\{PLAYWRIGHT_SHARD:\+ --shard=\$PLAYWRIGHT_SHARD\}"/);
+});
