@@ -34,6 +34,7 @@ function buildHandlers() {
   const { ticketingSecretNames } = require('./providers/index.cjs');
   const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
   const checkout = require('./stripeCheckout.cjs');
+  const promoPreview = require('./promoPreview.cjs');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
   const secrets = ticketingSecretNames(process.env).map(defineSecret);
   const wrap = (factory, methods) => onRequest({ region, secrets }, async (req, res) => {
@@ -44,6 +45,7 @@ function buildHandlers() {
     ticketingCatalog: wrap(checkout.createTicketingCatalogHandler, ['GET']),
     ticketingCheckout: wrap(checkout.createTicketingCheckoutHandler, ['POST']),
     ticketingOrderStatus: wrap(checkout.createTicketingOrderStatusHandler, ['GET', 'POST']),
+    ticketingPromoPreview: wrap(promoPreview.createTicketingPromoPreviewHandler, ['POST']),
   };
 }
 

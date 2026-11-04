@@ -202,8 +202,11 @@ Postmark announcement stream before a preview or an approval.
 `ticketingCatalog` is a public, redacted GET. `ticketingCheckout` accepts POST from
 a verified purchaser and computes prices/capacity on the server.
 `ticketingOrderStatus` accepts GET/POST for the owning verified purchaser only.
-Each is a domain factory in `src/ticketing/stripeCheckout.cjs`, with deploy wiring
-in `commerceHttp.cjs`. The SDK is pinned to Stripe 23.0.0; changing it requires
+`ticketingPromoPreview` accepts POST from a verified purchaser and prices a cart with
+a promo code, with no order and no use written; it allows 20 checks per account in
+15 minutes. Each is a domain factory in `src/ticketing/stripeCheckout.cjs` (the
+preview in `promoPreview.cjs`), with deploy wiring in `commerceHttp.cjs`. Promo code
+records and the admin actions are in `promoCodes.cjs`. The SDK is pinned to Stripe 23.0.0; changing it requires
 checking the Checkout request and response contract again.
 
 Stripe uses the existing webhook and sync queue. Exact raw bytes, account/mode/event

@@ -145,6 +145,19 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Promo codes for Stripe ticket sales (ADR 0004 amendment 2026-11-04, ADR 0008
+          §6). Staff and operators save codes on the commerce admin endpoint
+          (<code>promoCodes</code>, <code>savePromoCode</code>, <code>deletePromoCode</code>): percent or amount off each
+          ticket, the ticket types, a use limit and a per-order limit in tickets, start
+          and end times, active or not. The server applies a code inside the reservation
+          transaction and sends the lower unit price to Stripe; a use is held with the
+          reservation and given back when an unpaid hold expires, so racing checkouts
+          cannot pass a limit. <code>ticketingPromoPreview</code> prices a cart with a code for the
+          review step (20 checks per account in 15 minutes). Orders keep the code in
+          <code>promo</code>; the orders CSV gains <strong>Promo code</strong> and <strong>Promo discount</strong>, and the
+          event package gains <code>orders/promo_codes.json</code>. Clients cannot read or write
+          <code>ticket_promo_codes</code>. Deploy the functions and rules together, and add
+          <code>ticketingPromoPreview</code> to the deployed functions.</li>
           <li>The Stripe ticket page is now steps: Tickets, Attendees, Questions (when
           the registration form asks any), Review, then Pay (ADR 0008 §5). Answers
           for each attendee are checked when the order is reserved, held on that

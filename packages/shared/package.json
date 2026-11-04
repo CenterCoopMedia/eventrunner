@@ -16,6 +16,7 @@
     "./reminderSchedule": { "require": "./src/reminderSchedule.cjs", "import": "./src/reminderSchedule.mjs" },
     "./registration": { "require": "./src/registration.cjs", "import": "./src/registration.mjs" },
     "./ticketCommerce": { "require": "./src/ticketCommerce.cjs", "import": "./src/ticketCommerce.mjs" },
+    "./promoCodes": { "require": "./src/promoCodes.cjs", "import": "./src/promoCodes.mjs" },
     "./invoice": { "require": "./src/invoice.cjs", "import": "./src/invoice.mjs" },
     "./badges": { "require": "./src/badges.cjs", "import": "./src/badges.mjs" },
     "./profile": { "require": "./src/profile.cjs", "import": "./src/profile.mjs" },

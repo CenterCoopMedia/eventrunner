@@ -7,6 +7,7 @@ const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
 const { internals: { safeDocId } } = require('./index.cjs');
+const { listPromoCodes, savePromoCode, deletePromoCode } = require('./promoCodes.cjs');
 
 const ORDERS = 'ticket_orders';
 const CATALOG = 'ticket_catalog';
@@ -16,8 +17,9 @@ const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
 const OPERATOR_ACTIONS = new Set(['saveCatalog', 'pauseSales', 'issueComp', 'allocateRefund']);
-const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets']);
-const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee', 'cancelTickets', 'resend', 'reconcile']);
+const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets', 'promoCodes']);
+// Promo codes are staff-editable (ADR 0008 §6); they live in promoCodes.cjs.
+const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee', 'cancelTickets', 'resend', 'reconcile', 'savePromoCode', 'deletePromoCode']);
 const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
 
 class CommerceError extends Error {
@@ -80,6 +82,7 @@ function publicOrder(order) {
     status: order.status, paymentStatus: order.paymentStatus, currency: order.currency,
     subtotalAmount: order.subtotalAmount, totalAmount: order.totalAmount,
     discountAmount: order.discountAmount || 0, taxAmount: order.taxAmount || 0, feeAmount: order.feeAmount || 0,
+    promo: order.promo || null,
     refundStatus: order.refundStatus || 'none', refundedAmount: order.refundedAmount || 0,
     refunds: (order.refunds || []).map((refund) => ({
       id: refund.id, amount: refund.amount, currency: refund.currency, status: refund.status,
@@ -349,6 +352,9 @@ function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, no
       if (action === 'catalog') result = await readCatalog(deps);
       else if (action === 'saveCatalog') result = await saveCatalog(deps);
       else if (action === 'pauseSales') result = await pauseSales(deps);
+      else if (action === 'promoCodes') result = await listPromoCodes(deps);
+      else if (action === 'savePromoCode') result = await savePromoCode(deps);
+      else if (action === 'deletePromoCode') result = await deletePromoCode(deps);
       else if (action === 'orders' || action === 'tickets') result = await listCommerce({ ...deps, kind: action });
       else if (action === 'order') result = await readOrderDetail({ ...deps, orderId: body.orderId });
       else if (action === 'updateAttendee') result = await correctAttendee(deps);

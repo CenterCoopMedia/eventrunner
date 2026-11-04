@@ -222,6 +222,35 @@ test('confirmed unpaid expiration releases a hold exactly once without issuing t
   assert.equal(db.read('ticket_inventory', 'current').sold, 0);
 });
 
+test('an expired hold gives its promo code uses back once; a paid order keeps them', async () => {
+  const promo = { code: 'EARLY', kind: 'percent', value: 20, discountedSeats: 2, discountAmount: 600 };
+  const expired = fixture({ order: { ...ORDER, promo } });
+  await expired.db.collection('ticket_promo_codes').doc('EARLY').set({ code: 'EARLY', used: 3 });
+  expired.provider.readFinancialState = async () => {
+    const data = state();
+    return { ...data, session: { ...data.session, payment_status: 'unpaid', payment_intent: null, status: 'expired' }, paymentIntent: null };
+  };
+  await expired.reconcile();
+  await expired.reconcile();
+  assert.equal(expired.db.read('ticket_promo_codes', 'EARLY').used, 1);
+
+  const paid = fixture({ order: { ...ORDER, promo } });
+  await paid.db.collection('ticket_promo_codes').doc('EARLY').set({ code: 'EARLY', used: 3 });
+  await paid.reconcile();
+  assert.equal(paid.db.read('ticket_promo_codes', 'EARLY').used, 3);
+});
+
+test('a released hold whose promo code was removed still releases', async () => {
+  const { db, provider, reconcile } = fixture({ order: { ...ORDER, promo: { code: 'GONE', discountedSeats: 2 } } });
+  provider.readFinancialState = async () => {
+    const data = state();
+    return { ...data, session: { ...data.session, payment_status: 'unpaid', payment_intent: null, status: 'expired' }, paymentIntent: null };
+  };
+  await reconcile();
+  assert.equal(db.read('ticket_orders', ORDER.id).inventoryState, 'released');
+  assert.equal(db.ids('ticket_promo_codes').length, 0);
+});
+
 test('a processing payment keeps inventory and cannot enter the pending_info entitlement hold', async () => {
   const { db, provider, reconcile } = fixture();
   provider.readFinancialState = async () => {

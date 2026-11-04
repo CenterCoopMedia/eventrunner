@@ -34,7 +34,7 @@ Every spreadsheet writes an admin log entry before the file is sent. A cell that
 
 An operator selects **Download event data package** on the **Data export** page. The package is one zip file:
 
-- One JSON file per record type: content and settings, pages, updates, timeline, announcements, live updates, the media library index, sessions, speakers, organizations, session materials, attendees, ticket orders, admissions, the ticket catalog and session pitches with their review state.
+- One JSON file per record type: content and settings, pages, updates, timeline, announcements, live updates, the media library index, sessions, speakers, organizations, session materials, attendees, ticket orders, admissions, the ticket catalog, promo codes and session pitches with their review state.
 - CSV files for sessions, speakers, organizations, attendees, orders and admissions.
 - `manifest.json`: the format name, the schema version, the export time, each file's record count and SHA-256 checksum, the relationships between files and the list of what is left out.
 - `README.md`: what each file holds, the formats, the relationships, and the rules for personal data.

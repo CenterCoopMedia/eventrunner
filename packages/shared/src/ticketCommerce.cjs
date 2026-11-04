@@ -13,6 +13,7 @@ const TAX_TREATMENTS = Object.freeze(['inclusive', 'not_collected']);
 const TYPE_ID = /^[a-z][a-z0-9_-]{0,47}$/;
 const REQUEST_ID = /^[a-zA-Z0-9_-]{16,100}$/;
 const ORDER_ID = /^ord_[a-f0-9]{40}$/;
+const PROMO_CODE = /^[A-Z0-9][A-Z0-9_-]{2,31}$/;
 const RESERVED_IDS = new Set(['constructor', 'prototype', '__proto__']);
 // Registration answers ride on the order until the attendee claims the
 // ticket; a cap keeps one seat from bloating the order document.
@@ -28,6 +29,13 @@ function isCommerceRequestId(value) {
 
 function isCommerceOrderId(value) {
   return typeof value === 'string' && ORDER_ID.test(value);
+}
+
+/** A promo code as stored (its document ID, in capitals), or null when it cannot be one. */
+function normalizePromoCode(value) {
+  if (typeof value !== 'string') return null;
+  const code = value.trim().toUpperCase();
+  return PROMO_CODE.test(code) ? code : null;
 }
 
 function integer(value, min, max) {
@@ -145,9 +153,9 @@ function normalizeAttendee(input) {
 function validateCheckoutRequest(input) {
   const issue = (message) => ({ ok: false, value: null, issues: [{ path: 'checkout', message }] });
   if (!input || typeof input !== 'object' || Array.isArray(input)) return issue('A checkout request is required.');
-  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume', 'catalogRevision', 'formRevision'].includes(key))) return issue('Checkout accepts catalog acceptance, ticket selections, and attendee assignments only.');
+  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume', 'catalogRevision', 'formRevision', 'promoCode'].includes(key))) return issue('Checkout accepts catalog acceptance, ticket selections, and attendee assignments only.');
   if (input.resume === true) {
-    if (input.lines !== undefined || Object.hasOwn(input, 'catalogRevision') || Object.hasOwn(input, 'formRevision')) return issue('Resume uses the saved ticket selections and accepted terms.');
+    if (input.lines !== undefined || ['catalogRevision', 'formRevision', 'promoCode'].some((key) => Object.hasOwn(input, key))) return issue('Resume uses the saved ticket selections and accepted terms.');
     if (!Object.hasOwn(input, 'requestId') && isCommerceOrderId(input.orderId)) {
       return { ok: true, value: { orderId: input.orderId, resume: true }, issues: [] };
     }
@@ -167,6 +175,11 @@ function validateCheckoutRequest(input) {
   // reservation compares it with the live form.
   const hasFormRevision = Object.hasOwn(input, 'formRevision');
   if (hasFormRevision && !integer(input.formRevision, 0, Number.MAX_SAFE_INTEGER)) return issue('Reload the page to see the current registration questions.');
+  // A blank code is no code. The server prices the code; this only checks its shape.
+  const promoCode = typeof input.promoCode === 'string' && !input.promoCode.trim() ? undefined : input.promoCode;
+  if (promoCode !== undefined && !normalizePromoCode(promoCode)) {
+    return { ok: false, value: null, issues: [{ path: 'promoCode', message: 'This code is not valid.' }] };
+  }
   if (!Array.isArray(input.lines) || input.lines.length < 1 || input.lines.length > MAX_TICKET_TYPES) return issue('Choose at least one ticket type.');
   const seen = new Set();
   const lines = [];
@@ -214,6 +227,7 @@ function validateCheckoutRequest(input) {
       requestId: input.requestId, lines,
       ...(hasRevision ? { catalogRevision: input.catalogRevision } : {}),
       ...(hasFormRevision ? { formRevision: input.formRevision } : {}),
+      ...(promoCode !== undefined ? { promoCode: normalizePromoCode(promoCode) } : {}),
     },
     issues: [],
   };
@@ -229,6 +243,6 @@ function isSalesWindowOpen(object, at = new Date()) {
 module.exports = {
   MAX_TICKET_TYPES, MAX_ORDER_SEATS, MAX_CAPACITY, MAX_AMOUNT, MAX_ANSWERS_BYTES,
   CURRENCY_EXPONENTS, CURRENCY_MINIMUMS, TAX_TREATMENTS,
-  isTicketTypeId, isCommerceRequestId, isCommerceOrderId, normalizeAttendee,
+  isTicketTypeId, isCommerceRequestId, isCommerceOrderId, normalizeAttendee, normalizePromoCode,
   validateTicketCatalog, validateCheckoutRequest, isSalesWindowOpen,
 };

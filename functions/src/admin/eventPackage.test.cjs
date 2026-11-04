@@ -382,6 +382,21 @@ test('scrub removes credential keys at any depth and keeps design tokens', () =>
   });
 });
 
+test('records: an order keeps its promo code, the discount and each list price', () => {
+  const order = orderRecord('ord_x', {
+    provider: 'stripe', subtotalAmount: 4000, totalAmount: 4000, discountAmount: 0,
+    promo: { code: 'EARLY', kind: 'percent', value: 20, discountedSeats: 2, discountAmount: 1000 },
+    lines: [{ ticketTypeId: 'general', name: 'General', quantity: 2, unitAmount: 2000, lineAmount: 4000, listUnitAmount: 2500 }],
+  });
+  assert.equal(order.promoCode, 'EARLY');
+  assert.equal(order.promoDiscountAmount, 1000);
+  assert.equal(order.lines[0].listUnitAmount, 2500);
+  const plain = orderRecord('ord_y', { provider: 'stripe', lines: [{ ticketTypeId: 'general', quantity: 1, unitAmount: 2500, lineAmount: 2500 }] });
+  assert.equal(plain.promoCode, null);
+  assert.equal(plain.promoDiscountAmount, 0);
+  assert.equal(plain.lines[0].listUnitAmount, 2500);
+});
+
 test('records: answers held on an order seat at checkout never leave in the order or admission export', () => {
   const seat = { externalId: 'ord_x_0_0', email: 'ada@example.com', answers: { accessNeeds: 'Step-free seating near the aisle' } };
   const order = orderRecord('ord_x', {

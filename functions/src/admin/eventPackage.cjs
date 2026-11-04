@@ -199,6 +199,7 @@ const SECTIONS = Object.freeze([
       jsonFile('orders/admissions.json', 'tickets', admissionRecord, 'Admissions (one per ticket) from every ticketing source: holder, status, check-in. orderId names an order.'),
       datasetFile('orders/admissions.csv', 'admissions', 'Admissions as a spreadsheet.'),
       jsonFile('orders/catalog.json', 'ticket_catalog', publicRecord, 'The ticket catalog: ticket types, prices and sales windows.'),
+      jsonFile('orders/promo_codes.json', 'ticket_promo_codes', publicRecord, 'Promo codes: percent or amount off each ticket, the ticket types, limits and dates, and used (discounted tickets held or sold).'),
     ],
   },
   {
