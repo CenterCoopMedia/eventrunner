@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Registration answers (ADR 0008 §4): `saveTicketAnswers` stores one
+  attendee's answers per ticket in the private `ticket_answers`, checked
+  against the form revision they answered. The ticket holder can save until
+  registration closes; staff at any time. The Attendees page counts diet,
+  access and photo answers and shows each attendee's own; the attendee
+  export adds one `Answer: …` column per question. Answers are deleted with
+  the account and left out of the archive package.
 - **Settings → Registration form** (operators): turn on the standard
   attendee questions (organization, job title, dietary needs, access needs,
   photo consent, directory listing), make them required, and write up to 10

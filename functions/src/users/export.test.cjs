@@ -455,3 +455,30 @@ test('logs counts only, never a cell value', async () => {
   assert.equal(res.statusCode, 200);
   assert.deepEqual(lines, ['exportAttendees: 1 rows, 0 skipped']);
 });
+
+// ADR 0008 §4: each registration question the form asks is one column,
+// headed "Answer: …" so it is never mistaken for the account's own field.
+test('the export adds one column per registration question, filled from each account\'s answers', async () => {
+  const db = makeFakeDb({
+    'users/uid-ada': fullAccount(),
+    'users/uid-bo': fullAccount({ uid: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' }),
+    'config/registration_form': {
+      revision: 2,
+      standard: { dietary: { enabled: true, required: false }, accessNeeds: { enabled: true, required: false } },
+      custom: [{ id: 'q_shirt', kind: 'one_choice', label: 'T-shirt size', choices: ['S', 'M'], required: false }],
+    },
+    'ticket_answers/t-ada': { ticketId: 't-ada', uid: 'uid-ada', answers: { dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, q_shirt: 'M' } },
+    'ticket_answers/t-gone': { ticketId: 't-gone', uid: 'uid-gone', answers: { q_shirt: 'S' } },
+    // Bo's refunded ticket comes second to his valid one; its answer was a
+    // yes/no before the question became one choice, and still reads as one.
+    'ticket_answers/t-bo-a': { ticketId: 't-bo-a', uid: 'uid-bo', ticketStatus: 'refunded', answers: { q_shirt: 'S' } },
+    'ticket_answers/t-bo-b': { ticketId: 't-bo-b', uid: 'uid-bo', ticketStatus: 'valid', answers: { q_shirt: true },
+      questions: [{ id: 'q_shirt', name: 'Shirt?', kind: 'yes_no', choices: [] }] },
+  });
+  const res = await run(db, req('admin', { uids: ['uid-ada', 'uid-bo'], filter: FILTER }));
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const [header, ada, bo] = parseCsv(res.body.csv);
+  assert.deepEqual(header.slice(-3), ['Answer: Dietary needs', 'Answer: Access needs', 'Answer: T-shirt size']);
+  assert.deepEqual(ada.slice(-3), ['Vegan; Other: Low sodium', '', 'M']);
+  assert.deepEqual(bo.slice(-3), ['', '', 'Yes']);
+});

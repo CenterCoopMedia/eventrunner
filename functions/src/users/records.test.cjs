@@ -286,6 +286,9 @@ async function fullySeeded(overrides = {}) {
     'organization_representatives/uid-bo': { uid: 'uid-bo', organizationId: 'tide-media' },
     'organization_edit_requests/beacon-fund': { organizationId: 'beacon-fund', fields: { bio: 'x' }, submittedByUid: 'uid-ada' },
     'organization_edit_requests/tide-media': { organizationId: 'tide-media', fields: { bio: 'y' }, submittedByUid: 'uid-bo' },
+    // Registration answers (ADR 0008 §4): Ada's go with her; Bo's stay.
+    'ticket_answers/t-ada': { ticketId: 't-ada', uid: 'uid-ada', answers: { accessNeeds: 'Step-free stage.' } },
+    'ticket_answers/t-bo': { ticketId: 't-bo', uid: 'uid-bo', answers: {} },
   });
   await db.collection('users/uid-ada/bookmarks').doc('s1').set({ bookmarkedAt: T0 });
   await db.collection('users/uid-ada/bookmarks').doc('s2').set({ bookmarkedAt: T0 });
@@ -342,6 +345,7 @@ function assertNeighbourKept({ db, auth, bucket }) {
   assert.ok(db.read('change_request_rate_limits', 'uid-bo'));
   assert.ok(db.read('organization_representatives', 'uid-bo'));
   assert.ok(db.read('organization_edit_requests', 'tide-media'));
+  assert.ok(db.read('ticket_answers', 't-bo'));
 }
 
 test('the per-account store list is one named constant the delete reads', () => {
@@ -350,7 +354,7 @@ test('the per-account store list is one named constant the delete reads', () => 
     [
       'users_public', 'schedule_shares', 'organization_representatives', 'tickets', 'bookmarks',
       'sessionNotes', 'profile-photos', 'profile_photo_uploads', 'change_requests', 'change_request_rate_limits',
-      'organization_edit_requests',
+      'organization_edit_requests', 'ticket_answers',
     ],
   );
   assert.ok(Object.isFrozen(PER_ACCOUNT_STORES));
@@ -370,8 +374,10 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
     uid: 'uid-ada',
     removed: {
       tickets: 1, bookmarks: 2, notes: 1, photos: 2, photoUploads: 1, changeRequests: 2, changeRequestLimits: 1, organizationEdits: 1,
+      registrationAnswers: 1,
     },
   });
+  assert.equal(db.read('ticket_answers', 't-ada'), undefined);
   // Out of the directory, and no longer a representative.
   assert.equal(db.read('users', 'uid-ada'), undefined);
   assert.equal(db.read('organization_representatives', 'uid-ada'), undefined);
@@ -694,7 +700,7 @@ test('the sweep clears more than one page of every store, a page at a time', asy
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.deepEqual(res.body.removed, {
     tickets: 0, bookmarks: 250, notes: 450, photos: 501, photoUploads: 0, changeRequests: 450, changeRequestLimits: 0,
-    organizationEdits: 0,
+    organizationEdits: 0, registrationAnswers: 0,
   });
   assert.deepEqual(db.ids('change_requests'), []);
   assert.deepEqual(db.ids('users/uid-ada/bookmarks'), []);

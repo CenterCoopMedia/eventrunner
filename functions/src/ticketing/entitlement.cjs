@@ -296,6 +296,10 @@ function buildHandlers() {
         before: before && before.exists ? before.data() : null,
         after: after && after.exists ? after.data() : null,
       });
+      // A refund or cancellation also takes the ticket's registration
+      // answers out of the planning counts (ADR 0008 §4).
+      const { syncAnswerStatus } = require('./ticketAnswers.cjs');
+      await syncAnswerStatus({ db, ticketId: event.params.externalId });
     }),
   };
 }

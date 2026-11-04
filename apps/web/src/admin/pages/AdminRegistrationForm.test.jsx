@@ -103,6 +103,18 @@ describe('AdminRegistrationForm', () => {
     expect(callMock).not.toHaveBeenCalled();
   });
 
+  it('gives a saved question a new id when its answer type changes, so old answers keep their meaning', async () => {
+    callMock.mockResolvedValue({ revision: 3 });
+    await renderPage();
+    fireEvent.change(screen.getByLabelText('Answer type'), { target: { value: 'short_text' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save registration form' }));
+    await waitFor(() => expect(callMock).toHaveBeenCalledTimes(1));
+    const [question] = callMock.mock.calls[0][1].form.custom;
+    expect(question.kind).toBe('short_text');
+    expect(question.id).not.toBe('q_shirt');
+    expect(question.id).toMatch(/^q_[a-z0-9]{8}$/);
+  });
+
   it('runs the shared answer check in the preview', async () => {
     await renderPage();
     fireEvent.click(preview().getByRole('button', { name: 'Check answers' }));

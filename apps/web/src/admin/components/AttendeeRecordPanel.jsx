@@ -27,6 +27,7 @@ import {
   linkButtonClass,
   primaryButtonClass,
 } from './formControls.jsx';
+import { AttendeeAnswers } from './RegistrationAnswers.jsx';
 
 /** The name a person reads for a row: display name, then address, then id. */
 export function attendeeName(row) {
@@ -103,7 +104,7 @@ export function AttendeeRecordToggle({ open, uid, onToggle }) {
  *   every failure, whatever its shape; the page decides where it shows
  */
 export default function AttendeeRecordPanel({
-  row, deleteError = null, onDeleteStart, onDeleted, onDeleteFailed,
+  row, registrationForm = null, answers = [], deleteError = null, onDeleteStart, onDeleted, onDeleteFailed,
 }) {
   const call = useAdminApi();
   const name = attendeeName(row);
@@ -165,6 +166,7 @@ export default function AttendeeRecordPanel({
       aria-label={`Record for ${name}`}
       className="flex flex-col gap-md border-admin-rule-hairline border-t-admin-hairline px-md py-sm"
     >
+      <AttendeeAnswers form={registrationForm} records={answers} />
       <form className="flex flex-col gap-sm" onSubmit={save}>
         <ServerErrorSummary error={error} errorRef={errorRef} />
         <TextAreaField
@@ -198,7 +200,7 @@ export default function AttendeeRecordPanel({
             busyLabel="Deleting…"
             busy={deleting}
             disabled={Boolean(row.speakerId) || deleting}
-            consequence="This removes the account, its directory profile, its shared schedule, its sign-in, its saved sessions, its private notes, its profile photo, its change requests, its organization representative access and any edit it sent for review, and its ticket claim. The ticket record, sent email records, feedback, session reactions, and the admin log stay."
+            consequence="This removes the account, its directory profile, its shared schedule, its sign-in, its saved sessions, its private notes, its profile photo, its change requests, its organization representative access and any edit it sent for review, its registration answers, and its ticket claim. The ticket record, sent email records, feedback, session reactions, and the admin log stay."
             permanence="This cannot be undone."
             onConfirm={deleteAccount}
           />

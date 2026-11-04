@@ -60,6 +60,9 @@ import {
   rowMetaClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import { activeQuestions } from 'shared/registrationForm';
+import { subscribeRegistrationForm } from '../../lib/registrationFormSource.js';
+import { RegistrationSummary } from '../components/RegistrationAnswers.jsx';
 import AttendeeRecordPanel, {
   AttendeeRecordToggle,
   refusedBeforeDelete,
@@ -154,6 +157,21 @@ export default function AdminAttendees() {
   useEffect(() => {
     if (deleteResult) deleteResultRef.current?.focus();
   }, [deleteResult]);
+
+  // Registration answers (ADR 0008 §4), for the summary and each record.
+  const [answerRecords, setAnswerRecords] = useState([]);
+  const [registrationForm, setRegistrationForm] = useState(null);
+  useEffect(() => subscribeAdminCollection('ticket_answers', setAnswerRecords), []);
+  useEffect(() => subscribeRegistrationForm(setRegistrationForm), []);
+  const answersByUid = useMemo(() => {
+    const map = new Map();
+    for (const record of answerRecords) {
+      if (!record.uid) continue;
+      map.set(record.uid, [...(map.get(record.uid) ?? []), record].sort((a, b) => a.id.localeCompare(b.id)));
+    }
+    return map;
+  }, [answerRecords]);
+  const asksQuestions = activeQuestions(registrationForm).length > 0;
 
   useEffect(() => {
     return subscribeAdminCollection(
@@ -289,7 +307,7 @@ export default function AdminAttendees() {
       <AdminPageHeader
         title="Attendees"
         identifiers={rows ? `${shown.length} of ${rows.length} account${rows.length === 1 ? '' : 's'}` : undefined}
-        description="Registration status for every account. An approval you make here is recorded as an organizer decision and survives a ticket refund; a revocation is never undone by a later ticket sync. An export holds names, email addresses, and profile details, and every export is recorded."
+        description="Registration status for every account. An approval you make here is recorded as an organizer decision and survives a ticket refund; a revocation is never undone by a later ticket sync. An export holds names, email addresses, profile details and registration answers, including diet and access needs, and every export is recorded."
         actions={
           rows === null ? null : (
             <button
@@ -304,6 +322,8 @@ export default function AdminAttendees() {
           )
         }
       />
+
+      {asksQuestions ? <RegistrationSummary form={registrationForm} records={answerRecords} /> : null}
 
       {exportResult?.tone === 'ok' ? <SaveStatus message={exportResult.message} /> : null}
       {exportResult?.tone === 'error' ? <Notice tone="error" message={exportResult.message} /> : null}
@@ -458,6 +478,8 @@ export default function AdminAttendees() {
                 {openUid === row.id ? (
                   <AttendeeRecordPanel
                     row={row}
+                    registrationForm={registrationForm}
+                    answers={answersByUid.get(row.id) ?? []}
                     deleteError={rowDeleteError?.uid === row.id ? rowDeleteError.error : null}
                     onDeleteStart={deleteStarted}
                     onDeleted={deleted}
