@@ -1138,10 +1138,18 @@ Dispatch `.github/workflows/deploy-console.yml` from `main`. It runs in the GitH
 
 A deploy does not delete a function that left the code. In `--non-interactive` mode it stops, lists each one and prints its `firebase functions:delete` command. Run those commands and deploy again. A removed public function keeps answering at its direct address until it is deleted.
 
-Secrets stay in the console project's Secret Manager, and the Environment holds none: `CONSOLE_POSTMARK_TOKEN`, `CONSOLE_STRIPE_SECRET_KEY`, `CONSOLE_EVENTBRITE_CLIENT_SECRET`. A function that names a secret will not deploy without it, so until a provider is ready store a placeholder. The functions' runtime account needs read access to each one.
+Secrets stay in the console project's Secret Manager, and the Environment holds none: `CONSOLE_POSTMARK_TOKEN`, `CONSOLE_STRIPE_SECRET_KEY`, `CONSOLE_EVENTBRITE_CLIENT_SECRET`, `CONSOLE_GITHUB_APP_PRIVATE_KEY`. A function that names a secret will not deploy without it, so until a provider is ready store a placeholder. The functions' runtime account needs read access to each one.
 
 Set these up as the project owner before the first deploy, because the deploy account cannot:
 
+- These APIs on the console project: `cloudfunctions`, `cloudbuild`, `run`, `eventarc`, `pubsub`, `cloudscheduler`, `artifactregistry`, `secretmanager`, `firestore`, `firebasehosting` and `identitytoolkit`.
+- For the functions' runtime account, read access on each of the four secrets above. A project-level role doesn't satisfy the deploy's check, and the deploy account can't grant this, so without it the deploy stops. Run this once for each secret:
+
+  ```sh
+  gcloud secrets add-iam-policy-binding <secret-name> --project <console-project-id> \
+    --member serviceAccount:<project-number>-compute@developer.gserviceaccount.com \
+    --role roles/secretmanager.secretAccessor
+  ```
 - The Artifact Registry repository `gcf-artifacts` in `us-central1`, with the cleanup policy `firebase-functions-cleanup` (delete images older than 86400 seconds).
 - For the Pub/Sub service agent, `roles/iam.serviceAccountTokenCreator`. For the functions' runtime account, `roles/run.invoker`, `roles/eventarc.eventReceiver`, `roles/datastore.user`, and `roles/iam.serviceAccountTokenCreator` on itself, so emailed sign-in can make tokens.
 - For the deploy account, the role list in §2 without `roles/storage.admin`, plus `roles/secretmanager.viewer`, the custom role `eventrunnerDeployInvoker`, and `roles/iam.serviceAccountUser` on the compute and App Engine default accounts.
@@ -1306,7 +1314,7 @@ The Owners get an email saying the build did not finish, with a link to the stat
 | `exists outside the client folder` | The name's project already exists somewhere else. It needs a person. |
 | `the run has no value for ...` | A setting from section 12.1 is missing. |
 
-To close an accepted request that should not go on, such as a signup link that reached the wrong person, cancel its run if one is going, wait for it to stop, then select **Close this request** on its review page. That frees the web address and disconnects the client's accounts. It removes nothing the build already made. Read the build record to see how far it got, then remove by hand what exists: the Google Cloud project, the DNS records for its address, the GitHub Environment, and the sender domain. The freed name can't be reused until the project is gone, because the build refuses a project it didn't make.
+To close an accepted request that should not go on, such as a signup link that reached the wrong person, cancel its run if one is going, wait for it to stop, then select **Close this request** on its review page. That frees the web address and disconnects the client's accounts. It removes nothing the build already made. Read the build record to see how far it got, then remove by hand what exists: the Google Cloud project, the DNS records for its address, the GitHub Environment, and the sender domain. Once the build has made a project, that name can't be built again through the console, even after the project is deleted, because Google never reuses a project id and the build refuses a project it didn't make. So retry a failed build rather than close it, unless the client is finished with that name.
 
 To run a rehearsal with a test-mode connection, set `CONSOLE_TEST_MODE` to `true` in the `console` Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts. A test-mode build still makes real, billed resources: a Google Cloud project, DNS records and a deployment. Only the ticket account is in test mode.
 

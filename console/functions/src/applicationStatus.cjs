@@ -47,7 +47,8 @@ async function sendAll(log, sends) {
       await send();
     } catch (err) {
       allSent = false;
-      log.error('console status email failed', err);
+      // The builder's log is public, and a mail service's error can name the recipient.
+      log.error('console status email failed', String(err?.message).replace(/\S+@\S+/g, '[address]'));
     }
   }
   return allSent;
