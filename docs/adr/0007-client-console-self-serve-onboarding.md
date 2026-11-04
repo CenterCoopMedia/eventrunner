@@ -2,6 +2,7 @@
 
 **Date:** 2026-11-03 (revised the same day)  
 **Status:** Accepted by the owner on 2026-11-03.  
+**Amended:** 2026-11-04, for the agreement, the event fee and the automatic build. See [the amendment](#amendment-2026-11-04-agreement-fee-and-automatic-build).  
 **Amends:** [ADR 0001 §2](0001-event-platform-v1.md) operating model, and [ADR 0004](0004-stripe-ticket-commerce.md) (Stripe Connect, see its 2026-11-03 amendment). The model stays one Firebase project per event. This record adds a way to sign up, connect accounts, and get that project made with no manual step by the client.
 
 ## Context
@@ -190,7 +191,7 @@ These are the only places a client sees a DNS record, and both are optional.
 
 ## Not in scope
 
-- Taking payment for the service or signing the agreement in the console.
+- ~~Taking payment for the service or signing the agreement in the console.~~ Now in scope; see the 2026-11-04 amendment.
 - Moving existing clients into the console.
 - Changing an event project after `ready`, except through the admin panel and the deploy
   workflows.
@@ -213,3 +214,60 @@ These are the only places a client sees a DNS record, and both are optional.
 3. An Eventbrite app (client id and secret).
 4. The `eventrunner.org` DNS zone on a provider with an API (Google Cloud DNS preferred).
 5. A Postmark account token with the right to create servers and domains.
+
+## Amendment 2026-11-04: agreement, fee and automatic build
+
+The owner's requirement: a client who does not know the hosting team opens one sign-up link, accepts
+the agreement, pays the event fee and sets up the event alone, as on any commercial platform. The
+client never has to ask anyone a question. This amendment replaces the parts of the record above
+that conflict with that requirement.
+
+**Agreement.** A step after Review shows the current agreement in full. An Owner types their name
+and selects accept. The server stores an append-only record: agreement version, a SHA-256 hash of
+the text, typed name, verified email, user id, organization, application and time. It emails the
+signer a copy. The browser cannot write or change the record. The text lives in the console's
+Firestore (`console_config/agreement`), and each version is kept unchanged. It is not in this public
+repository. CCM's legal review must confirm this method and the text before a real client uses it.
+
+**Event fee.** A step after the agreement sends the Owner to Stripe Checkout on CCM's Stripe account.
+The server reads the amount and currency from `console_config/settings`. The browser never sends an
+amount, and the repository holds no price. The console fails closed: with no agreement text or no
+fee set, the request cannot move past Review, and the page says the site is not taking sign-ups.
+A paid session counts only through a signature-verified Stripe webhook, which handles a repeated
+event once. Returning from Checkout proves nothing. This payment is separate from the client's own
+ticket sales, which go to the client's connected account and carry no CCM fee (§4 stands).
+
+**Statuses.** `draft` → `awaiting_payment` → `approved` → `building` → `ready` → `launched`.
+Accepting the agreement freezes the answers and sets `awaiting_payment`. The client can go back to
+edit before paying, which clears the acceptance. The webhook sets `approved`. `submitted` and
+`changes_requested` stay for a request an operator holds back. The status page shows each change,
+and each one also sends an email.
+
+**Automatic build.** This replaces principle 4 and §5's approval step. Payment starts the build, and
+the operators get a notice. No cloud resource exists before payment, which is the control against
+cost and abuse. The project id and environment name come from the web-address name, and the folder,
+billing account and region from console settings. An operator can still see every request and decline one with a refund. The agreement states the
+refund terms.
+
+**Second Owner.** The second Owner moves from a condition of sending the request to a launch check.
+A client working alone can finish sign-up, pay and set up the site. The launch check explains the
+step and sends the invite from the same screen.
+
+**Launch.** This replaces the Launch row in §9. The client launches from the setup checklist once
+every row passes. No hosting-team step is needed. The Google sign-in row in §9 stays with the hosting
+team and is optional, because emailed codes work without it. Legal review stays with the client.
+
+**Ticket connections.** The first release includes all four choices in §3: Stripe, Eventbrite,
+a spreadsheet and no tickets.
+
+**A site built by hand first.** `eventrunner-nclocal` was built by hand on 2026-11-04 to rehearse a
+real deployment. It records the steps the provisioner must perform (`docs/DEPLOY_RUNBOOK.md`). It is
+not the client's site. It is removed or adopted before the client signs up, so `nclocal` is free.
+
+**Added owner prerequisites.**
+
+1. A Google Cloud organization. A folder needs one, and a service account cannot create a project
+   without a parent. None exists today.
+2. CCM's Stripe account in test and live mode, with Connect enabled (prerequisite 2 above). It both
+   takes the fee and is the Connect platform.
+3. The agreement text, its refund terms and the event fee, entered in the console.
