@@ -111,7 +111,11 @@ export default function ReviewStep({ app, answers, errors, ownersNeeded, orgId, 
   async function submit() {
     setBusy(true);
     setError('');
-    await flush();
+    if (!(await flush())) {
+      setError('We could not save your last change. Try again.');
+      setBusy(false);
+      return;
+    }
     try {
       await callApi('submitApplication', { orgId, appId });
       onSubmitted();

@@ -120,7 +120,8 @@ export default function Setup() {
   }, [showAll, app, location.key]);
 
   const go = useCallback(async (target) => {
-    await flush();
+    // A failed save keeps the reader here, next to the "Not saved" words.
+    if (!(await flush())) return;
     navigate(setupPath(orgId, appId, target));
   }, [flush, navigate, orgId, appId]);
 

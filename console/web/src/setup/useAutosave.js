@@ -8,6 +8,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * stepper calls it before it moves to another step. A waiting value is
  * also sent when the page closes the step.
  *
+ * A value whose save fails stays waiting, unless a newer value replaced
+ * it, so the next flush sends it again. `flush()` resolves to true when
+ * the last save reached the server and false when it failed, so the
+ * stepper can stay on the step and the review can hold the request.
+ *
  * `status` is 'idle', 'waiting', 'saving', 'saved', 'unsaved' (the server
  * kept the old answer, for example a taken name) or 'error'.
  */
@@ -16,7 +21,7 @@ export function useAutosave({ save, onResult, delay = 800 }) {
   const [error, setError] = useState('');
   const pending = useRef(undefined);
   const timer = useRef(null);
-  const chain = useRef(Promise.resolve());
+  const chain = useRef(Promise.resolve(true));
   const saveRef = useRef(save);
   const onResultRef = useRef(onResult);
 
@@ -38,9 +43,12 @@ export function useAutosave({ save, onResult, delay = 800 }) {
         setError('');
         setStatus(result && result.saved === false ? 'unsaved' : 'saved');
         onResultRef.current?.(result, value);
+        return true;
       } catch (err) {
+        if (pending.current === undefined) pending.current = value;
         setError(err.message);
         setStatus('error');
+        return false;
       }
     });
     return chain.current;

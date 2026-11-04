@@ -167,4 +167,24 @@ describe('Setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(await screen.findByText(/Not saved. This request is with the hosting team/)).toBeInTheDocument();
   });
+
+  it('stays on the step when a save fails, and Next tries the same answers again', async () => {
+    let calls = 0;
+    serveApi({
+      getApplication: { application: application({ answers: emptyAnswers() }) },
+      saveApplicationStep: (body) => {
+        calls += 1;
+        if (calls === 1) throw new Error('We could not reach the server. Try again.');
+        return { step: body.step, saved: true, answers: body.answers, errors: {} };
+      },
+    });
+    renderSetup('organization');
+    fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'x.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText(/Not saved. We could not reach the server/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
+    expect(callsTo('saveApplicationStep').map((b) => b.answers.website)).toEqual(['x.org', 'x.org']);
+  });
 });

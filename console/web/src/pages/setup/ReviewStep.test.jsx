@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api.js';
 import { application, callsTo, serveApi } from '../../test/application.js';
 import { fakeAuth } from '../../test/renderPage.jsx';
+import { renderPage } from '../../test/renderPage.jsx';
 import { renderSetup } from '../../test/setupPage.jsx';
+import ReviewStep from './ReviewStep.jsx';
 
 vi.mock('../../api.js', async (importOriginal) => ({ ...(await importOriginal()), callApi: vi.fn() }));
 
@@ -61,6 +63,19 @@ describe('Review step', () => {
     const problems = within(title.closest('section'));
     expect(problems.getByText(/Choose how you sell tickets\./)).toBeInTheDocument();
     expect(problems.getByText(/Add a second Owner to the team\./)).toBeInTheDocument();
+  });
+
+  it('does not send the request while a change is not saved', async () => {
+    const app = application();
+    const flush = vi.fn(async () => false);
+    renderPage(
+      <ReviewStep app={app} answers={app.answers} errors={{}} ownersNeeded={0} orgId="o1" appId="a1"
+        flush={flush} onSubmitted={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Create my site' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not save your last change. Try again.');
+    expect(callsTo('submitApplication')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Create my site' })).toBeEnabled();
   });
 
   it('tells an Editor that only an Owner can send the request', async () => {
