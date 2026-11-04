@@ -202,6 +202,14 @@ test('a client hears only that the build failed and whether the ticket account i
   assert.deepEqual(buildForClient(failed, { state: 'failed', failedStep: 'domain' }, NOW), { failed: true, needsReconnect: false });
   assert.deepEqual(buildForClient(failed, { state: 'running', failedStep: 'tickets' }, NOW), { failed: false, needsReconnect: false });
   assert.deepEqual(buildForClient({ status: 'approved', buildStart: { state: 'failed', at: new Date(NOW) } }, null, NOW), { failed: true, needsReconnect: false });
+  const rehearsed = {
+    status: 'approved',
+    buildStart: { state: 'failed', at: new Date(NOW) },
+    frozen: { tickets: { choice: 'stripe' } },
+    connections: { stripe: { connected: true, livemode: false } },
+  };
+  assert.equal(buildForClient(rehearsed, null, NOW).needsReconnect, true, 'a retry would refuse this account, so the page offers Reconnect');
+  assert.equal(buildForClient(rehearsed, null, NOW, { testMode: true }).needsReconnect, false);
 });
 
 test('the review page gets the record and whether it can be retried', async () => {

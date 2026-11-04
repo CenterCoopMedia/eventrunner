@@ -12,6 +12,8 @@
  */
 
 const { toMillis } = require('./access.cjs');
+const { connectionProblem } = require('./connectionState.cjs');
+const { reviewedAnswers } = require('./reviewAccess.cjs');
 
 const BUILD_COLLECTION = 'console_builds';
 const RETRY_STATUSES = Object.freeze(['approved', 'building']);
@@ -65,9 +67,12 @@ function canRetryBuild(app, build, at) {
 }
 
 /** What a client may know: never the error text, the run address or the step detail. */
-function buildForClient(app, build, at) {
+function buildForClient(app, build, at, { testMode = false } = {}) {
   const failed = canRetryBuild(app, build, at);
-  return { failed, needsReconnect: failed && build?.state === 'failed' && build.failedStep === TICKETS_STEP };
+  const ticketsFailed = build?.state === 'failed' && build.failedStep === TICKETS_STEP;
+  // The same check a retry makes, so the page offers a way out of every connection refusal.
+  const refused = Boolean(connectionProblem(reviewedAnswers(app)?.tickets?.choice, app.connections, { testMode }));
+  return { failed, needsReconnect: failed && (ticketsFailed || refused) };
 }
 
 module.exports = { BUILD_COLLECTION, RETRY_STATUSES, buildForClient, buildWentSilent, canRetryBuild, readBuild };

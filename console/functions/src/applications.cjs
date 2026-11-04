@@ -172,7 +172,7 @@ async function getApplication({ db, connectionsAvailable, consoleTestMode, now =
         ownersNeeded,
         signups: { open },
         available: connectionsAvailable,
-        build: buildForClient(data, record, now()),
+        build: buildForClient(data, record, now(), { testMode: consoleTestMode }),
         testMode: consoleTestMode,
       }),
     },
