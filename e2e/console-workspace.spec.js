@@ -120,7 +120,7 @@ test('console directories and application progress are readable across widths an
       await page.goto(`${origin}${APPLICATION_PATH}`);
       await expect(page.getByRole('heading', { level: 1, name: 'Community News Gathering' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Open your admin panel' })).toHaveAttribute('href', 'https://community-gathering.example.test/admin');
-      await expect(page.getByRole('complementary', { name: 'Setup progress' }).locator('[aria-current="step"]')).toHaveText('Your site is readyNow');
+      await expect(page.getByRole('complementary', { name: 'Setup progress' }).locator('[aria-current="step"]')).toHaveText('Your site is readyDone');
       await expect(page.getByRole('link', { name: 'Read the agreement' })).toHaveAttribute('href', `${APPLICATION_PATH}/accepted-agreement`);
       await expect(page.locator('html')).toHaveJSProperty('scrollWidth', width);
       await page.screenshot({ path: path.join(EVIDENCE, `console-application-${width}-${colorScheme}.png`), fullPage: true });
@@ -136,14 +136,14 @@ test('console directories and application progress are readable across widths an
   await expect(page.getByText('You can close this page')).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Setup progress' }).locator('[aria-current="step"]')).toHaveText('We are building your siteNow');
   await expect(page.getByRole('status')).toHaveText('Now: Setting up your web address. Next: Setting up email and tickets.');
-  await expect(page.locator('.console-spinner')).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.build-note .wb-body')).toHaveCSS('animation-name', 'none');
   await page.screenshot({ path: path.join(EVIDENCE, 'console-building-320-dark-reduced-motion.png'), fullPage: true });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await expect(page.locator('.console-spinner')).toHaveCSS('animation-name', 'console-spin');
+  await expect(page.locator('.build-note .wb-body')).toHaveCSS('animation-name', 'wb-bob');
   currentApplication = { ...application('building'), build: { failed: true, needsReconnect: false } };
   await page.goto(`${origin}${APPLICATION_PATH}`);
   await expect(page.getByText('The build did not finish', { exact: true })).toBeVisible();
-  await expect(page.locator('.console-spinner')).toHaveCount(0);
+  await expect(page.locator('.wait-buddy')).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });
 
