@@ -64,30 +64,32 @@ test('autoApproveTicketHolders carries the same claim to approved, source "ticke
   assert.equal(stored.approvalSource, 'ticket');
 });
 
-test('a free or complimentary Stripe order does not approve without staff', async () => {
-  const paid = `ord_${'a'.repeat(40)}`;
-  const free = `ord_${'b'.repeat(40)}`;
-  const orders = { [`ticket_orders/${paid}`]: { totalAmount: 5000 }, [`ticket_orders/${free}`]: { totalAmount: 0 } };
+test('a free or complimentary Stripe seat does not approve without staff', async () => {
+  const mixed = `ord_${'a'.repeat(40)}`;
+  const orders = {
+    [`ticket_orders/${mixed}`]: {
+      totalAmount: 5000,
+      lines: [{ unitAmount: 5000 }, { unitAmount: 0 }],
+      seats: [{ externalId: 'tkt-paid', lineIndex: 0 }, { externalId: 'tkt-free', lineIndex: 1 }],
+    },
+  };
+  const paidSeat = ticket({ externalId: 'tkt-paid', orderId: mixed });
+  const freeSeat = ticket({ externalId: 'tkt-free', orderId: mixed });
 
-  const onlyFree = makeFakeDb({ 'users/uid-ada': user(), 'tickets/tkt-1': ticket({ orderId: free }), ...orders });
+  const onlyFree = makeFakeDb({ 'users/uid-ada': user(), 'tickets/tkt-free': freeSeat, ...orders });
   await recompute(onlyFree, autoApproveOn);
   assert.equal(onlyFree.read('users', 'uid-ada').registrationStatus, 'ticketed');
 
-  const lost = makeFakeDb({ 'users/uid-ada': user(), 'tickets/tkt-1': ticket({ orderId: `ord_${'c'.repeat(40)}` }) });
-  await recompute(lost, autoApproveOn);
-  assert.equal(lost.read('users', 'uid-ada').registrationStatus, 'ticketed');
+  const unreadable = makeFakeDb({ 'users/uid-ada': user(), 'tickets/tkt-1': ticket({ orderId: `ord_${'c'.repeat(40)}` }) });
+  await recompute(unreadable, autoApproveOn);
+  assert.equal(unreadable.read('users', 'uid-ada').registrationStatus, 'ticketed');
 
-  const both = makeFakeDb({
-    'users/uid-ada': user(),
-    'tickets/tkt-1': ticket({ orderId: free }),
-    'tickets/tkt-2': ticket({ externalId: 'tkt-2', orderId: paid }),
-    ...orders,
-  });
+  const both = makeFakeDb({ 'users/uid-ada': user(), 'tickets/tkt-free': freeSeat, 'tickets/tkt-paid': paidSeat, ...orders });
   await recompute(both, autoApproveOn);
   assert.equal(both.read('users', 'uid-ada').approvalSource, 'ticket');
 
   // The paid ticket is refunded. The free ticket stays valid but cannot hold the approval.
-  await both.collection('tickets').doc('tkt-2').set({ ...ticket({ externalId: 'tkt-2', orderId: paid }), status: 'refunded' });
+  await both.collection('tickets').doc('tkt-paid').set({ ...paidSeat, status: 'refunded' });
   await recompute(both, autoApproveOn);
   const stored = both.read('users', 'uid-ada');
   assert.equal(stored.registrationStatus, 'ticketed');

@@ -122,10 +122,11 @@ function affectedUids(before, after) {
  */
 /**
  * Whether the account holds a valid ticket that may approve it without staff.
- * A free or complimentary Stripe order does not: anyone could claim one and
- * read the attendee list. Other providers record no price here, so their valid
- * tickets count, and the admin setting warns about free tickets. A Stripe order
- * that cannot be read does not count.
+ * A free or complimentary Stripe seat does not: anyone could claim one and read
+ * the attendee list. One order can mix paid and free seats, so this reads the
+ * price of the claimed seat, not the order total. Other providers record no
+ * price here, so their valid tickets count, and the admin setting warns about
+ * free tickets. A Stripe seat that cannot be read does not count.
  *
  * Reads only, inside the caller's transaction.
  *
@@ -136,10 +137,11 @@ async function holdsPaidTicket({ db, tx, uid }) {
   const valid = await tx.get(db.collection(TICKETS)
     .where('claimedByUid', '==', uid).where('status', '==', VALID));
   for (const ticket of valid.docs) {
-    const orderId = ticket.data()?.orderId;
+    const { orderId, externalId } = ticket.data() || {};
     if (!isCommerceOrderId(orderId)) return true;
-    const order = await tx.get(db.collection(ORDERS).doc(orderId));
-    if (order.exists && order.data()?.totalAmount > 0) return true;
+    const order = (await tx.get(db.collection(ORDERS).doc(orderId))).data();
+    const seat = order?.seats?.find((entry) => entry?.externalId === externalId);
+    if (order?.lines?.[seat?.lineIndex]?.unitAmount > 0) return true;
   }
   return false;
 }

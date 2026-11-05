@@ -16,7 +16,7 @@
 // that clears 3:1, and the error under the field with a mark and a word.
 // `aria-invalid` plus `aria-describedby` carry the failure to a screen
 // reader; nothing is signalled by colour alone.
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 // The field boundary is --admin-rule-control, not the hairline: a form
 // control's boundary is non-text user interface under WCAG 1.4.11 and needs
@@ -276,7 +276,30 @@ export function AddOneListField({ label, items, onChange, itemName, hint, error,
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const [draft, setDraft] = useState('');
+  const [heldRows, setHeldRows] = useState(null);
+  const mouseIsDown = useRef(false);
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
+
+  // A click on Save blurs this input first. A new row drawn at that moment
+  // would move Save away from the pointer and lose the click, so the row
+  // waits for the release. The list value itself updates at once.
+  useEffect(() => {
+    const press = () => { mouseIsDown.current = true; };
+    const release = () => {
+      mouseIsDown.current = false;
+      setTimeout(() => setHeldRows(null), 0);
+    };
+    document.addEventListener('mousedown', press, true);
+    document.addEventListener('mouseup', release, true);
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('blur', release);
+      document.removeEventListener('mousedown', press, true);
+      document.removeEventListener('mouseup', release, true);
+    };
+  }, []);
+
+  const visibleItems = items.slice(0, heldRows ?? items.length);
 
   const add = (text) => {
     const added = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -310,16 +333,19 @@ export function AddOneListField({ label, items, onChange, itemName, hint, error,
             const start = selectionStart ?? draft.length;
             add(`${draft.slice(0, start)}${pasted}${draft.slice(selectionEnd ?? start)}`);
           }}
-          onBlur={() => add(draft)}
+          onBlur={() => {
+            if (mouseIsDown.current) setHeldRows(items.length);
+            add(draft);
+          }}
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={describedBy || undefined}
           {...rest}
         />
         <button type="button" className={secondaryButtonClass} onClick={() => add(draft)} aria-label={`Add ${itemName}`}>+</button>
       </div>
-      {items.length ? (
+      {visibleItems.length ? (
         <ul className="flex flex-col gap-3xs" aria-label={`${label} list`}>
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <li key={item} className="flex items-center justify-between gap-xs text-admin-base text-admin-ink">
               <span className="min-w-0 break-words">{item}</span>
               <button type="button" className={ghostButtonClass} onClick={() => onChange(items.filter((other) => other !== item))} aria-label={`Remove ${item}`}>×</button>
