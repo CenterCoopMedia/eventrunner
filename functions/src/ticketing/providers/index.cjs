@@ -165,7 +165,9 @@ function getTicketingProvider({ env = process.env, fetchImpl, factories, db, get
  * fails the deploy, so each function binds only what its own runtime path
  * can read.
  *
- *   TICKETING_API_TOKEN      — whenever the provider is not `none`
+ *   TICKETING_API_TOKEN      — whenever the provider calls an outside
+ *                              account: not `none` and not `manual`, whose
+ *                              records stay in Firestore
  *   TICKETING_WEBHOOK_SECRET — only for providers that implement
  *                              registerWebhook (§3.3): eventbrite (the
  *                              shared secret in its webhook URL, #356) and
@@ -179,7 +181,7 @@ function ticketingSecretNames(env = process.env) {
   const name = typeof env.EVENT_TICKETING_PROVIDER === 'string'
     ? env.EVENT_TICKETING_PROVIDER.trim()
     : '';
-  if (!PROVIDER_NAMES.includes(name) || name === 'none') return [];
+  if (!PROVIDER_NAMES.includes(name) || name === 'none' || name === 'manual') return [];
   const secrets = ['TICKETING_API_TOKEN'];
   if (WEBHOOK_CAPABLE_PROVIDERS.has(name)) secrets.push('TICKETING_WEBHOOK_SECRET');
   return secrets;

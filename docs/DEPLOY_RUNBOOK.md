@@ -114,6 +114,7 @@ for role in \
   roles/run.developer \
   roles/iam.serviceAccountUser \
   roles/secretmanager.secretAccessor \
+  roles/secretmanager.viewer \
   roles/cloudbuild.builds.editor \
   roles/artifactregistry.writer \
   roles/serviceusage.serviceUsageConsumer \
@@ -131,6 +132,7 @@ Notes on that list: `cloudfunctions.developer` + `run.developer` + `iam.serviceA
 `cloudbuild.builds.editor` + `artifactregistry.writer` are what `firebase deploy --only functions`
 needs end to end (Cloud Functions v2 builds through Cloud Build and Artifact Registry, and the
 deploying principal must be allowed to act as the runtime service account).
+`secretmanager.viewer` lets the deploy read a bound secret's metadata and access policy.
 `secretmanager.secretAccessor` is required only once the environment actually uses a secret
 (`EMAIL_PROVIDER_API_KEY` etc., spec §2.1) — grant it up front so onboarding a provider later is a
 config change, not an IAM change. **This binding is only what the *deploying* identity needs to

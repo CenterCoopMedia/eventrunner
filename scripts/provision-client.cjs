@@ -116,6 +116,7 @@ const DEPLOY_ROLES = Object.freeze([
   'roles/firebaserules.admin',
   'roles/run.developer',
   'roles/secretmanager.secretAccessor',
+  'roles/secretmanager.viewer',
   'roles/serviceusage.serviceUsageConsumer',
   'roles/storage.admin',
 ]);
