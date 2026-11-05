@@ -304,10 +304,10 @@ describe('every class string the app ships', () => {
     expect(hits(/\b(duration|delay)-(\d|\[)/), 'name a motion token').toEqual([]);
   });
 
-  it('runs no spinner, no pulse, no bounce, no ping', () => {
+  it('uses no generic spinner, pulse, bounce, or ping utility', () => {
     expect(
       hits(/\banimate-(pulse|spin|bounce|ping)\b/),
-      'loading is a stated line, not a loop',
+      'pending-work indicators use their dedicated, motion-guarded component',
     ).toEqual([]);
   });
 
@@ -366,5 +366,33 @@ describe('every class string the app ships', () => {
 
   it('paints no gradient', () => {
     expect(hits(/\bbg-gradient-to-[a-z]+\b/)).toEqual([]);
+  });
+});
+
+describe('the operator loading indicator', () => {
+  const loadingFile = path.join(SRC, 'admin/components/adminLoading.css');
+  const loadingRoot = postcss.parse(fs.readFileSync(loadingFile, 'utf8'), { from: loadingFile });
+
+  it('limits the loop to the loading ring and the no-preference query', () => {
+    const animations = [];
+    loadingRoot.walkDecls(/^animation(?:-|$)/, (decl) => animations.push(decl));
+    expect(animations).toHaveLength(1);
+    expect(animations[0].parent.selector).toBe('.admin-loading-state__spinner');
+    expect(motionAllowed(animations[0])).toBe(true);
+    expect(animations[0].value).toBe('admin-loading-spin var(--admin-loading-cycle) linear infinite');
+  });
+
+  it('rotates only transform and owns a restrained cycle', () => {
+    const cycles = [];
+    loadingRoot.walkDecls('--admin-loading-cycle', (decl) => cycles.push(decl.value));
+    expect(cycles).toEqual(['1.2s']);
+    const keyframes = [];
+    loadingRoot.walkAtRules('keyframes', (atRule) => keyframes.push(atRule));
+    expect(keyframes).toHaveLength(1);
+    expect(keyframes[0].params).toBe('admin-loading-spin');
+    expect(motionAllowed(keyframes[0])).toBe(true);
+    const properties = [];
+    keyframes[0].walkDecls((decl) => properties.push(decl.prop));
+    expect(properties).toEqual(['transform']);
   });
 });
