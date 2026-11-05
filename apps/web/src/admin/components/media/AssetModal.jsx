@@ -123,6 +123,7 @@ export default function AssetModal({
     pending.current = true;
     setAction('save');
     setSaveError(null);
+    setDeleteError(null);
     setStatus('');
     try {
       await updateMetadata({ assetId: asset.id, alt: alt.trim(), title: title.trim() });
@@ -140,6 +141,7 @@ export default function AssetModal({
     pending.current = true;
     setAction('delete');
     setDeleteError(null);
+    setSaveError(null);
     try {
       await remove({ assetId: asset.id, force });
       onChanged?.({ type: 'deleted', asset });

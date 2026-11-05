@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ModalShell from './ModalShell.jsx';
+import { DestructiveConfirm } from '../formControls.jsx';
 
 describe('ModalShell', () => {
   it('lifts the panel with a strong-rule frame, never a shadow', () => {
@@ -117,6 +118,21 @@ describe('ModalShell', () => {
     unmount();
     expect(fallback).toHaveFocus();
     fallback.remove();
+  });
+
+  it('leaves native Tab order intact from a focused consequence inside the dialog', () => {
+    render(<ModalShell title="Details" onClose={() => {}}>
+      <button>Save description</button>
+      <DestructiveConfirm trigger="Delete file" title="Delete file" confirmLabel="Delete file" consequence="This removes the file." onConfirm={vi.fn()} />
+    </ModalShell>);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }));
+    const heading = screen.getByRole('heading', { name: 'Delete file' });
+    expect(heading).toHaveFocus();
+    for (const shiftKey of [false, true]) {
+      const tab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+      fireEvent(heading, tab);
+      expect(tab.defaultPrevented).toBe(false);
+    }
   });
 
   it('names the icon-only close control and returns focus after dismissal', () => {

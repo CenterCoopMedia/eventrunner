@@ -3,6 +3,8 @@
 // moves. Each is checked by keyboard, in a real browser, at real widths.
 /* global document, getComputedStyle */
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { ADMIN_EMAIL, signIn } from './helpers.mjs';
 
 const pageWidth = (page) =>
@@ -11,7 +13,13 @@ const pageWidth = (page) =>
     scroll: document.documentElement.scrollWidth,
   }));
 
-test('the rail folds and hides by keyboard, and remembers it', async ({ page }, testInfo) => {
+async function evidencePath(name) {
+  const directory = path.resolve('test-results/admin-visual-evidence');
+  await fs.mkdir(directory, { recursive: true });
+  return path.join(directory, name);
+}
+
+test('the rail folds and hides by keyboard, and remembers it', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -54,7 +62,7 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }, 
   await expect(toggle).toHaveText('');
   await expect(toggle.locator('svg')).toBeVisible();
   expect((await toggle.boundingBox()).width).toBeGreaterThanOrEqual(44);
-  await page.screenshot({ path: testInfo.outputPath('navigation-expanded-desktop.png'), animations: 'disabled' });
+  await page.screenshot({ path: await evidencePath('navigation-expanded-desktop.png'), animations: 'disabled' });
   await page.locator('body').focus();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
@@ -71,7 +79,7 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }, 
   const railBox = await page.locator('.admin-rail').boundingBox();
   expect(railBox.width).toBeLessThanOrEqual(68);
   expect((await show.boundingBox()).height).toBeGreaterThanOrEqual(44);
-  await page.screenshot({ path: testInfo.outputPath('navigation-collapsed-desktop.png'), animations: 'disabled' });
+  await page.screenshot({ path: await evidencePath('navigation-collapsed-desktop.png'), animations: 'disabled' });
   expect((await page.locator('#admin-content').boundingBox()).width).toBeGreaterThan(wideMain + 100);
   // The global reduce block disables transitions, so the width changes immediately.
   const motion = await page.locator('.admin-rail').evaluate((element) => getComputedStyle(element).transitionDuration);
@@ -90,7 +98,7 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }, 
   await expect(page.getByRole('tooltip')).toHaveCount(0);
 });
 
-test('the phone menu uses a compact named icon and keeps the current destination visible', async ({ page }, testInfo) => {
+test('the phone menu uses a compact named icon and keeps the current destination visible', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 320, height: 800 });
   await signIn(page, ADMIN_EMAIL);
@@ -103,13 +111,13 @@ test('the phone menu uses a compact named icon and keeps the current destination
   await expect(summary).toContainText('Pages');
   await expect(summary.locator('svg')).toBeVisible();
   expect((await summary.boundingBox()).height).toBeGreaterThanOrEqual(44);
-  await page.screenshot({ path: testInfo.outputPath('navigation-320.png'), animations: 'disabled' });
+  await page.screenshot({ path: await evidencePath('navigation-320.png'), animations: 'disabled' });
   await summary.click();
   await expect(summary).toHaveAccessibleName('Close menu');
   await expect(page.locator('#admin-content')).toHaveAttribute('inert');
   const dimensions = await pageWidth(page);
   expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
-  await page.screenshot({ path: testInfo.outputPath('navigation-menu-320.png'), animations: 'disabled' });
+  await page.screenshot({ path: await evidencePath('navigation-menu-320.png'), animations: 'disabled' });
   await page.keyboard.press('Escape');
   await expect(summary).toHaveAccessibleName('Open menu');
   await expect(summary).toBeFocused();

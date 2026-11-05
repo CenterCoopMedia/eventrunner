@@ -28,10 +28,10 @@ export function wrapModalTab(event) {
   if (!first) {
     event.preventDefault();
     dialog.focus();
-  } else if (event.shiftKey && (active === first || !controls.includes(active))) {
+  } else if (event.shiftKey && (active === first || active === dialog)) {
     event.preventDefault();
     last.focus();
-  } else if (!event.shiftKey && (active === last || !controls.includes(active))) {
+  } else if (!event.shiftKey && (active === last || active === dialog)) {
     event.preventDefault();
     first.focus();
   }
