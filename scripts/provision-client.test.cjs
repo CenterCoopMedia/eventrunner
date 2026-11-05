@@ -256,6 +256,8 @@ function fakeCloud(options = {}) {
       if (headers['X-Postmark-Server-Token'] !== 'server-token') return answer({ Message: 'bad server token' }, 401);
       if (p.startsWith('/webhooks')) {
         if (method === 'POST') {
+          // Postmark tests the address and saves nothing if it does not answer.
+          if (state.runs.length === 0) return answer({ Message: 'Webhook verification failed; nothing was saved.' }, 422);
           state.webhooks.push(body);
           return answer({ ID: 1 });
         }
@@ -591,7 +593,8 @@ test('email gets a server, its streams and webhooks, and a verified sender', asy
   assert.match(basicAuth, new RegExp(`^${PROJECT}:[0-9a-f]{40}$`));
   assert.ok(fake.state.streams.some((s) => s.ID === 'announcements' && s.MessageStreamType === 'Broadcasts'));
   assert.deepEqual(fake.state.webhooks.map((w) => w.MessageStream).sort(), ['announcements', 'outbound']);
-  assert.ok(fake.state.webhooks.every((w) => w.Url === `https://${basicAuth}@us-central1-${PROJECT}.cloudfunctions.net/emailDeliveryWebhook`));
+  assert.ok(fake.state.webhooks.every((w) => w.Url === `https://us-central1-${PROJECT}.cloudfunctions.net/emailDeliveryWebhook`));
+  assert.ok(fake.state.webhooks.every((w) => `${w.HttpAuth.Username}:${w.HttpAuth.Password}` === basicAuth));
   assert.equal(fake.state.webhooks.find((w) => w.MessageStream === 'announcements').Triggers.SubscriptionChange.Enabled, true);
   assert.equal(fake.state.mailDomain.ReturnPathDomain, `pm-bounces.${DOMAIN}`);
 

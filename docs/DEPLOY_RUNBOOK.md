@@ -1217,15 +1217,16 @@ Each step reads the current state and does nothing when it is already right, so 
 | `deploy-identity` | Deploy account, roles, its own identity pool, the agent grants, the image cleanup policy |
 | `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records, the wait for the certificate (up to an hour). Hosting can report `CERT_PROPAGATING` long after it serves the certificate, so that state passes once the address answers over HTTPS |
 | `sign-in` | Authorized domains |
-| `email` | Postmark server, streams, webhooks, sender domain, its DNS records, the wait for verification (up to 30 minutes) |
+| `email` | Postmark server, streams, sender domain, its DNS records, the wait for verification (up to 30 minutes) |
 | `tickets` | Tests the chosen token, moves it to the client project, deletes the console's copy and any leftover, sets up the Stripe webhook endpoint |
 | `environment` | The client's GitHub Environment, its `main`-only rule and its variables |
 | `first-deploy` | `deploy.yml` in bootstrap mode, up to three tries |
+| `mail-webhooks` | Postmark's delivery webhooks. Postmark tests the address when it creates one, so this follows the first deploy |
 | `seed` | `init-event.cjs` with the frozen answers and the team, the sender record, the ticket webhook |
 | `full-deploy` | `deploy.yml`, up to three tries |
 | `ready` | Emails the Owners their admin panel link, sets `ready` |
 
-The order differs from ADR §6 in one place: the sender record and the ticket webhook's registration are written in `seed`, because they need `config/event` and the deployed functions.
+The order differs from ADR §6 in two places: the mail webhooks follow the first deploy, and the sender record and the ticket webhook's registration are written in `seed`, because they need `config/event` and the deployed functions.
 
 ### 12.1 One-time setup
 
@@ -1364,6 +1365,6 @@ The tests run against a fake of each service, and the fake answers as the rehear
 - Google Cloud: a missing project answers 403 to the provisioner and creating it succeeds. The project's creator holds owner with these credentials. `identityPlatform:initializeAuth` is the right way to turn on sign-in, and the config answers 400 or 404 before it. The custom domain's `requiredDnsUpdates` and `cert.verification` field and value shapes. The default bucket's answer holds its name. `nam5` is accepted for `us-central1`.
 - Workflow identity: `google-github-actions/auth` exports the project and quota variables the script clears from a child's environment. Its credentials keep working past an hour, for a run that waits on a certificate. Credentials from the auth action carry no `quota_project_id` of their own, and if they do, branding fails loudly.
 - GitHub: `GITHUB_TOKEN` with `actions: write` dispatches `deploy.yml` and the run starts. `display_title` follows `run-name`. An App token with the three permissions above can create an Environment.
-- Postmark: `ApiTokens[0]` on the account's `/servers` answer. `/message-streams` accepts a `Broadcasts` stream with Postmark-managed unsubscribe. Webhooks accept a URL with a password in it, and list it back in a form this comparison matches.
+- Postmark: `ApiTokens[0]` on the account's `/servers` answer. `/message-streams` accepts a `Broadcasts` stream with Postmark-managed unsubscribe. Webhooks accept `HttpAuth`, pass Postmark's test of each trigger, and list the URL back in a form this comparison matches.
 - Cloudflare: a TXT value comes back in the form it was stored. A `pm-bounces` CNAME and the certificate's records are not proxied.
 - Stripe and Eventbrite: `GET /v1/account` answers with the connected account's id for a Connect OAuth token. Creating a webhook endpoint on that account with that token works. `GET /users/me/` answers for a live Eventbrite token.

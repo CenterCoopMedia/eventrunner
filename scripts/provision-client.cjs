@@ -626,7 +626,7 @@ function postmarkServer(ctx, token, label, pathAndQuery, options = {}) {
   });
 }
 
-/** ADR §6.5: the mail server, its streams and webhooks, and the sender domain. */
+/** ADR §6.5: the mail server, its streams, and the sender domain. */
 async function stepEmail(ctx) {
   const { domain, settings: { environment } } = ctx;
   const notes = [];
@@ -661,32 +661,6 @@ async function stepEmail(ctx) {
     });
     notes.push('created the announcement stream');
   }
-  const webhookHost = new URL(functionUrl(ctx, 'emailDeliveryWebhook'));
-  const webhookUrl = `https://${basicAuth}@${webhookHost.host}${webhookHost.pathname}`;
-  for (const [stream, subscription] of [[TRANSACTIONAL_STREAM, false], [ANNOUNCEMENT_STREAM, true]]) {
-    const hooks = await postmarkServer(ctx, serverToken, 'read the mail webhooks', `/webhooks?MessageStream=${stream}`);
-    const present = (hooks.Webhooks || []).some((hook) => {
-      const url = new URL(hook.Url);
-      return url.host === webhookHost.host && url.pathname === webhookHost.pathname;
-    });
-    if (!present) {
-      await postmarkServer(ctx, serverToken, 'create the mail webhook', '/webhooks', {
-        method: 'POST',
-        json: {
-          Url: webhookUrl,
-          MessageStream: stream,
-          Triggers: {
-            Delivery: { Enabled: true },
-            Bounce: { Enabled: true },
-            SpamComplaint: { Enabled: true },
-            ...(subscription ? { SubscriptionChange: { Enabled: true } } : {}),
-          },
-        },
-      });
-      notes.push(`added the ${stream} webhook`);
-    }
-  }
-
   const domains = await postmarkAccount(ctx, 'read the sender domains', '/domains?count=500&offset=0');
   let id = (domains.Domains || []).find((item) => item.Name === domain)?.ID;
   if (!id) {
@@ -708,6 +682,45 @@ async function stepEmail(ctx) {
     await ctx.deps.sleep(POSTMARK_WAIT_MS);
   }
   throw new Error(`the mail service has not verified ${domain} yet. Retry the build later.`);
+}
+
+/**
+ * ADR §6.5: Postmark tests a webhook's address when it is created, and saves
+ * nothing if the address does not answer, so this waits for the first deploy.
+ */
+async function stepMailWebhooks(ctx) {
+  const notes = [];
+  const serverToken = await ctx.clientSecrets.readSecret('EMAIL_PROVIDER_API_KEY');
+  const basicAuth = await ctx.clientSecrets.readSecret('EMAIL_WEBHOOK_BASIC_AUTH');
+  if (!serverToken || !basicAuth) throw new Error('the mail secrets are missing');
+  const separator = basicAuth.indexOf(':');
+  const url = functionUrl(ctx, 'emailDeliveryWebhook');
+  const { host, pathname } = new URL(url);
+  for (const [stream, subscription] of [[TRANSACTIONAL_STREAM, false], [ANNOUNCEMENT_STREAM, true]]) {
+    const hooks = await postmarkServer(ctx, serverToken, 'read the mail webhooks', `/webhooks?MessageStream=${stream}`);
+    const present = (hooks.Webhooks || []).some((hook) => {
+      const existing = new URL(hook.Url);
+      return existing.host === host && existing.pathname === pathname;
+    });
+    if (!present) {
+      await postmarkServer(ctx, serverToken, 'create the mail webhook', '/webhooks', {
+        method: 'POST',
+        json: {
+          Url: url,
+          MessageStream: stream,
+          HttpAuth: { Username: basicAuth.slice(0, separator), Password: basicAuth.slice(separator + 1) },
+          Triggers: {
+            Delivery: { Enabled: true },
+            Bounce: { Enabled: true },
+            SpamComplaint: { Enabled: true },
+            ...(subscription ? { SubscriptionChange: { Enabled: true } } : {}),
+          },
+        },
+      });
+      notes.push(`added the ${stream} webhook`);
+    }
+  }
+  return summary(notes);
 }
 
 function ticketing(ctx, choice, connection) {
@@ -1083,6 +1096,7 @@ const STEPS = Object.freeze([
   { id: 'tickets', label: 'Tickets', run: stepTickets },
   { id: 'environment', label: 'Deploy settings', run: stepEnvironment },
   { id: 'first-deploy', label: 'First deploy', run: (ctx) => deploy(ctx, { bootstrap: true }) },
+  { id: 'mail-webhooks', label: 'Email delivery updates', run: stepMailWebhooks },
   { id: 'seed', label: 'Site content and team', run: stepSeed },
   { id: 'full-deploy', label: 'Full deploy', run: (ctx) => deploy(ctx, { bootstrap: false, after: toMillis(ctx.ticketsChangedAt) }) },
   { id: 'ready', label: 'Tell the Owners', run: stepReady },
