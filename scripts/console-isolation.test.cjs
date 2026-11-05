@@ -62,8 +62,9 @@ test('console hosting refuses framing and keeps sign-in pages out of search', ()
 // init-event.cjs. The shared package is the one thing the console
 // functions take from outside console/, and it arrives as the vendored
 // `shared` package (console/functions/vendor/shared.tgz), never as a
-// relative path. Besides it they use only the Firebase SDKs, Stripe and Node.
-const FUNCTION_PACKAGES = Object.freeze(['shared', 'firebase-admin', 'firebase-functions', 'stripe']);
+// relative path. Besides it they use only the Firebase SDKs, Stripe,
+// pdf-lib (the signer's copy of the agreement) and Node.
+const FUNCTION_PACKAGES = Object.freeze(['shared', 'firebase-admin', 'firebase-functions', 'pdf-lib', 'stripe']);
 
 function allowedFunctionImport(specifier) {
   if (specifier.startsWith('node:')) return true;

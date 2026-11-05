@@ -1,0 +1,143 @@
+/* Announcements workspace only. Reuse the tenant-aware admin palette and
+   control scale; the public site and shared form controls are unchanged. */
+.admin-communications {
+  min-width: 0;
+  padding-bottom: var(--space-lg);
+}
+
+.admin-communications__channels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+  width: min(100%, 40rem);
+}
+
+.admin-communications__channel {
+  min-height: var(--admin-control-height);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid rgb(var(--admin-rule-control-rgb));
+  border-radius: var(--admin-radius);
+  background: rgb(var(--admin-ground-raised-rgb));
+  color: rgb(var(--admin-ink-rgb));
+  font-family: var(--admin-font-ui);
+  font-size: var(--admin-text-base);
+  font-weight: 700;
+  text-align: start;
+}
+
+.admin-communications__channel[aria-selected='true'] {
+  border-color: rgb(var(--admin-action-rgb));
+  background: rgb(var(--admin-action-soft-rgb));
+  color: rgb(var(--admin-ink-link-rgb));
+  box-shadow: inset 0 -3px 0 rgb(var(--admin-action-rgb));
+}
+
+.admin-communications__channel:focus-visible {
+  outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb));
+  outline-offset: var(--admin-focus-offset);
+}
+
+.admin-communications__panel {
+  min-width: 0;
+}
+
+.admin-communications__panel[hidden] {
+  display: none;
+}
+
+.admin-email-workspace__compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+  align-items: stretch;
+}
+
+.admin-email-workspace__writer,
+.admin-email-workspace__review {
+  min-width: 0;
+}
+
+.admin-email-workspace__writer {
+  container: announcement-editor / inline-size;
+}
+
+.admin-email-workspace__review {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-email-workspace__link-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+}
+
+.admin-email-workspace__envelope dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-email-workspace__empty-preview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 14rem;
+  padding: var(--space-md) var(--space-xs);
+  text-align: center;
+}
+
+.admin-email-workspace__document {
+  width: 4rem;
+  height: 5rem;
+  margin-bottom: var(--space-sm);
+  color: rgb(var(--admin-ink-data-rgb));
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.admin-email-workspace__steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+  color: rgb(var(--admin-ink-secondary-rgb));
+  font-size: var(--admin-text-sm);
+}
+
+.admin-email-workspace__steps li + li::before {
+  content: '\2192';
+  margin-inline-end: var(--space-xs);
+}
+
+@container announcement-editor (min-width: 26rem) {
+  .admin-email-workspace__link-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .admin-email-workspace__compose {
+    grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+  }
+
+  .admin-email-workspace__empty-preview {
+    min-height: 19rem;
+    padding-block: var(--space-lg);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-communications__channel:hover {
+    border-color: rgb(var(--admin-action-rgb));
+  }
+
+  .admin-communications__channel[aria-selected='true']:hover {
+    border-color: rgb(var(--admin-action-hover-rgb));
+  }
+}
