@@ -77,7 +77,7 @@ A member record repeats its own uid. Firestore cannot query a collection group b
 - **Editor**: edits the event content. In the event admin, an Editor is staff.
 - **Operator**: a CCM person named in `console_config/operators`. An operator can read every organization and team, and reviews requests. An operator does not change a client's team.
 
-An organization always keeps at least one Owner. Two Owners are a condition of launch, because launch readiness needs two operators. They are not a condition of finishing the setup or of starting the build.
+An organization always keeps at least one Owner. The console recommends two Owners, so one lost inbox can't lock a team out. It is not a condition of finishing the setup, starting the build or launching.
 
 ## Functions
 
@@ -206,7 +206,7 @@ The console does not hear about a client who removes the app from their provider
 | `CONSOLE_TEST_MODE` | `functions/.env` | `true` on a rehearsal console only: a test-mode ticket account can accept, and every build runs in test mode. Only the ticket account is in test mode: a build still makes real, billed resources. Unset on a console that serves clients. |
 | `CONSOLE_MAIL_FROM` | `functions/.env` | The sender, for example `Event Runner <hello@console.eventrunner.org>` |
 | `CONSOLE_PUBLIC_URL` | `functions/.env` | `https://console.eventrunner.org`, for invite links, signup links, the links in status email and the addresses providers return to |
-| `CONSOLE_STRIPE_SECRET_KEY` | Secret Manager in the console project | The Stripe platform account's secret key, for clients' ticket connections. It must exist before a deploy. |
+| `CONSOLE_STRIPE_SECRET_KEY` | Secret Manager in the console project | A live restricted key from the Stripe platform account with one permission, Connect OAuth: Write, for clients' ticket connections (a test key on a rehearsal console). It must exist before a deploy, and a deploy picks up each new version. |
 | `CONSOLE_STRIPE_CLIENT_ID` | `functions/.env` | The platform's Connect client id. Unset, the choice says it is not available yet. |
 | `CONSOLE_EVENTBRITE_CLIENT_SECRET` | Secret Manager in the console project | The Eventbrite app's client secret |
 | `CONSOLE_EVENTBRITE_CLIENT_ID` | `functions/.env` | The Eventbrite app's API key. Unset, the choice says it is not available yet. |

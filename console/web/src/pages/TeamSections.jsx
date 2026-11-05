@@ -2,21 +2,22 @@ import { ROLE_LABELS, formatDate } from '../text.js';
 import TeamInviteForm from './TeamInviteForm.jsx';
 import TeamMembers from './TeamMembers.jsx';
 
-/** ADR 0007 §2: launch readiness needs two operators, so the console asks for two Owners. */
-function LaunchOwners({ ownersNeeded }) {
-  let detail = 'This team has the two Owners that launch needs.';
-  if (ownersNeeded === 1) detail = 'Add 1 more Owner before launch.';
-  if (ownersNeeded > 1) detail = `Add ${ownersNeeded} more Owners before launch.`;
+/** A recommendation, not a condition: a second Owner keeps one lost inbox from locking the team out. */
+function SecondOwner({ ownersNeeded }) {
+  const covered = ownersNeeded === 0;
+  let detail = 'One lost inbox can\'t lock you out of your event site.';
+  if (ownersNeeded === 1) detail = 'With two, one lost inbox can\'t lock you out of your event site. You can add 1 more Owner at any time.';
+  if (ownersNeeded > 1) detail = `With two, one lost inbox can't lock you out of your event site. You can add ${ownersNeeded} more Owners at any time.`;
   return (
-    <aside className="note" role="note" aria-labelledby="launch-owners-title">
-      <p id="launch-owners-title" className="note-title">Two Owners are needed before launch.</p>
-      <p>Two people must be able to run the event site, so that one person is never the only way in. {detail}</p>
+    <aside className="note" role="note" aria-labelledby="second-owner-title">
+      <p id="second-owner-title" className="note-title">{covered ? 'Your team has two Owners.' : 'We recommend two Owners.'}</p>
+      <p>{detail}</p>
     </aside>
   );
 }
 
 /**
- * Everything on the Team page under its heading: the launch note, the
+ * Everything on the Team page under its heading: the second Owner note, the
  * members, the open invites and the invite form. `team` is useTeam().
  */
 export default function TeamSections({ team, myUid }) {
@@ -24,7 +25,7 @@ export default function TeamSections({ team, myUid }) {
   const isOwner = data.myRole === 'owner';
   return (
     <>
-      <LaunchOwners ownersNeeded={data.ownersNeeded} />
+      <SecondOwner ownersNeeded={data.ownersNeeded} />
 
       <div aria-live="polite" className="live">
         {notice ? <p className="message success">{notice}</p> : null}

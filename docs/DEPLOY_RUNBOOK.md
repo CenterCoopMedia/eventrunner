@@ -114,6 +114,7 @@ for role in \
   roles/run.developer \
   roles/iam.serviceAccountUser \
   roles/secretmanager.secretAccessor \
+  roles/secretmanager.viewer \
   roles/cloudbuild.builds.editor \
   roles/artifactregistry.writer \
   roles/serviceusage.serviceUsageConsumer \
@@ -131,6 +132,7 @@ Notes on that list: `cloudfunctions.developer` + `run.developer` + `iam.serviceA
 `cloudbuild.builds.editor` + `artifactregistry.writer` are what `firebase deploy --only functions`
 needs end to end (Cloud Functions v2 builds through Cloud Build and Artifact Registry, and the
 deploying principal must be allowed to act as the runtime service account).
+`secretmanager.viewer` lets the deploy read a bound secret's metadata and access policy.
 `secretmanager.secretAccessor` is required only once the environment actually uses a secret
 (`EMAIL_PROVIDER_API_KEY` etc., spec §2.1) — grant it up front so onboarding a provider later is a
 config change, not an IAM change. **This binding is only what the *deploying* identity needs to
@@ -1125,6 +1127,9 @@ The client console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md)
    ```
 
    - **Stripe**: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI `https://console.eventrunner.org/connect/stripe/return`. Put the Connect client id in `console/functions/.env` as `CONSOLE_STRIPE_CLIENT_ID`. Use the test mode client id and key for a rehearsal, with `CONSOLE_TEST_MODE` set (§11.2).
+     - A new account's live client id stays unavailable until the sandbox setup is done, payments are activated, and the Connect integration questions are answered. Do them in that order.
+     - The console's secret key only exchanges and revokes connection tokens, so make it a restricted key with one permission: **Connect OAuth: Write**. Store it in Secret Manager, then redeploy, because a deploy pins each secret's version.
+     - Creating a live key emails a verification link to the Stripe login address. Give that address a working mail route first. If mail to it bounced earlier, Stripe can stop sending: **Personal details** then shows "We've had trouble sending you emails," and the key pop-up keeps saying a link was sent.
    - **Eventbrite**: make an app, and set its OAuth redirect URI to `https://console.eventrunner.org/connect/eventbrite/return`. Put its API key in `console/functions/.env` as `CONSOLE_EVENTBRITE_CLIENT_ID`, and its client secret in the secret above.
    - **Secret Manager**: turn on the Secret Manager API in the console project. Give the functions' runtime service account the **Secret Manager Admin** role, with an IAM condition on the secret name prefix `projects/<project-number>/secrets/connection-`, so it cannot change other secrets. Without a condition, the role reaches every secret in the project.
 
@@ -1210,7 +1215,7 @@ Each step reads the current state and does nothing when it is already right, so 
 | `project` | Project `er-<name>` in the client folder, billing, APIs |
 | `firebase` | Firebase, Firestore, the default bucket, the Hosting site, the web app, sign-in |
 | `deploy-identity` | Deploy account, roles, its own identity pool, the agent grants, the image cleanup policy |
-| `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records, the wait for the certificate (up to an hour) |
+| `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records, the wait for the certificate (up to an hour). Hosting can report `CERT_PROPAGATING` long after it serves the certificate, so that state passes once the address answers over HTTPS |
 | `sign-in` | Authorized domains |
 | `email` | Postmark server, streams, webhooks, sender domain, its DNS records, the wait for verification (up to 30 minutes) |
 | `tickets` | Tests the chosen token, moves it to the client project, deletes the console's copy and any leftover, sets up the Stripe webhook endpoint |

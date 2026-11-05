@@ -144,9 +144,9 @@ test('a factory that returns nothing is rejected', () => {
   );
 });
 
-test('secret gating follows §8.2: token off none, webhook secret by capability', () => {
+test('secret gating: no token for none or manual, webhook secret by capability', () => {
   assert.deepEqual(ticketingSecretNames({ EVENT_TICKETING_PROVIDER: 'none' }), []);
-  assert.deepEqual(ticketingSecretNames({ EVENT_TICKETING_PROVIDER: 'manual' }), ['TICKETING_API_TOKEN']);
+  assert.deepEqual(ticketingSecretNames({ EVENT_TICKETING_PROVIDER: 'manual' }), []);
   assert.deepEqual(
     ticketingSecretNames({ EVENT_TICKETING_PROVIDER: 'eventbrite' }),
     ['TICKETING_API_TOKEN', 'TICKETING_WEBHOOK_SECRET'],

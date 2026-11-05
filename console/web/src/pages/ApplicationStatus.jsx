@@ -160,7 +160,7 @@ export default function ApplicationStatus() {
       <p className="lead">{app.build?.failed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status]}</p>
       {app.address ? <p>Web address: <strong>{app.address}</strong></p> : null}
 
-      <ConnectionNotice message={state?.connectionMessage} />
+      {notice ? null : <ConnectionNotice message={state?.connectionMessage} />}
       <div aria-live="polite" className="live">
         {notice ? <p className="message success">{notice}</p> : null}
       </div>

@@ -228,7 +228,7 @@ describe('SpeakerProfile', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Links' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Next: Logistics' }));
     expect(await screen.findByRole('heading', { level: 2, name: 'Logistics' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Next: Review' }));
     expect(await screen.findByRole('heading', { level: 2, name: 'Review' })).toBeInTheDocument();
     expect(updateOwnSpeakerProfileMock).not.toHaveBeenCalled();
     expect(saveOwnSpeakerLogisticsMock).not.toHaveBeenCalled();
