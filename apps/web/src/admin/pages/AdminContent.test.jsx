@@ -191,17 +191,142 @@ describe('content browsing', () => {
     expect(screen.getByRole('heading', { name: 'Content' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
 
-    await renderAt('/admin/content/scholarships');
+    fireEvent.click(screen.getByRole('link', { name: 'Scholarships', exact: true }));
     expect(await screen.findByRole('link', { name: 'Intro' })).toBeInTheDocument();
     expect(screen.getByText(/1 block/)).toBeInTheDocument();
+    expect(screen.getByText('Who the scholarships are for.')).toBeInTheDocument();
+    expect(screen.getByText('Rich text, Statistic', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Edit content in Intro' })).toHaveAttribute('href', '/admin/content/scholarships/intro');
 
-    await renderAt('/admin/content/scholarships/intro');
+    fireEvent.click(screen.getByRole('link', { name: 'Intro', exact: true }));
     expect(await screen.findByRole('link', { name: 'Scholarships open in spring.' })).toBeInTheDocument();
     expect(screen.getByText('Rich text')).toBeInTheDocument();
     // The title band names the section and its identifiers (the editor a
     // public "Edit section" link opens, issue #198).
     expect(screen.getByRole('heading', { level: 1, name: 'Intro' })).toBeInTheDocument();
     expect(screen.getByText('Scholarships · Intro · 1 block')).toBeInTheDocument();
+  });
+
+  it('searches page names, paths, and section names without changing page order, and clears back to the field', async () => {
+    sources.cmsPages = [
+      SCHOLARSHIPS_PAGE,
+      { ...SCHOLARSHIPS_PAGE, id: 'about', label: 'About the event', path: '/about', order: 1, sections: [] },
+      { ...SCHOLARSHIPS_PAGE, id: 'travel', label: 'Travel', path: '/getting-here', order: 5, sections: [{ id: 'travel_intro', label: 'Intro and directions' }] },
+    ];
+    await renderAt('/admin/content');
+    const search = screen.getByRole('searchbox', { name: 'Search pages and sections' });
+    const names = () => within(screen.getByRole('table')).getAllByRole('rowheader')
+      .map((cell) => within(cell).getByRole('link').textContent);
+    expect(names()).toEqual(['About the event', 'Travel', 'Scholarships']);
+    expect(search).toHaveAccessibleDescription('3 pages');
+
+    fireEvent.change(search, { target: { value: '  INTRO  ' } });
+    expect(names()).toEqual(['Travel', 'Scholarships']);
+    expect(search).toHaveAccessibleDescription('2 of 3 pages');
+    fireEvent.change(search, { target: { value: 'travel directions' } });
+    expect(names()).toEqual(['Travel']);
+    fireEvent.change(search, { target: { value: '/getting-here' } });
+    expect(names()).toEqual(['Travel']);
+    fireEvent.change(search, { target: { value: 'SCHOLARSHIPS' } });
+    expect(names()).toEqual(['Scholarships']);
+
+    fireEvent.change(search, { target: { value: 'nothing matches this' } });
+    expect(screen.getByRole('heading', { name: 'No matching pages' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(search).toHaveAccessibleDescription('0 of 3 pages');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(search).toHaveValue('');
+    expect(search).toHaveFocus();
+    expect(search).toHaveAccessibleDescription('3 pages');
+    expect(names()).toEqual(['About the event', 'Travel', 'Scholarships']);
+    expect(screen.getByRole('link', { name: 'Manage page structure' })).toHaveAttribute('href', '/admin/pages');
+  });
+
+  it('opens an encoded section directly from the page index', async () => {
+    const odd = { ...SCHOLARSHIPS_PAGE.sections[0], id: 'a b/c', label: 'Odd section' };
+    sources.cmsPages_drafts = [{ ...SCHOLARSHIPS_PAGE, sections: [odd] }];
+    await renderAt('/admin/content');
+
+    const directLink = screen.getByRole('link', { name: 'Odd section' });
+    expect(directLink).toHaveAttribute('href', '/admin/content/scholarships/a%20b%2Fc');
+    fireEvent.click(directLink);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Odd section' })).toBeInTheDocument();
+    expect(screen.getByText('Scholarships · Odd section · 0 blocks')).toBeInTheDocument();
+  });
+
+  it('keeps the page publication state separate from its content drafts', async () => {
+    sources.cmsPages = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent = [{ ...BODY_BLOCK_DRAFT, status: undefined, value: '<p>The published introduction.</p>' }];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
+    await renderAt('/admin/content');
+
+    const row = within(screen.getByRole('table')).getByRole('link', { name: 'Scholarships', exact: true }).closest('tr');
+    expect(within(row).getByText('Live', { exact: true })).toBeInTheDocument();
+    expect(within(row).queryByText('Live with unpublished changes')).not.toBeInTheDocument();
+    expect(screen.getByText('Page state is for the page’s structure. Open a section to review its content drafts.')).toBeInTheDocument();
+    fireEvent.click(within(row).getByRole('link', { name: 'Intro' }));
+    const block = (await screen.findByRole('link', { name: 'Scholarships open in spring.' })).closest('li');
+    expect(within(block).getByText('Live with unpublished changes')).toBeInTheDocument();
+  });
+
+  it('offers verified destinations for sectionless system pages without guessing from editable labels or paths', async () => {
+    const targets = [
+      ['schedule', 'Program', '/admin/sessions', 'Manage sessions'],
+      ['speakers', 'Presenters', '/admin/speakers', 'Manage speakers'],
+      ['sponsors', 'Partners', '/admin/organizations', 'Manage organizations'],
+      ['attendees', 'People', '/admin/attendees', 'Manage attendees'],
+      ['updates', 'News', '/admin/updates', 'Manage updates'],
+    ];
+    sources.cmsPages = [
+      ...targets.map(([id, label], order) => ({ ...SCHOLARSHIPS_PAGE, id, label, path: `/old-${id}`, systemPage: true, sections: [], order })),
+      { ...SCHOLARSHIPS_PAGE, id: 'custom', label: 'Speakers', path: '/speakers', sections: [], order: 10 },
+      { ...SCHOLARSHIPS_PAGE, id: 'unknown', label: 'Unknown system page', systemPage: true, sections: [], order: 11 },
+    ];
+    await renderAt('/admin/content');
+    const index = within(screen.getByRole('table'));
+
+    for (const [, label, to, action] of targets) {
+      const row = index.getByRole('link', { name: label, exact: true }).closest('tr');
+      expect(within(row).getByRole('link', { name: action })).toHaveAttribute('href', to);
+    }
+    for (const [id, label] of [['custom', 'Speakers'], ['unknown', 'Unknown system page']]) {
+      const row = index.getByRole('link', { name: label, exact: true }).closest('tr');
+      expect(within(row).getByText('No sections yet.')).toBeInTheDocument();
+      expect(within(row).getByRole('link', { name: 'Edit page structure' })).toHaveAttribute('href', `/admin/pages/${id}`);
+    }
+    fireEvent.click(index.getByRole('link', { name: 'Program', exact: true }));
+    expect(await screen.findByText('This page’s main content is managed in Sessions.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Manage sessions' })).toHaveAttribute('href', '/admin/sessions');
+  });
+
+  it('withholds section counts until both content revisions arrive and counts a live block plus its draft once', async () => {
+    sources.cmsPages = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent = [{ ...BODY_BLOCK_DRAFT, status: undefined }];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
+    silentCollections = ['cmsContent_drafts'];
+    await renderAt('/admin/content/scholarships');
+
+    expect(screen.getByText('Loading blocks…')).toBeInTheDocument();
+    expect(screen.queryByText('0 blocks', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('1 block', { exact: true })).not.toBeInTheDocument();
+    act(() => adminErrors.get('cmsContent_drafts')(new Error('draft listener failed')));
+    expect(screen.getByText('Block count unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Intro', exact: true })).toBeInTheDocument();
+    act(() => adminSubscriptions.get('cmsContent_drafts')(sources.cmsContent_drafts));
+    expect(await screen.findByText('1 block', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('Limit: 2 blocks')).toBeInTheDocument();
+    expect(screen.queryByText('Block count unavailable')).not.toBeInTheDocument();
+  });
+
+  it('does not call a draft-only page missing when its listener has not recovered', async () => {
+    silentCollections = ['cmsPages_drafts'];
+    await renderAt('/admin/content/scholarships');
+    expect(screen.getByRole('status', { name: 'Loading page…' })).toBeInTheDocument();
+    act(() => adminErrors.get('cmsPages_drafts')(new Error('draft listener failed')));
+    expect(screen.getByRole('heading', { name: 'The page is not available yet' })).toBeInTheDocument();
+    expect(screen.queryByText('No such page')).not.toBeInTheDocument();
+    act(() => adminSubscriptions.get('cmsPages_drafts')([SCHOLARSHIPS_PAGE]));
+    expect(await screen.findByRole('link', { name: 'Intro', exact: true })).toBeInTheDocument();
   });
 
   it('opens the right section from the path a public edit link builds, even for an id that needs encoding', async () => {
