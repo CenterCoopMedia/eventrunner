@@ -107,6 +107,19 @@ describe('AnnouncementEmailComposer', () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it('explains the empty review area without exposing send actions before a preview', async () => {
+    respond({ listAnnouncementSends: listResponse([]) });
+    await renderLoaded();
+    expect(screen.getByRole('heading', { name: 'Write your email' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Review before sending' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Your preview will appear here' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Email sending steps' })).toHaveTextContent('PreviewSend a testConfirm recipients');
+    expect(screen.queryByTitle('Email preview')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Send to/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send a test to me' })).not.toBeInTheDocument();
+    expect(call.mock.calls.filter(([name]) => name === 'previewAnnouncementEmail')).toHaveLength(0);
+  });
+
   it('lists the audiences from the server and the send history with counts, and no address', async () => {
     respond({ listAnnouncementSends: listResponse() });
     await renderLoaded();
