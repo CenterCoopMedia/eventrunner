@@ -379,7 +379,7 @@ describe('the operator loading indicator', () => {
     expect(animations).toHaveLength(1);
     expect(animations[0].parent.selector).toBe('.admin-loading-state__spinner');
     expect(motionAllowed(animations[0])).toBe(true);
-    expect(animations[0].value).toBe('admin-loading-spin var(--admin-loading-cycle) linear infinite');
+    expect(animations[0].value).toBe('admin-loading-spin var(--admin-loading-cycle) linear 600ms infinite');
   });
 
   it('rotates only transform and owns a restrained cycle', () => {

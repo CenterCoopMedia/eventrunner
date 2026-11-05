@@ -1,5 +1,6 @@
 /* A pending request owns this indicator. The label carries the meaning;
-   the ring is static unless the reader has allowed motion. */
+   the ring is static unless the reader has allowed motion. It starts to
+   turn only after a short wait, so a fast load never shows motion. */
 .admin-loading-state {
   --admin-loading-cycle: 1.2s;
   display: flex;
@@ -22,7 +23,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .admin-loading-state__spinner {
-    animation: admin-loading-spin var(--admin-loading-cycle) linear infinite;
+    animation: admin-loading-spin var(--admin-loading-cycle) linear 600ms infinite;
   }
 
   @keyframes admin-loading-spin {
