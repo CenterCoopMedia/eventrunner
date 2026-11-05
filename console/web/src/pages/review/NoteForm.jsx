@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { NOTE_MAX } from '../../reviewText.js';
+import { ActionResult } from '../../ActionFeedback.jsx';
 
 /**
  * A decision that needs a note to the client. The note goes in the email
  * to the Owners and in the history.
  */
-export default function NoteForm({ id, title, help, submitLabel, danger = false, onSubmit, onCancel }) {
+export default function NoteForm({ id, title, help, submitLabel, danger = false, onSubmit, onCancel, disabled, result }) {
   const [note, setNote] = useState('');
   const [fieldError, setFieldError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -14,6 +15,7 @@ export default function NoteForm({ id, title, help, submitLabel, danger = false,
 
   async function submit(event) {
     event.preventDefault();
+    if (busy || disabled) return;
     const text = note.trim();
     let problem = '';
     if (!text) problem = 'Write a note to the client.';
@@ -24,8 +26,11 @@ export default function NoteForm({ id, title, help, submitLabel, danger = false,
       return;
     }
     setBusy(true);
-    const done = await onSubmit(text);
-    if (!done) setBusy(false);
+    try {
+      await onSubmit(text);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -40,6 +45,7 @@ export default function NoteForm({ id, title, help, submitLabel, danger = false,
           rows={5}
           autoFocus
           value={note}
+          disabled={busy || disabled}
           onChange={(e) => setNote(e.target.value)}
           aria-invalid={fieldError ? 'true' : undefined}
           aria-describedby={[`${fieldId}-hint`, fieldError ? `${fieldId}-error` : null].filter(Boolean).join(' ')}
@@ -47,9 +53,10 @@ export default function NoteForm({ id, title, help, submitLabel, danger = false,
         {fieldError ? <p id={`${fieldId}-error`} className="field-error">{fieldError}</p> : null}
       </div>
       <div className="row-actions">
-        <button type="submit" className={`button ${danger ? 'danger' : 'primary'}`} disabled={busy}>{submitLabel}</button>
-        <button type="button" className="button" onClick={onCancel}>Cancel</button>
+        <button type="submit" className={`button ${danger ? 'danger' : 'primary'}`} disabled={busy || disabled}>{busy ? 'Saving decision…' : submitLabel}</button>
+        <button type="button" className="button" disabled={busy || disabled} onClick={onCancel}>Cancel</button>
       </div>
+      <ActionResult result={result} />
     </form>
   );
 }
