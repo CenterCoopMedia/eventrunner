@@ -19,9 +19,9 @@
 // and no figures; a failure after figures arrived keeps them on the page
 // under a caution notice that says when they were read.
 //
-// Under the figures: the milestones and the goal from config/event (issue
-// #180), then the registration funnel and the content readiness table
-// (issue #181), both read from the same response.
+// Under the figures: content readiness, with milestones and the goal from
+// config/event (issue #180), the registration funnel, and system health
+// beside it. All server figures come from the same response.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext.jsx';
@@ -98,14 +98,14 @@ export default function AdminOverview() {
         actions={
           <>
             <button
-            type="button"
-            className={secondaryButtonClass}
-            onClick={refresh}
-            aria-busy={busy || undefined}
-            aria-disabled={busy || undefined}
-          >
-            {busy ? 'Refreshing…' : 'Refresh figures'}
-          </button>
+              type="button"
+              className={secondaryButtonClass}
+              onClick={refresh}
+              aria-busy={busy || undefined}
+              aria-disabled={busy || undefined}
+            >
+              {busy ? 'Refreshing…' : 'Refresh figures'}
+            </button>
             <Link to="/admin/unpublished" className={primaryButtonClass}>Review unpublished changes</Link>
           </>
         }

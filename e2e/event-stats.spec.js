@@ -243,7 +243,7 @@ test.describe.serial('the event statistics endpoint', () => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
         await expect(page.getByRole('article')).toHaveCount(5);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+        const overflow = await page.locator('html').evaluate((element) => element.scrollWidth > element.ownerDocument.defaultView.innerWidth + 1);
         expect(overflow, `Overview must fit at ${viewport.width}px`).toBe(false);
         await page.locator('.admin-rail').evaluate((element) => { element.scrollTop = 0; });
         await page.locator('html').evaluate((element) => element.ownerDocument.fonts.ready);

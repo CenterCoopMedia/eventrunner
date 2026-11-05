@@ -468,12 +468,18 @@ describe('the admin overview', () => {
         'Refresh figures',
         'Review unpublished changes',
         'Manage attendees',
-        'Review system errors',
         'Open ticketing',
         'Manage speakers',
         'Manage sessions',
         'Review changes',
         'Records on the site and records with unpublished changes, by collection.',
+        'Pages',
+        'Content blocks',
+        'Sessions',
+        'Organizations',
+        'Timeline',
+        'Updates',
+        'Review system errors',
       ]);
       const region = screen.getByRole('region', { name: 'Records on the site and records with unpublished changes, by collection.' });
       expect(region).toHaveAttribute('tabindex', '0');

@@ -104,6 +104,10 @@
   min-width: 0;
 }
 
+.admin-overview-workspace .admin-overview-working-grid > .admin-readiness-panel {
+  grid-column: auto;
+}
+
 .admin-overview-workspace .admin-readiness-table {
   min-width: 0;
   table-layout: fixed;
@@ -111,11 +115,20 @@
 
 .admin-overview-workspace .admin-readiness-table th,
 .admin-overview-workspace .admin-readiness-table td {
+  padding-inline: var(--space-xs);
   overflow-wrap: anywhere;
 }
 
 .admin-overview-workspace .admin-readiness-table th:first-child {
-  width: 40%;
+  width: 41%;
+}
+
+.admin-overview-workspace .admin-readiness-table th:nth-child(2) {
+  width: 24%;
+}
+
+.admin-overview-workspace .admin-readiness-link {
+  font-size: var(--admin-text-sm);
 }
 
 .admin-overview-workspace .admin-overview-health .admin-figure-total {
