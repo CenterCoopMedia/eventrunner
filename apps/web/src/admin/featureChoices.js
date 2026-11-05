@@ -20,7 +20,7 @@ export const FEATURE_CHOICES = {
   icsExport: { label: 'Calendar export', hint: 'Offer calendar (.ics) export.' },
   calendarSync: { label: 'Calendar sync', hint: 'Let attendees sync bookmarked sessions to their calendar.' },
   updates: { label: 'Written updates', hint: 'Publish written updates.' },
-  autoApproveTicketHolders: { label: 'Automatic ticket approval', hint: 'Approve ticket holders without review.' },
+  autoApproveTicketHolders: { label: 'Automatic ticket approval', hint: 'Approve ticket holders without review. Turn this off if you offer free tickets.' },
   publicAttendeeProfiles: { label: 'Public attendee profiles', hint: 'Make attendee profiles publicly visible.' },
   webmcpPublic: { label: 'Public browser tools', hint: 'Expose bounded public read-only site tools in supported browsers.' },
   webmcpAdmin: { label: 'Admin browser tools', hint: 'Expose authenticated read-only admin diagnostics in supported browsers.' },

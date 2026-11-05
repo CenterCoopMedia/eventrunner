@@ -213,7 +213,7 @@ test('a write that does not change the projection writes nothing', async () => {
   db.writes.length = 0;
 
   // Only private fields moved: registrationStatus is not projected.
-  db.docs.set('users/u1', userDoc({ registrationStatus: 'revoked', lastSeenAt: 'now' }));
+  db.docs.set('users/u1', userDoc({ lastSeenAt: 'now' }));
   const result = await sync({ uid: 'u1' });
   assert.equal(result.action, 'unchanged');
   assert.deepEqual(db.writes, []);
@@ -353,4 +353,32 @@ test('refresh replaces oversized legacy public profiles with bounded projections
   assert.equal(pub.bio.length, 2000);
   assert.deepEqual(pub.socialHandles, {});
   assert.ok(Buffer.byteLength(JSON.stringify(pub)) < 4000);
+});
+
+test('an account without attendee access gets a private card', async () => {
+  for (const registrationStatus of ['pending', 'ticketed', 'revoked']) {
+    const db = fakeDb({ 'users/u1': userDoc({ registrationStatus, profileVisibility: 'public' }) });
+    await createSyncUserPublic({ db })({ uid: 'u1' });
+    assert.equal(db.docs.get('users_public/u1').profileVisibility, 'private', registrationStatus);
+  }
+  const speaker = fakeDb({ 'users/u1': userDoc({ registrationStatus: 'pending', speakerId: 's1' }) });
+  await createSyncUserPublic({ db: speaker })({ uid: 'u1' });
+  assert.equal(speaker.docs.get('users_public/u1').profileVisibility, 'attendees_only');
+});
+
+test('revocation hides the card, approval restores it, and a removed photo is still deleted', async () => {
+  const photoPath = 'profile-photos/u1/a.jpg';
+  const deleted = [];
+  const db = fakeDb({ 'users/u1': userDoc({ photoPath }) });
+  const sync = createSyncUserPublic({ db, deleteReplacedPhoto: async (path) => deleted.push(path) });
+  await sync({ uid: 'u1' });
+  db.docs.set('users/u1', userDoc({ photoPath, registrationStatus: 'revoked' }));
+  await sync({ uid: 'u1' });
+  assert.equal(db.docs.get('users_public/u1').profileVisibility, 'private');
+  db.docs.set('users/u1', userDoc({ photoPath: null, registrationStatus: 'revoked' }));
+  await sync({ uid: 'u1' });
+  assert.deepEqual(deleted, [photoPath]);
+  db.docs.set('users/u1', userDoc({ photoPath: null }));
+  await sync({ uid: 'u1' });
+  assert.equal(db.docs.get('users_public/u1').profileVisibility, 'attendees_only');
 });

@@ -21,10 +21,15 @@
  * rewritten to the intersection with the configured set rather than
  * copied.
  *
+ * Only an account with attendee access can be listed. Anyone can sign in with
+ * Google, so the card of a pending or revoked account is forced to `private`
+ * whatever the account chose. The card still exists because it names the
+ * photo that photo cleanup compares against. Approval restores the chosen
+ * visibility, because the approval write fires this trigger.
+ *
  * Idempotent and self-limiting: a write that leaves the projection
- * byte-identical (a `lastSeenAt` touch, a registrationStatus change —
- * private, so not projected) writes nothing, so trigger retries and
- * unrelated account churn do not amplify into writes.
+ * byte-identical (a `lastSeenAt` touch) writes nothing, so trigger retries
+ * and unrelated account churn do not amplify into writes.
  *
  * A replaced profile photo is deleted only after that write. The directory
  * reads `users_public.photoPath`, so deleting the previous object any
@@ -34,6 +39,7 @@
  */
 
 const { buildPublicProfile } = require('shared/profile');
+const { hasAttendeeAccess } = require('shared/registration');
 
 const USERS = 'users';
 const USERS_PUBLIC = 'users_public';
@@ -163,6 +169,7 @@ function createSyncUserPublic({
 
       const previousPhoto = publicSnap.exists ? publicSnap.data()?.photoPath : null;
       const payload = buildPublicProfile(userSnap.data(), badgesConfig, featuresConfig, uid);
+      if (!hasAttendeeAccess(userSnap.data())) payload.profileVisibility = 'private';
       if (publicSnap.exists && sameProjection(stripStamps(publicSnap.data()), payload)) {
         return { action: 'unchanged' };
       }
