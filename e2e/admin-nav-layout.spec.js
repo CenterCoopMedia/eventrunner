@@ -74,7 +74,16 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }) 
   const show = page.getByRole('button', { name: 'Show menu' });
   await expect(show).toBeFocused();
   await expect(show).toHaveAttribute('aria-expanded', 'false');
-  await expect(nav).toBeHidden();
+  // The collapsed rail keeps one icon per section; a group's icon opens its pages.
+  const programIcon = nav.getByRole('button', { name: 'Program', exact: true });
+  await expect(programIcon).toHaveAttribute('aria-expanded', 'false');
+  await expect(programIcon).toHaveAttribute('data-current', 'true');
+  await programIcon.click();
+  await expect(nav.getByRole('link', { name: 'Session pitches', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(programIcon).toHaveAttribute('aria-expanded', 'false');
+  await expect(programIcon).toBeFocused();
+  await expect(nav.getByRole('link', { name: 'Session pitches', exact: true })).toBeHidden();
   await expect(page).toHaveURL(/\/admin\/sessions$/);
   const railBox = await page.locator('.admin-rail').boundingBox();
   expect(railBox.width).toBeLessThanOrEqual(68);
