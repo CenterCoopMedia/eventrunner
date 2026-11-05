@@ -41,6 +41,7 @@ import { Link, useSearchParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { zoneLabel } from '../../lib/eventTime.js';
 import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { buildPreviewDoc } from '../emailPreview.js';
 import {
   Notice,
@@ -657,14 +658,14 @@ export default function AdminEmailLog() {
         title="Email log"
         description="Every message this site sent, newest first. Messages stay in this log for 90 days after the site sends them. Automatic maintenance then removes them. Sign-in codes and speaker invitations never store their body."
         actions={
-          <button
-            type="button"
+          <AdminIconControl
             className={secondaryButtonClass}
             onClick={refresh}
             aria-busy={pending === 'refresh' ? 'true' : undefined}
-          >
-            {pending === 'refresh' ? 'Refreshing…' : 'Refresh'}
-          </button>
+            busy={pending === 'refresh'}
+            label={pending === 'refresh' ? 'Refreshing…' : 'Refresh'}
+            icon="refresh"
+          />
         }
       />
 
