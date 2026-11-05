@@ -24,7 +24,7 @@
 
 const { hostName } = require('./hostName.cjs');
 const { agreementPdf, formatAcceptedAt } = require('./agreementPdf.cjs');
-const { button, detailsTable, wrapConsoleEmail } = require('./emailLayout.cjs');
+const { button, detailsTable, fineprint, heading, kicker, note, paragraph, wrapConsoleEmail } = require('./emailLayout.cjs');
 
 const POSTMARK_URL = 'https://api.postmarkapp.com/email';
 const ROLE_WORDS = Object.freeze({ owner: 'Owner', editor: 'Editor' });
@@ -50,11 +50,12 @@ function inviteMessage({ organizationName, inviterEmail, role, link, expiresInDa
     'If you did not expect this email, you can ignore it.',
   ];
   const text = `${lines[0]}\n\n${lines[1]}\n${lines[2]}\n\n${lines[3]}\n${lines[4]}\n`;
-  const html = [
-    `<p>${escapeHtml(lines[0])}</p>`,
-    `<p><a href="${escapeHtml(link)}">Accept the invite</a></p>`,
-    `<p>${escapeHtml(lines[3])}<br>${escapeHtml(lines[4])}</p>`,
-  ].join('\n');
+  const html = wrapConsoleEmail([
+    heading(escapeHtml(subject)),
+    paragraph(escapeHtml(lines[0])),
+    button(escapeHtml(link), 'Accept the invite'),
+    fineprint(`${escapeHtml(lines[3])}<br>${escapeHtml(lines[4])}`),
+  ].join('\n'), { preheader: escapeHtml(lines[0]) });
   return { subject, text, html };
 }
 
@@ -71,26 +72,45 @@ const STATUS_WORDS = Object.freeze({
   'build-failed': { subject: 'Your site did not finish building', line: 'Your site did not finish building. Open your request to see what to do next.' },
 });
 
-/** Text and HTML from paragraphs, with an optional link paragraph. */
-function compose(subject, paragraphs, link, linkText) {
-  const textParts = [...paragraphs];
+const breaks = (text) => escapeHtml(text).replace(/\n/g, '<br>');
+
+/**
+ * Text and branded HTML from paragraphs, with an optional link. A paragraph
+ * may be `{ note }`, a note from the host: "Note from ...:" and the note in
+ * the text, a quoted panel in the HTML. `context` is a small line above
+ * the heading and, unless `contextInText` is false, the first text
+ * paragraph. The heading is `title`.
+ */
+function compose(subject, paragraphs, link, linkText, { title = subject, context = '', contextInText = true } = {}) {
+  const noteLabel = () => `Note from ${hostName()}`;
+  const textParts = [...(context && contextInText ? [context] : []), ...paragraphs.map((p) => (typeof p === 'string' ? p : `${noteLabel()}:\n${p.note}`))];
   if (link) textParts.push(`${linkText}:\n${link}`);
-  const htmlParts = paragraphs.map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`);
-  if (link) htmlParts.push(`<p><a href="${escapeHtml(link)}">${escapeHtml(linkText)}</a></p>`);
-  return { subject, text: `${textParts.join('\n\n')}\n`, html: htmlParts.join('\n') };
+  const first = paragraphs.find((p) => typeof p === 'string') || '';
+  // A line that only repeats the heading ("Your site is ready.") is left out of the HTML.
+  const body = paragraphs.filter((p, i) => !(i === 0 && p === `${title}.`));
+  const html = wrapConsoleEmail([
+    context ? kicker(escapeHtml(context)) : '',
+    heading(escapeHtml(title)),
+    ...body.map((p, i) => (typeof p === 'string'
+      ? paragraph(breaks(p), i === body.length - 1 && !link)
+      : note(escapeHtml(noteLabel()), breaks(p.note)))),
+    link ? button(escapeHtml(link), escapeHtml(linkText)) : '',
+  ].filter(Boolean).join('\n'), { preheader: escapeHtml(first) });
+  return { subject, text: `${textParts.join('\n\n')}\n`, html };
 }
 
 /** @returns {{ subject: string, text: string, html: string }} */
 function statusChangeMessage({ organizationName, eventName, status, link, note, adminLink }) {
   const words = STATUS_WORDS[status];
   if (!words) throw new TypeError(`statusChangeMessage: unknown status ${status}`);
-  const paragraphs = [`${organizationName}: ${eventName}`, words.line];
-  if (note) paragraphs.push(`Note from ${hostName()}:\n${note}`);
+  const paragraphs = [words.line];
+  if (note) paragraphs.push({ note });
+  const shape = { title: words.subject, context: `${organizationName}: ${eventName}` };
   if (adminLink) {
     paragraphs.push('Sign in to your admin panel with this email address. The setup checklist there shows what is left before you open the site to the public.');
-    return compose(`${words.subject}: ${eventName}`, paragraphs, adminLink, 'Open your admin panel');
+    return compose(`${words.subject}: ${eventName}`, paragraphs, adminLink, 'Open your admin panel', shape);
   }
-  return compose(`${words.subject}: ${eventName}`, paragraphs, link, 'Open your request');
+  return compose(`${words.subject}: ${eventName}`, paragraphs, link, 'Open your request', shape);
 }
 
 /** @returns {{ subject: string, text: string, html: string }} */
@@ -104,7 +124,7 @@ function operatorNoticeMessage({ organizationName, eventName, link, kind = 'star
       'Open the request to read the build record and fix the cause, then select Retry the build. The steps that finished are not done twice.',
     ]],
   }[kind];
-  return compose(words[0], words[1], link, 'Open the request');
+  return compose(words[0], words[1], link, 'Open the request', { title: words[0].slice(0, words[0].length - who.length - 2), context: who, contextInText: false });
 }
 
 /**
