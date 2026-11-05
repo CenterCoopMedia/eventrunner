@@ -15,7 +15,7 @@ function team(overrides = {}) {
       { uid: 'ana', email: 'ana@example.org', role: 'owner', joinedAt: '2026-10-01T00:00:00.000Z' },
       { uid: 'ben', email: 'ben@example.org', role: 'editor', joinedAt: '2026-10-02T00:00:00.000Z' },
     ],
-    invites: [{ id: 'i1', email: 'dee@example.org', role: 'editor', expiresAt: '2026-11-10T00:00:00.000Z' }],
+    invites: [{ id: 'i1', email: 'dee@example.org', role: 'editor', expiresAt: '2026-11-10T12:00:00.000Z' }],
     ownersNeeded: 1,
     ...overrides,
   };

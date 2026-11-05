@@ -1125,6 +1125,9 @@ The client console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md)
    ```
 
    - **Stripe**: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI `https://console.eventrunner.org/connect/stripe/return`. Put the Connect client id in `console/functions/.env` as `CONSOLE_STRIPE_CLIENT_ID`. Use the test mode client id and key for a rehearsal, with `CONSOLE_TEST_MODE` set (§11.2).
+     - A new account's live client id stays unavailable until the sandbox setup is done, payments are activated, and the Connect integration questions are answered. Do them in that order.
+     - The console's secret key only exchanges and revokes connection tokens, so make it a restricted key with one permission: **Connect OAuth: Write**. Store it in Secret Manager, then redeploy, because a deploy pins each secret's version.
+     - Creating a live key emails a verification link to the Stripe login address. Give that address a working mail route first. If mail to it bounced earlier, Stripe can stop sending: **Personal details** then shows "We've had trouble sending you emails," and the key pop-up keeps saying a link was sent.
    - **Eventbrite**: make an app, and set its OAuth redirect URI to `https://console.eventrunner.org/connect/eventbrite/return`. Put its API key in `console/functions/.env` as `CONSOLE_EVENTBRITE_CLIENT_ID`, and its client secret in the secret above.
    - **Secret Manager**: turn on the Secret Manager API in the console project. Give the functions' runtime service account the **Secret Manager Admin** role, with an IAM condition on the secret name prefix `projects/<project-number>/secrets/connection-`, so it cannot change other secrets. Without a condition, the role reaches every secret in the project.
 
