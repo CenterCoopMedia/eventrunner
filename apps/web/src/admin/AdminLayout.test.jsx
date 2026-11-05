@@ -974,6 +974,15 @@ describe('folding groups and the hiding rail, issue 477', () => {
       fireEvent.keyDown(settings, { key: 'Escape' });
       expect(settings).toHaveAttribute('aria-expanded', 'false');
       expect(settings).toHaveFocus();
+      // A dialog opened over the flyout (unsaved changes) handles Escape itself.
+      fireEvent.click(settings);
+      const dialog = document.createElement('dialog');
+      const inside = document.createElement('button');
+      dialog.append(inside);
+      document.body.append(dialog);
+      fireEvent.keyDown(inside, { key: 'Escape' });
+      expect(settings).toHaveAttribute('aria-expanded', 'true');
+      dialog.remove();
     } finally {
       restore();
     }

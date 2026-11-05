@@ -411,6 +411,8 @@ function CollapsedDocket({ docket, activeGroup, pathname }) {
     };
     const onEscape = (event) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // A modal opened from a flyout link (unsaved changes) owns Escape.
+      if (event.target instanceof Element && event.target.closest('dialog')) return;
       event.preventDefault();
       event.stopPropagation();
       setOpenId(null);
@@ -609,6 +611,8 @@ function AdminDesk() {
     if (wide || !mobileDocketOpen) return undefined;
     const onKeyDown = (event) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // A modal opened from a flyout link (unsaved changes) owns Escape.
+      if (event.target instanceof Element && event.target.closest('dialog')) return;
       const target = event.target;
       // A dialog inside the sheet, including a nested media dialog, answers
       // Escape first. The sheet stays open until that dialog is gone.
@@ -634,7 +638,7 @@ function AdminDesk() {
         Skip to main content
       </a>
       <div
-        className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto"
+        className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto"
         data-collapsed={railHidden ? 'true' : undefined}
       >
         <div className="admin-rail__job flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline px-sm lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
