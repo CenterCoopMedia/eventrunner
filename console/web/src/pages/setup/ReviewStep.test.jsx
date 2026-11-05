@@ -15,7 +15,7 @@ describe('Review step', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'Your organization' })).toBeInTheDocument();
     expect(screen.getByText('NC Local News Summit')).toBeInTheDocument();
     expect(screen.getByText('nclocal.eventrunner.org')).toBeInTheDocument();
-    expect(screen.getByText('2027-05-13, 09:00 to 17:00')).toBeInTheDocument();
+    expect(screen.getByText('Thursday, 13 May 2027, 9:00 a.m. to 5:00 p.m.')).toBeInTheDocument();
     expect(screen.getByText('Sell with Stripe')).toBeInTheDocument();
     expect(screen.getByText('Connected: NC Local')).toBeInTheDocument();
     expect(screen.getByText('NC Local <hello@nclocal.eventrunner.org>')).toBeInTheDocument();

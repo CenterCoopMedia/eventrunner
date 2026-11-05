@@ -188,13 +188,13 @@ test.describe.serial('the event statistics endpoint', () => {
       await expect(nav.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'page');
 
       const figures = page.locator('section', { has: page.getByRole('heading', { name: 'Event figures' }) });
-      await expect(figures.getByRole('article')).toHaveCount(5);
+      await expect(figures.getByRole('article')).toHaveCount(4);
       const response = await callFunction('getEventStats', {}, token);
       expect(response.status).toBe(200);
       for (const expected of figureCards(response.body)) {
-        const card = figures.getByRole('article', { name: expected.title, exact: true });
+        const card = page.getByRole('article', { name: expected.title, exact: true });
         await expect(card).toBeVisible();
-        await expect(card.getByRole('heading', { level: 3 })).toHaveCSS('font-family', /Source Sans 3/);
+        await expect(card.getByRole('heading', { level: expected.title === 'System health' ? 2 : 3 })).toHaveCSS('font-family', /Source Sans 3/);
         await expect(card.locator('.admin-figure-total')).toHaveText(expected.total);
         await expect(card.getByRole('listitem')).toHaveText(expected.breakdown);
         if (expected.note) await expect(card.getByText(expected.note, { exact: true })).toBeVisible();
@@ -236,11 +236,15 @@ test.describe.serial('the event statistics endpoint', () => {
       for (const viewport of [
         { name: 'desktop', width: 1440, height: 1000 },
         { name: 'ultrawide', width: 2560, height: 1440 },
+        { name: 'tablet', width: 640, height: 960 },
         { name: 'narrow', width: 390, height: 844 },
+        { name: 'small', width: 320, height: 844 },
       ]) {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
         await expect(page.getByRole('article')).toHaveCount(5);
+        const overflow = await page.locator('html').evaluate((element) => element.scrollWidth > element.ownerDocument.defaultView.innerWidth + 1);
+        expect(overflow, `Overview must fit at ${viewport.width}px`).toBe(false);
         await page.locator('.admin-rail').evaluate((element) => { element.scrollTop = 0; });
         await page.locator('html').evaluate((element) => element.ownerDocument.fonts.ready);
         await page.screenshot({

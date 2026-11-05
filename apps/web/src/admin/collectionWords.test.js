@@ -27,8 +27,12 @@ describe('the collection words', () => {
       path.join(path.dirname(fileURLToPath(import.meta.url)), 'overview', 'ReadinessPanel.jsx'),
       'utf8',
     );
+    // The readiness rows can carry a management route after their name.
+    // Compare the id and label, not the tuple's length or formatting.
+    const names = [...readiness.matchAll(/\[\s*'([^']+)'\s*,\s*'([^']+)'(?=\s*[,\]])/g)]
+      .map(([, id, label]) => [id, label]);
     for (const choice of COLLECTION_CHOICES) {
-      expect(readiness, choice.id).toContain(`['${choice.id}', '${choice.label}']`);
+      expect(names, choice.id).toContainEqual([choice.id, choice.label]);
     }
   });
 
