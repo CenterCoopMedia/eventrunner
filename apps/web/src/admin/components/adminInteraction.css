@@ -1,0 +1,32 @@
+.admin-icon-control {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  min-width: var(--admin-control-height); min-height: var(--admin-control-height);
+  width: var(--admin-control-height); padding: 0;
+}
+.admin-icon-control svg { flex: none; }
+.admin-control-tooltip {
+  position: fixed; z-index: 100; pointer-events: none;
+  max-width: min(15rem, calc(100vw - 1rem)); padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid rgb(var(--admin-rail-rule-rgb)); border-radius: var(--admin-radius);
+  background: rgb(var(--admin-rail-ground-rgb)); color: rgb(var(--admin-rail-ink-rgb));
+  font-family: var(--admin-font-ui); font-size: var(--admin-text-sm, 0.875rem); line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.admin-modal {
+  width: calc(100% - var(--space-md) * 2); margin: auto;
+  max-height: calc(100dvh - var(--space-md) * 2); overflow: auto; overscroll-behavior: contain;
+}
+.admin-modal::backdrop { background: rgb(var(--admin-ink-rgb) / 0.4); }
+.admin-busy-mark {
+  display: inline-block; width: 1rem; height: 1rem; flex: none;
+  border: 2px solid currentColor; border-inline-end-color: transparent; border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .admin-busy-mark { animation: admin-request-spin 900ms linear infinite; }
+  .admin-control-tooltip { animation: admin-hint-in 110ms ease-out; }
+  @keyframes admin-request-spin { to { transform: rotate(360deg); } }
+  @keyframes admin-hint-in { from { opacity: 0; } to { opacity: 1; } }
+}
+@media (forced-colors: active) {
+  .admin-control-tooltip { border-color: CanvasText; background: Canvas; color: CanvasText; }
+}

@@ -27,18 +27,31 @@ async function expectCloseFits(page, width) {
   await expect(close).toHaveAttribute('title', 'Close dialog');
 }
 
-test('the media close control keeps its hit area at phone widths', async ({ page }) => {
+test('the media close control keeps its hit area at phone widths', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 400, height: 700 });
   await openPrimaryPicker(page);
+  const dialog = page.getByRole('dialog', { name: /Choose an image/ });
+  await expect(dialog).toHaveJSProperty('tagName', 'DIALOG');
+  await expect(dialog).toHaveJSProperty('open', true);
+  const close = dialog.getByRole('button', { name: 'Close', exact: true });
+  await close.focus();
+  await page.keyboard.press('Shift+Tab');
+  // A native top-layer dialog cannot leave Tab focus in the editor behind it.
+  await expect.poll(() => dialog.evaluate((node) => node.contains(globalThis.document.activeElement))).toBe(true);
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
   for (const width of [400, 390, 320]) {
     await page.setViewportSize({ width, height: 700 });
     await expectCloseFits(page, width);
   }
+  await page.screenshot({ path: testInfo.outputPath('media-dialog-320.png'), animations: 'disabled' });
   await page.evaluate(() => {
     globalThis.document.documentElement.style.fontSize = '32px';
   });
   await expectCloseFits(page, 320);
+  // Focusing the panel dismisses the close button's keyboard tooltip.
+  await dialog.focus();
   const opener = page.getByLabel('Primary logo').locator('..').getByRole('button', { name: 'Choose or upload…' });
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
