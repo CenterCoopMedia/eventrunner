@@ -582,6 +582,7 @@
           <code>functions/src/public/og.cjs</code> landing — <code>smoke</code>&#39;s OPTIONS-preflight of both functions now runs
           against the freshly-redeployed instances, not the ones from the <code>functions</code> job earlier in the
           same run.</p></li>
+          <li><p><strong>What each kind of file is cached for.</strong> Hashed files under <code>/assets/</code> are kept for a year, because a changed file gets a new name. A hashed file that a deploy removed answers 404, not the page: the page kept for a year at that address would break whoever asked for it. Fonts keep a stable name, so they are kept for 30 days and a changed font can take that long to reach a returning reader. Pages revalidate on every load, in the console as well.</p></li>
           <li><p><strong>What <code>routeMeta</code> costs, and the cache header that bounds it.</strong> Every public route that is not a
           static file now reaches a function on its first uncached load, rather than being rewritten
           straight to <code>index.html</code>. Three things bound that. The response carries

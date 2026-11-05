@@ -39,3 +39,11 @@ test('no static app page outlives a deploy in a browser', () => {
     assert.match(rule.headers.find(({ key }) => key === 'Cache-Control').value, /max-age=0.*must-revalidate/);
   }
 });
+
+test('hashed files stay for a year, and nothing else is immutable', () => {
+  const cacheRules = config.hosting.headers.flatMap(({ source, headers }) => headers
+    .filter(({ key }) => key === 'Cache-Control').map(({ value }) => [source, value]));
+  assert.deepEqual(cacheRules.filter(([, value]) => value.includes('immutable')).map(([source]) => source), ['/assets/**']);
+  assert.ok(cacheRules.some(([source, value]) => source === '/assets/**' && value.includes('max-age=31536000')));
+  assert.ok(cacheRules.some(([source]) => source === '/fonts/**'));
+});
