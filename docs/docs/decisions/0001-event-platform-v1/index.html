@@ -786,13 +786,13 @@
           }
           </code></pre>
           <ul>
-          <li><strong>postmark</strong> — authentication is HTTP Basic credentials embedded in the webhook URL registered
-          with Postmark (<code>https://user:pass@&lt;region&gt;-&lt;project&gt;.cloudfunctions.net/emailDeliveryWebhook</code>).
+          <li><strong>postmark</strong> — authentication is HTTP Basic credentials set on the webhook registered with Postmark
+          (its <code>HttpAuth</code> field, on <code>https://&lt;region&gt;-&lt;project&gt;.cloudfunctions.net/emailDeliveryWebhook</code>).
           <code>verifyDeliveryWebhook</code> constant-time-compares the decoded <code>Authorization: Basic</code> header against
           <code>EMAIL_WEBHOOK_BASIC_AUTH</code> (§2.1). Optionally tightened with an allowlist of Postmark&#39;s published
           outbound IP ranges, checked against the forwarded client IP; the allowlist is defense in depth, not
           the primary control, because the ranges change. The credential is generated per deployment during
-          onboarding, never shared between clients, and rotating it means re-registering the URL in Postmark.</li>
+          onboarding, never shared between clients, and rotating it means updating the webhook in Postmark.</li>
           <li><strong>webhook</strong> (generic) — keeps <code>X-Signature: sha256=&lt;hmac&gt;</code> over the raw body, because the operator
           controls both ends and can sign.</li>
           <li><strong>console</strong> — does not implement it; the endpoint refuses every request when the console adapter is

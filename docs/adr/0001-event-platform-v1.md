@@ -693,13 +693,13 @@ interface EmailProvider {
 }
 ```
 
-- **postmark** — authentication is HTTP Basic credentials embedded in the webhook URL registered
-  with Postmark (`https://user:pass@<region>-<project>.cloudfunctions.net/emailDeliveryWebhook`).
+- **postmark** — authentication is HTTP Basic credentials set on the webhook registered with Postmark
+  (its `HttpAuth` field, on `https://<region>-<project>.cloudfunctions.net/emailDeliveryWebhook`).
   `verifyDeliveryWebhook` constant-time-compares the decoded `Authorization: Basic` header against
   `EMAIL_WEBHOOK_BASIC_AUTH` (§2.1). Optionally tightened with an allowlist of Postmark's published
   outbound IP ranges, checked against the forwarded client IP; the allowlist is defense in depth, not
   the primary control, because the ranges change. The credential is generated per deployment during
-  onboarding, never shared between clients, and rotating it means re-registering the URL in Postmark.
+  onboarding, never shared between clients, and rotating it means updating the webhook in Postmark.
 - **webhook** (generic) — keeps `X-Signature: sha256=<hmac>` over the raw body, because the operator
   controls both ends and can sign.
 - **console** — does not implement it; the endpoint refuses every request when the console adapter is

@@ -6,7 +6,7 @@
  * verifySenderDomain.
  *
  * Postmark delivers delivery webhooks UNSIGNED, so verifyDeliveryWebhook is
- * HTTP Basic credentials embedded in the registered webhook URL,
+ * HTTP Basic credentials set on the registered webhook,
  * constant-time-compared against EMAIL_WEBHOOK_BASIC_AUTH (spec §3.1).
  *
  * No retries here — the core owns retry policy.

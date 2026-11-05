@@ -76,6 +76,7 @@ const IAM_WAIT_MS = 30_000;
 const IAM_ATTEMPTS = 8;
 const CERT_WAIT_MS = MINUTE;
 const CERT_POLLS = 60;
+const COMMAND_TIMEOUT_MS = 15 * 60 * 1000;
 const HTTPS_PROBE_MS = 15_000;
 const POSTMARK_WAIT_MS = MINUTE;
 const POSTMARK_POLLS = 30;
@@ -1359,7 +1360,8 @@ function realDeps(env) {
       return file;
     },
     runCommand: (command, args, options) => new Promise((resolve, reject) => {
-      const child = spawn(command, args, { env: options.env, stdio: ['ignore', 'pipe', 'inherit'] });
+      // A hung child fails its step and leaves a retry, instead of holding the build to the job's limit.
+      const child = spawn(command, args, { env: options.env, stdio: ['ignore', 'pipe', 'inherit'], timeout: COMMAND_TIMEOUT_MS });
       let output = '';
       child.stdout.on('data', (chunk) => {
         output += chunk;
