@@ -31,7 +31,7 @@ describe('OrganizationHome', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'NC Local' })).toBeInTheDocument();
     const items = within(screen.getByRole('list', { name: 'Event sites' })).getAllByRole('listitem');
     expect(items[0]).toHaveTextContent('We are building your site');
-    expect(items[0]).toHaveTextContent('nclocal.eventrunner.org');
+    expect(items[0]).not.toHaveTextContent('nclocal.eventrunner.org');
     expect(within(items[0]).getByRole('link', { name: 'NC Local News Summit' })).toHaveAttribute('href', '/organizations/o1/applications/a1');
     expect(within(items[1]).getByRole('link', { name: 'New event site' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Team' })).toHaveAttribute('href', '/organizations/o1/team');

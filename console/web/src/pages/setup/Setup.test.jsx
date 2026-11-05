@@ -186,6 +186,19 @@ describe('Setup', () => {
     expect(screen.queryByText(/is not saved/)).not.toBeInTheDocument();
   });
 
+  it('Next stays on the web address step when the server refuses the name', async () => {
+    const SHORT = 'Use 3 to 27 lowercase letters, numbers and hyphens.';
+    serveApi({
+      checkWebAddress: (body) => ({ name: body.name, address: `${body.name}.eventrunner.org`, available: false, message: SHORT }),
+      saveApplicationStep: (body) => ({ step: body.step, saved: false, answers: body.answers, errors: { 'webAddress.name': SHORT } }),
+    });
+    renderSetup('web-address');
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText('Not saved. Check the answer.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
+  });
+
   it('stays on the step when a save fails, and Next tries the same answers again', async () => {
     let calls = 0;
     serveApi({

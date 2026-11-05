@@ -39,7 +39,8 @@ describe('ApplicationStatus', () => {
       'Your site is readyNot started',
     ]);
     expect(stages[1]).toHaveAttribute('aria-current', 'step');
-    expect(screen.getByText('nclocal.eventrunner.org')).toBeInTheDocument();
+    // The address waits for the finished site, so it never opens to a hosting error page.
+    expect(screen.queryByText('nclocal.eventrunner.org')).not.toBeInTheDocument();
     expect(screen.getByText(/Ana Owner accepted the agreement on 4 November 2026/)).toBeInTheDocument();
   });
 
@@ -73,9 +74,44 @@ describe('ApplicationStatus', () => {
     serveStatus({ status: 'ready', canEdit: false, canWithdraw: false });
     page();
     const stages = await screen.findAllByRole('listitem');
-    expect(stages[2]).toHaveTextContent('Your site is readyNow');
+    expect(stages[2]).toHaveTextContent('Your site is readyDone');
     expect(screen.getByRole('link', { name: 'Open your admin panel' })).toHaveAttribute('href', 'https://nclocal.eventrunner.org/admin');
+    expect(screen.getByRole('link', { name: 'nclocal.eventrunner.org' })).toHaveAttribute('href', 'https://nclocal.eventrunner.org');
     expect(screen.queryByText('You can close this page')).not.toBeInTheDocument();
+  });
+
+  it('names the progress panel and keeps the agreement separate from the main action', async () => {
+    serveStatus({ status: 'ready', canEdit: false, canWithdraw: false, acceptance: { name: 'Ana Owner', at: '2026-11-04T15:00:00.000Z' } });
+    page();
+    const progress = await screen.findByRole('complementary', { name: 'Setup progress' });
+    expect(within(progress).getAllByRole('listitem')[2]).toHaveAttribute('aria-current', 'step');
+    const agreement = screen.getByRole('region', { name: 'Agreement' });
+    expect(within(agreement).getByRole('link', { name: 'Read the agreement' })).toHaveAttribute('href', '/organizations/o1/applications/a1/accepted-agreement');
+    expect(within(progress).queryByRole('link', { name: 'Open your admin panel' })).not.toBeInTheDocument();
+  });
+
+  it('announces actual build activity with the next step', async () => {
+    serveStatus({ status: 'building', canEdit: false, build: { failed: false, current: 'web-address' } });
+    page();
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('status')).toHaveTextContent('Now: Setting up your web address. Next: Setting up email and tickets.');
+  });
+
+  it.each(['ready', 'launched', 'withdrawn', 'declined'])('shows no build activity for a %s request', async (status) => {
+    serveStatus({ status, canEdit: false, canWithdraw: false });
+    page();
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    if (['withdrawn', 'declined'].includes(status)) {
+      expect(screen.queryByRole('complementary', { name: 'Setup progress' })).not.toBeInTheDocument();
+    }
+  });
+
+  it('does not show activity when the build did not finish', async () => {
+    serveStatus({ status: 'building', canEdit: false, canWithdraw: false, build: { failed: true, needsReconnect: false } });
+    page();
+    expect(await screen.findByText('The build did not finish')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('offers to continue a draft', async () => {

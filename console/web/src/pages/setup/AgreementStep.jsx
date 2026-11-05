@@ -3,6 +3,7 @@ import { callApi } from '../../api.js';
 import ActionFeedback from '../../ActionFeedback.jsx';
 import { SIGNUPS_CLOSED } from '../../setup/steps.js';
 import { fieldId, TextField } from '../../setup/Field.jsx';
+import LoadingState from '../../LoadingState.jsx';
 
 /** Blank lines part the paragraphs. Each one renders as text, so nothing in it can run as HTML. */
 export function AgreementText({ agreement }) {
@@ -71,7 +72,7 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
     }
   }
 
-  if (!data) return error ? <p className="message error" role="alert">{error}</p> : <p role="status">Loading the agreement.</p>;
+  if (!data) return error ? <p className="message error" role="alert">{error}</p> : <LoadingState>Loading the agreement.</LoadingState>;
 
   const { agreement } = data;
   if (!agreement) return <p className="message error">{SIGNUPS_CLOSED}</p>;

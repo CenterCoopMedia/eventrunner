@@ -1,0 +1,196 @@
+/* The overview owns this composition; shared controls and the other CMS
+   workspaces keep their existing dimensions and theme contracts. */
+.admin-overview-workspace .admin-overview-register,
+.admin-overview-workspace .admin-overview-health {
+  min-width: 0;
+  padding: var(--space-md);
+  border: 1px solid rgb(var(--admin-rule-hairline-rgb));
+  border-radius: var(--admin-radius-panel);
+  background: rgb(var(--admin-ground-raised-rgb));
+}
+
+.admin-overview-workspace .admin-section-intro {
+  padding-block-end: var(--space-sm);
+  margin-block-end: 0;
+  border-block-end: 1px solid rgb(var(--admin-rule-strong-rgb));
+}
+
+.admin-overview-workspace .admin-register-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-overview-workspace .admin-register-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding-block: var(--space-md);
+}
+
+.admin-overview-workspace .admin-register-item + .admin-register-item {
+  border-block-start: 1px solid rgb(var(--admin-rule-hairline-rgb));
+}
+
+.admin-overview-workspace .admin-register-item h3,
+.admin-overview-workspace .admin-overview-health h2 {
+  font-family: var(--admin-font-ui);
+  font-size: var(--admin-text-lg);
+  font-weight: 700;
+  color: rgb(var(--admin-ink-rgb));
+}
+
+.admin-overview-workspace .admin-register-item__body {
+  flex: 1;
+  padding-block: var(--space-sm);
+}
+
+.admin-overview-workspace .admin-figure-total {
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.admin-overview-workspace .admin-figure-total > .font-admin-data {
+  font-size: var(--admin-text-title);
+  letter-spacing: -0.04em;
+}
+
+.admin-overview-workspace .admin-register-breakdown {
+  display: grid;
+  gap: var(--space-2xs) var(--space-sm);
+  margin-block-start: var(--space-sm);
+}
+
+.admin-overview-workspace .admin-register-breakdown li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  font-size: var(--admin-text-base);
+  color: rgb(var(--admin-ink-secondary-rgb));
+}
+
+.admin-overview-workspace .admin-register-action,
+.admin-overview-workspace .admin-readiness-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--admin-control-height);
+  color: rgb(var(--admin-ink-link-rgb));
+  font-size: var(--admin-text-base);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  overflow-wrap: anywhere;
+}
+
+.admin-overview-workspace .admin-register-action {
+  justify-content: space-between;
+}
+
+.admin-overview-workspace .admin-register-action > span {
+  flex-shrink: 0;
+}
+
+.admin-overview-workspace .admin-overview-working-grid,
+.admin-overview-workspace .admin-overview-support {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-md);
+}
+
+.admin-overview-workspace .admin-overview-working-grid > *,
+.admin-overview-workspace .admin-overview-support > * {
+  min-width: 0;
+}
+
+.admin-overview-workspace .admin-overview-working-grid > .admin-readiness-panel {
+  grid-column: auto;
+}
+
+.admin-overview-workspace .admin-readiness-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.admin-overview-workspace .admin-readiness-table th,
+.admin-overview-workspace .admin-readiness-table td {
+  padding-inline: var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+.admin-overview-workspace .admin-readiness-table th:first-child {
+  width: 41%;
+}
+
+.admin-overview-workspace .admin-readiness-table th:nth-child(2) {
+  width: 24%;
+}
+
+.admin-overview-workspace .admin-readiness-link {
+  font-size: var(--admin-text-sm);
+}
+
+.admin-overview-workspace .admin-overview-health .admin-figure-total {
+  margin-block-start: var(--space-sm);
+}
+
+.admin-overview-workspace .admin-overview-health .admin-register-action {
+  display: flex;
+  margin-block-start: var(--space-xs);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-overview-workspace .admin-register-action:hover,
+  .admin-overview-workspace .admin-readiness-link:hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+@media (min-width: 900px) {
+  .admin-overview-workspace .admin-register-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-overview-workspace .admin-register-item:nth-child(2) {
+    border-block-start: 0;
+  }
+
+  .admin-overview-workspace .admin-register-item:nth-child(odd) {
+    padding-inline-end: var(--space-md);
+  }
+
+  .admin-overview-workspace .admin-register-item:nth-child(even) {
+    padding-inline-start: var(--space-md);
+    border-inline-start: 1px solid rgb(var(--admin-rule-hairline-rgb));
+  }
+}
+
+@media (min-width: 1280px) {
+  .admin-overview-workspace .admin-register-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding-block-start: var(--space-md);
+  }
+
+  .admin-overview-workspace .admin-register-item {
+    padding-block: 0;
+    padding-inline: var(--space-md);
+  }
+
+  .admin-overview-workspace .admin-register-item:first-child {
+    padding-inline-start: 0;
+  }
+
+  .admin-overview-workspace .admin-register-item:last-child {
+    padding-inline-end: 0;
+  }
+
+  .admin-overview-workspace .admin-register-item + .admin-register-item {
+    border-block-start: 0;
+    border-inline-start: 1px solid rgb(var(--admin-rule-hairline-rgb));
+  }
+
+  .admin-overview-workspace .admin-overview-working-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  }
+}

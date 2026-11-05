@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
+import LoadingState from '../../LoadingState.jsx';
 import { STATUS_FILTERS, STATUS_LABELS, formatDateTime } from '../../reviewText.js';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
 
@@ -50,7 +51,7 @@ export default function ReviewQueue() {
 
       <h2 id="queue-list-title">{STATUS_LABELS[status]}</h2>
       {error ? <p className="message error" role="alert">{error.message}</p> : null}
-      {!data && !error ? <p role="status">Loading the requests.</p> : null}
+      {!data && !error ? <LoadingState>Loading the requests.</LoadingState> : null}
       {data && data.applications.length === 0 ? <p>No request has this status.</p> : null}
       {data && data.applications.length > 0 ? (
         <ul className="cards" aria-labelledby="queue-list-title">

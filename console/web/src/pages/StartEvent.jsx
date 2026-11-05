@@ -6,6 +6,7 @@ import { STEPS, setupPath, statusPath } from '../setup/steps.js';
 import { ORGANIZATION_NAME_ERROR, cleanOrganizationName } from '../text.js';
 import { tokenFrom } from './AcceptInvite.jsx';
 import { browserTimeZone } from './setup/EventStep.jsx';
+import LoadingState from '../LoadingState.jsx';
 
 /** Refusals about the link itself. Trying again cannot help; the message says to ask for a new one. */
 const LINK_REFUSALS = ['link-invalid', 'link-used', 'link-revoked', 'link-expired'];
@@ -98,7 +99,7 @@ export default function StartEvent() {
     );
   }
 
-  if (!link) return <p role="status">Checking your signup link.</p>;
+  if (!link) return <LoadingState long>Checking your signup link.</LoadingState>;
   if (link.status === 'used') return <Navigate to={statusPath(link.orgId, link.appId)} replace />;
 
   return (

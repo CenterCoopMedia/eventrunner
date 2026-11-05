@@ -8,6 +8,7 @@ import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
 import ReviewActions from './ReviewActions.jsx';
 import ReviewAnswers from './ReviewAnswers.jsx';
 import ReviewHistory from './ReviewHistory.jsx';
+import LoadingState from '../../LoadingState.jsx';
 
 /** What the page says after a decision, with the email result. */
 function decidedMessage(name, result) {
@@ -199,7 +200,7 @@ export default function ReviewApplication() {
 
   if (isNotOperator(loadError)) return <HostingOnly />;
   if (!data) {
-    return loadError ? <p className="message error" role="alert">{loadError.message}</p> : <p role="status">Loading the request.</p>;
+    return loadError ? <p className="message error" role="alert">{loadError.message}</p> : <LoadingState>Loading the request.</LoadingState>;
   }
 
   const { application: app, organization, team, connection } = data;

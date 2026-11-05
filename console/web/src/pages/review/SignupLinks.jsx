@@ -5,6 +5,7 @@ import ActionFeedback, { ActionResult } from '../../ActionFeedback.jsx';
 import { LINK_STATUS_LABELS, formatDateTime } from '../../reviewText.js';
 import { ORGANIZATION_NAME_ERROR, cleanOrganizationName, formatDate } from '../../text.js';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
+import LoadingState from '../../LoadingState.jsx';
 
 /** The new link. The server gives it once, so it lives only in this page's memory. */
 function NewLink({ created }) {
@@ -190,7 +191,7 @@ export default function SignupLinks() {
       {loadError && !Object.values(results).some((result) => result?.refreshError) ? <ActionFeedback kind="error">
         <p>{loadError.message}</p><button type="button" className="button" onClick={load}>Refresh links</button>
       </ActionFeedback> : null}
-      {!links && !loadError ? <p role="status">Loading the links.</p> : null}
+      {!links && !loadError ? <LoadingState>Loading the links.</LoadingState> : null}
       {links && links.length === 0 ? <p>No links yet.</p> : null}
       {links && links.length > 0 ? (
         <ul className="cards" aria-labelledby="links-list-title">
