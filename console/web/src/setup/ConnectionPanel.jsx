@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { callApi } from '../api.js';
+import ActionFeedback from '../ActionFeedback.jsx';
 import { formatDate, hostName } from '../text.js';
 import { PROVIDER_COPY, canDisconnectWords, isProviderUrl, rememberConnectReturn } from './connections.js';
 import { fieldId } from './Field.jsx';
@@ -17,12 +18,12 @@ export function ConnectionNotice({ message }) {
 }
 
 /** Disconnect asks once, in place. Cancel returns the focus to Disconnect. */
-function Disconnect({ name, warning, onDisconnect }) {
+function Disconnect({ name, warning, onDisconnect, disabled }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const button = useRef(null);
   if (!asking) {
-    return <button type="button" className="button danger" ref={button} onClick={() => setAsking(true)}>Disconnect</button>;
+    return <button type="button" className="button danger" ref={button} disabled={disabled} onClick={() => setAsking(true)}>Disconnect</button>;
   }
   return (
     <div className="confirm" role="group" aria-label={`Disconnect your ${name} account`}>
@@ -30,12 +31,16 @@ function Disconnect({ name, warning, onDisconnect }) {
       <button
         type="button"
         className="button danger"
-        disabled={busy}
-        onClick={async () => { setBusy(true); await onDisconnect(); setBusy(false); setAsking(false); }}
+        disabled={busy || disabled}
+        onClick={async () => {
+          if (busy || disabled) return;
+          setBusy(true);
+          try { if (await onDisconnect()) setAsking(false); } finally { setBusy(false); }
+        }}
       >
-        Yes, disconnect
+        {busy ? 'Disconnecting…' : 'Yes, disconnect'}
       </button>
-      <button type="button" className="button" autoFocus onClick={() => { setAsking(false); setTimeout(() => button.current?.focus(), 0); }}>
+      <button type="button" className="button" disabled={busy || disabled} autoFocus onClick={() => { setAsking(false); setTimeout(() => button.current?.focus(), 0); }}>
         Cancel
       </button>
     </div>
@@ -56,10 +61,11 @@ function eventLabel({ name, start }) {
 }
 
 /** The client's Eventbrite events, to pick from. Nothing here is typed. */
-function EventPicker({ orgId, appId, chosen, error, onConnections, onNotice }) {
+function EventPicker({ orgId, appId, chosen, error, onConnections, disabled }) {
   const [events, setEvents] = useState(null);
   const [problem, setProblem] = useState('');
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
   const id = fieldId(EVENT_FIELD);
 
   const load = useCallback(async () => {
@@ -76,12 +82,13 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, onNotice }) {
   useEffect(() => { load(); }, [load]);
 
   async function choose(eventId) {
-    if (!eventId) return;
+    if (!eventId || busy || disabled) return;
     setBusy(true);
     setProblem('');
+    setNotice('');
     try {
       onConnections(await callApi('chooseEventbriteEvent', { orgId, appId, eventId }));
-      onNotice('We saved your Eventbrite event.');
+      setNotice('We saved your Eventbrite event.');
     } catch (err) {
       setProblem(err.message);
     }
@@ -113,7 +120,7 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, onNotice }) {
         id={id}
         name={EVENT_FIELD}
         value={chosen?.id || ''}
-        disabled={busy}
+        disabled={busy || disabled}
         onChange={(e) => choose(e.target.value)}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy}
@@ -122,7 +129,8 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, onNotice }) {
         {options.map((event) => <option key={event.id} value={event.id}>{eventLabel(event)}</option>)}
       </select>
       {error ? <p id={`${id}-error`} className="field-error">{error}</p> : null}
-      {problem ? <p className="message error" role="alert">{problem}</p> : null}
+      {problem ? <ActionFeedback kind="error" revealKey={problem}>{problem}</ActionFeedback> : null}
+      {notice ? <ActionFeedback revealKey={notice}>{notice}</ActionFeedback> : null}
     </div>
   );
 }
@@ -139,12 +147,14 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, onNotice }) {
  */
 export default function ConnectionPanel({
   provider, orgId, appId, connections, errors = {}, canConnect = connections.canChange, myRole,
-  beforeLeave, returnPath, onConnections, onNotice, connectLabel,
+  beforeLeave, returnPath, onConnections, onNotice, connectLabel, preserveResult = false,
 }) {
   const copy = PROVIDER_COPY[provider];
   const account = connections[provider];
   const [error, setError] = useState('');
   const [leaving, setLeaving] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [notice, setNotice] = useState('');
   const title = useRef(null);
   const connectError = errors[CONNECTION_FIELD];
   const connectErrorId = `${fieldId(CONNECTION_FIELD)}-error`;
@@ -156,7 +166,9 @@ export default function ConnectionPanel({
   if (connections.built) warning = `Your site stays online, but it stops selling paid tickets. Orders and attendees already in your site stay there, and you refund orders from your ${copy.name} account. To connect an account again, ask ${hostName()}.`;
 
   async function connect() {
+    if (leaving || disconnecting) return;
     setError('');
+    setNotice('');
     setLeaving(true);
     if (beforeLeave && !(await beforeLeave())) {
       setError(NOT_SAVED);
@@ -175,21 +187,29 @@ export default function ConnectionPanel({
   }
 
   async function disconnect() {
+    if (leaving || disconnecting) return false;
     setError('');
+    setNotice('');
+    setDisconnecting(true);
     try {
       const reply = await callApi('disconnectAccount', { orgId, appId, provider });
       onConnections(reply);
-      onNotice(disconnectedWords(copy.name, reply, connections.built));
+      const message = disconnectedWords(copy.name, reply, connections.built);
+      if (preserveResult) setNotice(message);
+      else onNotice?.(message);
       setTimeout(() => title.current?.focus(), 0);
+      return true;
     } catch (err) {
       setError(err.message);
+      return false;
+    } finally {
+      setDisconnecting(false);
     }
   }
 
   return (
     <section className="note stack" aria-labelledby={`account-${provider}`}>
       <p className="note-title" id={`account-${provider}`} tabIndex={-1} ref={title}>Your {copy.name} account</p>
-      {error ? <p className="message error" role="alert">{error}</p> : null}
 
       {account.connected ? (
         <>
@@ -206,7 +226,7 @@ export default function ConnectionPanel({
               chosen={account.event}
               error={errors[EVENT_FIELD]}
               onConnections={onConnections}
-              onNotice={onNotice}
+              disabled={leaving || disconnecting}
             />
           ) : null}
           {provider === 'eventbrite' && !showPicker ? (
@@ -215,8 +235,8 @@ export default function ConnectionPanel({
           {canConnect && copy.consent ? <p>{copy.consent}</p> : null}
           {canConnect || mayDisconnect ? (
             <div className="step-actions">
-              {canConnect ? <button type="button" className="button" disabled={leaving} onClick={connect}>{connectLabel || 'Connect again'}</button> : null}
-              {mayDisconnect ? <Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} /> : null}
+              {canConnect ? <button type="button" className="button" disabled={leaving || disconnecting} onClick={connect}>{leaving ? 'Opening account provider…' : connectLabel || 'Connect again'}</button> : null}
+              {mayDisconnect ? <Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} disabled={leaving} /> : null}
             </div>
           ) : null}
         </>
@@ -225,7 +245,7 @@ export default function ConnectionPanel({
           {account.unfinished && mayDisconnect ? (
             <>
               <p>An earlier change to this account did not finish, so we may still have access to it. Disconnect to end that access.</p>
-              <div className="step-actions"><Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} /></div>
+              <div className="step-actions"><Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} disabled={leaving} /></div>
             </>
           ) : null}
           {connections.built ? (
@@ -240,12 +260,12 @@ export default function ConnectionPanel({
                   <button
                     type="button"
                     className="button primary"
-                    disabled={leaving}
+                    disabled={leaving || disconnecting}
                     data-group-error={connectError ? CONNECTION_FIELD : undefined}
                     aria-describedby={connectError ? connectErrorId : undefined}
                     onClick={connect}
                   >
-                    {connectLabel || copy.button}
+                    {leaving ? 'Opening account provider…' : connectLabel || copy.button}
                   </button>
                 </p>
               ) : null}
@@ -255,6 +275,9 @@ export default function ConnectionPanel({
           )}
         </>
       )}
+
+      {error ? <ActionFeedback kind="error" revealKey={error}>{error}</ActionFeedback> : null}
+      {notice ? <ActionFeedback revealKey={notice}>{notice}</ActionFeedback> : null}
 
       {myRole !== 'owner' && !canConnect && !mayDisconnect ? (
         <p className="muted">Only an Owner can change this account.</p>

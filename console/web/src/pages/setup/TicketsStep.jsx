@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import ConnectionPanel, { ConnectionNotice } from '../../setup/ConnectionPanel.jsx';
 import { setupPath, stepById, TICKET_CHOICES } from '../../setup/steps.js';
@@ -13,17 +13,20 @@ const PROVIDERS = TICKET_CHOICES.filter((choice) => choice.connect).map((choice)
  */
 export default function TicketsStep({ value, errors, onChange, app, orgId, appId, flush, onConnections }) {
   const { state } = useLocation();
-  const [notice, setNotice] = useState('');
   const error = errors['tickets.choice'];
   const { connections } = app;
-  const shown = PROVIDERS.filter((provider) => provider === value.choice || connections[provider].connected);
+  const [seen, setSeen] = useState(() => PROVIDERS.filter((provider) => provider === value.choice || connections[provider].connected));
+  useEffect(() => {
+    setSeen((previous) => {
+      const added = PROVIDERS.filter((provider) => !previous.includes(provider) && (provider === value.choice || connections[provider].connected));
+      return added.length ? [...previous, ...added] : previous;
+    });
+  }, [value.choice, connections]);
+  const shown = PROVIDERS.filter((provider) => seen.includes(provider) || provider === value.choice || connections[provider].connected);
   return (
     <div className="stack">
       <p className="lead">Choose how people get tickets. You can change your choice until you accept the agreement.</p>
-      {notice ? null : <ConnectionNotice message={state?.connectionMessage} />}
-      <div aria-live="polite" className="live">
-        {notice ? <p className="message success">{notice}</p> : null}
-      </div>
+      <ConnectionNotice message={state?.connectionMessage} />
       <fieldset
         className="choices"
         aria-invalid={error ? 'true' : undefined}
@@ -61,7 +64,7 @@ export default function TicketsStep({ value, errors, onChange, app, orgId, appId
           beforeLeave={flush}
           returnPath={setupPath(orgId, appId, stepById('tickets'))}
           onConnections={onConnections}
-          onNotice={setNotice}
+          preserveResult
         />
       ))}
     </div>

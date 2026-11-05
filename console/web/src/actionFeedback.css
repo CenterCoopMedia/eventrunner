@@ -1,0 +1,35 @@
+.console-feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  margin-block: var(--space-sm) 0;
+  border: 1px solid rgb(var(--rule));
+  border-inline-start: 3px solid currentColor;
+  border-radius: var(--radius);
+  background: rgb(var(--surface-alt));
+  color: rgb(var(--ink));
+  min-width: 0;
+  width: 100%;
+  scroll-margin-block: var(--space-lg);
+  overflow-wrap: anywhere;
+}
+.console-feedback-success { border-inline-start-color: rgb(var(--success)); }
+.console-feedback-error { border-inline-start-color: rgb(var(--danger)); }
+.console-feedback-icon { width: 1.25rem; height: 1.25rem; flex: none; margin-block-start: 0.2rem; }
+.console-feedback-success .console-feedback-icon { color: rgb(var(--success)); }
+.console-feedback-error .console-feedback-icon { color: rgb(var(--danger)); }
+.console-feedback > div { min-width: 0; flex: 1; }
+.console-feedback p { margin: 0; }
+.console-feedback p + p, .console-feedback .button { margin-block-start: var(--space-xs); }
+.console-feedback-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.console-feedback-row { flex-wrap: wrap; }
+.console-feedback-row > .console-feedback { flex-basis: 100%; }
+.console-feedback-row .row-actions { flex-wrap: wrap; }
+.console-feedback-row .confirm { max-width: 100%; }
+.console-feedback-row .card-title { overflow-wrap: anywhere; }
+.console-feedback-actions { border-block-start: 1px solid rgb(var(--rule)); padding-block-start: var(--space-md); margin-block-start: var(--space-lg); }
+.console-feedback-actions .step-actions { margin-block: var(--space-sm); }
+.console-feedback-actions > p { margin-block: var(--space-xs); }
+.console-feedback-actions:focus { outline: none; }
+.console-feedback-actions .save-status { margin-block: 0; }

@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
+import { ActionResult } from '../ActionFeedback.jsx';
 import { ROLE_LABELS, formatDate, withArticle } from '../text.js';
 
-/**
- * The member list. An Owner gets a role menu and a Remove button on each
- * row. Remove asks once, in the row, and Cancel returns the focus to the
- * Remove button.
- */
-export default function TeamMembers({ members, myUid, canEdit, onChange }) {
+/** Keep each result in its row, and keep a removed row's result in its place. */
+export default function TeamMembers({ members, myUid, canEdit, onChange, outcome, pending, disabled, onRefresh, refreshing }) {
   const [confirming, setConfirming] = useState(null);
   const [refocus, setRefocus] = useState(null);
+  const [removed, setRemoved] = useState(null);
   const removeButtons = useRef(new Map());
+  const resultRef = useRef(null);
 
-  // After Cancel, the Remove button is back in the row; move the focus to it.
   useEffect(() => {
     if (refocus) {
       removeButtons.current.get(refocus)?.focus();
@@ -19,68 +17,65 @@ export default function TeamMembers({ members, myUid, canEdit, onChange }) {
     }
   }, [refocus]);
 
+  useEffect(() => {
+    if (outcome?.kind === 'success' && removed?.uid === outcome.key) resultRef.current?.focus();
+  }, [outcome, removed]);
+
   function cancel(uid) {
     setConfirming(null);
     setRefocus(uid);
   }
 
-  async function remove(member) {
-    setConfirming(null);
-    await onChange('removeMember', { uid: member.uid }, `${member.email} was removed from the team.`);
+  async function remove(member, index) {
+    setRemoved({ uid: member.uid, index });
+    if (await onChange('removeMember', { uid: member.uid }, `${member.email} was removed from the team.`)) setConfirming(null);
   }
 
-  return (
-    <ul className="cards" aria-labelledby="members-title">
-      {members.map((member) => {
-        const you = member.uid === myUid;
-        const selectId = `role-${member.uid}`;
-        return (
-          <li key={member.uid} className="card">
-            <span className="card-title">{member.email}{you ? ' (you)' : ''}</span>
-            <span className="muted">Joined {formatDate(member.joinedAt)}</span>
-            {canEdit ? (
-              <div className="row-actions">
-                <label htmlFor={selectId} className="visually-hidden">Role for {member.email}</label>
-                <select
-                  id={selectId}
-                  value={member.role}
-                  onChange={(e) => onChange(
-                    'changeMemberRole',
-                    { uid: member.uid, role: e.target.value },
-                    `${member.email} is now ${withArticle(e.target.value)}.`,
-                  )}
-                >
-                  <option value="owner">Owner</option>
-                  <option value="editor">Editor</option>
-                </select>
-                {confirming === member.uid ? (
-                  <span className="confirm" role="group" aria-label={`Remove ${member.email}`}>
-                    <span>Remove {member.email} from the team?</span>
-                    <button type="button" className="button danger" onClick={() => remove(member)}>Yes, remove</button>
-                    {/* Cancel takes the focus: a second Enter keeps the member. */}
-                    <button type="button" className="button" autoFocus onClick={() => cancel(member.uid)}>Cancel</button>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    className="button"
-                    ref={(node) => {
-                      if (node) removeButtons.current.set(member.uid, node);
-                      else removeButtons.current.delete(member.uid);
-                    }}
-                    aria-label={`Remove ${member.email}`}
-                    onClick={() => setConfirming(member.uid)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
+  const rows = members.map((member, index) => {
+    const you = member.uid === myUid;
+    const selectId = `role-${member.uid}`;
+    const result = outcome?.key === member.uid ? outcome : null;
+    return (
+      <li key={member.uid} className="card console-feedback-row">
+        <span className="card-title">{member.email}{you ? ' (you)' : ''}</span>
+        <span className="muted">Joined {formatDate(member.joinedAt)}</span>
+        {canEdit ? (
+          <div className="row-actions">
+            <label htmlFor={selectId} className="visually-hidden">Role for {member.email}</label>
+            <select id={selectId} value={member.role} disabled={disabled} onChange={(e) => {
+              setRemoved(null);
+              onChange('changeMemberRole', { uid: member.uid, role: e.target.value }, `${member.email} is now ${withArticle(e.target.value)}.`);
+            }}>
+              <option value="owner">Owner</option>
+              <option value="editor">Editor</option>
+            </select>
+            {confirming === member.uid ? (
+              <span className="confirm" role="group" aria-label={`Remove ${member.email}`}>
+                <span>Remove {member.email} from the team?</span>
+                <button type="button" className="button danger" disabled={disabled} onClick={() => remove(member, index)}>
+                  {pending === member.uid ? 'Removing…' : 'Yes, remove'}
+                </button>
+                <button type="button" className="button" disabled={Boolean(pending)} autoFocus onClick={() => cancel(member.uid)}>Cancel</button>
+              </span>
             ) : (
-              <span className="tag">{ROLE_LABELS[member.role]}</span>
+              <button type="button" className="button" disabled={disabled}
+                ref={(node) => { if (node) removeButtons.current.set(member.uid, node); else removeButtons.current.delete(member.uid); }}
+                aria-label={`Remove ${member.email}`} title={`Remove ${member.email}`} onClick={() => setConfirming(member.uid)}>Remove</button>
             )}
-          </li>
-        );
-      })}
-    </ul>
-  );
+            {pending === member.uid && confirming !== member.uid ? <span role="status">Saving role…</span> : null}
+          </div>
+        ) : <span className="tag">{ROLE_LABELS[member.role]}</span>}
+        <ActionResult result={result} focusRef={result ? resultRef : undefined} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh team" />
+      </li>
+    );
+  });
+
+  if (removed && outcome?.key === removed.uid && !members.some((member) => member.uid === removed.uid)) {
+    rows.splice(Math.min(removed.index, rows.length), 0,
+      <li key={`removed-${removed.uid}`} className="card console-feedback-row">
+        <ActionResult result={outcome} focusRef={resultRef} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh team" />
+      </li>);
+  }
+
+  return <ul className="cards" aria-labelledby="members-title">{rows}</ul>;
 }
