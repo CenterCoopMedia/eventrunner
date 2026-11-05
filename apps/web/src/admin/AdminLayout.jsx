@@ -29,12 +29,14 @@
 // names the current page in its head. Other groups keep what the reader
 // chose, in this browser (layoutPreference.js).
 //
-// THE RAIL HIDES (issues #477, #695). A chevron beside the event name
-// narrows the rail to the job mark and an expand control, which gives
-// the work surface the room. It is the same button in both states, so the
-// focus stays on it, and it is the one way back to the sections: one Tab
-// from the skip link. The choice is remembered in this browser. Nothing
-// about the route, the page or a draft changes when the rail hides.
+// THE RAIL COLLAPSES (issues #477, #695). A chevron beside the event name
+// narrows the rail to the job mark, an expand control and section icons.
+// Overview stays a link. Each named group opens a flyout of its destinations;
+// the current group's icon keeps the leading-edge marker. Escape closes the
+// flyout and returns focus to its button. An outside click or a chosen link
+// also closes it. Icons have names and tooltips. The collapse control keeps
+// focus in both states, and this browser remembers the choice. The route,
+// page and draft stay in place. The phone menu does not change.
 //
 // On a narrow screen the rail becomes one compact head of the page: job,
 // current section and a native Menu disclosure. Opening it shows the same
@@ -61,7 +63,7 @@
 // the stone; "Take the tour" on the rail opens it again. It is its own lazy
 // chunk (components/AdminTour.jsx), and its steps are this docket.
 import './adminWorkspace.css';
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import useAccountViews from '../hooks/useAccountViews.js';
 import RoleSwitcher from '../components/RoleSwitcher.jsx';
@@ -139,6 +141,7 @@ export const DOCKET = Object.freeze([
   {
     id: 'content',
     label: 'Content',
+    icon: 'content',
     items: [
       { to: 'pages', label: 'Pages', tier: 'staff' },
       { to: 'content', label: 'Content', tier: 'staff' },
@@ -153,6 +156,7 @@ export const DOCKET = Object.freeze([
   {
     id: 'program',
     label: 'Program',
+    icon: 'program',
     items: [
       { to: 'sessions', label: 'Sessions', tier: 'staff' },
       { to: 'pitches', label: 'Session pitches', tier: 'staff' },
@@ -163,6 +167,7 @@ export const DOCKET = Object.freeze([
   {
     id: 'registration',
     label: 'Registration and tickets',
+    icon: 'registration',
     items: [
       { to: 'attendees', label: 'Attendees', tier: 'staff' },
       { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
@@ -173,6 +178,7 @@ export const DOCKET = Object.freeze([
   {
     id: 'communications',
     label: 'Communications',
+    icon: 'communications',
     items: [
       { to: 'announcements', label: 'Announcements', tier: 'staff' },
       { to: 'reminders', label: 'Scheduled reminders', tier: 'staff' },
@@ -183,6 +189,7 @@ export const DOCKET = Object.freeze([
   {
     id: 'operations',
     label: 'Operations',
+    icon: 'operations',
     items: [
       { to: 'import', label: 'Import records', tier: 'staff' },
       { to: 'feedback', label: 'Feedback', tier: 'staff' },
@@ -193,6 +200,7 @@ export const DOCKET = Object.freeze([
   {
     id: 'settings',
     label: 'Settings',
+    icon: 'settings',
     items: [
       { to: 'settings', label: 'Event', tier: 'staff' },
       // The questions attendees answer (ADR 0008 §4). An operator sets them,
@@ -362,6 +370,101 @@ const railButtonClass =
   'border-admin-rail-rule px-sm py-2xs text-admin-sm font-semibold text-admin-rail-ink ' +
   'hover:bg-admin-rail-ground-hover';
 
+/** Desktop disclosures keep their links next to the trigger in Tab order. */
+function CollapsedDocket({ docket, activeGroup, pathname }) {
+  const [openId, setOpenId] = useState(null);
+  const buttonRefs = useRef({});
+  const flyoutRef = useRef(null);
+  const [position, setPosition] = useState({ left: 0, top: 0 });
+
+  useEffect(() => setOpenId(null), [pathname]);
+
+  useLayoutEffect(() => {
+    if (!openId) return;
+    const positionFlyout = () => {
+      const button = buttonRefs.current[openId];
+      const flyout = flyoutRef.current;
+      if (!button || !flyout) return;
+      const anchor = button.getBoundingClientRect();
+      const rail = button.closest('.admin-rail').getBoundingClientRect();
+      const panel = flyout.getBoundingClientRect();
+      const rtl = window.getComputedStyle(button).direction === 'rtl';
+      setPosition({
+        left: Math.max(8, Math.min(rtl ? rail.left - panel.width - 8 : rail.right + 8, window.innerWidth - panel.width - 8)),
+        top: Math.max(8, Math.min(anchor.top, window.innerHeight - panel.height - 8)),
+      });
+    };
+    positionFlyout();
+    window.addEventListener('resize', positionFlyout);
+    window.addEventListener('scroll', positionFlyout, true);
+    return () => {
+      window.removeEventListener('resize', positionFlyout);
+      window.removeEventListener('scroll', positionFlyout, true);
+    };
+  }, [openId]);
+
+  useEffect(() => {
+    if (!openId) return;
+    const onOutsideClick = (event) => {
+      if (buttonRefs.current[openId]?.contains(event.target) || flyoutRef.current?.contains(event.target)) return;
+      setOpenId(null);
+    };
+    const onEscape = (event) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // A modal opened from a flyout link (unsaved changes) owns Escape.
+      if (event.target instanceof Element && event.target.closest('dialog')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpenId(null);
+      buttonRefs.current[openId]?.focus();
+    };
+    document.addEventListener('click', onOutsideClick, true);
+    // Capture Escape before an icon's tooltip consumes it.
+    document.addEventListener('keydown', onEscape, true);
+    return () => {
+      document.removeEventListener('click', onOutsideClick, true);
+      document.removeEventListener('keydown', onEscape, true);
+    };
+  }, [openId]);
+
+  return (
+    <nav aria-label="Admin sections" className="admin-collapsed-docket">
+      <AdminIconControl as={NavLink} to={`${ROOT}/overview`} label="Overview" icon="overview"
+        className="admin-rail-section-icon" onClick={() => setOpenId(null)} />
+      {docket.filter((group) => group.label).map((group) => {
+        const open = openId === group.id;
+        const buttonId = `admin-rail-group-${group.id}`;
+        const listId = `${buttonId}-links`;
+        return (
+          <div key={group.id}>
+            <AdminIconControl
+              ref={(node) => { buttonRefs.current[group.id] = node; }}
+              id={buttonId}
+              label={group.label}
+              icon={group.icon}
+              className="admin-rail-section-icon"
+              data-current={activeGroup === group.id ? 'true' : undefined}
+              aria-expanded={open}
+              aria-controls={listId}
+              onClick={() => setOpenId(open ? null : group.id)}
+            />
+            <ul id={listId} hidden={!open} aria-labelledby={buttonId}
+              ref={open ? flyoutRef : undefined} className="admin-docket-flyout" style={open ? position : undefined}>
+              {group.items.map((item) => (
+                <li key={item.to}>
+                  <NavLink to={`${ROOT}/${item.to}`} className={docketItemClass} onClick={() => setOpenId(null)}>
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
 /**
  * The refusal an out-of-tier route meets. It is a page, not a redirect: the
  * reader typed or followed a link here, and the honest answer is what this
@@ -508,6 +611,8 @@ function AdminDesk() {
     if (wide || !mobileDocketOpen) return undefined;
     const onKeyDown = (event) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // A modal opened from a flyout link (unsaved changes) owns Escape.
+      if (event.target instanceof Element && event.target.closest('dialog')) return;
       const target = event.target;
       // A dialog inside the sheet, including a nested media dialog, answers
       // Escape first. The sheet stays open until that dialog is gone.
@@ -522,8 +627,7 @@ function AdminDesk() {
   const endTour = () => {
     markTourDone(uid);
     setTour(null);
-    // A hidden rail has no Take the tour button to return to; its Show menu
-    // button is the rail's one visible control.
+    // A collapsed rail has no Take the tour button. Return to Show menu.
     const target = railHidden ? railToggleRef : wide || mobileDocketOpen ? takeTourRef : mobileMenuRef;
     target.current?.focus();
   };
@@ -534,7 +638,7 @@ function AdminDesk() {
         Skip to main content
       </a>
       <div
-        className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto"
+        className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto"
         data-collapsed={railHidden ? 'true' : undefined}
       >
         <div className="admin-rail__job flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline px-sm lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
@@ -565,6 +669,8 @@ function AdminDesk() {
             />
           ) : null}
         </div>
+
+        {railHidden ? <CollapsedDocket docket={docket} activeGroup={activeGroup} pathname={pathname} /> : null}
 
         <details
           className="admin-mobile-docket shrink-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
@@ -610,6 +716,7 @@ function AdminDesk() {
                         aria-controls={listId}
                         onClick={() => toggleGroup(group)}
                       >
+                        {wide ? <AdminIcon name={group.icon} className="shrink-0" /> : null}
                         <span className="min-w-0 flex-1">
                           {group.label}
                           {current ? <span className="sr-only">, current page: </span> : null}
@@ -636,6 +743,7 @@ function AdminDesk() {
                               setMobileDocketOpen(false);
                             }}
                           >
+                            {wide && item.to === 'overview' ? <AdminIcon name="overview" className="me-xs shrink-0" /> : null}
                             {item.label}
                           </NavLink>
                         </li>

@@ -5,7 +5,7 @@ import './adminInteraction.css';
 
 /** Names stay available to assistive technology and on hover or keyboard focus. */
 const AdminIconControl = forwardRef(function AdminIconControl({
-  as: Control = 'button', label, icon, className = '', onClick, onKeyDown, ...props
+  as: Control = 'button', label, icon, busy = false, className = '', onClick, onKeyDown, ...props
 }, forwardedRef) {
   const controlRef = useRef(null);
   const tooltipRef = useRef(null);
@@ -64,7 +64,7 @@ const AdminIconControl = forwardRef(function AdminIconControl({
         }}
         onClick={(event) => { setVisible(false); onClick?.(event); }}
       >
-        <AdminIcon name={icon} />
+        {busy ? <span className="admin-busy-mark" aria-hidden="true" /> : <AdminIcon name={icon} />}
       </Control>
       {visible ? createPortal(
         <span ref={tooltipRef} id={tooltipId} role="tooltip" className="admin-control-tooltip" style={position}>{label}</span>,

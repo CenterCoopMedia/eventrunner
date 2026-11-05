@@ -29,4 +29,21 @@ describe('compact utility controls', () => {
     fireEvent.blur(link);
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
+
+  it('replaces the icon with a spinner and keeps the busy action named', () => {
+    const { rerender } = render(<AdminIconControl label="Refresh" icon="refresh" />);
+    const button = screen.getByRole('button', { name: 'Refresh' });
+    expect(button.querySelector('svg')).toBeInTheDocument();
+    rerender(<AdminIconControl label="Refreshing…" icon="refresh" busy aria-busy="true" aria-disabled="true" />);
+    expect(button).toHaveAccessibleName('Refreshing…');
+    expect(button.querySelector('svg')).toBeNull();
+    expect(button.querySelector('.admin-busy-mark')).toHaveAttribute('aria-hidden', 'true');
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.focus(button);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Refreshing…');
+    rerender(<AdminIconControl label="Refresh" icon="refresh" />);
+    expect(button.querySelector('.admin-busy-mark')).toBeNull();
+    expect(button.querySelector('svg')).toBeInTheDocument();
+  });
 });
