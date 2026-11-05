@@ -90,6 +90,8 @@ function fakeCloud(options = {}) {
     deployFailures: options.deployFailures || 0,
     policyRefusals: options.policyRefusals || 0,
     certNever: options.certNever || false,
+    certPropagating: options.certPropagating || false,
+    httpsServing: options.httpsServing ?? true,
   };
   const calls = [];
   const hasDns = (type, name) => state.dns.some((r) => r.type === type && r.name === name);
@@ -104,7 +106,7 @@ function fakeCloud(options = {}) {
       hostState: live ? 'HOST_ACTIVE' : 'HOST_PENDING',
       ownershipState: 'OWNERSHIP_ACTIVE',
       cert: {
-        state: live ? 'CERT_ACTIVE' : 'CERT_PENDING',
+        state: !live ? 'CERT_PENDING' : state.certPropagating ? 'CERT_PROPAGATING' : 'CERT_ACTIVE',
         verification: { dns: { desired: live ? [] : [{ records: [need[1]] }] } },
       },
       requiredDnsUpdates: { desired: live ? [] : [{ records: [need[0]] }] },
@@ -364,6 +366,10 @@ function fakeCloud(options = {}) {
     if (/^(?:firebase|firebasehosting|firebasestorage|identitytoolkit)\.googleapis\.com$/.test(url.host) && headers['x-goog-user-project'] !== PROJECT) {
       return answer({ error: { message: 'requires a quota project' } }, 403);
     }
+    if (url.host === DOMAIN) {
+      if (!state.httpsServing) throw new TypeError('fetch failed');
+      return answer({}, 404);
+    }
     let response = null;
     if (url.host.endsWith('.googleapis.com')) response = googleRoute(url, method, body);
     else if (url.host === 'api.cloudflare.com') response = cloudflareRoute(url, method, body, headers);
@@ -546,6 +552,18 @@ test('a certificate that never arrives fails with a record, and a second run aft
   fake.state.certNever = false;
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.db.read('applications/a1').status, 'ready');
+});
+
+test('a certificate that Hosting still calls propagating does not stop the build once it is served', async () => {
+  const fake = setup({ cloud: { certPropagating: true } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.db.read('applications/a1').status, 'ready');
+});
+
+test('a propagating certificate that is not served yet still fails the step', async () => {
+  const fake = setup({ cloud: { certPropagating: true, httpsServing: false } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.match(fake.db.read('console_builds/a1').error, /certificate is not active/);
 });
 
 test('a record for this site alone: a name outside it is refused', async () => {

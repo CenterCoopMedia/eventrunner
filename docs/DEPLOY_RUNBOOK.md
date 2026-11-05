@@ -1213,7 +1213,7 @@ Each step reads the current state and does nothing when it is already right, so 
 | `project` | Project `er-<name>` in the client folder, billing, APIs |
 | `firebase` | Firebase, Firestore, the default bucket, the Hosting site, the web app, sign-in |
 | `deploy-identity` | Deploy account, roles, its own identity pool, the agent grants, the image cleanup policy |
-| `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records, the wait for the certificate (up to an hour) |
+| `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records, the wait for the certificate (up to an hour). Hosting can report `CERT_PROPAGATING` long after it serves the certificate, so that state passes once the address answers over HTTPS |
 | `sign-in` | Authorized domains |
 | `email` | Postmark server, streams, webhooks, sender domain, its DNS records, the wait for verification (up to 30 minutes) |
 | `tickets` | Tests the chosen token, moves it to the client project, deletes the console's copy and any leftover, sets up the Stripe webhook endpoint |

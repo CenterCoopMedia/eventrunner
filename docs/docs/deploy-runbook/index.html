@@ -1109,7 +1109,12 @@
           npx firebase functions:secrets:set CONSOLE_EVENTBRITE_CLIENT_SECRET --project &lt;console-project-id&gt;
           </code></pre>
           <ul>
-          <li><strong>Stripe</strong>: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI <code>https://console.eventrunner.org/connect/stripe/return</code>. Put the Connect client id in <code>console/functions/.env</code> as <code>CONSOLE_STRIPE_CLIENT_ID</code>. Use the test mode client id and key for a rehearsal, with <code>CONSOLE_TEST_MODE</code> set (§11.2).</li>
+          <li><strong>Stripe</strong>: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI <code>https://console.eventrunner.org/connect/stripe/return</code>. Put the Connect client id in <code>console/functions/.env</code> as <code>CONSOLE_STRIPE_CLIENT_ID</code>. Use the test mode client id and key for a rehearsal, with <code>CONSOLE_TEST_MODE</code> set (§11.2).
+          <ul>
+          <li>A new account&#39;s live client id stays unavailable until the sandbox setup is done, payments are activated, and the Connect integration questions are answered. Do them in that order.</li>
+          <li>The console&#39;s secret key only exchanges and revokes connection tokens, so make it a restricted key with one permission: <strong>Connect OAuth: Write</strong>. Store it in Secret Manager, then redeploy, because a deploy pins each secret&#39;s version.</li>
+          <li>Creating a live key emails a verification link to the Stripe login address. Give that address a working mail route first. If mail to it bounced earlier, Stripe can stop sending: <strong>Personal details</strong> then shows &quot;We&#39;ve had trouble sending you emails,&quot; and the key pop-up keeps saying a link was sent.</li>
+          </ul></li>
           <li><strong>Eventbrite</strong>: make an app, and set its OAuth redirect URI to <code>https://console.eventrunner.org/connect/eventbrite/return</code>. Put its API key in <code>console/functions/.env</code> as <code>CONSOLE_EVENTBRITE_CLIENT_ID</code>, and its client secret in the secret above.</li>
           <li><strong>Secret Manager</strong>: turn on the Secret Manager API in the console project. Give the functions&#39; runtime service account the <strong>Secret Manager Admin</strong> role, with an IAM condition on the secret name prefix <code>projects/&lt;project-number&gt;/secrets/connection-</code>, so it cannot change other secrets. Without a condition, the role reaches every secret in the project.</li>
           </ul></li>
@@ -1189,7 +1194,7 @@
           <tr><td><code>project</code></td><td>Project <code>er-&lt;name&gt;</code> in the client folder, billing, APIs</td></tr>
           <tr><td><code>firebase</code></td><td>Firebase, Firestore, the default bucket, the Hosting site, the web app, sign-in</td></tr>
           <tr><td><code>deploy-identity</code></td><td>Deploy account, roles, its own identity pool, the agent grants, the image cleanup policy</td></tr>
-          <tr><td><code>web-address</code></td><td><code>&lt;name&gt;.eventrunner.org</code> on Hosting, its DNS records, the wait for the certificate (up to an hour)</td></tr>
+          <tr><td><code>web-address</code></td><td><code>&lt;name&gt;.eventrunner.org</code> on Hosting, its DNS records, the wait for the certificate (up to an hour). Hosting can report <code>CERT_PROPAGATING</code> long after it serves the certificate, so that state passes once the address answers over HTTPS</td></tr>
           <tr><td><code>sign-in</code></td><td>Authorized domains</td></tr>
           <tr><td><code>email</code></td><td>Postmark server, streams, webhooks, sender domain, its DNS records, the wait for verification (up to 30 minutes)</td></tr>
           <tr><td><code>tickets</code></td><td>Tests the chosen token, moves it to the client project, deletes the console&#39;s copy and any leftover, sets up the Stripe webhook endpoint</td></tr>

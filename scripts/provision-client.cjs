@@ -76,6 +76,7 @@ const IAM_WAIT_MS = 30_000;
 const IAM_ATTEMPTS = 8;
 const CERT_WAIT_MS = MINUTE;
 const CERT_POLLS = 60;
+const HTTPS_PROBE_MS = 15_000;
 const POSTMARK_WAIT_MS = MINUTE;
 const POSTMARK_POLLS = 30;
 const DEPLOY_WAIT_MS = MINUTE;
@@ -558,6 +559,16 @@ function requiredRecords(custom) {
     .map((record) => ({ type: record.type, name: record.domainName, content: record.rdata }));
 }
 
+/** Any answer over HTTPS, a 404 included, means the certificate is being served. */
+async function servesHttps(ctx, domain) {
+  try {
+    await ctx.deps.fetch(`https://${domain}/`, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(HTTPS_PROBE_MS) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** ADR §6.3: the web address, its DNS records, and the wait for its certificate. */
 async function stepWebAddress(ctx) {
   const { projectId, site, domain } = ctx;
@@ -574,7 +585,14 @@ async function stepWebAddress(ctx) {
       for (const record of requiredRecords(custom)) {
         if (await dnsRecord(ctx, record)) notes.push(`wrote ${record.type} ${record.name}`);
       }
-      if (custom.cert?.state === 'CERT_ACTIVE' && custom.hostState === 'HOST_ACTIVE') return summary(notes);
+      if (custom.hostState === 'HOST_ACTIVE') {
+        if (custom.cert?.state === 'CERT_ACTIVE') return summary(notes);
+        // Hosting can report this for an hour or more after it serves the certificate, while the site has no release.
+        if (custom.cert?.state === 'CERT_PROPAGATING' && await servesHttps(ctx, domain)) {
+          notes.push('the certificate is being served');
+          return summary(notes);
+        }
+      }
     }
     await ctx.deps.sleep(CERT_WAIT_MS);
   }
