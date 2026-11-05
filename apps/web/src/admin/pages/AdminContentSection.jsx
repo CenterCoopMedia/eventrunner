@@ -88,6 +88,25 @@ export default function AdminContentSection() {
   const setRowResult = (id, result) => setRowResults((current) => ({ ...current, [id]: result }));
 
   useEffect(() => {
+    if (!contentReady) return;
+    const present = new Set(contentRows.filter((row) => row.current?.section === sectionId).map((row) => row.id));
+    setRowResults((current) => {
+      let next = current;
+      for (const [id, result] of Object.entries(current)) {
+        if (!result?.removed) continue;
+        if (!present.has(id) && !result.removalObserved) {
+          next = { ...next, [id]: { ...result, removalObserved: true } };
+        } else if (present.has(id) && result.removalObserved) {
+          // Another tab can create the same deterministic section/field ID.
+          // Keep the focused result node while restoring the current controls.
+          next = { ...next, [id]: { tone: 'ok', message: 'This block is available again. Review its current content.' } };
+        }
+      }
+      return next;
+    });
+  }, [contentRows, contentReady, sectionId, rowResults]);
+
+  useEffect(() => {
     const node = frameRef.current;
     if (!node) return undefined;
     if (leaveGuard.pending) node.setAttribute('inert', '');

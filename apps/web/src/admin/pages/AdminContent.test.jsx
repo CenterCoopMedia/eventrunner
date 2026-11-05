@@ -783,5 +783,12 @@ describe('contextual block actions', () => {
     expect(result).toBeInTheDocument();
     expect(result.parentElement).toHaveFocus();
     expect(screen.getByText('Deleted', { exact: true })).toBeInTheDocument();
+    act(() => adminSubscriptions.get('cmsContent_drafts')([{ ...BODY_BLOCK_DRAFT, value: '<p>Recreated introduction.</p>' }]));
+    const restored = await screen.findByRole('link', { name: 'Recreated introduction.', exact: true });
+    const row = restored.closest('li');
+    expect(within(row).getByRole('button', { name: 'Publish' })).toBeInTheDocument();
+    expect(within(row).getByRole('link', { name: 'Edit Recreated introduction.' })).toBeInTheDocument();
+    expect(screen.queryByText('Deleted', { exact: true })).not.toBeInTheDocument();
+    expect(within(row).getByRole('status')).toHaveTextContent('This block is available again.');
   });
 });
