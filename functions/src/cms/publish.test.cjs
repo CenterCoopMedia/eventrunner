@@ -365,6 +365,28 @@ test('a publish with nothing dirty creates no row and never invokes the publishe
   assert.equal(invoked, false);
 });
 
+test('a first publish with nothing dirty opens a coming-soon site and refreshes the snapshot', async () => {
+  const db = makeFakeDb({ 'config/launch': { comingSoon: true } });
+  let invoked = 0;
+  const res = fakeRes();
+  await createCmsPublishHandler({
+    ...deps(db),
+    env: PUBLISHER_ENV,
+    fetchImpl: async () => { invoked += 1; throw new Error('publisher offline'); },
+  })(req({ body: { all: true } }), res);
+  assert.equal(res.statusCode, 200);
+  const launch = db.read('config', 'launch');
+  assert.equal(launch.comingSoon, false);
+  assert.equal(launch.openedBy, undefined, 'config/* is public: no admin email');
+  assert.ok(res.body.queueId, 'the refresh needs a row to record on');
+  assert.ok(invoked > 0);
+
+  // The site is open now, so the next empty publish is a plain no-op again.
+  const again = fakeRes();
+  await createCmsPublishHandler(deps(db))(req({ body: { all: true } }), again);
+  assert.equal(again.body.queueId, null);
+});
+
 test('a failed publish never invokes the publisher — there is no new snapshot to build', async () => {
   const db = dirtyDb();
   db.failAtCommit = 1;

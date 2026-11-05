@@ -71,4 +71,41 @@ function publicContentDoc(doc) {
   return isSeedOwned(doc) ? { ...rest, seeded: true } : rest;
 }
 
-module.exports = { SEED_ACTOR, SEED_WHEN_PLACEHOLDER, isSeedOwned, publicContentDoc };
+/** The mark every seeded placeholder string carries (scripts/lib/seed.cjs). */
+const STARTER_MARK = '[Replace]';
+
+/** Fields that describe a block rather than hold what it says. */
+const STARTER_SKIP_FIELDS = new Set(['id', 'section', 'field', 'blockType', 'seededAt']);
+
+/**
+ * Whether a content block still holds starter text: any field the seed
+ * wrote as a `[Replace]` instruction, or a seeded statistic that still
+ * reads 0. The public site draws no such block, and the admin says the
+ * block is hidden until it is filled in.
+ *
+ * @param {object|null|undefined} block a draft, a live doc, or a public copy
+ * @returns {boolean}
+ */
+function isStarterContent(block) {
+  if (block == null || typeof block !== 'object') return false;
+  for (const [key, value] of Object.entries(block)) {
+    if (STARTER_SKIP_FIELDS.has(key)) continue;
+    if (typeof value === 'string' && value.includes(STARTER_MARK)) return true;
+  }
+  return block.blockType === 'stat' && block.seeded === true && String(block.value ?? '').trim() === '0';
+}
+
+/** Whether a string is empty or still the seed's instruction. */
+function isStarterText(value) {
+  return typeof value !== 'string' || value.trim() === '' || value.includes(STARTER_MARK);
+}
+
+module.exports = {
+  SEED_ACTOR,
+  SEED_WHEN_PLACEHOLDER,
+  STARTER_MARK,
+  isSeedOwned,
+  isStarterContent,
+  isStarterText,
+  publicContentDoc,
+};

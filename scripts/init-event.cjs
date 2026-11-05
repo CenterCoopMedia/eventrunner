@@ -84,6 +84,7 @@ const {
   templateReadinessRows, formatInventory, pageSetErrors, isConfigDerived, EXCLUDED_REASONS,
 } = require('./lib/event-template.cjs');
 const { validateDeployEnv } = require('shared/config');
+const { SEED_ACTOR } = require('shared/seed');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
 const {
   writeConfigDocs, seedCollection, removeObsoleteSeeds, withholdUpgradeSeeds, findPagePathCollisions,
@@ -119,7 +120,7 @@ const TEMPLATE_APPLY_WRITES = Object.freeze([
   // cmsMeta/pending, the unpublished-change count the publish keeps.
   'cmsMeta',
 ]);
-const TEMPLATE_APPLY_CONFIG = Object.freeze(['event', 'features', 'theme', 'badges', 'providers', 'bootstrap', 'template']);
+const TEMPLATE_APPLY_CONFIG = Object.freeze(['event', 'features', 'theme', 'badges', 'providers', 'bootstrap', 'template', 'launch']);
 
 function usage() {
   return [
@@ -544,6 +545,22 @@ async function runInit({
 
   if (!dryRun) await store.ensurePendingCounts({ db, now });
 
+  // A brand-new site opens on a coming-soon page until its team publishes
+  // from the admin for the first time (functions/src/cms/launch.cjs). Only a
+  // first run sets it, and it is written BEFORE config/event: a run that
+  // fails after saving the event would otherwise leave a site with no
+  // launch document, which reads as open, and the retry would see the event
+  // and skip this. A site that is already live keeps whatever state it has.
+  let launchResult = null;
+  if (!eventSnap.exists && !dryRun) {
+    const launchRef = db.collection('config').doc('launch');
+    const launchSnap = await launchRef.get();
+    if (!launchSnap.exists) {
+      await launchRef.set({ comingSoon: true, updatedAt: new Date(now()), updatedBy: SEED_ACTOR.email });
+      launchResult = { docId: 'launch', action: 'create', reason: 'coming soon until the first publish' };
+    }
+  }
+
   // On a re-run, only the explicit flags may add to config/bootstrap: the
   // answers file's lists seeded the first run and are not re-applied, so
   // an address an operator removed or demoted on the Access page stays
@@ -552,6 +569,7 @@ async function runInit({
   const { results: configResults, effective } = await writeConfigDocs({
     db, docs, force, dryRun, now, bootstrapAdditions,
   });
+  if (launchResult) configResults.push(launchResult);
   if (templateDoc) {
     configResults.unshift({
       docId: 'template',

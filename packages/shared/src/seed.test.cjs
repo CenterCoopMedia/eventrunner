@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { SEED_ACTOR, isSeedOwned, publicContentDoc } = require('./seed.cjs');
+const { SEED_ACTOR, isSeedOwned, isStarterContent, publicContentDoc } = require('./seed.cjs');
 
 test('a flagged document written by the seed, or by nobody recorded, is the seed’s', () => {
   assert.equal(isSeedOwned({ seeded: true }), true);
@@ -28,4 +28,14 @@ test('the public copy states ownership by that rule and drops the writer bookkee
   assert.deepEqual(edited, { id: 'a', value: 'y' });
   const plain = publicContentDoc({ id: 'a', value: 'z' });
   assert.deepEqual(plain, { id: 'a', value: 'z' });
+});
+
+test('a block still holding starter text is starter content; a filled one is not', () => {
+  assert.equal(isStarterContent({ blockType: 'text', value: '[Replace] Venue name.' }), true);
+  assert.equal(isStarterContent({ blockType: 'richtext', value: '<p>[Replace] What happens.</p>' }), true);
+  assert.equal(isStarterContent({ blockType: 'stat', value: '0', label: 'attendees expected', seeded: true }), true);
+  assert.equal(isStarterContent({ blockType: 'stat', value: '0', label: 'tickets left' }), false);
+  assert.equal(isStarterContent({ blockType: 'text', value: 'The Grand Hall' }), false);
+  assert.equal(isStarterContent({ blockType: 'text', value: 'Hall', section: '[Replace]' }), false);
+  assert.equal(isStarterContent(null), false);
 });

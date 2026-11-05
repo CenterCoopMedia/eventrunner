@@ -7,6 +7,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router';
+import { isStarterContent } from 'shared/seed';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
@@ -309,6 +310,8 @@ export default function AdminContentSection() {
                       <StatusBadge tone="info">{blockTypeLabel(row.current.blockType)}</StatusBadge>
                       {row.current.visible === false ? (
                         <StatusBadge tone="neutral">Hidden</StatusBadge>
+                      ) : isStarterContent(row.current) ? (
+                        <StatusBadge tone="caution">Hidden until filled in</StatusBadge>
                       ) : null}
                     </div>
                   </div>

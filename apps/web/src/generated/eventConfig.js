@@ -184,4 +184,8 @@ export const theme = {
   },
 };
 
+export const launch = {
+  comingSoon: false,
+};
+
 export default eventConfig;

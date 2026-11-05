@@ -278,6 +278,7 @@ const {
   systemPageIdForPath,
 } = require('shared/routing');
 const { pageHeading, isPublicPage } = require('shared/page');
+const { isStarterText } = require('shared/seed');
 const { isValidDocId } = require('../cms/store.cjs');
 
 /**
@@ -715,7 +716,7 @@ function buildEventJsonLd({ event, url, imageUrl = null }) {
     '@type': 'Event',
     name: event.name.trim(),
   };
-  const description = isNonEmptyString(event?.seo?.description)
+  const description = !isStarterText(event?.seo?.description)
     ? event.seo.description.trim()
     : (isNonEmptyString(event?.tagline) ? event.tagline.trim() : '');
   if (description) data.description = description;
@@ -791,7 +792,7 @@ function speakerName(speaker) {
 function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
   const event = (config && config.event) || null;
   const siteName = isNonEmptyString(event?.name) ? event.name.trim() : 'Event site';
-  const eventDescription = isNonEmptyString(event?.seo?.description)
+  const eventDescription = !isStarterText(event?.seo?.description)
     ? event.seo.description.trim()
     : (isNonEmptyString(event?.tagline) ? event.tagline.trim() : '');
   const image = resolveCardImage({ config, base });

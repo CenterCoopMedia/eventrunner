@@ -109,10 +109,10 @@ function header(lines) {
  * eventConfig.js — `config/event`, `config/features`, and public theme
  * settings. Resolved colors go to theme.css; runtime keeps override inputs.
  *
- * @param {{ event: object, features: object, theme: object }} config
+ * @param {{ event: object, features: object, theme: object, launch?: object|null }} config
  * @returns {string}
  */
-function emitEventConfig({ event, features, theme }) {
+function emitEventConfig({ event, features, theme, launch = null }) {
   const themeProjection = {
     // The base look (design brief §4). EventConfigProvider writes it to
     // data-theme on <html>, and the theme editor seeds its preset picker
@@ -160,6 +160,10 @@ function emitEventConfig({ event, features, theme }) {
     `export const features = ${jsValue(features)};`,
     '',
     `export const theme = ${themeLiteral};`,
+    '',
+    // config/launch: whether the site still shows its coming-soon page.
+    // Only the one flag ships; who opened the site and when stay private.
+    `export const launch = ${jsValue({ comingSoon: launch?.comingSoon === true })};`,
     '',
     'export default eventConfig;',
     '',

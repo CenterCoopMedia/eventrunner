@@ -23,8 +23,8 @@ import { SponsorStrip } from '../components/SponsorWall.jsx';
 import HistorySection from '../components/HistorySection.jsx';
 import { resolvePageLayout } from '../lib/pageLayout.js';
 import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
-import { eventDateRangeLabel, formatDayDate } from '../lib/eventTime.js';
-import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
+import { eventDateRangeLabel, formatDayDate, formatDayHours } from '../lib/eventTime.js';
+import { SEED_WHEN_PLACEHOLDER, isStarterContent } from 'shared/seed';
 
 /**
  * The one composed moment on the first screen: three equal cells across the
@@ -75,7 +75,9 @@ export function SummaryRow({ days, timezone, eventConfig, facts, action = null, 
                 </h3>
                 <p className="font-mono text-caption text-text-secondary">
                   <time dateTime={day.date}>{formatDayDate(day, timezone) ?? day.date}</time>
-                  {day.startTime && day.endTime ? ` · ${day.startTime}–${day.endTime}` : null}
+                  {day.startTime && day.endTime
+                    ? ` · ${formatDayHours(day.startTime, day.endTime) ?? `${day.startTime}–${day.endTime}`}`
+                    : null}
                 </p>
               </li>
             ))}
@@ -196,10 +198,18 @@ export default function Home() {
   // has no head of its own, so its link sits after the row.
   const renderHomeSection = (section, blocks, editLink) => {
     if (section.id === 'info') {
+      // Read with starter text kept, not from `blocks`: the seeded When
+      // fact holds starter text until it is filled from the event's dates
+      // here, so the starter check runs after that, not before.
+      const infoBlocks = getSectionBlocks('info', { keepStarter: true });
       // Grouped before the section is opened, because a section whose
       // blocks are all of some type this arrangement does not draw would
       // otherwise print its heading over nothing.
-      const cards = groupIntoCards(blocks.map((block) => withLiveDates(block, eventConfig)));
+      const cards = groupIntoCards(
+        infoBlocks
+          .map((block) => withLiveDates(block, eventConfig))
+          .filter((block) => !isStarterContent(block)),
+      );
       // THE KEY FACTS ARE ONE CELL OF THE SUMMARY ROW, and the row is drawn
       // HERE, in this section's own place in the operator's order. Moving
       // the section in the admin moves the whole row, which is the control

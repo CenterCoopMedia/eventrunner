@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { resolveRegistrationAction } from 'shared/registration';
+import { DEFAULT_REGISTRATION_LABEL } from '../lib/useRegistrationLink.js';
 import { activeQuestions, answerText, checkAnswers, readRegistrationForm } from 'shared/registrationForm';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -376,9 +377,19 @@ export default function Tickets() {
     return (
       <article className="space-y-md">
         {heading}
-        <p>{registrationAction ? 'Registration is managed by the event’s registration provider.' : 'Contact the organizers for registration information.'}</p>
-        {registrationAction ? <a href={registrationAction.url} className={primaryActionClass}>{registrationAction.label || 'Open registration'}</a> : null}
-        <p><Link to="/ticket/claim" className="underline">Claim a ticket you already have</Link></p>
+        {/* No tickets are sold here. The register-interest link is the
+            way in where the organizers set one; otherwise the page says
+            so plainly rather than offering a claim for a ticket nobody
+            could have bought. */}
+        <p>
+          {registrationAction
+            ? 'Registration for this event is handled on another site.'
+            : 'Tickets are not sold on this site. Check this page again for registration details.'}
+        </p>
+        {registrationAction ? <a href={registrationAction.url} className={primaryActionClass}>{registrationAction.label || DEFAULT_REGISTRATION_LABEL}</a> : null}
+        {catalog.provider && catalog.provider !== 'none' ? (
+          <p><Link to="/ticket/claim" className="underline">Claim a ticket you already have</Link></p>
+        ) : null}
       </article>
     );
   }

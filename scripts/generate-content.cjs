@@ -81,7 +81,13 @@ function usage() {
  */
 async function readDeployment({ db }) {
   const configIds = ['event', 'features', 'theme'];
-  const configSnaps = await db.getAll(...configIds.map((id) => db.collection('config').doc(id)));
+  // config/launch rides the same read, and is optional: a site from before
+  // the coming-soon page has no such document, and is open.
+  const [launchSnap, ...configSnaps] = await db.getAll(
+    db.collection('config').doc('launch'),
+    ...configIds.map((id) => db.collection('config').doc(id)),
+  );
+  const launch = launchSnap?.exists ? launchSnap.data() : null;
   const config = {};
   configIds.forEach((id, i) => {
     config[id] = configSnaps[i].exists ? configSnaps[i].data() : null;
@@ -141,6 +147,7 @@ async function readDeployment({ db }) {
     event: config.event,
     features: config.features,
     theme: config.theme,
+    launch,
     pages,
     content,
     sessions,
