@@ -86,6 +86,7 @@ describe('Setup', () => {
     fireEvent.blur(field);
     expect(screen.getByText('Enter the mailing address.')).toBeInTheDocument();
     fireEvent.change(field, { target: { value: '1 Main' } });
+    expect(screen.queryByText('Enter the mailing address.')).not.toBeInTheDocument();
     await waitFor(() => expect(callsTo('saveApplicationStep')).toHaveLength(1), { timeout: 2000 });
     expect(await screen.findByText('Use at least 10 characters.')).toBeInTheDocument();
     expect(field).toHaveAttribute('aria-invalid', 'true');
