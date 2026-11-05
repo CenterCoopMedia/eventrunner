@@ -18,7 +18,7 @@ export const PROVIDER_COPY = Object.freeze({
   },
 });
 
-export const CAN_DISCONNECT = 'You can disconnect this account until you accept the agreement. After that, ask us for help if you want to remove it.';
+export const CAN_DISCONNECT = 'You can disconnect this account here until you accept the agreement. After that, you can cut it off at any time in the account\'s own settings, or ask us for help. Your site stays online, but it stops selling tickets or receiving ticket updates through that account.';
 
 /** The server names the provider's page; the browser goes only to that provider. */
 export function isProviderUrl(url, provider) {
