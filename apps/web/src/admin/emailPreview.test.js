@@ -113,6 +113,25 @@ describe('buildPreviewDoc', () => {
     expectFixedPoint(output);
   });
 
+  it('optionally fits the standard mail wrapper without changing stored content, nested buttons or safety barriers', () => {
+    const stored = '<table role="presentation" width="600" style="width:600px;max-width:100%"><tr><td>Event guide<table role="presentation" width="180"><tr><td><a href="https://example.test/schedule">Read the schedule</a></td></tr></table></td></tr></table>';
+    const original = parse(buildPreviewDoc(stored));
+    const output = buildPreviewDoc(stored, { fitWidth: true });
+    const fitted = parse(output);
+    const [policy, scheme, base, style] = fitted.head.children;
+
+    expect(policy.outerHTML).toBe(original.head.children[0].outerHTML);
+    expect(scheme.outerHTML).toBe(original.head.children[1].outerHTML);
+    expect(base.outerHTML).toBe(original.head.children[2].outerHTML);
+    expect(style.textContent).toContain('table[role="presentation"][width="600"]');
+    expect(style.textContent).toContain('overflow-wrap:anywhere');
+    expect(style.textContent).not.toContain('width="180"');
+    expect(fitted.body.innerHTML).toBe(original.body.innerHTML);
+    expect(liveLinks(fitted)).toEqual([]);
+    expectFixedPoint(output);
+    expect(original.head.querySelector('style').textContent).toBe(':root{background:Canvas;color:CanvasText}');
+  });
+
   it('removes SVG animation, so an animated target or href cannot bring a link back', () => {
     const payloads = [
       '<svg><a href="https://pixel.example.test/set"><set attributeName="target" to="_self"/><rect width="200" height="60"/></a></svg>',

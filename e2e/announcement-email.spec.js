@@ -62,7 +62,8 @@ test.describe.serial('announcement email', () => {
   test('compose, preview, test, confirm, send, history, and unsubscribe', async ({ page }) => {
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/announcements');
-    await expect(page.getByRole('heading', { level: 2, name: 'Email an announcement' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Email', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 2, name: 'Write your email' })).toBeVisible();
 
     await page.getByLabel('Audience').selectOption({ label: 'Approved attendees' });
     await page.getByLabel('Subject').fill(SUBJECT);
@@ -142,6 +143,7 @@ test.describe.serial('announcement email', () => {
     const db = adminDb();
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/announcements');
+    await page.getByRole('tab', { name: 'Email', exact: true }).click();
     const saved = page.locator('section', { has: page.getByRole('heading', { level: 2, name: 'Saved messages' }) });
     await expect(saved).toBeVisible();
     const beforeSaved = mailFileSize();
@@ -161,6 +163,7 @@ test.describe.serial('announcement email', () => {
 
     // Reopen the page; the message is still there. A draft with edits asks first.
     await page.reload();
+    await page.getByRole('tab', { name: 'Email', exact: true }).click();
     await expect(row).toBeVisible();
     await page.getByLabel('Subject').fill('Words I have not saved');
     await row.getByRole('button', { name: 'Load' }).click();
@@ -177,6 +180,7 @@ test.describe.serial('announcement email', () => {
     // An edit to the loaded draft leaves the saved message as it was.
     await page.getByLabel('Subject').fill(`${SAVED_SUBJECT} edited`);
     await page.reload();
+    await page.getByRole('tab', { name: 'Email', exact: true }).click();
     await row.getByRole('button', { name: 'Load' }).click();
     await expect(page.getByLabel('Subject')).toHaveValue(SAVED_SUBJECT);
     expect((await db.collection('announcement_messages').doc(savedId).get()).data().subject).toBe(SAVED_SUBJECT);
