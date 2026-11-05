@@ -80,6 +80,10 @@ export default function SignupLinks() {
   const fieldRef = useRef(null);
   const resultRefs = useRef({});
 
+  useEffect(() => {
+    if (fieldError && !busy) fieldRef.current?.focus();
+  }, [fieldError, busy]);
+
   const load = useCallback(async () => {
     try {
       setLinks((await callApi('listSignupLinks', {})).links);
@@ -113,7 +117,6 @@ export default function SignupLinks() {
     } catch (err) {
       if (err.field === 'organizationName') {
         setFieldError(err.message);
-        fieldRef.current?.focus();
       } else setError(err);
     }
     setBusy(false);

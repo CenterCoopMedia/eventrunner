@@ -63,8 +63,8 @@ describe('fieldErrorsOf', () => {
     expect(
       fieldErrorsOf("Invalid page: path: must start with '/'; label: must be a non-empty string"),
     ).toEqual([
-      { field: 'path', message: "path: must start with '/'" },
-      { field: 'label', message: 'label: must be a non-empty string' },
+      { field: 'path', message: "Path: must start with '/'" },
+      { field: 'label', message: 'Label: must be a non-empty string' },
     ]);
   });
 
@@ -76,6 +76,6 @@ describe('fieldErrorsOf', () => {
 
   it('is attached to every AdminApiError', () => {
     const error = new AdminApiError({ code: 'bad-request', status: 400, message: 'id: nope' });
-    expect(error.fieldErrors).toEqual([{ field: 'id', message: 'id: nope' }]);
+    expect(error.fieldErrors).toEqual([{ field: 'id', message: 'Id: nope' }]);
   });
 });

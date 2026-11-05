@@ -706,7 +706,7 @@ describe('server errors and publish skips', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
     expect(
-      (await screen.findAllByText(/intro__body was edited while publishing/i)).length,
+      (await screen.findAllByText(/One item was edited while publishing/i)).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText(/picks it up live/i)).toBeNull();
   });

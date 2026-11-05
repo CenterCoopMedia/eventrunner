@@ -147,7 +147,7 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, disabled }) {
  */
 export default function ConnectionPanel({
   provider, orgId, appId, connections, errors = {}, canConnect = connections.canChange, myRole,
-  beforeLeave, returnPath, onConnections, onNotice, connectLabel, preserveResult = false,
+  beforeLeave, returnPath, onConnections, onNotice, connectLabel, preserveResult = false, onResult,
 }) {
   const copy = PROVIDER_COPY[provider];
   const account = connections[provider];
@@ -193,6 +193,7 @@ export default function ConnectionPanel({
     setDisconnecting(true);
     try {
       const reply = await callApi('disconnectAccount', { orgId, appId, provider });
+      if (preserveResult) onResult?.();
       onConnections(reply);
       const message = disconnectedWords(copy.name, reply, connections.built);
       if (preserveResult) setNotice(message);

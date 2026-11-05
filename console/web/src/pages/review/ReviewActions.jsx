@@ -53,12 +53,12 @@ export default function ReviewActions({ status, canClose = false, onDecide, busy
       {allowed.decline ? <div className="row-actions">{opener('decline', 'Decline')}</div> : null}
       {open === 'decline' ? <NoteForm id="decline" title="Decline this request"
         help="Say why. The web address becomes free again, and the request is deleted after 90 days."
-        submitLabel="Decline" danger disabled={disabled} result={result}
+        submitLabel="Decline" danger disabled={disabled} result={result?.kind === 'error' ? result : null}
         onSubmit={(note) => submit('declineApplication', { note })} onCancel={close} /> : null}
       {allowed.close ? <div className="row-actions">{opener('close', 'Close this request')}</div> : null}
       {open === 'close' ? <NoteForm id="close" title="Close this request"
         help="Say why. Cancel any deploy run for this site first. The console drops the client's account connections. The web address becomes free only if no build ever began, because a build may have used it for good. Anything the build already made stays until you remove it, including the Google Cloud project and any Eventbrite token stored in it. The deploy runbook, section 12.2, lists it."
-        submitLabel="Close the request" danger disabled={disabled} result={result}
+        submitLabel="Close the request" danger disabled={disabled} result={result?.kind === 'error' ? result : null}
         onSubmit={(note) => submit('closeApplication', { note })} onCancel={close} /> : null}
       {allowed.deleteSpam ? (
         <section aria-labelledby="spam-title" className="section">
@@ -71,7 +71,7 @@ export default function ReviewActions({ status, canClose = false, onDecide, busy
                   onClick={() => submit('deleteSpamApplication', { confirm: true })}>{busy ? 'Deleting…' : 'Yes, delete'}</button>
                 <button type="button" className="button" autoFocus disabled={busy || disabled} onClick={close}>Cancel</button>
               </div>
-              <ActionResult result={result} />
+              <ActionResult result={result?.kind === 'error' ? result : null} />
             </>
           ) : opener('spam', 'Delete as spam')}
         </section>

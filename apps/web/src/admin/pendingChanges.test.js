@@ -297,7 +297,7 @@ describe('summarizeAll', () => {
     expect(verdict.ok).toBe(false);
     // The page that went out is reported too: two of the three changes are live.
     expect(verdict.message).toBe(
-      'Published 1 of 2 content blocks. Not published: b was edited while publishing, so its newer draft stayed unpublished. Published 1 page.',
+      'Published 1 of 2 content blocks. Not published: One item was edited while publishing, so its newer draft stayed unpublished. Published 1 page.',
     );
   });
 
@@ -311,6 +311,6 @@ describe('summarizeAll', () => {
       },
     });
     expect(verdict.ok).toBe(false);
-    expect(verdict.message).toBe('Nothing was published: b has no draft to publish. Published 1 page, 2 sessions.');
+    expect(verdict.message).toBe('Nothing was published: One item had nothing new to publish. Published 1 page, 2 sessions.');
   });
 });

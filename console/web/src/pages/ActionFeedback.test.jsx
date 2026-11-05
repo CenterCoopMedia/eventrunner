@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, callApi } from '../api.js';
+import { ApiError } from '../api.js';
 import { AppRoutes } from '../App.jsx';
 import { callsTo, fullAnswers, serveApi, team } from '../test/application.js';
 import { fakeAuth, renderPage } from '../test/renderPage.jsx';

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLocation } from 'react-router';
 import ConnectionPanel, { ConnectionNotice } from '../../setup/ConnectionPanel.jsx';
 import { setupPath, stepById, TICKET_CHOICES } from '../../setup/steps.js';
@@ -15,14 +15,8 @@ export default function TicketsStep({ value, errors, onChange, app, orgId, appId
   const { state } = useLocation();
   const error = errors['tickets.choice'];
   const { connections } = app;
-  const [seen, setSeen] = useState(() => PROVIDERS.filter((provider) => provider === value.choice || connections[provider].connected));
-  useEffect(() => {
-    setSeen((previous) => {
-      const added = PROVIDERS.filter((provider) => !previous.includes(provider) && (provider === value.choice || connections[provider].connected));
-      return added.length ? [...previous, ...added] : previous;
-    });
-  }, [value.choice, connections]);
-  const shown = PROVIDERS.filter((provider) => seen.includes(provider) || provider === value.choice || connections[provider].connected);
+  const [retained, setRetained] = useState([]);
+  const shown = PROVIDERS.filter((provider) => retained.includes(provider) || provider === value.choice || connections[provider].connected);
   return (
     <div className="stack">
       <p className="lead">Choose how people get tickets. You can change your choice until you accept the agreement.</p>
@@ -59,12 +53,14 @@ export default function TicketsStep({ value, errors, onChange, app, orgId, appId
           orgId={orgId}
           appId={appId}
           connections={connections}
+          canConnect={connections.canChange && (!retained.includes(provider) || provider === value.choice || connections[provider].connected)}
           errors={provider === value.choice ? errors : {}}
           myRole={app.myRole}
           beforeLeave={flush}
           returnPath={setupPath(orgId, appId, stepById('tickets'))}
           onConnections={onConnections}
           preserveResult
+          onResult={() => setRetained((previous) => previous.includes(provider) ? previous : [...previous, provider])}
         />
       ))}
     </div>

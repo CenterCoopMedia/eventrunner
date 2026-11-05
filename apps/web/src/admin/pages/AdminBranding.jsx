@@ -123,7 +123,7 @@ const LOGO_SLOT_LABELS = {
 };
 
 const LOGO_SLOT_HINTS = {
-  primary: 'The header logo, shown at the top of every page.',
+  primary: 'Your main logo. It shows at the top of every page and every email. Emails need a PNG or JPG.',
   mark: 'A square version for tight spaces. A square PNG from 512 to 4096 pixels on a side also becomes the app icon.',
   footer: 'Used in the site footer; falls back to the primary logo.',
   ogDefault: 'The image link previews use when a page has none of its own.',
@@ -510,7 +510,7 @@ export default function AdminBranding() {
         }
       />
 
-      <ServerErrorSummary error={error} errorRef={errorRef} title="The server rejected this theme" />
+      <ServerErrorSummary error={error} errorRef={errorRef} title="The theme was not published" />
       {status ? <SaveStatus message={status} /> : null}
       {contrastFailures.length > 0 ? (
         <Notice
