@@ -4,7 +4,7 @@
 // (set in Pages) — offered only when the section allows at least one block
 // type, and disabled once the section is at its cap, same guardrail
 // AdminPageEditor's block picker applies to defaultBlocks.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -33,6 +33,7 @@ import {
   ReorderControls,
   bindReorderDrop,
 } from '../components/ReorderControls.jsx';
+import { ActionFeedback, EditRecordLink, useActionResultFocus } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -47,7 +48,10 @@ export default function AdminContentSection() {
   const { showToast } = useToast();
   const { findRow: findPage, loading: pagesLoading, ready: pagesReady } = useAdminPages();
   const { rows: contentRows, loading: contentLoading, ready: contentReady, error: contentError } = useAdminContent();
-  const [busyId, setBusyId] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const requestPending = useRef(false);
+  const [rowResults, setRowResults] = useState({});
+  const blockedReasonId = useId();
   const [savingOrder, setSavingOrder] = useState(false);
   const [notice, setNotice] = useState(null);
   const [spoken, setSpoken] = useState('');
@@ -61,7 +65,14 @@ export default function AdminContentSection() {
   const serverBlocks = byStoredOrder(contentRows.filter((row) => row.current?.section === sectionId));
   const draft = useDraftOrder(serverBlocks);
   const blocks = draft.rows;
-  const leaveGuard = useUnsavedNavigation(draft.dirty, { blocked: savingOrder || busyId !== null });
+  const actionFocus = useActionResultFocus(busy !== null || savingOrder);
+  const displayed = blocks.map((row) => ({ row, result: rowResults[row.id] }));
+  for (const [id, result] of Object.entries(rowResults)) {
+    if (result?.removed && !blocks.some((row) => row.id === id)) {
+      displayed.splice(Math.min(result.position, displayed.length), 0, { row: { id }, result });
+    }
+  }
+  const leaveGuard = useUnsavedNavigation(draft.dirty, { blocked: savingOrder || busy !== null });
   const allowed = section?.allowedBlocks ?? [];
   const maxBlocks = Number.isFinite(section?.maxBlocks) ? section.maxBlocks : Infinity;
   // While either cmsContent revision is still loading, `blocks` can be an
@@ -71,6 +82,29 @@ export default function AdminContentSection() {
   // create past maxBlocks on a slow connection. Block the action instead of
   // guessing until both listeners have actually reported.
   const atMax = !pagesReady || !contentReady || serverBlocks.length >= maxBlocks;
+  const blockedReason = !pagesReady || !contentReady
+    ? 'Waiting for this section and its draft blocks…'
+    : atMax ? `This section already has its maximum of ${maxBlocks} blocks.` : '';
+  const setRowResult = (id, result) => setRowResults((current) => ({ ...current, [id]: result }));
+
+  useEffect(() => {
+    if (!contentReady) return;
+    const present = new Set(contentRows.filter((row) => row.current?.section === sectionId).map((row) => row.id));
+    setRowResults((current) => {
+      let next = current;
+      for (const [id, result] of Object.entries(current)) {
+        if (!result?.removed) continue;
+        if (!present.has(id) && !result.removalObserved) {
+          next = { ...next, [id]: { ...result, removalObserved: true } };
+        } else if (present.has(id) && result.removalObserved) {
+          // Another tab can create the same deterministic section/field ID.
+          // Keep the focused result node while restoring the current controls.
+          next = { ...next, [id]: { tone: 'ok', message: 'This block is available again. Review its current content.' } };
+        }
+      }
+      return next;
+    });
+  }, [contentRows, contentReady, sectionId, rowResults]);
 
   useEffect(() => {
     const node = frameRef.current;
@@ -81,7 +115,7 @@ export default function AdminContentSection() {
   }, [leaveGuard.pending]);
 
   function moveRow(from, to) {
-    if (!contentReady || savingOrder || busyId !== null) return false;
+    if (!contentReady || savingOrder || busy !== null) return false;
     const label = contentBlockTitle(blocks[from]?.current);
     const count = blocks.length;
     const moved = draft.move(from, to);
@@ -95,7 +129,8 @@ export default function AdminContentSection() {
   }
 
   async function saveOrder() {
-    if (!contentReady) return;
+    if (!contentReady || requestPending.current) return;
+    requestPending.current = true;
     const writes = ordersToWrite(blocks);
     setSavingOrder(true);
     setNotice(null);
@@ -115,6 +150,7 @@ export default function AdminContentSection() {
     setNotice(verdict);
     showToast(verdict.message, verdict.tone === 'ok' ? { announce: false } : { tone: 'error', announce: false });
     setSavingOrder(false);
+    requestPending.current = false;
   }
 
   if ((pagesLoading || contentLoading) && !section) {
@@ -135,33 +171,40 @@ export default function AdminContentSection() {
   }
 
   async function publishOne(row) {
-    setBusyId(row.id);
-    setNotice(null);
+    if (requestPending.current) return;
+    requestPending.current = true;
+    actionFocus.remember(row.id);
+    setBusy({ id: row.id, action: 'publish' });
+    setRowResult(row.id, null);
     try {
       const response = await call('cmsPublish', { collection: 'cmsContent', docIds: [row.id] });
       const verdict = summarizePublish(response, 'cmsContent', [row.id], 'content blocks');
-      setNotice({ tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
+      setRowResult(row.id, { tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
       if (verdict.ok) setResolvedIds((current) => new Set([...current, row.id]));
-      showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
     } catch (err) {
-      setNotice({ tone: 'error', message: err.message });
-      showToast(err.message, { tone: 'error' });
+      setRowResult(row.id, { tone: 'error', message: err.message });
     } finally {
-      setBusyId(null);
+      requestPending.current = false;
+      setBusy(null);
     }
   }
 
   async function remove(row) {
-    setBusyId(row.id);
-    setNotice(null);
+    if (requestPending.current) return;
+    requestPending.current = true;
+    actionFocus.remember(row.id);
+    setBusy({ id: row.id, action: 'delete' });
+    setRowResult(row.id, null);
+    const label = contentBlockTitle(row.current);
+    const position = blocks.findIndex((block) => block.id === row.id);
     try {
       await call('cmsDeleteContent', { section: sectionId, field: row.current.field });
-      showToast('Block deleted.');
+      setRowResult(row.id, { tone: 'ok', message: `${label} deleted. The live block and its draft were removed.`, removed: true, label, position });
     } catch (err) {
-      setNotice({ tone: 'error', message: err.message });
-      showToast(err.message, { tone: 'error' });
+      setRowResult(row.id, { tone: 'error', message: err.message });
     } finally {
-      setBusyId(null);
+      requestPending.current = false;
+      setBusy(null);
     }
   }
 
@@ -171,6 +214,7 @@ export default function AdminContentSection() {
         type="button"
         className={primaryButtonClass}
         disabled
+        aria-describedby={blockedReasonId}
         title={
           !pagesReady || !contentReady
             ? 'Waiting for this section and its draft blocks…'
@@ -203,7 +247,7 @@ export default function AdminContentSection() {
             <OrderDraftButtons
               dirty={draft.dirty}
               saving={savingOrder}
-              saveDisabled={!contentReady}
+              saveDisabled={!contentReady || busy !== null}
               onSave={saveOrder}
               onCancel={cancelOrder}
             />
@@ -211,6 +255,8 @@ export default function AdminContentSection() {
               Back to content
             </Link>
             {addBlockButton}
+            {allowed.length > 0 && blockedReason ? <p id={blockedReasonId} className="basis-full text-admin-sm text-admin-ink-secondary">{blockedReason}</p> : null}
+            <ActionFeedback message={notice?.message} tone={notice?.tone} className="admin-editor-action-feedback" />
           </>
         }
       />
@@ -222,9 +268,8 @@ export default function AdminContentSection() {
           message="We lost the connection to the content list; showing the last values we received and retrying."
         />
       ) : null}
-      {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
-      {blocks.length === 0 ? (
+      {displayed.length === 0 ? (
         <AdminEmptyState
           title="No blocks yet"
           description="Add the first content block for this section."
@@ -233,8 +278,15 @@ export default function AdminContentSection() {
       ) : (
         <Panel flush>
           <ul>
-            {blocks.map((row, index) => {
-              const label = contentBlockTitle(row.current);
+            {displayed.map(({ row, result }) => {
+              const index = blocks.findIndex((block) => block.id === row.id);
+              const label = result?.removed ? result.label : contentBlockTitle(row.current);
+              if (result?.removed) return (
+                <li key={row.id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
+                  <div className={rowClass}><p className="font-admin-ui text-admin-base font-semibold text-admin-ink">{label}</p><StatusBadge tone="neutral">Deleted</StatusBadge></div>
+                  <div ref={actionFocus.resultRef(row.id)} tabIndex={-1} className="admin-row-result"><ActionFeedback {...result} /></div>
+                </li>
+              );
               return (
               <li
                 key={row.id}
@@ -267,34 +319,35 @@ export default function AdminContentSection() {
                       count={blocks.length}
                       dragToken={`content:${index}`}
                       onMove={moveRow}
-                      disabled={!contentReady || savingOrder || busyId !== null}
+                      disabled={!contentReady || savingOrder || busy !== null}
                     />
                     {row.state.id !== 'live' && !draft.dirty ? (
                       <button
                         type="button"
                         className={secondaryButtonClass}
-                        disabled={busyId !== null || savingOrder}
+                        disabled={savingOrder || (busy !== null && !(busy.id === row.id && busy.action === 'publish'))}
+                        aria-disabled={busy !== null || savingOrder || undefined}
+                        aria-busy={busy?.id === row.id && busy.action === 'publish' || undefined}
                         onClick={() => publishOne(row)}
                       >
-                        {busyId === row.id ? 'Publishing…' : 'Publish'}
+                        {busy?.id === row.id && busy.action === 'publish' ? 'Publishing…' : 'Publish'}
                       </button>
                     ) : null}
-                    <Link to={row.current.field} className={linkButtonClass}>
-                      Edit
-                    </Link>
+                    <EditRecordLink to={row.current.field} label={`Edit ${label}`} />
                     <DestructiveConfirm
                       trigger="Delete"
                       title={`Delete ${contentBlockTitle(row.current)}`}
                       confirmLabel="Delete this block"
                       busyLabel="Deleting…"
-                      busy={busyId === row.id}
-                      disabled={busyId !== null}
+                      busy={busy?.id === row.id && busy.action === 'delete'}
+                      disabled={busy !== null || savingOrder}
                       consequence="The live revision and its draft both go, and the section renders without this block."
                       permanence="This cannot be undone."
                       onConfirm={() => remove(row)}
                     />
                   </div>
                 </div>
+                <div ref={actionFocus.resultRef(row.id)} tabIndex={-1} className="admin-row-result"><ActionFeedback message={result?.message} tone={result?.tone} /></div>
               </li>
               );
             })}

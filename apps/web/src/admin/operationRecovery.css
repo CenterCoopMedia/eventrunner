@@ -1,0 +1,33 @@
+.admin-live-composer {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.admin-live-composer__message textarea {
+  min-height: 13rem;
+}
+
+.admin-operation-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--admin-control-height);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+.admin-operation-result:focus {
+  outline: 2px solid rgb(var(--admin-action-rgb));
+  outline-offset: 4px;
+}
+
+.admin-operation-result {
+  scroll-margin-block: 6rem;
+}
+
+@media (min-width: 960px) {
+  .admin-live-composer {
+    grid-template-columns: minmax(0, 1.6fr) minmax(15rem, 1fr);
+  }
+}

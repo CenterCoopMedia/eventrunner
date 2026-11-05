@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useSavedMessage } from '../useSavedMessage.js';
 import {
   Notice,
   Panel,
@@ -57,7 +58,7 @@ export default function AdminBadgeSettings() {
   const [categories, setCategories] = useState(() => toForm(badges));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedMessage(categories);
   const errorRef = useRef(null);
   // Keyed on CONFIG/BADGES' own readiness (never the aggregate `source`):
   // this doc is overlay-only and a whole-doc replace, so saving before it has
@@ -90,6 +91,7 @@ export default function AdminBadgeSettings() {
 
   async function submit(event) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError(null);
     setStatus('');
@@ -100,7 +102,7 @@ export default function AdminBadgeSettings() {
           ? { customBadgeBlockList: badges.customBadgeBlockList } : {}),
       } });
       setStatus('Saved. Attendees see the new set immediately.');
-      showToast('Badges saved.');
+      showToast('Badges saved.', { announce: false });
     } catch (err) {
       setError(err);
     } finally {
@@ -115,7 +117,7 @@ export default function AdminBadgeSettings() {
         description="The badge set attendees pick from, grouped into categories with a cap on how many each attendee may choose."
         identifiers={`${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}
         actions={
-          <button type="submit" className={primaryButtonClass} disabled={saving}>
+          <button type="submit" className={primaryButtonClass} disabled={saving} aria-busy={saving || undefined}>
             {saving ? 'Saving…' : 'Save badges'}
           </button>
         }

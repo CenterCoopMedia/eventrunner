@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { callApi } from '../../api.js';
+import ActionFeedback from '../../ActionFeedback.jsx';
 import { SIGNUPS_CLOSED } from '../../setup/steps.js';
-import { TextField } from '../../setup/Field.jsx';
+import { fieldId, TextField } from '../../setup/Field.jsx';
 
 /** Blank lines part the paragraphs. Each one renders as text, so nothing in it can run as HTML. */
 export function AgreementText({ agreement }) {
   return (
     <article className="agreement" aria-labelledby="agreement-title">
-      <h2 id="agreement-title">{agreement.title}</h2>
+      <h2 id="agreement-title" tabIndex={-1}>{agreement.title}</h2>
       <p className="muted">Version {agreement.version}</p>
       {agreement.body.split(/\n\s*\n/).map((paragraph, i) => <p className="pre" key={i}>{paragraph}</p>)}
     </article>
@@ -24,6 +25,12 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [changed, setChanged] = useState(false);
+
+  useEffect(() => {
+    const first = Object.keys(fieldErrors)[0];
+    if (first && !busy) document.getElementById(fieldId(`agreement.${first}`))?.focus();
+  }, [fieldErrors, busy]);
 
   const load = useCallback(async () => {
     try {
@@ -39,8 +46,10 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
 
   async function accept(event) {
     event.preventDefault();
+    if (busy) return;
     setFieldErrors({});
     setError('');
+    setChanged(false);
     setBusy(true);
     try {
       const result = await callApi('acceptAgreement', {
@@ -48,15 +57,17 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
       });
       await onAccepted(result);
     } catch (err) {
-      setBusy(false);
       if (err.field in signer) {
         setFieldErrors({ [err.field]: err.message });
         return;
       }
       setError(err.message);
+      setChanged(err.code === 'agreement-changed');
       // The agreement or the request changed: show what is true now.
       await load();
       await onRefresh().catch(() => {});
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -68,10 +79,10 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
   return (
     <div className="stack">
       <p className="lead">Read the agreement between your organization and the hosting team. When you accept it, we start building your site. You do not need to wait on the page: we email you when the site is ready.</p>
-      {error ? <p className="message error" role="alert">{error}</p> : null}
       <AgreementText agreement={agreement} />
       {app.canAccept ? (
         <form noValidate onSubmit={accept} className="stack">
+          <fieldset className="console-feedback-fields stack" disabled={busy}>
           <TextField
             path="agreement.legalName"
             label="Your organization's legal name"
@@ -102,10 +113,18 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
             maxLength={200}
           />
           <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Starting the build' : 'Accept the agreement'}</button></div>
+          </fieldset>
+          {error ? <ActionFeedback kind="error" revealKey={error}>
+            <p>{error}</p>
+            {changed ? <button type="button" className="button" onClick={() => document.getElementById('agreement-title')?.focus()}>Read the updated agreement</button> : null}
+          </ActionFeedback> : null}
         </form>
       ) : null}
       {!app.canAccept ? (
-        <p className="muted">Only an Owner can accept the agreement. Ask an Owner on your team to open this step.</p>
+        <>
+          {error ? <ActionFeedback kind="error" revealKey={error}>{error}</ActionFeedback> : null}
+          <p className="muted">Only an Owner can accept the agreement. Ask an Owner on your team to open this step.</p>
+        </>
       ) : null}
     </div>
   );

@@ -9,7 +9,7 @@
 // The file limits shown are the same constants storage.rules and
 // functions/src/media/upload.cjs enforce; this form checks them before
 // spending a slow upload on a file the server will refuse.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   MEDIA_FOLDERS,
   MEDIA_MAX_BYTES,
@@ -30,13 +30,14 @@ import {
 import { mediaErrorMessage } from './mediaErrors.js';
 import ModalShell from './ModalShell.jsx';
 
-export default function UploadModal({ folder, onClose, onUploaded, upload }) {
+export default function UploadModal({ folder, onClose, onUploaded, upload, returnFocusRef }) {
   const accepted = MEDIA_FOLDERS[folder] ?? MEDIA_FOLDERS['cms-images'];
   const [file, setFile] = useState(null);
   const [alt, setAlt] = useState('');
   const [title, setTitle] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
 
   function chooseFile(event) {
     const chosen = event.target.files?.[0] ?? null;
@@ -46,11 +47,13 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
 
   async function submit(event) {
     event.preventDefault();
+    if (pending.current) return;
     const problem = checkFile(file, { types: accepted, maxBytes: MEDIA_MAX_BYTES });
     if (problem) {
       setError(problem);
       return;
     }
+    pending.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -59,6 +62,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
     } catch (err) {
       setError(mediaErrorMessage(err));
     } finally {
+      pending.current = false;
       setBusy(false);
     }
   }
@@ -68,6 +72,8 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
       title="Upload a file"
       description={`${accepted.map(typeLabel).join(', ')} · up to ${formatBytes(MEDIA_MAX_BYTES)} · stored in ${folder}/`}
       onClose={onClose}
+      busy={busy}
+      returnFocusRef={returnFocusRef}
     >
       <form className="flex flex-col gap-sm" onSubmit={submit}>
         <div className="flex flex-col gap-3xs">
@@ -79,6 +85,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
             type="file"
             accept={accepted.join(',')}
             onChange={chooseFile}
+            disabled={busy}
             aria-invalid={error ? 'true' : undefined}
             aria-describedby={error ? 'media-upload-error' : undefined}
             className={inputClass}
@@ -95,11 +102,13 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
           value={alt}
           onChange={setAlt}
           rows={2}
+          disabled={busy}
           hint="What the image shows, for someone who cannot see it. Leave blank for a purely decorative image."
         />
         <TextField
           label="Title (optional)"
           value={title}
+          disabled={busy}
           onChange={setTitle}
           hint="A name for this file in the library."
         />
@@ -111,6 +120,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload }) {
 
         <div className="flex flex-wrap gap-xs">
           <button type="submit" className={primaryButtonClass} disabled={busy}>
+            {busy ? <span className="admin-busy-mark" aria-hidden="true" /> : null}
             {busy ? 'Uploading…' : 'Upload'}
           </button>
           <button type="button" className={secondaryButtonClass} onClick={onClose} disabled={busy}>

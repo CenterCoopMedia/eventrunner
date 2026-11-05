@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import ActionFeedback from '../../ActionFeedback.jsx';
 import { callApi } from '../../api.js';
 import { TextField } from '../../setup/Field.jsx';
 import { formatDateTime } from '../../reviewText.js';
@@ -15,8 +16,14 @@ export default function AgreementSettings({ agreement, onSaved }) {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    const first = Object.keys(errors)[0];
+    if (first && !busy) document.getElementsByName(first)[0]?.focus();
+  }, [errors, busy]);
+
   async function onSubmit(event) {
     event.preventDefault();
+    if (busy) return;
     setNotice('');
     setError('');
     setErrors({});
@@ -32,7 +39,6 @@ export default function AgreementSettings({ agreement, onSaved }) {
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
-        document.querySelector(`[name="${err.field}"]`)?.focus();
       } else setError(err.message);
     }
     setBusy(false);
@@ -45,24 +51,24 @@ export default function AgreementSettings({ agreement, onSaved }) {
         {agreement ? `The current text is version ${agreement.version}, saved ${formatDateTime(agreement.savedAt)}. ` : 'No agreement is saved. '}
         Saving a changed text makes a new version. A saved version never changes, and a client who accepted one keeps it.
       </p>
-      <div aria-live="polite" className="live">
-        {notice ? <p className="message success">{notice}</p> : null}
-      </div>
-      {error ? <p className="message error" role="alert">{error}</p> : null}
       <form noValidate onSubmit={onSubmit} className="stack">
-        <TextField path="agreementTitle" label="Title" value={title} onChange={setTitle} error={errors.agreementTitle} maxLength={TITLE_MAX} />
+        <fieldset className="console-feedback-fields stack" disabled={busy}>
+        <TextField path="agreementTitle" label="Title" value={title} onChange={(value) => { setTitle(value); setNotice(''); }} error={errors.agreementTitle} maxLength={TITLE_MAX} />
         <TextField
           path="agreementBody"
           label="Text"
           hint="Plain text. A blank line starts a new paragraph."
           value={body}
-          onChange={setBody}
+          onChange={(value) => { setBody(value); setNotice(''); }}
           error={errors.agreementBody}
           multiline
           maxLength={BODY_MAX}
           className="agreement-text-field"
         />
-        <div><button type="submit" className="button primary" disabled={busy}>Save as a new version</button></div>
+        <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Saving agreement…' : 'Save as a new version'}</button></div>
+        </fieldset>
+        {notice ? <ActionFeedback revealKey={notice}>{notice}</ActionFeedback> : null}
+        {error ? <ActionFeedback kind="error" revealKey={error}>{error}</ActionFeedback> : null}
       </form>
     </section>
   );

@@ -12,6 +12,7 @@ import { INVOICE_LIMITS, formatInvoiceNumber, validateInvoiceSettings } from 'sh
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { useAdminApi } from '../adminApi.js';
+import { useSavedMessage } from '../useSavedMessage.js';
 import { CURRENCY_CHOICES, INVOICES_ROOT, messageOf } from '../invoiceDoc.js';
 import {
   Notice,
@@ -50,8 +51,9 @@ export default function AdminInvoiceSettings() {
   const [error, setError] = useState(null);
   const [attempted, setAttempted] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedMessage(form);
   const [focusRequest, setFocusRequest] = useState(0);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const formRef = useRef(null);
   const errorRef = useRef(null);
 
@@ -61,6 +63,7 @@ export default function AdminInvoiceSettings() {
   useEffect(() => {
     if (loadedRef.current) return undefined;
     let active = true;
+    setLoadError(null);
     call('invoiceAdmin', { action: 'settings' })
       .then((result) => {
         if (!active) return;
@@ -74,7 +77,7 @@ export default function AdminInvoiceSettings() {
     return () => {
       active = false;
     };
-  }, [call]);
+  }, [call, loadAttempt]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -83,7 +86,7 @@ export default function AdminInvoiceSettings() {
     if (focusRequest > 0) focusFirstError(formRef.current);
   }, [focusRequest]);
 
-  if (loadError) return <ServerErrorSummary error={loadError} title="The invoice settings could not be loaded" />;
+  if (loadError) return <div className="flex flex-col gap-sm"><ServerErrorSummary error={loadError} title="The invoice settings could not be loaded" /><button type="button" className={secondaryButtonClass} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button></div>;
   if (!data) return <AdminLoadingState label="Loading invoice settings…" />;
 
   const canEdit = data.canEdit === true;
@@ -114,7 +117,7 @@ export default function AdminInvoiceSettings() {
       setForm(formOf(result.settings));
       setAttempted(false);
       const message = 'Invoice settings saved. Invoices issued from now on use them.';
-      setStatus(message);
+      setStatus(message, formOf(result.settings));
       showToast(message, { announce: false });
     } catch (err) {
       setError(err);
@@ -157,6 +160,8 @@ export default function AdminInvoiceSettings() {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
+      <fieldset disabled={saving} className="flex min-w-0 flex-col gap-md">
+      <legend className="sr-only">Invoice settings</legend>
       <Panel title="Numbering and currency">
         <div className="flex flex-col gap-sm">
           <TextField
@@ -241,6 +246,7 @@ export default function AdminInvoiceSettings() {
           readOnly={!canEdit}
         />
       </Panel>
+      </fieldset>
     </form>
   );
 }

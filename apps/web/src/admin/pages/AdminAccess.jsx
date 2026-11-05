@@ -339,6 +339,7 @@ export default function AdminAccess() {
   // The one change awaiting confirmation, or null.
   const [pending, setPending] = useState(null);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [changeError, setChangeError] = useState(null);
   const [result, setResult] = useState(null);
   const surfaceRef = useRef(null);
@@ -416,6 +417,7 @@ export default function AdminAccess() {
   }, [changeError]);
 
   function open(change, trigger) {
+    if (busyRef.current) return;
     setResult(null);
     setChangeError(null);
     triggerRef.current = trigger ?? null;
@@ -447,6 +449,7 @@ export default function AdminAccess() {
 
   function submitGrant(event) {
     event.preventDefault();
+    if (busyRef.current) return;
     const email = form.email.trim().toLowerCase();
     const emailBad = !EMAIL_RE.test(email);
     const ends = readEndsAt();
@@ -482,13 +485,15 @@ export default function AdminAccess() {
         previousTier: accounts ? existing?.tier ?? null : undefined,
         expiresAt,
         previousTemporary: isTemporary(existing),
+        grantForm: { ...form },
       },
       event.currentTarget.querySelector('button[type="submit"]'),
     );
   }
 
   async function confirm() {
-    if (!pending) return;
+    if (!pending || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setChangeError(null);
     const { email, tier, previousTier, expiresAt = null } = pending;
@@ -519,7 +524,16 @@ export default function AdminAccess() {
       // repeats it silently.
       setResult({ tone: 'ok', message: sentence });
       showToast(sentence, { announce: false });
-      if (standing === null && tier !== 'none') setForm({ email: '', tier: 'staff', endsAt: '' });
+      if (standing === null && tier !== 'none' && pending.grantForm) {
+        const submitted = pending.grantForm;
+        setForm((current) => (
+          current.email === submitted.email
+          && current.tier === submitted.tier
+          && current.endsAt === submitted.endsAt
+            ? { email: '', tier: 'staff', endsAt: '' }
+            : current
+        ));
+      }
       // The operator's OWN standing changed: read the tier again so the
       // rail and the route refusal follow now (a demotion refuses this
       // page; a revocation shows the not-an-admin state), not on the next
@@ -534,6 +548,7 @@ export default function AdminAccess() {
       setChangeError(err.message);
       showToast(err.message, { tone: 'error', announce: false });
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
@@ -557,7 +572,7 @@ export default function AdminAccess() {
         description={`Enter an address and pick a tier. The person signs in with that address the way every admin does: Google, or the emailed code. For staff, you can set a time when access ends, at most ${MAX_STAFF_ACCESS_DAYS} days from now. Leave it empty for access with no end time. The time is in your time zone.`}
       >
         <form ref={formRef} onSubmit={submitGrant} className="flex flex-col gap-sm" noValidate>
-          <div className="flex flex-wrap items-end gap-sm">
+          <fieldset disabled={busy} className="flex min-w-0 flex-wrap items-end gap-sm">
             <div className="min-w-0 flex-1">
               <TextField
                 label="Email address"
@@ -593,7 +608,7 @@ export default function AdminAccess() {
             <button type="submit" className={primaryButtonClass} disabled={busy}>
               Grant access
             </button>
-          </div>
+          </fieldset>
         </form>
       </Panel>
 

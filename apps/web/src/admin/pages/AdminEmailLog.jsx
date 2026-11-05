@@ -289,7 +289,7 @@ function StoredBody({ message }) {
 }
 
 /** What an open row shows: the frame, the plain text, or the reason there is neither. */
-function PreviewBody({ row, detail }) {
+function PreviewBody({ row, detail, onRetry }) {
   if (!row.bodyStored) {
     return (
       <p className="text-admin-sm text-admin-ink">
@@ -297,14 +297,19 @@ function PreviewBody({ row, detail }) {
       </p>
     );
   }
-  if (!detail || detail.state === 'loading') {
+  if (!detail || detail.state === 'loading' || detail.state === 'error') {
+    const failed = detail?.state === 'error';
     return (
-      <p aria-busy="true" className="text-admin-sm text-admin-ink-secondary">
-        Loading the message…
-      </p>
+      <div className="flex flex-col items-start gap-xs">
+        {failed ? <Notice tone="error" message={detail.error.message} /> : <AdminLoadingState label="Loading the message…" />}
+        {failed || detail?.retrying ? (
+          <button type="button" className={secondaryButtonClass} aria-disabled={!failed} aria-busy={!failed} onClick={() => { if (failed) onRetry(); }}>
+            {failed ? 'Retry preview' : 'Loading preview…'}
+          </button>
+        ) : null}
+      </div>
     );
   }
-  if (detail.state === 'error') return <Notice tone="error" message={detail.error.message} />;
   return <StoredBody message={detail.row} />;
 }
 
@@ -325,6 +330,7 @@ export default function AdminEmailLog() {
   const [result, setResult] = useState(null);
   const [pending, setPending] = useState(null); // 'search' | 'refresh' | 'more' | null
   const [error, setError] = useState(null);
+  const [pageError, setPageError] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [details, setDetails] = useState({});
   const [focusTarget, setFocusTarget] = useState(null);
@@ -338,7 +344,9 @@ export default function AdminEmailLog() {
   const writtenKeyRef = useRef(null);
   const formRef = useRef(null);
   const pagerRef = useRef(null);
+  const accessFeedbackRef = useRef(null);
   const previewRefs = useRef(new Map());
+  const detailRequests = useRef(new Set());
 
   const focusSearchField = () => formRef.current?.querySelector('input[type="search"]')?.focus();
 
@@ -346,6 +354,7 @@ export default function AdminEmailLog() {
     const requestId = (requestRef.current += 1);
     latestSearchRef.current = search;
     setPending(kind);
+    setPageError(null);
     try {
       const response = await call('listSentEmails', requestBody(search));
       if (requestId !== requestRef.current) return;
@@ -380,11 +389,18 @@ export default function AdminEmailLog() {
 
   useEffect(() => {
     if (!focusTarget) return;
-    if (focusTarget.kind === 'row') previewRefs.current.get(focusTarget.id)?.focus();
+    if (focusTarget.kind === 'access') accessFeedbackRef.current?.focus();
+    else if (focusTarget.kind === 'row') previewRefs.current.get(focusTarget.id)?.focus();
     else if (pagerRef.current) pagerRef.current.focus();
     else focusSearchField();
     setFocusTarget(null);
   }, [focusTarget]);
+
+  useEffect(() => {
+    if (pageError && document.activeElement === pagerRef.current) {
+      pagerRef.current.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
+    }
+  }, [pageError]);
 
   function writeFilters({ source, status, send }) {
     writtenKeyRef.current = `${source}|${status}|${send}`;
@@ -427,13 +443,14 @@ export default function AdminEmailLog() {
   // Load more pages the rows on screen. While a search or a refresh runs,
   // those rows are about to be replaced, so the pager refuses: paging them
   // would take the newer request and drop the answer the page asked for.
-  const pagerRefused = pending === 'search' || pending === 'refresh';
+  const pagerRefused = pending !== null;
 
   async function loadMore() {
     if (!result?.nextCursor || pending !== null) return;
     const requestId = (requestRef.current += 1);
     const { applied, nextCursor } = result;
     setPending('more');
+    setPageError(null);
     try {
       const response = await call('listSentEmails', requestBody(applied, nextCursor));
       if (requestId !== requestRef.current) return;
@@ -448,19 +465,31 @@ export default function AdminEmailLog() {
       setError(null);
       setFocusTarget(more.length > 0 ? { kind: 'row', id: more[0].id } : { kind: 'pager' });
     } catch (err) {
-      if (requestId === requestRef.current) setError(err);
+      if (requestId === requestRef.current) {
+        if (err.status === 401 || err.status === 403) {
+          setError(err);
+          setFocusTarget({ kind: 'access' });
+        }
+        else setPageError(err);
+      }
     } finally {
       if (requestId === requestRef.current) setPending(null);
     }
   }
 
-  async function fetchDetail(id) {
-    setDetails((current) => ({ ...current, [id]: { state: 'loading' } }));
+  async function fetchDetail(id, retrying = false) {
+    if (detailRequests.current.has(id)) return;
+    detailRequests.current.add(id);
+    const trigger = retrying ? document.activeElement : null;
+    setDetails((current) => ({ ...current, [id]: { state: 'loading', retrying } }));
     try {
       const response = await call('getSentEmail', { id });
       setDetails((current) => ({ ...current, [id]: { state: 'ready', row: response.row } }));
+      if (trigger?.isConnected && document.activeElement === trigger) setFocusTarget({ kind: 'row', id });
     } catch (err) {
       setDetails((current) => ({ ...current, [id]: { state: 'error', error: err } }));
+    } finally {
+      detailRequests.current.delete(id);
     }
   }
 
@@ -609,7 +638,7 @@ export default function AdminEmailLog() {
                   {open ? (
                     <tr id={previewId} className="border-b-admin-hairline border-admin-rule-hairline">
                       <td colSpan={6} className="bg-admin-ground-soft px-sm py-sm">
-                        <PreviewBody row={row} detail={details[row.id]} />
+                        <PreviewBody row={row} detail={details[row.id]} onRetry={() => fetchDetail(row.id, true)} />
                       </td>
                     </tr>
                   ) : null}
@@ -640,10 +669,12 @@ export default function AdminEmailLog() {
       />
 
       {denied ? (
-        <AdminEmptyState
-          title="You don’t have access to the email log"
-          description="The email log is open to operators and staff. Ask an operator to check your access."
-        />
+        <div ref={accessFeedbackRef} tabIndex={-1}>
+          <AdminEmptyState
+            title="You don’t have access to the email log"
+            description="The email log is open to operators and staff. Ask an operator to check your access."
+          />
+        </div>
       ) : (
         <>
           <form
@@ -710,7 +741,7 @@ export default function AdminEmailLog() {
             </Notice>
           ) : null}
 
-          {notice}
+          {notice ? <div ref={accessFeedbackRef} tabIndex={-1}>{notice}</div> : null}
 
           {result ? (
             <p role="status" className="text-admin-sm text-admin-ink-secondary">
@@ -726,7 +757,8 @@ export default function AdminEmailLog() {
           {body}
 
           {result?.nextCursor ? (
-            <div>
+            <div className="flex flex-col items-start gap-xs">
+              {pageError ? <Notice tone="error" message={`Older messages could not be loaded. ${pageError.message}`} /> : null}
               <button
                 ref={pagerRef}
                 type="button"
@@ -735,7 +767,7 @@ export default function AdminEmailLog() {
                 aria-busy={pending === 'more' ? 'true' : undefined}
                 aria-disabled={pagerRefused ? 'true' : undefined}
               >
-                {pending === 'more' ? 'Loading more…' : rows.length === 0 ? 'Search older messages' : 'Load more'}
+                {pending === 'more' ? 'Loading more…' : pageError ? 'Retry loading older messages' : rows.length === 0 ? 'Search older messages' : 'Load more'}
               </button>
             </div>
           ) : null}

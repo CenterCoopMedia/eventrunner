@@ -28,13 +28,13 @@ import {
   DestructiveConfirm,
   Notice,
   Panel,
-  SaveStatus,
   ServerErrorSummary,
   TextAreaField,
   TextField,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -78,8 +78,11 @@ export default function AdminTimelineEditor({ mode }) {
   const [attempted, setAttempted] = useState(false);
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [errorTitle, setErrorTitle] = useState(undefined);
+  const [action, setAction] = useState(null);
+  const saving = action !== null;
   const [status, setStatus] = useState('');
+  const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   const errorRef = useRef(null);
   const formRef = useRef(null);
   const adoptedRef = useRef(false);
@@ -132,10 +135,12 @@ export default function AdminTimelineEditor({ mode }) {
       setFocusRequest((count) => count + 1);
       return;
     }
-    setSaving(true);
+    setAction(publish ? 'publish' : 'draft');
     setError(null);
+    setErrorTitle(undefined);
     setStatus('');
     const body = { collection: COLLECTION, docId, fields: timelineFields(form), visible: form.visible };
+    let stage = 'save';
     try {
       if (creating) {
         await call('cmsCreateContent', body);
@@ -145,39 +150,42 @@ export default function AdminTimelineEditor({ mode }) {
       } else {
         await call('cmsUpdateContent', body);
       }
+      setFeedbackSnapshot(JSON.stringify(form));
       if (publish) {
+        stage = 'publish';
         const response = await call('cmsPublish', { collection: COLLECTION, docIds: [docId] });
         const verdict = summarizePublish(response, COLLECTION, [docId], 'timeline entries');
         if (!verdict.ok) throw new Error(verdict.message);
         setStatus(verdict.message);
-        // The line above is the record and it announces; the toast repeats
-        // it where the operator is looking, and says nothing.
-        showToast(verdict.message, { announce: false });
+        if (mode === 'create') showToast(verdict.message, { announce: false });
       } else {
         setStatus('Draft saved. It is not live until you publish it.');
-        showToast('Draft saved. It is not live until you publish it.', { announce: false });
+        if (mode === 'create') showToast('Draft saved. It is not live until you publish it.', { announce: false });
       }
       if (mode === 'create') {
         navigate(`${TIMELINE_LIST}/${encodeURIComponent(docId)}`, { replace: true });
       }
     } catch (err) {
+      if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(err);
     } finally {
-      setSaving(false);
+      setAction(null);
     }
   }
 
   async function remove() {
-    setSaving(true);
+    setAction('delete');
     setError(null);
+    setErrorTitle(undefined);
     try {
       await call('cmsDeleteContent', { collection: COLLECTION, docId });
       showToast('Timeline entry deleted.');
       navigate(TIMELINE_LIST);
     } catch (err) {
+      setErrorTitle('The server refused the delete');
       setError(err);
     } finally {
-      setSaving(false);
+      setAction(null);
     }
   }
 
@@ -227,25 +235,25 @@ export default function AdminTimelineEditor({ mode }) {
               type="submit"
               className={secondaryButtonClass}
               disabled={saving}
-              aria-busy={saving || undefined}
+              aria-busy={action === 'draft' || undefined}
             >
-              {saving ? 'Saving…' : 'Save draft'}
+              {action === 'draft' ? 'Saving…' : 'Save draft'}
             </button>
             <button
               type="button"
               className={primaryButtonClass}
               disabled={saving}
-              aria-busy={saving || undefined}
+              aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {saving ? 'Working…' : 'Save and publish'}
+              {action === 'publish' ? 'Publishing…' : 'Save and publish'}
             </button>
+            <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />
 
-      <ServerErrorSummary error={error} errorRef={errorRef} />
-      {status ? <SaveStatus message={status} /> : null}
+      <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
       <Panel title="Entry">
         <div className="flex flex-col gap-sm">
@@ -295,7 +303,8 @@ export default function AdminTimelineEditor({ mode }) {
             title={`Delete ${form.title.trim() || docId}`}
             confirmLabel="Delete this entry"
             busyLabel="Deleting…"
-            busy={saving}
+            busy={action === 'delete'}
+            disabled={saving}
             consequence="The live entry and its draft are removed together. Its version history stays."
             permanence="This cannot be undone."
             onConfirm={remove}

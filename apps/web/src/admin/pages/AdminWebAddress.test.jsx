@@ -23,6 +23,23 @@ function renderPage() {
 describe('AdminWebAddress', () => {
   beforeEach(() => callMock.mockReset());
 
+  it('retries an initial failure on the same page', async () => {
+    callMock.mockRejectedValueOnce(new Error('Address status could not be loaded.')).mockResolvedValueOnce(NONE);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByLabelText('Your domain')).toBeInTheDocument();
+    expect(callMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('states the result of a check beside its action and moves focus to it', async () => {
+    callMock.mockResolvedValueOnce(WAITING).mockResolvedValueOnce(WAITING);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Check now' }));
+    const outcome = await screen.findByText('Address checked. Waiting for the records.');
+    expect(outcome.parentElement).toHaveFocus();
+    expect(outcome.closest('section')).toContainElement(screen.getByRole('button', { name: 'Check now' }));
+  });
+
   it('says the site already works at its address and the upgrade is optional', async () => {
     callMock.mockResolvedValueOnce(NONE);
     renderPage();
