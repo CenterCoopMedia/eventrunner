@@ -116,3 +116,13 @@ test('console code does not import the client functions or web app', () => {
   walk(path.join(ROOT, 'console'));
   assert.deepEqual(offenders, []);
 });
+
+test('console hosting keeps hashed files for a year and revalidates its pages', () => {
+  const { headers, rewrites } = JSON.parse(read('console/firebase.json')).hosting;
+  const cache = (source) => headers.find((rule) => rule.source === source)?.headers
+    .find(({ key }) => key === 'Cache-Control')?.value;
+  assert.match(cache('/assets/**'), /max-age=31536000, immutable/);
+  assert.match(cache('!/@(assets|api)/**'), /max-age=0.*must-revalidate/);
+  // A removed hashed file must not answer with the page: it would be kept for a year.
+  assert.equal(rewrites.at(-1).source, '!/assets/**');
+});

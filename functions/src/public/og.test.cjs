@@ -889,6 +889,13 @@ test('buildRouteHtml: escapes injected values, and a $-pattern in a title is ins
 
 // ----------------------------------------------------------------- headers
 
+test('routeMeta: a missing hashed file is a plain 404, never the shell', async () => {
+  const res = await getRoute(routeHandler(), '/assets/nope-abc123.js');
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.headers['Cache-Control'], 'no-store');
+  assert.ok(!String(res.body).includes('<'));
+});
+
 test('routeMeta: sets a cache header so the edge, not the function, answers repeat traffic', async () => {
   const res = await getRoute(routeHandler(), '/travel');
   assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);

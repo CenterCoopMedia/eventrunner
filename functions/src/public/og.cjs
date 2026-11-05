@@ -932,6 +932,15 @@ function createRouteMetaHandler({
       return methodNotAllowed(res, ['GET', 'HEAD']);
     }
 
+    // A hashed file a deploy removed. Hosting caches /assets/** for a year, so
+    // the shell must never answer here, and the importer needs a real failure
+    // to reload from (apps/web/src/lib/chunkReload.js).
+    if (String(req.path || '').startsWith('/assets/')) {
+      res.set('Cache-Control', 'no-store');
+      res.set('Content-Type', 'text/plain; charset=utf-8');
+      return res.status(404).send('Not found');
+    }
+
     try {
       // Each of the three reads below can fail on its own, and none of
       // them is worth a 5xx for the whole site: the shell alone still
