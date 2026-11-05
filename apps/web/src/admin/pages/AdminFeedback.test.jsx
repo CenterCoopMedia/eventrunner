@@ -1,7 +1,7 @@
 // AdminFeedback — the review tab (issue #28). Mocks adminApi and
 // adminSource directly, same convention as AdminLiveUpdates.test.jsx.
-import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 let rowsCallback;
 vi.mock('../adminSource.js', () => ({
@@ -22,6 +22,11 @@ import AdminFeedback from './AdminFeedback.jsx';
 function pushRows(rows) {
   act(() => rowsCallback(rows));
 }
+
+beforeEach(() => {
+  callMock.mockReset();
+  showToastMock.mockReset();
+});
 
 describe('AdminFeedback', () => {
   it('encodes reserved characters in a mailto link and keeps the @', () => {
@@ -87,7 +92,7 @@ describe('AdminFeedback', () => {
     expect(alert.textContent).toContain('You are not signed in as an admin.');
     expect(showToastMock).toHaveBeenCalledWith(
       'You are not signed in as an admin.',
-      { tone: 'error' },
+      { tone: 'error', announce: false },
     );
   });
 
@@ -124,6 +129,52 @@ describe('AdminFeedback', () => {
   it('shows an empty state when nothing matches the filter', () => {
     render(<AdminFeedback />);
     pushRows([]);
+    expect(screen.getByText('Nothing here')).toBeInTheDocument();
+  });
+
+  it('serializes row writes and moves focus beside the archived row after the listener updates', async () => {
+    let finish;
+    callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    render(<AdminFeedback />);
+    const rows = [
+      { id: 'f1', message: 'Newest report', status: 'new', createdAt: new Date('2026-08-10') },
+      { id: 'f2', message: 'Next report', status: 'new', createdAt: new Date('2026-08-09') },
+    ];
+    pushRows(rows);
+    const first = screen.getByText('Newest report').closest('li');
+    const next = screen.getByText('Next report').closest('li');
+    const archive = within(first).getByRole('button', { name: 'Archive' });
+    archive.focus();
+    fireEvent.click(archive);
+    expect(within(first).getByRole('button', { name: 'Archiving…' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByLabelText('Show')).toBeDisabled();
+    const nextArchive = within(next).getByRole('button', { name: 'Archive' });
+    expect(nextArchive).toBeDisabled();
+    fireEvent.click(nextArchive);
+    expect(callMock).toHaveBeenCalledTimes(1);
+
+    // The subscription can answer before the request itself. Wait until
+    // controls are usable before moving the keyboard to the next report.
+    pushRows([{ ...rows[0], status: 'archived' }, rows[1]]);
+    await act(async () => { finish({ id: 'f1', status: 'archived' }); });
+    expect(within(next).getByRole('button', { name: 'Mark reviewed' })).toHaveFocus();
+    expect(within(next).getByRole('status')).toHaveTextContent('Feedback archived.');
+    expect(showToastMock).toHaveBeenCalledWith('Feedback archived.', { announce: false });
+    expect(nextArchive).toBeEnabled();
+  });
+
+  it('returns focus to the filter when the final visible report is archived', async () => {
+    callMock.mockResolvedValueOnce({ id: 'f1', status: 'archived' });
+    render(<AdminFeedback />);
+    const row = { id: 'f1', message: 'Last report', status: 'new', createdAt: new Date() };
+    pushRows([row]);
+    const archive = screen.getByRole('button', { name: 'Archive' });
+    archive.focus();
+    fireEvent.click(archive);
+    await act(async () => { await Promise.resolve(); });
+    pushRows([{ ...row, status: 'archived' }]);
+    expect(screen.getByLabelText('Show')).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Feedback archived.');
     expect(screen.getByText('Nothing here')).toBeInTheDocument();
   });
 

@@ -12,7 +12,7 @@
 // because a state is always a word first and colour is never the only
 // signal (§8.1). An archived row is dead matter: it takes the dead tone and
 // keeps its word.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
@@ -80,7 +80,12 @@ export default function AdminFeedback() {
   const [rows, setRows] = useState(null);
   const [listError, setListError] = useState(null);
   const [filter, setFilter] = useState('open');
-  const [updatingId, setUpdatingId] = useState(null);
+  const [updating, setUpdating] = useState(null);
+  const writeRef = useRef(false);
+  const rowRefs = useRef(new Map());
+  const filterRef = useRef(null);
+  const focusAfterRef = useRef(null);
+  const [statusResult, setStatusResult] = useState(null);
   // A failed status change used to be a toast and nothing else. A toast
   // leaves, and when it does there is no record that the write failed —
   // the row simply still says what it said before, which reads as "nothing
@@ -107,17 +112,50 @@ export default function AdminFeedback() {
     return filtered.sort((a, b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0));
   }, [rows, filter]);
 
+  // A successful status change can remove the active control or its whole
+  // row. Wait for the listener and the write to settle before handing focus
+  // to the nearest surviving row, or the filter when the list is empty.
+  useEffect(() => {
+    const request = focusAfterRef.current;
+    if (!request || updating || !statusResult) return;
+    const source = rows?.find((row) => row.id === request.id);
+    if (source && source.status !== request.status) return;
+    const target = [request.id, ...request.neighbours]
+      .map((id) => rowRefs.current.get(id)?.querySelector('button:not(:disabled)'))
+      .find(Boolean);
+    focusAfterRef.current = null;
+    (target ?? filterRef.current)?.focus();
+  }, [ordered, rows, updating, statusResult]);
+
+  const resultAnchorId = statusResult
+    ? [statusResult.id, ...statusResult.neighbours, ordered[0]?.id]
+      .find((id) => ordered.some((row) => row.id === id))
+    : null;
+
   async function setStatus(id, status) {
-    setUpdatingId(id);
+    if (writeRef.current) return;
+    writeRef.current = true;
+    const index = ordered.findIndex((row) => row.id === id);
+    const neighbours = [...ordered.slice(index + 1), ...ordered.slice(0, index).reverse()]
+      .map((row) => row.id);
+    setUpdating({ id, status });
     setStatusError(null);
+    setStatusResult(null);
+    focusAfterRef.current = null;
     try {
       await call('updateFeedbackStatus', { id, status });
-      showToast('Feedback updated.');
+      const message = status === 'archived'
+        ? 'Feedback archived.'
+        : status === 'reviewed' ? 'Feedback marked reviewed.' : 'Feedback restored.';
+      focusAfterRef.current = { id, status, neighbours };
+      setStatusResult({ id, neighbours, message });
+      showToast(message, { announce: false });
     } catch (err) {
       setStatusError({ id, message: err.message });
-      showToast(err.message, { tone: 'error' });
+      showToast(err.message, { tone: 'error', announce: false });
     } finally {
-      setUpdatingId(null);
+      writeRef.current = false;
+      setUpdating(null);
     }
   }
 
@@ -133,9 +171,14 @@ export default function AdminFeedback() {
           <label className="flex items-center gap-xs text-admin-sm font-semibold text-admin-ink">
             Show
             <select
+              ref={filterRef}
               className={`${inputClass} w-auto min-w-[14rem]`}
               value={filter}
-              onChange={(event) => setFilter(event.target.value)}
+              disabled={Boolean(updating)}
+              onChange={(event) => {
+                focusAfterRef.current = null;
+                setFilter(event.target.value);
+              }}
             >
               {STATUS_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -154,6 +197,10 @@ export default function AdminFeedback() {
         />
       ) : null}
 
+      {statusResult && !resultAnchorId ? (
+        <Notice tone="ok" message={statusResult.message} />
+      ) : null}
+
       {rows === null ? (
         <AdminLoadingState label="Loading feedback…" />
       ) : ordered.length === 0 ? (
@@ -164,6 +211,10 @@ export default function AdminFeedback() {
             {ordered.map((row) => (
               <li
                 key={row.id}
+                ref={(node) => {
+                  if (node) rowRefs.current.set(row.id, node);
+                  else rowRefs.current.delete(row.id);
+                }}
                 className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
               >
                 {/* The galley rhythm, but aligned to the top rather than
@@ -192,6 +243,9 @@ export default function AdminFeedback() {
                     ) : null}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2xs">
+                    {statusResult && resultAnchorId === row.id ? (
+                      <Notice tone="ok" message={statusResult.message} />
+                    ) : null}
                     {/* The failure stays beside the buttons that caused it,
                         on the row it belongs to, until the next attempt. */}
                     {statusError?.id === row.id ? (
@@ -207,9 +261,10 @@ export default function AdminFeedback() {
                           type="button"
                           className={secondaryButtonClass}
                           onClick={() => setStatus(row.id, 'reviewed')}
-                          disabled={updatingId === row.id}
+                          disabled={Boolean(updating)}
+                          aria-busy={updating?.id === row.id && updating.status === 'reviewed'}
                         >
-                          Mark reviewed
+                          {updating?.id === row.id && updating.status === 'reviewed' ? 'Marking reviewed…' : 'Mark reviewed'}
                         </button>
                       ) : null}
                       {row.status !== 'archived' ? (
@@ -217,18 +272,20 @@ export default function AdminFeedback() {
                           type="button"
                           className={secondaryButtonClass}
                           onClick={() => setStatus(row.id, 'archived')}
-                          disabled={updatingId === row.id}
+                          disabled={Boolean(updating)}
+                          aria-busy={updating?.id === row.id && updating.status === 'archived'}
                         >
-                          Archive
+                          {updating?.id === row.id && updating.status === 'archived' ? 'Archiving…' : 'Archive'}
                         </button>
                       ) : (
                         <button
                           type="button"
                           className={secondaryButtonClass}
                           onClick={() => setStatus(row.id, 'new')}
-                          disabled={updatingId === row.id}
+                          disabled={Boolean(updating)}
+                          aria-busy={updating?.id === row.id && updating.status === 'new'}
                         >
-                          Restore
+                          {updating?.id === row.id && updating.status === 'new' ? 'Restoring…' : 'Restore'}
                         </button>
                       )}
                     </div>

@@ -137,8 +137,12 @@ function SpeakerSchedule({ call }) {
   const offsetsId = useId();
   const topicsId = useId();
   const resultRef = useRef(null);
+  const busyRef = useRef(false);
+  const formRevision = useRef(0);
+  const previewRevision = useRef(null);
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(null);
   const [dueProblem, setDueProblem] = useState(null);
   const [offsetsProblem, setOffsetsProblem] = useState(null);
@@ -151,6 +155,7 @@ function SpeakerSchedule({ call }) {
   }, []);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const next = await call('reminderSchedules', { action: 'get', schedule: 'speakers' });
       setData(next);
@@ -158,6 +163,8 @@ function SpeakerSchedule({ call }) {
       setLoadError(null);
     } catch (err) {
       setLoadError(err.message);
+    } finally {
+      setLoading(false);
     }
   }, [call]);
 
@@ -169,15 +176,18 @@ function SpeakerSchedule({ call }) {
     if (result) resultRef.current?.focus();
   }, [result]);
 
-  if (loadError && !data) return <Notice tone="error" message={loadError} />;
+  if (loadError && !data) return <Panel title="Speakers"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading} aria-busy={loading || undefined}>{loading ? 'Trying again…' : 'Try again'}</button></Panel>;
   if (!data || !form) return <AdminLoadingState label="Loading the schedule…" />;
 
   const { timeZone } = data;
   const dirty = !sameForm(form, data);
 
   function update(patch) {
+    if (busyRef.current && busy !== 'preview') return;
+    formRevision.current += 1;
     setForm({ ...form, ...patch });
     setPreview(null);
+    setResult(null);
   }
 
   function apply(next) {
@@ -186,10 +196,13 @@ function SpeakerSchedule({ call }) {
   }
 
   async function run(kind, body, onDone) {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(kind);
+    const revision = formRevision.current;
     try {
       const next = await call('reminderSchedules', { schedule: 'speakers', ...body });
+      if (kind === 'preview' && revision !== formRevision.current) return;
       if (next?.refreshError) {
         // The change is stored; only the read after it failed. Say so, and
         // read the schedule again.
@@ -200,8 +213,10 @@ function SpeakerSchedule({ call }) {
       }
       onDone(next);
     } catch (err) {
+      if (kind === 'preview' && revision !== formRevision.current) return;
       show('error', err.message);
     } finally {
+      busyRef.current = false;
       setBusy(null);
     }
   }
@@ -230,17 +245,26 @@ function SpeakerSchedule({ call }) {
   }
 
   function runPreview() {
+    if (busyRef.current) return;
     if (dirty) {
       show('error', 'Save the settings first, then preview.');
       return;
     }
+    const revision = formRevision.current;
     run('preview', { action: 'preview' }, (next) => {
+      if (revision !== formRevision.current) return;
+      previewRevision.current = revision;
       setPreview(next);
       show('ok', `Preview ready: ${next.samples.length} ${next.samples.length === 1 ? 'reminder' : 'reminders'}. ${speakerWord(next.audienceCount)} ${next.audienceCount === 1 ? 'owes' : 'owe'} a chosen item now.`);
     });
   }
 
   function approve() {
+    if (!preview || dirty || previewRevision.current !== formRevision.current) {
+      setPreview(null);
+      show('caution', 'The settings changed. Save them, then preview again before approving.');
+      return;
+    }
     run('approve', { action: 'approve', wordingVersion: preview.wordingVersion, settingsVersion: preview.settingsVersion }, (next) => {
       apply(next);
       setPreview(null);
@@ -250,7 +274,7 @@ function SpeakerSchedule({ call }) {
 
   function turnOff() {
     run('disable', { action: 'disable' }, (next) => {
-      apply(next);
+      setData(next);
       show('ok', 'Scheduled speaker reminders are off.');
     });
   }
@@ -275,8 +299,11 @@ function SpeakerSchedule({ call }) {
           <Notice tone="caution" message="The reminder wording is not the wording you approved. The next run sends nothing and pauses the schedule. Preview, then approve again." />
         ) : null}
         {data.eventEnded ? <Notice tone="info" message="The event has ended. Scheduled reminders do not send." /> : null}
+        {loadError ? <div className="flex flex-col gap-xs"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading}>{loading ? 'Trying again…' : 'Try again'}</button></div> : null}
 
         <form className="flex flex-col gap-md" onSubmit={save} noValidate>
+          <fieldset disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
+          <legend className="sr-only">Speaker reminder settings</legend>
           <fieldset aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
             <legend className="text-admin-base font-semibold text-admin-ink">Days before the due date</legend>
             <p id={`${offsetsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
@@ -354,15 +381,16 @@ function SpeakerSchedule({ call }) {
             ))}
           </fieldset>
 
+          </fieldset>
           <div className="flex flex-wrap items-center gap-xs">
-            <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
+            <button type="submit" className={primaryButtonClass} disabled={Boolean(busy)} aria-busy={busy === 'save'}>
               {busy === 'save' ? 'Saving…' : 'Save settings'}
             </button>
-            <button type="button" className={secondaryButtonClass} onClick={runPreview} aria-busy={busy === 'preview'}>
+            <button type="button" className={secondaryButtonClass} onClick={runPreview} disabled={Boolean(busy)} aria-busy={busy === 'preview'}>
               {busy === 'preview' ? 'Preparing the preview…' : 'Preview'}
             </button>
             {data.state !== 'off' ? (
-              <button type="button" className={secondaryButtonClass} onClick={turnOff} aria-busy={busy === 'disable'}>
+              <button type="button" className={secondaryButtonClass} onClick={turnOff} disabled={Boolean(busy)} aria-busy={busy === 'disable'}>
                 {busy === 'disable' ? 'Turning off…' : 'Turn off'}
               </button>
             ) : null}
@@ -388,7 +416,7 @@ function SpeakerSchedule({ call }) {
               <SampleMessage key={sample.windowKey} sample={sample} timeZone={timeZone} />
             ))}
             <div>
-              <button type="button" className={primaryButtonClass} onClick={approve} aria-busy={busy === 'approve'}>
+              <button type="button" className={primaryButtonClass} onClick={approve} disabled={Boolean(busy)} aria-busy={busy === 'approve'}>
                 {busy === 'approve' ? 'Approving…' : 'Approve and turn on'}
               </button>
             </div>
