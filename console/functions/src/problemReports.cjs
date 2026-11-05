@@ -23,14 +23,12 @@ const { siteNameOf } = require('./reviewAccess.cjs');
 const { projectIdFor } = require('./consoleSettings.cjs');
 
 const CATEGORIES = Object.freeze(['bug', 'suggestion', 'question']);
-const SURFACES = Object.freeze(['console', 'admin']);
 const LEVELS = Object.freeze(['log', 'info', 'warn', 'error']);
 const MIN_DESCRIPTION = 10;
 const MAX_DESCRIPTION = 4000;
 const MAX_LOGS = 50;
 const MAX_LOG_MESSAGE = 1000;
 const PROJECT_ID_RE = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
-const SITE_RE = /^[a-z0-9-]{0,63}$/;
 const VERSION_RE = /^[A-Za-z0-9._-]{0,64}$/;
 const BUILT_STATUSES = Object.freeze(['building', 'ready', 'launched']);
 const HOUR = 60 * 60 * 1000;
@@ -98,12 +96,10 @@ function readReport(body, extraOrigins = []) {
     throw Object.assign(new ConsoleError(400, 'bad-request',
       `Describe the problem in ${MIN_DESCRIPTION} to ${MAX_DESCRIPTION} characters.`), { field: 'description' });
   }
-  const surface = SURFACES.includes(body.surface) ? body.surface : null;
   const url = cleanPageUrl(body.url, extraOrigins);
-  const site = typeof body.site === 'string' && SITE_RE.test(body.site) ? body.site : null;
   const version = typeof body.version === 'string' && VERSION_RE.test(body.version) ? body.version : '';
-  if (!surface || !url || site === null) throw new ConsoleError(400, 'bad-request', 'The report could not be read. Reload the page and try again.');
-  return { category, description, url, surface, site: surface === 'console' ? '' : site, version, consoleLogs: cleanLogs(body.consoleLogs) };
+  if (!url) throw new ConsoleError(400, 'bad-request', 'The report could not be read. Reload the page and try again.');
+  return { category, description, url, version, consoleLogs: cleanLogs(body.consoleLogs) };
 }
 
 /** The unverified `aud` of a Firebase ID token: which project to check it against. */
@@ -233,8 +229,9 @@ function reportProblemHandler(deps) {
         description: report.description,
         email: reporter.email,
         url: report.url,
-        surface: report.surface,
-        site: report.site,
+        // Where the report came from is the verified sign-in's project, never the browser's word.
+        surface: reporter.project === deps.consoleProject ? 'console' : 'admin',
+        site: reporter.project === deps.consoleProject ? '' : reporter.project,
         version: report.version,
         consoleLogs: report.consoleLogs,
       }).catch((err) => {

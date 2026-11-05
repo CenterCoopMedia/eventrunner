@@ -35,6 +35,7 @@ test('a console user report is forwarded with the verified email, no query and r
   assert.equal(body.email, 'pat@example.org');
   assert.equal(body.url, 'https://nclocal.eventrunner.org/admin/pitches');
   assert.equal(body.site, '');
+  assert.equal(body.surface, 'console');
   assert.match(body.request_id, /^[a-f0-9]{32}$/);
   assert.deepEqual(body.consoleLogs, [{ level: 'error', message: 'Bearer [removed] failed for [email removed]' }]);
   assert.equal(res.body.id, `er_${body.request_id}`);
@@ -46,7 +47,8 @@ test('a client admin is accepted only for a project this console built or listed
   let res = makeRes();
   await reportProblemHandler(s.deps)(makeReq({ token: jwt('er-nclocal'), body: BODY }), res);
   assert.equal(res.statusCode, 200);
-  assert.equal(s.sent[0].body.site, 'nclocal');
+  assert.equal(s.sent[0].body.site, 'er-nclocal', 'the site is the verified project, not the browser value');
+  assert.equal(s.sent[0].body.surface, 'admin');
 
   s = setup({ seed: { 'applications/a1': { status: 'draft', answers: { webAddress: { name: 'nclocal' } } } } });
   res = makeRes();
@@ -106,5 +108,5 @@ test('origins, page addresses and fields are bounded', () => {
   assert.equal(cleanPageUrl('https://example.com/'), null);
   assert.equal(redact('see ?oobCode=123&x=1 token eyJabcdefghij.abcdefghij.sig'), 'see ?oobCode=[removed]&x=1 token [token removed]');
   assert.throws(() => readReport({ ...BODY, category: 'other' }), (err) => err.field === 'category');
-  assert.throws(() => readReport({ ...BODY, surface: 'public' }), { status: 400 });
+  assert.throws(() => readReport({ ...BODY, url: 'https://example.com/' }), { status: 400 });
 });
