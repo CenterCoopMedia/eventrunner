@@ -73,7 +73,7 @@ describe('ReviewApplication', () => {
     expect(callApi).toHaveBeenCalledWith('getApplicationForReview', { appId: 'a1' });
     expect(screen.getByText('Approved', { selector: '.tag' })).toBeInTheDocument();
     expect(screen.getByText('A day for local news')).toBeInTheDocument();
-    expect(screen.getByText('2027-03-04, 09:00 to 17:00 (Day one)')).toBeInTheDocument();
+    expect(screen.getByText('Thursday, 4 March 2027, 9:00 a.m. to 5:00 p.m. (Day one)')).toBeInTheDocument();
     expect(screen.getAllByText('nclocal.eventrunner.org').length).toBeGreaterThan(0);
     expect(screen.getByText('NC Local <hello@nclocal.eventrunner.org>')).toBeInTheDocument();
     expect(screen.getAllByText('Sell with Stripe').length).toBeGreaterThan(0);

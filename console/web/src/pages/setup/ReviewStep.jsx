@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { STEPS, SIGNUPS_CLOSED, SITE_DOMAIN, TICKET_CHOICES, setupPath, stepById, stepOfField } from '../../setup/steps.js';
 import { senderPreview } from './EmailStep.jsx';
+import { eventDayText } from '../../reviewText.js';
 
 function Row({ label, children }) {
   return (
@@ -9,11 +10,6 @@ function Row({ label, children }) {
       <dd>{children || <span className="muted">Not answered</span>}</dd>
     </div>
   );
-}
-
-function dayText(day) {
-  return [day.label, day.date, day.startTime && day.endTime ? `${day.startTime} to ${day.endTime}` : '']
-    .filter(Boolean).join(', ');
 }
 
 function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
@@ -42,7 +38,7 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
           <Row label="Description">{event.tagline}</Row>
           <Row label="Time zone">{event.timezone}</Row>
           <Row label="Dates">
-            {event.days.length > 0 ? <ul className="plain">{event.days.map((d, i) => <li key={i}>{dayText(d)}</li>)}</ul> : null}
+            {event.days.length > 0 ? <ul className="plain">{event.days.map((d, i) => <li key={i}>{eventDayText(d)}</li>)}</ul> : null}
           </Row>
           <Row label="Venue">{[event.venue.name, event.venue.address].filter(Boolean).join(', ')}</Row>
         </dl>
