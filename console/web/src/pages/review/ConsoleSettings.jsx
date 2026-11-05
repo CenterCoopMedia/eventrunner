@@ -20,6 +20,7 @@ export default function ConsoleSettings() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const fieldRefs = useRef({});
+  const resultRef = useRef(null);
 
   useEffect(() => {
     let live = true;
@@ -36,8 +37,14 @@ export default function ConsoleSettings() {
 
   // Focus the field an error is about once it shows.
   useEffect(() => {
-    if (fieldError) fieldRefs.current[fieldError.field]?.focus();
-  }, [fieldError]);
+    if (fieldError && !busy) fieldRefs.current[fieldError.field]?.focus();
+  }, [fieldError, busy]);
+
+  useEffect(() => {
+    if (!resultRef.current || (!notice && !error)) return;
+    const box = resultRef.current.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > window.innerHeight) resultRef.current.scrollIntoView?.({ block: 'nearest' });
+  }, [notice, error]);
 
   if (isNotOperator(loadError)) return <HostingOnly />;
   if (loadError) return <p className="message error" role="alert">{loadError.message}</p>;
@@ -45,10 +52,14 @@ export default function ConsoleSettings() {
 
   function change(field, value) {
     setValues((current) => ({ ...current, [field]: value }));
+    setNotice('');
+    setError('');
+    setFieldError((current) => current?.field === field ? null : current);
   }
 
   async function onSubmit(event) {
     event.preventDefault();
+    if (busy) return;
     setNotice('');
     setError('');
     const invalid = firstSettingError(values, FIELDS);
@@ -78,13 +89,11 @@ export default function ConsoleSettings() {
         </aside>
       ) : null}
       <p>Every new build uses these values.</p>
-      <div aria-live="polite" className="live">
-        {notice ? <p className="message success">{notice}</p> : null}
-      </div>
-      {error ? <p className="message error" role="alert">{error}</p> : null}
       <form noValidate onSubmit={onSubmit} className="stack">
-        <SettingsFields fields={FIELDS} values={values} onChange={change} error={fieldError} fieldRefs={fieldRefs} idPrefix="settings" />
-        <button type="submit" className="button primary" disabled={busy}>Save settings</button>
+        <SettingsFields fields={FIELDS} values={values} onChange={change} error={fieldError} fieldRefs={fieldRefs} idPrefix="settings" disabled={busy} />
+        <button type="submit" className="button primary" disabled={busy}>{busy ? 'Saving settings…' : 'Save settings'}</button>
+        {notice ? <p className="message success" role="status" ref={resultRef}>{notice}</p> : null}
+        {error ? <p className="message error" role="alert" ref={resultRef}>{error}</p> : null}
       </form>
       <AgreementSettings agreement={agreement} onSaved={setAgreement} />
       <p><Link to="/review">Go to the review queue</Link></p>

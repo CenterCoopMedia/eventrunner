@@ -122,7 +122,7 @@ export default function AdminSpeakersList() {
 
   const [invites, setInvites] = useState(null); // speakerId → newest invite row
   const [busy, setBusy] = useState(null); // `${speakerId}:${action}`
-  const [notice, setNotice] = useState(null); // { kind: 'ok'|'error', message }
+  const [notice, setNotice] = useState(null); // { speakerId, kind: 'ok'|'error', message }, shown in that row
 
   const refreshInvites = useCallback(async () => {
     try {
@@ -158,6 +158,7 @@ export default function AdminSpeakersList() {
     try {
       await call(endpoint, { speakerId: speaker.id, ...body });
       setNotice({
+        speakerId: speaker.id,
         kind: 'ok',
         message: (ACTION_NOTICES[action] ?? ((who) => `Invitation emailed to ${who}.`))(name),
       });
@@ -166,7 +167,7 @@ export default function AdminSpeakersList() {
       // Verbatim: the server's message is the actionable part — which
       // transition it refused, or that the invitation was recorded but not
       // delivered.
-      setNotice({ kind: 'error', message: err?.message ?? 'Something went wrong.' });
+      setNotice({ speakerId: speaker.id, kind: 'error', message: err?.message ?? 'Something went wrong.' });
       await refreshInvites();
     } finally {
       setBusy(null);
@@ -178,10 +179,11 @@ export default function AdminSpeakersList() {
     const row = invites?.get(speaker.id);
     if (!row) return null;
     if (row.status === 'pending' && !row.sentAt) {
-      return 'Recorded, not delivered — resend it';
+      return 'Invite not sent. Select Resend invite.';
     }
     if (row.status === 'pending' && row.expiresAt) {
-      return `Expires ${row.expiresAt.slice(0, 10)}`;
+      const expires = new Date(row.expiresAt);
+      return Number.isFinite(expires.getTime()) ? `Expires ${expires.toLocaleDateString(undefined, { dateStyle: 'medium' })}` : null;
     }
     return null;
   }
@@ -191,7 +193,7 @@ export default function AdminSpeakersList() {
       <AdminPageHeader
         title="Speakers"
         identifiers={`${speakers.length} record${speakers.length === 1 ? '' : 's'}`}
-        description="One record per speaker. Sessions reference these records by id, so editing a name here updates it everywhere it appears."
+        description="Edit a speaker here and every session shows the change."
         actions={
           <>
             <Link to="reminders/send" className={secondaryButtonClass}>
@@ -210,12 +212,8 @@ export default function AdminSpeakersList() {
       {error ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the speaker list; showing the last values we received and retrying."
+          message="The list did not refresh. Trying again…"
         />
-      ) : null}
-
-      {notice ? (
-        <Notice tone={notice.kind === 'error' ? 'error' : 'ok'} message={notice.message} />
       ) : null}
 
       {loading ? (
@@ -260,10 +258,13 @@ export default function AdminSpeakersList() {
                       </div>
                       <p className={`mt-3xs truncate ${rowMetaClass}`}>
                         {[speaker.jobTitle, speaker.organization].filter(Boolean).join(', ') || '—'}
-                        {' · '}
-                        {speaker.slug}
                         {note ? ` · ${note}` : ''}
                       </p>
+                      {notice?.speakerId === speaker.id ? (
+                        <div className="mt-xs">
+                          <Notice tone={notice.kind === 'error' ? 'error' : 'ok'} message={notice.message} />
+                        </div>
+                      ) : null}
                       {pendingFieldsOf(speaker).length > 0 ? (
                         <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
                           Speaker-submitted changes awaiting review:{' '}

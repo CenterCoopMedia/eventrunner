@@ -177,7 +177,7 @@ describe('speakers list', () => {
     listenerError = new Error('permission denied');
     await renderAt('/admin/speakers');
     expect(screen.getByRole('link', { name: 'Rae Okonkwo' })).toBeInTheDocument();
-    expect(screen.getByText(/lost the connection to the speaker list/)).toBeInTheDocument();
+    expect(screen.getByText('The list did not refresh. Trying again…')).toBeInTheDocument();
   });
 });
 
@@ -353,11 +353,11 @@ describe('speaker editor', () => {
     // Each segment appears twice on purpose: once in the summary, once
     // against the input it names (aria-describedby).
     await waitFor(() =>
-      expect(screen.getAllByText('firstName: must be a non-empty string').length).toBeGreaterThan(0),
+      expect(screen.getAllByText('First name: must be a non-empty string').length).toBeGreaterThan(0),
     );
     expect(screen.getByLabelText('First name')).toHaveAttribute('aria-invalid', 'true');
     expect(
-      screen.getAllByText('slug: must be lowercase letters, digits, and single hyphens').length,
+      screen.getAllByText('Slug: must be lowercase letters, digits, and single hyphens').length,
     ).toBeGreaterThan(0);
     expect(screen.getByLabelText('URL slug')).toHaveAttribute('aria-invalid', 'true');
   });
@@ -602,7 +602,8 @@ describe('invite actions', () => {
 
     await waitFor(() => expect(callTo('sendSpeakerInvite')).toBeTruthy());
     expect(JSON.parse(callTo('sendSpeakerInvite')[1].body)).toEqual({ speakerId: 'draft-one' });
-    expect(screen.getByText(/Invitation emailed to Draft One/)).toBeInTheDocument();
+    // The result shows in the speaker's row, not at the page top.
+    expect(screen.getByText(/Invitation emailed to Draft One/).closest('li')).toHaveTextContent('Draft One');
   });
 
   it('posts cancelSpeakerInvite and says the invitation was cancelled', async () => {
@@ -680,7 +681,7 @@ describe('invite actions', () => {
     });
     await renderAt('/admin/speakers');
 
-    await waitFor(() => expect(screen.getByText(/Recorded, not delivered/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Invite not sent\. Select Resend invite\./)).toBeInTheDocument());
   });
 
   it('shows the expiry of a delivered invitation', async () => {
@@ -697,7 +698,8 @@ describe('invite actions', () => {
     });
     await renderAt('/admin/speakers');
 
-    await waitFor(() => expect(screen.getByText(/Expires 2026-09-04/)).toBeInTheDocument());
+    const expires = new Date('2026-09-04T12:00:00.000Z').toLocaleDateString(undefined, { dateStyle: 'medium' });
+    await waitFor(() => expect(screen.getByText(new RegExp(`Expires ${expires}`))).toBeInTheDocument());
   });
 });
 

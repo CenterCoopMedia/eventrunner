@@ -7,10 +7,10 @@
 // gate in AdminGate.jsx is convenience only.
 //
 // Failures normalize to AdminApiError carrying the server's `error.message`
-// VERBATIM (spec: validation messages name the offending field, so rewriting
-// them client-side would destroy the only useful part). `fieldErrors` splits
-// that message into the per-field segments the server joined with '; ' so a
-// form can mark individual inputs aria-invalid without inventing copy.
+// verbatim. `fieldErrors` splits that message into the per-field segments the
+// server joined with '; ': each keeps its field key in `field`, so a form can
+// mark the input, and its readable sentence, without the key, in `message`.
+// Screens show the segments, never the raw `field: reason` text.
 import { useCallback } from 'react';
 import { functionsOrigin, useAuth } from '../contexts/AuthContext.jsx';
 
@@ -49,6 +49,18 @@ export class AdminApiError extends Error {
  * @param {string} message
  * @returns {Array<{ field: string|null, message: string }>}
  */
+/**
+ * A readable name for a server field key: its last part, in words.
+ * `registration.externalUrl` -> "External url", `milestones[0].date` -> "Date".
+ *
+ * @param {string} key
+ */
+export function fieldLabel(key) {
+  const last = String(key).split('.').pop().replace(/\[\d+\]/g, '');
+  const words = last.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_$]/g, ' ').trim().toLowerCase();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'This field';
+}
+
 export function fieldErrorsOf(message) {
   if (typeof message !== 'string' || message.length === 0) return [];
   return message
@@ -58,8 +70,10 @@ export function fieldErrorsOf(message) {
     .filter(Boolean)
     .map((segment) => {
       const match = segment.match(FIELD_SEGMENT_RE);
+      // The field key stays in `field` for the form; people read only the
+      // sentence, so the key leaves the message.
       return match
-        ? { field: match[1], message: segment }
+        ? { field: match[1], message: `${fieldLabel(match[1])}: ${match[2]}` }
         : { field: null, message: segment };
     });
 }

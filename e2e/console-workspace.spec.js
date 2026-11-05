@@ -146,3 +146,65 @@ test('console directories and application progress are readable across widths an
   await expect(page.locator('.console-spinner')).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });
+
+test('status withdrawal and settings saves keep their outcome beside the action', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  const settings = { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' };
+  let finishWithdrawal;
+  let finishSettings;
+  const withdrawalPending = new Promise((done) => { finishWithdrawal = done; });
+  const settingsPending = new Promise((done) => { finishSettings = done; });
+  let withdrawals = 0;
+  let saves = 0;
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('**/*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.origin !== origin) return route.abort();
+    if (!url.pathname.startsWith('/api/')) return route.continue();
+    const action = url.pathname.split('/').at(-1);
+    if (action === 'getApplication') return route.fulfill({ json: { application: application('draft') } });
+    if (action === 'withdrawApplication') {
+      withdrawals += 1;
+      await withdrawalPending;
+      return route.fulfill({ status: 503, json: { error: { code: 'unavailable', message: 'The request could not be withdrawn. Try again.' } } });
+    }
+    if (action === 'getConsoleSettings') return route.fulfill({ json: { settings,
+      agreement: { version: 1, title: 'Event hosting agreement', body: 'A synthetic agreement for this fixture.', savedAt: '2026-11-01T12:00:00.000Z' } } });
+    if (action === 'saveConsoleSettings') {
+      saves += 1;
+      await settingsPending;
+      return route.fulfill({ json: { settings: route.request().postDataJSON().settings } });
+    }
+    throw new Error(`Unexpected console action: ${action}`);
+  });
+  await page.goto(`${origin}${APPLICATION_PATH}`);
+  await page.getByRole('button', { name: 'Withdraw the request' }).click();
+  await page.getByRole('button', { name: 'Yes, withdraw' }).click();
+  await expect(page.getByRole('button', { name: 'Withdrawing…' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+  finishWithdrawal();
+  await expect(page.getByRole('alert')).toHaveText('The request could not be withdrawn. Try again.');
+  await expect(page.getByRole('alert')).toBeInViewport();
+  await expect(page.getByRole('group', { name: 'Withdraw the request' })).toBeVisible();
+  await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
+  await page.screenshot({ path: path.join(EVIDENCE, 'console-withdraw-failure-390-light.png') });
+
+  await page.goto(`${origin}/review/settings`);
+  await page.getByLabel('Region').fill('us-east1');
+  await page.getByRole('button', { name: 'Save settings' }).click();
+  await expect(page.getByLabel('Region')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Saving settings…' })).toBeDisabled();
+  finishSettings();
+  await expect(page.getByRole('status')).toHaveText('The settings are saved. New builds use them.');
+  await expect(page.getByRole('status')).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Save settings' })).toBeInViewport();
+  await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
+  await page.screenshot({ path: path.join(EVIDENCE, 'console-settings-saved-390-light.png') });
+  await page.getByLabel('Region').fill('us-central1');
+  await expect(page.getByText('The settings are saved. New builds use them.')).toHaveCount(0);
+  expect(withdrawals).toBe(1);
+  expect(saves).toBe(1);
+  expect(errors).toEqual([]);
+});
