@@ -19,12 +19,12 @@ import { Figure } from './figures.jsx';
 
 /** The rows, in the order an operator meets them on the rail. */
 const COLLECTIONS = Object.freeze([
-  ['cmsPages', 'Pages'],
-  ['cmsContent', 'Content blocks'],
-  ['cmsSchedule', 'Sessions'],
-  ['cmsOrganizations', 'Organizations'],
-  ['cmsTimeline', 'Timeline'],
-  ['cmsUpdates', 'Updates'],
+  ['cmsPages', 'Pages', '/admin/pages'],
+  ['cmsContent', 'Content blocks', '/admin/content'],
+  ['cmsSchedule', 'Sessions', '/admin/sessions'],
+  ['cmsOrganizations', 'Organizations', '/admin/organizations'],
+  ['cmsTimeline', 'Timeline', '/admin/timeline'],
+  ['cmsUpdates', 'Updates', '/admin/updates'],
 ]);
 
 const COLUMNS = Object.freeze([
@@ -35,10 +35,10 @@ const COLUMNS = Object.freeze([
 
 /** @param {{ content: Record<string, { published: number, drafts: number }>|undefined }} props */
 export default function ReadinessPanel({ content }) {
-  const rows = COLLECTIONS.map(([id, label]) => ({
+  const rows = COLLECTIONS.map(([id, label, to]) => ({
     id,
     cells: {
-      collection: label,
+      collection: <Link to={to} className="admin-readiness-link">{label}</Link>,
       published: <Figure value={content?.[id]?.published} />,
       drafts: <Figure value={content?.[id]?.drafts} />,
     },
@@ -54,6 +54,7 @@ export default function ReadinessPanel({ content }) {
           caption="Records on the site and records with unpublished changes, by collection."
           columns={COLUMNS}
           rows={rows}
+          tableClassName="admin-readiness-table"
         />
       </div>
     </Panel>

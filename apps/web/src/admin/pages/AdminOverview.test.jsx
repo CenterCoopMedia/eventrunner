@@ -168,6 +168,17 @@ describe('the admin overview', () => {
     expect(card('Program')).toHaveTextContent('9 with unpublished changes.');
     expect(total('System health')).toBe('21 unresolved errors');
 
+    // Readiness offers the same management routes as the navigation, so
+    // a count can lead straight to the work without another menu search.
+    const readiness = screen.getByRole('table', { name: /by collection/ });
+    for (const [name, href] of [
+      ['Pages', '/admin/pages'], ['Content blocks', '/admin/content'],
+      ['Sessions', '/admin/sessions'], ['Organizations', '/admin/organizations'],
+      ['Timeline', '/admin/timeline'], ['Updates', '/admin/updates'],
+    ]) {
+      expect(within(readiness).getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
+    }
+
     // The number is in the data face, bold and tabular, beside its words.
     const [figure] = screen.getAllByText('412', { selector: 'span' });
     expect(figure.className).toMatch(/font-admin-data/);
@@ -457,12 +468,18 @@ describe('the admin overview', () => {
         'Refresh figures',
         'Review unpublished changes',
         'Manage attendees',
-        'Review system errors',
         'Open ticketing',
         'Manage speakers',
         'Manage sessions',
         'Review changes',
         'Records on the site and records with unpublished changes, by collection.',
+        'Pages',
+        'Content blocks',
+        'Sessions',
+        'Organizations',
+        'Timeline',
+        'Updates',
+        'Review system errors',
       ]);
       const region = screen.getByRole('region', { name: 'Records on the site and records with unpublished changes, by collection.' });
       expect(region).toHaveAttribute('tabindex', '0');

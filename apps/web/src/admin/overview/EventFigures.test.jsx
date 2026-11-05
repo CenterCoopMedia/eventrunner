@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import EventFigures from './EventFigures.jsx';
+import EventFigures, { SystemHealth } from './EventFigures.jsx';
 
 function show(isOperator) {
-  render(<MemoryRouter><EventFigures stats={{ errors: { unresolved: 0 } }} isOperator={isOperator} /></MemoryRouter>);
+  render(<MemoryRouter>
+    <EventFigures stats={{}} />
+    <SystemHealth errors={{ unresolved: 0 }} isOperator={isOperator} />
+  </MemoryRouter>);
 }
 
 describe('actionable overview figures', () => {
