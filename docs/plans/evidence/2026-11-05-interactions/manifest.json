@@ -3,46 +3,45 @@
   "verified_code": [
     {
       "pr": 690,
+      "title": "Overview and CMS loading",
       "head": "e1996cc1ec819cc9cd0bd1c5493c54b16d82dbd6",
-      "run": 42098488120,
-      "title": "Overview and CMS loading"
+      "run": 42098488120
     },
     {
       "pr": 693,
+      "title": "Announcements and email-log recovery",
       "head": "ea0f5f83fe0459f42bb11ae6a0b2d0468e4645a9",
-      "run": 42096852356,
-      "title": "Announcements and email-log recovery"
+      "run": 42096852356
     },
     {
       "pr": 694,
+      "title": "Console directories, setup and loading",
       "head": "9caad46e1b1163226a4aa93c92e4864e37587b3c",
-      "run": 42098495361,
-      "title": "Console directories, setup and loading"
+      "run": 42098495361
     },
     {
       "pr": 696,
+      "title": "CMS operations and access",
       "head": "018429df6ebeb1184fb87f125a6689f482c35d94",
-      "run": 42098107963,
-      "title": "CMS operations and access"
+      "run": 42098107963
     },
     {
       "pr": 697,
-      "head": "af70b2784c6c1bc56749464dee9ab45838106fb3",
-      "run": 42096153995,
       "title": "Console actions and hosting decisions",
-      "merged": true
+      "head": "af70b2784c6c1bc56749464dee9ab45838106fb3",
+      "run": 42096153995
     },
     {
       "pr": 699,
+      "title": "CMS editor and row feedback",
       "head": "d99baf18581778a452a41787deedcd3c3decbac6",
-      "run": 42098423987,
-      "title": "CMS editor and row feedback"
+      "run": 42098423987
     },
     {
       "pr": 700,
+      "title": "Compact navigation and dialogs",
       "head": "01133005eb11ec82076af6b9c997d9cd303b25c0",
-      "run": 42098117836,
-      "title": "Compact navigation and dialogs"
+      "run": 42098117836
     }
   ],
   "captures": [

@@ -4,19 +4,21 @@ These are real browser captures from GitHub-hosted emulator and console fixture 
 
 Images are stored separately from tested code branches, so adding review evidence does not replace their verified heads. All 22 captures linked below were visually inspected.
 
-## Verified code
+## Recorded validation
 
-| PR | Surface | State | Verified head | Passing CI |
-| --- | --- | --- | --- | --- |
-| [#690](https://github.com/CenterCoopMedia/eventrunner/pull/690) | Overview and CMS loading | Ready for review | `e1996cc1ec81` | [42098488120](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098488120) |
-| [#693](https://github.com/CenterCoopMedia/eventrunner/pull/693) | Announcements and email-log recovery | Ready for review | `ea0f5f83fe04` | [42096852356](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096852356) |
-| [#694](https://github.com/CenterCoopMedia/eventrunner/pull/694) | Console directories, setup and loading | Ready for review | `9caad46e1b11` | [42098495361](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098495361) |
-| [#696](https://github.com/CenterCoopMedia/eventrunner/pull/696) | CMS operations and access | Ready for review | `018429df6ebe` | [42098107963](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098107963) |
-| [#697](https://github.com/CenterCoopMedia/eventrunner/pull/697) | Console actions and hosting decisions | Merged | `af70b2784c6c` | [42096153995](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096153995) |
-| [#699](https://github.com/CenterCoopMedia/eventrunner/pull/699) | CMS editor and row feedback | Ready for review | `d99baf185817` | [42098423987](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098423987) |
-| [#700](https://github.com/CenterCoopMedia/eventrunner/pull/700) | Compact navigation and dialogs | Ready for review | `01133005eb11` | [42098117836](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098117836) |
+This table records the passing implementation runs. PR links show current merge status and any CI refresh triggered by later base updates.
 
-#697 has merged into main `6cec930`. #690, #694, #696, #699, and #700 were validated with that main commit. #693's current product head passed with `35a98f7`; the later #697 merge changes console-only paths. Existing required checks should be rechecked as further merges land.
+| PR | Surface | Verified head | Passing CI |
+| --- | --- | --- | --- |
+| [#690](https://github.com/CenterCoopMedia/eventrunner/pull/690) | Overview and CMS loading | `e1996cc1ec81` | [42098488120](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098488120) |
+| [#693](https://github.com/CenterCoopMedia/eventrunner/pull/693) | Announcements and email-log recovery | `ea0f5f83fe04` | [42096852356](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096852356) |
+| [#694](https://github.com/CenterCoopMedia/eventrunner/pull/694) | Console directories, setup and loading | `9caad46e1b11` | [42098495361](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098495361) |
+| [#696](https://github.com/CenterCoopMedia/eventrunner/pull/696) | CMS operations and access | `018429df6ebe` | [42098107963](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098107963) |
+| [#697](https://github.com/CenterCoopMedia/eventrunner/pull/697) | Console actions and hosting decisions | `af70b2784c6c` | [42096153995](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096153995) |
+| [#699](https://github.com/CenterCoopMedia/eventrunner/pull/699) | CMS editor and row feedback | `d99baf185817` | [42098423987](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098423987) |
+| [#700](https://github.com/CenterCoopMedia/eventrunner/pull/700) | Compact navigation and dialogs | `01133005eb11` | [42098117836](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098117836) |
+
+#697 merged into main `6cec930`. #690, #694, #696, #699, and #700 were validated with that main commit. #693's product head passed with `35a98f7`; the #697 merge changes console-only paths. #696 subsequently merged as `7e56c51`; further base merges refresh required checks without changing the captured UI. [The review index](https://github.com/CenterCoopMedia/eventrunner/issues/695) tracks the handoff status.
 
 ## Source browser runs
 
