@@ -237,6 +237,7 @@ function buildHandlers({ startBuild } = {}) {
       log: console,
       consoleProject: process.env.GCLOUD_PROJECT,
       extraProjects: parseAllowedOrigins(process.env.CONSOLE_REPORT_PROJECTS),
+      extraOrigins,
       intake: { url: process.env.CONSOLE_REPORT_INTAKE_URL || '', secret, accessId, accessSecret },
     })(req, res);
   });

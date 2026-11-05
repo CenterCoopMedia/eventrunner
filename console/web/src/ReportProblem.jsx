@@ -101,7 +101,7 @@ export default function ReportProblem() {
                 aria-describedby={descriptionError ? `${id}-description-error` : undefined}
                 onChange={(event) => setDescription(event.target.value)}
               />
-              {descriptionError ? <p id={`${id}-description-error`} className="field-error">{descriptionError}</p> : null}
+              {descriptionError ? <p id={`${id}-description-error`} className="field-error" role="alert">{descriptionError}</p> : null}
             </div>
             {error && !descriptionError ? <p className="message error" role="alert">{error.message}</p> : null}
             <div className="report-actions">

@@ -680,10 +680,7 @@ function AdminDesk() {
                   ref={reportRef}
                   label="Report a problem"
                   icon="report"
-                  onClick={() => {
-                    setMobileDocketOpen(false);
-                    setReporting(true);
-                  }}
+                  onClick={() => setReporting(true)}
                   className={railButtonClass}
                 />
                 <AdminIconControl as={NavLink} to="/" label="View site" icon="globe" className={railButtonClass} />
@@ -723,9 +720,10 @@ function AdminDesk() {
             </Suspense>
           )}
           {refused ? <TierRefusal /> : <Outlet />}
-          {reporting ? <ReportProblemDialog onClose={() => setReporting(false)} returnFocusRef={reportRef} /> : null}
         </div>
       </main>
+      {/* Outside the main region, which is inert while the mobile menu is open. */}
+      {reporting ? <ReportProblemDialog onClose={() => setReporting(false)} returnFocusRef={reportRef} /> : null}
     </div>
   );
 }

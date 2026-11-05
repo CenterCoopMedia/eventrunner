@@ -54,7 +54,7 @@ function reportOriginAllowed(origin, extra = []) {
 }
 
 /** A page address the triage service will accept: https, a report origin, no query. */
-function cleanPageUrl(raw) {
+function cleanPageUrl(raw, extraOrigins = []) {
   if (typeof raw !== 'string' || raw.length > 2048) return null;
   let url;
   try {
@@ -62,7 +62,7 @@ function cleanPageUrl(raw) {
   } catch {
     return null;
   }
-  if (url.username || url.password || !reportOriginAllowed(url.origin)) return null;
+  if (url.username || url.password || !reportOriginAllowed(url.origin, extraOrigins)) return null;
   url.search = '';
   return url.toString();
 }
@@ -90,7 +90,7 @@ function cleanLogs(raw) {
  * The report to forward, or a ConsoleError naming the field to fix.
  * @returns {{ category, description, url, surface, site, version, consoleLogs }}
  */
-function readReport(body) {
+function readReport(body, extraOrigins = []) {
   const category = CATEGORIES.includes(body.category) ? body.category : null;
   if (!category) throw Object.assign(new ConsoleError(400, 'bad-request', 'Choose what kind of report this is.'), { field: 'category' });
   const description = typeof body.description === 'string' ? body.description.trim() : '';
@@ -99,7 +99,7 @@ function readReport(body) {
       `Describe the problem in ${MIN_DESCRIPTION} to ${MAX_DESCRIPTION} characters.`), { field: 'description' });
   }
   const surface = SURFACES.includes(body.surface) ? body.surface : null;
-  const url = cleanPageUrl(body.url);
+  const url = cleanPageUrl(body.url, extraOrigins);
   const site = typeof body.site === 'string' && SITE_RE.test(body.site) ? body.site : null;
   const version = typeof body.version === 'string' && VERSION_RE.test(body.version) ? body.version : '';
   if (!surface || !url || site === null) throw new ConsoleError(400, 'bad-request', 'The report could not be read. Reload the page and try again.');
@@ -116,30 +116,44 @@ function tokenProject(token) {
   }
 }
 
-/** True when this console built a site in that project, or the operator listed it. */
-async function knownClientProject(db, projectId, extraProjects) {
-  if (extraProjects.includes(projectId)) return true;
+// The built projects, read at most once per PROJECTS_TTL_MS per instance, so
+// a stream of unsigned tokens cannot turn into a stream of database reads.
+const PROJECTS_TTL_MS = 5 * 60 * 1000;
+let builtProjects = { at: -Infinity, ids: new Set(), db: null };
+
+async function readBuiltProjects(db) {
   const snap = await db.collection('applications').where('status', 'in', BUILT_STATUSES).get();
-  return snap.docs.some((doc) => {
+  return new Set(snap.docs.flatMap((doc) => {
     const app = doc.data();
     const stored = app.review?.settings?.projectId;
     const name = siteNameOf(app);
-    return stored === projectId || (!stored && name && projectIdFor(name) === projectId);
-  });
+    if (stored) return [stored];
+    return name ? [projectIdFor(name)] : [];
+  }));
+}
+
+/** True when this console built a site in that project, or the operator listed it. */
+async function knownClientProject(db, projectId, extraProjects, now = Date.now) {
+  if (extraProjects.includes(projectId)) return true;
+  const at = now();
+  if (builtProjects.db !== db || at - builtProjects.at >= PROJECTS_TTL_MS) {
+    builtProjects = { at, ids: await readBuiltProjects(db), db };
+  }
+  return builtProjects.ids.has(projectId);
 }
 
 /**
  * The verified reporter. `authFor(projectId)` returns an Auth for a client
  * project; the console's own Auth checks console tokens with revocation.
  */
-async function verifyReporter({ auth, authFor, db, consoleProject, extraProjects }, token) {
+async function verifyReporter({ auth, authFor, db, consoleProject, extraProjects, now }, token) {
   const project = token ? tokenProject(token) : null;
   if (!project) return null;
   let decoded = null;
   try {
     if (project === consoleProject) {
       decoded = await auth.verifyIdToken(token, true);
-    } else if (await knownClientProject(db, project, extraProjects)) {
+    } else if (await knownClientProject(db, project, extraProjects, now)) {
       decoded = await authFor(project).verifyIdToken(token);
     }
   } catch {
@@ -202,7 +216,7 @@ function reportProblemHandler(deps) {
       return;
     }
     try {
-      const report = readReport(body);
+      const report = readReport(body, deps.extraOrigins || []);
       if (!deps.intake?.url || !deps.intake.secret || !deps.intake.accessId || !deps.intake.accessSecret) {
         throw new ConsoleError(503, 'unavailable', 'Reports are not switched on yet. Email us instead.');
       }

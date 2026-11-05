@@ -108,7 +108,7 @@ export default function ReportProblemDialog({ onClose, returnFocusRef }) {
             maxLength={4000}
             disabled={busy}
           />
-          {error && !descriptionError ? <Notice tone="error" message={error.message} /> : null}
+          {error ? <Notice tone="error" message={error.message} /> : null}
           <div className="flex flex-wrap gap-xs">
             <button type="submit" className={primaryButtonClass} disabled={busy}>{busy ? 'Sending report…' : 'Send report'}</button>
             <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onClose}>Cancel</button>
