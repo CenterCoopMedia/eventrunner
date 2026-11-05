@@ -1,103 +1,104 @@
-// Content editor, step 2 (issue #61): the sections of one page, each with
-// how many content blocks it currently holds. Section structure (id, label,
-// allowedBlocks, maxBlocks) comes from the page's own doc — the CURRENT one
-// (draft if it has one, else live), same as AdminPageEditor reads it — so a
-// section just renamed in a draft shows its new label here immediately.
-//
-// The galley pattern here is the same one AdminContentSection.jsx (step 3,
-// singular) uses for its blocks: hairline rows in a Panel, no zebra, no row
-// cards. This list carries no publish state of its own — a section is
-// structure, not a record — so its rows carry only the count in the data
-// face.
+// Sections use the current page revision, so an unpublished rename remains
+// visible here. Block counts wait for both content revisions before stating
+// a total; one published block plus its draft is still one block.
 import { Link, useParams } from 'react-router';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
+import { blockTypeLabel } from '../blockTypes.js';
+import { contentManagementTarget, contentSectionPath, pageStructurePath } from '../contentBrowser.js';
 import {
+  Notice,
   Panel,
   linkButtonClass,
-  rowClass,
-  rowMetaClass,
   rowTitleLinkClass,
+  secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
 } from '../components/adminChrome.jsx';
+import '../contentBrowser.css';
 
 export default function AdminContentSections() {
   const { pageId } = useParams();
-  const { findRow, loading: pagesLoading } = useAdminPages();
-  const { rows: contentRows, loading: contentLoading } = useAdminContent();
-
+  const { findRow, loading: pagesLoading, ready: pagesReady, error: pagesError } = useAdminPages();
+  const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
   const page = findRow(pageId);
-  const sections = page?.current?.sections ?? [];
+  const sections = Array.isArray(page?.current?.sections) ? page.current.sections : [];
 
-  if (pagesLoading && !page) {
-    return <AdminLoadingState label="Loading page…" />;
-  }
-  if (!pagesLoading && !page) {
+  if (pagesLoading && !page) return <AdminLoadingState label="Loading page…" />;
+  if (!page) {
     return (
       <AdminEmptyState
-        title="No such page"
-        description="That page id has neither a published nor a draft revision."
-        action={
-          <Link to=".." relative="path" className={linkButtonClass}>
-            Back to content
-          </Link>
-        }
+        title={pagesReady ? 'No such page' : 'The page is not available yet'}
+        description={pagesReady ? 'That page id has neither a published nor a draft revision.' : 'We are waiting for the page list to reconnect.'}
+        action={<Link to="/admin/content" className={linkButtonClass}>Back to content</Link>}
       />
     );
   }
 
+  const pageName = page.current?.label || page.id;
+  const target = contentManagementTarget(page);
+  const identifiers = [page.current?.path, `${sections.length} section${sections.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+
   return (
-    <div className="flex flex-col gap-md">
+    <div className="admin-content-browser flex flex-col gap-md">
       <AdminPageHeader
-        title={page.current?.label || page.id}
-        identifiers={`${sections.length} section${sections.length === 1 ? '' : 's'}`}
-        description="Each section holds the content blocks the public page renders in that slot."
+        title={pageName}
+        identifiers={identifiers}
+        description="Choose a section to edit its content. Change the sections themselves in the page structure."
         actions={
-          <Link to=".." relative="path" className={linkButtonClass}>
-            Back to content
-          </Link>
+          <>
+            <Link to="/admin/content" className={linkButtonClass}>Back to content</Link>
+            <Link to={pageStructurePath(page.id)} className={linkButtonClass}>Edit page structure</Link>
+          </>
         }
       />
+
+      {pagesError || contentError ? (
+        <Notice tone="caution" message="We lost the connection to part of this page; showing the last values we received and retrying." />
+      ) : null}
 
       {sections.length === 0 ? (
         <AdminEmptyState
           title="No sections"
-          description="Add a section to this page in Pages before editing its content."
+          description={target ? `This page’s main content is managed in ${target.name}.` : 'Add a section to this page in Pages before editing its content.'}
+          action={
+            <Link to={target?.to ?? pageStructurePath(page.id)} className={secondaryButtonClass}>
+              {target?.action ?? 'Edit page structure'}
+            </Link>
+          }
         />
       ) : (
-        <Panel flush>
-          <ul>
+        <Panel flush className="admin-content-browser__panel">
+          <ol className="admin-content-sections" role="list" aria-label={`Sections in ${pageName}`}>
             {sections.map((section) => {
-              const count = contentRows.filter(
-                (row) => row.current?.section === section.id,
-              ).length;
+              const sectionName = section.label || section.id;
+              const count = contentRows.filter((row) => row.current?.section === section.id).length;
+              const types = Array.isArray(section.allowedBlocks) ? section.allowedBlocks.map(blockTypeLabel) : [];
+              const to = contentSectionPath(page.id, section.id);
               return (
-                <li
-                  key={section.id}
-                  className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
-                >
-                  <div className={rowClass}>
-                    <div className="min-w-0">
-                      <Link to={section.id} className={rowTitleLinkClass}>
-                        {section.label || section.id}
-                      </Link>
-                      <p className={`mt-3xs truncate ${rowMetaClass}`}>
-                        {contentLoading ? 'Loading…' : `${count} block${count === 1 ? '' : 's'}`}
-                        {' · max '}
-                        {section.maxBlocks}
-                      </p>
-                    </div>
-                    <Link to={section.id} className={linkButtonClass}>
-                      Open
-                    </Link>
+                <li key={section.id} className="admin-content-section">
+                  <div className="admin-content-section__description">
+                    <h2 className="font-admin-ui">
+                      <Link to={to} className={`${rowTitleLinkClass} admin-content-page-name`}>{sectionName}</Link>
+                    </h2>
+                    {section.description ? <p>{section.description}</p> : null}
+                    <p className="admin-content-section__types">
+                      <span>Allowed content: </span>{types.length ? types.join(', ') : 'No new block types'}
+                    </p>
                   </div>
+                  <div className="admin-content-section__count">
+                    <p>{contentReady ? `${count} block${count === 1 ? '' : 's'}` : contentError ? 'Block count unavailable' : 'Loading blocks…'}</p>
+                    {Number.isFinite(section.maxBlocks) ? <p className="admin-content-section__limit">Limit: {section.maxBlocks} block{section.maxBlocks === 1 ? '' : 's'}</p> : null}
+                  </div>
+                  <Link to={to} className={`${linkButtonClass} admin-content-section__action`} aria-label={`Edit content in ${sectionName}`}>
+                    Edit content <span aria-hidden="true">→</span>
+                  </Link>
                 </li>
               );
             })}
-          </ul>
+          </ol>
         </Panel>
       )}
     </div>

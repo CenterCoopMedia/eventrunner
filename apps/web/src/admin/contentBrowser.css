@@ -1,0 +1,83 @@
+/* Content navigation only. The existing admin palette, type and control
+   tokens supply both modes; no page editor or public theme is restyled. */
+.admin-content-browser { container: admin-content-browser / inline-size; min-width: 0; }
+.admin-content-browser__toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-sm) var(--space-lg); }
+.admin-content-search { flex: 1 1 28rem; min-width: 0; }
+.admin-content-search > label { display: block; margin-bottom: var(--space-xs); }
+.admin-content-search__controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.admin-content-search__field { position: relative; flex: 1 1 18rem; min-width: 0; }
+.admin-content-search__field svg {
+  position: absolute; inset-inline-start: var(--space-sm); top: 50%; transform: translateY(-50%);
+  width: 1.25rem; height: 1.25rem; color: rgb(var(--admin-ink-secondary-rgb)); pointer-events: none;
+}
+.admin-content-search__field input { padding-inline-start: calc(var(--space-sm) + 1.25rem + var(--space-xs)); }
+.admin-content-browser__result {
+  display: flex; align-items: center; min-height: var(--admin-control-height);
+  margin: 0; font-family: var(--admin-font-data); font-size: var(--admin-text-sm);
+  font-variant-numeric: tabular-nums; color: rgb(var(--admin-ink-secondary-rgb));
+}
+.admin-content-browser__panel { overflow: hidden; }
+.admin-content-index { display: block; width: 100%; text-align: start; border-collapse: collapse; }
+.admin-content-index thead {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap;
+}
+.admin-content-index tbody, .admin-content-index tr, .admin-content-index th, .admin-content-index td { display: block; }
+.admin-content-index tbody tr { padding: var(--space-md); border-top: 1px solid rgb(var(--admin-rule-hairline-rgb)); }
+.admin-content-index tbody tr:first-child { border-top: 0; }
+.admin-content-index tr[data-page-state='draft'], .admin-content-index tr[data-page-state='dirty'] { background: rgb(var(--admin-ground-proof-rgb)); }
+.admin-content-index th, .admin-content-index td { min-width: 0; text-align: start; vertical-align: middle; }
+.admin-content-page-name { max-inline-size: 100%; font-size: var(--admin-text-lg); overflow-wrap: anywhere; }
+.admin-content-page-path {
+  margin-top: var(--space-3xs); font-family: var(--admin-font-data); font-size: var(--admin-text-sm);
+  font-weight: 400; line-height: 1.5; color: rgb(var(--admin-ink-data-rgb)); overflow-wrap: anywhere;
+}
+.admin-content-index__sections { margin-top: var(--space-sm); }
+.admin-content-index__state { margin-top: var(--space-sm); }
+.admin-content-index__mobile-label { display: block; margin-bottom: var(--space-3xs); font-size: var(--admin-text-sm); font-weight: 600; color: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-content-index__state .admin-content-index__mobile-label { display: inline; margin-inline-end: var(--space-xs); }
+.admin-content-section-links { display: flex; flex-wrap: wrap; gap: var(--space-3xs) var(--space-sm); }
+.admin-content-section-links > li { min-width: 0; max-inline-size: 100%; }
+.admin-content-section-link {
+  display: inline-flex; align-items: center; min-height: 2rem; max-inline-size: 100%;
+  padding-block: var(--space-3xs); border-radius: var(--admin-radius-small);
+  color: rgb(var(--admin-ink-link-rgb)); font-size: var(--admin-text-base); font-weight: 500;
+  line-height: 1.5; text-decoration: underline; text-underline-offset: 0.2em; overflow-wrap: anywhere;
+}
+.admin-content-no-sections { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3xs) var(--space-xs); }
+.admin-content-no-sections p { font-size: var(--admin-text-sm); color: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-content-browser__note { font-size: var(--admin-text-sm); line-height: 1.5; color: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-content-section {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm);
+  padding: var(--space-md); border-top: 1px solid rgb(var(--admin-rule-hairline-rgb));
+}
+.admin-content-section:first-child { border-top: 0; }
+.admin-content-section__description { min-width: 0; }
+.admin-content-section__description > p { margin-top: var(--space-xs); font-size: var(--admin-text-base); line-height: 1.5; color: rgb(var(--admin-ink-secondary-rgb)); overflow-wrap: anywhere; }
+.admin-content-section__description .admin-content-section__types { font-size: var(--admin-text-sm); }
+.admin-content-section__types > span { font-weight: 600; }
+.admin-content-section__count { font-family: var(--admin-font-data); font-size: var(--admin-text-base); font-variant-numeric: tabular-nums; color: rgb(var(--admin-ink-rgb)); }
+.admin-content-section__count .admin-content-section__limit { margin-top: var(--space-3xs); font-family: var(--admin-font-ui); font-size: var(--admin-text-sm); color: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-content-section__action { justify-self: start; gap: var(--space-xs); min-height: var(--admin-control-height); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-content-section-link:hover { color: rgb(var(--admin-action-rgb)); text-decoration-thickness: 2px; }
+}
+@media (pointer: coarse) {
+  .admin-content-section-link { min-height: var(--admin-control-height); }
+}
+@container admin-content-browser (min-width: 46rem) {
+  .admin-content-index { display: table; table-layout: fixed; }
+  .admin-content-index thead { display: table-header-group; position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; white-space: normal; }
+  .admin-content-index tbody { display: table-row-group; }
+  .admin-content-index tr { display: table-row; }
+  .admin-content-index th, .admin-content-index td { display: table-cell; padding: var(--space-md); }
+  .admin-content-index thead th {
+    padding-block: var(--space-sm); background: rgb(var(--admin-ground-soft-rgb));
+    border-bottom: 1px solid rgb(var(--admin-rule-hairline-rgb)); font-size: var(--admin-text-sm); font-weight: 700;
+  }
+  .admin-content-index thead th:first-child { width: 26%; }
+  .admin-content-index thead th:last-child { width: 24%; }
+  .admin-content-index__mobile-label, .admin-content-index__state .admin-content-index__mobile-label { display: none; }
+  .admin-content-section { grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.25fr) auto; align-items: center; gap: var(--space-lg); }
+  .admin-content-section__action { justify-self: end; }
+}
