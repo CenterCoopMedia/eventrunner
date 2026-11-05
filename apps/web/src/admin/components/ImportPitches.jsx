@@ -28,7 +28,7 @@ export default function ImportPitches({ call }) {
     setBusy(true); setError(null); setResult('');
     try {
       const response = await call('importSessionPitches', { source, rows });
-      setResult(`${response.imported} imported; ${response.unchanged} already present. No decisions or emails were created.`);
+      setResult(`${response.imported} ${response.imported === 1 ? 'pitch' : 'pitches'} added. ${response.unchanged} ${response.unchanged === 1 ? 'was' : 'were'} already here. No emails were sent.`);
       setRows(null); setReviewed(false);
     } catch (err) { setError(err); }
     finally { setBusy(false); }

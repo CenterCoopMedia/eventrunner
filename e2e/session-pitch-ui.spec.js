@@ -89,7 +89,7 @@ test('pitch entries survive the steps, sign-in, keyboard validation, a lost resp
     await page.unroute('**/submitSessionPitch');
   });
   await page.getByRole('button', { name: 'Submit pitch' }).click();
-  await expect(page.getByText(/Your entries are still here. Retry/)).toBeVisible();
+  await expect(page.getByText(/Your answers are still here. Select Submit pitch again/)).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Submit pitch' })).toBeEnabled();
   await page.getByRole('button', { name: 'Submit pitch' }).click();
@@ -142,16 +142,15 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await longRef.delete();
     await page.goto(`/admin/pitches/${id}`);
-    await page.getByLabel('Private review notes').fill('PRIVATE-STAFF-NOTE');
+    await page.getByLabel('Add a note').fill('PRIVATE-STAFF-NOTE');
     await ref.update({ reviewRevision: 1, privateNotes: 'Other reviewer note' });
-    await expect(page.getByText(/This pitch changed since you opened it/)).toBeVisible();
-    await expect(page.getByLabel('Private review notes')).toHaveValue('PRIVATE-STAFF-NOTE');
+    await expect(page.getByText(/Someone else changed this pitch while you had it open/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeDisabled();
+    // A note never conflicts: the older note shows live, and a new one still saves.
+    await expect(page.getByText('Other reviewer note')).toBeVisible();
+    await page.getByRole('button', { name: 'Add note' }).click();
+    await expect(page.getByText('Note added.')).toBeVisible();
     await page.getByRole('button', { name: 'Load the current version' }).click();
-    await expect(page.getByLabel('Private review notes')).toHaveValue('Other reviewer note');
-    await page.getByLabel('Private review notes').fill('PRIVATE-STAFF-NOTE');
-    await page.getByRole('button', { name: 'Save notes' }).click();
-    await expect(page.getByText('Notes saved.')).toBeVisible();
     // A staff correction keeps the submitted copy and sends nothing.
     await page.getByRole('button', { name: 'Edit pitch' }).click();
     await page.getByLabel('Lead presenter name').fill('Example Presenter');
@@ -218,15 +217,14 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     expect((await db.collection('cmsSchedule_drafts').doc(converted.sessionId).get()).data()).toMatchObject({ visible: false, status: 'dirty', speakerIds: [converted.speakerId] });
     expect((await db.collection('speakers').doc(converted.speakerId).get()).data()).toMatchObject({ firstName: 'Example', lastName: 'Presenter', status: 'invited', uid: null });
     expect((await db.collection('speakers_public').doc(converted.speakerId).get()).exists).toBe(false);
-    await expect(page.getByRole('button', { name: 'Save notes' })).toBeEnabled();
-    await page.getByLabel('Private review notes').fill('Post-conversion review');
-    await page.getByRole('button', { name: 'Save notes' }).click();
-    await expect(page.getByText('Notes saved.')).toBeVisible();
+    await page.getByLabel('Add a note').fill('Post-conversion review');
+    await page.getByRole('button', { name: 'Add note' }).click();
+    await expect(page.getByText('Note added.')).toBeVisible();
     const afterNotes = (await ref.get()).data();
-    expect(afterNotes.privateNotes).toBe('Post-conversion review');
+    expect(afterNotes.reviewNotes.at(-1)).toMatchObject({ text: 'Post-conversion review' });
     await ref.update({ reviewRevision: afterNotes.reviewRevision + 1, privateNotes: 'Another reviewer after conversion' });
-    await expect(page.getByText(/This pitch changed since you opened it/)).toBeVisible();
-    await expect(page.getByLabel('Private review notes')).toHaveValue('Post-conversion review');
+    await expect(page.getByText(/Someone else changed this pitch while you had it open/)).toBeVisible();
+    await expect(page.getByText('Post-conversion review')).toBeVisible();
     const token = await adminIdToken();
     const retry = await callFunction('convertSessionPitch', { id, expectedRevision: converted.revision - 1, firstName: 'Example', lastName: 'Presenter', dayId, startTime: '10:00', endTime: '11:00' }, token);
     expect(retry).toMatchObject({ status: 200, body: { ...converted, replayed: true, invites: [] } });
@@ -253,7 +251,7 @@ test('CSV preview imports consented source rows once and refuses changed or unre
   await expect(page.getByRole('button', { name: 'Import reviewed proposals' })).toBeDisabled();
   await page.getByRole('checkbox', { name: /I reviewed these proposals/ }).check();
   await page.getByRole('button', { name: 'Import reviewed proposals' }).click();
-  await expect(page.getByText(/1 imported; 0 already present/)).toBeVisible();
+  await expect(page.getByText(/1 pitch added\. 0 were already here\./)).toBeVisible();
   const db = adminDb();
   const stored = await db.collection('session_pitches').where('source', '==', 'outside-form').get();
   const original = stored.docs[0].data();

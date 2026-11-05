@@ -16,6 +16,7 @@
 /** Tokens referenced by the wrapper itself. */
 const LAYOUT_TOKENS = [
   'brand_primary',
+  'logo_url',
   'event_name',
   'postal_address_html',
   'social_links_html',
@@ -54,6 +55,9 @@ function wrap(innerHtml) {
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;">',
     '<tr><td align="center" style="padding:24px 12px;">',
     '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background-color:#ffffff;border:1px solid #e0e0e0;">',
+    // The client's uploaded logo, on white so any logo colour reads, above
+    // the brand-colour band. No logo, no row.
+    '{{#if logo_url}}<tr><td style="background-color:#ffffff;padding:20px 32px 16px 32px;"><img src="{{logo_url}}" alt="{{event_name}}" height="48" style="display:block;height:48px;width:auto;max-width:240px;border:0;"></td></tr>{{/if}}',
     '<tr><td style="background-color:{{brand_primary}};padding:20px 32px;">',
     '<span style="font-family:Helvetica,Arial,sans-serif;font-size:20px;font-weight:bold;color:#ffffff;">{{event_name}}</span>',
     '</td></tr>',

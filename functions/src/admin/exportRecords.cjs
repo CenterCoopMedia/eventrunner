@@ -224,6 +224,22 @@ function attendeeRecord(id, data) {
  * `conversion: { sessionId, speakerId, revision }` and `convertedAt`. The
  * record names the session and the speaker the pitch became.
  */
+
+/**
+ * Staff notes as one text block: the older single note first, then each
+ * signed review note as "email, time: text".
+ */
+function staffNotesText(source) {
+  const parts = [];
+  const legacy = textOrNull(source.privateNotes);
+  if (legacy) parts.push(legacy);
+  for (const note of Array.isArray(source.reviewNotes) ? source.reviewNotes : []) {
+    const body = textOrNull(note?.text);
+    if (body) parts.push(`${textOrNull(note.email) ?? 'Staff'}, ${toIso(note.createdAt) ?? 'no date'}: ${body}`);
+  }
+  return parts.length ? parts.join('\n\n') : null;
+}
+
 function pitchRecord(id, data, { includeStaffNotes = false } = {}) {
   const source = data && typeof data === 'object' ? data : {};
   const record = {
@@ -246,7 +262,7 @@ function pitchRecord(id, data, { includeStaffNotes = false } = {}) {
     convertedAt: toIso(source.convertedAt),
     createdAt: toIso(source.createdAt),
   };
-  if (includeStaffNotes) record.staffNotes = textOrNull(source.privateNotes);
+  if (includeStaffNotes) record.staffNotes = staffNotesText(source);
   return scrub(record);
 }
 

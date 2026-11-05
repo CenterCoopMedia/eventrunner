@@ -111,15 +111,15 @@ function DeliveryState({ slot, record }) {
   const at = toMillis(record.sentAt || record.updatedAt || record.queuedAt);
   return <li className="flex flex-wrap items-center gap-sm text-admin-sm">
     <span className="font-semibold">{slotNames[slot]}</span>
-    <StatusBadge tone={stateTones[record.state] || 'neutral'}>{stateLabels[record.state] || record.state}</StatusBadge>
+    <StatusBadge tone={stateTones[record.state] || 'neutral'}>{stateLabels[record.state] || 'Unknown'}</StatusBadge>
     <span className="text-admin-ink-secondary">
       {record.mode === 'automatic' ? 'Automatic' : `By ${record.queuedBy || 'staff'}`}
       {at !== null ? ` · ${new Date(at).toLocaleString()}` : ''}
       {record.attempt > 1 ? ` · Attempt ${record.attempt}` : ''}
     </span>
     {record.state === 'unknown' || (record.state === 'queued' && !isSending(record))
-      ? <span className="basis-full break-words font-semibold">May have been sent. Check the Email log before you retry.</span> : null}
-    {(record.state === 'failed' || record.state === 'unknown') && record.error ? <span className="basis-full break-words text-admin-ink-secondary">Reason: {record.error}</span> : null}
+      ? <span className="basis-full break-words font-semibold">We do not know if the email went out. Check the Email log before you send it again.</span> : null}
+    {record.state === 'failed' && record.error ? <span className="basis-full break-words text-admin-ink-secondary">The email service refused it. The Email log has the details.</span> : null}
   </li>;
 }
 
