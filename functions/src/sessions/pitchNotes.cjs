@@ -24,6 +24,9 @@ const PITCHES = 'session_pitches';
 const ADMIN_LOGS = 'admin_logs';
 const MAX_NOTE_LENGTH = 5000;
 const MAX_NOTES = 200;
+// All note text on one pitch, in bytes. Firestore caps a document at 1 MiB;
+// this leaves room for the pitch itself and each note's other fields.
+const MAX_NOTES_BYTES = 400 * 1024;
 const MAX_BODY_BYTES = 32 * 1024;
 const NOTE_ID_RE = /^[a-f0-9]{16}$/;
 
@@ -56,7 +59,14 @@ function readNoteRequest(body) {
  *
  * @returns {{ ok: true, notes: object[], note: object } | { ok: false, code: string }}
  */
-function applyNoteChange(stored, request, actor, at, newId = () => crypto.randomBytes(8).toString('hex')) {
+function applyNoteChange(stored, request, actor, at, newId) {
+  const change = changeNotes(stored, request, actor, at, newId);
+  if (!change.ok) return change;
+  const bytes = change.notes.reduce((sum, note) => sum + Buffer.byteLength(String(note.text ?? '')), 0);
+  return bytes > MAX_NOTES_BYTES ? { ok: false, code: 'notes-full' } : change;
+}
+
+function changeNotes(stored, request, actor, at, newId = () => crypto.randomBytes(8).toString('hex')) {
   const notes = Array.isArray(stored) ? stored.filter((note) => note && typeof note === 'object') : [];
   if (request.action === 'add') {
     if (notes.length >= MAX_NOTES) return { ok: false, code: 'too-many-notes' };
@@ -81,6 +91,7 @@ const REFUSALS = Object.freeze({
   'too-many-notes': [409, `This pitch has ${MAX_NOTES} notes, the most it can hold. Edit an earlier note instead.`],
   'note-missing': [404, 'That note is no longer on this pitch. Reload the page to see the current notes.'],
   'not-your-note': [403, 'You can only edit notes you wrote.'],
+  'notes-full': [409, 'This pitch has no room for more note text. Shorten an earlier note you wrote, then try again.'],
   'note-changed': [409, 'This note changed in another window. Copy your text, select Cancel to see the current note, then edit again.'],
 });
 
