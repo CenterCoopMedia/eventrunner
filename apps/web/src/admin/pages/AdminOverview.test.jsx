@@ -273,7 +273,7 @@ describe('the admin overview', () => {
     fireEvent.click(refresh);
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-    expect(refresh).toHaveTextContent('Refreshing…');
+    expect(refresh).toHaveAccessibleName('Refreshing…');
     expect(refresh).toHaveAttribute('aria-busy', 'true');
     expect(refresh).toHaveAttribute('aria-disabled', 'true');
     // Never disabled, so the focus stays on it.
@@ -295,7 +295,7 @@ describe('the admin overview', () => {
     expect(await screen.findByText('Read at 9:20 AM EDT')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Figures read at 9:20 AM EDT.');
     expect(total('Attendees')).toBe('413 accounts');
-    expect(refresh).toHaveTextContent('Refresh figures');
+    expect(refresh).toHaveAccessibleName('Refresh figures');
     expect(refresh).not.toHaveAttribute('aria-busy');
     expect(document.activeElement).toBe(refresh);
   });

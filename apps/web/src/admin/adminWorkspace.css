@@ -237,6 +237,33 @@
   color: rgb(var(--admin-rail-ink-muted-rgb));
 }
 .admin-docket-group-toggle + .admin-docket-group { margin-top: var(--space-3xs); }
+.admin-collapsed-docket {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-xs);
+  padding-block: var(--space-sm);
+}
+.admin-rail-section-icon {
+  border-inline-start: var(--admin-nav-active-marker-width) solid transparent;
+  border-radius: var(--admin-radius); color: rgb(var(--admin-rail-ink-muted-rgb));
+}
+.admin-rail-section-icon:hover { background: rgb(var(--admin-rail-ground-hover-rgb)); color: rgb(var(--admin-rail-ink-rgb)); }
+.admin-rail-section-icon[aria-current='page'], .admin-rail-section-icon[data-current='true'] {
+  border-inline-start-color: rgb(var(--admin-nav-active-marker-rgb));
+  background: rgb(var(--admin-rail-current-rgb)); color: rgb(var(--admin-rail-ink-rgb));
+}
+.admin-docket-flyout {
+  position: fixed; z-index: 50; width: 18rem; max-width: calc(100vw - 6rem);
+  max-height: calc(100dvh - 1rem); overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--space-xs); border: 1px solid rgb(var(--admin-rail-rule-rgb));
+  border-radius: var(--admin-radius); background: rgb(var(--admin-rail-ground-rgb));
+  color: rgb(var(--admin-rail-ink-rgb));
+}
+.admin-docket-flyout[hidden] { display: none; }
+@media (forced-colors: active) {
+  .admin-docket-flyout { border-color: CanvasText; background: Canvas; color: CanvasText; }
+  .admin-rail-section-icon[aria-current='page'], .admin-rail-section-icon[data-current='true'] {
+    border-inline-start-color: Highlight; outline: 1px solid CanvasText;
+  }
+}
 /* A chevron drawn from two borders in the text's own colour, so it follows
    the ink of whatever it sits in. It points where the control will move. */
 .admin-chevron {

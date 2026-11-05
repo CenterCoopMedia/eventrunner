@@ -7,11 +7,11 @@
 //   1. The admin reads the admin-* tokens ONLY. No brand utility survives in
 //      the shell chrome — that is the greppable form of "the admin stops
 //      mirroring the client theme" (brief §5.2).
-//   2. The docket is a grouped standing list of WORDS on the dark rail, not a
-//      tab row and not an icon rail, and the current item carries four
+//   2. The open docket is a grouped standing list on the dark rail. Its
+//      desktop collapsed state keeps named icons, and the current item carries four
 //      signals rather than colour alone: the leading-edge marker, the bold
 //      weight, the filled ground, and aria-current="page". Its groups fold,
-//      and the whole rail hides on a wide screen (issue #477).
+//      and the rail collapses on a wide screen (issue #477).
 //   3. The client's two elements are the job mark and the accent, and
 //      nothing else on this surface belongs to the client.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -881,7 +881,7 @@ describe('folding groups and the hiding rail, issue 477', () => {
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
       expect(toggle).toHaveFocus();
       expect(docket).toHaveAttribute('hidden');
-      expect(screen.queryByRole('navigation', { name: 'Admin sections' })).toBeNull();
+      expect(screen.getByRole('navigation', { name: 'Admin sections' })).not.toBe(docket.querySelector('nav'));
       expect(rail).toHaveAttribute('data-collapsed', 'true');
       expect(window.localStorage.getItem(RAIL_COLLAPSED_KEY)).toBe('true');
       // The page, its route and its heading are untouched.
@@ -893,6 +893,112 @@ describe('folding groups and the hiding rail, issue 477', () => {
       expect(screen.getByRole('link', { name: 'Branding' })).toHaveAttribute('aria-current', 'page');
       expect(rail).not.toHaveAttribute('data-collapsed');
       expect(window.localStorage.getItem(RAIL_COLLAPSED_KEY)).toBe('false');
+    } finally {
+      restore();
+    }
+  });
+
+  it('shows Overview and every named group as icons in the collapsed desktop rail', async () => {
+    const restore = wideScreen();
+    try {
+      await renderAdmin('/admin/branding');
+      const openNav = screen.getByRole('navigation', { name: 'Admin sections' });
+      expect(within(openNav).getByRole('link', { name: 'Overview' }).querySelector('svg')).toBeInTheDocument();
+      for (const group of DOCKET.filter((entry) => entry.label)) {
+        expect(head(group.label).querySelector('svg')).toBeInTheDocument();
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Hide menu' }));
+      const nav = screen.getByRole('navigation', { name: 'Admin sections' });
+      const overview = within(nav).getByRole('link', { name: 'Overview' });
+      expect(overview).toHaveAttribute('href', '/admin/overview');
+      expect(overview.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      for (const group of DOCKET.filter((entry) => entry.label)) {
+        const button = within(nav).getByRole('button', { name: group.label });
+        expect(button).toHaveTextContent('');
+        expect(button.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+        expect(button).toHaveAttribute('aria-expanded', 'false');
+        expect(document.getElementById(button.getAttribute('aria-controls'))).toHaveAttribute('hidden');
+      }
+      expect(head('Settings')).toHaveAttribute('data-current', 'true');
+      expect(head('Content')).not.toHaveAttribute('data-current');
+      fireEvent.focus(head('Program'));
+      expect(screen.getByRole('tooltip')).toHaveTextContent('Program');
+      fireEvent.click(overview);
+      await waitFor(() => expect(overview).toHaveAttribute('aria-current', 'page'));
+      expect(head('Settings')).not.toHaveAttribute('data-current');
+    } finally {
+      restore();
+    }
+  });
+
+  it('opens a collapsed group flyout with its destinations and closes it after navigation', async () => {
+    const restore = wideScreen();
+    try {
+      await renderAdmin('/admin/branding');
+      fireEvent.click(screen.getByRole('button', { name: 'Hide menu' }));
+      const content = head('Content');
+      fireEvent.click(content);
+      expect(content).toHaveAttribute('aria-expanded', 'true');
+      const list = document.getElementById(content.getAttribute('aria-controls'));
+      expect(list).not.toHaveAttribute('hidden');
+      for (const item of DOCKET.find((group) => group.id === 'content').items) {
+        expect(within(list).getByRole('link', { name: item.label })).toHaveAttribute('href', `/admin/${item.to}`);
+      }
+      fireEvent.click(within(list).getByRole('link', { name: 'Pages' }));
+      await screen.findByRole('heading', { level: 1, name: 'Pages' });
+      expect(content).toHaveAttribute('aria-expanded', 'false');
+      expect(list).toHaveAttribute('hidden');
+      expect(content).toHaveAttribute('data-current', 'true');
+    } finally {
+      restore();
+    }
+  });
+
+  it('closes a flyout on Escape and returns focus to its group button', async () => {
+    const restore = wideScreen();
+    try {
+      await renderAdmin('/admin/branding');
+      fireEvent.click(screen.getByRole('button', { name: 'Hide menu' }));
+      const settings = head('Settings');
+      fireEvent.click(settings);
+      const link = screen.getByRole('link', { name: 'Branding' });
+      expect(link).toHaveAttribute('aria-current', 'page');
+      link.focus();
+      fireEvent.keyDown(link, { key: 'Escape' });
+      expect(settings).toHaveAttribute('aria-expanded', 'false');
+      expect(settings).toHaveFocus();
+      expect(screen.queryByRole('link', { name: 'Branding' })).toBeNull();
+      // The icon's own tooltip must not consume Escape before the flyout.
+      fireEvent.click(settings);
+      fireEvent.focus(settings);
+      fireEvent.keyDown(settings, { key: 'Escape' });
+      expect(settings).toHaveAttribute('aria-expanded', 'false');
+      expect(settings).toHaveFocus();
+      // A dialog opened over the flyout (unsaved changes) handles Escape itself.
+      fireEvent.click(settings);
+      const dialog = document.createElement('dialog');
+      const inside = document.createElement('button');
+      dialog.append(inside);
+      document.body.append(dialog);
+      fireEvent.keyDown(inside, { key: 'Escape' });
+      expect(settings).toHaveAttribute('aria-expanded', 'true');
+      dialog.remove();
+    } finally {
+      restore();
+    }
+  });
+
+  it('closes a flyout on an outside click and keeps only one group open', async () => {
+    const restore = wideScreen();
+    try {
+      await renderAdmin('/admin/branding');
+      fireEvent.click(screen.getByRole('button', { name: 'Hide menu' }));
+      fireEvent.click(head('Content'));
+      fireEvent.click(head('Program'));
+      expect(head('Content')).toHaveAttribute('aria-expanded', 'false');
+      expect(head('Program')).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(screen.getByRole('heading', { level: 1, name: 'Branding' }));
+      expect(head('Program')).toHaveAttribute('aria-expanded', 'false');
     } finally {
       restore();
     }

@@ -36,6 +36,10 @@ export default function ModalShell({ title, description = null, onClose, busy = 
         tabIndex={-1}
         className="admin-modal max-w-3xl rounded-admin-panel border-admin-strong border-admin-rule-strong bg-admin-ground-raised p-md font-admin-ui text-admin-base text-admin-ink"
         onKeyDown={wrapModalTab}
+        // The dialog is not portalled, so it can sit inside a page's form
+        // (Branding, the block editor). React bubbles a submit through the
+        // component tree: an upload form in here would also submit the page.
+        onSubmit={(event) => event.stopPropagation()}
         onCancel={(event) => {
           event.preventDefault();
           event.stopPropagation();

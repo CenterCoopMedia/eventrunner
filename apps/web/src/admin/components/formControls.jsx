@@ -17,6 +17,7 @@
 // `aria-invalid` plus `aria-describedby` carry the failure to a screen
 // reader; nothing is signalled by colour alone.
 import { useEffect, useId, useRef, useState } from 'react';
+import AdminIconControl from './AdminIconControl.jsx';
 
 // The field boundary is --admin-rule-control, not the hairline: a form
 // control's boundary is non-text user interface under WCAG 1.4.11 and needs
@@ -496,6 +497,7 @@ export function Notice({ tone = 'info', message, children }) {
  *
  * @param {object} props
  * @param {string} props.trigger the verb-first label that opens the moment
+ * @param {string} [props.triggerIcon] show an icon control with the trigger as its accessible name
  * @param {string} props.confirmLabel the verb-first label that does the work
  * @param {string} props.consequence what is lost, in one plain sentence
  * @param {string} [props.permanence] said the same way every time it applies
@@ -508,6 +510,7 @@ export function Notice({ tone = 'info', message, children }) {
  */
 export function DestructiveConfirm({
   trigger,
+  triggerIcon,
   confirmLabel,
   consequence,
   permanence,
@@ -532,6 +535,16 @@ export function DestructiveConfirm({
   }, [open]);
 
   if (!open) {
+    if (triggerIcon) return (
+      <AdminIconControl
+        ref={triggerRef}
+        label={trigger}
+        icon={triggerIcon}
+        className={`${dangerButtonClass} ${className}`}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+      />
+    );
     return (
       <button
         ref={triggerRef}

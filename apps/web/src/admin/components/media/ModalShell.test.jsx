@@ -96,6 +96,21 @@ describe('ModalShell', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('keeps a form submitted inside it from submitting the page form around it', () => {
+    const page = vi.fn((event) => event.preventDefault());
+    const upload = vi.fn((event) => event.preventDefault());
+    render(
+      <form onSubmit={page}>
+        <ModalShell title="Upload" onClose={() => {}}>
+          <form onSubmit={upload}><button type="submit">Upload</button></form>
+        </ModalShell>
+      </form>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+    expect(upload).toHaveBeenCalledOnce();
+    expect(page).not.toHaveBeenCalled();
+  });
+
   it('wraps both keyboard boundaries and skips disabled controls', () => {
     render(<ModalShell title="Details" onClose={() => {}}><button disabled>Unavailable</button><button>Done</button></ModalShell>);
     const close = screen.getByRole('button', { name: 'Close' });
