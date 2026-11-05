@@ -45,9 +45,21 @@
       { "source": "/api/disconnectAccount", "function": { "functionId": "disconnectAccount", "region": "us-central1" } },
       { "source": "/api/listEventbriteEvents", "function": { "functionId": "listEventbriteEvents", "region": "us-central1" } },
       { "source": "/api/chooseEventbriteEvent", "function": { "functionId": "chooseEventbriteEvent", "region": "us-central1" } },
-      { "source": "**", "destination": "/index.html" }
+      { "source": "!/assets/**", "destination": "/index.html" }
     ],
     "headers": [
+      {
+        "source": "/assets/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      },
+      {
+        "source": "!/@(assets|api)/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }
+        ]
+      },
       {
         "source": "**",
         "headers": [
