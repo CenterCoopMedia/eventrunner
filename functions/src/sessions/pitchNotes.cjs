@@ -42,7 +42,12 @@ function readNoteRequest(body) {
   if (text.length > MAX_NOTE_LENGTH) {
     return { ok: false, message: `A note can be at most ${MAX_NOTE_LENGTH.toLocaleString('en-US')} characters.` };
   }
-  return { ok: true, id: source.id, action: source.action, noteId: source.noteId ?? null, text };
+  // An edit names the text it started from, so a stale editor cannot
+  // silently replace a newer version of the same note.
+  if (source.action === 'edit' && typeof source.baseText !== 'string') {
+    return { ok: false, message: 'baseText: must be the note text the edit started from.' };
+  }
+  return { ok: true, id: source.id, action: source.action, noteId: source.noteId ?? null, text, baseText: source.baseText ?? null };
 }
 
 /**
@@ -61,6 +66,7 @@ function applyNoteChange(stored, request, actor, at, newId = () => crypto.random
   const index = notes.findIndex((note) => note.id === request.noteId);
   if (index === -1) return { ok: false, code: 'note-missing' };
   if (notes[index].uid !== actor.uid) return { ok: false, code: 'not-your-note' };
+  if (notes[index].text !== request.baseText) return { ok: false, code: 'note-changed' };
   const note = { ...notes[index], text: request.text, editedAt: at };
   return { ok: true, notes: notes.map((each, i) => (i === index ? note : each)), note };
 }
@@ -75,6 +81,7 @@ const REFUSALS = Object.freeze({
   'too-many-notes': [409, `This pitch has ${MAX_NOTES} notes, the most it can hold. Edit an earlier note instead.`],
   'note-missing': [404, 'That note is no longer on this pitch. Reload the page to see the current notes.'],
   'not-your-note': [403, 'You can only edit notes you wrote.'],
+  'note-changed': [409, 'This note changed in another window. Copy your text, select Cancel to see the current note, then edit again.'],
 });
 
 function createSaveSessionPitchNoteHandler({ db, auth, getConfig, now = Date.now, log = console }) {

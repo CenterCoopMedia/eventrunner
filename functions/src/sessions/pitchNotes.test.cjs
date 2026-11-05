@@ -31,11 +31,14 @@ test('each staff member adds a signed note, and only the author can edit it', as
   const second = await invoke(db, 'other', { id: 'p1', action: 'add', text: 'Needs a co-presenter.' });
   assert.equal(second.statusCode, 200);
 
-  const stolen = await invoke(db, 'other', { id: 'p1', action: 'edit', noteId: added.body.note.id, text: 'Changed.' });
+  const stolen = await invoke(db, 'other', { id: 'p1', action: 'edit', noteId: added.body.note.id, text: 'Changed.', baseText: 'Strong fit.' });
   assert.equal(stolen.statusCode, 403);
 
-  const edited = await invoke(db, 'staff', { id: 'p1', action: 'edit', noteId: added.body.note.id, text: 'Strong fit. Ask for slides.' });
+  const edited = await invoke(db, 'staff', { id: 'p1', action: 'edit', noteId: added.body.note.id, text: 'Strong fit. Ask for slides.', baseText: 'Strong fit.' });
   assert.equal(edited.statusCode, 200);
+  // A second window still holding the old text is refused, not applied.
+  const stale = await invoke(db, 'staff', { id: 'p1', action: 'edit', noteId: added.body.note.id, text: 'Older draft.', baseText: 'Strong fit.' });
+  assert.equal(stale.statusCode, 409);
 
   const stored = (await db.collection('session_pitches').doc('p1').get()).data();
   assert.deepEqual(stored.reviewNotes.map((note) => [note.email, note.text]), [
@@ -57,7 +60,7 @@ test('a note needs text, a pitch and a staff sign-in', async () => {
 test('applyNoteChange refuses a missing note and a full list', () => {
   const actor = { uid: 'a', email: 'a@example.test' };
   const at = new Date(0);
-  assert.equal(applyNoteChange([], { action: 'edit', noteId: 'x', text: 'y' }, actor, at).code, 'note-missing');
+  assert.equal(applyNoteChange([], { action: 'edit', noteId: 'x', text: 'y', baseText: '' }, actor, at).code, 'note-missing');
   const full = Array.from({ length: 200 }, (_, i) => ({ id: String(i), uid: 'a' }));
   assert.equal(applyNoteChange(full, { action: 'add', text: 'y' }, actor, at).code, 'too-many-notes');
 });
@@ -67,7 +70,7 @@ test('editing a stored note answers with its dates even when Firestore returns a
   const db = makeFakeDb({ 'config/bootstrap': bootstrap, 'session_pitches/p1': { status: 'new', reviewNotes: [
     { id: 'abcdef0123456789', uid: 'staff', email: 'staff@example.test', text: 'Old.', createdAt, editedAt: null },
   ] } });
-  const edited = await invoke(db, 'staff', { id: 'p1', action: 'edit', noteId: 'abcdef0123456789', text: 'New.' });
+  const edited = await invoke(db, 'staff', { id: 'p1', action: 'edit', noteId: 'abcdef0123456789', text: 'New.', baseText: 'Old.' });
   assert.equal(edited.statusCode, 200, JSON.stringify(edited.body));
   assert.equal(edited.body.note.createdAt, new Date(0).toISOString());
 });

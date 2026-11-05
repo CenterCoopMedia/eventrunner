@@ -22,19 +22,22 @@ function when(value) {
   return date ? date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
 }
 
-function NoteEntry({ note, mine, busy, onSave }) {
+function NoteEntry({ note, mine, busy, onSave, feedback }) {
   const [draft, setDraft] = useState(null);
+  // The text the edit started from; the server refuses the save if it changed.
+  const [base, setBase] = useState('');
   if (draft !== null) {
     return (
       <li className="flex flex-col gap-xs">
         <TextAreaField label="Edit your note" value={draft} onChange={setDraft} maxLength={MAX_LENGTH} rows={3} disabled={busy} />
         <div className="flex flex-wrap gap-xs">
           <button type="button" className={secondaryButtonClass} disabled={busy || !draft.trim()}
-            onClick={async () => { if (await onSave(note.id, draft)) setDraft(null); }}>
+            onClick={async () => { if (await onSave(note.id, draft, base)) setDraft(null); }}>
             {busy ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className={linkButtonClass} disabled={busy} onClick={() => setDraft(null)}>Cancel</button>
         </div>
+        {feedback}
       </li>
     );
   }
@@ -47,8 +50,9 @@ function NoteEntry({ note, mine, busy, onSave }) {
       </p>
       <p className="whitespace-pre-line">{note.text}</p>
       {mine ? (
-        <div><button type="button" className={linkButtonClass} disabled={busy} onClick={() => setDraft(note.text)}>Edit</button></div>
+        <div><button type="button" className={linkButtonClass} disabled={busy} onClick={() => { setBase(note.text); setDraft(note.text); }}>Edit</button></div>
       ) : null}
+      {feedback}
     </li>
   );
 }
@@ -62,6 +66,8 @@ export default function PitchNotes({ pitch, call }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('');
+  // Which control the last result belongs to: 'add' or a note id.
+  const [where, setWhere] = useState('add');
   // A note saved here shows at once, before the live row catches up.
   const [local, setLocal] = useState({});
   const errorRef = useRef(null);
@@ -79,7 +85,7 @@ export default function PitchNotes({ pitch, call }) {
 
   async function save(request, message) {
     if (busy) return false;
-    setBusy(true); setError(null); setStatus('');
+    setBusy(true); setError(null); setStatus(''); setWhere(request.noteId ?? 'add');
     try {
       const { note } = await call('saveSessionPitchNote', { id: pitch.id, ...request });
       setLocal((previous) => ({ ...previous, [note.id]: note }));
@@ -93,6 +99,13 @@ export default function PitchNotes({ pitch, call }) {
     if (await save({ action: 'add', text }, 'Note added.')) setText('');
   }
 
+  const feedback = (
+    <>
+      <ServerErrorSummary error={error} errorRef={errorRef} title="The note was not saved" />
+      {status ? <SaveStatus message={status} /> : null}
+    </>
+  );
+
   return (
     <div className="flex flex-col gap-md">
       {pitch.privateNotes || notes.length ? (
@@ -105,7 +118,8 @@ export default function PitchNotes({ pitch, call }) {
           ) : null}
           {notes.map((note) => (
             <NoteEntry key={note.id} note={note} mine={Boolean(user?.uid) && note.uid === user.uid} busy={busy}
-              onSave={(noteId, draft) => save({ action: 'edit', noteId, text: draft }, 'Note updated.')} />
+              feedback={where === note.id ? feedback : null}
+              onSave={(noteId, draft, baseText) => save({ action: 'edit', noteId, text: draft, baseText }, 'Note updated.')} />
           ))}
         </ul>
       ) : (
@@ -114,8 +128,7 @@ export default function PitchNotes({ pitch, call }) {
       <form onSubmit={add} className="flex flex-col gap-sm">
         <TextAreaField label="Add a note" value={text} onChange={setText} maxLength={MAX_LENGTH} rows={3} disabled={busy} />
         <div><button type="submit" className={secondaryButtonClass} disabled={busy || !text.trim()}>{busy ? 'Saving…' : 'Add note'}</button></div>
-        <ServerErrorSummary error={error} errorRef={errorRef} title="The note was not saved" />
-        {status ? <SaveStatus message={status} /> : null}
+        {where === 'add' ? feedback : null}
       </form>
     </div>
   );
