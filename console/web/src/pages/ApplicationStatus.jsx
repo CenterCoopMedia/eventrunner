@@ -19,6 +19,8 @@ const STAGES = [
 
 function Stages({ app }) {
   const at = STAGES.findIndex((stage) => stage.reached.includes(app.status));
+  // The last stage is an end state: once reached, the whole list is done.
+  const finished = at === STAGES.length - 1;
   return (
     <ol className="stages">
       {STAGES.map((stage, i) => {
@@ -26,13 +28,15 @@ function Stages({ app }) {
         let state = 'Not started';
         if (i < at) state = 'Done';
         if (i === at) state = stopped ? 'Did not finish' : 'Now';
+        if (finished && i === at) state = 'Done';
+        const now = i === at && !finished;
         return (
-          <li key={stage.label} className={`stage ${i === at ? 'now' : ''} ${state === 'Done' ? 'done' : ''}`.trim()}
+          <li key={stage.label} className={`stage ${now ? 'now' : ''} ${state === 'Done' ? 'done' : ''}`.trim()}
             aria-current={i === at ? 'step' : undefined}>
             <svg className="stage-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <circle cx="12" cy="12" r="9" />
               {state === 'Done' ? <path d="m8 12 3 3 5-6" /> : null}
-              {i === at ? <circle className="stage-current-dot" cx="12" cy="12" r="3" /> : null}
+              {now ? <circle className="stage-current-dot" cx="12" cy="12" r="3" /> : null}
             </svg>
             <span className="stage-label">{stopped ? 'We started building your site' : stage.label}</span>
             <span className="tag">{state}</span>

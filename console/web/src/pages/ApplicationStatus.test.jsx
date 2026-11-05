@@ -74,7 +74,7 @@ describe('ApplicationStatus', () => {
     serveStatus({ status: 'ready', canEdit: false, canWithdraw: false });
     page();
     const stages = await screen.findAllByRole('listitem');
-    expect(stages[2]).toHaveTextContent('Your site is readyNow');
+    expect(stages[2]).toHaveTextContent('Your site is readyDone');
     expect(screen.getByRole('link', { name: 'Open your admin panel' })).toHaveAttribute('href', 'https://nclocal.eventrunner.org/admin');
     expect(screen.getByRole('link', { name: 'nclocal.eventrunner.org' })).toHaveAttribute('href', 'https://nclocal.eventrunner.org');
     expect(screen.queryByText('You can close this page')).not.toBeInTheDocument();
