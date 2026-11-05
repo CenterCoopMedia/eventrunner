@@ -29,9 +29,10 @@ function NoteEntry({ note, mine, busy, onSave, feedback }) {
   if (draft !== null) {
     return (
       <li className="flex flex-col gap-xs">
-        <TextAreaField label="Edit your note" value={draft} onChange={setDraft} maxLength={MAX_LENGTH} rows={3} disabled={busy} />
+        {/* Opening Edit puts the cursor in the box, so typing goes into the note. */}
+        <TextAreaField label="Edit your note" value={draft} onChange={setDraft} maxLength={MAX_LENGTH} rows={3} disabled={busy} autoFocus />
         <div className="flex flex-wrap gap-xs">
-          <button type="button" className={secondaryButtonClass} disabled={busy || !draft.trim()}
+          <button type="button" className={secondaryButtonClass} disabled={busy || !draft.trim() || draft.trim() === note.text}
             onClick={async () => { if (await onSave(note.id, draft, base)) setDraft(null); }}>
             {busy ? 'Saving…' : 'Save'}
           </button>
