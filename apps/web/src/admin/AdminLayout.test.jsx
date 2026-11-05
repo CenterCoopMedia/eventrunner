@@ -181,7 +181,8 @@ describe('the admin shell', () => {
       expect(rail.className).toContain('flex-wrap');
       expect(within(rail).getByText('NC Local')).toBeInTheDocument();
       expect(within(summary).getByText('Pages')).toBeInTheDocument();
-      expect(within(summary).getByText('Menu')).toBeInTheDocument();
+      expect(summary).toHaveAccessibleName('Open menu');
+      expect(summary.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
       expect(docket).not.toHaveAttribute('open');
       expect(sheet.className).toMatch(/\bfixed\b/);
       expect(sheet.className).toContain('top-14');
@@ -619,7 +620,7 @@ describe('the editor tour in the shell', () => {
     try {
       await renderAdmin('/admin/pages');
       const tour = await tourPanel();
-      const menu = screen.getByText('Menu').closest('summary');
+      const menu = document.querySelector('details.admin-mobile-docket > summary');
       expect(menu.closest('details')).not.toHaveAttribute('open');
 
       fireEvent.click(within(tour).getByRole('button', { name: 'End tour' }));
@@ -636,7 +637,7 @@ describe('the editor tour in the shell', () => {
   it('closes the phone menu before opening the tour, then returns focus to Menu', async () => {
     markTourDone('admin-1');
     await renderAdmin('/admin/pages');
-    const menu = screen.getByText('Menu').closest('summary');
+    const menu = document.querySelector('details.admin-mobile-docket > summary');
     const docket = menu.closest('details');
     docket.open = true;
     fireEvent(docket, new Event('toggle'));
