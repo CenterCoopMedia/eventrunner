@@ -17,6 +17,7 @@ import { senderDomainVerified } from 'shared/readiness';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useSavedMessage } from '../useSavedMessage.js';
 import {
   Panel,
   SaveStatus,
@@ -241,7 +242,7 @@ export default function AdminEventSettings() {
   const [form, setForm] = useState(() => toForm(eventConfig));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedMessage(toPayload(form, { includeSender: canEditSender }));
   const [liveSessions, setLiveSessions] = useState([]);
   const [draftSessions, setDraftSessions] = useState([]);
   // Whether each session list has delivered a snapshot and is listening.
@@ -365,6 +366,7 @@ export default function AdminEventSettings() {
 
   async function submit(event) {
     event.preventDefault();
+    if (saving) return;
     // Nothing is sent while the venue is wrong, and the person is put in
     // front of the field that is wrong rather than left to hunt for it.
     //

@@ -136,8 +136,12 @@ describe('system errors list', () => {
     await renderPage();
     expect(await screen.findByRole('status', { name: '' })).toBeTruthy();
     expect(
-      screen.getByText(/could not refresh the error list/i),
+      screen.getByText(/could not load the error list/i),
     ).toBeInTheDocument();
+    expect(screen.queryByText('No unresolved errors')).not.toBeInTheDocument();
+    fetch.mockResolvedValueOnce(okResponse({ rows: [], nextCursor: null }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('No unresolved errors')).toBeInTheDocument();
   });
 
   it('a long message is truncated behind a keyboard-accessible <details> expansion, collapsed by default', async () => {
@@ -162,6 +166,16 @@ describe('system errors list', () => {
 });
 
 describe('manual refresh', () => {
+  it('preserves the last rows when refresh fails', async () => {
+    fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
+    await renderPage();
+    await screen.findByText('TypeError: boom');
+    fetch.mockRejectedValueOnce(new Error('offline'));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText(/showing the last values/)).toBeInTheDocument();
+    expect(screen.getByText('TypeError: boom')).toBeInTheDocument();
+    expect(screen.queryByText('No unresolved errors')).not.toBeInTheDocument();
+  });
   it('refetches the list on demand', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
@@ -178,6 +192,18 @@ describe('manual refresh', () => {
 });
 
 describe('load more', () => {
+  it('places a next-page failure beside its retry control and keeps the first page', async () => {
+    fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: 'page-2' }));
+    await renderPage();
+    fetch.mockRejectedValueOnce(new Error('offline'));
+    const more = await screen.findByRole('button', { name: 'Load more' });
+    fireEvent.click(more);
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent('The next page could not be loaded. We could not reach the server. Check your connection and try again.');
+    expect(notice.parentElement).toContainElement(more);
+    expect(screen.getByText('TypeError: boom')).toBeInTheDocument();
+    expect(more).toBeEnabled();
+  });
   it('fetches the next page with the server cursor and appends it', async () => {
     const cursor = { createdAt: 1700000000000, id: 'e-open-1' };
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: cursor }));
