@@ -49,6 +49,7 @@ describe('ApplicationStatus', () => {
     page();
     expect(await screen.findByText('You can close this page')).toBeInTheDocument();
     expect(screen.getByText(/You will receive an email when your site is ready, with a link to finish setting it up/)).toBeInTheDocument();
+    expect(screen.getByText('Most sites take about an hour and a half to build. Setting up your web address takes the longest.')).toBeInTheDocument();
     expect(screen.getByText('Now: Setting up your web address. Next: Setting up email and tickets.')).toBeInTheDocument();
   });
 
