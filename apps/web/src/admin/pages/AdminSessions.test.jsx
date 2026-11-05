@@ -272,6 +272,28 @@ describe('admin Sessions workspace', () => {
     expect(bodyOf(1).fields.title).toBe('Welcome remarks');
   });
 
+  it('updates the already-created draft after its first publish fails', async () => {
+    await renderAt('/admin/sessions/new/session');
+    await screen.findByRole('heading', { name: 'New session' });
+    for (const [label, value] of [['Public title', 'Opening session'], ['Public description', 'Welcome.'], ['Event day', 'day-1'], ['Start time', '09:00'], ['End time', '10:00']]) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    }
+    fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }))
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: { message: 'Publishing is unavailable.' } }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('The draft is saved, and it is not published');
+    expect(alert).toHaveTextContent('Publishing is unavailable.');
+    pushSessions([], [{ id: 'opening-session', dayId: 'day-1', title: 'Opening session', status: 'dirty' }]);
+    expect(within(screen.getByLabelText('Parent session')).queryByRole('option', { name: 'Opening session' })).not.toBeInTheDocument();
+    fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Welcome remarks' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(String(fetch.mock.calls[2][0])).toMatch(/\/cmsUpdateContent$/);
+    expect(bodyOf(2)).toMatchObject({ docId: 'opening-session', fields: { title: 'Welcome remarks' } });
+  });
+
   it('sends the no-materials mark the staff member sets', async () => {
     await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });
@@ -384,10 +406,14 @@ describe('admin Sessions workspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
     const resume = await screen.findByRole('button', { name: 'Resume publish' });
+    pushSessions([{ id: 'opening', dayId: 'day-1', title: 'Opening' }], [
+      { id: 'later', dayId: 'day-1', title: 'Later draft', status: 'dirty' },
+    ]);
     fireEvent.click(resume);
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(bodyOf(1)).toEqual({ queueId: 'queue-42' });
+    expect(await screen.findByText('Published. The public site picks it up live.', { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 
   // The editor's route is a sibling of the list under the admin layout, so

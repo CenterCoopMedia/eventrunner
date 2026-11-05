@@ -22,7 +22,6 @@ import {
   DestructiveConfirm,
   Notice,
   Panel,
-  SaveStatus,
   SelectField,
   ServerErrorSummary,
   TextAreaField,
@@ -31,6 +30,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -110,13 +110,18 @@ export default function AdminSessionEditor({ mode }) {
   const { showToast } = useToast();
   const { eventConfig } = useEventConfig();
   const { rows, ready, error: listenerError, findRow } = useAdminSessions();
-  const row = mode === 'edit' ? findRow(sessionId) : null;
+  const [createdId, setCreatedId] = useState(null);
+  const creating = mode === 'create' && !createdId;
+  const currentId = createdId ?? sessionId;
+  const row = !creating ? findRow(currentId) : null;
   const [form, setForm] = useState(EMPTY);
   const [savedSnapshot, setSavedSnapshot] = useState(() => (
     mode === 'create' ? editorSnapshot(EMPTY) : null
   ));
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [errorTitle, setErrorTitle] = useState(undefined);
+  const [action, setAction] = useState(null);
+  const saving = action !== null;
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
@@ -192,7 +197,7 @@ export default function AdminSessionEditor({ mode }) {
     { value: '', label: 'No parent session' },
     ...rows
       .filter((candidate) =>
-        candidate.id !== sessionId
+        candidate.id !== currentId
         && candidate.current.dayId === form.dayId
         && !candidate.current.parentId,
       )
@@ -209,15 +214,17 @@ export default function AdminSessionEditor({ mode }) {
       focusFirstError(formRef.current);
       return;
     }
-    const nextForm = mode === 'create'
+    const nextForm = creating
       ? lockSessionId(form, rows.map((candidate) => candidate.id))
       : form;
     if (nextForm !== form) setForm(nextForm);
-    const docId = mode === 'create' ? nextForm.id : sessionId;
-    const endpoint = mode === 'create' ? 'cmsCreateContent' : 'cmsUpdateContent';
-    setSaving(true);
+    const docId = creating ? nextForm.id : currentId;
+    const endpoint = creating ? 'cmsCreateContent' : 'cmsUpdateContent';
+    setAction(publish ? 'publish' : 'draft');
     setError(null);
+    setErrorTitle(undefined);
     setStatus('');
+    let stage = 'save';
     try {
       await call(endpoint, {
         collection: 'cmsSchedule',
@@ -225,8 +232,13 @@ export default function AdminSessionEditor({ mode }) {
         fields: sessionFields(nextForm),
         visible: nextForm.visible,
       });
+      if (creating) {
+        adoptedRef.current = true;
+        setCreatedId(docId);
+      }
       setSavedSnapshot(editorSnapshot(nextForm));
       if (publish) {
+        stage = 'publish';
         // Use the fields just saved. `row` still has the parent from before
         // this edit, so publishing from it can include an unrelated draft.
         const publishRow = { id: docId, current: sessionFields(nextForm) };
@@ -235,35 +247,35 @@ export default function AdminSessionEditor({ mode }) {
         const verdict = summarizePublish(response, 'cmsSchedule', ids, 'sessions');
         if (!verdict.ok) throw new Error(verdict.message);
         setStatus(verdict.message);
-        // The line above is the record and it announces. The bar repeats it
-        // where the operator is looking, and says nothing, so one result is
-        // announced once.
-        showToast(verdict.message, { announce: false });
+        if (mode === 'create') showToast(verdict.message, { announce: false });
       } else {
         setStatus('Draft saved. It is not live until you publish it.');
-        showToast('Session draft saved.', { announce: false });
+        if (mode === 'create') showToast('Session draft saved.', { announce: false });
       }
       if (mode === 'create') {
         navigate(`/admin/sessions/${encodeURIComponent(docId)}`, { replace: true });
       }
     } catch (err) {
+      if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(err);
     } finally {
-      setSaving(false);
+      setAction(null);
     }
   }
 
   async function remove() {
-    setSaving(true);
+    setAction('delete');
     setError(null);
+    setErrorTitle(undefined);
     try {
-      await call('cmsDeleteContent', { collection: 'cmsSchedule', docId: sessionId });
+      await call('cmsDeleteContent', { collection: 'cmsSchedule', docId: currentId });
       showToast('Session deleted.');
       navigate(SESSIONS_LIST);
     } catch (err) {
+      setErrorTitle('The server refused the delete');
       setError(err);
     } finally {
-      setSaving(false);
+      setAction(null);
     }
   }
 
@@ -295,7 +307,7 @@ export default function AdminSessionEditor({ mode }) {
       onSubmit={(event) => { event.preventDefault(); save(); }}
     >
       <AdminPageHeader
-        title={mode === 'create' ? 'New session' : form.title || 'Session'}
+        title={creating ? 'New session' : form.title || 'Session'}
         state={(
           <>
             {mode === 'edit' ? <RecordState state={row?.state} /> : null}
@@ -325,25 +337,25 @@ export default function AdminSessionEditor({ mode }) {
               type="submit"
               className={secondaryButtonClass}
               disabled={saving}
-              aria-busy={saving || undefined}
+              aria-busy={action === 'draft' || undefined}
             >
-              {saving ? 'Saving…' : 'Save draft'}
+              {action === 'draft' ? 'Saving…' : 'Save draft'}
             </button>
             <button
               type="button"
               className={primaryButtonClass}
               disabled={saving}
-              aria-busy={saving || undefined}
+              aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {saving ? 'Working…' : 'Save and publish'}
+              {action === 'publish' ? 'Publishing…' : 'Save and publish'}
             </button>
+            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />
 
-      <ServerErrorSummary error={error} errorRef={errorRef} />
-      {status ? <SaveStatus message={status} /> : null}
+      <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog
           onStay={leaveGuard.stay}
@@ -486,7 +498,8 @@ export default function AdminSessionEditor({ mode }) {
             title={`Delete ${form.title || sessionId}`}
             confirmLabel="Delete this session"
             busyLabel="Deleting…"
-            busy={saving}
+            busy={action === 'delete'}
+            disabled={saving}
             consequence="The live session and its draft are removed. A parent session cannot be deleted while it has children."
             permanence="This cannot be undone."
             onConfirm={remove}

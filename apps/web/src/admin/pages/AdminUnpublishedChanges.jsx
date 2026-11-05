@@ -12,7 +12,7 @@
 // ({ collection, docIds }), or Resume on a failed run ({ queueId }). One
 // call runs at a time; while it runs every publish control is unavailable
 // and the pressed one says what it is doing. The result is stated in place
-// under the title band, and a toast repeats it without a second
+// beside its collection or run, and a toast repeats it without a second
 // announcement.
 //
 // The design record's ruled table (§3.4), without its sort and bulk row:
@@ -46,6 +46,7 @@ import {
   secondaryButtonClass,
   unavailableButtonClass,
 } from '../components/formControls.jsx';
+import { ActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -103,7 +104,7 @@ function RecordName({ row }) {
   );
 }
 
-function CollectionPanel({ group, pages, timeZone, busyKey, controlProps }) {
+function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice, resultRef }) {
   const { choice, rows } = group;
   const key = `collection:${choice.id}`;
   // Past the server's cap the control stays, unavailable, and names why:
@@ -114,7 +115,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps }) {
     <Panel
       flush
       title={choice.label}
-      actions={
+      actions={rows.length > 0 ? (
         <button
           type="button"
           {...controlProps(key, secondaryButtonClass, tooMany)}
@@ -122,8 +123,11 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps }) {
         >
           {busyKey === key ? 'Publishing…' : `Publish ${countWords(choice, rows.length)}`}
         </button>
-      }
+      ) : null}
     >
+      <div ref={resultRef} tabIndex={-1} className="admin-row-result">
+        <ActionFeedback message={notice?.message} tone={notice?.tone} />
+      </div>
       {tooMany ? (
         <p id={whyId} className="px-md pb-sm text-admin-sm text-admin-ink-secondary">
           Use Publish all. One collection publish takes at most 2,000 changes.
@@ -131,7 +135,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps }) {
       ) : null}
       {/* A scrolling box has to take a tab stop to be scrolled by keyboard;
           the room's ring draws its focus. */}
-      <div role="region" aria-label={choice.label} tabIndex={0} className="max-h-[32rem] overflow-auto">
+      {rows.length > 0 ? <div role="region" aria-label={choice.label} tabIndex={0} className="max-h-[32rem] overflow-auto">
         <table className="w-full min-w-[40rem] border-collapse text-admin-sm" data-collection={choice.id}>
           <caption className="sr-only">{`${choice.label} with unpublished changes, newest first`}</caption>
           <thead>
@@ -182,7 +186,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps }) {
             })}
           </tbody>
         </table>
-      </div>
+      </div> : null}
     </Panel>
   );
 }
@@ -194,7 +198,7 @@ function RunWord({ summary }) {
   return <StatusBadge tone={summary.tone}>{summary.word}</StatusBadge>;
 }
 
-function RunRow({ row, timeZone, busyKey, controlProps }) {
+function RunRow({ row, timeZone, busyKey, controlProps, notice, resultRef }) {
   const summary = runSummary(row);
   const key = `resume:${row.id}`;
   const failed = row.status === 'failed';
@@ -224,6 +228,9 @@ function RunRow({ row, timeZone, busyKey, controlProps }) {
           </button>
         </div>
       ) : null}
+      <div ref={resultRef} tabIndex={-1} className="empty:hidden">
+        <ActionFeedback message={notice?.message} tone={notice?.tone} />
+      </div>
     </li>
   );
 }
@@ -283,23 +290,37 @@ export default function AdminUnpublishedChanges() {
   // panel (the panel's rows were all published), focus would fall to the
   // document; it goes to the result instead.
   const pressedRef = useRef(null);
+  const resultShownRef = useRef(false);
 
   useEffect(() => {
     const pressed = pressedRef.current;
     // Wait for the answer while the call runs: the result is what focus
     // lands on, and until it arrives the result line is empty and hidden.
-    if (!pressed || pressed.isConnected || busyRef.current) return;
+    if (!pressed || busyRef.current || !notice) return;
+    if (pressed.isConnected) {
+      if (!resultShownRef.current && document.activeElement === pressed) {
+        resultRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
+      }
+      resultShownRef.current = true;
+      return;
+    }
     pressedRef.current = null;
     const active = document.activeElement;
-    if (!active || active === document.body) resultRef.current?.focus();
+    if (!active || active === document.body) {
+      resultRef.current?.focus({ preventScroll: true });
+      resultRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
+    }
   });
 
-  const groups = groupPending(docsByCollection).filter((group) => group.rows.length > 0);
+  const resultKey = notice?.key ?? busyKey;
+  const groups = groupPending(docsByCollection).filter((group) => group.rows.length > 0 || resultKey === `collection:${group.choice.id}`);
+  const localResult = resultKey?.startsWith('collection:') || runs.runs.some((run) => resultKey === `resume:${run.id}`);
 
   async function publish(event, key, body, read) {
     if (busyRef.current) return;
     busyRef.current = true;
     pressedRef.current = event.currentTarget;
+    resultShownRef.current = false;
     setBusyKey(key);
     setNotice(null);
     let result;
@@ -312,7 +333,7 @@ export default function AdminUnpublishedChanges() {
       busyRef.current = false;
       setBusyKey(null);
     }
-    setNotice({ tone: result.ok ? 'ok' : 'error', message: result.message });
+    setNotice({ key, tone: result.ok ? 'ok' : 'error', message: result.message });
     showToast(result.message, result.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
@@ -361,19 +382,18 @@ export default function AdminUnpublishedChanges() {
         title="Unpublished changes"
         description="Pages, content blocks, sessions, organizations, updates, and timeline entries that are saved but not yet on the site. Publish here or in each editor."
         actions={
-          ready && total > 0 ? (
-            <button type="button" {...controlProps('all', primaryButtonClass)}>
-              {busyKey === 'all' ? 'Publishing…' : `Publish all (${total})`}
-            </button>
-          ) : null
+          <>
+            {ready && total > 0 ? (
+              <button type="button" {...controlProps('all', primaryButtonClass)}>
+                {busyKey === 'all' ? 'Publishing…' : `Publish all (${total})`}
+              </button>
+            ) : null}
+            {!localResult ? <div ref={resultRef} tabIndex={-1} className="basis-full empty:hidden">
+              <ActionFeedback message={notice?.message} tone={notice?.tone} />
+            </div> : null}
+          </>
         }
       />
-
-      {/* The result of the last press, stated in place. Focus comes here
-          when the pressed control has left the page. */}
-      <div ref={resultRef} tabIndex={-1} className="flex flex-col gap-sm empty:hidden">
-        {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
-      </div>
 
       {!ready ? (
         error ? (
@@ -395,22 +415,22 @@ export default function AdminUnpublishedChanges() {
               }
             />
           ) : (
-            <>
-              <p className="text-admin-base text-admin-ink" data-pending-total={total}>
-                {sentence}
-              </p>
-              {groups.map((group) => (
-                <CollectionPanel
-                  key={group.choice.id}
-                  group={group}
-                  pages={pages}
-                  timeZone={timeZone}
-                  busyKey={busyKey}
-                  controlProps={controlProps}
-                />
-              ))}
-            </>
+            <p className="text-admin-base text-admin-ink" data-pending-total={total}>
+              {sentence}
+            </p>
           )}
+          {groups.map((group) => (
+            <CollectionPanel
+              key={group.choice.id}
+              group={group}
+              pages={pages}
+              timeZone={timeZone}
+              busyKey={busyKey}
+              controlProps={controlProps}
+              notice={notice?.key === `collection:${group.choice.id}` ? notice : null}
+              resultRef={resultKey === `collection:${group.choice.id}` ? resultRef : undefined}
+            />
+          ))}
         </>
       )}
 
@@ -428,7 +448,9 @@ export default function AdminUnpublishedChanges() {
         ) : (
           <ol aria-label="Publish runs">
             {runs.runs.map((row) => (
-              <RunRow key={row.id} row={row} timeZone={timeZone} busyKey={busyKey} controlProps={controlProps} />
+              <RunRow key={row.id} row={row} timeZone={timeZone} busyKey={busyKey} controlProps={controlProps}
+                notice={notice?.key === `resume:${row.id}` ? notice : null}
+                resultRef={resultKey === `resume:${row.id}` ? resultRef : undefined} />
             ))}
           </ol>
         )}

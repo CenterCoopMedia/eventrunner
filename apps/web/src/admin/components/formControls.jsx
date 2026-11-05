@@ -521,10 +521,20 @@ export function DestructiveConfirm({
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const headingId = useId();
+  const consequenceId = useId();
+  const headingRef = useRef(null);
+  const triggerRef = useRef(null);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open) headingRef.current?.focus();
+    else if (wasOpen.current) triggerRef.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
 
   if (!open) {
     return (
       <button
+        ref={triggerRef}
         type="button"
         className={`${dangerButtonClass} ${className}`}
         disabled={disabled}
@@ -537,12 +547,18 @@ export function DestructiveConfirm({
   return (
     <section
       aria-labelledby={headingId}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!busy) setOpen(false);
+      }}
       className={`flex flex-col gap-xs rounded-admin-panel border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm ${className}`}
     >
-      <h2 id={headingId} className="text-admin-base font-bold text-admin-state-error">
+      <h2 ref={headingRef} id={headingId} tabIndex={-1} aria-describedby={consequenceId} className="text-admin-base font-bold text-admin-state-error">
         {title ?? trigger}
       </h2>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+      <p id={consequenceId} className="max-w-[65ch] text-admin-sm text-admin-ink">
         {consequence}
         {permanence ? ` ${permanence}` : ''}
       </p>
@@ -551,7 +567,7 @@ export function DestructiveConfirm({
           type="button"
           className={dangerButtonClass}
           disabled={busy || disabled}
-          onClick={() => onConfirm()}
+          onClick={() => { if (!busy && !disabled) onConfirm(); }}
         >
           {busy ? (busyLabel ?? confirmLabel) : confirmLabel}
         </button>

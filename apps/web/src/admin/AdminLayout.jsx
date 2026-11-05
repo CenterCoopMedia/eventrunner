@@ -17,8 +17,8 @@
 // where the admin opens rather than a kind of work (issue #179). The named
 // sections under it read as a standing list grouped by what the operator
 // came to do: content, program, registration and tickets, communications,
-// operations, settings. Every item is a word — no icon rail, no glyph-only
-// item, no counts in bubbles. The current item is a filled block in the
+// operations, settings. Destinations keep their names; familiar utility
+// controls use named icons (issue #695). The current item is a filled block in the
 // action blue and carries four signals, never colour alone: the marker at
 // its leading edge, the bold weight, the ground shift, and
 // `aria-current="page"`.
@@ -29,8 +29,8 @@
 // names the current page in its head. Other groups keep what the reader
 // chose, in this browser (layoutPreference.js).
 //
-// THE RAIL HIDES (issue #477). On a wide screen "Hide menu" at the head of
-// the rail narrows it to the job mark and a "Show menu" button, which gives
+// THE RAIL HIDES (issues #477, #695). A chevron beside the event name
+// narrows the rail to the job mark and an expand control, which gives
 // the work surface the room. It is the same button in both states, so the
 // focus stays on it, and it is the one way back to the sections: one Tab
 // from the skip link. The choice is remembered in this browser. Nothing
@@ -70,6 +70,8 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
 import { useMediaQuery } from '../lib/viewport.js';
 import { AdminEmptyState } from './components/adminChrome.jsx';
+import AdminIcon from './components/AdminIcon.jsx';
+import AdminIconControl from './components/AdminIconControl.jsx';
 import PendingChangesBanner from './components/PendingChangesBanner.jsx';
 import { linkButtonClass } from './components/formControls.jsx';
 import { PendingChangesProvider } from './PendingChangesContext.jsx';
@@ -548,23 +550,18 @@ function AdminDesk() {
           >
             {eventConfig.shortName}
           </p>
-        </div>
-
-        {wide ? (
-          <div className="border-admin-rail-rule border-b-admin-hairline px-xs py-xs">
-            <button
-              type="button"
+          {wide ? (
+            <AdminIconControl
               ref={railToggleRef}
-              className={`${railButtonClass} admin-rail-toggle w-full gap-2xs`}
+              className={`${railButtonClass} admin-rail-toggle`}
+              label={railCollapsed ? 'Show menu' : 'Hide menu'}
+              icon={railCollapsed ? 'expand' : 'collapse'}
               aria-expanded={!railCollapsed}
               aria-controls="admin-docket"
               onClick={toggleRail}
-            >
-              <span className="admin-chevron" data-direction={railCollapsed ? 'end' : 'start'} aria-hidden="true" />
-              <span>{railCollapsed ? 'Show menu' : 'Hide menu'}</span>
-            </button>
-          </div>
-        ) : null}
+            />
+          ) : null}
+        </div>
 
         <details
           className="admin-mobile-docket shrink-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
@@ -576,6 +573,8 @@ function AdminDesk() {
           <summary
             ref={mobileMenuRef}
             className="admin-target flex h-14 cursor-pointer items-center gap-xs px-sm font-semibold text-admin-rail-ink lg:hidden"
+            aria-label={mobileDocketOpen ? 'Close menu' : 'Open menu'}
+            aria-controls="admin-docket"
           >
             <span
               className="max-w-28 truncate font-admin-data text-admin-xs text-admin-rail-ink-muted"
@@ -583,7 +582,7 @@ function AdminDesk() {
             >
               {activeSection?.label ?? 'Admin sections'}
             </span>
-            <span className="shrink-0">Menu</span>
+            <AdminIcon name={mobileDocketOpen ? 'close' : 'menu'} />
           </summary>
           <div
             id="admin-docket"
@@ -664,23 +663,18 @@ function AdminDesk() {
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-xs">
-                <button
-                  type="button"
+                <AdminIconControl
                   ref={takeTourRef}
+                  label="Take the tour"
+                  icon="help"
                   onClick={() => {
                     setMobileDocketOpen(false);
                     setTour((run) => (run ?? 0) + 1);
                   }}
                   className={railButtonClass}
-                >
-                  Take the tour
-                </button>
-                <NavLink to="/" className={railButtonClass}>
-                  View site
-                </NavLink>
-                <button type="button" onClick={signOut} className={railButtonClass}>
-                  Sign out
-                </button>
+                />
+                <AdminIconControl as={NavLink} to="/" label="View site" icon="globe" className={railButtonClass} />
+                <AdminIconControl onClick={signOut} label="Sign out" icon="signOut" data-admin-action="sign-out" className={railButtonClass} />
               </div>
             </div>
           </div>
