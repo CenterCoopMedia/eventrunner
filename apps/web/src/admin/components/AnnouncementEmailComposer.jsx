@@ -122,7 +122,7 @@ function draftBody(draft) {
 }
 
 function PreviewFrame({ html, text }) {
-  const srcDoc = useMemo(() => (html ? buildPreviewDoc(html) : null), [html]);
+  const srcDoc = useMemo(() => (html ? buildPreviewDoc(html, { fitWidth: true }) : null), [html]);
   return (
     <div className="flex flex-col gap-xs">
       {srcDoc ? (
@@ -694,7 +694,7 @@ export default function AnnouncementEmailComposer() {
         <Panel title="Review before sending" className="admin-email-workspace__review">
           {preview ? (
             <section aria-labelledby="announcement-email-preview" className="flex flex-col gap-sm">
-              <h3 id="announcement-email-preview" ref={previewHeadingRef} tabIndex={-1} className="text-admin-lg font-bold text-admin-ink focus:outline-none">
+              <h3 id="announcement-email-preview" ref={previewHeadingRef} tabIndex={-1} className="font-admin-ui text-admin-lg font-bold text-admin-ink focus:outline-none">
                 Preview
               </h3>
               <dl className="admin-email-workspace__envelope grid grid-cols-[max-content_1fr] gap-x-sm gap-y-3xs text-admin-sm">

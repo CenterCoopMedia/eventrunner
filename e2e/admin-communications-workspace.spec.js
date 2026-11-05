@@ -30,9 +30,31 @@ test('communications keeps drafts and review state across channels and fits desk
 
   const evidenceDir = path.resolve('test-results/admin-visual-evidence');
   await fs.mkdir(evidenceDir, { recursive: true });
+  let tourDismissed = false;
 
   async function capture(name, viewport) {
+    // The tour is a lazy chunk and can appear after the initial page check.
+    const endTour = page.getByRole('button', { name: 'End tour', exact: true });
+    if (!tourDismissed) {
+      await page.getByRole('button', { name: 'Take the tour', exact: true }).click();
+      await endTour.click();
+      tourDismissed = true;
+    }
+    await expect(endTour).not.toBeVisible();
     await page.setViewportSize(viewport);
+    if (name === 'communications-preview') {
+      const frameElement = page.locator('iframe[title="Email preview"]');
+      await frameElement.scrollIntoViewIfNeeded();
+      await expect(frameElement).toBeInViewport();
+      const frame = page.frameLocator('iframe[title="Email preview"]');
+      await expect(frame.getByText('Doors open at nine. Bring your badge and allow time to check in.')).toBeVisible();
+      const frameGeometry = await frame.locator('html').evaluate(async (element) => {
+        await element.ownerDocument.fonts.ready;
+        const body = element.ownerDocument.body;
+        return { viewport: element.clientWidth, width: Math.max(element.scrollWidth, body.scrollWidth) };
+      });
+      expect(frameGeometry.width, `email document fits its frame at ${viewport.width}`).toBeLessThanOrEqual(frameGeometry.viewport + 1);
+    }
     await page.locator('html').evaluate((element) => {
       element.ownerDocument.defaultView.scrollTo(0, 0);
       return element.ownerDocument.fonts.ready;
