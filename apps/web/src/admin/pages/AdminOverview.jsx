@@ -30,10 +30,11 @@ import { zoneLabel } from '../../lib/eventTime.js';
 import { useAdminApi } from '../adminApi.js';
 import { Notice, primaryButtonClass, secondaryButtonClass } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState } from '../components/adminChrome.jsx';
-import EventFigures from '../overview/EventFigures.jsx';
+import EventFigures, { SystemHealth } from '../overview/EventFigures.jsx';
 import MilestonesPanel from '../overview/MilestonesPanel.jsx';
 import FunnelPanel from '../overview/FunnelPanel.jsx';
 import ReadinessPanel from '../overview/ReadinessPanel.jsx';
+import '../overview/overviewWorkspace.css';
 
 /**
  * The time the figures were read, on the event's clock: "9:14 AM EDT". An
@@ -89,7 +90,7 @@ export default function AdminOverview() {
   const readAt = stats ? formatReadAt(stats.readAt, eventConfig.timezone) : null;
 
   return (
-    <div className="admin-overview flex flex-col gap-md">
+    <div className="admin-overview admin-overview-workspace flex flex-col gap-md">
       <AdminPageHeader
         title="Overview"
         identifiers={readAt ? `Read at ${readAt}` : null}
@@ -120,22 +121,24 @@ export default function AdminOverview() {
       ) : null}
       {stats && !error ? <p role="status" className="sr-only">Figures read at {readAt}.</p> : null}
 
-      {stats ? <EventFigures stats={stats} isOperator={isOperator} /> : null}
+      {stats ? <EventFigures stats={stats} /> : null}
 
-      <div className="admin-overview-detail-grid">
-      <MilestonesPanel
-        milestones={eventConfig.milestones}
-        goal={eventConfig.registration?.goal}
-        approved={stats?.registrations?.byStatus?.approved}
-        timezone={eventConfig.timezone}
-      />
-
-      {stats ? (
-        <>
-          <FunnelPanel funnel={stats.funnel} revoked={stats.registrations?.byStatus?.revoked} />
-          <ReadinessPanel content={stats.content} />
-        </>
-      ) : null}
+      <div className={stats ? 'admin-overview-working-grid' : undefined}>
+        {stats ? <ReadinessPanel content={stats.content} /> : null}
+        <div className="admin-overview-support">
+          <MilestonesPanel
+            milestones={eventConfig.milestones}
+            goal={eventConfig.registration?.goal}
+            approved={stats?.registrations?.byStatus?.approved}
+            timezone={eventConfig.timezone}
+          />
+          {stats ? (
+            <>
+              <FunnelPanel funnel={stats.funnel} revoked={stats.registrations?.byStatus?.revoked} />
+              <SystemHealth errors={stats.errors} isOperator={isOperator} />
+            </>
+          ) : null}
+        </div>
       </div>
     </div>
   );
