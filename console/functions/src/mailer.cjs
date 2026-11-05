@@ -12,7 +12,7 @@
  *     to a CCM operator. `kind` is 'started', 'build-failed' or
  *     'build-run-failed', which carries the `problem` text
  *   mailer.sendAgreementCopy({ to, organizationName, eventName, title, version, body, sha256, typedName, legalName, signerTitle, acceptedAt, link })
- *     to the person who accepted the agreement
+ *     to the person who accepted the agreement, with a PDF of the text attached
  *
  * Each returns Promise<void> and rejects when the provider refuses the
  * message. `link` may be '' when the console address is not set; the
@@ -23,6 +23,8 @@
  */
 
 const { hostName } = require('./hostName.cjs');
+const { agreementPdf, formatAcceptedAt } = require('./agreementPdf.cjs');
+const { button, detailsTable, fineprint, heading, kicker, note, paragraph, wrapConsoleEmail } = require('./emailLayout.cjs');
 
 const POSTMARK_URL = 'https://api.postmarkapp.com/email';
 const ROLE_WORDS = Object.freeze({ owner: 'Owner', editor: 'Editor' });
@@ -48,11 +50,12 @@ function inviteMessage({ organizationName, inviterEmail, role, link, expiresInDa
     'If you did not expect this email, you can ignore it.',
   ];
   const text = `${lines[0]}\n\n${lines[1]}\n${lines[2]}\n\n${lines[3]}\n${lines[4]}\n`;
-  const html = [
-    `<p>${escapeHtml(lines[0])}</p>`,
-    `<p><a href="${escapeHtml(link)}">Accept the invite</a></p>`,
-    `<p>${escapeHtml(lines[3])}<br>${escapeHtml(lines[4])}</p>`,
-  ].join('\n');
+  const html = wrapConsoleEmail([
+    heading(escapeHtml(subject)),
+    paragraph(escapeHtml(lines[0])),
+    button(escapeHtml(link), 'Accept the invite'),
+    fineprint(`${escapeHtml(lines[3])}<br>${escapeHtml(lines[4])}`),
+  ].join('\n'), { preheader: escapeHtml(lines[0]) });
   return { subject, text, html };
 }
 
@@ -69,26 +72,45 @@ const STATUS_WORDS = Object.freeze({
   'build-failed': { subject: 'Your site did not finish building', line: 'Your site did not finish building. Open your request to see what to do next.' },
 });
 
-/** Text and HTML from paragraphs, with an optional link paragraph. */
-function compose(subject, paragraphs, link, linkText) {
-  const textParts = [...paragraphs];
+const breaks = (text) => escapeHtml(text).replace(/\n/g, '<br>');
+
+/**
+ * Text and branded HTML from paragraphs, with an optional link. A paragraph
+ * may be `{ note }`, a note from the host: "Note from ...:" and the note in
+ * the text, a quoted panel in the HTML. `context` is a small line above
+ * the heading and, unless `contextInText` is false, the first text
+ * paragraph. The heading is `title`.
+ */
+function compose(subject, paragraphs, link, linkText, { title = subject, context = '', contextInText = true } = {}) {
+  const noteLabel = () => `Note from ${hostName()}`;
+  const textParts = [...(context && contextInText ? [context] : []), ...paragraphs.map((p) => (typeof p === 'string' ? p : `${noteLabel()}:\n${p.note}`))];
   if (link) textParts.push(`${linkText}:\n${link}`);
-  const htmlParts = paragraphs.map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`);
-  if (link) htmlParts.push(`<p><a href="${escapeHtml(link)}">${escapeHtml(linkText)}</a></p>`);
-  return { subject, text: `${textParts.join('\n\n')}\n`, html: htmlParts.join('\n') };
+  const first = paragraphs.find((p) => typeof p === 'string') || '';
+  // A line that only repeats the heading ("Your site is ready.") is left out of the HTML.
+  const body = paragraphs.filter((p, i) => !(i === 0 && p === `${title}.`));
+  const html = wrapConsoleEmail([
+    context ? kicker(escapeHtml(context)) : '',
+    heading(escapeHtml(title)),
+    ...body.map((p, i) => (typeof p === 'string'
+      ? paragraph(breaks(p), i === body.length - 1 && !link)
+      : note(escapeHtml(noteLabel()), breaks(p.note)))),
+    link ? button(escapeHtml(link), escapeHtml(linkText)) : '',
+  ].filter(Boolean).join('\n'), { preheader: escapeHtml(first) });
+  return { subject, text: `${textParts.join('\n\n')}\n`, html };
 }
 
 /** @returns {{ subject: string, text: string, html: string }} */
 function statusChangeMessage({ organizationName, eventName, status, link, note, adminLink }) {
   const words = STATUS_WORDS[status];
   if (!words) throw new TypeError(`statusChangeMessage: unknown status ${status}`);
-  const paragraphs = [`${organizationName}: ${eventName}`, words.line];
-  if (note) paragraphs.push(`Note from ${hostName()}:\n${note}`);
+  const paragraphs = [words.line];
+  if (note) paragraphs.push({ note });
+  const shape = { title: words.subject, context: `${organizationName}: ${eventName}` };
   if (adminLink) {
     paragraphs.push('Sign in to your admin panel with this email address. The setup checklist there shows what is left before you open the site to the public.');
-    return compose(`${words.subject}: ${eventName}`, paragraphs, adminLink, 'Open your admin panel');
+    return compose(`${words.subject}: ${eventName}`, paragraphs, adminLink, 'Open your admin panel', shape);
   }
-  return compose(`${words.subject}: ${eventName}`, paragraphs, link, 'Open your request');
+  return compose(`${words.subject}: ${eventName}`, paragraphs, link, 'Open your request', shape);
 }
 
 /** @returns {{ subject: string, text: string, html: string }} */
@@ -102,22 +124,49 @@ function operatorNoticeMessage({ organizationName, eventName, link, kind = 'star
       'Open the request to read the build record and fix the cause, then select Retry the build. The steps that finished are not done twice.',
     ]],
   }[kind];
-  return compose(words[0], words[1], link, 'Open the request');
+  return compose(words[0], words[1], link, 'Open the request', { title: words[0].slice(0, words[0].length - who.length - 2), context: who, contextInText: false });
 }
 
-/** The signer's copy: the record's details, then the full text. @returns {{ subject: string, text: string, html: string }} */
-function agreementCopyMessage({ organizationName, eventName, title, version, body, sha256, typedName, legalName, signerTitle, acceptedAt, link }) {
-  return compose(
-    `Your copy of the agreement: ${eventName}`,
-    [
-      `${typedName}, ${signerTitle}, accepted this agreement for ${legalName} (${organizationName}), for ${eventName}, at ${acceptedAt}.`,
-      `Version ${version}. SHA-256 of the text: ${sha256}`,
-      title,
-      ...body.split(/\n\s*\n/),
-    ],
-    link,
-    'Open your request',
-  );
+/**
+ * The signer's note: what they accepted, when, and which version. The full
+ * text and its SHA-256 are in the attached PDF (agreementPdf.cjs).
+ * @returns {{ subject: string, text: string, html: string }}
+ */
+function agreementCopyMessage({ eventName, title, version, typedName, legalName, signerTitle, acceptedAt, link }) {
+  const when = formatAcceptedAt(acceptedAt);
+  const intro = `You accepted the agreement on behalf of ${legalName} for ${eventName}.`;
+  const attached = 'Your copy of the agreement is attached as a PDF. Keep it for your records.';
+  const rows = [
+    ['Agreement', title],
+    ['Version', String(version)],
+    ['Accepted by', `${typedName}, ${signerTitle}`],
+    ['Date', when],
+  ];
+  const text = [
+    'Agreement accepted',
+    intro,
+    rows.map(([label, value]) => `${label}: ${value}`).join('\n'),
+    attached,
+    ...(link ? [`Open your request:\n${link}`] : []),
+  ].join('\n\n');
+  const html = wrapConsoleEmail([
+    '<h1 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;">Agreement accepted</h1>',
+    `<p style="margin:0 0 24px 0;">${escapeHtml(intro)}</p>`,
+    detailsTable(rows.map(([label, value]) => [escapeHtml(label), escapeHtml(value)])),
+    `<p style="margin:0 0 24px 0;">${escapeHtml(attached)}</p>`,
+    link ? button(escapeHtml(link), 'Open your request') : '',
+  ].filter(Boolean).join('\n'), { preheader: escapeHtml(`Version ${version}, accepted ${when}. Your copy is attached.`) });
+  return { subject: `Your copy of the agreement: ${eventName}`, text: `${text}\n`, html };
+}
+
+/** The PDF file the signer's note carries, as a Postmark attachment. */
+async function agreementAttachment(copy) {
+  const pdf = await agreementPdf(copy);
+  return {
+    Name: `Event Runner agreement, version ${copy.version}.pdf`,
+    Content: Buffer.from(pdf).toString('base64'),
+    ContentType: 'application/pdf',
+  };
 }
 
 /**
@@ -127,7 +176,7 @@ function createPostmarkMailer({ token, from, fetch }) {
   if (typeof token !== 'string' || !token) throw new TypeError('createPostmarkMailer: token is required');
   if (typeof from !== 'string' || !from) throw new TypeError('createPostmarkMailer: from is required');
 
-  async function send(to, message, tag, what) {
+  async function send(to, message, tag, what, attachments = []) {
     const response = await fetch(POSTMARK_URL, {
       method: 'POST',
       headers: {
@@ -143,6 +192,7 @@ function createPostmarkMailer({ token, from, fetch }) {
         HtmlBody: message.html,
         MessageStream: 'outbound',
         Tag: tag,
+        ...(attachments.length ? { Attachments: attachments } : {}),
       }),
     });
     if (!response.ok) {
@@ -160,7 +210,7 @@ function createPostmarkMailer({ token, from, fetch }) {
     sendInvite: (invite) => send(invite.to, inviteMessage(invite), 'console-invite', 'invite'),
     sendStatusChange: (change) => send(change.to, statusChangeMessage(change), 'console-status', 'status'),
     sendOperatorNotice: (notice) => send(notice.to, operatorNoticeMessage(notice), 'console-operator', 'operator notice'),
-    sendAgreementCopy: (copy) => send(copy.to, agreementCopyMessage(copy), 'console-agreement', 'agreement copy'),
+    sendAgreementCopy: async (copy) => send(copy.to, agreementCopyMessage(copy), 'console-agreement', 'agreement copy', [await agreementAttachment(copy)]),
   };
 }
 

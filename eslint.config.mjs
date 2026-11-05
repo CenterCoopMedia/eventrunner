@@ -135,6 +135,7 @@ export default [
       "functions/src/email/templates/**",
       "functions/src/schedule/pdf.cjs",
       "functions/src/pdf/kit.cjs",
+      "console/functions/src/emailLayout.cjs",
     ],
     rules: { "no-restricted-syntax": "off" },
   },
