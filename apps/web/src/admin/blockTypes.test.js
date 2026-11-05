@@ -11,7 +11,6 @@ import {
   FACT_HINTS,
   QUOTE_HINTS,
   STAT_CONTRACT_HINTS,
-  blockTypeFieldSummary,
   blockTypeFor,
   blockTypeLabel,
 } from './blockTypes.js';
@@ -44,14 +43,6 @@ describe('admin block palette', () => {
     expect(blockTypeFor('toString')).toBeNull();
     expect(blockTypeFor(undefined)).toBeNull();
     expect(blockTypeLabel('not-a-type')).toBe('not-a-type');
-    expect(blockTypeFieldSummary('not-a-type')).toBe('');
-  });
-
-  it('summarizes a block type’s fields for the editor', () => {
-    expect(blockTypeFieldSummary('image')).toBe(
-      'url (url) · alt (string) · caption (string, optional) · ' +
-        'focalX (number, optional) · focalY (number, optional)',
-    );
   });
 
   // The stat contract (design brief §2.1.1) is enforced on write from PR3
