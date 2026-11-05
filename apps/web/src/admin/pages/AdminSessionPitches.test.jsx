@@ -17,7 +17,7 @@ vi.mock('../adminSource.js', () => ({
 }));
 // A live snapshot after mount, as Firestore delivers one.
 function push(name, docs) { act(() => listeners[name](docs)); }
-vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ isOperator: true }) }));
+vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ isOperator: true, user: { uid: 'me' } }) }));
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: { days: [] } }) }));
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => call }));
 
@@ -214,7 +214,8 @@ describe('AdminSessionPitches decision email', () => {
       accepted: { state: 'sent', mode: 'manual', queuedBy: 'staff@example.test', attempt: 1 },
     } });
     expect(screen.getByText('Not sent')).toBeInTheDocument();
-    expect(screen.getByText('Reason: Inactive recipient')).toBeInTheDocument();
+    expect(screen.getByText('The email service refused it. The Email log has the details.')).toBeInTheDocument();
+    expect(screen.queryByText(/Inactive recipient/)).toBeNull();
     expect(screen.getByText('Sent')).toBeInTheDocument();
     expect(screen.getByText('Retry the receipt')).toBeInTheDocument();
     expect(screen.queryByText('Prepare the acceptance email')).toBeNull();
@@ -232,7 +233,8 @@ describe('AdminSessionPitches decision email', () => {
   it('shows an unknown delivery and requires a log check before the retry', async () => {
     openPitch({ ...PITCH, status: 'new', notices: { receipt: { state: 'unknown', mode: 'automatic', attempt: 1, error: 'socket hang up' } } });
     expect(screen.getByText('May have been sent')).toBeInTheDocument();
-    expect(screen.getByText('May have been sent. Check the Email log before you retry.')).toBeInTheDocument();
+    expect(screen.getByText('We do not know if the email went out. Check the Email log before you send it again.')).toBeInTheDocument();
+    expect(screen.queryByText(/socket hang up/)).toBeNull();
     fireEvent.click(screen.getByText('Retry the receipt'));
     call.mockResolvedValueOnce({ preview: { to: PITCH.email, addressVerified: true, templateId: 'pitch.receipt', subject: 'Got it', text: 'Hello.', settingsRevision: 0, mayHaveBeenSent: true, otherDecisionSent: null } });
     fireEvent.click(screen.getByRole('button', { name: 'Preview the receipt' }));
@@ -319,13 +321,19 @@ describe('AdminSessionPitch decisions, notes and edits', () => {
     expect(call).toHaveBeenCalledWith('reviewSessionPitch', { id: PITCH.id, status: 'accepted', expectedStatus: 'new', expectedRevision: 2 });
   });
 
-  it('saves private notes on their own, keeping the decision', async () => {
-    openPitch({ ...PITCH, status: 'in_review' });
-    fireEvent.change(screen.getByLabelText('Private review notes'), { target: { value: 'Strong fit.' } });
-    call.mockResolvedValueOnce({ id: PITCH.id, status: 'in_review', revision: 3 });
-    fireEvent.click(screen.getByRole('button', { name: 'Save notes' }));
-    expect(await screen.findByText('Notes saved.')).toBeInTheDocument();
-    expect(call).toHaveBeenCalledWith('reviewSessionPitch', { id: PITCH.id, status: 'in_review', privateNotes: 'Strong fit.', expectedStatus: 'in_review', expectedRevision: 2 });
+  it('adds a signed note without touching the decision, and edits only your own', async () => {
+    openPitch({ ...PITCH, status: 'in_review', reviewNotes: [
+      { id: 'aaaaaaaaaaaaaaaa', uid: 'someone', email: 'other@example.test', text: 'Their note.', createdAt: '2026-11-05T15:00:00Z', editedAt: null },
+      { id: 'bbbbbbbbbbbbbbbb', uid: 'me', email: 'me@example.test', text: 'My note.', createdAt: '2026-11-05T15:05:00Z', editedAt: null },
+    ] });
+    expect(screen.getByText('other@example.test')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Add a note'), { target: { value: 'Strong fit.' } });
+    call.mockResolvedValueOnce({ note: { id: 'cccccccccccccccc', uid: 'me', email: 'me@example.test', text: 'Strong fit.', createdAt: '2026-11-05T16:00:00Z', editedAt: null } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add note' }));
+    expect(await screen.findByText('Note added.')).toBeInTheDocument();
+    expect(screen.getByText('Strong fit.')).toBeInTheDocument();
+    expect(call).toHaveBeenCalledWith('saveSessionPitchNote', { id: PITCH.id, action: 'add', text: 'Strong fit.' });
   });
 
   it('edits the proposal and sends the corrected fields with the revision it read', async () => {
@@ -354,7 +362,7 @@ describe('AdminSessionPitch decisions, notes and edits', () => {
   it('stops every control when the live pitch moves on, and offers the current version', () => {
     openPitch({ ...PITCH, status: 'new' });
     push('session_pitches', [{ ...PITCH, status: 'in_review', reviewRevision: 3 }]);
-    expect(screen.getByText(/This pitch changed since you opened it/)).toBeInTheDocument();
+    expect(screen.getByText(/Someone else changed this pitch while you had it open/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Edit pitch' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Load the current version' }));

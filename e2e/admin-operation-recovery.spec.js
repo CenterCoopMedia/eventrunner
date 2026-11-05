@@ -20,7 +20,6 @@ async function capture(page, name) {
 test('a phone edit opens the composer, keeps a failed draft and exposes its retry outcome', async ({ page }) => {
   test.setTimeout(120_000);
   const db = adminDb();
-  const mailBefore = mailFileSize();
   let releaseHeld;
   await fs.mkdir(EVIDENCE, { recursive: true });
   await Promise.all(IDS.map((id, i) => db.collection('live_updates').doc(id).set({
@@ -31,6 +30,7 @@ test('a phone edit opens the composer, keeps a failed draft and exposes its retr
   try {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await signIn(page, ADMIN_EMAIL);
+    const mailBefore = mailFileSize();
     await page.goto('/admin/live-updates');
     const endTour = page.getByRole('button', { name: 'End tour', exact: true });
     if (await endTour.isVisible()) await endTour.click();

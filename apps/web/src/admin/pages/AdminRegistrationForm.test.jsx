@@ -41,7 +41,7 @@ function addChoice(value) {
 describe('AdminRegistrationForm', () => {
   it('loads the saved form into the editor and the preview', async () => {
     await renderPage();
-    expect(screen.getByText('Revision 2')).toBeInTheDocument();
+    expect(screen.queryByText(/Revision/)).toBeNull();
     expect(screen.getByRole('checkbox', { name: 'Ask: Organization' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Required: Organization' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Required: Job title' })).toBeDisabled();
@@ -97,7 +97,7 @@ describe('AdminRegistrationForm', () => {
     expect(screen.getByRole('button', { name: 'Save registration form' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Ask: Job title' })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Load the current version' }));
-    expect(screen.getByText('Revision 3')).toBeInTheDocument();
+    expect(screen.queryByText(/Someone saved the registration form after you opened it/)).toBeNull();
     expect(screen.getByRole('checkbox', { name: 'Ask: Job title' })).not.toBeChecked();
   });
 

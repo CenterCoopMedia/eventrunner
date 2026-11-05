@@ -91,6 +91,7 @@
     "saveTicketAnswers",
     "editSessionPitch",
     "reviewSessionPitch",
+    "saveSessionPitchNote",
     "importSessionPitches",
     "convertSessionPitch",
     "sendSessionPitchNotice",

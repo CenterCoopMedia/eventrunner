@@ -199,7 +199,7 @@ describe('load more', () => {
     const more = await screen.findByRole('button', { name: 'Load more' });
     fireEvent.click(more);
     const notice = await screen.findByRole('alert');
-    expect(notice).toHaveTextContent('The next page could not be loaded. offline');
+    expect(notice).toHaveTextContent('The next page could not be loaded. We could not reach the server. Check your connection and try again.');
     expect(notice.parentElement).toContainElement(more);
     expect(screen.getByText('TypeError: boom')).toBeInTheDocument();
     expect(more).toBeEnabled();

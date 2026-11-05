@@ -186,6 +186,38 @@ describe('AdminAccess', () => {
     expect(setCalls()).toHaveLength(0);
   });
 
+  it('locks the grant form during a write and preserves a newer draft behind its confirmation', async () => {
+    await renderPage();
+    const email = screen.getByLabelText('Email address');
+    fireEvent.change(email, { target: { value: 'first@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    const surface = screen.getByRole('region', { name: 'Grant staff access to first@example.org' });
+
+    // The confirmation records the first grant, even if the operator starts
+    // another draft before confirming it.
+    fireEvent.change(email, { target: { value: 'next@example.org' } });
+    const tier = screen.getByLabelText('Tier');
+    fireEvent.change(tier, { target: { value: 'operator' } });
+    let finish;
+    callMock.mockImplementation((name) => name === 'setAdminAccess'
+      ? new Promise((resolve) => { finish = resolve; })
+      : Promise.resolve(LIST));
+    const confirm = within(surface).getByRole('button', { name: 'Grant staff access' });
+    fireEvent.click(confirm);
+    expect(email).toBeDisabled();
+    expect(tier).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Grant access' })).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(setCalls()).toHaveLength(1);
+    expect(setCalls()[0][1]).toEqual({ email: 'first@example.org', tier: 'staff' });
+
+    await act(async () => { finish({ ok: true, changed: true, previousTier: null, tier: 'staff' }); });
+    await screen.findByText('Staff access granted to first@example.org.');
+    expect(email).toBeEnabled();
+    expect(email).toHaveValue('next@example.org');
+    expect(tier).toHaveValue('operator');
+  });
+
   it('says so in place when the address already holds the chosen tier, and opens no confirmation', async () => {
     await renderPage();
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'desk@example.org' } });

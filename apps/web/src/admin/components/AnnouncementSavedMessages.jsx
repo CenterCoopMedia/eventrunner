@@ -228,7 +228,7 @@ export default function AnnouncementSavedMessages({
         description="Save a message you send often, then load it into a new email. Loading changes the subject, the message and the link. The audience stays as it is. Saved messages stay until you remove them."
       >
         <div className="flex flex-col gap-sm">
-          <ServerErrorSummary error={error} errorRef={errorRef} title="The server refused this request" />
+          <ServerErrorSummary error={error} errorRef={errorRef} title="This message was not saved" />
           {loaded ? (
             <p className="text-admin-sm text-admin-ink">
               {`Loaded from "${loaded.name}". Changes here do not change the saved message until you update it.`}
