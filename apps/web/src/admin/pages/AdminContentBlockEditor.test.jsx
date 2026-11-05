@@ -551,7 +551,7 @@ describe('content editing workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveFocus();
-    expect(alert).toHaveTextContent('order: must be a non-negative number');
+    expect(alert).toHaveTextContent('Order: must be a non-negative number');
     expect(screen.queryByLabelText('Order')).toBeNull();
     expect(screen.getByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByLabelText('Button text')).toHaveValue('Register now');

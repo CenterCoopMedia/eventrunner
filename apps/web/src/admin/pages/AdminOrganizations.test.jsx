@@ -406,10 +406,10 @@ describe('the organization editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const summary = await screen.findByRole('alert');
-    expect(summary).toHaveTextContent('name: must be text');
+    expect(summary).toHaveTextContent('Name: must be text');
     await waitFor(() => expect(document.activeElement).toBe(summary));
     expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Name')).toHaveAccessibleDescription('name: must be text');
+    expect(screen.getByLabelText('Name')).toHaveAccessibleDescription('Name: must be text');
     expect(screen.getByLabelText('Website')).not.toHaveAttribute('aria-invalid');
   });
 
@@ -420,11 +420,11 @@ describe('the organization editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
 
     const summary = await screen.findByRole('alert');
-    expect(summary).toHaveTextContent('slug: another organization already uses "example-fund"');
+    expect(summary).toHaveTextContent('Slug: another organization already uses "example-fund"');
     const address = screen.getByLabelText(/^Page address/);
     expect(address).toHaveAttribute('aria-invalid', 'true');
     expect(address).toHaveAccessibleDescription(
-      expect.stringContaining('slug: another organization already uses "example-fund"'),
+      expect.stringContaining('Slug: another organization already uses "example-fund"'),
     );
     // Refused at the save: nothing was published.
     expect(fetch).toHaveBeenCalledTimes(1);

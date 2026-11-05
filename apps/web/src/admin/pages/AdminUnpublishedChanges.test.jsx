@@ -487,7 +487,7 @@ describe('the Unpublished changes page', () => {
     }));
     fireEvent.click(screen.getByRole('button', { name: 'Publish 2 content blocks' }));
     expect(await within(main()).findByText(
-      'Published 1 of 2 content blocks. Not published: hero__title was edited while publishing, so its newer draft stayed unpublished.',
+      'Published 1 of 2 content blocks. Not published: One item was edited while publishing, so its newer draft stayed unpublished.',
     )).toHaveAttribute('role', 'alert');
   });
 

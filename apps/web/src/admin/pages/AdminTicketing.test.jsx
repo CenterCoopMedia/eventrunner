@@ -53,7 +53,7 @@ describe('AdminTicketing', () => {
 
   it('loads and renders the provider status card', async () => {
     render(<AdminTicketing />);
-    await waitFor(() => expect(screen.getByText('manual')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
     expect(callMock).toHaveBeenCalledWith('getTicketingStatus', {});
   });
 
@@ -109,7 +109,7 @@ describe('AdminTicketing', () => {
       return Promise.reject(new Error(`unexpected call: ${name}`));
     });
     render(<AdminTicketing />);
-    await screen.findByText('unrecognized-provider');
+    await screen.findByText('Other');
     expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Ticket code for check-in')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
@@ -208,11 +208,11 @@ describe('AdminTicketing', () => {
 
   it('does not show a webhook registration row when the provider does not support webhooks', async () => {
     render(<AdminTicketing />);
-    await waitFor(() => expect(screen.getByText('manual')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
     expect(screen.queryByText('Webhook registration')).not.toBeInTheDocument();
   });
 
-  it('shows "not registered" plus the operator command for a webhook-capable provider with no registration yet', async () => {
+  it('shows "not connected" without an operator command for a webhook-capable provider with no registration yet', async () => {
     callMock.mockImplementation((name) => {
       if (name === 'getTicketingStatus') {
         return Promise.resolve({
@@ -223,13 +223,13 @@ describe('AdminTicketing', () => {
       return Promise.reject(new Error(`unexpected call: ${name}`));
     });
     render(<AdminTicketing />);
-    await waitFor(() => expect(screen.getByText('eventbrite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Eventbrite')).toBeInTheDocument());
     expect(screen.getByText('Webhook registration')).toBeInTheDocument();
-    expect(screen.getByText(/Not registered/)).toBeInTheDocument();
-    expect(screen.getByText('node scripts/register-ticketing-webhook.cjs')).toBeInTheDocument();
+    expect(screen.getByText('Not connected. Ask Joe to connect ticket updates.')).toBeInTheDocument();
+    expect(screen.queryByText(/register-ticketing-webhook/)).not.toBeInTheDocument();
   });
 
-  it('shows the registration timestamp and webhook id once registered', async () => {
+  it('shows the local connection time and no webhook id once registered', async () => {
     callMock.mockImplementation((name) => {
       if (name === 'getTicketingStatus') {
         return Promise.resolve({
@@ -244,8 +244,9 @@ describe('AdminTicketing', () => {
       return Promise.reject(new Error(`unexpected call: ${name}`));
     });
     render(<AdminTicketing />);
-    await waitFor(() => expect(screen.getByText('eventbrite')).toBeInTheDocument());
-    expect(screen.getByText(/Registered 2026-08-20T12:00:00\.000Z \(id hook-42\)/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Eventbrite')).toBeInTheDocument());
+    expect(screen.getByText(`Connected on ${new Date('2026-08-20T12:00:00.000Z').toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`)).toBeInTheDocument();
+    expect(screen.queryByText(/hook-42/)).not.toBeInTheDocument();
   });
 
   it('surfaces a status load error without crashing the page', async () => {
@@ -260,7 +261,7 @@ describe('AdminTicketing', () => {
 
   it('parses a CSV, auto-maps obvious headers, and previews a dry run', async () => {
     render(<AdminTicketing />);
-    await waitFor(() => expect(screen.getByText('manual')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
 
     const file = csvFile('Email,Order ID,Name\na@example.com,ord-1,Ada Lovelace\n');
     const input = document.getElementById('ticketing-csv-file');
@@ -290,12 +291,12 @@ describe('AdminTicketing', () => {
       }),
     );
     await waitFor(() => expect(screen.getByText('1 New ticket')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Commit 1 tickets' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import 1 tickets' })).toBeInTheDocument();
   });
 
   it('commits after a preview, using dryRun: false, and reports the summary', async () => {
     render(<AdminTicketing />);
-    await waitFor(() => expect(screen.getByText('manual')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
 
     const file = csvFile('Email,Order ID\na@example.com,ord-1\n');
     const input = document.getElementById('ticketing-csv-file');
@@ -324,7 +325,7 @@ describe('AdminTicketing', () => {
       summary: { create: 1, update: 0, duplicate: 0, invalid: 0 },
       rows: [{ index: 0, verdict: 'create', externalId: 'ord-1', email: 'a@example.com' }],
     }));
-    fireEvent.click(screen.getByRole('button', { name: /Commit/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Import \d+ tickets/ }));
     await flush();
 
     expect(callMock).toHaveBeenCalledWith(
@@ -336,7 +337,7 @@ describe('AdminTicketing', () => {
 
   it('surfaces a preview error verbatim, without writing anything', async () => {
     render(<AdminTicketing />);
-    await waitFor(() => expect(screen.getByText('manual')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
 
     const file = csvFile('Email,Order ID\na@example.com,ord-1\n');
     const input = document.getElementById('ticketing-csv-file');
@@ -351,12 +352,12 @@ describe('AdminTicketing', () => {
     await flush();
 
     await waitFor(() => expect(screen.getByText('rows: at most 500 rows per import')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /Commit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Import \d+ tickets/ })).not.toBeInTheDocument();
   });
 
   it('searches tickets by email', async () => {
     render(<AdminTicketing />);
-    await waitFor(() => expect(screen.getByText('manual')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
 
     callMock.mockImplementationOnce((name, body) => {
       expect(name).toBe('ticketingListTickets');
@@ -371,6 +372,7 @@ describe('AdminTicketing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     await flush();
 
-    await waitFor(() => expect(screen.getByText('tkt-1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('cell', { name: 'Valid' })).toBeInTheDocument());
+    expect(screen.queryByText('tkt-1')).not.toBeInTheDocument();
   });
 });
