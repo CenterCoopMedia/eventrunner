@@ -10,6 +10,7 @@ import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useSavedMessage } from '../useSavedMessage.js';
 import {
   FieldError,
   Panel,
@@ -112,7 +113,7 @@ export default function AdminFeatureSettings() {
   const [form, setForm] = useState(() => toForm(features));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedMessage(form);
   const errorRef = useRef(null);
   // Keyed on CONFIG/FEATURES' own readiness. The aggregate `source` flips as
   // soon as any config doc reports, so seeding on it would let a config/event
@@ -141,13 +142,14 @@ export default function AdminFeatureSettings() {
 
   async function submit(event) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError(null);
     setStatus('');
     try {
       await call('updateFeatures', { features: form });
       setStatus('Saved. The site picks the change up live.');
-      showToast('Feature flags saved.');
+      showToast('Feature flags saved.', { announce: false });
     } catch (err) {
       setError(err);
     } finally {
@@ -161,7 +163,7 @@ export default function AdminFeatureSettings() {
         title="Features"
         description="What the site offers. Turning a feature off hides its route as well as its navigation."
         actions={
-          <button type="submit" className={primaryButtonClass} disabled={saving}>
+          <button type="submit" className={primaryButtonClass} disabled={saving} aria-busy={saving || undefined}>
             {saving ? 'Saving…' : 'Save features'}
           </button>
         }

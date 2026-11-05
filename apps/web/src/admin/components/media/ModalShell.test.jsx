@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ModalShell from './ModalShell.jsx';
+import { DestructiveConfirm } from '../formControls.jsx';
 
 describe('ModalShell', () => {
   it('lifts the panel with a strong-rule frame, never a shadow', () => {
@@ -23,15 +24,19 @@ describe('ModalShell', () => {
     expect(panel.className).not.toContain('shadow');
   });
 
-  it('tints the overlay with the admin ink, with no blur', () => {
-    const { container } = render(
+  it('opens a native modal so the background is inert', () => {
+    const showModal = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
+    render(
       <ModalShell title="Upload a file" onClose={() => {}}>
         <p>Body</p>
       </ModalShell>,
     );
-    const overlay = container.firstChild;
-    expect(overlay).toHaveClass('bg-admin-ink/40');
-    expect(overlay.className).not.toMatch(/blur/);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.tagName).toBe('DIALOG');
+    expect(dialog).toHaveAttribute('open');
+    expect(dialog).toHaveClass('admin-modal');
+    expect(showModal).toHaveBeenCalledTimes(1);
+    showModal.mockRestore();
   });
 
   it('labels the dialog by its own heading and shows the description', () => {
@@ -69,11 +74,65 @@ describe('ModalShell', () => {
         <p>Body</p>
       </ModalShell>,
     );
-    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
     expect(onClose).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a pending write open for both Escape and the close control', () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<ModalShell title="Upload" busy onClose={onClose}>Uploading…</ModalShell>);
+    const dialog = screen.getByRole('dialog');
+    const cancel = new Event('cancel', { cancelable: true });
+    fireEvent(dialog, cancel);
+    expect(cancel.defaultPrevented).toBe(true);
+    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).not.toHaveBeenCalled();
+    rerender(<ModalShell title="Upload" onClose={onClose}>Upload failed. Try again.</ModalShell>);
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('wraps both keyboard boundaries and skips disabled controls', () => {
+    render(<ModalShell title="Details" onClose={() => {}}><button disabled>Unavailable</button><button>Done</button></ModalShell>);
+    const close = screen.getByRole('button', { name: 'Close' });
+    const done = screen.getByRole('button', { name: 'Done' });
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Tab', shiftKey: true });
+    expect(done).toHaveFocus();
+    fireEvent.keyDown(done, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(done).toHaveFocus();
+  });
+
+  it('uses a connected fallback after the original asset control disappears', () => {
+    const opener = document.createElement('button');
+    const fallback = document.createElement('input');
+    document.body.append(opener, fallback);
+    opener.focus();
+    const { unmount } = render(<ModalShell title="Details" onClose={() => {}} returnFocusRef={{ current: fallback }}>File</ModalShell>);
+    opener.remove();
+    unmount();
+    expect(fallback).toHaveFocus();
+    fallback.remove();
+  });
+
+  it('leaves native Tab order intact from a focused consequence inside the dialog', () => {
+    render(<ModalShell title="Details" onClose={() => {}}>
+      <button>Save description</button>
+      <DestructiveConfirm trigger="Delete file" title="Delete file" confirmLabel="Delete file" consequence="This removes the file." onConfirm={vi.fn()} />
+    </ModalShell>);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete file' }));
+    const heading = screen.getByRole('heading', { name: 'Delete file' });
+    expect(heading).toHaveFocus();
+    for (const shiftKey of [false, true]) {
+      const tab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+      fireEvent(heading, tab);
+      expect(tab.defaultPrevented).toBe(false);
+    }
   });
 
   it('names the icon-only close control and returns focus after dismissal', () => {

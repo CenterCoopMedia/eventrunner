@@ -229,12 +229,12 @@ describe('nested dialogs', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Details and delete' }));
 
     expect(screen.getAllByRole('dialog')).toHaveLength(2);
-    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent(screen.getAllByRole('dialog').at(-1), new Event('cancel', { cancelable: true }));
     await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
     // The one still open is the picker's library, not the detail modal.
     expect(screen.getByRole('dialog')).toHaveAccessibleName(/Choose an image/);
 
-    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent(screen.getAllByRole('dialog').at(-1), new Event('cancel', { cancelable: true }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
@@ -242,11 +242,11 @@ describe('nested dialogs', () => {
     render(<ImagePicker label="Primary logo" folder="branding" value="" onChange={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Choose or upload…' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Details and delete' }));
-    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent(screen.getAllByRole('dialog').at(-1), new Event('cancel', { cancelable: true }));
     await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
     expect(document.body.style.overflow).toBe('hidden');
 
-    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent(screen.getAllByRole('dialog').at(-1), new Event('cancel', { cancelable: true }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(document.body.style.overflow).not.toBe('hidden');
   });

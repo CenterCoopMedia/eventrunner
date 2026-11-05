@@ -14,7 +14,7 @@
 // shows, but offers no upload, and its asset modal offers no save or
 // delete. The server refuses those writes anyway; the drawer says so in one
 // line rather than with buttons that fail.
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
 import { formatBytes } from '../../../lib/mediaSource.js';
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from '../adminChrome.jsx';
@@ -66,6 +66,7 @@ export default function MediaLibrary({
   const [uploading, setUploading] = useState(false);
   const [detail, setDetail] = useState(null);
   const [notice, setNotice] = useState(null);
+  const searchRef = useRef(null);
 
   const visible = useMemo(() => assets.filter((asset) => matches(asset, term)), [assets, term]);
   const choosing = typeof onSelect === 'function';
@@ -82,6 +83,7 @@ export default function MediaLibrary({
             Search the library
           </label>
           <input
+            ref={searchRef}
             id="media-search"
             type="search"
             value={term}
@@ -109,7 +111,7 @@ export default function MediaLibrary({
 
       {loading ? <AdminLoadingState label="Loading the media library…" /> : null}
 
-      {!loading && visible.length === 0 ? (
+      {!loading && !error && visible.length === 0 ? (
         <AdminEmptyState
           title={term ? 'Nothing matches that search' : 'No files yet'}
           description={
@@ -173,6 +175,7 @@ export default function MediaLibrary({
         <UploadModal
           folder={folder}
           upload={upload}
+          returnFocusRef={searchRef}
           onClose={() => setUploading(false)}
           onUploaded={(asset) => {
             setUploading(false);
@@ -191,7 +194,10 @@ export default function MediaLibrary({
           updateMetadata={updateMetadata}
           remove={remove}
           operator={operator}
-          onChanged={() => setNotice('Library updated.')}
+          returnFocusRef={searchRef}
+          onChanged={({ type, asset: changed }) => {
+            if (type === 'deleted') setNotice(`Deleted ${changed.filename || changed.title || 'the file'}.`);
+          }}
           onClose={() => setDetail(null)}
         />
       ) : null}

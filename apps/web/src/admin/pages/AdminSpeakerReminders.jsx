@@ -189,10 +189,11 @@ function SpeakerRow({ row, checked, onToggle, timeZone }) {
 function WordingEditor({ call, timeZone }) {
   const [state, setState] = useState({ status: 'loading', data: null, error: null });
   const [draft, setDraft] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(null);
   const [result, setResult] = useState(null);
 
   const load = useCallback(async () => {
+    setState((current) => ({ ...current, status: 'loading', error: null }));
     try {
       const data = await call('speakerReminders', { action: 'template' });
       setState({ status: 'ready', data, error: null });
@@ -207,7 +208,7 @@ function WordingEditor({ call, timeZone }) {
   async function save(event) {
     event.preventDefault();
     if (busy) return;
-    setBusy(true);
+    setBusy('save');
     setResult(null);
     try {
       const data = await call('speakerReminders', { action: 'saveTemplate', ...draft });
@@ -217,12 +218,13 @@ function WordingEditor({ call, timeZone }) {
     } catch (err) {
       setResult({ tone: 'error', message: err.message });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function reset() {
-    setBusy(true);
+    if (busy) return;
+    setBusy('reset');
     setResult(null);
     try {
       const data = await call('speakerReminders', { action: 'resetTemplate' });
@@ -232,17 +234,19 @@ function WordingEditor({ call, timeZone }) {
     } catch (err) {
       setResult({ tone: 'error', message: err.message });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   let body;
   if (state.status === 'loading') body = <AdminLoadingState label="Loading the wording…" />;
-  else if (state.status === 'error') body = <Notice tone="error" message={state.error} />;
+  else if (state.status === 'error') body = <div className="flex flex-col gap-xs"><Notice tone="error" message={state.error} /><button type="button" className={secondaryButtonClass} onClick={load}>Try again</button></div>;
   else {
     const { data } = state;
     body = (
-      <form className="flex flex-col gap-md" onSubmit={save} noValidate>
+      <form className="flex flex-col gap-md" onSubmit={save} onChangeCapture={() => setResult(null)} noValidate>
+        <fieldset disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
+        <legend className="sr-only">Reminder wording</legend>
         <p className="text-admin-sm text-admin-ink">
           {data.saved
             ? `Saved wording, last changed ${formatWhen(data.saved.updatedAt, timeZone)} by ${data.saved.updatedBy ?? 'an admin'}.`
@@ -281,8 +285,8 @@ function WordingEditor({ call, timeZone }) {
           Saving pauses scheduled reminders until you approve them again.
         </p>
         <div className="flex flex-wrap items-center gap-xs">
-          <button type="submit" className={primaryButtonClass} aria-busy={busy}>
-            {busy ? 'Saving…' : 'Save wording'}
+          <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
+            {busy === 'save' ? 'Saving…' : 'Save wording'}
           </button>
           {data.saved ? (
             <DestructiveConfirm
@@ -291,12 +295,13 @@ function WordingEditor({ call, timeZone }) {
               confirmLabel="Delete the saved wording"
               consequence="The saved wording is deleted and every later reminder uses the shipped wording."
               permanence="This cannot be undone."
-              busy={busy}
+              busy={busy === 'reset'}
               busyLabel="Deleting…"
               onConfirm={reset}
             />
           ) : null}
         </div>
+        </fieldset>
       </form>
     );
   }

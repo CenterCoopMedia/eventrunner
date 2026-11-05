@@ -132,8 +132,12 @@ export default function AttendeeReminderSchedule({ call }) {
   const resultId = useId();
   const previewId = useId();
   const resultRef = useRef(null);
+  const busyRef = useRef(false);
+  const formRevision = useRef(0);
+  const previewRevision = useRef(null);
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(null);
   const [offsetsProblem, setOffsetsProblem] = useState(null);
   const [wordingProblems, setWordingProblems] = useState({ subject: null, message: null });
@@ -146,6 +150,7 @@ export default function AttendeeReminderSchedule({ call }) {
   }, []);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const next = await call('reminderSchedules', { action: 'get', schedule: 'attendees' });
       setData(next);
@@ -153,6 +158,8 @@ export default function AttendeeReminderSchedule({ call }) {
       setLoadError(null);
     } catch (err) {
       setLoadError(err.message);
+    } finally {
+      setLoading(false);
     }
   }, [call]);
 
@@ -165,7 +172,7 @@ export default function AttendeeReminderSchedule({ call }) {
   }, [result]);
 
   const body = (() => {
-    if (loadError && !data) return <Notice tone="error" message={loadError} />;
+    if (loadError && !data) return <div className="flex flex-col gap-xs"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading} aria-busy={loading || undefined}>{loading ? 'Trying again…' : 'Try again'}</button></div>;
     if (!data || !form) return <AdminLoadingState label="Loading the attendee schedule…" />;
     return null;
   })();
@@ -181,8 +188,11 @@ export default function AttendeeReminderSchedule({ call }) {
   const dirty = !sameForm(form, data);
 
   function update(patch) {
+    if (busyRef.current && busy !== 'preview') return;
+    formRevision.current += 1;
     setForm({ ...form, ...patch });
     setPreview(null);
+    setResult(null);
   }
 
   function apply(next) {
@@ -191,10 +201,13 @@ export default function AttendeeReminderSchedule({ call }) {
   }
 
   async function run(kind, request, onDone) {
-    if (busy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(kind);
+    const revision = formRevision.current;
     try {
       const next = await call('reminderSchedules', { schedule: 'attendees', ...request });
+      if (kind === 'preview' && revision !== formRevision.current) return;
       if (next?.refreshError) {
         // The change is stored; only the read after it failed.
         setPreview(null);
@@ -204,8 +217,10 @@ export default function AttendeeReminderSchedule({ call }) {
       }
       onDone(next);
     } catch (err) {
+      if (kind === 'preview' && revision !== formRevision.current) return;
       show('error', err.message);
     } finally {
+      busyRef.current = false;
       setBusy(null);
     }
   }
@@ -237,17 +252,26 @@ export default function AttendeeReminderSchedule({ call }) {
   }
 
   function runPreview() {
+    if (busyRef.current) return;
     if (dirty) {
       show('error', 'Save the settings first, then preview.');
       return;
     }
+    const revision = formRevision.current;
     run('preview', { action: 'preview' }, (next) => {
+      if (revision !== formRevision.current) return;
+      previewRevision.current = revision;
       setPreview(next);
       show('ok', `Preview ready: ${next.samples.length} ${next.samples.length === 1 ? 'reminder' : 'reminders'}.`);
     });
   }
 
   function approve() {
+    if (!preview || dirty || previewRevision.current !== formRevision.current) {
+      setPreview(null);
+      show('caution', 'The settings changed. Save them, then preview again before approving.');
+      return;
+    }
     run('approve', {
       action: 'approve',
       wordingVersion: preview.wordingVersion,
@@ -262,7 +286,7 @@ export default function AttendeeReminderSchedule({ call }) {
 
   function turnOff() {
     run('disable', { action: 'disable' }, (next) => {
-      apply(next);
+      setData(next);
       show('ok', 'Scheduled attendee reminders are off.');
     });
   }
@@ -294,7 +318,10 @@ export default function AttendeeReminderSchedule({ call }) {
 
         <Facts facts={data.facts} />
 
+        {loadError ? <div className="flex flex-col gap-xs"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading}>{loading ? 'Trying again…' : 'Try again'}</button></div> : null}
         <form className="flex flex-col gap-md" onSubmit={save} noValidate>
+          <fieldset disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
+          <legend className="sr-only">Attendee reminder settings</legend>
           <fieldset aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
             <legend className="text-admin-base font-semibold text-admin-ink">Days before the event</legend>
             <p id={`${offsetsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
@@ -359,18 +386,19 @@ export default function AttendeeReminderSchedule({ call }) {
           />
 
           <div className="flex flex-wrap items-center gap-xs">
-            <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
+            <button type="submit" className={primaryButtonClass} disabled={Boolean(busy)} aria-busy={busy === 'save'}>
               {busy === 'save' ? 'Saving…' : 'Save attendee settings'}
             </button>
-            <button type="button" className={secondaryButtonClass} onClick={runPreview} aria-busy={busy === 'preview'}>
+            <button type="button" className={secondaryButtonClass} onClick={runPreview} disabled={Boolean(busy)} aria-busy={busy === 'preview'}>
               {busy === 'preview' ? 'Preparing the preview…' : 'Preview attendee reminders'}
             </button>
             {data.state !== 'off' ? (
-              <button type="button" className={secondaryButtonClass} onClick={turnOff} aria-busy={busy === 'disable'}>
+              <button type="button" className={secondaryButtonClass} onClick={turnOff} disabled={Boolean(busy)} aria-busy={busy === 'disable'}>
                 {busy === 'disable' ? 'Turning off…' : 'Turn off attendee reminders'}
               </button>
             ) : null}
           </div>
+          </fieldset>
         </form>
 
         {result ? (
@@ -400,7 +428,7 @@ export default function AttendeeReminderSchedule({ call }) {
             ))}
             {preview.canSend ? (
               <div>
-                <button type="button" className={primaryButtonClass} onClick={approve} aria-busy={busy === 'approve'}>
+                <button type="button" className={primaryButtonClass} onClick={approve} disabled={Boolean(busy)} aria-busy={busy === 'approve'}>
                   {busy === 'approve' ? 'Approving…' : 'Approve and turn on attendee reminders'}
                 </button>
               </div>
