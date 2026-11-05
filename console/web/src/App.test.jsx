@@ -22,6 +22,13 @@ function renderApp(path, auth = fakeAuth()) {
 }
 
 describe('AppRoutes', () => {
+  it('includes a screen-reader-hidden Badger for the wide page margin', () => {
+    renderApp('/nowhere');
+    const badger = document.querySelector('.margin-badger');
+    expect(badger).toHaveAttribute('aria-hidden', 'true');
+    expect(badger?.querySelector('.wait-buddy')).toBeInTheDocument();
+  });
+
   it('starts every page with a skip link to the main content', async () => {
     renderApp('/');
     const skip = screen.getAllByRole('link')[0];

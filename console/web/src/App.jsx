@@ -18,6 +18,7 @@ import ReviewQueue from './pages/review/ReviewQueue.jsx';
 import SignupLinks from './pages/review/SignupLinks.jsx';
 import LoadingState from './LoadingState.jsx';
 import ReportProblem from './ReportProblem.jsx';
+import WaitingBuddy from './WaitingBuddy.jsx';
 
 const MARK = (
   <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false" className="mark">
@@ -77,6 +78,9 @@ function Layout() {
           ) : null}
         </div>
       </header>
+      <div className="margin-badger" aria-hidden="true">
+        <WaitingBuddy />
+      </div>
       <main id="main" tabIndex={-1} className="page">
         <Outlet />
         {helpEmail ? <p className="muted section">{helpName ? `Need a hand? Email ${helpName} at ` : 'Need the hosting team? Email '}<a href={`mailto:${helpEmail}`}>{helpEmail}</a>.</p> : null}
