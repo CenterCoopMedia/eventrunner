@@ -506,8 +506,8 @@ describe('AdminEmailLog', () => {
     await renderPage();
     callMock.mockImplementation(() => new Promise(() => {}));
     fireEvent.click(within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' }));
-    const loading = screen.getByText('Loading the message…');
-    expect(loading).toHaveAttribute('aria-busy', 'true');
+    const loading = screen.getByRole('status', { name: 'Loading the message…' });
+    expect(loading).toHaveTextContent('Loading the message…');
   });
 
   it('opens a row whose body was never stored to the reason, with no frame and no call', async () => {
