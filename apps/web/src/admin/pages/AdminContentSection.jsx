@@ -306,7 +306,8 @@ export default function AdminContentSection() {
                       <button
                         type="button"
                         className={secondaryButtonClass}
-                        disabled={busy !== null || savingOrder}
+                        disabled={savingOrder || (busy !== null && !(busy.id === row.id && busy.action === 'publish'))}
+                        aria-disabled={busy !== null || savingOrder || undefined}
                         aria-busy={busy?.id === row.id && busy.action === 'publish' || undefined}
                         onClick={() => publishOne(row)}
                       >

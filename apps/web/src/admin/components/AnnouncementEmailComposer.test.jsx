@@ -636,6 +636,6 @@ describe('AnnouncementEmailComposer saved messages', () => {
     fillDraft();
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save as a new message' })); });
     const alert = within(savedPanel()).getByRole('alert');
-    expect(alert).toHaveTextContent('Invalid message: name: must contain text');
+    expect(alert).toHaveTextContent('must contain text');
   });
 });

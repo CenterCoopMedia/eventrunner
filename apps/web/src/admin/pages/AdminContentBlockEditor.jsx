@@ -697,7 +697,7 @@ export default function AdminContentBlockEditor({ mode }) {
             >
               {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
             </button>
-            <EditorActionFeedback status={status} error={error} errorTitle={errorTitle} />
+            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />

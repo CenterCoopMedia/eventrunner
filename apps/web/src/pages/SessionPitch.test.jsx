@@ -111,7 +111,7 @@ describe('SessionPitch with an external form', () => {
     pitchCall = { enabled: true, closesAt: OPEN_UNTIL, externalFormUrl: FORM };
     renderPitch();
     act(() => listener.onError(new Error('offline')));
-    expect(screen.getByRole('status')).toHaveTextContent('Cannot check submissions. Reconnecting…');
+    expect(screen.getByRole('status')).toHaveTextContent('Checking your connection…');
     expect(screen.queryByLabelText(/Session title/)).toBeNull();
     expect(screen.getByText('The pitch form is not available now.')).toBeInTheDocument();
   });
@@ -279,10 +279,10 @@ describe('the pitch stepper', () => {
     pitchCall = NATIVE;
     user = SIGNED_IN;
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title: 'T', description: 'D', leadName: 'Ada', consent: true }));
-    call.mockRejectedValue(Object.assign(new Error('Too many session pitches. Try again later.'), { code: 'rate-limited' }));
+    call.mockRejectedValue(Object.assign(new Error('You have sent several pitches in a short time. Wait 15 minutes, then try again.'), { code: 'rate-limited' }));
     renderPitch('/pitch/review');
     fireEvent.click(screen.getByRole('button', { name: 'Submit pitch' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Too many session pitches. Try again later. Your entries are still here.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('You have sent several pitches in a short time. Wait 15 minutes, then try again. Your answers are still here. Select Submit pitch again.');
     expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY)).title).toBe('T');
   });
 });

@@ -135,14 +135,14 @@ export default function SessionPitch() {
       if (slug !== 'review') navigate(`/pitch/${slug}`);
       return;
     }
-    if (!open) { setError('Session pitch submissions are closed or cannot be checked. Your entries are still here.'); return; }
+    if (!open) { setError('Pitches are closed right now. Your answers are still here.'); return; }
     if (!email) { setError('Sign in with a verified email address before submitting.'); return; }
     setBusy(true);
     try {
       const result = await call('submitSessionPitch', body);
       setSaved({ id: result.id, email: user.email });
     } catch (err) {
-      setError(`${err.message} Your entries are still here. Retry the same pitch to avoid a duplicate.`);
+      setError(`${err.message} Your answers are still here. Select Submit pitch again.`);
     } finally {
       setBusy(false);
     }
@@ -154,7 +154,7 @@ export default function SessionPitch() {
       <p className="text-body-lg text-text-secondary">Share an idea for {event.shortName}. Tell the organizers what people will learn and how you will involve them.</p>
       <section className="space-y-xs border-t-hairline border-rule-hairline pt-sm" aria-labelledby="pitch-call-heading">
         <h2 id="pitch-call-heading" className="sr-only">Call for sessions</h2>
-        <p role="status" className="font-semibold">{IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Cannot check submissions. Reconnecting…' : !settings ? 'Checking submissions…' : open ? 'Submissions are open' : 'Submissions are closed'}</p>
+        <p role="status" className="font-semibold">{IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Checking your connection…' : !settings ? 'Checking submissions…' : open ? 'Submissions are open' : 'Submissions are closed'}</p>
         {Number.isFinite(deadline) ? <p className="text-caption text-text-secondary">Deadline: <time dateTime={settings.closesAt}>{new Date(deadline).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time> ({Intl.DateTimeFormat().resolvedOptions().timeZone})</p>
           : open ? <p className="text-caption text-text-secondary">There is no set deadline. The organizers close submissions when they are ready.</p> : null}
         <p className="text-caption text-text-secondary">{externalForm ? 'You do not need a ticket to pitch a session.' : 'A verified email address is required to submit. You do not need a ticket or attendee approval.'}</p>
@@ -185,9 +185,8 @@ export default function SessionPitch() {
         {header}
         <section ref={savedRef} tabIndex={-1} className="space-y-sm border-hairline border-rule-hairline bg-surface-alt p-lg">
           <h2 className="font-heading text-h2 font-semibold">Your pitch is saved</h2>
-          <p role="status">The organizers can now review it. Submission does not confirm a place on the schedule.</p>
-          <p className="break-all font-data text-caption text-text-secondary">Reference: {saved.id}</p>
-          <p className="text-text-secondary">Submitted as {saved.email}. This confirmation does not mean an email was sent.</p>
+          <p role="status">The organizers will review it and let you know by email whether it is accepted.</p>
+          <p className="text-text-secondary">Submitted as {saved.email}.</p>
           <button type="button" className={secondaryButtonClass} onClick={() => { setDraft(blankPitch()); setSaved(null); navigate('/pitch/session'); }}>Pitch another session</button>
         </section>
       </article>
@@ -230,7 +229,7 @@ export default function SessionPitch() {
               <h3 id="pitch-identity-heading" className="font-heading text-h3 font-semibold">Your sign-in</h3>
               {loading ? <p role="status">Checking your sign-in…</p>
                 : email ? <><p className="break-all text-caption text-text-secondary">Submitting as {email}</p><button type="button" className={secondaryButtonClass} onClick={signOut}>Use another account</button></>
-                  : <><p className="text-caption text-text-secondary">{user ? 'This account needs a verified email. Sign out and use Google or an emailed code.' : 'Sign in with Google or an emailed code to submit. Your answers stay here.'}</p>{user ? <button type="button" className={secondaryButtonClass} onClick={signOut}>Sign out</button> : <SignInPanel />}</>}
+                  : <><p className="text-caption text-text-secondary">{user ? 'We need to confirm your email. Sign out, then sign in with Google or an email code.' : 'Sign in with Google or an emailed code to submit. Your answers stay here.'}</p>{user ? <button type="button" className={secondaryButtonClass} onClick={signOut}>Sign out</button> : <SignInPanel />}</>}
             </section>
           ) : null}
           <StepPager
@@ -242,7 +241,7 @@ export default function SessionPitch() {
             onNext={goNext}
             last={review ? submitControl : null}
           />
-          <p className="text-caption text-text-secondary">{storageError ? 'Keep this page open: Browser storage is unavailable.' : 'Your answers stay in this browser tab until you submit.'}</p>
+          <p className="text-caption text-text-secondary">{storageError ? 'Keep this tab open. Your browser cannot save your answers if you close it.' : 'Your answers stay in this browser tab until you submit.'}</p>
         </section>
       </div>
     </article>

@@ -400,3 +400,12 @@ test('the social links footer lists safe accounts and drops the rest', () => {
   assert.equal(internals.buildSocialLinksHtml(undefined), '');
   assert.equal(internals.buildSocialLinksHtml({ handles: 'nope' }), '');
 });
+
+test('the email header uses an uploaded raster primary logo, and nothing else', () => {
+  const tokens = (primary) => buildGlobalTokens({ theme: { logos: { primary } }, tierA: { storageBucket: 'er-x.appspot.com' } }).logo_url;
+  assert.equal(tokens('branding/abc123/logo.png'),
+    'https://firebasestorage.googleapis.com/v0/b/er-x.appspot.com/o/branding%2Fabc123%2Flogo.png?alt=media');
+  assert.equal(tokens('branding/abc123/logo.svg'), '');
+  assert.equal(tokens('branding/logo.png'), '');
+  assert.equal(tokens(undefined), '');
+});

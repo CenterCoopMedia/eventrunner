@@ -187,10 +187,11 @@ export default function AdminSpeakersList() {
     const row = invites?.get(speaker.id);
     if (!row) return null;
     if (row.status === 'pending' && !row.sentAt) {
-      return 'Recorded, not delivered — resend it';
+      return 'Invite not sent. Select Resend invite.';
     }
     if (row.status === 'pending' && row.expiresAt) {
-      return `Expires ${row.expiresAt.slice(0, 10)}`;
+      const expires = new Date(row.expiresAt);
+      return Number.isFinite(expires.getTime()) ? `Expires ${expires.toLocaleDateString(undefined, { dateStyle: 'medium' })}` : null;
     }
     return null;
   }
@@ -200,7 +201,7 @@ export default function AdminSpeakersList() {
       <AdminPageHeader
         title="Speakers"
         identifiers={`${speakers.length} record${speakers.length === 1 ? '' : 's'}`}
-        description="One record per speaker. Sessions reference these records by id, so editing a name here updates it everywhere it appears."
+        description="Edit a speaker here and every session shows the change."
         actions={
           <>
             <Link to="reminders/send" className={secondaryButtonClass}>
@@ -219,7 +220,7 @@ export default function AdminSpeakersList() {
       {error ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the speaker list; showing the last values we received and retrying."
+          message="The list did not refresh. Trying again…"
         />
       ) : null}
 
@@ -265,8 +266,6 @@ export default function AdminSpeakersList() {
                       </div>
                       <p className={`mt-3xs truncate ${rowMetaClass}`}>
                         {[speaker.jobTitle, speaker.organization].filter(Boolean).join(', ') || '—'}
-                        {' · '}
-                        {speaker.slug}
                         {note ? ` · ${note}` : ''}
                       </p>
                       {pendingFieldsOf(speaker).length > 0 ? (
@@ -281,7 +280,8 @@ export default function AdminSpeakersList() {
                         <button
                           type="button"
                           onClick={() => run('invite', 'sendSpeakerInvite', speaker)}
-                          disabled={busy !== null}
+                          disabled={busy !== null && busy !== `${speaker.id}:invite`}
+                          aria-disabled={busy !== null || undefined}
                           aria-busy={busy === `${speaker.id}:invite` || undefined}
                           className={secondaryButtonClass}
                         >
@@ -293,7 +293,8 @@ export default function AdminSpeakersList() {
                           <button
                             type="button"
                             onClick={() => run('resend', 'resendSpeakerInvite', speaker)}
-                            disabled={busy !== null}
+                            disabled={busy !== null && busy !== `${speaker.id}:resend`}
+                            aria-disabled={busy !== null || undefined}
                             aria-busy={busy === `${speaker.id}:resend` || undefined}
                             className={secondaryButtonClass}
                           >
@@ -302,7 +303,8 @@ export default function AdminSpeakersList() {
                           <button
                             type="button"
                             onClick={() => run('cancel', 'cancelSpeakerInvite', speaker)}
-                            disabled={busy !== null}
+                            disabled={busy !== null && busy !== `${speaker.id}:cancel`}
+                            aria-disabled={busy !== null || undefined}
                             aria-busy={busy === `${speaker.id}:cancel` || undefined}
                             className={linkButtonClass}
                           >
@@ -316,7 +318,8 @@ export default function AdminSpeakersList() {
                           onClick={() =>
                             run('approve', 'updateSpeaker', speaker, { speaker: { status: 'approved' } })
                           }
-                          disabled={busy !== null}
+                          disabled={busy !== null && busy !== `${speaker.id}:approve`}
+                          aria-disabled={busy !== null || undefined}
                           aria-busy={busy === `${speaker.id}:approve` || undefined}
                           className={primaryButtonClass}
                         >
@@ -328,7 +331,8 @@ export default function AdminSpeakersList() {
                           <button
                             type="button"
                             onClick={() => run('apply', 'applySpeakerPendingEdits', speaker)}
-                            disabled={busy !== null}
+                            disabled={busy !== null && busy !== `${speaker.id}:apply`}
+                            aria-disabled={busy !== null || undefined}
                             aria-busy={busy === `${speaker.id}:apply` || undefined}
                             className={primaryButtonClass}
                           >

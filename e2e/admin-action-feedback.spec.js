@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, adminDb, signIn } from './helpers.mjs';
+import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './helpers.mjs';
 
 async function fitsViewport(page, locator) {
   await expect(locator).toBeInViewport();
@@ -104,5 +104,9 @@ test('long CMS pages keep save and row outcomes with the action at desktop and p
     await Promise.all([pageRef.delete(), draftPageRef.delete(), ...blocks.flatMap((block) => [
       db.collection('cmsContent').doc(block.id).delete(), db.collection('cmsContent_drafts').doc(block.id).delete(),
     ])]);
+    // Direct fixture cleanup bypasses the CMS store's count transaction.
+    // Rebuild it so later emulator scenarios see only their own drafts.
+    const repaired = await callFunction('cmsEnsurePendingCounts', { force: true }, await adminIdToken());
+    expect(repaired.status, JSON.stringify(repaired.body)).toBe(200);
   }
 });

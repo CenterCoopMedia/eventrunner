@@ -102,6 +102,7 @@ export default function AdminOrganizationEditor({ mode }) {
   const [action, setAction] = useState(null);
   const saving = action !== null;
   const [status, setStatus] = useState('');
+  const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   const errorRef = useRef(null);
   const formRef = useRef(null);
   const adoptedRef = useRef(false);
@@ -193,6 +194,7 @@ export default function AdminOrganizationEditor({ mode }) {
       } else {
         await call('cmsUpdateContent', { ...body, docId: id });
       }
+      setFeedbackSnapshot(JSON.stringify(form));
       if (publish) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: COLLECTION, docIds: [id] });
@@ -312,7 +314,7 @@ export default function AdminOrganizationEditor({ mode }) {
               >
                 {action === 'publish' ? 'Publishing…' : 'Save and publish'}
               </button>
-              <EditorActionFeedback status={status} error={error} errorTitle={errorTitle} />
+              <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} />
           </>
           }
         />

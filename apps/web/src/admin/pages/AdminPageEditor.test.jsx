@@ -542,8 +542,8 @@ describe('page editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent("path: must be a string starting with '/'");
-    expect(alert).toHaveTextContent('sections[0].label: must be a non-empty string');
+    expect(alert).toHaveTextContent("Path: must be a string starting with '/'");
+    expect(alert).toHaveTextContent('Label: must be a non-empty string');
     // The offending inputs are marked, described by the server's own words.
     expect(screen.getByLabelText('Path')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Path')).toHaveAccessibleDescription(
@@ -583,7 +583,7 @@ describe('page editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      "path: 'schedule' is a reserved route and cannot be used by a page",
+      "Path: 'schedule' is a reserved route and cannot be used by a page",
     );
     expect(screen.getByLabelText('Path')).toHaveAttribute('aria-invalid', 'true');
   });
@@ -732,6 +732,19 @@ describe('page editor', () => {
     await screen.findByRole('alert');
     expect(screen.getByLabelText('Navigation on this page')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Hide the individual settings' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('qualifies a completed save when a newer edit was typed while it ran', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    let answer;
+    fetch.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Newer label' } });
+    await act(async () => { answer(okResponse({ id: 'scholarships', status: 'dirty' })); });
+    expect(screen.getByLabelText('Navigation label')).toHaveValue('Newer label');
+    expect(screen.getByText(/Newer edits are still unsaved/)).toHaveAttribute('role', 'status');
   });
 
   it('takes focus to added sections and blocks, and restores it after their removal', async () => {
@@ -1101,7 +1114,7 @@ describe('publish results and recovery', () => {
 
     // Both the inline status and the toast carry the verdict.
     expect(
-      (await screen.findAllByText(/scholarships was edited while publishing/i)).length,
+      (await screen.findAllByText(/One item was edited while publishing/i)).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText(/picks it up live/i)).toBeNull();
   });
@@ -1179,7 +1192,7 @@ describe('publish results and recovery', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Publish all (1)' }));
     const alerts = await screen.findAllByRole('alert');
     expect(
-      alerts.some((el) => /scholarships has no draft to publish/i.test(el.textContent)),
+      alerts.some((el) => /One item had nothing new to publish/i.test(el.textContent)),
     ).toBe(true);
   });
 });

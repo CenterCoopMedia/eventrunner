@@ -18,9 +18,11 @@ export function ActionFeedback({ message, tone = 'ok', announce = true, classNam
 }
 
 /** The detail summary announces errors; this compact repeat stays by Save. */
-export function EditorActionFeedback({ status, error, errorTitle, tone = 'ok' }) {
+export function EditorActionFeedback({ status, error, errorTitle, tone = 'ok', unsaved = false }) {
   return <ActionFeedback
-    message={error ? (errorTitle ? `${errorTitle}. Review the error below.` : 'The action failed. Review the error below.') : status}
+    message={error
+      ? (errorTitle ? `${errorTitle}. Review the error below.` : 'The action failed. Review the error below.')
+      : status && unsaved ? `${status} Newer edits are still unsaved.` : status}
     tone={error ? 'error' : tone}
     announce={!error}
     className="admin-editor-action-feedback"

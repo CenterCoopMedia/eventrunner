@@ -197,7 +197,9 @@ export default function AdminAttendees() {
       showToast(
         result?.changed === false
           ? 'That account was already in this state.'
-          : `Registration set to ${result?.registrationStatus ?? 'updated'}.`,
+          : REGISTRATION_LABELS[result?.registrationStatus]
+            ? `Registration set to ${REGISTRATION_LABELS[result.registrationStatus].toLowerCase()}.`
+            : 'Registration updated.',
       );
     } catch (err) {
       showToast(err.message, { tone: 'error' });
@@ -371,7 +373,7 @@ export default function AdminAttendees() {
       {listError ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the attendee list; showing the last values we received and retrying."
+          message="The list did not refresh. Trying again…"
         />
       ) : null}
 

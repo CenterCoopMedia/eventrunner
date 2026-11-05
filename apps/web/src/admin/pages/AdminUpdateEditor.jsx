@@ -119,6 +119,7 @@ export default function AdminUpdateEditor({ mode }) {
   const [action, setAction] = useState(null);
   const saving = action !== null;
   const [status, setStatus] = useState('');
+  const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   // The id this form created, once its first save lands. The route then
   // moves to the update's own address. The router keeps this component
   // (the two routes render the same element), and the draft listener may
@@ -200,6 +201,7 @@ export default function AdminUpdateEditor({ mode }) {
       });
       if (mode === 'create') setCreatedId(id);
       let message = 'Draft saved. It is not live until you publish it.';
+      setFeedbackSnapshot(JSON.stringify(form));
       if (publish) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: 'cmsUpdates', docIds: [id] });
@@ -326,7 +328,7 @@ export default function AdminUpdateEditor({ mode }) {
             >
               {action === 'publish' ? 'Publishing…' : 'Save and publish'}
             </button>
-            <EditorActionFeedback status={status} error={error} errorTitle={errorTitle} />
+            <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />

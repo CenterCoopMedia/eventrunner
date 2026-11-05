@@ -344,7 +344,7 @@ function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now =
       return sendError(res, 409, 'form-changed', 'The organizers changed the pitch form. Reload the page and check your choices.');
     }
     if (result.outcome === 'changed') {
-      return sendError(res, 409, 'conflict', 'submissionKey: already used for a different session pitch.');
+      return sendError(res, 409, 'conflict', 'You changed your answers after sending. Select Submit pitch again.');
     }
     if (result.outcome === 'limited') {
       const retryAfterSeconds = Math.max(1, Math.ceil(result.retryAfterMs / 1000));
@@ -352,7 +352,7 @@ function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now =
       res.status(429).json({
         error: {
           code: 'rate-limited',
-          message: 'Too many session pitches. Try again later.',
+          message: 'You have sent several pitches in a short time. Wait 15 minutes, then try again.',
           retryAfterSeconds,
         },
       });
@@ -570,7 +570,7 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
     }
     if (outcome.outcome === 'missing') return notFound(res, 'No such session pitch.');
     if (outcome.outcome === 'conflict') {
-      return sendError(res, 409, 'status-conflict', 'The session pitch changed. Refresh and try again.');
+      return sendError(res, 409, 'status-conflict', 'Someone else changed this pitch. Reload the page, then try again.');
     }
     if (outcome.outcome === 'invalid') return badRequest(res, outcome.message);
     return res.status(200).json({ id: body.id, revision: outcome.revision, changed: outcome.changed ?? [] });
@@ -655,7 +655,7 @@ function createReviewSessionPitchHandler({ db, auth, getConfig, now = Date.now, 
 
     if (outcome.outcome === 'missing') return notFound(res, 'No such session pitch.');
     if (outcome.outcome === 'conflict') {
-      return sendError(res, 409, 'status-conflict', 'The session pitch changed. Refresh and try again.');
+      return sendError(res, 409, 'status-conflict', 'Someone else changed this pitch. Reload the page, then try again.');
     }
     return res.status(200).json({ id: review.id, status: review.status, revision: outcome.revision });
   };
@@ -698,6 +698,7 @@ function buildHandlers() {
     createSendSessionPitchNoticeHandler,
     createSavePitchNoticeSettingsHandler,
   } = require('./pitchNotices.cjs');
+  const { createSaveSessionPitchNoteHandler } = require('./pitchNotes.cjs');
 
   return {
     submitSessionPitch: expose(createSubmitSessionPitchHandler, { secrets }),
@@ -705,6 +706,7 @@ function buildHandlers() {
     updatePitchFormOptions: expose(createUpdatePitchFormOptionsHandler),
     editSessionPitch: expose(createEditSessionPitchHandler),
     reviewSessionPitch: expose(createReviewSessionPitchHandler),
+    saveSessionPitchNote: expose(createSaveSessionPitchNoteHandler),
     sendSessionPitchNotice: expose(createSendSessionPitchNoticeHandler, { secrets }),
     savePitchNoticeSettings: expose(createSavePitchNoticeSettingsHandler),
   };

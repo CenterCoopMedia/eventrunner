@@ -14,7 +14,8 @@
 //
 // CONFLICTS. The page holds the revision it last read. When the live pitch
 // moves on (another reviewer, an Airtable refresh), the controls stop and a
-// notice offers the current version. Unsaved notes stay on the page.
+// notice offers the current version. Notes (PitchNotes) do not move the
+// revision, so they never cause a conflict.
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -27,11 +28,12 @@ import { subscribeAdminCollection } from '../adminSource.js';
 import { PITCH_STATUS_LABELS, PITCH_STATUS_TONES, pitchRevision } from '../pitchStatus.js';
 import PitchDetails from '../components/PitchDetails.jsx';
 import PitchEditForm from '../components/PitchEditForm.jsx';
+import PitchNotes from '../components/PitchNotes.jsx';
 import { PitchEmailDelivery } from '../components/PitchEmails.jsx';
 import PitchSourceMarkers from './PitchSourceMarkers.jsx';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import {
-  CheckboxField, Notice, Panel, SaveStatus, SelectField, ServerErrorSummary, TextAreaField, TextField,
+  CheckboxField, Notice, Panel, SaveStatus, SelectField, ServerErrorSummary, TextField,
   primaryButtonClass, secondaryButtonClass,
 } from '../components/formControls.jsx';
 
@@ -95,7 +97,7 @@ function ConvertToDrafts({ pitch, call, disabled, onConverted }) {
             );
           })}
         </ul>
-        <SelectField label="Event day" value={dayId} onChange={setDayId} required options={[{ value: '', label: 'Choose a day' }, ...(event.days || []).map((day) => ({ value: day.id, label: day.label || day.date || day.id }))]} />
+        <SelectField label="Event day" value={dayId} onChange={setDayId} required options={[{ value: '', label: 'Choose a day' }, ...(event.days || []).map((day, i) => ({ value: day.id, label: day.label || day.date || `Day ${i + 1}` }))]} />
         <div className="grid gap-sm sm:grid-cols-2"><TextField label="Start time" type="time" value={startTime} onChange={setStartTime} required /><TextField label="End time" type="time" value={endTime} onChange={setEndTime} required /></div>
         <CheckboxField label="Invite the presenters now" hint="Each new speaker gets the speaker invite email, to make an account and fill in a profile. Linked speakers get nothing." checked={invite} onChange={setInvite} />
         <CheckboxField label="I reviewed the proposal, the presenters, consent, and the time." checked={confirmed} onChange={setConfirmed} />
@@ -108,12 +110,13 @@ function ConvertToDrafts({ pitch, call, disabled, onConverted }) {
 function PitchReview({ initial, current, call, settings }) {
   const { eventConfig: event } = useEventConfig();
   const [baseline, setBaseline] = useState(initial);
-  const [notes, setNotes] = useState(initial.privateNotes || '');
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [editError, setEditError] = useState(null);
-  const [result, setResult] = useState('');
+  // Each result shows next to the control that caused it: { where, message }.
+  const [result, setResultState] = useState(null);
+  const setResult = (message, where = 'top') => setResultState(message ? { where, message } : null);
   // Bumped by "Load the current version": the draft-creation form starts
   // again, so a confirmation given for the old proposal never carries over.
   const [loads, setLoads] = useState(0);
@@ -127,17 +130,7 @@ function PitchReview({ initial, current, call, settings }) {
     try {
       const response = await call('reviewSessionPitch', { id: baseline.id, status, expectedStatus: baseline.status, expectedRevision: pitchRevision(baseline) });
       setBaseline((previous) => ({ ...previous, status, reviewRevision: response.revision }));
-      setResult(message);
-    } catch (err) { setError(err); } finally { setBusy(false); }
-  }
-  async function saveNotes(event) {
-    event.preventDefault();
-    if (busy || conflict) return;
-    setBusy(true); setError(null); setResult('');
-    try {
-      const response = await call('reviewSessionPitch', { id: baseline.id, status: baseline.status, privateNotes: notes, expectedStatus: baseline.status, expectedRevision: pitchRevision(baseline) });
-      setBaseline((previous) => ({ ...previous, privateNotes: notes, reviewRevision: response.revision }));
-      setResult('Notes saved.');
+      setResult(message, 'decision');
     } catch (err) { setError(err); } finally { setBusy(false); }
   }
   async function saveEdit(pitch) {
@@ -147,12 +140,12 @@ function PitchReview({ initial, current, call, settings }) {
       const response = await call('editSessionPitch', { id: baseline.id, expectedRevision: pitchRevision(baseline), pitch });
       setEditing(false);
       setBaseline((previous) => ({ ...previous, reviewRevision: response.revision }));
-      setResult(response.changed.length ? 'Changes saved. The submitted copy is kept. No email was sent.' : 'Nothing changed.');
+      setResult(response.changed.length ? 'Changes saved. The submitted copy is kept. No email was sent.' : 'Nothing changed.', 'proposal');
     } catch (err) { setEditError(err); } finally { setBusy(false); }
   }
   function reload() {
     if (!current || busy) return;
-    setBaseline(current); setNotes(current.privateNotes || ''); setEditing(false); setError(null); setLoads((n) => n + 1); setResult('Current version loaded.');
+    setBaseline(current); setEditing(false); setError(null); setLoads((n) => n + 1); setResult('Current version loaded.');
   }
 
   // After an own save the live row catches up; show it, so the answers are current.
@@ -169,12 +162,12 @@ function PitchReview({ initial, current, call, settings }) {
       />
       {conflict ? (
         <div className="flex flex-col gap-xs">
-          <Notice tone="caution" message="This pitch changed since you opened it. Your unsaved notes stay below. Copy them before you load the current version." />
+          <Notice tone="caution" message="Someone else changed this pitch while you had it open. Load the current version to continue." />
           <div><button type="button" className={secondaryButtonClass} onClick={reload} disabled={busy || !current}>Load the current version</button></div>
         </div>
       ) : null}
       <ServerErrorSummary error={error} errorRef={errorRef} />
-      {result ? <SaveStatus message={result} /> : null}
+      {result?.where === 'top' ? <SaveStatus message={result.message} /> : null}
 
       <Panel title="Decision" description="Each button saves at once. Choose another to change the decision. No email is sent.">
         <div className="flex flex-wrap gap-xs" role="group" aria-label="Decision">
@@ -190,6 +183,7 @@ function PitchReview({ initial, current, call, settings }) {
             </button>
           ))}
         </div>
+        {result?.where === 'decision' ? <div className="mt-sm"><SaveStatus message={result.message} /></div> : null}
       </Panel>
 
       <Panel
@@ -202,17 +196,15 @@ function PitchReview({ initial, current, call, settings }) {
         ) : (
           <div className="flex flex-col gap-sm">
             <PitchDetails pitch={shown} />
-            <p className="text-admin-sm text-admin-ink-secondary">Consent: {shown.consent ? 'Recorded for organizer review' : 'Not recorded by the legacy API; verify before using this proposal.'}</p>
+            <p className="text-admin-sm text-admin-ink-secondary">Consent: {shown.consent ? 'Recorded for organizer review' : 'Not recorded. Ask the submitter to confirm before you use this pitch.'}</p>
             <PitchSourceMarkers row={shown} detailed timeZone={event.timezone} />
+            {result?.where === 'proposal' ? <SaveStatus message={result.message} /> : null}
           </div>
         )}
       </Panel>
 
-      <Panel title="Private notes" description="Staff only. Notes are left out of every export and every public draft.">
-        <form onSubmit={saveNotes} className="flex flex-col gap-sm">
-          <TextAreaField label="Private review notes" value={notes} onChange={setNotes} maxLength={5000} rows={4} disabled={busy} />
-          <div><button type="submit" className={secondaryButtonClass} disabled={busy || conflict}>{busy ? 'Saving…' : 'Save notes'}</button></div>
-        </form>
+      <Panel title="Private notes" description="Staff only. Each note shows who wrote it. You can edit your own notes. Notes never go to the submitter or into public drafts.">
+        <PitchNotes pitch={current ?? baseline} call={call} />
       </Panel>
 
       {/* The delivery block names itself ("Emails to the submitter"). */}
@@ -260,7 +252,7 @@ export default function AdminSessionPitch() {
   useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs); setListError(null); }, setListError), []);
   useEffect(() => subscribePitchCall(setSettings, () => {}), []);
   const current = rows?.find((row) => row.id === pitchId);
-  if (rows === null) return listError ? <Notice tone="caution" message="Cannot load this pitch. Reconnecting…" /> : <AdminLoadingState label="Loading the pitch…" />;
+  if (rows === null) return listError ? <Notice tone="caution" message="This pitch did not load. Trying again…" /> : <AdminLoadingState label="Loading the pitch…" />;
   if (!current) {
     return (
       <AdminEmptyState

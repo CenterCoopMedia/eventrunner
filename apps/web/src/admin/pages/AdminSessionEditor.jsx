@@ -197,7 +197,7 @@ export default function AdminSessionEditor({ mode }) {
     { value: '', label: 'No parent session' },
     ...rows
       .filter((candidate) =>
-        candidate.id !== sessionId
+        candidate.id !== currentId
         && candidate.current.dayId === form.dayId
         && !candidate.current.parentId,
       )
@@ -353,7 +353,7 @@ export default function AdminSessionEditor({ mode }) {
             >
               {action === 'publish' ? 'Publishing…' : 'Save and publish'}
             </button>
-            <EditorActionFeedback status={status} error={error} errorTitle={errorTitle} />
+            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />

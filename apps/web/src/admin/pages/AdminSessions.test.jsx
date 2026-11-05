@@ -284,6 +284,8 @@ describe('admin Sessions workspace', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The draft is saved, and it is not published');
     expect(alert).toHaveTextContent('Publishing is unavailable.');
+    pushSessions([], [{ id: 'opening-session', dayId: 'day-1', title: 'Opening session', status: 'dirty' }]);
+    expect(within(screen.getByLabelText('Parent session')).queryByRole('option', { name: 'Opening session' })).not.toBeInTheDocument();
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Welcome remarks' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));

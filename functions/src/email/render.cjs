@@ -178,6 +178,23 @@ function formatVenueAddress(venue) {
 }
 
 /**
+ * The public address of the client's uploaded primary logo, for the email
+ * header. Only an uploaded file (`branding/{assetId}/{name}`) counts: a flat
+ * seeded path is a placeholder. Only PNG, JPEG and GIF count, because many
+ * mail apps do not show SVG or WebP. Anything else gives '' and the email
+ * keeps its plain header.
+ *
+ * @param {object} theme
+ * @param {string|undefined} bucket
+ */
+function emailLogoUrl(theme, bucket) {
+  const path = typeof theme?.logos?.primary === 'string' ? theme.logos.primary.trim() : '';
+  if (!bucket || path.split('/').length < 3 || path.includes('..') || path.startsWith('/')) return '';
+  if (!/\.(png|jpe?g|gif)$/i.test(path)) return '';
+  return `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}?alt=media`;
+}
+
+/**
  * Global token values available to every template (spec §6.2), from the
  * loaded config (core/config.cjs shape: { event, theme, tierA, ... }).
  *
@@ -211,7 +228,7 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
     operator_name: event.legal?.operatorName || '',
     brand_primary: configuredThemeColor(theme.colors, 'primary'),
     brand_ink: configuredThemeColor(theme.colors, 'ink'),
-    logo_url: theme.logoUrl || '',
+    logo_url: emailLogoUrl(theme, config?.tierA?.storageBucket),
     // UTC, not the local clock: a laptop and a CI runner in different
     // timezones must render the same token for the same instant.
     current_year: String(now().getUTCFullYear()),

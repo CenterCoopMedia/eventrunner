@@ -314,7 +314,7 @@ export default function AdminSpeakerEditor({ mode }) {
             <button type="submit" className={primaryButtonClass} disabled={saving || photoBusy} aria-busy={action === 'draft' || undefined}>
               {action === 'draft' ? 'Saving…' : mode === 'create' ? 'Create speaker' : 'Save speaker'}
             </button>
-            <EditorActionFeedback status={status} error={error} errorTitle={errorTitle} />
+            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />

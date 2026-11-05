@@ -132,7 +132,7 @@ describe('AttendeeRecordPanel', () => {
     await flush();
 
     const summary = screen.getByRole('alert');
-    expect(summary).toHaveTextContent('pastAttendance: "2024" is listed twice.');
+    expect(summary).toHaveTextContent('Past attendance: "2024" is listed twice.');
     expect(document.activeElement).toBe(summary);
     expect(screen.getByLabelText('Past attendance')).toHaveAttribute('aria-invalid', 'true');
     // The rejected value is kept for the fix.
