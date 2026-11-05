@@ -37,6 +37,7 @@ import {
   toMillis,
 } from '../pendingChanges.js';
 import { useAdminPages } from '../useAdminPages.js';
+import { useComingSoon } from '../../lib/launchSource.js';
 import {
   Notice,
   Panel,
@@ -279,6 +280,10 @@ export default function AdminUnpublishedChanges() {
   const { eventConfig } = useEventConfig();
   const timeZone = typeof eventConfig?.timezone === 'string' && eventConfig.timezone ? eventConfig.timezone : undefined;
   const runs = usePublishRuns();
+  // A new site shows visitors a coming-soon page until its first publish
+  // (functions/src/cms/launch.cjs). With nothing pending there is no
+  // Publish all, so the site gets its own control to open it.
+  const comingSoon = useComingSoon();
   const call = useAdminApi();
   const { showToast } = useToast();
 
@@ -342,6 +347,11 @@ export default function AdminUnpublishedChanges() {
       if (busyRef.current) return;
       if (key === 'all') {
         publish(event, key, { all: true }, summarizeAll);
+      } else if (key === 'open') {
+        publish(event, key, { all: true }, () => ({
+          ok: true,
+          message: 'The site is open. Visitors now see the full site.',
+        }));
       } else if (key.startsWith('collection:')) {
         const group = groups.find((candidate) => `collection:${candidate.choice.id}` === key);
         // Past the server's cap the control refuses every press. So does a
@@ -386,6 +396,11 @@ export default function AdminUnpublishedChanges() {
             {ready && total > 0 ? (
               <button type="button" {...controlProps('all', primaryButtonClass)}>
                 {busyKey === 'all' ? 'Publishing…' : `Publish all (${total})`}
+              </button>
+            ) : null}
+            {ready && total === 0 && comingSoon ? (
+              <button type="button" {...controlProps('open', primaryButtonClass)}>
+                {busyKey === 'open' ? 'Opening…' : 'Open the site'}
               </button>
             ) : null}
             {!localResult ? <div ref={resultRef} tabIndex={-1} className="basis-full empty:hidden">
