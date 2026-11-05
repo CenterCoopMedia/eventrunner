@@ -12,7 +12,7 @@
  *     to a CCM operator. `kind` is 'started', 'build-failed' or
  *     'build-run-failed', which carries the `problem` text
  *   mailer.sendAgreementCopy({ to, organizationName, eventName, title, version, body, sha256, typedName, legalName, signerTitle, acceptedAt, link })
- *     to the person who accepted the agreement
+ *     to the person who accepted the agreement, with a PDF of the text attached
  *
  * Each returns Promise<void> and rejects when the provider refuses the
  * message. `link` may be '' when the console address is not set; the
@@ -23,6 +23,8 @@
  */
 
 const { hostName } = require('./hostName.cjs');
+const { agreementPdf, formatAcceptedAt } = require('./agreementPdf.cjs');
+const { button, detailsTable, wrapConsoleEmail } = require('./emailLayout.cjs');
 
 const POSTMARK_URL = 'https://api.postmarkapp.com/email';
 const ROLE_WORDS = Object.freeze({ owner: 'Owner', editor: 'Editor' });
@@ -105,19 +107,46 @@ function operatorNoticeMessage({ organizationName, eventName, link, kind = 'star
   return compose(words[0], words[1], link, 'Open the request');
 }
 
-/** The signer's copy: the record's details, then the full text. @returns {{ subject: string, text: string, html: string }} */
-function agreementCopyMessage({ organizationName, eventName, title, version, body, sha256, typedName, legalName, signerTitle, acceptedAt, link }) {
-  return compose(
-    `Your copy of the agreement: ${eventName}`,
-    [
-      `${typedName}, ${signerTitle}, accepted this agreement for ${legalName} (${organizationName}), for ${eventName}, at ${acceptedAt}.`,
-      `Version ${version}. SHA-256 of the text: ${sha256}`,
-      title,
-      ...body.split(/\n\s*\n/),
-    ],
-    link,
-    'Open your request',
-  );
+/**
+ * The signer's note: what they accepted, when, and which version. The full
+ * text and its SHA-256 are in the attached PDF (agreementPdf.cjs).
+ * @returns {{ subject: string, text: string, html: string }}
+ */
+function agreementCopyMessage({ eventName, title, version, typedName, legalName, signerTitle, acceptedAt, link }) {
+  const when = formatAcceptedAt(acceptedAt);
+  const intro = `You accepted the agreement on behalf of ${legalName} for ${eventName}.`;
+  const attached = 'Your copy of the agreement is attached as a PDF. Keep it for your records.';
+  const rows = [
+    ['Agreement', title],
+    ['Version', String(version)],
+    ['Accepted by', `${typedName}, ${signerTitle}`],
+    ['Date', when],
+  ];
+  const text = [
+    'Agreement accepted',
+    intro,
+    rows.map(([label, value]) => `${label}: ${value}`).join('\n'),
+    attached,
+    ...(link ? [`Open your request:\n${link}`] : []),
+  ].join('\n\n');
+  const html = wrapConsoleEmail([
+    '<h1 style="margin:0 0 12px 0;font-size:22px;line-height:1.3;">Agreement accepted</h1>',
+    `<p style="margin:0 0 24px 0;">${escapeHtml(intro)}</p>`,
+    detailsTable(rows.map(([label, value]) => [escapeHtml(label), escapeHtml(value)])),
+    `<p style="margin:0 0 24px 0;">${escapeHtml(attached)}</p>`,
+    link ? button(escapeHtml(link), 'Open your request') : '',
+  ].filter(Boolean).join('\n'), { preheader: escapeHtml(`Version ${version}, accepted ${when}. Your copy is attached.`) });
+  return { subject: `Your copy of the agreement: ${eventName}`, text: `${text}\n`, html };
+}
+
+/** The PDF file the signer's note carries, as a Postmark attachment. */
+async function agreementAttachment(copy) {
+  const pdf = await agreementPdf(copy);
+  return {
+    Name: `Event Runner agreement, version ${copy.version}.pdf`,
+    Content: Buffer.from(pdf).toString('base64'),
+    ContentType: 'application/pdf',
+  };
 }
 
 /**
@@ -127,7 +156,7 @@ function createPostmarkMailer({ token, from, fetch }) {
   if (typeof token !== 'string' || !token) throw new TypeError('createPostmarkMailer: token is required');
   if (typeof from !== 'string' || !from) throw new TypeError('createPostmarkMailer: from is required');
 
-  async function send(to, message, tag, what) {
+  async function send(to, message, tag, what, attachments = []) {
     const response = await fetch(POSTMARK_URL, {
       method: 'POST',
       headers: {
@@ -143,6 +172,7 @@ function createPostmarkMailer({ token, from, fetch }) {
         HtmlBody: message.html,
         MessageStream: 'outbound',
         Tag: tag,
+        ...(attachments.length ? { Attachments: attachments } : {}),
       }),
     });
     if (!response.ok) {
@@ -160,7 +190,7 @@ function createPostmarkMailer({ token, from, fetch }) {
     sendInvite: (invite) => send(invite.to, inviteMessage(invite), 'console-invite', 'invite'),
     sendStatusChange: (change) => send(change.to, statusChangeMessage(change), 'console-status', 'status'),
     sendOperatorNotice: (notice) => send(notice.to, operatorNoticeMessage(notice), 'console-operator', 'operator notice'),
-    sendAgreementCopy: (copy) => send(copy.to, agreementCopyMessage(copy), 'console-agreement', 'agreement copy'),
+    sendAgreementCopy: async (copy) => send(copy.to, agreementCopyMessage(copy), 'console-agreement', 'agreement copy', [await agreementAttachment(copy)]),
   };
 }
 
