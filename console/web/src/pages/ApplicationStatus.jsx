@@ -231,6 +231,7 @@ export default function ApplicationStatus() {
   const reconnectProvider = app.build?.failed && PROVIDERS.includes(choice) && (app.build.needsReconnect || !app.connections[choice].connected) ? choice : null;
   const canReconnect = Boolean(reconnectProvider) && app.myRole === 'owner';
   const underway = ['approved', 'building'].includes(app.status) && !app.build?.failed;
+  const live = ['ready', 'launched'].includes(app.status);
   return (
     <section aria-labelledby="status-title" className="console-workspace application-workspace">
       <div className={`application-layout${closed ? ' application-closed' : ''}`}>
@@ -239,7 +240,10 @@ export default function ApplicationStatus() {
             <h1 id="status-title" tabIndex={-1}>{title}</h1>
             <p className="lead application-state">{app.build?.failed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status]}</p>
           </header>
-          {app.address ? <p className="application-address"><span>Web address</span><strong>{app.address}</strong></p> : null}
+          {/* The address shows once the site answers there, so nobody opens it to a hosting error page mid-build. */}
+          {live && app.address ? (
+            <p className="application-address"><span>Web address</span><strong><a href={`https://${app.address}`}>{app.address}</a></strong></p>
+          ) : null}
 
           <ConnectionNotice message={state?.connectionMessage} />
           {error ? <p className="message error" role="alert">{error}</p> : null}
@@ -260,7 +264,7 @@ export default function ApplicationStatus() {
           ) : null}
 
           <div className="application-actions">
-            {['ready', 'launched'].includes(app.status) && app.address ? (
+            {live && app.address ? (
               <p><a className="button primary" href={`https://${app.address}/admin`}>Open your admin panel</a></p>
             ) : null}
             {app.canEdit ? (
