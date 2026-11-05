@@ -297,7 +297,7 @@ export default function ApplicationStatus() {
             {app.canEdit ? (
               <p><Link className="button primary" to={setupPath(orgId, appId, STEPS[0])}>Continue the setup</Link></p>
             ) : null}
-            <p><Link to={`/organizations/${orgId}`}>Back to your event sites</Link></p>
+            <p><Link className="button" to={`/organizations/${orgId}`}>Back to your event sites</Link></p>
           </div>
         </div>
         {closed ? null : (
