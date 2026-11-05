@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { callApi } from '../api.js';
+import LoadingState from '../LoadingState.jsx';
 import { BUILD_FAILED_LABEL, STATUS_LABELS, statusPath } from '../setup/steps.js';
 import { SIGNUP_LINK_HELP } from '../text.js';
 
@@ -19,7 +20,7 @@ export default function OrganizationHome() {
   }, [orgId]);
 
   if (error) return <p className="message error" role="alert">{error}</p>;
-  if (!data) return <p role="status">Loading the organization.</p>;
+  if (!data) return <LoadingState>Loading the organization.</LoadingState>;
 
   return (
     <section aria-labelledby="org-title">

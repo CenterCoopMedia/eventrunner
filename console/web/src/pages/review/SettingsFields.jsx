@@ -5,7 +5,7 @@ import { SETTING_FIELDS } from '../../reviewText.js';
  * error. `fieldRefs` collects the inputs, so the form can focus the field
  * an error is about.
  */
-export default function SettingsFields({ fields, values, onChange, error, fieldRefs, idPrefix }) {
+export default function SettingsFields({ fields, values, onChange, error, fieldRefs, idPrefix, disabled = false }) {
   return fields.map((field) => {
     const spec = SETTING_FIELDS[field];
     const id = `${idPrefix}-${field}`;
@@ -22,6 +22,7 @@ export default function SettingsFields({ fields, values, onChange, error, fieldR
           autoComplete="off"
           spellCheck="false"
           value={values[field] ?? ''}
+          disabled={disabled}
           onChange={(e) => onChange(field, e.target.value)}
           aria-invalid={invalid ? 'true' : undefined}
           aria-describedby={described}
