@@ -206,6 +206,7 @@ export default function ConnectionPanel({
           {provider === 'eventbrite' && !showPicker ? (
             <p>Event: {account.event ? eventLabel(account.event) : <span className="muted">Not chosen yet</span>}</p>
           ) : null}
+          {canConnect && copy.consent ? <p>{copy.consent}</p> : null}
           {canConnect || connections.canDisconnect ? (
             <div className="step-actions">
               {canConnect ? <button type="button" className="button" disabled={leaving} onClick={connect}>{connectLabel || 'Connect again'}</button> : null}
@@ -224,6 +225,7 @@ export default function ConnectionPanel({
           {account.available ? (
             <>
               <p>{copy.explain}{connections.canDisconnect ? ` ${CAN_DISCONNECT}` : ''}</p>
+              {canConnect && copy.consent ? <p>{copy.consent}</p> : null}
               {connectError ? <p id={connectErrorId} className="field-error">{connectError}</p> : null}
               {canConnect ? (
                 <p>
