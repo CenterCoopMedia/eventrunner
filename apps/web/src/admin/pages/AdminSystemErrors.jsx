@@ -33,6 +33,7 @@
 // read (same contract AdminPagesList's listener failure follows).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { Notice, Panel, secondaryButtonClass } from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
@@ -212,7 +213,7 @@ export default function AdminSystemErrors() {
         title="System errors"
         description="Unresolved server-side faults (telemetry/systemErrors.cjs). Resolving a row here is not permanent — the server reopens it automatically if the same fault happens again."
         actions={
-          <button
+          rows === null && error ? <button
             ref={refreshRef}
             type="button"
             className={secondaryButtonClass}
@@ -222,7 +223,16 @@ export default function AdminSystemErrors() {
           >
             <OperationIcon name="refresh" />
             {refreshing ? 'Refreshing…' : rows === null && error ? 'Try again' : 'Refresh'}
-          </button>
+          </button> : <AdminIconControl
+            ref={refreshRef}
+            className={secondaryButtonClass}
+            onClick={load}
+            disabled={loading || refreshing || loadingMore || Boolean(resolvingId)}
+            aria-busy={loading || refreshing || undefined}
+            busy={loading || refreshing}
+            label={loading || refreshing ? 'Refreshing…' : 'Refresh'}
+            icon="refresh"
+          />
         }
       />
 
