@@ -17,12 +17,13 @@
 //
 // The preview is a ruled table (RuledTable): each verdict a word in a badge
 // whose tint agrees with it, never colour alone and never a pill.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
 import { saveTextFile } from '../downloadFile.js';
 import { subscribeRegistrationForm } from '../../lib/registrationFormSource.js';
+import '../operationRecovery.css';
 import {
   MATCHED_WORD,
   RECORD_IMPORT_TYPES,
@@ -136,11 +137,19 @@ export default function AdminRecordImport() {
   const [result, setResult] = useState(null); // the last preview or import response
   const [busy, setBusy] = useState(null); // 'preview' | 'import' | null
   const [notice, setNotice] = useState(null);
+  const inputRevision = useRef(0);
+  const busyRef = useRef(null);
+  const previewRevision = useRef(null);
+  const noticeRef = useRef(null);
+
+  useEffect(() => { if (notice) noticeRef.current?.focus(); }, [notice]);
 
   const writes = result?.dryRun ? (result.summary.create ?? 0) + (result.summary.update ?? 0) : 0;
   const sentRows = useMemo(() => (parsed ? projectRows(parsed.rows, mapping) : []), [parsed, mapping]);
 
   function chooseType(next) {
+    if (busyRef.current === 'import') return;
+    inputRevision.current += 1;
     setTypeId(next);
     setResult(null);
     setNotice(null);
@@ -151,20 +160,29 @@ export default function AdminRecordImport() {
   // question columns, keep every choice already made, and drop a mapping
   // whose question the form no longer asks, so its column is not sent.
   useEffect(() => {
-    if (!parsed || typeId !== 'registrations') return;
-    setMapping((current) => pruneMapping({ ...guessMapping(parsed.headers, type), ...current }, type));
-  }, [type, parsed, typeId]);
+    if (!parsed || typeId !== 'registrations' || busy === 'import') return;
+    const next = pruneMapping({ ...guessMapping(parsed.headers, type), ...mapping }, type);
+    if (JSON.stringify(next) === JSON.stringify(mapping)) return;
+    inputRevision.current += 1;
+    setResult(null);
+    setMapping(next);
+  }, [type, parsed, typeId, mapping, busy]);
 
   function changeMapping(next) {
+    if (busyRef.current === 'import') return;
+    inputRevision.current += 1;
     setMapping(next);
     // A preview's digest covers the mapping: a changed mapping needs a new one.
     setResult(null);
+    setNotice(null);
   }
 
   async function chooseFile(event) {
+    if (busyRef.current === 'import') return;
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    const revision = ++inputRevision.current;
     setNotice(null);
     setResult(null);
     setParsed(null);
@@ -174,7 +192,9 @@ export default function AdminRecordImport() {
       return;
     }
     try {
-      const { headers, rows } = parseCsvFile(await file.text());
+      const contents = await file.text();
+      if (revision !== inputRevision.current) return;
+      const { headers, rows } = parseCsvFile(contents);
       if (rows.length === 0) {
         setNotice({ tone: 'error', message: 'That file has no data rows. The first row must name the columns.' });
         return;
@@ -186,33 +206,46 @@ export default function AdminRecordImport() {
       setParsed({ headers, rows, fileName: file.name });
       setMapping(guessMapping(headers, type));
     } catch {
+      if (revision !== inputRevision.current) return;
       setNotice({ tone: 'error', message: 'That file could not be read as text.' });
     }
   }
 
   async function preview() {
-    if (busy) return;
+    if (busyRef.current) return;
     const missing = missingMapping(mapping, type);
     if (missing) {
       setNotice({ tone: 'error', message: missing });
       return;
     }
     setBusy('preview');
+    busyRef.current = 'preview';
+    const revision = inputRevision.current;
     setNotice(null);
     try {
       const response = await call('importRecordsCsv', { type: type.id, mapping, rows: sentRows, dryRun: true });
+      if (revision !== inputRevision.current) return;
+      previewRevision.current = revision;
       setResult(response);
       setNotice({ tone: 'info', message: `Preview: ${summaryWords(response.summary)}. Nothing is saved yet.` });
     } catch (err) {
+      if (revision !== inputRevision.current) return;
       setResult(null);
       setNotice({ tone: 'error', message: err?.message ?? 'The preview could not be made.' });
     } finally {
+      busyRef.current = null;
       setBusy(null);
     }
   }
 
   async function runImport() {
-    if (busy) return;
+    if (busyRef.current) return;
+    if (!result?.dryRun || previewRevision.current !== inputRevision.current) {
+      setResult(null);
+      setNotice({ tone: 'caution', message: 'The file or columns changed. Preview the import again.' });
+      return;
+    }
+    busyRef.current = 'import';
     setBusy('import');
     setNotice(null);
     try {
@@ -233,6 +266,7 @@ export default function AdminRecordImport() {
       // A refused confirm (the file changed) needs a new preview.
       if (err?.status === 409) setResult(null);
     } finally {
+      busyRef.current = null;
       setBusy(null);
     }
   }
@@ -244,6 +278,8 @@ export default function AdminRecordImport() {
         description="Add or update speakers, sessions, organizations and registrations from a CSV file. Speakers, sessions and organizations are saved as drafts only; registrations make tickets. The import publishes nothing and sends no email."
       />
 
+      <fieldset disabled={busy === 'import'} className="flex min-w-0 flex-col gap-md">
+      <legend className="sr-only">Import inputs</legend>
       <Panel
         title="File"
         description="Choose the record type, then the CSV file. The first row of the file names the columns."
@@ -309,8 +345,9 @@ export default function AdminRecordImport() {
           </div>
         </Panel>
       ) : null}
+      </fieldset>
 
-      {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
+      {notice ? <div ref={noticeRef} tabIndex={-1} className="admin-operation-result"><Notice tone={notice.tone} message={notice.message} /></div> : null}
 
       {result ? (
         <Panel

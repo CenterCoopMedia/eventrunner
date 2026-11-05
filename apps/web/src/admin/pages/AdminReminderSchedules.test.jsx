@@ -4,7 +4,7 @@
 // server. The page loads two panels, so each answer is routed by the
 // request's `schedule`.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 const callMock = vi.fn();
@@ -186,6 +186,38 @@ beforeEach(() => {
 });
 
 describe('AdminReminderSchedules', () => {
+  it('does not restore a speaker preview after the settings change while it loads', async () => {
+    let finish;
+    route({ speakers: [state(), new Promise((resolve) => { finish = resolve; })] });
+    renderPage();
+    await screen.findByTestId('schedule-state');
+    fireEvent.click(screen.getByRole('button', { name: 'Preview', exact: true }));
+    fireEvent.change(screen.getByLabelText('Send time'), { target: { value: '11:00' } });
+    await act(async () => finish(PREVIEW));
+    expect(screen.queryByRole('button', { name: 'Approve and turn on', exact: true })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Send time')).toHaveValue('11:00');
+  });
+
+  it('keeps speaker settings fixed while saving and exposes a truthful pending action', async () => {
+    let finish;
+    route({ speakers: [state(), new Promise((resolve) => { finish = resolve; })] });
+    renderPage();
+    await screen.findByTestId('schedule-state');
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings', exact: true }));
+    expect(screen.getByLabelText('Send time')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Preview', exact: true })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Saving…' })).toHaveAttribute('aria-busy', 'true');
+    await act(async () => finish(state()));
+    expect(screen.getByLabelText('Send time')).not.toBeDisabled();
+  });
+
+  it('recovers a failed initial schedule load without leaving the page', async () => {
+    route({ speakers: [new Error('The schedule could not be loaded.'), state()] });
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByTestId('schedule-state')).toHaveTextContent('Scheduled speaker reminders are off.');
+    expect(callsFor('speakers')).toHaveLength(2);
+  });
   it('states the schedule in words and shows the next run with the zone, the reach and who waits', async () => {
     route({ speakers: [state()] });
     renderPage();
@@ -292,6 +324,17 @@ describe('AdminReminderSchedules', () => {
 });
 
 describe('AdminReminderSchedules, attendees', () => {
+  it('does not offer approval for an attendee preview that finished after an edit', async () => {
+    let finish;
+    route({ attendees: [attendeeState(), new Promise((resolve) => { finish = resolve; })] });
+    renderPage();
+    await screen.findByTestId('attendee-schedule-state');
+    fireEvent.click(screen.getByRole('button', { name: 'Preview attendee reminders' }));
+    fireEvent.change(screen.getByLabelText('Attendee reminder message'), { target: { value: 'A newer message.' } });
+    await act(async () => finish(ATTENDEE_PREVIEW));
+    expect(screen.queryByRole('button', { name: 'Approve and turn on attendee reminders' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Attendee reminder message')).toHaveValue('A newer message.');
+  });
   it('states the attendee schedule in words, with the facts, the next run as a count and no addresses', async () => {
     route();
     renderPage();

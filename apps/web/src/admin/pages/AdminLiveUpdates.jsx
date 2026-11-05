@@ -9,7 +9,7 @@
 // so the field says who can read the entry, not who sees it first. A row
 // saved before the audience field existed has none, and the rules show it
 // to admins only: the list names it, and saving it again gives it one.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -23,7 +23,6 @@ import {
   TextAreaField,
   TextField,
   DestructiveConfirm,
-  linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -33,6 +32,8 @@ import AdminPageHeader, {
   StatusBadge,
 } from '../components/adminChrome.jsx';
 import { UPDATE_CATEGORY_MAX } from 'shared/update';
+import OperationIcon from '../components/OperationIcon.jsx';
+import '../operationRecovery.css';
 
 function toDate(value) {
   if (!value) return null;
@@ -67,6 +68,20 @@ export default function AdminLiveUpdates() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [outcome, setOutcome] = useState(null);
+  const [rowErrors, setRowErrors] = useState({});
+  const [removed, setRemoved] = useState('');
+  const composerRef = useRef(null);
+  const errorRef = useRef(null);
+  const removedRef = useRef(null);
+  const writeRef = useRef(false);
+
+  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
+  useEffect(() => { if (removed) removedRef.current?.focus(); }, [removed]);
+
+  function focusComposer() {
+    composerRef.current?.querySelector('textarea')?.focus();
+  }
 
   useEffect(() => {
     return subscribeAdminCollection(
@@ -88,6 +103,7 @@ export default function AdminLiveUpdates() {
   const withoutAudience = ordered.filter((row) => !audienceBadge(row.audience)).length;
 
   function startEdit(row) {
+    if (writeRef.current) return;
     setEditingId(row.id);
     setForm({
       message: row.message ?? '',
@@ -98,18 +114,26 @@ export default function AdminLiveUpdates() {
       audience: audienceBadge(row.audience) ? row.audience : 'everyone',
     });
     setError(null);
+    setOutcome(null);
+    focusComposer();
   }
 
   function cancelEdit() {
+    if (writeRef.current) return;
     setEditingId(null);
     setForm(EMPTY_FORM);
     setError(null);
+    setOutcome(null);
+    focusComposer();
   }
 
   async function submit(event) {
     event.preventDefault();
+    if (writeRef.current) return;
+    writeRef.current = true;
     setSaving(true);
     setError(null);
+    setOutcome(null);
     try {
       await call('saveLiveUpdate', {
         ...(editingId ? { id: editingId } : {}),
@@ -120,24 +144,40 @@ export default function AdminLiveUpdates() {
           audience: form.audience,
         },
       });
-      showToast(editingId ? 'Live update saved.' : 'Live update posted.');
-      cancelEdit();
+      const message = editingId ? 'Live update saved.' : 'Live update posted.';
+      setOutcome({ message, id: editingId });
+      showToast(message, { announce: false });
+      setEditingId(null);
+      setForm(EMPTY_FORM);
     } catch (err) {
       setError(err);
     } finally {
+      writeRef.current = false;
       setSaving(false);
     }
   }
 
   async function remove(id) {
+    if (writeRef.current) return;
+    writeRef.current = true;
     setDeletingId(id);
+    setRemoved('');
+    setRowErrors((current) => ({ ...current, [id]: null }));
     try {
       await call('deleteLiveUpdate', { id });
-      showToast('Live update removed.');
-      if (editingId === id) cancelEdit();
+      setRemoved('Live update removed.');
+      showToast('Live update removed.', { announce: false });
+      if (editingId === id) {
+        setEditingId(null);
+        setForm(EMPTY_FORM);
+        setError(null);
+        setOutcome(null);
+      }
     } catch (err) {
-      showToast(err.message, { tone: 'error' });
+      setRowErrors((current) => ({ ...current, [id]: err.message }));
+      showToast(err.message, { tone: 'error', announce: false });
     } finally {
+      writeRef.current = false;
       setDeletingId(null);
     }
   }
@@ -165,14 +205,18 @@ export default function AdminLiveUpdates() {
       ) : null}
 
       <Panel title={editingId ? 'Edit update' : 'Post an update'}>
-        <form className="flex flex-col gap-sm" onSubmit={submit}>
-          <ServerErrorSummary error={error} />
+        <form ref={composerRef} className="flex flex-col gap-sm" onSubmit={submit} onChangeCapture={() => setOutcome(null)}>
+          <fieldset disabled={saving || Boolean(deletingId)} className="admin-live-composer min-w-0">
+          <legend className="sr-only">Update details</legend>
+          <div className="admin-live-composer__message min-w-0">
           <TextAreaField
             label="Message"
             value={form.message}
             onChange={(value) => setForm((f) => ({ ...f, message: value }))}
-            rows={3}
+            rows={5}
           />
+          </div>
+          <div className="flex min-w-0 flex-col gap-sm">
           <TextField
             label="Category"
             hint="One or two words shown as a tag beside the update. Leave it empty for none."
@@ -193,18 +237,24 @@ export default function AdminLiveUpdates() {
             checked={form.pinned}
             onChange={(checked) => setForm((f) => ({ ...f, pinned: checked }))}
           />
+          </div>
+          </fieldset>
+          <ServerErrorSummary error={error} errorRef={errorRef} />
+          {outcome ? <Notice tone="ok" message={outcome.message} /> : null}
           <div className="flex flex-wrap gap-xs">
-            <button type="submit" className={primaryButtonClass} disabled={saving}>
+            <button type="submit" className={primaryButtonClass} disabled={saving || Boolean(deletingId)} aria-busy={saving || undefined}>
               {saving ? 'Saving…' : editingId ? 'Save changes' : 'Post update'}
             </button>
             {editingId ? (
-              <button type="button" className={secondaryButtonClass} onClick={cancelEdit}>
+              <button type="button" className={secondaryButtonClass} onClick={cancelEdit} disabled={saving || Boolean(deletingId)}>
                 Cancel
               </button>
             ) : null}
           </div>
         </form>
       </Panel>
+
+      {removed ? <div ref={removedRef} tabIndex={-1} className="admin-operation-result"><Notice tone="ok" message={removed} /></div> : null}
 
       {listError ? (
         <Notice
@@ -248,8 +298,8 @@ export default function AdminLiveUpdates() {
                     <p className="mt-3xs text-admin-base text-admin-ink">{row.message}</p>
                   </div>
                   <div className="flex shrink-0 gap-xs">
-                    <button type="button" className={linkButtonClass} onClick={() => startEdit(row)}>
-                      Edit
+                    <button type="button" className={`${secondaryButtonClass} admin-operation-icon`} aria-label="Edit" title="Edit this update" disabled={saving || Boolean(deletingId)} onClick={() => startEdit(row)}>
+                      <OperationIcon name="edit" />
                     </button>
                     <DestructiveConfirm
                       trigger="Remove"
@@ -257,13 +307,14 @@ export default function AdminLiveUpdates() {
                       confirmLabel="Remove this update"
                       busyLabel="Removing…"
                       busy={deletingId === row.id}
-                      disabled={deletingId === row.id}
+                      disabled={saving || Boolean(deletingId)}
                       consequence="The update disappears from the public updates feed and from its own page."
                       permanence="This cannot be undone."
                       onConfirm={() => remove(row.id)}
                     />
                   </div>
                 </div>
+                {rowErrors[row.id] ? <div className="px-md pb-sm"><Notice tone="error" message={rowErrors[row.id]} /></div> : null}
               </li>
             ))}
           </ul>

@@ -298,6 +298,32 @@ describe('the invoice editor', () => {
 });
 
 describe('invoice settings', () => {
+  it('locks replace-on-save fields until the response arrives and clears stale success after editing', async () => {
+    let finish;
+    answers.settings = { ...SETTINGS, canEdit: true };
+    answers.saveSettings = (body) => new Promise((resolve) => { finish = () => resolve(response({ ...SETTINGS, canEdit: true, revision: 1, settings: body.settings })); });
+    await renderAt('/admin/invoices/settings');
+    const instructions = await screen.findByLabelText('Payment instructions');
+    fireEvent.change(instructions, { target: { value: 'Pay by bank transfer.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    await waitFor(() => expect(invoiceCalls().some((body) => body.action === 'saveSettings')).toBe(true));
+    expect(instructions).toBeDisabled();
+    await act(async () => finish());
+    expect(instructions).not.toBeDisabled();
+    const saved = screen.getAllByText('Invoice settings saved. Invoices issued from now on use them.').find((node) => node.getAttribute('role') === 'status');
+    expect(saved).toBeInTheDocument();
+    fireEvent.change(instructions, { target: { value: 'New unsaved instructions.' } });
+    expect(saved).not.toBeInTheDocument();
+  });
+
+  it('retries a failed settings load', async () => {
+    answers.settings = () => Promise.reject(new Error('offline'));
+    await renderAt('/admin/invoices/settings');
+    const retry = await screen.findByRole('button', { name: 'Try again' });
+    answers.settings = { ...SETTINGS, canEdit: true };
+    fireEvent.click(retry);
+    expect(await screen.findByLabelText('Payment instructions')).toBeInTheDocument();
+  });
   it('shows staff the settings read-only', async () => {
     await renderAt('/admin/invoices/settings');
     expect(await screen.findByRole('heading', { level: 1, name: 'Invoice settings' }, { timeout: 5000 })).toBeInTheDocument();

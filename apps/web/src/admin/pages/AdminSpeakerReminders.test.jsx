@@ -2,7 +2,7 @@
 // adminApi directly, as AdminEmailLog.test.jsx does: the endpoint is the
 // only data source, and every reminder is rendered on the server.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
 const callMock = vi.fn();
@@ -276,6 +276,31 @@ describe('preview and send', () => {
 });
 
 describe('reminder wording', () => {
+  it('keeps a submitted wording draft fixed until it is saved', async () => {
+    let finish;
+    serve({ saveTemplate: () => new Promise((resolve) => { finish = resolve; }) });
+    renderPage();
+    const text = await screen.findByLabelText('Plain text body');
+    fireEvent.change(text, { target: { value: 'Open {{dashboard_url}}' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save wording' }));
+    await waitFor(() => expect(callsFor('saveTemplate')).toHaveLength(1));
+    expect(text).toBeDisabled();
+    await act(async () => finish({ ...TEMPLATE, saved: { ...TEMPLATE.shipped, text: 'Open {{dashboard_url}}' } }));
+    expect(text).not.toBeDisabled();
+    expect(await screen.findByText('Wording saved. The next preview and send use it.')).toBeInTheDocument();
+    fireEvent.change(text, { target: { value: 'New wording: {{dashboard_url}}' } });
+    expect(screen.queryByText('Wording saved. The next preview and send use it.')).not.toBeInTheDocument();
+  });
+
+  it('retries a failed wording load without losing the reminder list', async () => {
+    serve({ template: new Error('The wording could not be loaded.') });
+    renderPage();
+    const retry = await screen.findByRole('button', { name: 'Try again' });
+    serve();
+    fireEvent.click(retry);
+    expect(await screen.findByLabelText('Plain text body')).toHaveValue(TEMPLATE.shipped.text);
+    expect(callsFor('template')).toHaveLength(2);
+  });
   it('shows the server refusal of an unknown token and saves valid wording', async () => {
     serve({
       saveTemplate: (body) => {

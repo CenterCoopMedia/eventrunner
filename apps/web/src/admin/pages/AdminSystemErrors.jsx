@@ -39,6 +39,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import OperationIcon from '../components/OperationIcon.jsx';
 
 const PAGE_SIZE = 100;
 // Long enough to show real signal (a stack's first line, a validation
@@ -96,8 +97,16 @@ export default function AdminSystemErrors() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
+  const [moreError, setMoreError] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
   const [rowNotices, setRowNotices] = useState({});
+  const [resolvedMessage, setResolvedMessage] = useState('');
+  const readBusyRef = useRef(false);
+  const resolveBusyRef = useRef(false);
+  const resultRef = useRef(null);
+  const refreshRef = useRef(null);
+  const rowRefs = useRef(new Map());
+  const [focusRow, setFocusRow] = useState(null);
   // Distinguishes the one-time initial fetch (full-page skeleton) from a
   // manual refresh or a post-resolve reload (keeps the current rows on
   // screen, just relabels the refresh control) — a ref so `load` does not
@@ -105,6 +114,8 @@ export default function AdminSystemErrors() {
   const hasLoadedRef = useRef(false);
 
   const load = useCallback(async () => {
+    if (readBusyRef.current) return;
+    readBusyRef.current = true;
     if (!hasLoadedRef.current) setLoading(true);
     else setRefreshing(true);
     try {
@@ -112,13 +123,17 @@ export default function AdminSystemErrors() {
       setRows(Array.isArray(response?.rows) ? response.rows : []);
       setNextCursor(response?.nextCursor ?? null);
       setError(null);
+      setMoreError(null);
+      hasLoadedRef.current = true;
+      return true;
     } catch (err) {
       // Fail soft: keep whatever rows we already have and surface a
       // non-blocking notice, the same contract AdminPagesList's listener
       // failure follows.
       setError(err);
+      return false;
     } finally {
-      hasLoadedRef.current = true;
+      readBusyRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -128,24 +143,38 @@ export default function AdminSystemErrors() {
     load();
   }, [load]);
 
+  useEffect(() => { if (resolvedMessage) resultRef.current?.focus(); }, [resolvedMessage]);
+  useEffect(() => {
+    if (focusRow === null) return;
+    (rowRefs.current.get(focusRow) ?? refreshRef.current)?.focus();
+    setFocusRow(null);
+  }, [focusRow]);
+
   async function loadMore() {
-    if (!nextCursor) return;
+    if (!nextCursor || readBusyRef.current || resolveBusyRef.current) return;
+    readBusyRef.current = true;
     setLoadingMore(true);
+    setMoreError(null);
     try {
       const response = await call('listSystemErrors', { limit: PAGE_SIZE, cursor: nextCursor });
       const more = Array.isArray(response?.rows) ? response.rows : [];
       setRows((current) => [...(current ?? []), ...more]);
       setNextCursor(response?.nextCursor ?? null);
       setError(null);
+      setFocusRow(more.find((row) => !row.resolved)?.id ?? '');
     } catch (err) {
-      setError(err);
+      setMoreError(err.message);
     } finally {
+      readBusyRef.current = false;
       setLoadingMore(false);
     }
   }
 
   async function resolveRow(row) {
+    if (resolveBusyRef.current || readBusyRef.current) return;
+    resolveBusyRef.current = true;
     setResolvingId(row.id);
+    setResolvedMessage('');
     setRowNotices((current) => {
       const next = { ...current };
       delete next[row.id];
@@ -164,11 +193,13 @@ export default function AdminSystemErrors() {
       } else {
         // Reload from the server rather than patching local state — see the
         // file-level note on why a local-only patch is not enough here.
-        await load();
+        const refreshed = await load();
+        setResolvedMessage(refreshed ? 'Error resolved. The list has been checked again.' : 'Error resolved. Refresh to check the list again.');
       }
     } catch (err) {
       setRowNotices((current) => ({ ...current, [row.id]: err.message }));
     } finally {
+      resolveBusyRef.current = false;
       setResolvingId(null);
     }
   }
@@ -182,12 +213,15 @@ export default function AdminSystemErrors() {
         description="Unresolved server-side faults (telemetry/systemErrors.cjs). Resolving a row here is not permanent — the server reopens it automatically if the same fault happens again."
         actions={
           <button
+            ref={refreshRef}
             type="button"
             className={secondaryButtonClass}
             onClick={load}
-            disabled={loading || refreshing}
+            disabled={loading || refreshing || loadingMore || Boolean(resolvingId)}
+            aria-busy={loading || refreshing || undefined}
           >
-            {refreshing ? 'Refreshing…' : 'Refresh'}
+            <OperationIcon name="refresh" />
+            {refreshing ? 'Refreshing…' : rows === null && error ? 'Try again' : 'Refresh'}
           </button>
         }
       />
@@ -195,16 +229,17 @@ export default function AdminSystemErrors() {
       {error ? (
         <Notice
           tone="caution"
-          message="We could not refresh the error list; showing the last values we received."
+          message={rows === null ? 'We could not load the error list. Try again to check for unresolved errors.' : 'We could not refresh the error list; showing the last values we received.'}
         />
       ) : null}
+      {resolvedMessage ? <div ref={resultRef} tabIndex={-1}><Notice tone="ok" message={resolvedMessage} /></div> : null}
 
       {loading ? (
         <AdminLoadingState label="Loading system errors…" />
-      ) : visibleRows.length === 0 && !nextCursor ? (
+      ) : rows === null ? null : visibleRows.length === 0 && !nextCursor ? (
         <AdminEmptyState
           title="No unresolved errors"
-          description="Nothing is currently flagged. New system errors appear here as soon as they are logged."
+          description="No unresolved errors were returned by the last check. Refresh to check for new errors."
         />
       ) : (
         <>
@@ -241,10 +276,12 @@ export default function AdminSystemErrors() {
                         </p>
                       </div>
                       <button
+                        ref={(node) => { if (node) rowRefs.current.set(row.id, node); else rowRefs.current.delete(row.id); }}
                         type="button"
                         className={secondaryButtonClass}
                         onClick={() => resolveRow(row)}
-                        disabled={resolvingId === row.id}
+                        disabled={Boolean(resolvingId) || refreshing || loadingMore}
+                        aria-busy={resolvingId === row.id || undefined}
                       >
                         {resolvingId === row.id ? 'Resolving…' : 'Resolve'}
                       </button>
@@ -258,12 +295,14 @@ export default function AdminSystemErrors() {
             </ul>
           </Panel>
           {nextCursor ? (
-            <div>
+            <div className="flex flex-col gap-xs">
+              {moreError ? <Notice tone="error" message={`The next page could not be loaded. ${moreError}`} /> : null}
               <button
                 type="button"
                 className={secondaryButtonClass}
                 onClick={loadMore}
-                disabled={loadingMore}
+                disabled={loadingMore || refreshing || Boolean(resolvingId)}
+                aria-busy={loadingMore || undefined}
               >
                 {loadingMore ? 'Loading more…' : 'Load more'}
               </button>

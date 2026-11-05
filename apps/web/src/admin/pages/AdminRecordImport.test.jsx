@@ -144,6 +144,49 @@ describe('AdminRecordImport', () => {
     expect(screen.queryByRole('button', { name: /as drafts/ })).not.toBeInTheDocument();
   });
 
+  it('ignores a preview that finishes after the mapping has changed', async () => {
+    let finish;
+    callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    renderPage();
+    await chooseFile(SPEAKER_CSV);
+    fireEvent.click(screen.getByRole('button', { name: 'Preview import' }));
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'last_name' } });
+    await act(async () => finish(PREVIEW));
+    expect(screen.queryByRole('region', { name: /Preview: speakers/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Import 1 speaker/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('First name')).toHaveValue('last_name');
+  });
+
+  it('keeps confirmed inputs fixed during import and focuses the result', async () => {
+    let finish;
+    callMock.mockResolvedValueOnce(PREVIEW).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    renderPage();
+    await chooseFile(SPEAKER_CSV);
+    fireEvent.click(screen.getByRole('button', { name: 'Preview import' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Import 1 speaker as drafts' }));
+    expect(screen.getByLabelText('Record type')).toBeDisabled();
+    expect(screen.getByLabelText('CSV file')).toBeDisabled();
+    expect(screen.getByLabelText('First name')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Record type'), { target: { value: 'organizations' } });
+    expect(screen.getByLabelText('Record type')).toHaveValue('speakers');
+    await act(async () => finish({ ...PREVIEW, dryRun: false }));
+    expect(screen.getByLabelText('Record type')).not.toBeDisabled();
+    expect(screen.getByRole('status').parentElement).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Open speakers' })).toBeInTheDocument();
+  });
+
+  it('ignores an earlier file read after another file is selected', async () => {
+    let finish;
+    const older = csvFile(SPEAKER_CSV, 'older.csv');
+    older.text = () => new Promise((resolve) => { finish = resolve; });
+    renderPage();
+    fireEvent.change(screen.getByLabelText('CSV file'), { target: { files: [older] } });
+    await chooseFile('external_id,first_name\nNEW,Newer\n');
+    await act(async () => finish(SPEAKER_CSV));
+    expect(screen.getByText('speakers.csv · 1 row')).toBeInTheDocument();
+    expect(screen.queryByText(/older.csv/)).not.toBeInTheDocument();
+  });
+
   it('shows a refused confirm verbatim and asks for a new preview', async () => {
     callMock.mockResolvedValueOnce(PREVIEW);
     const refused = Object.assign(new Error('The file or the column mapping changed after the preview. Preview the import again.'), { status: 409 });
