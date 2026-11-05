@@ -154,7 +154,6 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
           <h3 className="text-admin-lg font-bold">Ticket types</h3>
           {draft.ticketTypes.map((type, index) => <fieldset key={type.id} className="min-w-0 space-y-sm rounded-admin-panel border-admin-hairline border-admin-rule-hairline p-md">
             <legend className="px-xs text-admin-base font-bold">{type.name || `Ticket type ${index + 1}`}</legend>
-            <p className="font-admin-data text-admin-xs text-admin-ink-data">{type.id}</p>
             <div className="grid gap-md sm:grid-cols-2">
               <TextField label="Ticket name" value={type.name} maxLength={120} onChange={(value) => updateType(index, 'name', value)} />
               <TextField label={`Price (${draft.currency.toUpperCase()})`} type="text" inputMode="decimal" value={priceInputs[type.id] ?? '0'} error={priceErrors[type.id]} hint={`0 for free admission. Current preview: ${formatTicketMoney(Math.round(Number(priceInputs[type.id]) * (10 ** currencyDigits(draft.currency))), draft.currency)}`} onChange={(value) => setPriceInputs((previous) => ({ ...previous, [type.id]: value }))} />

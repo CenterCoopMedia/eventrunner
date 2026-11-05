@@ -120,13 +120,12 @@ export default function AdminRegistrationForm() {
     <div className="flex flex-col gap-md [overflow-wrap:anywhere]">
       <AdminPageHeader
         title="Registration form"
-        identifiers={`Revision ${draft.revision}`}
         description="The questions each attendee answers when they register. Answers about diet and access are private to staff."
         // The editor form is named here: the preview sits outside it, so Enter
         // in a preview answer can never save the form.
         actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}>{busy ? 'Saving…' : 'Save registration form'}</button>}
       />
-      {listError ? <Notice tone="caution" message="Cannot load the saved form. Reconnecting; it may be out of date." /> : null}
+      {listError ? <Notice tone="caution" message="The saved form did not load. Trying again…" /> : null}
       {conflict ? (
         <div className="flex flex-col gap-xs">
           <Notice tone="caution" message="Someone saved the registration form after you opened it. Your unsaved changes are still below. Load the current version to continue." />

@@ -7,6 +7,7 @@
 // them one by one on each attendee's record.
 import { activeQuestions, answerText, summarizeAnswers } from 'shared/registrationForm';
 import { Panel, fieldHintClass } from './formControls.jsx';
+import { ticketStatusLabel } from '../../lib/ticketingCommerce.js';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -61,13 +62,13 @@ export function AttendeeAnswers({ form, records }) {
   return (
     <section aria-label="Registration answers" className="flex flex-col gap-xs">
       <h3 className="font-admin-ui text-admin-base font-semibold text-admin-ink">Registration answers</h3>
-      {!records.length ? <p className={fieldHintClass}>No answers yet.</p> : records.map((record) => {
+      {!records.length ? <p className={fieldHintClass}>No answers yet.</p> : records.map((record, index) => {
         const invalid = record.ticketStatus !== undefined && record.ticketStatus !== 'valid';
         return (
           <dl key={record.id} className="grid gap-x-sm gap-y-3xs sm:grid-cols-[12rem_minmax(0,1fr)]">
             {records.length > 1 || invalid ? (
               <p className="font-admin-data text-admin-xs text-admin-ink-data sm:col-span-2">
-                Ticket {record.id}{invalid ? ` (${record.ticketStatus}: not counted in the summary)` : ''}
+                Ticket {index + 1}{invalid ? ` (not counted: ${ticketStatusLabel(record.ticketStatus).toLowerCase()})` : ''}
               </p>
             ) : null}
             {questions.map((question) => {

@@ -37,6 +37,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import { ticketStatusLabel } from '../../lib/ticketingCommerce.js';
 
 const StripeTicketingWorkspace = lazy(() => import('../components/StripeTicketingWorkspace.jsx'));
 
@@ -51,6 +52,13 @@ const MAPPING_FIELDS = [
   { id: 'status', label: 'Status', required: false },
   { id: 'purchasedAt', label: 'Purchase date', required: false },
 ];
+
+const PROVIDER_LABELS = { stripe: 'Stripe', eventbrite: 'Eventbrite', manual: 'Manual list', none: 'None' };
+
+function localDateTime(value) {
+  const ms = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(ms) ? new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : null;
+}
 
 const VERDICT_LABELS = {
   create: 'New ticket',
@@ -103,7 +111,7 @@ function StatusCard({ status, error, onRefresh, busy }) {
         <dl className="grid grid-cols-1 gap-sm text-admin-sm sm:grid-cols-2">
           <div>
             <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Provider</dt>
-            <dd className="font-admin-data text-admin-ink-data">{status.provider}</dd>
+            <dd className="font-admin-data text-admin-ink-data">{PROVIDER_LABELS[status.provider] || 'Other'}</dd>
           </div>
           <div>
             <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Webhook support</dt>
@@ -117,32 +125,25 @@ function StatusCard({ status, error, onRefresh, busy }) {
               <dd className="text-admin-ink-secondary">
                 {status.webhookRegisteredAt ? (
                   <span className="font-admin-data text-admin-ink-data">
-                    Registered {status.webhookRegisteredAt}
-                    {status.webhookId ? ` (id ${status.webhookId})` : ''}
+                    {localDateTime(status.webhookRegisteredAt) ? `Connected on ${localDateTime(status.webhookRegisteredAt)}` : 'Connected'}
                   </span>
                 ) : status.provider === 'stripe' ? (
                   'Verify the configured endpoint and recent deliveries in Stripe Dashboard.'
                 ) : (
-                  <>
-                    Not registered —{' '}
-                    <code className="rounded-admin-small bg-admin-ground-soft px-2xs py-3xs font-admin-data text-admin-xs text-admin-ink-data">
-                      node scripts/register-ticketing-webhook.cjs
-                    </code>
-                  </>
+                  'Not connected. Ask Joe to connect ticket updates.'
                 )}
               </dd>
             </div>
           ) : null}
           <div>
-            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Last webhook delivery</dt>
-            <dd className="font-admin-data text-admin-ink-data">{status.lastDeliveryAt ?? 'None'}</dd>
+            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Last ticket update</dt>
+            <dd className="font-admin-data text-admin-ink-data">{localDateTime(status.lastDeliveryAt) ?? 'None'}</dd>
           </div>
           <div>
-            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Sync queue</dt>
+            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Update queue</dt>
             <dd className="font-admin-data text-admin-ink-data">
-              {status.queue.pending} pending{status.queue.pendingCapped ? '+' : ''}
-              {', '}
-              {status.queue.exhausted} exhausted{status.queue.exhaustedCapped ? '+' : ''}
+              Updates waiting: {status.queue.pending}{status.queue.pendingCapped ? '+' : ''}.
+              {' '}Updates that failed: {status.queue.exhausted}{status.queue.exhaustedCapped ? '+' : ''}.
             </dd>
           </div>
         </dl>
@@ -280,7 +281,7 @@ function ImportPanel({ call, onImported }) {
       setParsed(null);
       onImported();
     } catch (err) {
-      setNotice({ kind: 'error', message: err?.message ?? 'The import could not be committed.' });
+      setNotice({ kind: 'error', message: err?.message ?? 'The import did not finish. Nothing changed. Try again.' });
     } finally {
       setBusy(false);
     }
@@ -324,7 +325,7 @@ function ImportPanel({ call, onImported }) {
               </button>
               {preview ? (
                 <button type="button" className={primaryButtonClass} onClick={commit} disabled={busy}>
-                  {busy ? 'Importing…' : `Commit ${preview.summary.create + preview.summary.update} tickets`}
+                  {busy ? 'Importing…' : `Import ${preview.summary.create + preview.summary.update} tickets`}
                 </button>
               ) : null}
             </div>
@@ -424,7 +425,6 @@ function TicketList({ call, refreshToken }) {
           <table className="w-full min-w-[40rem] border-collapse text-admin-sm">
             <thead>
               <tr>
-                <GalleyHead>Ticket ID</GalleyHead>
                 <GalleyHead>Email</GalleyHead>
                 <GalleyHead>Name</GalleyHead>
                 <GalleyHead>Status</GalleyHead>
@@ -434,12 +434,11 @@ function TicketList({ call, refreshToken }) {
             <tbody>
               {tickets.map((t) => (
                 <tr key={t.id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
-                  <td className="px-sm py-xs font-admin-data text-admin-ink-data">{t.id}</td>
                   <td className="px-sm py-xs font-admin-data text-admin-ink-data">{t.email ?? '—'}</td>
                   <td className="px-sm py-xs text-admin-ink-secondary">
                     {[t.firstName, t.lastName].filter(Boolean).join(' ') || '—'}
                   </td>
-                  <td className="px-sm py-xs font-admin-data text-admin-ink-data">{t.status ?? '—'}</td>
+                  <td className="px-sm py-xs font-admin-data text-admin-ink-data">{t.status ? ticketStatusLabel(t.status) : '—'}</td>
                   <td className="px-sm py-xs text-admin-ink-secondary">{t.claimedByUid ? 'Yes' : 'No'}</td>
                 </tr>
               ))}

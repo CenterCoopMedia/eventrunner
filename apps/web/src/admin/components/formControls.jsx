@@ -422,7 +422,7 @@ export function FieldError({ id, message, role }) {
  * case the guidelines reserve it for, and `tabIndex -1` so a submit handler
  * can move focus here. The failed value is never discarded.
  */
-export function ServerErrorSummary({ error, errorRef, title = 'The server rejected this save' }) {
+export function ServerErrorSummary({ error, errorRef, title = 'This was not saved' }) {
   if (!error) return null;
   const segments = error.fieldErrors ?? [];
   return (
@@ -434,13 +434,13 @@ export function ServerErrorSummary({ error, errorRef, title = 'The server reject
     >
       <p className="text-admin-base font-bold">{title}</p>
       {segments.length > 1 ? (
-        <ul className="mt-2xs list-disc ps-5 font-admin-data text-admin-sm">
+        <ul className="mt-2xs list-disc ps-5 text-admin-sm">
           {segments.map((segment, index) => (
             <li key={`${segment.message}-${index}`}>{segment.message}</li>
           ))}
         </ul>
       ) : (
-        <p className="mt-3xs font-admin-data text-admin-sm">{error.message}</p>
+        <p className="mt-3xs text-admin-sm">{segments.length === 1 ? segments[0].message : error.message}</p>
       )}
     </div>
   );

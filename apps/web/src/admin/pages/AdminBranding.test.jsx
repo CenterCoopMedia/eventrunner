@@ -711,7 +711,7 @@ describe('publishing the theme', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('theme.colors.primary: must be a hex color');
+    expect(alert).toHaveTextContent('Primary: must be a hex color');
     expect(screen.getByLabelText('Primary')).toHaveAttribute('aria-invalid', 'true');
   });
 
