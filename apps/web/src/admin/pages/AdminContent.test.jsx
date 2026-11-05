@@ -742,3 +742,46 @@ describe('server errors and publish skips', () => {
     expect((await screen.findAllByText(/picks it up live/i)).length).toBeGreaterThan(0);
   });
 });
+
+
+describe('contextual block actions', () => {
+  it('keeps publishing feedback on its row and restores focus when the publish control leaves', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
+    await renderAt('/admin/content/scholarships/intro');
+    const row = (await screen.findByRole('link', { name: 'Scholarships open in spring.', exact: true })).closest('li');
+    let answer;
+    fetch.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    const publish = within(row).getByRole('button', { name: 'Publish' });
+    publish.focus();
+    fireEvent.click(publish);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(publish).toHaveAttribute('aria-busy', 'true');
+    expect(within(row).getByRole('button', { name: 'Delete' })).toBeDisabled();
+    act(() => {
+      adminSubscriptions.get('cmsContent')([{ ...BODY_BLOCK_DRAFT, status: undefined }]);
+      adminSubscriptions.get('cmsContent_drafts')([{ ...BODY_BLOCK_DRAFT, status: 'clean' }]);
+    });
+    expect(publish.isConnected).toBe(false);
+    await act(async () => { answer(okResponse({ results: { cmsContent: { published: ['intro__body'], skipped: [] } } })); });
+    const result = within(row).getByRole('status');
+    expect(result).toHaveTextContent('Published. The public site picks it up live.');
+    expect(result.parentElement).toHaveFocus();
+  });
+
+  it('retains a deletion receipt where the removed block was', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
+    await renderAt('/admin/content/scholarships/intro');
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete', exact: true }));
+    const confirm = screen.getByRole('button', { name: 'Delete this block' });
+    confirm.focus();
+    fetch.mockResolvedValueOnce(okResponse({}));
+    fireEvent.click(confirm);
+    const result = await screen.findByText(/deleted. The live block and its draft were removed/);
+    act(() => adminSubscriptions.get('cmsContent_drafts')([]));
+    expect(result).toBeInTheDocument();
+    expect(result.parentElement).toHaveFocus();
+    expect(screen.getByText('Deleted', { exact: true })).toBeInTheDocument();
+  });
+});

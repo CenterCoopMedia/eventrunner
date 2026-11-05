@@ -62,7 +62,6 @@ import {
   FieldError,
   Notice,
   Panel,
-  SaveStatus,
   SelectField,
   ServerErrorSummary,
   TextAreaField,
@@ -76,6 +75,7 @@ import {
 } from '../components/formControls.jsx';
 import EditorDisclosure from '../components/EditorDisclosure.jsx';
 import { OrderAnnouncement, ReorderControls, bindReorderDrop } from '../components/ReorderControls.jsx';
+import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -199,6 +199,7 @@ export default function AdminPageEditor({ mode }) {
     mode === 'create' ? pageSnapshot(blankPage()) : null
   ));
   const [error, setError] = useState(null);
+  const [errorTitle, setErrorTitle] = useState(undefined);
   const [busy, setBusy] = useState(null); // null | 'draft' | 'publish' | 'delete'
   const [status, setStatus] = useState('');
   // Set once a create has landed, so the form switches to editing that
@@ -218,6 +219,7 @@ export default function AdminPageEditor({ mode }) {
   // our own save) must not clobber whatever is being typed.
   const loadedIdRef = useRef(null);
   const nextSectionKey = useRef(0);
+  const pendingItemFocus = useRef(null);
   // Ids the server refused on create. The listener may not have them yet.
   const rejectedPageIds = useRef(new Set());
 
@@ -256,6 +258,24 @@ export default function AdminPageEditor({ mode }) {
     return map;
   }, [error]);
   const errorFor = (field) => fieldErrors.get(field);
+
+  useEffect(() => {
+    if ([...fieldErrors.keys()].some((field) => field.startsWith('layout.'))) setLayoutOpen(true);
+  }, [fieldErrors]);
+
+  useEffect(() => {
+    const request = pendingItemFocus.current;
+    if (!request) return;
+    pendingItemFocus.current = null;
+    const section = formRef.current?.querySelector(`[data-editor-section="${request.sectionKey}"]`);
+    const target = request.kind === 'section-toggle'
+      ? section?.querySelector('.admin-editor-disclosure__toggle')
+      : request.kind === 'block'
+        ? section?.querySelector(`[data-editor-block="${request.blockIndex}"] input:not([readonly]), [data-editor-block="${request.blockIndex}"] select`)
+          ?? section?.querySelector('[data-add-block]')
+        : section?.querySelector('input:not([readonly]), select');
+    (target ?? formRef.current?.querySelector('[data-add-section]'))?.focus();
+  }, [page.sections]);
 
   if (mode === 'edit' && ready && !row) {
     return (
@@ -303,6 +323,33 @@ export default function AdminPageEditor({ mode }) {
         i === index ? { ...section, ...patch } : section,
       ),
     }));
+  function addSection() {
+    const key = nextSectionKey.current++;
+    pendingItemFocus.current = { kind: 'section', sectionKey: key };
+    update({ sections: [...page.sections, { ...blankSection(), [EDITOR_SECTION_KEY]: key }] });
+  }
+
+  function removeSection(index) {
+    const next = page.sections.filter((_, at) => at !== index);
+    pendingItemFocus.current = { kind: 'section-toggle', sectionKey: next[Math.min(index, next.length - 1)]?.[EDITOR_SECTION_KEY] };
+    update({ sections: next });
+  }
+
+  function addBlock(sectionIndex) {
+    const section = page.sections[sectionIndex];
+    pendingItemFocus.current = { kind: 'block', sectionKey: section[EDITOR_SECTION_KEY], blockIndex: section.defaultBlocks.length };
+    updateSection(sectionIndex, { defaultBlocks: [...section.defaultBlocks, {
+      field: '', blockType: section.allowedBlocks[0] ?? BLOCK_TYPE_IDS[0], description: '',
+    }] });
+  }
+
+  function removeBlock(sectionIndex, blockIndex) {
+    const section = page.sections[sectionIndex];
+    const next = section.defaultBlocks.filter((_, at) => at !== blockIndex);
+    pendingItemFocus.current = { kind: 'block', sectionKey: section[EDITOR_SECTION_KEY], blockIndex: Math.min(blockIndex, next.length - 1) };
+    updateSection(sectionIndex, { defaultBlocks: next });
+  }
+
   function moveSections(from, to) {
     const next = moveItem(page.sections, from, to);
     if (next === page.sections) return false;
@@ -338,9 +385,11 @@ export default function AdminPageEditor({ mode }) {
 
   async function save({ publish }) {
     setError(null);
+    setErrorTitle(undefined);
     setStatus('');
     setResumeQueueId(null);
     if (!String(page.label ?? '').trim()) {
+      setErrorTitle('Enter a navigation label');
       setError({
         message: 'Enter a navigation label.',
         fieldErrors: [{ field: 'label', message: 'Enter a navigation label.' }],
@@ -372,6 +421,7 @@ export default function AdminPageEditor({ mode }) {
     if (pageSnapshot(assigned) !== pageSnapshot(page)) setPage(assigned);
     const payload = toPagePayload(assigned);
     setBusy(publish ? 'publish' : 'draft');
+    let stage = 'save';
     try {
       await call('cmsSavePage', creating ? { page: payload, create: true } : { page: payload });
       // Mark the document existing the moment the DRAFT is written, before
@@ -383,18 +433,20 @@ export default function AdminPageEditor({ mode }) {
       setSavedSnapshot(pageSnapshot(assigned));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
-        showToast('Draft saved.');
+        showToast('Draft saved.', { announce: false });
         return;
       }
       // Separate call by design: cmsSavePage only ever writes the draft
       // revision; the live doc is cmsPublish's to write (spec §8.4).
+      stage = 'publish';
       const response = await call('cmsPublish', {
         collection: 'cmsPages',
         docIds: [payload.id],
       });
       reportPublish(response, [payload.id]);
     } catch (err) {
-      if (creating && err?.status === 409) {
+      if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
+      if (creating && stage === 'save' && err?.status === 409) {
         rejectedPageIds.current.add(payload.id);
         setPage((current) => ({ ...current, id: '' }));
         setError({
@@ -413,8 +465,9 @@ export default function AdminPageEditor({ mode }) {
   /** cmsPublish answers 200 even when it skipped what you asked for. */
   function reportPublish(response, requestedIds) {
     const verdict = summarizePublish(response, 'cmsPages', requestedIds);
+    if (!verdict.ok) throw new Error(verdict.message);
     setStatus(verdict.message);
-    showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
+    showToast(verdict.message, { announce: false });
   }
 
   /**
@@ -425,6 +478,8 @@ export default function AdminPageEditor({ mode }) {
   async function resumePublish() {
     setBusy('publish');
     setError(null);
+    setErrorTitle('The draft is saved, and it is not published');
+    setStatus('');
     try {
       const response = await call('cmsPublish', { queueId: resumeQueueId });
       setResumeQueueId(null);
@@ -440,11 +495,13 @@ export default function AdminPageEditor({ mode }) {
   async function remove() {
     setBusy('delete');
     setError(null);
+    setErrorTitle(undefined);
     try {
       await call('cmsDeletePage', { id: page.id });
       showToast('Page deleted.');
       navigate('..', { relative: 'path' });
     } catch (err) {
+      setErrorTitle('The server refused the delete');
       setError(err);
       setBusy(null);
     }
@@ -480,23 +537,24 @@ export default function AdminPageEditor({ mode }) {
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to pages
             </Link>
-            <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
+            <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
               {busy === 'draft' ? 'Saving…' : 'Save draft'}
             </button>
             <button
               type="button"
               className={primaryButtonClass}
               disabled={busy !== null}
+              aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
               {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
             </button>
+            <EditorActionFeedback status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />
 
-      <ServerErrorSummary error={error} errorRef={errorRef} />
-      {status ? <SaveStatus message={status} /> : null}
+      <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog
           onStay={leaveGuard.stay}
@@ -710,7 +768,8 @@ export default function AdminPageEditor({ mode }) {
           <button
             type="button"
             className={secondaryButtonClass}
-            onClick={() => update({ sections: [...page.sections, { ...blankSection(), [EDITOR_SECTION_KEY]: nextSectionKey.current++ }] })}
+            data-add-section=""
+            onClick={addSection}
           >
             Add section
           </button>
@@ -728,6 +787,7 @@ export default function AdminPageEditor({ mode }) {
               return (
                 <li
                   key={section[EDITOR_SECTION_KEY]}
+                  data-editor-section={section[EDITOR_SECTION_KEY]}
                   className="min-w-0"
                   {...bindReorderDrop('section:', sectionIndex, moveSections)}
                 >
@@ -751,11 +811,7 @@ export default function AdminPageEditor({ mode }) {
                         type="button"
                         className={dangerButtonClass}
                         aria-label={`Remove section ${sectionIndex + 1}`}
-                        onClick={() =>
-                          update({
-                            sections: page.sections.filter((_, i) => i !== sectionIndex),
-                          })
-                        }
+                        onClick={() => removeSection(sectionIndex)}
                       >
                         Remove
                       </button>
@@ -867,18 +923,8 @@ export default function AdminPageEditor({ mode }) {
                       <button
                         type="button"
                         className={secondaryButtonClass}
-                        onClick={() =>
-                          updateSection(sectionIndex, {
-                            defaultBlocks: [
-                              ...section.defaultBlocks,
-                              {
-                                field: '',
-                                blockType: section.allowedBlocks[0] ?? BLOCK_TYPE_IDS[0],
-                                description: '',
-                              },
-                            ],
-                          })
-                        }
+                        data-add-block=""
+                        onClick={() => addBlock(sectionIndex)}
                       >
                         Add block to section {sectionIndex + 1}
                       </button>
@@ -901,6 +947,7 @@ export default function AdminPageEditor({ mode }) {
                           ).map((id) => ({ value: id, label: blockTypeLabel(id) }));
                           return (
                             <li
+                              data-editor-block={blockIndex}
                               key={blockIndex}
                               className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-sm"
                               {...bindReorderDrop(`block:${sectionIndex}:`, blockIndex, (from, to) => moveBlocks(sectionIndex, from, to))}
@@ -951,13 +998,7 @@ export default function AdminPageEditor({ mode }) {
                                   type="button"
                                   className={dangerButtonClass}
                                   aria-label={`Remove block ${blockIndex + 1} from section ${sectionIndex + 1}`}
-                                  onClick={() =>
-                                    updateSection(sectionIndex, {
-                                      defaultBlocks: section.defaultBlocks.filter(
-                                        (_, j) => j !== blockIndex,
-                                      ),
-                                    })
-                                  }
+                                  onClick={() => removeBlock(sectionIndex, blockIndex)}
                                 >
                                   Remove
                                 </button>

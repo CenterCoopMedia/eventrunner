@@ -724,6 +724,33 @@ describe('page editor', () => {
     expect(screen.getByLabelText('Rich text — section 1')).toBeVisible();
   });
 
+  it('reveals a rejected individual layout setting', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'Invalid page: layout.navPlacement: choose a supported position'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Navigation on this page')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Hide the individual settings' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('takes focus to added sections and blocks, and restores it after their removal', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    const add = await screen.findByRole('button', { name: 'Add section' });
+    fireEvent.click(add);
+    expect(screen.getByLabelText('Section 2 label')).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove section 2' }));
+    const intro = screen.getByRole('button', { name: 'Intro 1 block · 1 allowed type' });
+    expect(intro).toHaveFocus();
+    fireEvent.click(intro);
+    const addBlock = screen.getByRole('button', { name: 'Add block to section 1' });
+    fireEvent.click(addBlock);
+    expect(screen.getByLabelText('Block 2 type — section 1')).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove block 2 from section 1' }));
+    expect(screen.getByLabelText('Block 1 type — section 1')).toHaveFocus();
+  });
+
   it('adds, reorders, and removes blocks within a section', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));

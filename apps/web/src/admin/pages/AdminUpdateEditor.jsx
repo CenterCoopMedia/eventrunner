@@ -38,7 +38,6 @@ import {
   DestructiveConfirm,
   Notice,
   Panel,
-  SaveStatus,
   ServerErrorSummary,
   TextAreaField,
   TextField,
@@ -46,6 +45,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -116,7 +116,8 @@ export default function AdminUpdateEditor({ mode }) {
   const [focusRequest, setFocusRequest] = useState(0);
   const [error, setError] = useState(null);
   const [errorTitle, setErrorTitle] = useState(undefined);
-  const [saving, setSaving] = useState(false);
+  const [action, setAction] = useState(null);
+  const saving = action !== null;
   const [status, setStatus] = useState('');
   // The id this form created, once its first save lands. The route then
   // moves to the update's own address. The router keeps this component
@@ -186,7 +187,7 @@ export default function AdminUpdateEditor({ mode }) {
       setFocusRequest((count) => count + 1);
       return;
     }
-    setSaving(true);
+    setAction(publish ? 'publish' : 'draft');
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -222,12 +223,12 @@ export default function AdminUpdateEditor({ mode }) {
       }
       setError(err);
     } finally {
-      setSaving(false);
+      setAction(null);
     }
   }
 
   async function remove() {
-    setSaving(true);
+    setAction('delete');
     setError(null);
     setErrorTitle(undefined);
     try {
@@ -238,7 +239,7 @@ export default function AdminUpdateEditor({ mode }) {
       setErrorTitle('The server refused the delete');
       setError(err);
     } finally {
-      setSaving(false);
+      setAction(null);
     }
   }
 
@@ -312,19 +313,20 @@ export default function AdminUpdateEditor({ mode }) {
               type="submit"
               className={secondaryButtonClass}
               disabled={saving}
-              aria-busy={saving || undefined}
+              aria-busy={action === 'draft' || undefined}
             >
-              {saving ? 'Saving…' : 'Save draft'}
+              {action === 'draft' ? 'Saving…' : 'Save draft'}
             </button>
             <button
               type="button"
               className={primaryButtonClass}
               disabled={saving}
-              aria-busy={saving || undefined}
+              aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {saving ? 'Working…' : 'Save and publish'}
+              {action === 'publish' ? 'Publishing…' : 'Save and publish'}
             </button>
+            <EditorActionFeedback status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />
@@ -332,7 +334,6 @@ export default function AdminUpdateEditor({ mode }) {
       {features?.updates ? null : <Notice tone="caution" message={UPDATES_OFF_MESSAGE} />}
 
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
-      {status ? <SaveStatus message={status} /> : null}
 
       <Panel title="Public update">
         <div className="flex flex-col gap-sm">
@@ -423,7 +424,8 @@ export default function AdminUpdateEditor({ mode }) {
             title={`Delete ${form.title.trim() || updateId}`}
             confirmLabel="Delete this update"
             busyLabel="Deleting…"
-            busy={saving}
+            busy={action === 'delete'}
+            disabled={saving}
             consequence="The live update and its draft are removed together. Its version history stays."
             permanence="This cannot be undone."
             onConfirm={remove}

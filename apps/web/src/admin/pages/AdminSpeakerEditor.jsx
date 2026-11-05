@@ -30,7 +30,6 @@ import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import {
   DestructiveConfirm,
   Panel,
-  SaveStatus,
   SelectField,
   FieldError,
   ServerErrorSummary,
@@ -40,6 +39,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -179,7 +179,9 @@ export default function AdminSpeakerEditor({ mode }) {
     mode === 'create' ? editorSnapshot(EMPTY) : null
   ));
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [errorTitle, setErrorTitle] = useState(undefined);
+  const [action, setAction] = useState(null);
+  const saving = action !== null;
   const [status, setStatus] = useState('');
   const [deleteBlocked, setDeleteBlocked] = useState(false);
   // Only a deliberate pick sends a status (see toPayload). Creating always
@@ -228,8 +230,9 @@ export default function AdminSpeakerEditor({ mode }) {
 
   async function submit(event) {
     event.preventDefault();
-    setSaving(true);
+    setAction('draft');
     setError(null);
+    setErrorTitle(undefined);
     setStatus('');
     try {
       if (mode === 'create') {
@@ -245,18 +248,19 @@ export default function AdminSpeakerEditor({ mode }) {
         });
         setSavedSnapshot(editorSnapshot(form));
         setStatus('Saved. The public directory updates within moments.');
-        showToast('Speaker saved.');
+        showToast('Speaker saved.', { announce: false });
       }
     } catch (err) {
       setError(err);
     } finally {
-      setSaving(false);
+      setAction(null);
     }
   }
 
   async function remove(soft) {
-    setSaving(true);
+    setAction('delete');
     setError(null);
+    setErrorTitle(undefined);
     setStatus('');
     try {
       const response = await call('deleteSpeaker', { speakerId, soft });
@@ -270,11 +274,12 @@ export default function AdminSpeakerEditor({ mode }) {
       navigate(SPEAKERS_LIST);
     } catch (err) {
       setError(err);
+      setErrorTitle('The server refused the delete');
       // The server refused a full unlink and named the soft delete as the
       // way through; nothing was changed.
       if (err?.code === 'too-many-references') setDeleteBlocked(true);
     } finally {
-      setSaving(false);
+      setAction(null);
     }
   }
 
@@ -305,14 +310,16 @@ export default function AdminSpeakerEditor({ mode }) {
         identifiers={null}
         description="This is the one record for this person. Sessions point at it by id, and the public directory shows a published copy of the safe fields."
         actions={
-          <button type="submit" className={primaryButtonClass} disabled={saving || photoBusy}>
-            {saving ? 'Saving…' : mode === 'create' ? 'Create speaker' : 'Save speaker'}
-          </button>
+          <>
+            <button type="submit" className={primaryButtonClass} disabled={saving || photoBusy} aria-busy={action === 'draft' || undefined}>
+              {action === 'draft' ? 'Saving…' : mode === 'create' ? 'Create speaker' : 'Save speaker'}
+            </button>
+            <EditorActionFeedback status={status} error={error} errorTitle={errorTitle} />
+          </>
         }
       />
 
-      <ServerErrorSummary error={error} errorRef={errorRef} />
-      {status ? <SaveStatus message={status} /> : null}
+      <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog
           onStay={leaveGuard.stay}
@@ -490,7 +497,8 @@ export default function AdminSpeakerEditor({ mode }) {
             title={`Delete ${form.firstName} ${form.lastName}`.trim()}
             confirmLabel="Delete this speaker"
             busyLabel="Deleting…"
-            busy={saving}
+            busy={action === 'delete'}
+            disabled={saving}
             consequence="The speaker record goes, and every session that references them is unlinked. Their profile disappears from the public directory."
             permanence="This cannot be undone. To keep the record and only hide it, mark the speaker removed instead."
             onConfirm={() => remove(false)}
@@ -510,7 +518,8 @@ export default function AdminSpeakerEditor({ mode }) {
             trigger="Mark this speaker removed"
             confirmLabel="Mark this speaker removed"
             busyLabel="Marking…"
-            busy={saving}
+            busy={action === 'delete'}
+            disabled={saving}
             consequence="The record stays and keeps every field. The speaker disappears from the public directory and from every public surface, and the sessions that reference them are left alone."
             onConfirm={() => remove(true)}
           />

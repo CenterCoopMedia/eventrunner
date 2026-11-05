@@ -591,6 +591,27 @@ describe('invite actions', () => {
     expect(screen.queryByRole('button', { name: 'Invite' })).not.toBeInTheDocument();
   });
 
+  it('keeps a refused row action beside its speaker and prevents overlapping requests', async () => {
+    speakerDocs = [{ ...RAE, status: 'invited' }];
+    let answer;
+    routeInviteFetch({ action: () => new Promise((resolve) => { answer = resolve; }) });
+    await renderAt('/admin/speakers');
+    const row = (await screen.findByRole('link', { name: 'Rae Okonkwo', exact: true })).closest('li');
+    const resend = within(row).getByRole('button', { name: 'Resend invite' });
+    resend.focus();
+    fireEvent.click(resend);
+    await waitFor(() => expect(callTo('resendSpeakerInvite')).toBeTruthy());
+    expect(resend).toHaveAttribute('aria-busy', 'true');
+    const cancel = within(row).getByRole('button', { name: 'Cancel invite' });
+    expect(cancel).toBeDisabled();
+    fireEvent.click(cancel);
+    expect(callTo('cancelSpeakerInvite')).toBeFalsy();
+    await act(async () => { answer(errorResponse(409, 'invalid-status', 'This invitation is already accepted.')); });
+    expect(within(row).getByRole('alert')).toHaveTextContent('This invitation is already accepted.');
+    expect(resend).not.toHaveAttribute('aria-busy');
+    expect(cancel).not.toBeDisabled();
+  });
+
   it('posts sendSpeakerInvite with the speaker id and confirms', async () => {
     speakerDocs = [{ ...RAE, id: 'draft-one', firstName: 'Draft', lastName: 'One', status: 'draft' }];
     routeInviteFetch({ action: okResponse({ speakerId: 'draft-one', status: 'invited' }) });
@@ -753,6 +774,8 @@ describe('pending-edit review (issue #22 review finding P1-1)', () => {
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+      expect(callTo('discardSpeakerPendingEdits')).toBeFalsy();
+      fireEvent.click(screen.getByRole('button', { name: 'Discard pending changes' }));
     });
 
     await waitFor(() => expect(callTo('discardSpeakerPendingEdits')).toBeTruthy());
