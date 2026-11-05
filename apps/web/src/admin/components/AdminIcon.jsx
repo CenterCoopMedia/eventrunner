@@ -7,6 +7,7 @@ export default function AdminIcon({ name, className = '' }) {
     expand: <path d="m10 6 6 6-6 6" />,
     help: <><circle cx="12" cy="12" r="9" /><path d="M9.2 9a3 3 0 0 1 5.8 1c0 2-3 2-3 4M12 17h.01" /></>,
     globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18" /></>,
+    report: <><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></>,
     signOut: <><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M10 12h10m-4-4 4 4-4 4" /></>,
   };
   return (

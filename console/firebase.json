@@ -45,6 +45,7 @@
       { "source": "/api/disconnectAccount", "function": { "functionId": "disconnectAccount", "region": "us-central1" } },
       { "source": "/api/listEventbriteEvents", "function": { "functionId": "listEventbriteEvents", "region": "us-central1" } },
       { "source": "/api/chooseEventbriteEvent", "function": { "functionId": "chooseEventbriteEvent", "region": "us-central1" } },
+      { "source": "/api/reportProblem", "function": { "functionId": "reportProblem", "region": "us-central1" } },
       { "source": "!/assets/**", "destination": "/index.html" }
     ],
     "headers": [

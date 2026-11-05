@@ -12,6 +12,10 @@ import './index.css';
 import './styles/schedule.css';
 import { initErrorReporting } from './lib/errorReporting.js';
 import { installChunkReload } from './lib/chunkReload.js';
+import { startRecentMessages } from './lib/recentMessages.js';
+
+// Recent warnings and errors ride along with a "Report a problem" report.
+startRecentMessages();
 
 // Client-error telemetry (spec §9, issue #10): on in production builds by
 // default, off in dev/emulator unless VITE_ENABLE_CLIENT_ERROR_REPORTING=true.

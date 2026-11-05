@@ -17,6 +17,7 @@ import ReviewApplication from './pages/review/ReviewApplication.jsx';
 import ReviewQueue from './pages/review/ReviewQueue.jsx';
 import SignupLinks from './pages/review/SignupLinks.jsx';
 import LoadingState from './LoadingState.jsx';
+import ReportProblem from './ReportProblem.jsx';
 
 const MARK = (
   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="mark">
@@ -61,6 +62,7 @@ function Layout() {
           {user ? (
             <div className="account">
               <span className="account-email">{user.email}</span>
+              {user.emailVerified ? <ReportProblem /> : null}
               <button type="button" className="button quiet" onClick={() => signOut()}>Sign out</button>
             </div>
           ) : null}

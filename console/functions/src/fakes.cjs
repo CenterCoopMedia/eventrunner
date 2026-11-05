@@ -36,6 +36,7 @@ const COMPARE = Object.freeze({
   '<=': (a, b) => a <= b,
   '>': (a, b) => a > b,
   '>=': (a, b) => a >= b,
+  in: (a, b) => Array.isArray(b) && b.includes(a),
 });
 
 function makeFakeDb(seed = {}) {
