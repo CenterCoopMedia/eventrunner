@@ -1,0 +1,133 @@
+{
+  "main": "35a98f703de5dcf0064722dc308ec57aa5213220",
+  "captures": [
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr700/navigation-expanded-desktop.png",
+      "bytes": 99489,
+      "blob_sha": "60d9dc525ff294a5e0101a9aa1013abafa4c8219",
+      "pr": 700,
+      "source_head": "4c17d3bf3ae1e44d1f7441734e1535d6bfa2b540",
+      "source_run": 42094901694
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr700/navigation-collapsed-desktop.png",
+      "bytes": 75017,
+      "blob_sha": "c1694d91a29085c4be1d3240c79f8175145b1c6c",
+      "pr": 700,
+      "source_head": "4c17d3bf3ae1e44d1f7441734e1535d6bfa2b540",
+      "source_run": 42094901694
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr700/navigation-320.png",
+      "bytes": 43472,
+      "blob_sha": "49dbcce757d13a192149f9d59f46966a9b6871f9",
+      "pr": 700,
+      "source_head": "4c17d3bf3ae1e44d1f7441734e1535d6bfa2b540",
+      "source_run": 42094901694
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr700/navigation-menu-320.png",
+      "bytes": 23477,
+      "blob_sha": "08b476446fed21357dfe41e0a223938381405a4c",
+      "pr": 700,
+      "source_head": "4c17d3bf3ae1e44d1f7441734e1535d6bfa2b540",
+      "source_run": 42094901694
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr700/media-dialog-320.png",
+      "bytes": 39182,
+      "blob_sha": "64143e0451d7dcbd3330020f34335b231d44a1fd",
+      "pr": 700,
+      "source_head": "4c17d3bf3ae1e44d1f7441734e1535d6bfa2b540",
+      "source_run": 42094901694
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr693/email-log-retry-390.png",
+      "bytes": 64979,
+      "blob_sha": "c10c56cc244a2d36e1c199808c4790925c4e7fb5",
+      "pr": 693,
+      "source_head": "45992e213e6c95d69eb7b4a3dd22be67257be31f",
+      "source_run": 42095781377
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr696/operations-import-result-phone.png",
+      "bytes": 37232,
+      "blob_sha": "eb86146cf4f44926a31a3b72c1463f7f9d07e1ad",
+      "pr": 696,
+      "source_head": "e7a14a7b729f5603ce3c8bce9702bccef20cc1dd",
+      "source_run": 42096377356
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr696/operations-live-editor-desktop.png",
+      "bytes": 126015,
+      "blob_sha": "c4afff8340bc623fe1210cd46f2e259529326072",
+      "pr": 696,
+      "source_head": "e7a14a7b729f5603ce3c8bce9702bccef20cc1dd",
+      "source_run": 42096377356
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr696/operations-live-retry-phone.png",
+      "bytes": 48401,
+      "blob_sha": "1981c173467656194ca6bb65d4ec203b14a7eb62",
+      "pr": 696,
+      "source_head": "e7a14a7b729f5603ce3c8bce9702bccef20cc1dd",
+      "source_run": 42096377356
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr696/operations-live-saved-phone.png",
+      "bytes": 43556,
+      "blob_sha": "2fbc04da33a0680389c5a2c238aac5dee0ba4bd5",
+      "pr": 696,
+      "source_head": "e7a14a7b729f5603ce3c8bce9702bccef20cc1dd",
+      "source_run": 42096377356
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr697/console-feedback-agreement-error-390.png",
+      "bytes": 56586,
+      "blob_sha": "2a8448e706c082c5920104d8c5862d23145a22ea",
+      "pr": 697,
+      "source_head": "af70b2784c6c1bc56749464dee9ab45838106fb3",
+      "source_run": 42096153995
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr697/console-feedback-team-refresh-390.png",
+      "bytes": 57689,
+      "blob_sha": "72ab93266d6f1770a4b7e1b5fad532894e6843da",
+      "pr": 697,
+      "source_head": "af70b2784c6c1bc56749464dee9ab45838106fb3",
+      "source_run": 42096153995
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr697/console-feedback-revoke-error-320.png",
+      "bytes": 56063,
+      "blob_sha": "bd40b2fe36af89f304568a61952ac0685f4d87cd",
+      "pr": 697,
+      "source_head": "af70b2784c6c1bc56749464dee9ab45838106fb3",
+      "source_run": 42096153995
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr697/console-feedback-decision-refresh-1440.png",
+      "bytes": 123041,
+      "blob_sha": "3bf2f8a5e605b59a3632b5cc1217bbde2f365163",
+      "pr": 697,
+      "source_head": "af70b2784c6c1bc56749464dee9ab45838106fb3",
+      "source_run": 42096153995
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr694/console-withdraw-failure-390-light.png",
+      "bytes": 51146,
+      "blob_sha": "1ba69e702cf58f51e97875f17e91b19fc32f3c9b",
+      "pr": 694,
+      "source_head": "53e548a5765c0cbea8eee8c5bae4adc415b8afc4",
+      "source_run": 42096645871
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr694/console-settings-saved-390-light.png",
+      "bytes": 55081,
+      "blob_sha": "2e5a7b8d63de39984b00aeaee380bba6e83d396a",
+      "pr": 694,
+      "source_head": "53e548a5765c0cbea8eee8c5bae4adc415b8afc4",
+      "source_run": 42096645871
+    }
+  ]
+}
