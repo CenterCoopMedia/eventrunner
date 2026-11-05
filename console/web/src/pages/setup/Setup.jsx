@@ -161,14 +161,18 @@ export default function Setup() {
     first?.focus?.();
   }, [showAll, app, location.key]);
 
-  const go = useCallback(async (target) => {
+  // Next stays on a step whose answer the server refused (for example a web
+  // address that is too short), with the field's error beside it. Back, the
+  // step list and Leave still work; the review holds the request until a
+  // new answer saves.
+  const go = useCallback(async (target, { leaving = false } = {}) => {
     if (navigationPending.current) return;
     navigationPending.current = true;
     setNavigating(true);
     const saved = await flush();
     navigationPending.current = false;
     setNavigating(false);
-    if (!saved) {
+    if (!saved || (saved === 'refused' && !leaving)) {
       // A top step link can be far from the save result on a long form.
       actionArea.current?.focus();
       return;
@@ -200,7 +204,7 @@ export default function Setup() {
         orgId={orgId}
         appId={appId}
         disabled={navigating}
-        onGo={(e, target) => { e.preventDefault(); go(setupPath(orgId, appId, target)); }}
+        onGo={(e, target) => { e.preventDefault(); go(setupPath(orgId, appId, target), { leaving: true }); }}
       />
       <section className="step-body" aria-labelledby="step-title">
         <p className="muted">Step {index + 1} of {STEPS.length}</p>
@@ -247,12 +251,12 @@ export default function Setup() {
             <ActionFeedback kind="error">{saveStatusText(saveStatus, saveError)}</ActionFeedback>
           ) : <p className="save-status" role="status" aria-live="polite">{saveStatusText(saveStatus, saveError)}</p>}
           <div className="step-actions">
-            {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous))}>Back</button> : null}
+            {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous), { leaving: true })}>Back</button> : null}
             {next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next</button> : null}
             {saveStatus === 'error' ? <button type="button" className="button" disabled={navigating} onClick={async () => { await flush(); actionArea.current?.focus(); }}>Retry save</button> : null}
           </div>
           <p><Link to={statusPath(orgId, appId)} aria-disabled={navigating || undefined}
-            onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId)); }}>Leave the setup</Link></p>
+            onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId), { leaving: true }); }}>Leave the setup</Link></p>
         </div>
       </section>
     </div>

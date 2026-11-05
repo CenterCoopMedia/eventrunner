@@ -33,6 +33,30 @@ export const TICKET_LABELS = Object.freeze({
 export const NOTE_MAX = 2000;
 
 /** A time for people, for example "4 November 2026, 10:00". */
+/** "14:30" as "2:30 p.m.", for a client reading their own answers. */
+function clockText(time) {
+  const match = /^(\d{2}):(\d{2})$/.exec(time ?? '');
+  if (!match) return time ?? '';
+  const hour = Number(match[1]);
+  const suffix = hour < 12 ? 'a.m.' : 'p.m.';
+  return `${hour % 12 || 12}:${match[2]} ${suffix}`;
+}
+
+/**
+ * One event day as plain text, for example
+ * "Thursday, 15 April 2027, 9:00 a.m. to 5:00 p.m. (Workshops)".
+ * The date is a calendar date, so it is read at noon UTC to keep its day.
+ */
+export function eventDayText(day) {
+  const date = new Date(`${day?.date}T12:00:00Z`);
+  const dateText = Number.isNaN(date.getTime())
+    ? (day?.date ?? '')
+    : date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const hours = day?.startTime && day?.endTime ? `${clockText(day.startTime)} to ${clockText(day.endTime)}` : '';
+  const label = day?.label ? ` (${day.label})` : '';
+  return `${[dateText, hours].filter(Boolean).join(', ')}${label}`;
+}
+
 export function formatDateTime(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
