@@ -115,6 +115,13 @@ test('an Eventbrite answer with no token is refused', async () => {
   await assert.rejects(eventbrite(fakeFetch(json(200, {}))).exchangeCode({ code: 'c', redirectUri }), { message: 'eventbrite exchange: no token' });
 });
 
+test('a Stripe revoke counts an account already gone as ended, and any other refusal as a failure', async () => {
+  const answer = (error_description) => fakeFetch(json(401, { error: 'invalid_client', error_description }));
+  assert.equal(await stripe(answer('This application is not connected to stripe account acct_abc.')).revoke('acct_abc'), true);
+  assert.equal(await stripe(answer("No such user: 'acct_abc'")).revoke('acct_abc'), true);
+  await assert.rejects(stripe(answer('Invalid client_id')).revoke('acct_abc'), { status: 401 });
+});
+
 test('Eventbrite has no revoke, so the connector says it did not end the connection', async () => {
   const fetch = fakeFetch();
   assert.equal(await eventbrite(fetch).revoke('555'), false);

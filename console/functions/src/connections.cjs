@@ -49,8 +49,9 @@ const { checkAnswers, stepErrors } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
 const { RETRY_STATUSES, canRetryBuild, readBuild } = require('./buildState.cjs');
 const { CLOSED, readApplication } = require('./applications.cjs');
+const { hostName } = require('./hostName.cjs');
 const {
-  CHANGEABLE, PROVIDERS, PROVIDER_NAMES, connectionChanging, connectionsForClient, liveConnection,
+  BUILT_STATUSES, CHANGEABLE, PROVIDERS, PROVIDER_NAMES, connectionChanging, connectionsForClient, liveConnection,
 } = require('./connectionState.cjs');
 
 const STATE_COLLECTION = 'console_connection_states';
@@ -335,11 +336,65 @@ async function completeConnection(deps, { body, user }) {
   return { body: { connected: true, provider, orgId, appId } };
 }
 
+/**
+ * End a built site's Stripe connection. The site runs on the token the build
+ * moved to its project, so only Stripe can stop it. The state clears only
+ * after Stripe answers, and a failure leaves the connection as it was. The
+ * site's copy of the token stays, and stops working.
+ */
+async function endBuiltConnection(deps, { orgId, appId, provider, user }) {
+  const { db, connectors, now = Date.now, log = console } = deps;
+  const at = new Date(now());
+  const changeId = randomBytes(8).toString('hex');
+  let previous = null;
+  let reply = null;
+  await db.runTransaction(async (tx) => {
+    const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
+    if (!BUILT_STATUSES.includes(data.status)) throw new ConsoleError(409, 'locked', stillBuilding);
+    const changing = changingState(data, provider, at, changeId);
+    previous = previousOf(data, accountsOf(await tx.get(accountsRef(db, appId))), provider);
+    const connections = withoutProvider(data.connections, provider);
+    tx.update(ref, { connections: { ...connections, [provider]: changing }, updatedAt: at, updatedBy: user.uid });
+    reply = connectionsReply(deps, data, connections);
+  });
+  const accountId = previous.account?.accountId;
+  const restore = () => finishChange(deps, { orgId, appId, provider, changeId, connection: previous.connection });
+  if (accountId) {
+    try {
+      // Stripe ends the connection for every site on the account, so one Owner cannot do that for another site.
+      const users = await db.collection(ACCOUNT_COLLECTION).where(`${provider}.accountId`, '==', accountId).limit(2).get();
+      if (users.docs.some((doc) => doc.id !== appId)) {
+        throw new ConsoleError(409, 'account-shared', `Another event site uses this ${PROVIDER_NAMES[provider]} account, so disconnecting here would stop that site too. Ask ${hostName()} for help.`);
+      }
+      if (!connectors?.[provider]) throw new Error('not set up');
+      await connectors[provider].revoke(accountId);
+    } catch (err) {
+      await restore().catch((failed) => log.error('console could not restore a connection', provider, failed.message));
+      if (err instanceof ConsoleError) throw err;
+      throw failure(502, 'disconnect-failed', `We could not disconnect your ${PROVIDER_NAMES[provider]} account. Try again in a few minutes.`, err);
+    }
+  }
+  // The connection is over. If these fail, a mark only runs out, and a second try finds Stripe already ended.
+  try {
+    await db.runTransaction(async (tx) => {
+      tx.set(accountsRef(db, appId), withoutProvider(accountsOf(await tx.get(accountsRef(db, appId))), provider));
+    });
+    await finishChange(deps, { orgId, appId, provider, changeId, connection: null });
+  } catch (err) {
+    log.error('console could not finish a disconnect', provider, err.message);
+  }
+  return { body: { ...reply, revoked: Boolean(accountId), shared: false } };
+}
+
 async function disconnectAccount(deps, { body, user }) {
   const { db, now = Date.now, secrets, log = console } = deps;
   const { orgId, appId } = body;
   const provider = requireProvider(body.provider);
   await requireOwner(db, orgId, user, ONLY_OWNER);
+  if (provider === 'stripe') {
+    const { data: current } = await readApplication((r) => r.get(), db, orgId, appId);
+    if (BUILT_STATUSES.includes(current.status)) return endBuiltConnection(deps, { orgId, appId, provider, user });
+  }
   const at = new Date(now());
   const changeId = randomBytes(8).toString('hex');
   let previous = null;

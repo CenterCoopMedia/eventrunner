@@ -30,6 +30,10 @@ const PROVIDER_NAMES = Object.freeze({ stripe: 'Stripe', eventbrite: 'Eventbrite
 // account after a failed build (requireConnectable in connections.cjs).
 const CHANGEABLE = Object.freeze(['draft']);
 const CLOSED_STATUSES = Object.freeze(['withdrawn', 'declined']);
+// A built site runs on the token the build moved to its project. An Owner can end
+// its Stripe connection at Stripe. Eventbrite has no way to, so that one is an
+// operator step (docs/DEPLOY_RUNBOOK.md §12.5).
+const BUILT_STATUSES = Object.freeze(['ready', 'launched']);
 
 /** @returns {object|null} the connection state of one provider, when it is connected */
 function liveConnection(connections, provider) {
@@ -68,11 +72,13 @@ function connectionProblem(choice, connections, { testMode = false } = {}) {
  * What the browser gets. `available` says which providers the console has
  * set up. `reconnect` says a failed build lets an Owner connect again. An Owner
  * can also disconnect a closed request's account, rather than wait for it to
- * be deleted.
+ * be deleted. `built` says the site exists, and `stripe.canEnd` lets an Owner
+ * end its Stripe connection.
  */
 function connectionsForClient(connections, { available = {}, status, role, reconnect = false } = {}) {
   const owner = role === 'owner';
   const draft = owner && CHANGEABLE.includes(status);
+  const built = BUILT_STATUSES.includes(status);
   const one = (provider) => {
     const connection = liveConnection(connections, provider);
     return {
@@ -88,7 +94,8 @@ function connectionsForClient(connections, { available = {}, status, role, recon
   return {
     canChange: draft || (owner && reconnect),
     canDisconnect: draft || (owner && CLOSED_STATUSES.includes(status)),
-    stripe: one('stripe'),
+    built,
+    stripe: { ...one('stripe'), canEnd: owner && built },
     eventbrite: { ...one('eventbrite'), event: event ? { id: event.id, name: event.name, start: event.start || null } : null },
   };
 }
@@ -105,6 +112,7 @@ function connectionForReview(choice, connections) {
 }
 
 module.exports = {
+  BUILT_STATUSES,
   CHANGEABLE,
   PROVIDERS,
   PROVIDER_NAMES,

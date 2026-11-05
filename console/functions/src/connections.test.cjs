@@ -385,7 +385,7 @@ test('from acceptance on, the connection cannot change while no build has failed
     });
     secrets.store.set('connection-stripe-a1', TOKEN);
     await assert.rejects(startConnection(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'locked' });
-    await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'locked' });
+    if (!['ready', 'launched'].includes(status)) await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'locked' });
     assert.equal(secrets.store.size, 1, status);
   }
 });
@@ -575,6 +575,49 @@ function sharing({ a2Status = 'launched', a2Accounts = { stripe: { accountId: 'a
     },
   });
 }
+
+const builtSite = (extra = {}) => setup({ application: { status: 'ready', connections: { stripe: stripeConnection() } }, extra });
+
+test('an Owner can end a built site\'s Stripe connection at Stripe', async () => {
+  const { db, stripe, deps } = builtSite();
+  const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+  assert.equal(body.revoked, true);
+  assert.equal(stored(db).stripe, undefined);
+  assert.equal(privateRow(db).stripe, undefined);
+});
+
+test('only an Owner can end a built site\'s Stripe connection', async () => {
+  const { stripe, deps } = builtSite();
+  for (const user of [ben, cy, ops]) {
+    await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user }), (err) => [403, 404].includes(err.status));
+  }
+  assert.deepEqual(stripe.revoked, []);
+});
+
+test('a built site keeps its connection when Stripe does not end it', async () => {
+  const { db, stripe, deps } = builtSite();
+  stripe.revokeError = new Error('stripe revoke: no answer');
+  await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 502, code: 'disconnect-failed' });
+  assert.equal(stored(db).stripe.connected, true);
+  assert.equal(privateRow(db).stripe.accountId, 'acct_client1');
+});
+
+test('a built site cannot end a Stripe connection another site uses', async () => {
+  const { db, stripe, deps } = builtSite({
+    'applications/a2': applicationDoc({ orgId: 'o2', status: 'launched', connections: { stripe: stripeConnection() } }),
+    'console_connections/a2': { stripe: { accountId: 'acct_client1', connectedBy: 'cy' } },
+  });
+  await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'account-shared' });
+  assert.deepEqual(stripe.revoked, []);
+  assert.equal(stored(db).stripe.connected, true);
+  assert.equal(db.read('console_connections/a2').stripe.accountId, 'acct_client1');
+});
+
+test('a built site\'s Eventbrite connection stays locked: an operator ends it', async () => {
+  const { deps } = setup({ application: { status: 'ready', connections: { eventbrite: { connected: true, displayName: 'Ana', event: null } } } });
+  await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'eventbrite' }, user: ana }), { status: 409, code: 'locked' });
+});
 
 test('disconnecting one of two requests on an account keeps the connection for the other', async () => {
   const { db, secrets, stripe, deps } = sharing();

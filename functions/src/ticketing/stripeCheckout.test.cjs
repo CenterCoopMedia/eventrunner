@@ -14,6 +14,21 @@ const {
   START, ADA, BOB, PERSON, QUIET, catalog, request, response, setup, makeSession, checkout, status,
 } = require('./commerceTestKit.cjs');
 
+test('Stripe refusing the key closes paid tickets for the next buyer, and a lost answer does not', async () => {
+  const lost = setup({ create() { throw new Error('Lost creation response'); } });
+  await checkout(lost.deps, request({}));
+  assert.equal((await readTicketingCatalog(lost.deps)).ticketTypes.find((type) => type.id === 'general').available, true);
+  const ended = setup({ create() { throw Object.assign(new Error('Expired API Key provided'), { statusCode: 401 }); } });
+  await checkout(ended.deps, request({}));
+  const shown = await readTicketingCatalog(ended.deps);
+  assert.equal(shown.ticketTypes.find((type) => type.id === 'general').available, false);
+  // A buyer with the old page open holds no seats.
+  const held = ended.db.read('ticket_inventory', 'current').held;
+  const stale = await checkout(ended.deps, request(), 'bob');
+  assert.equal(stale.statusCode, 503);
+  assert.equal(ended.db.read('ticket_inventory', 'current').held, held);
+});
+
 test('paid checkout reserves inventory before external creation and freezes exact card-only prices', async () => {
   const { deps, db, calls } = setup({ create({ db: current, params }) {
     assert.equal(current.read('ticket_inventory', 'current').held, 2);
