@@ -6,11 +6,11 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
-const { ENDPOINTS, SCHEDULED, buildHandlers } = require('./handlers.cjs');
+const { ENDPOINTS, REPORT_FUNCTION, SCHEDULED, buildHandlers } = require('./handlers.cjs');
 
 const firebaseJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'firebase.json'), 'utf8'));
-const ALL_FUNCTIONS = [...Object.keys(ENDPOINTS), ...Object.keys(SCHEDULED)].sort();
-const HTTP_FUNCTIONS = Object.keys(ENDPOINTS);
+const ALL_FUNCTIONS = [...Object.keys(ENDPOINTS), REPORT_FUNCTION, ...Object.keys(SCHEDULED)].sort();
+const HTTP_FUNCTIONS = [...Object.keys(ENDPOINTS), REPORT_FUNCTION];
 
 test('every endpoint is an onRequest function with a Hosting rewrite at /api/<name>', () => {
   const handlers = buildHandlers();

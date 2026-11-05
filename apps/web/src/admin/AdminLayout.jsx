@@ -73,6 +73,7 @@ import { AdminEmptyState } from './components/adminChrome.jsx';
 import AdminIcon from './components/AdminIcon.jsx';
 import AdminIconControl from './components/AdminIconControl.jsx';
 import PendingChangesBanner from './components/PendingChangesBanner.jsx';
+import ReportProblemDialog from './components/ReportProblemDialog.jsx';
 import { linkButtonClass } from './components/formControls.jsx';
 import { PendingChangesProvider } from './PendingChangesContext.jsx';
 import {
@@ -478,6 +479,8 @@ function AdminDesk() {
   const uid = user?.uid;
   const [tour, setTour] = useState(null);
   const takeTourRef = useRef(null);
+  const [reporting, setReporting] = useState(false);
+  const reportRef = useRef(null);
   const mobileMenuRef = useRef(null);
   // The first-visit run waits while the reader is on "Set up your event"
   // (ADR 0007 §7): a new client opens there from the welcome email, and the
@@ -673,6 +676,16 @@ function AdminDesk() {
                   }}
                   className={railButtonClass}
                 />
+                <AdminIconControl
+                  ref={reportRef}
+                  label="Report a problem"
+                  icon="report"
+                  onClick={() => {
+                    setMobileDocketOpen(false);
+                    setReporting(true);
+                  }}
+                  className={railButtonClass}
+                />
                 <AdminIconControl as={NavLink} to="/" label="View site" icon="globe" className={railButtonClass} />
                 <AdminIconControl onClick={signOut} label="Sign out" icon="signOut" data-admin-action="sign-out" className={railButtonClass} />
               </div>
@@ -710,6 +723,7 @@ function AdminDesk() {
             </Suspense>
           )}
           {refused ? <TierRefusal /> : <Outlet />}
+          {reporting ? <ReportProblemDialog onClose={() => setReporting(false)} returnFocusRef={reportRef} /> : null}
         </div>
       </main>
     </div>

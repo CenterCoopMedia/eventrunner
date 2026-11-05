@@ -21,6 +21,11 @@
  *   CONSOLE_GITHUB_REPOSITORY          the repository, as owner/name
  *   CONSOLE_GITHUB_APP_PRIVATE_KEY     secret: that App's private key
  *   CONSOLE_TEST_MODE                  'true' on a rehearsal console: its builds run in test mode, so a test-mode account passes
+ *   CONSOLE_REPORT_INTAKE_URL          where "Report a problem" sends reports (the operator's triage service)
+ *   CONSOLE_REPORT_PROJECTS            extra client projects whose admins may report, for sites from before the console
+ *   CONSOLE_REPORT_INTAKE_SECRET       secret: the triage service's intake key
+ *   CONSOLE_REPORT_ACCESS_ID           secret: the access-gate service token id for that intake path
+ *   CONSOLE_REPORT_ACCESS_SECRET       secret: that service token's secret
  */
 
 const { applyCors, parseAllowedOrigins, postEndpoint } = require('./http.cjs');
@@ -45,6 +50,7 @@ const {
   chooseEventbriteEvent, completeConnection, disconnectAccount, listEventbriteEvents, startConnection,
 } = require('./connections.cjs');
 const { connectionsAvailable, createConnectors } = require('./connectors.cjs');
+const { reportOriginAllowed, reportProblemHandler } = require('./problemReports.cjs');
 
 // Fixed, not a setting: console/firebase.json routes every /api/<name> to
 // this region, and the web app calls only those routes. Moving the console
@@ -97,6 +103,10 @@ const SCHEDULED = Object.freeze({
   runApplicationRetention: { job: runRetention, schedule: RETENTION_SCHEDULE, connect: true },
   runBuildWatch: { job: reportSilentBuilds, schedule: BUILD_WATCH_SCHEDULE, mail: true },
 });
+
+// "Report a problem" answers the console and every client site's admin
+// panel, so it has its own CORS and sign-in check (problemReports.cjs).
+const REPORT_FUNCTION = 'reportProblem';
 
 const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice', 'sendAgreementCopy']);
 
@@ -188,6 +198,48 @@ function buildHandlers({ startBuild } = {}) {
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
     });
   }
+  const reportSecrets = ['CONSOLE_REPORT_INTAKE_SECRET', 'CONSOLE_REPORT_ACCESS_ID', 'CONSOLE_REPORT_ACCESS_SECRET'].map(defineSecret);
+  const clientAuths = new Map();
+  // A client project's ID tokens are checked with Google's public keys; no access to the project is needed.
+  const authFor = (projectId) => {
+    if (!clientAuths.has(projectId)) {
+      const { getApps, initializeApp } = require('firebase-admin/app');
+      const { getAuth } = require('firebase-admin/auth');
+      const name = `report-${projectId}`;
+      const app = getApps().find((a) => a.name === name) || initializeApp({ projectId }, name);
+      clientAuths.set(projectId, getAuth(app));
+    }
+    return clientAuths.get(projectId);
+  };
+  handlers[REPORT_FUNCTION] = onRequest({ region, secrets: reportSecrets }, async (req, res) => {
+    const origin = req.headers?.origin;
+    const extraOrigins = parseAllowedOrigins(process.env.CONSOLE_ALLOWED_ORIGINS);
+    if (reportOriginAllowed(origin, extraOrigins)) {
+      res.set('Access-Control-Allow-Origin', origin);
+      res.set('Vary', 'Origin');
+      res.set('Access-Control-Allow-Methods', 'POST');
+      res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.set('Access-Control-Max-Age', '3600');
+      res.set('Access-Control-Expose-Headers', 'Retry-After');
+    }
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('');
+      return;
+    }
+    const { db, auth } = adminServices();
+    const [secret, accessId, accessSecret] = reportSecrets.map((s) => s.value());
+    await reportProblemHandler({
+      db,
+      auth,
+      authFor,
+      fetch: globalThis.fetch,
+      now: Date.now,
+      log: console,
+      consoleProject: process.env.GCLOUD_PROJECT,
+      extraProjects: parseAllowedOrigins(process.env.CONSOLE_REPORT_PROJECTS),
+      intake: { url: process.env.CONSOLE_REPORT_INTAKE_URL || '', secret, accessId, accessSecret },
+    })(req, res);
+  });
   for (const [name, spec] of Object.entries(SCHEDULED)) {
     const secrets = [...(spec.mail ? [postmarkToken] : []), ...(spec.connect ? connectSecrets : [])];
     handlers[name] = onSchedule({ region, schedule: spec.schedule, timeZone: 'America/New_York', secrets }, async () => {
@@ -204,4 +256,4 @@ function buildHandlers({ startBuild } = {}) {
   return handlers;
 }
 
-module.exports = { ENDPOINTS, REGION, SCHEDULED, buildHandlers };
+module.exports = { ENDPOINTS, REGION, REPORT_FUNCTION, SCHEDULED, buildHandlers };
