@@ -16,6 +16,7 @@ import ConsoleSettings from './pages/review/ConsoleSettings.jsx';
 import ReviewApplication from './pages/review/ReviewApplication.jsx';
 import ReviewQueue from './pages/review/ReviewQueue.jsx';
 import SignupLinks from './pages/review/SignupLinks.jsx';
+import LoadingState from './LoadingState.jsx';
 
 const MARK = (
   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="mark">
@@ -110,7 +111,7 @@ function ConfirmEmail({ user }) {
 function RequireAuth() {
   const { user, ready } = useAuth();
   const location = useLocation();
-  if (!ready) return <p role="status">Loading.</p>;
+  if (!ready) return <LoadingState long>Loading.</LoadingState>;
   if (!user?.emailVerified) rememberReturn(`${location.pathname}${location.search}${location.hash}`);
   if (!user) return <Navigate to="/signin" replace />;
   if (!user.emailVerified) return <ConfirmEmail user={user} />;

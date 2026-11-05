@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { callApi } from '../api.js';
 import { renderPage } from '../test/renderPage.jsx';
@@ -7,6 +7,12 @@ import Organizations from './Organizations.jsx';
 vi.mock('../api.js', () => ({ callApi: vi.fn() }));
 
 describe('Organizations', () => {
+  it('keeps a readable status while the organization directory loads', () => {
+    callApi.mockReturnValue(new Promise(() => {}));
+    renderPage(<Organizations />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading your organizations.');
+  });
+
   it('lists my organizations with my role and a link to each organization', async () => {
     callApi.mockResolvedValue({
       operator: false,
@@ -39,6 +45,17 @@ describe('Organizations', () => {
     expect(screen.getByText(/You are on the hosting team/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Review requests' })).toHaveAttribute('href', '/review');
     expect(screen.queryByText(/Event sites start from a signup link/)).not.toBeInTheDocument();
+  });
+
+  it('keeps membership and hosting directory links distinct when an organization appears in both', async () => {
+    const org = { id: 'same-org', name: 'Community Newsroom', role: 'owner', createdAt: '2026-10-05T12:00:00.000Z' };
+    callApi.mockResolvedValue({ operator: true, organizations: [org], allOrganizations: [org] });
+    renderPage(<Organizations />);
+    const mine = await screen.findByRole('list', { name: 'Your organizations' });
+    const all = screen.getByRole('list', { name: 'All organizations' });
+    expect(within(mine).getByRole('link', { name: org.name })).toHaveAccessibleDescription('Owner');
+    expect(within(all).getByRole('link', { name: org.name })).toHaveAccessibleDescription('Created 5 October 2026');
+    expect(within(all).getByRole('link', { name: org.name })).toHaveAttribute('href', '/organizations/same-org');
   });
 
   it('shows the server message when the list cannot load', async () => {

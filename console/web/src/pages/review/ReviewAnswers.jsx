@@ -1,4 +1,4 @@
-import { TICKET_LABELS } from '../../reviewText.js';
+import { TICKET_LABELS, eventDayText } from '../../reviewText.js';
 
 const MISSING = 'Not given';
 
@@ -18,7 +18,7 @@ function Days({ days }) {
     <ul className="plain">
       {days.map((day, i) => (
         <li key={`${day.date}-${i}`}>
-          {day.date}, {day.startTime} to {day.endTime}{day.label ? ` (${day.label})` : ''}
+          {eventDayText(day)}
         </li>
       ))}
     </ul>

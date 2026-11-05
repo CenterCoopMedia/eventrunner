@@ -5,6 +5,7 @@ import { formatDate, hostName } from '../text.js';
 import { PROVIDER_COPY, canDisconnectWords, isProviderUrl, rememberConnectReturn } from './connections.js';
 import { fieldId } from './Field.jsx';
 import { leavePage } from './leavePage.js';
+import LoadingState from '../LoadingState.jsx';
 
 const NOT_SAVED = 'We could not save your last change. Try again.';
 const CONNECTION_FIELD = 'tickets.connection';
@@ -99,7 +100,7 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, disabled }) {
   if (problem && !events) {
     return <div className="stack"><p className="message error" role="alert">{problem}</p><p>{again}</p></div>;
   }
-  if (!events) return <p role="status">Loading your Eventbrite events.</p>;
+  if (!events) return <LoadingState>Loading your Eventbrite events.</LoadingState>;
   if (events.length === 0 && !chosen) {
     return (
       <div className="stack">

@@ -1,0 +1,32 @@
+/* A pending request owns this indicator. The label carries the meaning;
+   the ring is static unless the reader has allowed motion. It starts to
+   turn only after a short wait, so a fast load never shows motion. */
+.admin-loading-state {
+  --admin-loading-cycle: 1.2s;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  line-height: 1.5;
+}
+
+.admin-loading-state__spinner {
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: rgb(var(--admin-action-rgb));
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.admin-loading-state__track { opacity: 0.2; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .admin-loading-state__spinner {
+    animation: admin-loading-spin var(--admin-loading-cycle) linear 600ms infinite;
+  }
+
+  @keyframes admin-loading-spin {
+    to { transform: rotate(360deg); }
+  }
+}

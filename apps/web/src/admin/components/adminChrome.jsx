@@ -16,6 +16,7 @@
 // state is always a word — set in a badge whose tinted ground and ink agree
 // with the word, and never colour alone (§8.1).
 import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
+import './adminLoading.css';
 
 export { RECORD_STATE_IDS, RECORD_STATE_WORDS };
 
@@ -113,16 +114,20 @@ export function AdminEmptyState({ title, description, action = null }) {
 }
 
 /**
- * Loading is a stated line, not a loop (brief §2.2): no spinner, no
- * skeleton, no shimmer. Ambient animation is banned outright, and the room
- * does not perform.
+ * The label states what is loading; the small ring shows that work is
+ * pending. It is decorative, static under reduced motion, and unmounts
+ * with the loading state (brief §2.2, asynchronous-work amendment).
  *
  * @param {{ label: string }} props
  */
 export function AdminLoadingState({ label }) {
   return (
-    <p role="status" aria-label={label} className="py-md text-admin-sm text-admin-ink-secondary">
-      {label}
+    <p role="status" aria-label={label} className="admin-loading-state py-md text-admin-sm text-admin-ink-secondary">
+      <svg className="admin-loading-state__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="9" className="admin-loading-state__track" />
+        <path d="M12 3a9 9 0 0 1 9 9" />
+      </svg>
+      <span>{label}</span>
     </p>
   );
 }

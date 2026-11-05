@@ -183,6 +183,7 @@ describe('admin route gating', () => {
     expect(adminCall.mock.calls.filter(([name]) => name === 'getEventStats')).toHaveLength(1);
     // Every settings surface is reachable from the shell, one group head away.
     openEveryGroup();
+    const navigation = within(screen.getByRole('navigation', { name: 'Admin sections' }));
     for (const tab of [
       'Overview',
       'Pages',
@@ -202,7 +203,7 @@ describe('admin route gating', () => {
       'System errors',
       'Unpublished changes',
     ]) {
-      expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
+      expect(navigation.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     // The signed-in identity is shown, so an operator can tell which account
     // the server will see.
@@ -264,11 +265,12 @@ describe('admin route gating', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
     openEveryGroup();
+    const navigation = within(screen.getByRole('navigation', { name: 'Admin sections' }));
     for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Timeline', 'Media', 'Materials', 'Version history', 'Unpublished changes', 'Speakers', 'Attendees', 'Badges', 'Scheduled reminders', 'Live updates', 'Ticketing', 'Invoices', 'Import records', 'Feedback', 'Email log', 'Change requests', 'Event', 'Data export']) {
-      expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
+      expect(navigation.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Registration form', 'Features', 'Branding', 'Access', 'System errors']) {
-      expect(screen.queryByRole('link', { name: tab })).toBeNull();
+      expect(navigation.queryByRole('link', { name: tab })).toBeNull();
     }
     // The tier is said in a word beside the address, never left to inference.
     expect(screen.getByText('Staff')).toBeInTheDocument();
