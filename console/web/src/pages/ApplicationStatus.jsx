@@ -58,6 +58,7 @@ function BuildUnderway({ app }) {
       <WaitingBuddy />
       <div className="stack">
         <p className="note-title">You can close this page</p>
+        <p>Most sites take about an hour and a half to build. Setting up your web address takes the longest.</p>
         <p>{app.myRole === 'owner' ? 'You' : 'The Owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
         <p role="status" aria-atomic="true" className="visually-hidden">{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</p>
         <ol className="build-steps" aria-label="Build steps">
