@@ -1,14 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Event Runner">
-  <!-- The Event Runner mark: a stem, and the three rule weights the design
-       system ships — nameplate, hairline, strong. It is the same four strokes
-       the masthead draws inline; here they carry ink, because a favicon has
-       no page color to inherit. -->
-  <style>
-    rect { fill: #16181d }
-    @media (prefers-color-scheme: dark) { rect { fill: #e8ebf0 } }
-  </style>
-  <rect x="2.5" y="2" width="3" height="20"/>
-  <rect x="5.5" y="2" width="16" height="3"/>
-  <rect x="5.5" y="11" width="9.5" height="2"/>
-  <rect x="5.5" y="19.5" width="13" height="2.5"/>
+  <!-- Derived from design/brand/badger-face.svg by build-social-cards.mjs. -->
+  <style>:root { --badger-ink: rgb(23 24 26); --badger-surface: rgb(250 250 249); --badger-accent: rgb(26 82 150); color: var(--badger-ink); } @media (prefers-color-scheme: dark) { :root { --badger-ink: rgb(238 238 236); --badger-surface: rgb(25 26 28); --badger-accent: rgb(128 178 238); } }</style>
+<!-- Face-only source for icons. Larger eyes and a 2-unit outline stay distinct at 16px. -->
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4.5" width="18" height="18" rx="4" fill="var(--badger-surface, rgb(25 26 28))" stroke="currentColor" stroke-width="2"/>
+    <path d="M4 8.5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3V10H4Z" fill="var(--badger-accent, rgb(128 178 238))"/>
+    <rect x="9" y="1" width="6" height="5.5" rx="1.2" fill="currentColor"/>
+    <circle cx="8.5" cy="13.75" r="1.65" fill="currentColor"/>
+    <circle cx="15.5" cy="13.75" r="1.65" fill="currentColor"/>
+    <path d="M8.5 18.25q3.5 3 7 0" fill="none" stroke="currentColor" stroke-width="2"/>
+  </g>
 </svg>
