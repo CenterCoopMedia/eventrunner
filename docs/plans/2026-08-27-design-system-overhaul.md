@@ -202,12 +202,23 @@ state at every frame.
 These rules bind both classes:
 
 - Never trigger motion from scroll position. Scroll-triggered reveals are banned (#105).
-- Never run ambient animation. Nothing loops, drifts, pulses, or breathes on its own.
+- Never run ambient animation. Nothing loops, drifts, pulses, or breathes for decoration.
 - Wayfinding is instant. Navigation, route changes, and focus moves never animate.
 - Support `prefers-reduced-motion` in full. The reduced state must be truly static. A shortened
   animation is not a reduced-motion fallback.
 - Wrap every motion rule in `@media (prefers-reduced-motion: no-preference)` (interface
   guidelines, Accessibility).
+
+**Asynchronous-work indicators (owner direction, 2026-11-05).** A small spinner may loop
+while an operator CMS or client-console request is pending, or while the server reports that
+a site build is active. This is functional feedback, including the hosting team's client lists
+and settings. Keep the explanatory status text, hide the decorative ring from assistive
+technology, and remove it when the operation succeeds, fails, or stops. Never invent a progress
+percentage or keep a completed or failed build spinning. Use only a restrained `transform`
+rotation, a component-owned cycle of about 1.2 seconds, and the no-preference query above;
+reduced motion shows the same label and a static ring. This narrow exception supersedes the
+earlier no-spinner rule and the short state-transition duration limit for these indicators.
+It does not permit shimmer, pulse, bounce, or other decorative loops.
 
 **React Bits.** [React Bits](https://reactbits.dev) is an allowed source for a signature
 interaction. It is not a source for general UI. Before you use a component from it, apply all six
