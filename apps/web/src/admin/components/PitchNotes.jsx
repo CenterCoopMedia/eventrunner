@@ -68,7 +68,13 @@ export default function PitchNotes({ pitch, call }) {
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   const stored = Array.isArray(pitch.reviewNotes) ? pitch.reviewNotes : [];
-  const notes = stored.map((note) => local[note.id] ?? note);
+  // The local copy wins only until the live row has the same or a later
+  // version, so an edit made elsewhere is never hidden.
+  const notes = stored.map((note) => {
+    const mine = local[note.id];
+    const version = (each) => toDate(each.editedAt ?? each.createdAt)?.getTime() ?? 0;
+    return mine && version(mine) > version(note) ? mine : note;
+  });
   for (const note of Object.values(local)) if (!stored.some((each) => each.id === note.id)) notes.push(note);
 
   async function save(request, message) {

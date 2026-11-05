@@ -65,6 +65,12 @@ function applyNoteChange(stored, request, actor, at, newId = () => crypto.random
   return { ok: true, notes: notes.map((each, i) => (i === index ? note : each)), note };
 }
 
+/** A Date, or a Firestore Timestamp read back from a stored note, as ISO text. */
+function isoDate(value) {
+  if (!value) return null;
+  return (typeof value.toDate === 'function' ? value.toDate() : new Date(value)).toISOString();
+}
+
 const REFUSALS = Object.freeze({
   'too-many-notes': [409, `This pitch has ${MAX_NOTES} notes, the most it can hold. Edit an earlier note instead.`],
   'note-missing': [404, 'That note is no longer on this pitch. Reload the page to see the current notes.'],
@@ -111,7 +117,7 @@ function createSaveSessionPitchNoteHandler({ db, auth, getConfig, now = Date.now
       return sendError(res, status, outcome.code, message);
     }
     const { note } = outcome;
-    return res.status(200).json({ note: { ...note, createdAt: note.createdAt.toISOString(), editedAt: note.editedAt?.toISOString() ?? null } });
+    return res.status(200).json({ note: { ...note, createdAt: isoDate(note.createdAt), editedAt: isoDate(note.editedAt) } });
   };
 }
 

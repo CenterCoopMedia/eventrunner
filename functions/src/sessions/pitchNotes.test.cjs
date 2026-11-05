@@ -61,3 +61,13 @@ test('applyNoteChange refuses a missing note and a full list', () => {
   const full = Array.from({ length: 200 }, (_, i) => ({ id: String(i), uid: 'a' }));
   assert.equal(applyNoteChange(full, { action: 'add', text: 'y' }, actor, at).code, 'too-many-notes');
 });
+
+test('editing a stored note answers with its dates even when Firestore returns a Timestamp', async () => {
+  const createdAt = { toDate: () => new Date(0) };
+  const db = makeFakeDb({ 'config/bootstrap': bootstrap, 'session_pitches/p1': { status: 'new', reviewNotes: [
+    { id: 'abcdef0123456789', uid: 'staff', email: 'staff@example.test', text: 'Old.', createdAt, editedAt: null },
+  ] } });
+  const edited = await invoke(db, 'staff', { id: 'p1', action: 'edit', noteId: 'abcdef0123456789', text: 'New.' });
+  assert.equal(edited.statusCode, 200, JSON.stringify(edited.body));
+  assert.equal(edited.body.note.createdAt, new Date(0).toISOString());
+});

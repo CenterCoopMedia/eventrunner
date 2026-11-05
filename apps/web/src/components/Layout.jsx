@@ -311,7 +311,8 @@ export default function Layout() {
   // A slot can point at an object that has since been deleted from the
   // bucket. The shell must degrade to the wordmark, never to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
-  const [logoFailed, setLogoFailed] = useState(false);
+  // The address that failed, so a newly published logo gets its own try.
+  const [failedLogo, setFailedLogo] = useState(null);
   // A runtime config/event doc can replace `legal` wholesale (shallow
   // overlay) with a partial or malformed object; fall back per-field so one
   // bad admin write never white-screens the shell that wraps every route.
@@ -529,14 +530,14 @@ export default function Layout() {
             dates={plate.dates}
             place={plate.edition}
             mark={
-              !historicalDemo && uploadedPrimary && !logoFailed ? (
+              !historicalDemo && uploadedPrimary && failedLogo !== uploadedPrimary ? (
                 // A wide logo keeps its own proportions at the mark's height.
                 <img
                   src={uploadedPrimary}
                   alt=""
                   className={`site-logo ${headerVariant === 'masthead' ? 'site-logo--masthead' : ''}`}
                   height={markSize.px}
-                  onError={() => setLogoFailed(true)}
+                  onError={() => setFailedLogo(uploadedPrimary)}
                 />
               ) : markSrc && !markFailed ? (
                 // width/height must match the box the class draws. They
