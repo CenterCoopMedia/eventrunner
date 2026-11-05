@@ -1356,6 +1356,15 @@
           <li>Cloudflare: a TXT value comes back in the form it was stored. A <code>pm-bounces</code> CNAME and the certificate&#39;s records are not proxied.</li>
           <li>Stripe and Eventbrite: <code>GET /v1/account</code> answers with the connected account&#39;s id for a Connect OAuth token. Creating a webhook endpoint on that account with that token works. <code>GET /users/me/</code> answers for a live Eventbrite token.</li>
           </ul>
+          <h3 id="1241-turn-on-google-sign-in-after-a-build">12.4.1 Turn on Google sign-in after a build<a class="heading-anchor" href="#1241-turn-on-google-sign-in-after-a-build" aria-label="Link to this section">#</a></h3>
+          <p>The builder cannot turn on Google sign-in, because Firebase creates that sign-in client only in its console. Do this as soon as a build finishes:</p>
+          <ol>
+          <li>Open the new project in the Firebase console as the admin account. It has <code>roles/firebase.admin</code> on the client folder.</li>
+          <li>Open <strong>Authentication</strong>, then <strong>Sign-in method</strong>. Add <strong>Google</strong>, and set the public name and the support email.</li>
+          <li>Sign in on the site with <strong>Continue with Google</strong>.</li>
+          <li>Run <code>node scripts/init-event.cjs --attest-auth</code> for that client, so the setup step shows <strong>Done</strong>.</li>
+          </ol>
+          <p>To undo the folder role, remove the <code>roles/firebase.admin</code> binding for the admin account from the client folder.</p>
           <h3 id="125-watching-a-site-and-stepping-in">12.5 Watching a site and stepping in<a class="heading-anchor" href="#125-watching-a-site-and-stepping-in" aria-label="Link to this section">#</a></h3>
           <p>Nothing needs to be open during a build. Operators get an email when a build fails or goes silent, and the review page at <code>/review/&lt;application id&gt;</code> shows every step. These commands cover the rest. <code>&lt;name&gt;</code> is the client&#39;s Environment, which is also its web-address name.</p>
           <div class="table-scroll" data-scroll-region data-scroll-label="Table">

@@ -22,7 +22,10 @@ test('an operator writes the registration questions, previews them, and saves th
     await page.getByRole('button', { name: 'Add a question' }).click();
     await page.getByRole('textbox', { name: /^Question/ }).fill('T-shirt size');
     await page.getByLabel('Answer type').selectOption('one_choice');
-    await page.getByLabel('Choices').fill('S\nM\nL');
+    for (const choice of ['S', 'M', 'L']) {
+      await page.getByLabel('Choices', { exact: true }).fill(choice);
+      await page.getByLabel('Choices', { exact: true }).press('Enter');
+    }
     await expect(preview.getByLabel('Organization (required)')).toBeVisible();
     await expect(preview.getByRole('group', { name: 'T-shirt size' })).toBeVisible();
 

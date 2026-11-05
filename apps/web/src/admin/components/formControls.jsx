@@ -261,6 +261,77 @@ export function SelectField({
   );
 }
 
+/**
+ * A list built one item at a time: type, then press Enter or the plus button.
+ * Text left in the box joins the list when the box loses focus, so a save
+ * never drops it. Pasted lines become one item each. An exact repeat is
+ * ignored; the caller's own check names anything else it refuses.
+ *
+ * @param {{ label: string, items: string[], onChange: (items: string[]) => void,
+ *           itemName: string, hint?: string, error?: string }} props
+ *   Other props go to the input, for example `inputMode`.
+ */
+export function AddOneListField({ label, items, onChange, itemName, hint, error, ...rest }) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const [draft, setDraft] = useState('');
+  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
+
+  const add = (text) => {
+    const added = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const next = [...items];
+    for (const item of added) if (!next.includes(item)) next.push(item);
+    if (next.length !== items.length) onChange(next);
+    setDraft('');
+  };
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3xs">
+      <label htmlFor={id} className={fieldLabelClass}>{label}</label>
+      {hint ? <p id={hintId} className={fieldHintClass}>{hint}</p> : null}
+      <div className="flex items-center gap-2xs">
+        <input
+          id={id}
+          type="text"
+          className={`${inputClass} min-w-0 flex-1`}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            add(draft);
+          }}
+          onPaste={(event) => {
+            const pasted = event.clipboardData?.getData('text') ?? '';
+            if (!pasted.includes('\n')) return;
+            event.preventDefault();
+            const { selectionStart, selectionEnd } = event.target;
+            const start = selectionStart ?? draft.length;
+            add(`${draft.slice(0, start)}${pasted}${draft.slice(selectionEnd ?? start)}`);
+          }}
+          onBlur={() => add(draft)}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={describedBy || undefined}
+          {...rest}
+        />
+        <button type="button" className={secondaryButtonClass} onClick={() => add(draft)} aria-label={`Add ${itemName}`}>+</button>
+      </div>
+      {items.length ? (
+        <ul className="flex flex-col gap-3xs" aria-label={`${label} list`}>
+          {items.map((item) => (
+            <li key={item} className="flex items-center justify-between gap-xs text-admin-base text-admin-ink">
+              <span className="min-w-0 break-words">{item}</span>
+              <button type="button" className={ghostButtonClass} onClick={() => onChange(items.filter((other) => other !== item))} aria-label={`Remove ${item}`}>×</button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {error ? <FieldError id={errorId} message={error} /> : null}
+    </div>
+  );
+}
+
 /** A labelled checkbox. */
 export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
   const id = useId();

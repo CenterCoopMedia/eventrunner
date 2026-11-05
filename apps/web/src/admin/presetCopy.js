@@ -882,6 +882,145 @@ export const PRESET_COPY = Object.freeze({
       },
     },
   },
+  nclocal: {
+    label: 'NC Local',
+    summary: 'NC Local\'s own look: deep teal, soft lavender, warm surfaces and broad serif headlines beside a large photo.',
+    bestFor: 'Built for the NC Local News & Information Summit.',
+    options: {
+      headingFace: {
+        label: 'Heading face',
+        prompt: 'Choose the headline typeface.',
+        choices: {
+          merriweather: {
+            label: 'Merriweather',
+            why: 'Uses the broad serif from the NC Local demo for headlines and body text.',
+          },
+          cabin: {
+            label: 'Cabin',
+            why: 'Uses a humanist sans-serif for headlines. It sets them apart from the Merriweather body text.',
+          },
+        },
+      },
+      nameplate: {
+        label: 'Header style',
+        prompt: 'Choose the masthead layout.',
+        choices: {
+          'rule-bounded-bar': {
+            label: 'Rule-bounded bar',
+            why: 'Places the event name at the left and dates at the right. A strong rule closes the header.',
+          },
+          'stacked-with-deck': {
+            label: 'Stacked with a deck',
+            why: 'Places the event name above a short factual description. A hairline rule closes the header.',
+          },
+          'section-aware-bar': {
+            label: 'Section-aware bar',
+            why: 'Uses a smaller running header for inner pages and keeps the active section visible.',
+          },
+        },
+      },
+      component: {
+        label: 'Schedule style',
+        prompt: 'Choose the schedule row style.',
+        choices: {
+          'hairline-row': {
+            label: 'Hairline row',
+            why: 'Uses one row for the title, time, track, and speaker. Hairline rules separate the rows.',
+          },
+          'lead-and-rest': {
+            label: 'Lead and rest',
+            why: 'Makes the first session larger than the remaining sessions. Use it when one session must lead the list.',
+          },
+        },
+      },
+      longReadOpening: {
+        label: 'Long read opening',
+        prompt: 'Choose how the first paragraph of a Long read page opens.',
+        choices: {
+          'drop-cap': {
+            label: 'Drop cap',
+            why: 'Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.',
+          },
+          standfirst: {
+            label: 'Standfirst',
+            why: 'Sets the first paragraph at the lead size, as a summary of the page.',
+          },
+          plain: {
+            label: 'Plain',
+            why: 'Keeps the first paragraph at body size with no drop cap.',
+          },
+        },
+      },
+      quote: {
+        label: 'Quote device',
+        prompt: 'Choose how a quoted sentence is set.',
+        choices: {
+          'ruled-with-mark': {
+            label: 'Ruled with an opening mark',
+            why: 'Sets the quote between strong rules with a large opening mark in the heading typeface.',
+          },
+          'side-rule': {
+            label: 'Side rule',
+            why: 'Sets the quote beside one strong rule with no rules above or below; the quotation marks sit inline around the sentence.',
+          },
+          'mark-only': {
+            label: 'Opening mark only',
+            why: 'Sets the quote with the large opening mark and no rules.',
+          },
+        },
+      },
+      directory: {
+        label: 'Directory style',
+        prompt: 'Choose how the speaker shelf and the attendee index are set.',
+        choices: {
+          'portrait-shelf': {
+            label: 'Portrait shelf',
+            why: 'Sets square portraits on the alternate ground, ruled at the hairline.',
+          },
+          'tall-portraits': {
+            label: 'Tall portraits',
+            why: 'Sets portraits at three by four, like a profile picture in a print feature.',
+          },
+        },
+      },
+      sectionBoundary: {
+        label: 'Section boundary',
+        prompt: 'Choose how a section heading is ruled and labelled.',
+        choices: {
+          'rule-and-folio': {
+            label: 'Rule and folio',
+            why: 'Draws the section rule with the folio at the far end of the heading line.',
+          },
+          'rule-only': {
+            label: 'Rule only',
+            why: 'Draws the section rule and hides the folio beside the heading.',
+          },
+          'folio-in-margin': {
+            label: 'Folio in the margin',
+            why: 'Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.',
+          },
+        },
+      },
+      tableRules: {
+        label: 'Table rules',
+        prompt: 'Choose how a table is ruled.',
+        choices: {
+          'hairline-rows': {
+            label: 'Hairline rows',
+            why: 'Rules the rows and the head at the hairline and draws no column rules.',
+          },
+          'ruled-head': {
+            label: 'Ruled head',
+            why: 'Closes the head with a strong rule and rules the rows at the hairline, with no column rules.',
+          },
+          'full-grid': {
+            label: 'Full grid',
+            why: 'Rules the rows and the columns at the hairline, with the head closed at the width the style sets.',
+          },
+        },
+      },
+    },
+  },
 });
 
 /**

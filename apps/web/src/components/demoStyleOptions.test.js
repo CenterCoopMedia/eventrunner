@@ -8,8 +8,8 @@ import {
 } from './demoStyleOptions.js';
 
 describe('demoStyleOptions', () => {
-  it('covers every shipped preset in picker order', () => {
-    expect(DEMO_STYLE_OPTIONS.map(({ id }) => id)).toEqual(PRESET_IDS);
+  it('covers every preset but NC Local, which the demo shows through Newsroom', () => {
+    expect(DEMO_STYLE_OPTIONS.map(({ id }) => id)).toEqual(PRESET_IDS.filter((id) => id !== 'nclocal'));
     expect(DEMO_STYLE_OPTIONS).toHaveLength(6);
     expect(
       DEMO_STYLE_OPTIONS.every(({ label, summary }) => label && summary),

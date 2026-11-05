@@ -18,9 +18,9 @@ async function load() {
   return import(MODULE_URL);
 }
 
-test('the defaults cover six styles, both modes, and two widths', async () => {
+test('the defaults cover seven styles, both modes, and two widths', async () => {
   const { DEFAULT_STYLES, DEFAULT_MODES, DEFAULT_WIDTHS } = await load();
-  assert.equal(DEFAULT_STYLES.length, 6);
+  assert.equal(DEFAULT_STYLES.length, 7);
   assert.deepEqual([...DEFAULT_MODES], ['light', 'dark']);
   assert.deepEqual([...DEFAULT_WIDTHS], [1440, 390]);
 });
