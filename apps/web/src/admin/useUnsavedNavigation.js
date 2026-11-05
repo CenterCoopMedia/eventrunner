@@ -91,7 +91,8 @@ export function useUnsavedNavigation(unsaved, { blocked = false } = {}) {
       if (!target) return;
       const anchor = target.closest('a[href]');
       const signOutButton = anchor ? null : target.closest('button');
-      const signOut = signOutButton?.textContent?.trim() === 'Sign out';
+      const signOut = signOutButton?.dataset.adminAction === 'sign-out'
+        || signOutButton?.textContent?.trim() === 'Sign out';
       if (!anchor && !signOut) return;
       if (anchor && (anchor.target === '_blank' || anchor.hasAttribute('download'))) return;
       const path = anchor ? inAppPath(anchor.href, window.location.href) : null;

@@ -336,7 +336,8 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   const summary = docket.locator('summary');
   await expect(page.locator('.admin-rail')).toContainText('E2E Summit');
   await expect(summary).toContainText('Branding');
-  await expect(summary).toContainText('Menu');
+  await expect(summary).toHaveAccessibleName('Open menu');
+  await expect(summary.locator('svg')).toBeVisible();
 
   await summary.click();
   await expect(docket).toHaveAttribute('open', '');

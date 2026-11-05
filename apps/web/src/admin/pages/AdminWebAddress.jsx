@@ -24,15 +24,20 @@ export default function AdminWebAddress() {
   const [domain, setDomain] = useState('');
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const busyRef = useRef(false);
+  const outcomeRef = useRef(null);
 
   useEffect(() => {
     let active = true;
+    setNotice(null);
     call('webAddress', { action: 'status' })
       .then((result) => { if (active) setStatus(result); })
       .catch((err) => { if (active) setNotice({ tone: 'error', message: err.message }); });
     return () => { active = false; };
-  }, [call]);
+  }, [call, loadAttempt]);
+
+  useEffect(() => { if (notice) outcomeRef.current?.focus(); }, [notice]);
 
   async function run(action, body = {}) {
     if (busyRef.current) return;
@@ -40,7 +45,12 @@ export default function AdminWebAddress() {
     setBusy(action);
     setNotice(null);
     try {
-      setStatus(await call('webAddress', { action, ...body }));
+      const next = await call('webAddress', { action, ...body });
+      setStatus(next);
+      setNotice({ tone: 'ok', message: action === 'add'
+        ? 'Address added. Follow the domain instructions on this page.'
+        : action === 'remove' ? 'Custom address removed. The site still works at its own address.'
+          : `Address checked. ${STATE_WORDS[next.state]?.label ?? 'The current status is shown below'}.` });
       if (action === 'add' || action === 'remove') setDomain('');
     } catch (err) {
       setNotice({ tone: 'error', message: err.message });
@@ -57,7 +67,7 @@ export default function AdminWebAddress() {
         title="Web address"
         description="Your site already works at its own address. A custom web address, such as summit.example.org, is optional."
       />
-      {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
+      {!status && notice ? <div ref={outcomeRef} tabIndex={-1}><Notice tone={notice.tone} message={notice.message} /><button type="button" className={secondaryButtonClass} onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Try again</button></div> : null}
       {!status && !notice ? <AdminLoadingState label="Loading the web address…" /> : null}
       {status ? (
         <Panel title="Current address">
@@ -68,12 +78,13 @@ export default function AdminWebAddress() {
       {status?.state === 'none' ? (
         <Panel title="Use your own domain" description="Type the domain you want for the site. You need access to the place where you bought it, to add records there.">
           <form className="flex flex-col gap-sm" noValidate onSubmit={(event) => { event.preventDefault(); run('add', { domain }); }}>
-            <TextField label="Your domain" value={domain} onChange={setDomain} hint="For example summit.example.org. No https:// and no path." autoComplete="off" autoCapitalize="none" />
+            <TextField label="Your domain" value={domain} onChange={setDomain} disabled={Boolean(busy)} hint="For example summit.example.org. No https:// and no path." autoComplete="off" autoCapitalize="none" />
             <div>
               <button type="submit" className={primaryButtonClass} aria-busy={busy === 'add' ? 'true' : undefined} aria-disabled={busy ? 'true' : undefined}>
                 {busy === 'add' ? 'Adding…' : 'Add this address'}
               </button>
             </div>
+            {notice ? <div ref={outcomeRef} tabIndex={-1}><Notice tone={notice.tone} message={notice.message} /></div> : null}
           </form>
         </Panel>
       ) : null}
@@ -119,10 +130,12 @@ export default function AdminWebAddress() {
               <DestructiveConfirm
                 trigger="Remove this address" title={`Remove ${status.domain}?`} confirmLabel="Remove address"
                 busy={busy === 'remove'} busyLabel="Removing…"
+                disabled={Boolean(busy)}
                 consequence="The site stops answering at this domain." permanence="You can add it again later."
                 onConfirm={() => run('remove')}
               />
             </div>
+            {notice ? <div ref={outcomeRef} tabIndex={-1}><Notice tone={notice.tone} message={notice.message} /></div> : null}
           </div>
         </Panel>
       ) : null}

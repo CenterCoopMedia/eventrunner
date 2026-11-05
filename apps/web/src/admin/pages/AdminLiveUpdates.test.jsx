@@ -2,8 +2,8 @@
 // Mocks adminApi and adminSource directly rather than going through the full
 // router/auth stack (AdminSettings.test.jsx's style), since this page has no
 // EventConfigContext dependency beyond `features` for the off-feature notice.
-import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 let rowsCallback;
 vi.mock('../adminSource.js', () => ({
@@ -138,5 +138,53 @@ describe('AdminLiveUpdates', () => {
       id: 'old',
       update: { message: 'From before audiences', pinned: false, category: null, audience: 'everyone' },
     });
+  });
+});
+
+describe('live update action feedback', () => {
+  beforeEach(() => { callMock.mockReset(); showToastMock.mockReset(); });
+
+  it('focuses the composer on edit and locks the draft until the pending save finishes', async () => {
+    let finish;
+    callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    render(<AdminLiveUpdates />);
+    pushRows([{ id: 'a', message: 'First update', audience: 'everyone' }, { id: 'b', message: 'Second update', audience: 'everyone' }]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    const message = screen.getByLabelText('Message');
+    expect(message).toHaveFocus();
+    fireEvent.change(message, { target: { value: 'Submitted update' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(message).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    const otherEdit = screen.getAllByRole('button', { name: 'Edit' })[1];
+    expect(otherEdit).toBeDisabled();
+    fireEvent.click(otherEdit);
+    expect(message).toHaveValue('Submitted update');
+    await act(async () => finish({ id: 'a' }));
+    expect(message).not.toBeDisabled();
+    expect(message).toHaveValue('');
+    expect(screen.getByRole('status')).toHaveTextContent('Live update saved.');
+    expect(showToastMock).toHaveBeenLastCalledWith('Live update saved.', { announce: false });
+  });
+
+  it('focuses a save refusal and keeps the attempted message', async () => {
+    callMock.mockRejectedValueOnce(new Error('The update could not be saved.'));
+    render(<AdminLiveUpdates />);
+    pushRows([]);
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Keep this message' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Post update' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus());
+    expect(screen.getByLabelText('Message')).toHaveValue('Keep this message');
+  });
+
+  it('keeps a delete failure beside its row after the toast disappears', async () => {
+    callMock.mockRejectedValueOnce(new Error('Removal failed. Try again.'));
+    render(<AdminLiveUpdates />);
+    pushRows([{ id: 'a', message: 'Keep me', audience: 'everyone' }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this update' }));
+    const row = screen.getByText('Keep me').closest('li');
+    expect(await within(row).findByRole('alert')).toHaveTextContent('Removal failed. Try again.');
+    expect(within(row).getByRole('button', { name: 'Remove this update' })).toBeEnabled();
   });
 });

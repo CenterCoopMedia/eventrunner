@@ -3,6 +3,8 @@
 // moves. Each is checked by keyboard, in a real browser, at real widths.
 /* global document, getComputedStyle */
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { ADMIN_EMAIL, signIn } from './helpers.mjs';
 
 const pageWidth = (page) =>
@@ -10,6 +12,12 @@ const pageWidth = (page) =>
     client: document.documentElement.clientWidth,
     scroll: document.documentElement.scrollWidth,
   }));
+
+async function evidencePath(name) {
+  const directory = path.resolve('test-results/admin-visual-evidence');
+  await fs.mkdir(directory, { recursive: true });
+  return path.join(directory, name);
+}
 
 test('the rail folds and hides by keyboard, and remembers it', async ({ page }) => {
   test.setTimeout(120_000);
@@ -51,6 +59,10 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }) 
 
   // The rail's toggle is the first stop after the skip link.
   const toggle = page.getByRole('button', { name: 'Hide menu' });
+  await expect(toggle).toHaveText('');
+  await expect(toggle.locator('svg')).toBeVisible();
+  expect((await toggle.boundingBox()).width).toBeGreaterThanOrEqual(44);
+  await page.screenshot({ path: await evidencePath('navigation-expanded-desktop.png'), animations: 'disabled' });
   await page.locator('body').focus();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
@@ -65,7 +77,9 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }) 
   await expect(nav).toBeHidden();
   await expect(page).toHaveURL(/\/admin\/sessions$/);
   const railBox = await page.locator('.admin-rail').boundingBox();
-  expect(railBox.width).toBeLessThan(120);
+  expect(railBox.width).toBeLessThanOrEqual(68);
+  expect((await show.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  await page.screenshot({ path: await evidencePath('navigation-collapsed-desktop.png'), animations: 'disabled' });
   expect((await page.locator('#admin-content').boundingBox()).width).toBeGreaterThan(wideMain + 100);
   // The global reduce block disables transitions, so the width changes immediately.
   const motion = await page.locator('.admin-rail').evaluate((element) => getComputedStyle(element).transitionDuration);
@@ -76,6 +90,37 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }) 
   await page.getByRole('button', { name: 'Show menu' }).click();
   await expect(nav).toBeVisible();
   await expect(page.getByRole('button', { name: 'Hide menu' })).toBeFocused();
+  const tour = page.getByRole('button', { name: 'Take the tour' });
+  await tour.focus();
+  await expect(page.getByRole('tooltip', { name: 'Take the tour' })).toBeVisible();
+  await expect(tour).toHaveText('');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+});
+
+test('the phone menu uses a compact named icon and keeps the current destination visible', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 320, height: 800 });
+  await signIn(page, ADMIN_EMAIL);
+  await page.goto('/admin/pages');
+  await expect(page.getByRole('heading', { name: 'Pages', level: 1 })).toBeVisible();
+  const endTour = page.getByRole('button', { name: 'End tour', exact: true });
+  if (await endTour.isVisible()) await endTour.click();
+  const summary = page.locator('details.admin-mobile-docket > summary');
+  await expect(summary).toHaveAccessibleName('Open menu');
+  await expect(summary).toContainText('Pages');
+  await expect(summary.locator('svg')).toBeVisible();
+  expect((await summary.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  await page.screenshot({ path: await evidencePath('navigation-320.png'), animations: 'disabled' });
+  await summary.click();
+  await expect(summary).toHaveAccessibleName('Close menu');
+  await expect(page.locator('#admin-content')).toHaveAttribute('inert');
+  const dimensions = await pageWidth(page);
+  expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
+  await page.screenshot({ path: await evidencePath('navigation-menu-320.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(summary).toHaveAccessibleName('Open menu');
+  await expect(summary).toBeFocused();
 });
 
 test('the Branding bar resizes the panes by keyboard, keeps the frame width, and stacks on a phone', async ({ page }) => {
