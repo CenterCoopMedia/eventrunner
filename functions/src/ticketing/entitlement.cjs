@@ -35,11 +35,13 @@
  */
 
 const { isValidTransition, computeEntitlement } = require('shared/registration');
+const { isCommerceOrderId } = require('shared/ticketCommerce');
 const {
   internals: { TICKETS },
 } = require('./index.cjs');
 
 const USERS = 'users';
+const ORDERS = 'ticket_orders';
 
 /** The ticket status that confers entitlement (§3.3 TicketRecord, §3.4). */
 const VALID = 'valid';
@@ -118,6 +120,30 @@ function affectedUids(before, after) {
  * @returns {Promise<{ uid: string, action: 'updated'|'unchanged'|'held'|'missing',
  *                     registrationStatus: string|null, approvalSource: string|null }>}
  */
+/**
+ * Whether the account holds a valid ticket that may approve it without staff.
+ * A free or complimentary Stripe order does not: anyone could claim one and
+ * read the attendee list. Other providers record no price here, so their valid
+ * tickets count, and the admin setting warns about free tickets. A Stripe order
+ * that cannot be read does not count.
+ *
+ * Reads only, inside the caller's transaction.
+ *
+ * @param {{ db: object, tx: object, uid: string }} deps
+ * @returns {Promise<boolean>}
+ */
+async function holdsPaidTicket({ db, tx, uid }) {
+  const valid = await tx.get(db.collection(TICKETS)
+    .where('claimedByUid', '==', uid).where('status', '==', VALID));
+  for (const ticket of valid.docs) {
+    const orderId = ticket.data()?.orderId;
+    if (!isCommerceOrderId(orderId)) return true;
+    const order = await tx.get(db.collection(ORDERS).doc(orderId));
+    if (order.exists && order.data()?.totalAmount > 0) return true;
+  }
+  return false;
+}
+
 async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
   if (typeof uid !== 'string' || uid.length === 0) {
     return { uid: '', action: 'missing', registrationStatus: null, approvalSource: null };
@@ -149,13 +175,15 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
 
     const hasValidTicket = validSnap.empty === true ? false : validSnap.size > 0;
     const entitled = computeEntitlement({ hasValidTicket, approvalSource });
+    const paidFor = autoApprove && hasValidTicket && await holdsPaidTicket({ db, tx, uid });
 
     let next = current;
     let nextSource = approvalSource;
 
-    // A ticket remains valid when automatic approval is disabled, but it no
-    // longer supplies staff approval. Explicit admin grants remain intact.
-    if (!autoApprove && approvalSource === 'ticket' &&
+    // A ticket remains valid when automatic approval is disabled, or when only
+    // a free ticket is left, but it no longer supplies staff approval. Explicit
+    // admin grants remain intact.
+    if ((!autoApprove || (hasValidTicket && !paidFor)) && approvalSource === 'ticket' &&
         isValidTransition(current, 'ticketed', 'auto_approval_disabled')) {
       next = 'ticketed';
       nextSource = null;
@@ -167,7 +195,7 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
       if (hasValidTicket && isValidTransition(current, 'ticketed', 'ticket_claimed')) {
         next = 'ticketed';
       }
-      if (hasValidTicket && autoApprove && isValidTransition(next, 'approved', 'auto_approve')) {
+      if (paidFor && isValidTransition(next, 'approved', 'auto_approve')) {
         next = 'approved';
         nextSource = 'ticket';
       }
@@ -305,6 +333,7 @@ function buildHandlers() {
 }
 
 module.exports = {
+  holdsPaidTicket,
   recomputeEntitlement,
   createOnTicketWritten,
   createOnApprovalPolicyWritten,
