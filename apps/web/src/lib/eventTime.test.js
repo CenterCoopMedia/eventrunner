@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   countdownParts,
+  formatDayHours,
   eventDateRangeLabel,
   formatDayDate,
   formatEventDateRange,
@@ -230,5 +231,15 @@ describe('eventDateRangeLabel', () => {
     expect(eventDateRangeLabel({ days: [{ date: '2026-13-01' }] })).toBeNull();
     expect(eventDateRangeLabel({ days: [{ date: '2026-02-30' }, { date: '2026-10-14' }] })).toBe('October 14, 2026');
     expect(eventDateRangeLabel({ days: [{ date: '2026-02-28' }] })).toBe('February 28, 2026');
+  });
+});
+
+describe('formatDayHours', () => {
+  it('reads a day’s hours the way a person says them', () => {
+    expect(formatDayHours('09:00', '17:00')).toBe('9 a.m. to 5 p.m.');
+    expect(formatDayHours('09:00', '11:30')).toBe('9 to 11:30 a.m.');
+    expect(formatDayHours('10:00', '12:00')).toBe('10 a.m. to noon');
+    expect(formatDayHours('13:15', '23:59')).toBe('1:15 to 11:59 p.m.');
+    expect(formatDayHours('9am', '17:00')).toBeNull();
   });
 });

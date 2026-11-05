@@ -61,5 +61,14 @@ export default async function globalSetup() {
   if (!adminEmails.includes('e2e-admin@example.test')) {
     throw new Error('[e2e global-setup] e2e-admin@example.test was not seeded as an admin.');
   }
+  // A first run closes the site behind its coming-soon page until the first
+  // admin publish (functions/src/cms/launch.cjs). The suite tests a site
+  // whose team has already launched it, so it opens it here, after checking
+  // that init closed it.
+  const launchRef = adminDb().collection('config').doc('launch');
+  if ((await launchRef.get()).data()?.comingSoon !== true) {
+    throw new Error('[e2e global-setup] init-event did not write config/launch { comingSoon: true }.');
+  }
+  await launchRef.set({ comingSoon: false }, { merge: true });
   console.log('[e2e global-setup] seed complete.');
 }

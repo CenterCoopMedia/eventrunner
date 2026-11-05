@@ -13,6 +13,7 @@ import { ContentProvider } from './contexts/ContentContext.jsx';
 import { ProfileProvider } from './contexts/ProfileContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
+import LaunchGate from './components/LaunchGate.jsx';
 import ProfileSetupRedirect from './components/ProfileSetupRedirect.jsx';
 import RouteTitle from './components/RouteTitle.jsx';
 import ScrollReset from './components/ScrollReset.jsx';
@@ -105,6 +106,7 @@ export function AppRoutes() {
           </ChunkErrorBoundary>
         }
       />
+      <Route element={<LaunchGate />}>
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="schedule" element={<DeferredPage component={Schedule} label="schedule" />} />
@@ -175,6 +177,7 @@ export function AppRoutes() {
             stay the LAST route: react-router matches routes in order,
             and "*" matches everything. */}
         <Route path="*" element={<DeferredPage component={ContentPage} label="page" />} />
+      </Route>
       </Route>
     </Routes>
   );

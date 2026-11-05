@@ -270,6 +270,35 @@ export function formatDayDate(day, timeZone) {
   }).format(instant);
 }
 
+/** One wall-clock "HH:MM" as AP-style parts: { clock: '9:30', period: 'a.m.' }. */
+function apClock(time) {
+  const match = /^(\d{1,2}):(\d{2})$/u.exec(String(time ?? '').trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = match[2];
+  if (hour > 23 || Number(minute) > 59) return null;
+  if (minute === '00' && hour === 12) return { clock: 'noon', period: '' };
+  if (minute === '00' && hour === 0) return { clock: 'midnight', period: '' };
+  const twelve = hour % 12 === 0 ? 12 : hour % 12;
+  return { clock: minute === '00' ? String(twelve) : `${twelve}:${minute}`, period: hour < 12 ? 'a.m.' : 'p.m.' };
+}
+
+/**
+ * A configured day's hours as reading copy: "9 a.m. to 5 p.m.",
+ * "9 to 11:30 a.m.", "10 a.m. to noon". Null when either time is not a
+ * wall-clock "HH:MM".
+ *
+ * @param {string} startTime @param {string} endTime
+ * @returns {string|null}
+ */
+export function formatDayHours(startTime, endTime) {
+  const start = apClock(startTime);
+  const end = apClock(endTime);
+  if (!start || !end) return null;
+  const startText = start.period && start.period === end.period ? start.clock : `${start.clock} ${start.period}`.trim();
+  return `${startText} to ${`${end.clock} ${end.period}`.trim()}`;
+}
+
 /**
  * The event's own start instant — the earliest configured day's start time,
  * resolved in the event's timezone — or null when it cannot be resolved (no

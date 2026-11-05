@@ -13,6 +13,8 @@ import { MemoryRouter } from 'react-router';
 // editors land one branch at a time, so the tests that need an unlinked row
 // take one editor off the docket here rather than naming one that is absent.
 const unowned = vi.hoisted(() => new Set());
+const launch = vi.hoisted(() => ({ comingSoon: false }));
+vi.mock('../../lib/launchSource.js', () => ({ useComingSoon: () => launch.comingSoon }));
 vi.mock('../AdminLayout.jsx', async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -188,6 +190,7 @@ beforeEach(() => {
   // record words this file reads; the account has already ended it.
   markTourDone('admin-1');
   unowned.clear();
+  launch.comingSoon = false;
   adminSubscriptions.clear();
   drafts.clear();
   runs.recent = null;
@@ -295,6 +298,18 @@ describe('the Unpublished changes page', () => {
     });
     const notice = await within(main()).findByText('Published. The public site picks it up live.');
     await waitFor(() => expect(document.activeElement).toBe(notice.parentElement));
+  });
+
+  it('opens a coming-soon site with nothing pending through one publish', async () => {
+    launch.comingSoon = true;
+    await renderAt('/admin/unpublished');
+    pushDrafts();
+    expect(screen.queryByRole('button', { name: /^Publish all/ })).toBeNull();
+    fetch.mockResolvedValueOnce(ok({ queueId: 'q-open', status: 'done', results: {} }));
+    fireEvent.click(within(main()).getByRole('button', { name: 'Open the site' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0)).toEqual({ all: true });
+    expect(await within(main()).findByText('The site is open. Visitors now see the full site.')).toBeInTheDocument();
   });
 
   it('publishes everything with { all: true } and reads the whole answer', async () => {

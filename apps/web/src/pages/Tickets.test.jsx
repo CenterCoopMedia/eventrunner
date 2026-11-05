@@ -211,15 +211,21 @@ describe('attendee ticket selection', () => {
     state.event.registration = { externalUrl: 'https://register.example.test', actionLabel: '   ' };
     ticketingRequest.mockResolvedValue({ provider: 'manual' });
     mount();
-    expect(await screen.findByRole('link', { name: 'Open registration' })).toHaveAttribute('href', 'https://register.example.test/');
+    expect(await screen.findByRole('link', { name: 'Register' })).toHaveAttribute('href', 'https://register.example.test/');
   });
   it.each(['javascript:alert(1)', 'https:register.example.test'])('does not render a rejected external registration destination: %s', async (externalUrl) => {
     state.event.registration = { externalUrl, actionLabel: 'Register with the organizer' };
     ticketingRequest.mockResolvedValue({ provider: 'manual' });
     mount();
-    expect(await screen.findByText('Contact the organizers for registration information.')).toBeInTheDocument();
+    expect(await screen.findByText('Tickets are not sold on this site. Check this page again for registration details.')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Register with the organizer' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Claim a ticket you already have' })).toHaveAttribute('href', '/ticket/claim');
+  });
+  it('offers no ticket claim when the event sells no tickets', async () => {
+    ticketingRequest.mockResolvedValue({ provider: 'none' });
+    mount();
+    expect(await screen.findByText('Tickets are not sold on this site. Check this page again for registration details.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Claim a ticket you already have' })).not.toBeInTheDocument();
   });
   it.each([
     ['global-only deadlines', NARROW_SALES_WINDOW, {}],

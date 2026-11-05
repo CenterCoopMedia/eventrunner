@@ -35,6 +35,7 @@ const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
 const { listDirty, publishDocs, logAdminAction, isValidDocId } = require('./store.cjs');
 const { requestSitePublish } = require('./publisher.cjs');
 const { checkSchedulePublishSet } = require('../schedule/sessions.cjs');
+const { isComingSoon, openSiteOnFirstPublish } = require('./launch.cjs');
 
 const MAX_DOC_IDS = 2000;
 const QUEUE_LIST_DEFAULT = 20;
@@ -165,8 +166,32 @@ function createCmsPublishHandler({
       if (!resolved.ok) return badRequest(res, resolved.message);
       request = resolved.request;
       if (Object.keys(request).length === 0) {
-        // Nothing dirty: no queue row for a no-op.
-        return res.status(200).json({ queueId: null, status: 'done', results: {} });
+        // Nothing dirty: no queue row for a no-op. A team that publishes a
+        // new site without changing anything still means to open it, and
+        // the deployed snapshot still says coming soon, so that one case
+        // gets a row and a snapshot refresh like any other publish.
+        // The row is written before the flag is cleared: if the row's write
+        // failed after the site opened, a retry would find nothing to do and
+        // the snapshot would never be rebuilt.
+        if (!(await isComingSoon({ db, log }))) {
+          return res.status(200).json({ queueId: null, status: 'done', results: {} });
+        }
+        const openRef = db.collection('cmsPublishQueue').doc();
+        await openRef.set({
+          status: 'done',
+          request: {},
+          progress: {},
+          requestedBy: actor.email,
+          requestedAt: new Date(now()),
+          finishedAt: new Date(now()),
+          updatedAt: new Date(now()),
+        });
+        await logAdminAction({ db, action: 'cms-publish', docPath: openRef.path, actor, now, log });
+        await openSiteOnFirstPublish({ db, now, log });
+        const publisher = await requestSitePublish({
+          db, queueId: openRef.id, env, fetchImpl, notifyOperator, now, log,
+        });
+        return res.status(200).json({ queueId: openRef.id, status: 'done', results: {}, publisher });
       }
       const refusal = await structuralRefusal({ db }, request);
       if (refusal) return badRequest(res, refusal);
@@ -207,6 +232,9 @@ function createCmsPublishHandler({
 
     await queueRef.set({ status: 'done', finishedAt: new Date(now()), updatedAt: new Date(now()) }, { merge: true });
     await logAdminAction({ db, action: 'cms-publish', docPath: queueRef.path, actor, now, log });
+    // Before the snapshot refresh below, so the rebuilt bundle reads the
+    // site as open.
+    await openSiteOnFirstPublish({ db, now, log });
 
     // The publish is committed and the row says so. Refreshing the static
     // snapshot is a separate, best-effort concern (§8.4 phase 5): the

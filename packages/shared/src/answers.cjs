@@ -425,9 +425,11 @@ function buildEvent({ answers, tierA }) {
     announcedAt: null,
     archivedAt: null,
     seo: {
+      // The event's own description from setup, where it gave one, so a
+      // new site's search and link cards never carry the instruction.
       description: orDefault(
         seo.description,
-        '[Replace] One-sentence description of the event for search and social cards.',
+        orDefault(src.tagline, '[Replace] One-sentence description of the event for search and social cards.'),
       ),
       defaultOgImagePath: orDefault(seo.defaultOgImagePath, 'branding/og-default.svg'),
       organizerName: orDefault(seo.organizerName, orDefault(legal.operatorName, '')),

@@ -47,7 +47,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { publicContentDoc } from 'shared/seed';
+import { isStarterContent, publicContentDoc } from 'shared/seed';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotScheduleData, { speakers as snapshotSpeakers } from '@generated/scheduleData.js';
 import snapshotOrganizationsData from '@generated/organizationsData.js';
@@ -68,6 +68,16 @@ const RUNTIME_COLLECTIONS = [
 ];
 
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
+
+// A block that still holds the seed's starter text is never drawn: a reader
+// would otherwise see "[Replace] Venue name." on a client's site. The admin
+// marks such a block as hidden until it is filled in. The home page's key
+// facts ask for their section with starter text kept (`keepStarter`),
+// because the seeded When fact is filled from the event's dates there
+// (pages/Home.jsx), and that page checks each block again after that.
+function isDrawable(block, { keepStarter = false } = {}) {
+  return Boolean(block) && block.visible !== false && (keepStarter || !isStarterContent(block));
+}
 
 // cmsOrganizations is written through the generic content endpoint
 // (functions/src/cms/content.cjs), whose organization seam now checks each
@@ -237,12 +247,12 @@ export function ContentProvider({ readSource = 'published', children }) {
       const block = siteContent[`${section}__${field}`] ?? null;
       // Draft preview reads unfiltered collections; hide what a publish
       // would hide. No hardcoded fallback text — event-neutrality (§5.3).
-      return block && block.visible !== false ? block : null;
+      return isDrawable(block) ? block : null;
     };
 
-    const getSectionBlocks = (section) =>
+    const getSectionBlocks = (section, options) =>
       Object.values(siteContent)
-        .filter((block) => block.section === section && block.visible !== false)
+        .filter((block) => block.section === section && isDrawable(block, options))
         .sort(byOrder);
 
     // THE DOCUMENT BEHIND A ROUTE THAT RENDERS ITSELF. A system route is

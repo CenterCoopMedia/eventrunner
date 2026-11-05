@@ -18,6 +18,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
+import { isStarterContent } from 'shared/seed';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { leadsToNoPublicPage, switchedOffSectionFor } from '../../lib/linkTargets.js';
@@ -714,6 +715,12 @@ export default function AdminContentBlockEditor({ mode }) {
         document.body,
       ) : null}
 
+      {isExisting && isStarterContent({ ...content.values, blockType: content.blockType, seeded: existingRow?.current?.seeded }) ? (
+        <Notice
+          tone="caution"
+          message="This block still has starter text, so it is hidden on the public site. Replace every line that starts with [Replace], then publish, and the block appears."
+        />
+      ) : null}
       <div className="admin-content-editor-layout" data-creating={!isExisting}>
         {isExisting ? <>{valuePanel}{settingsPanel}</> : <>{settingsPanel}{valuePanel}</>}
       </div>

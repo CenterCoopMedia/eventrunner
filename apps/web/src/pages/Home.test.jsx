@@ -372,13 +372,14 @@ describe('Home key facts', () => {
   });
 
   it('drops the seeded dates when the event settings list no day, as the seed would (connector review of PR 270)', async () => {
-    // A valid empty day list means the dates are not set. The seed writes
-    // its own placeholder in that case, so the card says the same thing the
-    // seed would write now, never the range init copied in.
+    // A valid empty day list means the dates are not set. The seed would
+    // write its own placeholder in that case, and a placeholder is starter
+    // text, which the public page never draws: the card goes, and the range
+    // init copied in never shows either.
     eventConfig = { name: 'Demo Event', timezone: 'UTC', days: [] };
     infoBlocks = [await whenFactFromTheCms()];
     render(<Home />);
-    expect(screen.getByText(SEED_WHEN_PLACEHOLDER, { selector: 'dd' })).toBeInTheDocument();
+    expect(screen.queryByText(SEED_WHEN_PLACEHOLDER)).toBeNull();
     expect(screen.queryByText('October 14–16, 2026')).toBeNull();
   });
 
