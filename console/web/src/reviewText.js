@@ -49,7 +49,10 @@ function clockText(time) {
  */
 export function eventDayText(day) {
   const date = new Date(`${day?.date}T12:00:00Z`);
-  const dateText = Number.isNaN(date.getTime())
+  // An impossible draft date such as 2027-02-30 shows as typed, not as the
+  // day the browser would roll it over to.
+  const real = !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === day?.date;
+  const dateText = !real
     ? (day?.date ?? '')
     : date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
   const hours = day?.startTime && day?.endTime ? `${clockText(day.startTime)} to ${clockText(day.endTime)}` : '';

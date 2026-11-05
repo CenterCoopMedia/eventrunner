@@ -35,19 +35,6 @@ describe('useAutosave', () => {
     expect(save.mock.calls.map(([v]) => v)).toEqual([{ n: 1 }, { n: 2 }]);
   });
 
-  it('reports a save the server refused, so Next can stay on the step', async () => {
-    const save = vi.fn().mockResolvedValue({ saved: false });
-    const { result } = renderHook(() => useAutosave({ save }));
-    act(() => result.current.queue({ step: 'web-address', answers: { name: 'x' } }));
-    let ok;
-    await act(async () => { ok = await result.current.flush(); });
-    expect(ok).toBe('refused');
-    expect(result.current.status).toBe('unsaved');
-    // A later flush with nothing new still reports the refusal.
-    await act(async () => { ok = await result.current.flush(); });
-    expect(ok).toBe('refused');
-  });
-
   it('a flush with nothing waiting reports success', async () => {
     const { result } = renderHook(() => useAutosave({ save: vi.fn() }));
     let ok;

@@ -11,9 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * A value whose save fails stays waiting, unless a newer value replaced
  * it, so the next flush sends it again. `flush()` resolves to true when
  * the last save reached the server and false when it failed, so the
- * stepper can stay on the step and the review can hold the request. When
- * the server kept the old answer (saved: false), it resolves to 'refused',
- * so Next can stay on the step while Back still works.
+ * stepper can stay on the step and the review can hold the request.
  *
  * `status` is 'idle', 'waiting', 'saving', 'saved', 'unsaved' (the server
  * kept the old answer, for example a taken name) or 'error'.
@@ -45,7 +43,7 @@ export function useAutosave({ save, onResult, delay = 800 }) {
         setError('');
         setStatus(result && result.saved === false ? 'unsaved' : 'saved');
         onResultRef.current?.(result, value);
-        return result && result.saved === false ? 'refused' : true;
+        return true;
       } catch (err) {
         if (pending.current === undefined) pending.current = value;
         setError(err.message);

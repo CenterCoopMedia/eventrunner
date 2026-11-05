@@ -115,15 +115,16 @@ export default function Setup() {
   // taken web address. The server keeps the older answer, so the review
   // holds the request until a new answer saves.
   const [refused, setRefused] = useState(() => []);
+  // The same list, readable right after a save inside go().
+  const refusedNow = useRef([]);
   const showAll = search.get('check') === '1';
 
   const { queue, flush, status: saveStatus, error: saveError } = useAutosave({
     save: (value) => callApi('saveApplicationStep', { orgId, appId, step: value.step, answers: value.answers }),
     onResult: (result) => {
-      setRefused((prev) => {
-        const others = prev.filter((id) => id !== result.step);
-        return result.saved === false ? [...others, result.step] : others;
-      });
+      const others = refusedNow.current.filter((id) => id !== result.step);
+      refusedNow.current = result.saved === false ? [...others, result.step] : others;
+      setRefused(refusedNow.current);
       setApp((prev) => withStepErrors(prev, result.step, result.errors));
     },
   });
@@ -172,13 +173,13 @@ export default function Setup() {
     const saved = await flush();
     navigationPending.current = false;
     setNavigating(false);
-    if (!saved || (saved === 'refused' && !leaving)) {
+    if (!saved || (!leaving && refusedNow.current.includes(step?.id))) {
       // A top step link can be far from the save result on a long form.
       actionArea.current?.focus();
       return;
     }
     navigate(target);
-  }, [flush, navigate]);
+  }, [flush, navigate, step?.id]);
 
   const stepErrors = useMemo(() => (app && step ? errorsOfStep(app.errors, step.id) : {}), [app, step]);
 
