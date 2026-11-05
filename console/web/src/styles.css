@@ -475,3 +475,10 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
   .directory-heading > div { flex-basis: 100%; }
   .application-actions, .application-actions p, .application-actions .button { width: 100%; }
 }
+
+/* Report a problem */
+.report-dialog { width: min(36rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--space-md); border: 1px solid rgb(var(--rule)); border-radius: var(--radius); background: rgb(var(--surface)); color: rgb(var(--ink)); }
+.report-dialog::backdrop { background: rgb(0 0 0 / 0.55); }
+.report-dialog h2 { margin-top: 0; }
+.report-dialog form { display: grid; gap: var(--space-sm); }
+.report-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
