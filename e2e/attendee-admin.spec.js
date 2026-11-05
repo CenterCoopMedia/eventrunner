@@ -126,8 +126,11 @@ test.describe.serial('attendee export and administration', () => {
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
     const panel = page.getByRole('region', { name: `Record for ${name}` });
-    await panel.getByLabel('Past attendance').fill('2024\n 2025 \n');
-    await panel.getByRole('button', { name: 'Save record' }).click();
+    for (const edition of ['2024', ' 2025 ']) {
+      await panel.getByLabel('Past attendance', { exact: true }).fill(edition);
+      await panel.getByLabel('Past attendance', { exact: true }).press('Enter');
+    }
+    await panel.getByRole('button', { name: 'Save' }).click();
     await expect(panel.getByRole('status')).toHaveText('Past attendance saved.');
 
     const ref = adminDb().collection('users').doc(uid);

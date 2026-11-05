@@ -69,11 +69,11 @@ describe('theme vocabulary parity: browser against the shared schema', () => {
     expect([...MOTIF_SET_IDS]).toEqual([...sharedTheme.THEME_MOTIF_SET_IDS]);
   });
 
-  it('offers all six styles with no second tier, and leads with the default', () => {
+  it('offers all seven styles with no second tier, and leads with the default', () => {
     // Owner calibration, 2026-08-27: every style is first-class. The picker
     // shows one flat list in catalog order, and the style a fresh deployment
     // starts on is the one it leads with.
-    expect(PRESET_IDS).toHaveLength(6);
+    expect(PRESET_IDS).toHaveLength(7);
     expect(PRESET_IDS[0]).toBe(DEFAULT_PRESET_ID);
     for (const id of PRESET_IDS) {
       expect(sharedTheme.getPreset(id)).not.toHaveProperty('tier');

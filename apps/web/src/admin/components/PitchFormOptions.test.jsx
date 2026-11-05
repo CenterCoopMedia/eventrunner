@@ -1,19 +1,54 @@
 // The pitch form's option lists in the admin (ADR 0008 §2).
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PitchFormOptions from './PitchFormOptions.jsx';
 import PitchDetails from './PitchDetails.jsx';
 
 const SETTINGS = { enabled: true, closesAt: null, formOptions: { formats: ['Panel'], lengths: [60], tracks: [], maxCoPresenters: 4 } };
 
+function addItem(label, value) {
+  const box = screen.getByLabelText(label);
+  fireEvent.change(box, { target: { value } });
+  fireEvent.keyDown(box, { key: 'Enter' });
+}
+
 describe('PitchFormOptions', () => {
-  it('shows the saved lists one per line and saves the checked lists', async () => {
+  it('adds text left in the box when the box loses focus, and removes an item', () => {
+    render(<PitchFormOptions settings={SETTINGS} call={vi.fn()} />);
+    const box = screen.getByLabelText('Tracks');
+    fireEvent.change(box, { target: { value: 'Audience' } });
+    fireEvent.blur(box);
+    expect(box).toHaveValue('');
+    expect(screen.getByText('Audience')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Audience' }));
+    expect(screen.queryByText('Audience')).toBeNull();
+  });
+
+  it('replaces selected text when lines are pasted, and leaves a composing Enter alone', () => {
+    render(<PitchFormOptions settings={SETTINGS} call={vi.fn()} />);
+    const box = screen.getByLabelText('Tracks');
+    fireEvent.change(box, { target: { value: 'Wrong' } });
+    fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
+    expect(box).toHaveValue('Wrong');
+    box.setSelectionRange(0, 5);
+    fireEvent.paste(box, { clipboardData: { getData: () => 'One\nTwo' } });
+    expect(screen.queryByText('Wrong')).toBeNull();
+    expect(within(screen.getByRole('list', { name: 'Tracks list' })).getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('turns pasted lines into one item each', () => {
+    render(<PitchFormOptions settings={SETTINGS} call={vi.fn()} />);
+    fireEvent.paste(screen.getByLabelText('Tracks'), { clipboardData: { getData: () => 'One\r\n Two \n\nOne' } });
+    expect(within(screen.getByRole('list', { name: 'Tracks list' })).getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('shows the saved lists and saves the checked lists', async () => {
     const call = vi.fn().mockResolvedValue({});
     render(<PitchFormOptions settings={SETTINGS} call={call} />);
-    expect(screen.getByLabelText('Formats')).toHaveValue('Panel');
-    expect(screen.getByLabelText('Lengths in minutes')).toHaveValue('60');
-    fireEvent.change(screen.getByLabelText('Formats'), { target: { value: 'Panel\n Workshop \n\n' } });
-    fireEvent.change(screen.getByLabelText('Lengths in minutes'), { target: { value: '60\n30' } });
+    expect(within(screen.getByRole('list', { name: 'Formats list' })).getByText('Panel')).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Lengths in minutes list' })).getByText('60')).toBeInTheDocument();
+    addItem('Formats', ' Workshop ');
+    addItem('Lengths in minutes', '30');
     fireEvent.change(screen.getByLabelText('Co-presenters per pitch'), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save pitch form options' }));
     await screen.findByText('Pitch form options saved.');
@@ -25,8 +60,8 @@ describe('PitchFormOptions', () => {
   it('names a wrong list before the save and sends nothing', async () => {
     const call = vi.fn();
     render(<PitchFormOptions settings={SETTINGS} call={call} />);
-    fireEvent.change(screen.getByLabelText('Lengths in minutes'), { target: { value: 'an hour' } });
-    fireEvent.change(screen.getByLabelText('Formats'), { target: { value: 'Panel\npanel' } });
+    addItem('Lengths in minutes', 'an hour');
+    addItem('Formats', 'panel');
     fireEvent.click(screen.getByRole('button', { name: 'Save pitch form options' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/lengths: each length is a whole number/));
     expect(screen.getByRole('alert')).toHaveTextContent(/"panel" is listed twice/);

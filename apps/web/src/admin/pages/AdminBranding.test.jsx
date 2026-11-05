@@ -435,7 +435,7 @@ describe('the staff workflow', () => {
     expect(previewIframe()).toBe(proof);
   });
 
-  it('offers all six styles with no second tier, and says who each suits', async () => {
+  it('offers all seven styles with no second tier, and says who each suits', async () => {
     await renderBranding(PRESET_THEME);
     const picker = screen.getByLabelText('Site style');
     expect(picker).toHaveValue('broadsheet');
@@ -448,6 +448,7 @@ describe('the staff workflow', () => {
       'Atlas',
       'Field Guide',
       'Zine',
+      'NC Local',
     ]);
     // Nothing carries a warning label.
     expect(offered.join(' ')).not.toMatch(/experimental|beta|unstable/i);

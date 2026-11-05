@@ -965,6 +965,158 @@ const PRESETS = Object.freeze({
       },
     },
   },
+  nclocal: {
+    id: 'nclocal',
+    palette: {
+      light: {
+        surface: [253, 252, 250],
+        surfaceAlt: [244, 240, 235],
+        ink: [17, 17, 17],
+        inkMuted: [103, 103, 103],
+        primary: [9, 58, 70],
+        primaryDark: [0, 28, 40],
+        primaryLight: [193, 196, 220],
+        accent: [9, 58, 70],
+        success: [22, 96, 62],
+        warning: [134, 82, 10],
+        danger: [170, 32, 44],
+        highlight: [124, 90, 14],
+        keynote: [9, 58, 70],
+      },
+      dark: {
+        surface: [0, 28, 40],
+        surfaceAlt: [9, 42, 54],
+        ink: [249, 247, 245],
+        inkMuted: [194, 206, 209],
+        primary: [193, 196, 220],
+        primaryDark: [224, 225, 237],
+        primaryLight: [9, 58, 70],
+        accent: [194, 206, 209],
+        success: [116, 200, 150],
+        warning: [228, 174, 88],
+        danger: [242, 136, 142],
+        highlight: [222, 190, 108],
+        keynote: [193, 196, 220],
+      },
+    },
+    fonts: {
+      heading: 'merriweather',
+      body: 'merriweather',
+      data: 'cabin',
+      mono: 'plex-mono',
+    },
+    shape: {
+      radius: 'editorial',
+      texture: 'flat',
+      density: 'comfortable',
+    },
+    motifSet: 'none',
+    options: {
+      headingFace: {
+        default: 'merriweather',
+        choices: [
+          {
+            id: 'merriweather',
+          },
+          {
+            id: 'cabin',
+          },
+        ],
+      },
+      nameplate: {
+        default: 'rule-bounded-bar',
+        choices: [
+          {
+            id: 'rule-bounded-bar',
+          },
+          {
+            id: 'stacked-with-deck',
+          },
+          {
+            id: 'section-aware-bar',
+          },
+        ],
+      },
+      component: {
+        default: 'hairline-row',
+        choices: [
+          {
+            id: 'hairline-row',
+          },
+          {
+            id: 'lead-and-rest',
+          },
+        ],
+      },
+      longReadOpening: {
+        default: 'standfirst',
+        choices: [
+          {
+            id: 'drop-cap',
+          },
+          {
+            id: 'standfirst',
+          },
+          {
+            id: 'plain',
+          },
+        ],
+      },
+      quote: {
+        default: 'ruled-with-mark',
+        choices: [
+          {
+            id: 'ruled-with-mark',
+          },
+          {
+            id: 'side-rule',
+          },
+          {
+            id: 'mark-only',
+          },
+        ],
+      },
+      directory: {
+        default: 'portrait-shelf',
+        choices: [
+          {
+            id: 'portrait-shelf',
+          },
+          {
+            id: 'tall-portraits',
+          },
+        ],
+      },
+      sectionBoundary: {
+        default: 'rule-and-folio',
+        choices: [
+          {
+            id: 'rule-and-folio',
+          },
+          {
+            id: 'rule-only',
+          },
+          {
+            id: 'folio-in-margin',
+          },
+        ],
+      },
+      tableRules: {
+        default: 'ruled-head',
+        choices: [
+          {
+            id: 'hairline-rows',
+          },
+          {
+            id: 'ruled-head',
+          },
+          {
+            id: 'full-grid',
+          },
+        ],
+      },
+    },
+  },
 });
 
 const ADMIN_TOKENS = Object.freeze({

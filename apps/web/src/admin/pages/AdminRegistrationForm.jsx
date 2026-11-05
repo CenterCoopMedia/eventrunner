@@ -45,6 +45,11 @@ function toForm(draft) {
 }
 
 /** `field: reason` segments, as the admin error summary reads them. */
+/** The wording attendees see, when it adds to the question's name. */
+function attendeeWording({ name, label, help }) {
+  return [label === name ? '' : `“${label}”`, help].filter(Boolean).join(' ');
+}
+
 function clientError(errors) {
   const message = errors.join('; ');
   return { message, fieldErrors: errors.map((segment) => ({ field: segment.split(':')[0], message: segment })) };
@@ -141,10 +146,11 @@ export default function AdminRegistrationForm() {
                 return (
                   <li key={question.id} className="flex flex-col gap-2xs border-admin-rule-hairline border-b-admin-hairline pb-sm last:border-b-0 last:pb-0">
                     <p className="font-semibold text-admin-ink">{question.name}{question.sensitive ? ' (private to staff)' : ''}</p>
-                    <p className={fieldHintClass}>Attendees see: “{question.label}”{question.help ? ` ${question.help}` : ''}</p>
+                    {attendeeWording(question) ? <p className={fieldHintClass}>{attendeeWording(question)}</p> : null}
+                    {/* The question's name shows once, above. Screen readers hear it on each box. */}
                     <div className="flex flex-wrap gap-md">
-                      <CheckboxField label={`Ask: ${question.name}`} checked={entry.enabled} onChange={(enabled) => setStandard(question.id, { enabled, required: enabled && entry.required })} />
-                      <CheckboxField label={`Required: ${question.name}`} checked={entry.required} disabled={!entry.enabled} onChange={(required) => setStandard(question.id, { required })} />
+                      <CheckboxField label="Ask" aria-label={`Ask: ${question.name}`} checked={entry.enabled} onChange={(enabled) => setStandard(question.id, { enabled, required: enabled && entry.required })} />
+                      <CheckboxField label="Required" aria-label={`Required: ${question.name}`} checked={entry.required} disabled={!entry.enabled} onChange={(required) => setStandard(question.id, { required })} />
                     </div>
                   </li>
                 );

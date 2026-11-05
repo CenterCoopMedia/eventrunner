@@ -309,14 +309,14 @@ test('the font roles are heading, body, data, and mono — accent is not one of 
   assert.ok(!THEME_FONT_ROLES.includes('accent'));
 });
 
-test('all six styles are first-class, in picker order, led by the default', () => {
+test('all seven styles are first-class, in picker order, led by the default', () => {
   // Owner calibration, 2026-08-27. The stability tier is withdrawn: no style
   // carries a tier, nothing is labelled experimental, and the catalog is one
   // flat ordered list. Order is a recommendation, and Institutional leads it
   // because a fresh deployment starts there.
   assert.deepEqual(
     [...THEME_PRESET_IDS],
-    ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'],
+    ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine', 'nclocal'],
   );
   assert.equal(THEME_PRESET_IDS[0], DEFAULT_PRESET_ID);
   assert.equal(DEFAULT_PRESET_ID, 'civic');

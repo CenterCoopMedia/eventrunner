@@ -629,3 +629,99 @@ Choose how a table is ruled.
 - **Hairline rows**: Rules the rows and the head at the hairline and draws no column rules.
 - **Ruled head** *(default)*: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
 - **Full grid**: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.
+
+## NC Local
+
+`data-theme="nclocal"`
+
+NC Local's own look: deep teal, soft lavender, warm surfaces and broad serif headlines beside a large photo.
+
+Built for the NC Local News & Information Summit.
+
+| | |
+|---|---|
+| Headings | `merriweather` |
+| Body | `merriweather` |
+| Data | `cabin` |
+| Figures and code | `plex-mono` |
+| Corners | editorial |
+| Surface | flat |
+| Density | comfortable |
+| Illustrations | none |
+
+**schema-note.** Defines one complete site style. The file supplies two color palettes, four font roles, shape, texture, density, a default illustration set, and curated options.
+
+**story.** The look from the NC Local demo (scripts/lib/nclocal-theme.json), offered as a style for the pilot. Removing this file and rerunning the generator withdraws it.
+
+**palette-note.** Color channels use [r, g, b] numbers. The generator writes RGB triples. The dark palette is authored separately.
+
+**first-class-note.** All six styles are complete and supported. Each has one default configuration.
+
+**palette-words-light.** warm white page, warm stone band, near-black ink, deep NC Local teal, soft lavender
+
+**palette-words-dark.** midnight teal page, deep teal band, warm white ink, soft lavender
+
+**font-note.** Uses Merriweather for headings and body text, Cabin for labels and data, and Plex Mono for figures and identifiers.
+
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading. The definition list keeps the data face for its terms in a wide column. The pull quote sits between strong rules with a large opening mark. An urgent notice takes the nameplate rule, and table heads are set in small capitals over a strong rule. The standfirst is set in the heading typeface at regular weight.
+
+### Heading face: `headingFace`
+
+Choose the headline typeface.
+
+- **Merriweather** *(default)*: Uses the broad serif from the NC Local demo for headlines and body text.
+- **Cabin**: Uses a humanist sans-serif for headlines. It sets them apart from the Merriweather body text.
+
+### Header style: `nameplate`
+
+Choose the masthead layout.
+
+- **Rule-bounded bar** *(default)*: Places the event name at the left and dates at the right. A strong rule closes the header.
+- **Stacked with a deck**: Places the event name above a short factual description. A hairline rule closes the header.
+- **Section-aware bar**: Uses a smaller running header for inner pages and keeps the active section visible.
+
+### Schedule style: `component`
+
+Choose the schedule row style.
+
+- **Hairline row** *(default)*: Uses one row for the title, time, track, and speaker. Hairline rules separate the rows.
+- **Lead and rest**: Makes the first session larger than the remaining sessions. Use it when one session must lead the list.
+
+### Long read opening: `longReadOpening`
+
+Choose how the first paragraph of a Long read page opens.
+
+- **Drop cap**: Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.
+- **Standfirst** *(default)*: Sets the first paragraph at the lead size, as a summary of the page.
+- **Plain**: Keeps the first paragraph at body size with no drop cap.
+
+### Quote device: `quote`
+
+Choose how a quoted sentence is set.
+
+- **Ruled with an opening mark** *(default)*: Sets the quote between strong rules with a large opening mark in the heading typeface.
+- **Side rule**: Sets the quote beside one strong rule with no rules above or below; the quotation marks sit inline around the sentence.
+- **Opening mark only**: Sets the quote with the large opening mark and no rules.
+
+### Directory style: `directory`
+
+Choose how the speaker shelf and the attendee index are set.
+
+- **Portrait shelf** *(default)*: Sets square portraits on the alternate ground, ruled at the hairline.
+- **Tall portraits**: Sets portraits at three by four, like a profile picture in a print feature.
+
+### Section boundary: `sectionBoundary`
+
+Choose how a section heading is ruled and labelled.
+
+- **Rule and folio** *(default)*: Draws the section rule with the folio at the far end of the heading line.
+- **Rule only**: Draws the section rule and hides the folio beside the heading.
+- **Folio in the margin**: Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.
+
+### Table rules: `tableRules`
+
+Choose how a table is ruled.
+
+- **Hairline rows**: Rules the rows and the head at the hairline and draws no column rules.
+- **Ruled head** *(default)*: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
+- **Full grid**: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.

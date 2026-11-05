@@ -232,3 +232,7 @@ Rules written after user corrections. Read at session start.
 - Ask the owner every question with the AskUserQuestion tool, never in
   plain text at the end of a reply. The owner answers only there; questions
   left in prose waited for hours (2026-11-04).
+- Say a thing once in admin forms. A label that repeats the heading above it
+  ("Organization", "Attendees see: Organization", "Ask: Organization",
+  "Required: Organization") reads as noise. Show the short word, and keep the
+  full name for screen readers with `aria-label` (owner, 2026-11-05).
