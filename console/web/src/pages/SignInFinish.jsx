@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { EMAIL_KEY, peekReturn, readStored, signInErrorMessage, useAuth } from '../auth.jsx';
 import { isEmail } from '../text.js';
+import LoadingState from '../LoadingState.jsx';
 
 /** The page the emailed sign-in link opens: /signin/finish. */
 export default function SignInFinish() {
@@ -64,7 +65,7 @@ export default function SignInFinish() {
           <p><Link to="/signin">Get a new sign-in link</Link></p>
         </>
       ) : null}
-      {address && !error ? <p role="status">Signing you in. This takes a moment.</p> : null}
+      {address && !error ? <LoadingState long>Signing you in. This takes a moment.</LoadingState> : null}
       {!address ? (
         <form noValidate onSubmit={onSubmit} className="stack">
           <p>You opened the link in a different browser. Enter the email address the link was sent to. If you started from a signup link, open that link again here once you are signed in.</p>

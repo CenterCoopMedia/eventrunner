@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAuth } from '../../auth.jsx';
 import TeamSections from '../TeamSections.jsx';
 import { useTeam } from '../useTeam.js';
+import LoadingState from '../../LoadingState.jsx';
 
 /** Step 4: the same team tools as the Team page. Invites go out at once. */
 export default function TeamStep({ orgId, onOwnersNeeded }) {
@@ -14,7 +15,7 @@ export default function TeamStep({ orgId, onOwnersNeeded }) {
   }, [ownersNeeded, onOwnersNeeded]);
 
   if (!team.data) {
-    return team.error ? <p className="message error" role="alert">{team.error}</p> : <p role="status">Loading the team.</p>;
+    return team.error ? <p className="message error" role="alert">{team.error}</p> : <LoadingState>Loading the team.</LoadingState>;
   }
   return (
     <div>

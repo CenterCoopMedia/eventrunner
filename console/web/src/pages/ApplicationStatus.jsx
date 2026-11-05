@@ -52,7 +52,7 @@ function BuildUnderway({ app }) {
     <aside className="note stack" role="note">
       <p className="note-title">You can close this page</p>
       <p>{app.myRole === 'owner' ? 'You' : 'The Owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
-      <LoadingState>{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</LoadingState>
+      <LoadingState long>{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</LoadingState>
     </aside>
   );
 }
@@ -221,7 +221,7 @@ export default function ApplicationStatus() {
     } }));
   }
 
-  if (!app) return error ? <p className="message error console-workspace" role="alert">{error}</p> : <LoadingState className="console-workspace">Loading your request.</LoadingState>;
+  if (!app) return error ? <p className="message error console-workspace" role="alert">{error}</p> : <LoadingState long className="console-workspace">Loading your request.</LoadingState>;
 
   const title = app.answers.event.name || 'New event site';
   const closed = ['withdrawn', 'declined'].includes(app.status);

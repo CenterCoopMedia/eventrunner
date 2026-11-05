@@ -300,6 +300,50 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
   @keyframes console-spin { to { transform: rotate(360deg); } }
 }
 
+/* The long-wait badge (WaitingBuddy.jsx). It appears only after 1.2 seconds
+   and moves only without a reduced-motion preference; otherwise it stands
+   still with its confetti in place. */
+.console-loading-long { align-items: center; }
+.wait-buddy { flex: none; width: 4.5rem; height: 5rem; overflow: visible; }
+.wait-buddy * { transform-box: view-box; }
+.wb-line { fill: none; stroke: rgb(var(--ink)); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.wb-strap { fill: none; stroke: rgb(var(--accent)); stroke-width: 3.5; stroke-linecap: round; }
+.wb-badge { fill: rgb(var(--surface)); stroke: rgb(var(--ink)); stroke-width: 2.5; }
+.wb-band, .wb-confetti { fill: rgb(var(--accent)); }
+.wb-c2 { fill: rgb(var(--ink-muted)); }
+.wb-ink { fill: rgb(var(--ink)); }
+.wb-shadow { fill: rgb(var(--rule)); }
+.wb-c1 { --wb-dx: -6px; }
+.wb-c2 { --wb-dx: 6px; }
+.wb-c3 { --wb-dx: 8px; }
+.wait-buddy { animation: wb-appear 200ms ease-out 1.2s both; }
+@keyframes wb-appear { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .wb-body { animation: wb-bob 380ms ease-in-out infinite alternate; }
+  .wb-shadow { transform-origin: 32px 69px; animation: wb-squash 380ms ease-in-out infinite alternate; }
+  .wb-leg-a { transform-origin: 27px 50px; }
+  .wb-leg-b { transform-origin: 37px 50px; }
+  .wb-arm-a { transform-origin: 17px 34px; }
+  .wb-arm-b { transform-origin: 47px 34px; }
+  .wb-leg-a, .wb-arm-b { animation: wb-swing 380ms ease-in-out infinite alternate; }
+  .wb-leg-b, .wb-arm-a { animation: wb-swing 380ms ease-in-out infinite alternate-reverse; }
+  .wb-eyes { transform-origin: 32px 37px; animation: wb-blink 3.4s infinite; }
+  .wb-strap { transform-origin: 32px -6px; animation: wb-sway 760ms ease-in-out infinite alternate; }
+  .wb-confetti { opacity: 0; animation: wb-pop 1.9s ease-out infinite; }
+  .wb-c2 { animation-delay: 0.6s; }
+  .wb-c3 { animation-delay: 1.25s; }
+  @keyframes wb-bob { to { transform: translateY(-3px); } }
+  @keyframes wb-squash { to { transform: scaleX(0.8); } }
+  @keyframes wb-swing { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
+  @keyframes wb-sway { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+  @keyframes wb-blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
+  @keyframes wb-pop {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+    15%, 70% { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--wb-dx), -14px) rotate(160deg); }
+  }
+}
+
 /* Organization and application workspaces share the console's palette,
    with more room for the directory and a secondary progress column. */
 .page:has(.console-workspace), body:has(.console-workspace) .masthead-inner {

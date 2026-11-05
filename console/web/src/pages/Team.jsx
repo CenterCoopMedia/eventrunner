@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router';
 import { useAuth } from '../auth.jsx';
 import TeamSections from './TeamSections.jsx';
 import { useTeam } from './useTeam.js';
+import LoadingState from '../LoadingState.jsx';
 
 export default function Team() {
   const { orgId } = useParams();
@@ -10,7 +11,7 @@ export default function Team() {
   const { data, error } = team;
 
   if (!data) {
-    return error ? <p className="message error" role="alert">{error}</p> : <p role="status">Loading the team.</p>;
+    return error ? <p className="message error" role="alert">{error}</p> : <LoadingState>Loading the team.</LoadingState>;
   }
 
   return (
