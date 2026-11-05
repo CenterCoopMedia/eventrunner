@@ -95,8 +95,11 @@ test('console directories and application progress are readable across widths an
       if (width === 1440 && colorScheme === 'light') {
         await expect(page.getByRole('status')).toHaveText('Loading your organizations.');
         await expect(page.locator('.console-spinner')).toHaveCSS('animation-name', 'none');
+        const loadingWidth = await page.locator('.masthead-inner').evaluate((element) => element.clientWidth);
         await page.screenshot({ path: path.join(EVIDENCE, 'console-organizations-loading-1440-light.png'), fullPage: true });
         releaseDirectory();
+        await expect(page.getByRole('heading', { name: 'All organizations' })).toBeVisible();
+        await expect(page.locator('.masthead-inner')).toHaveJSProperty('clientWidth', loadingWidth);
       }
       await expect(page.getByRole('heading', { name: 'All organizations' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Review requests' })).toHaveAttribute('href', '/review');

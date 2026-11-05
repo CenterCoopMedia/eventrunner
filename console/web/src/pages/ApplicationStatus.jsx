@@ -166,7 +166,7 @@ export default function ApplicationStatus() {
     }
   }
 
-  if (!app) return error ? <p className="message error" role="alert">{error}</p> : <LoadingState>Loading your request.</LoadingState>;
+  if (!app) return error ? <p className="message error console-workspace" role="alert">{error}</p> : <LoadingState className="console-workspace">Loading your request.</LoadingState>;
 
   const title = app.answers.event.name || 'New event site';
   const closed = ['withdrawn', 'declined'].includes(app.status);

@@ -42,8 +42,8 @@ export default function Organizations() {
     return () => { live = false; };
   }, []);
 
-  if (error) return <p className="message error" role="alert">{error}</p>;
-  if (!data) return <LoadingState>Loading your organizations.</LoadingState>;
+  if (error) return <p className="message error console-workspace" role="alert">{error}</p>;
+  if (!data) return <LoadingState className="console-workspace">Loading your organizations.</LoadingState>;
 
   return (
     <section aria-labelledby="orgs-title" className="console-workspace organizations-workspace">
