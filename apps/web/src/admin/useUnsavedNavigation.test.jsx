@@ -10,7 +10,7 @@ function Editor({ unsaved, blocked = false, onSignOut = () => {} }) {
     <>
       <h1>Editor</h1>
       <Link to="/other">Other page</Link>
-      <button type="button" onClick={onSignOut}>Sign out</button>
+      <button type="button" onClick={onSignOut} data-admin-action="sign-out" aria-label="Sign out"><svg aria-hidden="true" /></button>
       {guard.pending ? (
         <UnsavedChangesDialog
           onStay={guard.stay}
@@ -64,6 +64,24 @@ describe('useUnsavedNavigation', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Other page' }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Other page' })).toBeInTheDocument();
+  });
+
+  it('contains focus and restores the attempted link when Escape keeps the draft', () => {
+    renderEditor(true);
+    const link = screen.getByRole('link', { name: 'Other page' });
+    link.focus();
+    fireEvent.click(link);
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog.tagName).toBe('DIALOG');
+    expect(dialog).toHaveAttribute('open');
+    const stay = screen.getByRole('button', { name: 'Stay' });
+    expect(stay).toHaveFocus();
+    fireEvent.keyDown(stay, { key: 'Tab', shiftKey: true });
+    expect(screen.getByRole('button', { name: 'Discard changes' })).toHaveFocus();
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(link).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Editor' })).toBeInTheDocument();
   });
 
   it('blocks reload while unsaved and lets a clean form reload', () => {

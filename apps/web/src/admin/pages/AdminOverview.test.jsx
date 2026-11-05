@@ -189,7 +189,7 @@ describe('the admin overview', () => {
     expect(screen.getByText('Read at 9:14 AM EDT')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Figures read at 9:14 AM EDT.');
     // No decorative rings: every figure remains labeled in words.
-    expect(document.querySelector('svg circle')).toBeNull();
+    expect(screen.getByRole('main').querySelector('svg circle')).toBeNull();
   });
 
   it('takes the singular at one and prints zero as 0', async () => {

@@ -122,7 +122,7 @@ function draftBody(draft) {
 }
 
 function PreviewFrame({ html, text }) {
-  const srcDoc = useMemo(() => (html ? buildPreviewDoc(html) : null), [html]);
+  const srcDoc = useMemo(() => (html ? buildPreviewDoc(html, { fitWidth: true }) : null), [html]);
   return (
     <div className="flex flex-col gap-xs">
       {srcDoc ? (
@@ -616,174 +616,191 @@ export default function AnnouncementEmailComposer() {
   const count = preview?.recipientCount ?? 0;
 
   return (
-    <div className="flex flex-col gap-md">
-      <Panel
-        title="Email an announcement"
-        description="Write one email to an audience of registered people. Preview it, send a test to yourself, then confirm the send."
-      >
-        {history === null && !historyError ? <AdminLoadingState label="Loading the email settings…" /> : null}
-        {historyError ? <Notice tone="error" message={historyError.message} /> : null}
-        {channel && !channel.canSend ? <Notice tone="caution" message={channel.blocker} /> : null}
-        {history ? (
-          <form className="mt-sm flex flex-col gap-sm" onSubmit={runPreview} noValidate>
-            <ServerErrorSummary error={error} errorRef={errorRef} title="This email was not sent" />
-            {retry ? (
-              <div className="flex flex-col gap-2xs">
-                <Notice
-                  tone="caution"
-                  message={`This email goes only to the ${plural(retry.count, 'address', 'addresses')} that failed in "${retry.subject}".`}
-                />
-                <div>
-                  <button type="button" className={linkButtonClass} onClick={cancelRetry}>
-                    Send to the whole audience instead
-                  </button>
+    <div className="admin-email-workspace flex flex-col gap-md">
+      <div className="admin-email-workspace__compose">
+        <Panel
+          title="Write your email"
+          className="admin-email-workspace__writer"
+          description="Write to registered people, then preview the message and recipient count before sending."
+        >
+          {history === null && !historyError ? <AdminLoadingState label="Loading the email settings…" /> : null}
+          {historyError ? <Notice tone="error" message={historyError.message} /> : null}
+          {channel && !channel.canSend ? <Notice tone="caution" message={channel.blocker} /> : null}
+          {history ? (
+            <form className="mt-sm flex flex-col gap-sm" onSubmit={runPreview} noValidate>
+              <ServerErrorSummary error={error} errorRef={errorRef} title="This email was not sent" />
+              {retry ? (
+                <div className="flex flex-col gap-2xs">
+                  <Notice
+                    tone="caution"
+                    message={`This email goes only to the ${plural(retry.count, 'address', 'addresses')} that failed in "${retry.subject}".`}
+                  />
+                  <div>
+                    <button type="button" className={linkButtonClass} onClick={cancelRetry}>
+                      Send to the whole audience instead
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : null}
-            <SelectField
-              label="Audience"
-              value={selectedAudience}
-              options={audienceOptions}
-              hint={audienceHint}
-              onChange={(value) => edit('audience', value)}
-            />
-            <div ref={subjectRef}>
-              <TextField
-                label="Subject"
-              value={draft.subject}
-                maxLength={150}
-                required
-                onChange={(value) => edit('subject', value)}
-              />
-            </div>
-            <TextAreaField
-              label="Email message"
-              hint="Plain text. A blank line starts a new paragraph."
-              value={draft.message}
-              rows={8}
-              maxLength={10000}
-              required
-              onChange={(value) => edit('message', value)}
-            />
-            <div className="grid gap-sm md:grid-cols-2">
-              <TextField
-                label="Button link (optional)"
-                type="url"
-                value={draft.linkUrl}
-                placeholder="https://example.org/schedule"
-                onChange={(value) => edit('linkUrl', value)}
-              />
-              <TextField
-                label="Button label (optional)"
-                value={draft.linkLabel}
-                maxLength={80}
-                onChange={(value) => edit('linkLabel', value)}
-              />
-            </div>
-            <div className="flex flex-wrap gap-xs">
-              <button type="submit" className={primaryButtonClass} aria-busy={busy === 'preview' ? 'true' : undefined}>
-                {busy === 'preview' ? 'Building the preview…' : 'Preview email'}
-              </button>
-            </div>
-          </form>
-        ) : null}
-      </Panel>
-
-      {preview ? (
-        <Panel>
-          <section aria-labelledby="announcement-email-preview" className="flex flex-col gap-sm">
-            <h3 id="announcement-email-preview" ref={previewHeadingRef} tabIndex={-1} className="text-admin-lg font-bold text-admin-ink focus:outline-none">
-              Preview
-            </h3>
-            <dl className="grid grid-cols-[max-content_1fr] gap-x-sm gap-y-3xs text-admin-sm">
-              <dt className="font-semibold text-admin-ink">To</dt>
-              <dd className="text-admin-ink">{`${recipients(count)}: ${preview.audienceLabel}`}</dd>
-              <dt className="font-semibold text-admin-ink">From</dt>
-              <dd className="font-admin-data text-admin-ink-data">{preview.from ?? 'Not set'}</dd>
-              {preview.replyTo ? (
-                <>
-                  <dt className="font-semibold text-admin-ink">Reply to</dt>
-                  <dd className="font-admin-data text-admin-ink-data">{preview.replyTo}</dd>
-                </>
               ) : null}
-              <dt className="font-semibold text-admin-ink">Subject</dt>
-              <dd className="text-admin-ink">{preview.subject}</dd>
-            </dl>
-            {preview.suppressedCount > 0 ? (
-              <p className="text-admin-sm text-admin-ink">
-                {`${plural(preview.suppressedCount, 'address is', 'addresses are')} left out because they unsubscribed.`}
-              </p>
-            ) : null}
-            {preview.unusableCount > 0 ? (
-              <p className="text-admin-sm text-admin-ink">
-                {`${plural(preview.unusableCount, 'account has', 'accounts have')} no usable email address and ${preview.unusableCount === 1 ? 'is' : 'are'} left out.`}
-              </p>
-            ) : null}
-            <p className="text-admin-sm text-admin-ink-secondary">{preview.unsubscribeNote}</p>
-            <PreviewFrame html={preview.html} text={preview.text} />
-            {preview.canSend ? null : <Notice tone="caution" message={preview.blocker} />}
-            {preview.canSend && !confirming ? (
+              <SelectField
+                label="Audience"
+                value={selectedAudience}
+                options={audienceOptions}
+                hint={audienceHint}
+                onChange={(value) => edit('audience', value)}
+              />
+              <div ref={subjectRef}>
+                <TextField
+                  label="Subject"
+                  value={draft.subject}
+                  maxLength={150}
+                  required
+                  onChange={(value) => edit('subject', value)}
+                />
+              </div>
+              <TextAreaField
+                label="Email message"
+                hint="Plain text. A blank line starts a new paragraph."
+                value={draft.message}
+                rows={8}
+                maxLength={10000}
+                required
+                onChange={(value) => edit('message', value)}
+              />
+              <div className="admin-email-workspace__link-fields">
+                <TextField
+                  label="Button link (optional)"
+                  type="url"
+                  value={draft.linkUrl}
+                  placeholder="https://example.org/schedule"
+                  onChange={(value) => edit('linkUrl', value)}
+                />
+                <TextField
+                  label="Button label (optional)"
+                  value={draft.linkLabel}
+                  maxLength={80}
+                  onChange={(value) => edit('linkLabel', value)}
+                />
+              </div>
               <div className="flex flex-wrap gap-xs">
-                <button
-                  type="button"
-                  ref={sendButtonRef}
-                  className={primaryButtonClass}
-                  onClick={() => setConfirming(true)}
-                >
-                  {`Send to ${recipients(count)}`}
-                </button>
-                <button
-                  type="button"
-                  className={secondaryButtonClass}
-                  aria-busy={busy === 'test' ? 'true' : undefined}
-                  aria-disabled={busy ? 'true' : undefined}
-                  onClick={sendTest}
-                >
-                  {busy === 'test' ? 'Sending the test…' : 'Send a test to me'}
+                <button type="submit" className={primaryButtonClass} aria-busy={busy === 'preview' ? 'true' : undefined}>
+                  {busy === 'preview' ? 'Building the preview…' : 'Preview email'}
                 </button>
               </div>
-            ) : null}
-            {preview.canSend && confirming ? (
-              <section
-                aria-labelledby="announcement-email-confirm"
-                className="flex flex-col gap-xs rounded-admin-panel border-admin-strong border-admin-rule-strong px-md py-sm"
-              >
-                <h3 id="announcement-email-confirm" ref={confirmHeadingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
-                  {`Send this email to ${recipients(count)}?`}
-                </h3>
-                <p className="max-w-[65ch] text-admin-sm text-admin-ink">
-                  Each recipient gets one copy. A sent email cannot be recalled.
+            </form>
+          ) : null}
+        </Panel>
+
+        <Panel title="Review before sending" className="admin-email-workspace__review">
+          {preview ? (
+            <section aria-labelledby="announcement-email-preview" className="flex flex-col gap-sm">
+              <h3 id="announcement-email-preview" ref={previewHeadingRef} tabIndex={-1} className="font-admin-ui text-admin-lg font-bold text-admin-ink focus:outline-none">
+                Preview
+              </h3>
+              <dl className="admin-email-workspace__envelope grid grid-cols-[max-content_1fr] gap-x-sm gap-y-3xs text-admin-sm">
+                <dt className="font-semibold text-admin-ink">To</dt>
+                <dd className="text-admin-ink">{`${recipients(count)}: ${preview.audienceLabel}`}</dd>
+                <dt className="font-semibold text-admin-ink">From</dt>
+                <dd className="font-admin-data text-admin-ink-data">{preview.from ?? 'Not set'}</dd>
+                {preview.replyTo ? (
+                  <>
+                    <dt className="font-semibold text-admin-ink">Reply to</dt>
+                    <dd className="font-admin-data text-admin-ink-data">{preview.replyTo}</dd>
+                  </>
+                ) : null}
+                <dt className="font-semibold text-admin-ink">Subject</dt>
+                <dd className="text-admin-ink">{preview.subject}</dd>
+              </dl>
+              {preview.suppressedCount > 0 ? (
+                <p className="text-admin-sm text-admin-ink">
+                  {`${plural(preview.suppressedCount, 'address is', 'addresses are')} left out because they unsubscribed.`}
                 </p>
+              ) : null}
+              {preview.unusableCount > 0 ? (
+                <p className="text-admin-sm text-admin-ink">
+                  {`${plural(preview.unusableCount, 'account has', 'accounts have')} no usable email address and ${preview.unusableCount === 1 ? 'is' : 'are'} left out.`}
+                </p>
+              ) : null}
+              <p className="text-admin-sm text-admin-ink-secondary">{preview.unsubscribeNote}</p>
+              <PreviewFrame html={preview.html} text={preview.text} />
+              {preview.canSend ? null : <Notice tone="caution" message={preview.blocker} />}
+              {preview.canSend && !confirming ? (
                 <div className="flex flex-wrap gap-xs">
                   <button
                     type="button"
+                    ref={sendButtonRef}
                     className={primaryButtonClass}
-                    aria-busy={busy === 'send' ? 'true' : undefined}
-                    aria-disabled={busy ? 'true' : undefined}
-                    onClick={confirmSend}
+                    onClick={() => setConfirming(true)}
                   >
-                    {busy === 'send' ? 'Sending…' : `Send to ${recipients(count)}`}
+                    {`Send to ${recipients(count)}`}
                   </button>
                   <button
                     type="button"
                     className={secondaryButtonClass}
+                    aria-busy={busy === 'test' ? 'true' : undefined}
                     aria-disabled={busy ? 'true' : undefined}
-                    onClick={() => {
-                      if (busy) return;
-                      setConfirming(false);
-                      requestAnimationFrame(() => sendButtonRef.current?.focus());
-                    }}
+                    onClick={sendTest}
                   >
-                    Go back
+                    {busy === 'test' ? 'Sending the test…' : 'Send a test to me'}
                   </button>
                 </div>
-              </section>
-            ) : null}
-          </section>
+              ) : null}
+              {preview.canSend && confirming ? (
+                <section
+                  aria-labelledby="announcement-email-confirm"
+                  className="flex flex-col gap-xs rounded-admin-panel border-admin-strong border-admin-rule-strong px-md py-sm"
+                >
+                  <h3 id="announcement-email-confirm" ref={confirmHeadingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
+                    {`Send this email to ${recipients(count)}?`}
+                  </h3>
+                  <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+                    Each recipient gets one copy. A sent email cannot be recalled.
+                  </p>
+                  <div className="flex flex-wrap gap-xs">
+                    <button
+                      type="button"
+                      className={primaryButtonClass}
+                      aria-busy={busy === 'send' ? 'true' : undefined}
+                      aria-disabled={busy ? 'true' : undefined}
+                      onClick={confirmSend}
+                    >
+                      {busy === 'send' ? 'Sending…' : `Send to ${recipients(count)}`}
+                    </button>
+                    <button
+                      type="button"
+                      className={secondaryButtonClass}
+                      aria-disabled={busy ? 'true' : undefined}
+                      onClick={() => {
+                        if (busy) return;
+                        setConfirming(false);
+                        requestAnimationFrame(() => sendButtonRef.current?.focus());
+                      }}
+                    >
+                      Go back
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+            </section>
+          ) : (
+            <div className="admin-email-workspace__empty-preview">
+              <svg className="admin-email-workspace__document" viewBox="0 0 64 80" fill="none" aria-hidden="true">
+                <path d="M40 4H12a8 8 0 0 0-8 8v56a8 8 0 0 0 8 8h40a8 8 0 0 0 8-8V24L40 4Z" />
+                <path d="M40 4v20h20M16 38h32M16 50h32M16 62h24" />
+              </svg>
+              <h3 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Your preview will appear here</h3>
+              <p className="text-admin-sm text-admin-ink-secondary">Check the message and recipient count before sending.</p>
+              <ol className="admin-email-workspace__steps" aria-label="Email sending steps">
+                <li>Preview</li>
+                <li>Send a test</li>
+                <li>Confirm recipients</li>
+              </ol>
+            </div>
+          )}
         </Panel>
-      ) : null}
+      </div>
 
-      <p role="status" className="text-admin-sm text-admin-ink">
+      <p role="status" className={progress ? 'text-admin-sm text-admin-ink' : 'sr-only'}>
         {progress ? `Sending. ${plural(progress.processed ?? 0, 'address', 'addresses')} of ${(progress.total ?? 0).toLocaleString('en-US')} handled.` : ''}
       </p>
 

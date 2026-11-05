@@ -26,7 +26,7 @@ const MARK = (
   </svg>
 );
 
-/** A move to another page puts the focus on its heading; the first load does not. */
+/** Focus the destination, including its main region while an async heading loads. */
 function useFocusHeadingOnNavigate() {
   const { pathname } = useLocation();
   const first = useRef(true);
@@ -35,7 +35,7 @@ function useFocusHeadingOnNavigate() {
       first.current = false;
       return;
     }
-    document.querySelector('main h1')?.focus();
+    (document.querySelector('main h1') || document.querySelector('main'))?.focus();
   }, [pathname]);
 }
 
@@ -78,13 +78,18 @@ function ConfirmEmail({ user }) {
   const { sendEmailLink } = useAuth();
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
   async function send() {
+    if (sending) return;
     setError('');
+    setSending(true);
     try {
       await sendEmailLink(user.email);
       setSent(true);
     } catch (err) {
       setError(signInErrorMessage(err));
+    } finally {
+      setSending(false);
     }
   }
   return (
@@ -95,7 +100,7 @@ function ConfirmEmail({ user }) {
       {sent ? (
         <p className="message success" role="status">We sent a sign-in link to {user.email}. Open it on this device.</p>
       ) : (
-        <button type="button" className="button primary" onClick={send}>Email me a link</button>
+        <button type="button" className="button primary" disabled={sending} onClick={send}>{sending ? 'Sending link…' : 'Email me a link'}</button>
       )}
     </section>
   );

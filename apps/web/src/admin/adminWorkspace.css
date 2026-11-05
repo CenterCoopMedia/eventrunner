@@ -223,9 +223,8 @@
   .admin-settings-row-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
 }
 
-/* Issue #477: the rail folds and hides, and the Branding panes resize.
-   Nothing here animates: a state change in the room is instant, so a
-   reader who asks for reduced motion meets the same static change. */
+/* Issues #477 and #695: navigation and layout changes remain immediate.
+   Compact, named utility icons leave the destination names room to breathe. */
 .admin-mobile-docket__content[hidden], .admin-docket-group[hidden] { display: none; }
 .admin-docket-group-toggle {
   display: flex; align-items: center; gap: var(--space-xs); width: 100%;
@@ -254,10 +253,15 @@
   .admin-docket-group-toggle:hover { background: rgb(var(--admin-rail-ground-hover-rgb)); }
 }
 @media (min-width: 1024px) {
-  .admin-rail[data-collapsed='true'] { width: 6rem; }
-  .admin-rail[data-collapsed='true'] .admin-rail__job { justify-content: center; padding-inline: var(--space-xs); }
-  .admin-rail[data-collapsed='true'] .admin-rail-toggle { flex-direction: column; padding-inline: var(--space-2xs); text-align: center; }
+  .admin-rail__job { column-gap: var(--space-xs); padding-inline: var(--space-xs); }
+  .admin-rail__job > p { flex: 1; }
+  .admin-rail .admin-rail-toggle { border-color: transparent; }
+  .admin-rail[data-collapsed='true'] { width: 4rem; }
+  .admin-rail[data-collapsed='true'] .admin-rail__job {
+    flex-direction: column; justify-content: center; gap: var(--space-xs); padding-inline: 0;
+  }
 }
+[dir='rtl'] .admin-rail-toggle svg { transform: rotate(180deg); }
 
 /* The bar between two panes (components/PaneSplitter.jsx). The whole bar
    is the 24px target; the grip in its middle is what a reader sees. */

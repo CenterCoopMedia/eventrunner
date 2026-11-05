@@ -169,6 +169,20 @@ beforeEach(() => {
 });
 
 describe('event settings', () => {
+  it('keeps edits made during saving without calling the newer values saved', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    let finish;
+    fetch.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    fireEvent.change(screen.getByLabelText('Event name'), { target: { value: 'Submitted name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText('Event name'), { target: { value: 'New unsaved name' } });
+    await act(async () => finish(okResponse({ docPath: 'config/event' })));
+    expect(screen.getByLabelText('Event name')).toHaveValue('New unsaved name');
+    expect(screen.queryByText('Saved. The site picks the change up live.')).not.toBeInTheDocument();
+    expect(bodyOf(0).event.name).toBe('Submitted name');
+  });
   it('organizes the settings into named groups without moving fields out of their save form', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
@@ -440,7 +454,8 @@ describe('event settings', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     fireEvent.change(screen.getByLabelText('Track 1 letter'), { target: { value: 'Z' } });
     await act(async () => { finish(okResponse({ docPath: 'config/event' })); });
-    await screen.findByText(/picks the change up live/i);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save event settings' })).toBeEnabled());
+    expect(screen.queryByText(/picks the change up live/i)).not.toBeInTheDocument();
 
     // The save stored A, and the session still uses A, so the field still
     // warns that changing the letter leaves the session without a track.
@@ -1063,6 +1078,15 @@ describe('per-document adoption', () => {
 });
 
 describe('feature flags', () => {
+  it('clears the saved claim when a feature is changed again', async () => {
+    await renderAt('/admin/features');
+    await pushConfig('features', { schedule: true });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save features' }));
+    expect(await screen.findByText('Saved. The site picks the change up live.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Public schedule' }));
+    expect(screen.queryByText('Saved. The site picks the change up live.')).not.toBeInTheDocument();
+  });
   it('keeps future schema keys visible in a fallback group without duplicating known features', async () => {
     const { featureGroupsFor } = await import('./AdminFeatureSettings.jsx');
     const keys = [...KNOWN_FEATURE_KEYS, 'futureFeature'];

@@ -33,11 +33,12 @@
 // invitation that was recorded and never delivered is the one case an
 // organizer must be able to see, because the speaker is waiting for mail
 // that will never arrive.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { useAdminApi } from '../adminApi.js';
 import {
+  DestructiveConfirm,
   Notice,
   Panel,
   linkButtonClass,
@@ -47,6 +48,7 @@ import {
   rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import { ActionFeedback, EditRecordLink, useActionResultFocus } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -122,7 +124,10 @@ export default function AdminSpeakersList() {
 
   const [invites, setInvites] = useState(null); // speakerId → newest invite row
   const [busy, setBusy] = useState(null); // `${speakerId}:${action}`
-  const [notice, setNotice] = useState(null); // { speakerId, kind: 'ok'|'error', message }, shown in that row
+  const [results, setResults] = useState({});
+  const requestPending = useRef(false);
+  const actionFocus = useActionResultFocus(busy !== null);
+  const setResult = (id, result) => setResults((current) => ({ ...current, [id]: result }));
 
   const refreshInvites = useCallback(async () => {
     try {
@@ -152,14 +157,16 @@ export default function AdminSpeakersList() {
   };
 
   async function run(action, endpoint, speaker, body = {}) {
+    if (requestPending.current) return;
+    requestPending.current = true;
+    actionFocus.remember(speaker.id);
     setBusy(`${speaker.id}:${action}`);
-    setNotice(null);
+    setResult(speaker.id, null);
     const name = speaker.displayName || speaker.id;
     try {
       await call(endpoint, { speakerId: speaker.id, ...body });
-      setNotice({
-        speakerId: speaker.id,
-        kind: 'ok',
+      setResult(speaker.id, {
+        tone: 'ok',
         message: (ACTION_NOTICES[action] ?? ((who) => `Invitation emailed to ${who}.`))(name),
       });
       await refreshInvites();
@@ -167,9 +174,10 @@ export default function AdminSpeakersList() {
       // Verbatim: the server's message is the actionable part — which
       // transition it refused, or that the invitation was recorded but not
       // delivered.
-      setNotice({ speakerId: speaker.id, kind: 'error', message: err?.message ?? 'Something went wrong.' });
+      setResult(speaker.id, { tone: 'error', message: err?.message ?? 'Something went wrong.' });
       await refreshInvites();
     } finally {
+      requestPending.current = false;
       setBusy(null);
     }
   }
@@ -260,11 +268,6 @@ export default function AdminSpeakersList() {
                         {[speaker.jobTitle, speaker.organization].filter(Boolean).join(', ') || '—'}
                         {note ? ` · ${note}` : ''}
                       </p>
-                      {notice?.speakerId === speaker.id ? (
-                        <div className="mt-xs">
-                          <Notice tone={notice.kind === 'error' ? 'error' : 'ok'} message={notice.message} />
-                        </div>
-                      ) : null}
                       {pendingFieldsOf(speaker).length > 0 ? (
                         <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
                           Speaker-submitted changes awaiting review:{' '}
@@ -277,7 +280,9 @@ export default function AdminSpeakersList() {
                         <button
                           type="button"
                           onClick={() => run('invite', 'sendSpeakerInvite', speaker)}
-                          disabled={busy === `${speaker.id}:invite`}
+                          disabled={busy !== null && busy !== `${speaker.id}:invite`}
+                          aria-disabled={busy !== null || undefined}
+                          aria-busy={busy === `${speaker.id}:invite` || undefined}
                           className={secondaryButtonClass}
                         >
                           {busy === `${speaker.id}:invite` ? 'Inviting…' : 'Invite'}
@@ -288,7 +293,9 @@ export default function AdminSpeakersList() {
                           <button
                             type="button"
                             onClick={() => run('resend', 'resendSpeakerInvite', speaker)}
-                            disabled={busy === `${speaker.id}:resend`}
+                            disabled={busy !== null && busy !== `${speaker.id}:resend`}
+                            aria-disabled={busy !== null || undefined}
+                            aria-busy={busy === `${speaker.id}:resend` || undefined}
                             className={secondaryButtonClass}
                           >
                             {busy === `${speaker.id}:resend` ? 'Resending…' : 'Resend invite'}
@@ -296,7 +303,9 @@ export default function AdminSpeakersList() {
                           <button
                             type="button"
                             onClick={() => run('cancel', 'cancelSpeakerInvite', speaker)}
-                            disabled={busy === `${speaker.id}:cancel`}
+                            disabled={busy !== null && busy !== `${speaker.id}:cancel`}
+                            aria-disabled={busy !== null || undefined}
+                            aria-busy={busy === `${speaker.id}:cancel` || undefined}
                             className={linkButtonClass}
                           >
                             {busy === `${speaker.id}:cancel` ? 'Cancelling…' : 'Cancel invite'}
@@ -309,7 +318,9 @@ export default function AdminSpeakersList() {
                           onClick={() =>
                             run('approve', 'updateSpeaker', speaker, { speaker: { status: 'approved' } })
                           }
-                          disabled={busy === `${speaker.id}:approve`}
+                          disabled={busy !== null && busy !== `${speaker.id}:approve`}
+                          aria-disabled={busy !== null || undefined}
+                          aria-busy={busy === `${speaker.id}:approve` || undefined}
                           className={primaryButtonClass}
                         >
                           {busy === `${speaker.id}:approve` ? 'Approving…' : 'Approve'}
@@ -320,19 +331,23 @@ export default function AdminSpeakersList() {
                           <button
                             type="button"
                             onClick={() => run('apply', 'applySpeakerPendingEdits', speaker)}
-                            disabled={busy === `${speaker.id}:apply`}
+                            disabled={busy !== null && busy !== `${speaker.id}:apply`}
+                            aria-disabled={busy !== null || undefined}
+                            aria-busy={busy === `${speaker.id}:apply` || undefined}
                             className={primaryButtonClass}
                           >
                             {busy === `${speaker.id}:apply` ? 'Applying…' : 'Apply changes'}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => run('discard', 'discardSpeakerPendingEdits', speaker)}
-                            disabled={busy === `${speaker.id}:discard`}
-                            className={linkButtonClass}
-                          >
-                            {busy === `${speaker.id}:discard` ? 'Discarding…' : 'Discard changes'}
-                          </button>
+                          <DestructiveConfirm
+                            trigger="Discard changes"
+                            title={`Discard changes from ${speaker.displayName || speaker.id}`}
+                            confirmLabel="Discard pending changes"
+                            consequence="The speaker’s pending edits are removed. The published profile stays unchanged."
+                            busy={busy === `${speaker.id}:discard`}
+                            busyLabel="Discarding…"
+                            disabled={busy !== null}
+                            onConfirm={() => run('discard', 'discardSpeakerPendingEdits', speaker)}
+                          />
                         </>
                       ) : null}
                       {speaker.status === 'accepted' || speaker.status === 'approved' ? (
@@ -344,10 +359,11 @@ export default function AdminSpeakersList() {
                           Remind
                         </Link>
                       ) : null}
-                      <Link to={speaker.id} className={linkButtonClass}>
-                        Edit
-                      </Link>
+                      <EditRecordLink to={speaker.id} label={`Edit ${speaker.displayName || speaker.id}`} />
                     </div>
+                  </div>
+                  <div ref={actionFocus.resultRef(speaker.id)} tabIndex={-1} className="admin-row-result">
+                    <ActionFeedback message={results[speaker.id]?.message} tone={results[speaker.id]?.tone} />
                   </div>
                 </li>
               );
