@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../api.js';
 import { PROVIDER_COPY, takeConnectReturn } from '../setup/connections.js';
 import { setupPath, stepById } from '../setup/steps.js';
+import LoadingState from '../LoadingState.jsx';
 
 /**
  * Where a provider sends the client back to (ADR 0007 §4). This page hands
@@ -55,5 +56,5 @@ export default function ConnectReturn() {
       </section>
     );
   }
-  return <p role="status">Connecting your account.</p>;
+  return <LoadingState long>Connecting your account.</LoadingState>;
 }

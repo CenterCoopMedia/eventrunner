@@ -14,6 +14,7 @@ import ReviewStep from './ReviewStep.jsx';
 import TeamStep from './TeamStep.jsx';
 import TicketsStep from './TicketsStep.jsx';
 import WebAddressStep from './WebAddressStep.jsx';
+import LoadingState from '../../LoadingState.jsx';
 
 const STEP_VIEWS = {
   organization: OrganizationStep,
@@ -185,7 +186,7 @@ export default function Setup() {
 
   if (!step) return <Navigate to={setupPath(orgId, appId, STEPS[0])} replace />;
   if (error) return <p className="message error" role="alert">{error}</p>;
-  if (!app) return <p role="status">Loading your setup.</p>;
+  if (!app) return <LoadingState long>Loading your setup.</LoadingState>;
   if (!app.canEdit) return <Navigate to={statusPath(orgId, appId)} replace />;
   const open = openStepIds(app, refused);
   if (!open.includes(step.id)) return <Navigate to={setupPath(orgId, appId, stepById(open.at(-1)))} replace />;
