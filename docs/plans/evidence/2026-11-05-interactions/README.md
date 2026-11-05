@@ -1,22 +1,37 @@
 # Operator interaction review evidence
 
-These are real browser captures from GitHub-hosted emulator and console fixture checks. Names, organizations, accounts, and message recipients are synthetic. Each screenshot shows its individual PR; the compact navigation in #700 is a separate change from the other surface captures.
+These are real browser captures from GitHub-hosted emulator and console fixture checks. Names, organizations, accounts, and message recipients are synthetic. Each screenshot shows its individual PR; compact navigation in #700 is a separate change from the other surface captures.
 
-Images are stored separately from the tested code branches so adding review evidence does not replace their verified heads.
+Images are stored separately from tested code branches, so adding review evidence does not replace their verified heads. All 22 captures linked below were visually inspected.
 
-## Source runs and verified code
+## Verified code
 
-| PR | Captured head | Browser capture run | Verified code head | Passing CI |
+| PR | Surface | State | Verified head | Passing CI |
 | --- | --- | --- | --- | --- |
-| [#693](https://github.com/CenterCoopMedia/eventrunner/pull/693) | `45992e2` | [42095781377](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42095781377) | `ea0f5f8` | [42096852356](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096852356) |
-| [#694](https://github.com/CenterCoopMedia/eventrunner/pull/694) | `53e548a` | [42096645871](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096645871) | `53e548a` | [42096645871](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096645871) |
-| [#696](https://github.com/CenterCoopMedia/eventrunner/pull/696) | `e7a14a7` | [42096377356](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096377356) | `e7a14a7` | [42096377356](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096377356) |
-| [#697](https://github.com/CenterCoopMedia/eventrunner/pull/697) | `af70b27` | [42096153995](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096153995) | `af70b27` | [42096153995](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096153995) |
-| [#700](https://github.com/CenterCoopMedia/eventrunner/pull/700) | `4c17d3b` | [42094901694](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42094901694) | `4c17d3b` | [42094901694](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42094901694) |
+| [#690](https://github.com/CenterCoopMedia/eventrunner/pull/690) | Overview and CMS loading | Ready for review | `e1996cc1ec81` | [42098488120](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098488120) |
+| [#693](https://github.com/CenterCoopMedia/eventrunner/pull/693) | Announcements and email-log recovery | Ready for review | `ea0f5f83fe04` | [42096852356](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096852356) |
+| [#694](https://github.com/CenterCoopMedia/eventrunner/pull/694) | Console directories, setup and loading | Ready for review | `9caad46e1b11` | [42098495361](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098495361) |
+| [#696](https://github.com/CenterCoopMedia/eventrunner/pull/696) | CMS operations and access | Ready for review | `018429df6ebe` | [42098107963](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098107963) |
+| [#697](https://github.com/CenterCoopMedia/eventrunner/pull/697) | Console actions and hosting decisions | Merged | `af70b2784c6c` | [42096153995](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096153995) |
+| [#699](https://github.com/CenterCoopMedia/eventrunner/pull/699) | CMS editor and row feedback | Ready for review | `d99baf185817` | [42098423987](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098423987) |
+| [#700](https://github.com/CenterCoopMedia/eventrunner/pull/700) | Compact navigation and dialogs | Ready for review | `01133005eb11` | [42098117836](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098117836) |
 
-For #693, the capture run's browser checks passed. The later `ea0f5f8` commit corrects a loading-status unit assertion and changes no UI code; its complete CI run is green.
+#697 has merged into main `6cec930`. #690, #694, #696, #699, and #700 were validated with that main commit. #693's current product head passed with `35a98f7`; the later #697 merge changes console-only paths. Existing required checks should be rechecked as further merges land.
 
-All listed code was validated with main `35a98f7`, after #698 merged. #700's hosted run checks the merge of `4c17d3b` into `35a98f7`; the other branches include that main commit.
+## Source browser runs
+
+| PR | Captured head | Source run |
+| --- | --- | --- |
+| #693 | `45992e213e6c` | [42095781377](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42095781377) |
+| #694 | `9caad46e1b11` | [42098495361](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098495361) |
+| #696 | `e7a14a7b729f` | [42096377356](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096377356) |
+| #697 | `af70b2784c6c` | [42096153995](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42096153995) |
+| #699 | `d99baf185817` | [42098423987](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42098423987) |
+| #700 | `4c17d3bf3ae1` | [42094901694](https://github.com/CenterCoopMedia/eventrunner/actions/runs/42094901694) |
+
+For #693, the capture run's browser checks passed. The later `ea0f5f8` commit corrects a loading-status unit assertion and changes no UI code; its complete CI run is green. Subsequent main integrations in #696 and #700 do not change their captured surfaces. The final #694 captures are byte-identical to the preceding reviewed run; its only later presentation change is the 600ms delay before loading rotation starts.
+
+The #699 captures are from the final notification correction: repeated saves keep one persistent local result instead of stacking success toasts over form fields.
 
 ## Captures
 
@@ -42,6 +57,15 @@ All listed code was validated with main `35a98f7`, after #698 merged. #700's hos
 - [console-feedback-team-refresh-390.png](pr697/console-feedback-team-refresh-390.png)
 - [console-feedback-revoke-error-320.png](pr697/console-feedback-revoke-error-320.png)
 - [console-feedback-decision-refresh-1440.png](pr697/console-feedback-decision-refresh-1440.png)
+
+### PR #699
+
+- [content-row-feedback-1440.png](pr699/content-row-feedback-1440.png)
+- [content-row-feedback-320.png](pr699/content-row-feedback-320.png)
+- [editor-save-feedback-1440.png](pr699/editor-save-feedback-1440.png)
+- [content-row-feedback-390.png](pr699/content-row-feedback-390.png)
+- [editor-save-feedback-390.png](pr699/editor-save-feedback-390.png)
+- [editor-save-feedback-320.png](pr699/editor-save-feedback-320.png)
 
 ### PR #700
 

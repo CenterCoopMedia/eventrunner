@@ -1,5 +1,50 @@
 {
-  "main": "35a98f703de5dcf0064722dc308ec57aa5213220",
+  "verification_reference_main": "6cec9300fbfa704870a2bac708dfb3657061d062",
+  "verified_code": [
+    {
+      "pr": 690,
+      "head": "e1996cc1ec819cc9cd0bd1c5493c54b16d82dbd6",
+      "run": 42098488120,
+      "title": "Overview and CMS loading"
+    },
+    {
+      "pr": 693,
+      "head": "ea0f5f83fe0459f42bb11ae6a0b2d0468e4645a9",
+      "run": 42096852356,
+      "title": "Announcements and email-log recovery"
+    },
+    {
+      "pr": 694,
+      "head": "9caad46e1b1163226a4aa93c92e4864e37587b3c",
+      "run": 42098495361,
+      "title": "Console directories, setup and loading"
+    },
+    {
+      "pr": 696,
+      "head": "018429df6ebeb1184fb87f125a6689f482c35d94",
+      "run": 42098107963,
+      "title": "CMS operations and access"
+    },
+    {
+      "pr": 697,
+      "head": "af70b2784c6c1bc56749464dee9ab45838106fb3",
+      "run": 42096153995,
+      "title": "Console actions and hosting decisions",
+      "merged": true
+    },
+    {
+      "pr": 699,
+      "head": "d99baf18581778a452a41787deedcd3c3decbac6",
+      "run": 42098423987,
+      "title": "CMS editor and row feedback"
+    },
+    {
+      "pr": 700,
+      "head": "01133005eb11ec82076af6b9c997d9cd303b25c0",
+      "run": 42098117836,
+      "title": "Compact navigation and dialogs"
+    }
+  ],
   "captures": [
     {
       "path": "docs/plans/evidence/2026-11-05-interactions/pr700/navigation-expanded-desktop.png",
@@ -118,16 +163,64 @@
       "bytes": 51146,
       "blob_sha": "1ba69e702cf58f51e97875f17e91b19fc32f3c9b",
       "pr": 694,
-      "source_head": "53e548a5765c0cbea8eee8c5bae4adc415b8afc4",
-      "source_run": 42096645871
+      "source_head": "9caad46e1b1163226a4aa93c92e4864e37587b3c",
+      "source_run": 42098495361
     },
     {
       "path": "docs/plans/evidence/2026-11-05-interactions/pr694/console-settings-saved-390-light.png",
       "bytes": 55081,
       "blob_sha": "2e5a7b8d63de39984b00aeaee380bba6e83d396a",
       "pr": 694,
-      "source_head": "53e548a5765c0cbea8eee8c5bae4adc415b8afc4",
-      "source_run": 42096645871
+      "source_head": "9caad46e1b1163226a4aa93c92e4864e37587b3c",
+      "source_run": 42098495361
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr699/content-row-feedback-1440.png",
+      "bytes": 113688,
+      "blob_sha": "af1cdf72f253fe2f340002ac9b7e54dc96ceb8ba",
+      "pr": 699,
+      "source_head": "d99baf18581778a452a41787deedcd3c3decbac6",
+      "source_run": 42098423987
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr699/content-row-feedback-320.png",
+      "bytes": 39884,
+      "blob_sha": "52850edbcf29568522c396c033a307c303e70715",
+      "pr": 699,
+      "source_head": "d99baf18581778a452a41787deedcd3c3decbac6",
+      "source_run": 42098423987
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr699/editor-save-feedback-1440.png",
+      "bytes": 88340,
+      "blob_sha": "1002582c410d7a1c31f5d990720ee5d92009f236",
+      "pr": 699,
+      "source_head": "d99baf18581778a452a41787deedcd3c3decbac6",
+      "source_run": 42098423987
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr699/content-row-feedback-390.png",
+      "bytes": 38673,
+      "blob_sha": "86a4a74b24e29060cb4f406cb8097cf29924ab66",
+      "pr": 699,
+      "source_head": "d99baf18581778a452a41787deedcd3c3decbac6",
+      "source_run": 42098423987
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr699/editor-save-feedback-390.png",
+      "bytes": 63540,
+      "blob_sha": "0c196f6170c77b28a511282a79f2cdcff44beae6",
+      "pr": 699,
+      "source_head": "d99baf18581778a452a41787deedcd3c3decbac6",
+      "source_run": 42098423987
+    },
+    {
+      "path": "docs/plans/evidence/2026-11-05-interactions/pr699/editor-save-feedback-320.png",
+      "bytes": 55496,
+      "blob_sha": "b39c1d160f08ee970cbde129286a607bbc11174f",
+      "pr": 699,
+      "source_head": "d99baf18581778a452a41787deedcd3c3decbac6",
+      "source_run": 42098423987
     }
   ]
 }
