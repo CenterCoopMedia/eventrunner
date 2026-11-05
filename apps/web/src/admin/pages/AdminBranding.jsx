@@ -54,6 +54,9 @@ import {
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useAdminPages } from '../useAdminPages.js';
+import { useAdminContent } from '../useAdminContent.js';
+import HomeHeroImageEditor from '../components/HomeHeroImageEditor.jsx';
 import { configuredThemeColor } from '../themeColors.js';
 import {
   ADMIN_SCHEME_IDS,
@@ -354,6 +357,8 @@ function brandingTaskForField(field) {
 export default function AdminBranding() {
   const { theme, sources } = useEventConfig();
   const call = useAdminApi();
+  const { rows: pageRows, ready: pagesReady } = useAdminPages();
+  const { rows: contentRows, ready: contentReady } = useAdminContent();
   const { showToast } = useToast();
 
   const [form, setForm] = useState(() => toForm(theme));
@@ -620,6 +625,14 @@ export default function AdminBranding() {
                 </div>
               </div>
             </Panel>
+
+            <HomeHeroImageEditor
+              page={pageRows.find((row) => row.id === 'home')}
+              rows={contentRows}
+              ready={pagesReady && contentReady}
+              disabled={saving}
+              branding
+            />
 
             {/* 3 ----------------------------------------- main brand colour */}
             <Panel
