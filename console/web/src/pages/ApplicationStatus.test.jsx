@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext } from '../auth.jsx';
-import { application, callsTo, connections, serveApi } from '../test/application.js';
+import { application, callsTo, connections, fullAnswers, serveApi } from '../test/application.js';
 import { fakeAuth, renderPage } from '../test/renderPage.jsx';
 import ApplicationStatus from './ApplicationStatus.jsx';
 
@@ -238,6 +238,25 @@ describe('ApplicationStatus', () => {
       expect(await screen.findByRole('note')).toHaveTextContent('could not use your Stripe account');
       expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+    });
+
+    it('shows the Eventbrite consent to an Owner who can reconnect, and not to an Editor', async () => {
+      const eventbrite = {
+        ...FAILED,
+        answers: { ...fullAnswers(), tickets: { choice: 'eventbrite' } },
+        build: { failed: true, needsReconnect: true },
+        connections: connections({ canChange: false, canDisconnect: false, stripe: notConnected, eventbrite: notConnected }),
+      };
+      const consent = /By connecting, you authorize Event Runner to read your Eventbrite/;
+      serveStatus(eventbrite);
+      const { unmount } = page();
+      expect(await screen.findByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+      expect(screen.getByText(consent)).toBeInTheDocument();
+      unmount();
+      serveStatus({ ...eventbrite, myRole: 'editor' });
+      page();
+      await screen.findByText(/Only an Owner can reconnect an account or retry the build/);
+      expect(screen.queryByText(consent)).not.toBeInTheDocument();
     });
 
     it('an account that is gone needs reconnecting whichever step failed', async () => {
