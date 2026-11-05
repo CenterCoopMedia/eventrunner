@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { ROLE_HELP, ROLE_LABELS, isEmail } from '../text.js';
+import { ActionResult } from '../ActionFeedback.jsx';
 
 /** Invite a teammate by email, as an Owner or an Editor. Owners only. */
-export default function TeamInviteForm({ onInvite }) {
+export default function TeamInviteForm({ onInvite, outcome, disabled, onRefresh, refreshing }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('editor');
   const [fieldError, setFieldError] = useState('');
@@ -11,6 +12,7 @@ export default function TeamInviteForm({ onInvite }) {
 
   async function onSubmit(event) {
     event.preventDefault();
+    if (busy || disabled) return;
     if (!isEmail(email)) {
       setFieldError('Enter a valid email address.');
       fieldRef.current?.focus();
@@ -38,13 +40,14 @@ export default function TeamInviteForm({ onInvite }) {
             inputMode="email"
             autoComplete="off"
             value={email}
+            disabled={busy}
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={fieldError ? 'true' : undefined}
             aria-describedby={fieldError ? 'invite-email-error' : undefined}
           />
           {fieldError ? <p id="invite-email-error" className="field-error">{fieldError}</p> : null}
         </div>
-        <fieldset className="choices">
+        <fieldset className="choices" disabled={busy}>
           <legend>Role</legend>
           {['editor', 'owner'].map((value) => (
             <label key={value} className="choice">
@@ -53,7 +56,8 @@ export default function TeamInviteForm({ onInvite }) {
             </label>
           ))}
         </fieldset>
-        <button type="submit" className="button primary" disabled={busy}>Send invite</button>
+        <button type="submit" className="button primary" disabled={busy || disabled}>{busy ? 'Sending invite…' : 'Send invite'}</button>
+        <ActionResult result={outcome} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh team" />
       </form>
     </section>
   );

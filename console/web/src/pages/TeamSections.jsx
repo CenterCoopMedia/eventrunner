@@ -21,16 +21,11 @@ function SecondOwner({ ownersNeeded }) {
  * members, the open invites and the invite form. `team` is useTeam().
  */
 export default function TeamSections({ team, myUid }) {
-  const { data, error, notice, change } = team;
+  const { data, outcome, pending, stale, refreshing, change, refresh } = team;
   const isOwner = data.myRole === 'owner';
   return (
     <>
       <SecondOwner ownersNeeded={data.ownersNeeded} />
-
-      <div aria-live="polite" className="live">
-        {notice ? <p className="message success">{notice}</p> : null}
-      </div>
-      {error ? <p className="message error" role="alert">{error}</p> : null}
 
       {!isOwner && data.myRole ? <p className="muted">Only an Owner can invite people or change roles.</p> : null}
       {!data.myRole && data.operator ? (
@@ -38,7 +33,9 @@ export default function TeamSections({ team, myUid }) {
       ) : null}
 
       <h2 id="members-title">Members</h2>
-      <TeamMembers members={data.members} myUid={myUid} canEdit={isOwner} onChange={change} />
+      <TeamMembers members={data.members} myUid={myUid} canEdit={isOwner} onChange={change}
+        outcome={outcome?.key !== 'invite' ? outcome : null} pending={pending} disabled={Boolean(pending) || stale}
+        onRefresh={refresh} refreshing={refreshing} />
 
       {data.invites.length > 0 ? (
         <>
@@ -55,7 +52,8 @@ export default function TeamSections({ team, myUid }) {
         </>
       ) : null}
 
-      {isOwner ? <TeamInviteForm onInvite={change} /> : null}
+      {isOwner ? <TeamInviteForm onInvite={change} outcome={outcome?.key === 'invite' ? outcome : null}
+        disabled={Boolean(pending) || stale} onRefresh={refresh} refreshing={refreshing} /> : null}
     </>
   );
 }

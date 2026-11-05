@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { callApi } from '../../api.js';
+import { ActionResult } from '../../ActionFeedback.jsx';
 import { ROLE_LABELS, formatDate } from '../../text.js';
 import { STATUS_LABELS, TICKET_LABELS, formatDateTime } from '../../reviewText.js';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
@@ -53,8 +54,8 @@ const BUILD_STATE_LABELS = Object.freeze({
 });
 
 /** The build record, in full. Only the hosting team sees it. */
-function BuildRecord({ build, canRetry, retrying, onRetry }) {
-  if (!build && !canRetry) return null;
+function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onRefresh, refreshing }) {
+  if (!build && !canRetry && !result) return null;
   return (
     <>
       <h2 id="build-title">Build</h2>
@@ -85,11 +86,12 @@ function BuildRecord({ build, canRetry, retrying, onRetry }) {
       ) : null}
       {canRetry ? (
         <p>
-          <button type="button" className="button primary" disabled={retrying} onClick={onRetry}>
+          <button type="button" className="button primary" disabled={retrying || disabled} onClick={onRetry}>
             {retrying ? 'Starting the build' : 'Retry the build'}
           </button>
         </p>
       ) : null}
+      <ActionResult result={result} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh build record" />
     </>
   );
 }
@@ -117,16 +119,21 @@ export default function ReviewApplication() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(null);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [retrying, setRetrying] = useState(false);
+  const [decisionResult, setDecisionResult] = useState(null);
+  const [retryResult, setRetryResult] = useState(null);
+  const [working, setWorking] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [stale, setStale] = useState(false);
+  const inFlight = useRef(false);
 
   const load = useCallback(async () => {
     try {
       setData(await callApi('getApplicationForReview', { appId }));
       setLoadError(null);
+      return '';
     } catch (err) {
       setLoadError(err);
+      return err.message;
     }
   }, [appId]);
 
@@ -135,8 +142,10 @@ export default function ReviewApplication() {
   }, [load]);
 
   const decide = useCallback(async (name, body) => {
-    setNotice('');
-    setError('');
+    if (inFlight.current || stale) return false;
+    inFlight.current = true;
+    setWorking('decision');
+    setDecisionResult(null);
     try {
       // The revision ties the decision to the version on this page.
       const revision = name === 'deleteSpamApplication' ? {} : { revision: data?.application.revision };
@@ -145,30 +154,48 @@ export default function ReviewApplication() {
         navigate('/review', { state: { notice: 'The request is deleted. If no build ever began, its web address is free again.' } });
         return true;
       }
-      setNotice(decidedMessage(name, result));
-      await load();
+      const problem = await load();
+      setStale(Boolean(problem));
+      setDecisionResult({ kind: 'success', message: decidedMessage(name, result),
+        refreshError: problem ? `The decision is saved, but we could not refresh the request. ${problem}` : '' });
       return true;
     } catch (err) {
-      setError(err.message);
+      setDecisionResult({ kind: 'error', message: err.message });
       return err;
+    } finally {
+      inFlight.current = false;
+      setWorking('');
     }
-  }, [appId, data, load, navigate]);
+  }, [appId, data, load, navigate, stale]);
 
   const retry = useCallback(async () => {
-    setNotice('');
-    setError('');
-    setRetrying(true);
+    if (inFlight.current || stale) return;
+    inFlight.current = true;
+    setWorking('retry');
+    setRetryResult(null);
     try {
       const { started } = await callApi('retryBuild', { appId });
-      if (started) setNotice('The build started again.');
-      else setError('The build did not start. Read the function logs and fix the cause, then retry.');
-      await load();
+      const problem = await load();
+      setStale(Boolean(problem));
+      setRetryResult({ kind: started ? 'success' : 'error',
+        message: started ? 'The build started again.' : 'The build did not start. Read the function logs and fix the cause, then retry.',
+        refreshError: problem ? `We could not refresh the build record. ${problem}` : '' });
     } catch (err) {
-      setError(err.message);
+      setRetryResult({ kind: 'error', message: err.message });
     } finally {
-      setRetrying(false);
+      inFlight.current = false;
+      setWorking('');
     }
-  }, [appId, load]);
+  }, [appId, load, stale]);
+
+  async function refresh(kind) {
+    setRefreshing(true);
+    const problem = await load();
+    setStale(Boolean(problem));
+    const update = kind === 'retry' ? setRetryResult : setDecisionResult;
+    update((current) => current ? { ...current, refreshError: problem ? `We could not refresh the request. ${problem}` : '' } : current);
+    setRefreshing(false);
+  }
 
   if (isNotOperator(loadError)) return <HostingOnly />;
   if (!data) {
@@ -182,17 +209,14 @@ export default function ReviewApplication() {
       <h1 id="review-title" tabIndex={-1}>{app.answers?.event?.name || 'Request'}</h1>
       <p><span className="tag">{STATUS_LABELS[app.status] || app.status}</span></p>
 
-      <div aria-live="polite" className="live">
-        {notice ? <p className="message success">{notice}</p> : null}
-      </div>
-      {error ? <p className="message error" role="alert">{error}</p> : null}
       {app.buildStart?.state === 'failed' && data.build?.state !== 'failed' ? (
         <aside className="note" role="note">
           <p className="note-title">The build did not start</p>
           <p>The request stays approved. Read the function logs and fix the cause, then retry the build.</p>
         </aside>
       ) : null}
-      <BuildRecord build={data.build} canRetry={data.canRetryBuild} retrying={retrying} onRetry={retry} />
+      <BuildRecord build={data.build} canRetry={data.canRetryBuild} retrying={working === 'retry'} onRetry={retry}
+        disabled={Boolean(working) || stale || refreshing} result={retryResult} onRefresh={() => refresh('retry')} refreshing={refreshing} />
 
       <h2 id="decision-title">Decision</h2>
       {app.review?.note ? (
@@ -201,7 +225,9 @@ export default function ReviewApplication() {
           <p className="history-note">{app.review.note}</p>
         </aside>
       ) : null}
-      <ReviewActions key={app.status} status={app.status} canClose={data.canRetryBuild} onDecide={decide} />
+      <ReviewActions key={app.status} status={app.status} canClose={data.canRetryBuild} onDecide={decide}
+        busy={working === 'decision'} disabled={stale || working === 'retry' || refreshing}
+        result={decisionResult} onRefresh={() => refresh('decision')} refreshing={refreshing} />
 
       <h2 id="answers-title">Answers</h2>
       {app.acceptance ? <p className="muted">These are the answers the client accepted. The client cannot change them now.</p> : null}
