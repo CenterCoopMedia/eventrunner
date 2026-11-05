@@ -15,6 +15,7 @@
 const crypto = require('node:crypto');
 
 const API_BASE = 'https://api.postmarkapp.com';
+const TEST_MESSAGE_ID = '00000000-0000-0000-0000-000000000000';
 
 /**
  * Postmark's batch endpoint limits (developer docs, "Send batch emails"):
@@ -321,6 +322,8 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
     const record = /** @type {Record<string, any>} */ (body);
     const providerMessageId = record.MessageID;
     if (typeof providerMessageId !== 'string' || !providerMessageId) return null;
+    // Postmark's own test of the address, which must answer 200.
+    if (providerMessageId === TEST_MESSAGE_ID) return [];
 
     let event = null;
     switch (record.RecordType) {

@@ -210,6 +210,13 @@ test('verifyDeliveryWebhook is false when EMAIL_WEBHOOK_BASIC_AUTH is absent', (
 
 // --- parseDeliveryEvent ------------------------------------------------------
 
+test('parseDeliveryEvent has nothing to record for a Postmark test event', () => {
+  const provider = createPostmarkProvider({ env: ENV, fetchImpl: fakeFetch([]) });
+  assert.deepEqual(provider.parseDeliveryEvent({
+    RecordType: 'Delivery', MessageID: '00000000-0000-0000-0000-000000000000', DeliveredAt: new Date().toISOString(),
+  }), []);
+});
+
 test('parseDeliveryEvent maps Delivery', () => {
   const provider = createPostmarkProvider({ env: ENV, fetchImpl: fakeFetch([]) });
   assert.deepEqual(

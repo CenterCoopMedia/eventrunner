@@ -684,6 +684,13 @@ jobs:
         with:
           name: web-dist-${{ inputs.client }}
           path: apps/web/dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: shared-tgz-${{ inputs.client }}
+          path: functions/vendor
+      - name: Copy the shared tarball to every functions vendor folder
+        # npm ci finds it only in a warm npm cache otherwise.
+        run: node scripts/prepare-functions.cjs --copy
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}

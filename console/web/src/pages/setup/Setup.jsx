@@ -130,7 +130,11 @@ export default function Setup() {
   const onChange = useCallback((value, path) => {
     if (!step || !ANSWER_STEPS.includes(step.id)) return;
     touch(path);
-    setApp((prev) => ({ ...prev, answers: { ...prev.answers, [step.id]: value } }));
+    // The field's old error no longer applies. The save brings the current ones.
+    setApp((prev) => {
+      const { [path]: _edited, ...errors } = prev.errors;
+      return { ...prev, errors, answers: { ...prev.answers, [step.id]: value } };
+    });
     queue({ step: step.id, answers: value });
   }, [step, touch, setApp, queue]);
 

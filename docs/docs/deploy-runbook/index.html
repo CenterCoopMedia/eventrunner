@@ -1198,17 +1198,18 @@
           <tr><td><code>deploy-identity</code></td><td>Deploy account, roles, its own identity pool, the agent grants, the image cleanup policy</td></tr>
           <tr><td><code>web-address</code></td><td><code>&lt;name&gt;.eventrunner.org</code> on Hosting, its DNS records, the wait for the certificate (up to an hour). Hosting can report <code>CERT_PROPAGATING</code> long after it serves the certificate, so that state passes once the address answers over HTTPS</td></tr>
           <tr><td><code>sign-in</code></td><td>Authorized domains</td></tr>
-          <tr><td><code>email</code></td><td>Postmark server, streams, webhooks, sender domain, its DNS records, the wait for verification (up to 30 minutes)</td></tr>
+          <tr><td><code>email</code></td><td>Postmark server, streams, sender domain, its DNS records, the wait for verification (up to 30 minutes)</td></tr>
           <tr><td><code>tickets</code></td><td>Tests the chosen token, moves it to the client project, deletes the console&#39;s copy and any leftover, sets up the Stripe webhook endpoint</td></tr>
           <tr><td><code>environment</code></td><td>The client&#39;s GitHub Environment, its <code>main</code>-only rule and its variables</td></tr>
           <tr><td><code>first-deploy</code></td><td><code>deploy.yml</code> in bootstrap mode, up to three tries</td></tr>
+          <tr><td><code>mail-webhooks</code></td><td>Postmark&#39;s delivery webhooks. Postmark tests the address when it creates one, so this follows the first deploy</td></tr>
           <tr><td><code>seed</code></td><td><code>init-event.cjs</code> with the frozen answers and the team, the sender record, the ticket webhook</td></tr>
           <tr><td><code>full-deploy</code></td><td><code>deploy.yml</code>, up to three tries</td></tr>
           <tr><td><code>ready</code></td><td>Emails the Owners their admin panel link, sets <code>ready</code></td></tr>
           </tbody>
           </table>
           </div>
-          <p>The order differs from ADR §6 in one place: the sender record and the ticket webhook&#39;s registration are written in <code>seed</code>, because they need <code>config/event</code> and the deployed functions.</p>
+          <p>The order differs from ADR §6 in two places: the mail webhooks follow the first deploy, and the sender record and the ticket webhook&#39;s registration are written in <code>seed</code>, because they need <code>config/event</code> and the deployed functions.</p>
           <h3 id="121-one-time-setup">12.1 One-time setup<a class="heading-anchor" href="#121-one-time-setup" aria-label="Link to this section">#</a></h3>
           <p>Use placeholders from your own records. Nothing below belongs in the repository.</p>
           <ol>
@@ -1350,7 +1351,7 @@
           <li>Google Cloud: a missing project answers 403 to the provisioner and creating it succeeds. The project&#39;s creator holds owner with these credentials. <code>identityPlatform:initializeAuth</code> is the right way to turn on sign-in, and the config answers 400 or 404 before it. The custom domain&#39;s <code>requiredDnsUpdates</code> and <code>cert.verification</code> field and value shapes. The default bucket&#39;s answer holds its name. <code>nam5</code> is accepted for <code>us-central1</code>.</li>
           <li>Workflow identity: <code>google-github-actions/auth</code> exports the project and quota variables the script clears from a child&#39;s environment. Its credentials keep working past an hour, for a run that waits on a certificate. Credentials from the auth action carry no <code>quota_project_id</code> of their own, and if they do, branding fails loudly.</li>
           <li>GitHub: <code>GITHUB_TOKEN</code> with <code>actions: write</code> dispatches <code>deploy.yml</code> and the run starts. <code>display_title</code> follows <code>run-name</code>. An App token with the three permissions above can create an Environment.</li>
-          <li>Postmark: <code>ApiTokens[0]</code> on the account&#39;s <code>/servers</code> answer. <code>/message-streams</code> accepts a <code>Broadcasts</code> stream with Postmark-managed unsubscribe. Webhooks accept a URL with a password in it, and list it back in a form this comparison matches.</li>
+          <li>Postmark: <code>ApiTokens[0]</code> on the account&#39;s <code>/servers</code> answer. <code>/message-streams</code> accepts a <code>Broadcasts</code> stream with Postmark-managed unsubscribe. Webhooks accept <code>HttpAuth</code>, pass Postmark&#39;s test of each trigger, and list the URL back in a form this comparison matches.</li>
           <li>Cloudflare: a TXT value comes back in the form it was stored. A <code>pm-bounces</code> CNAME and the certificate&#39;s records are not proxied.</li>
           <li>Stripe and Eventbrite: <code>GET /v1/account</code> answers with the connected account&#39;s id for a Connect OAuth token. Creating a webhook endpoint on that account with that token works. <code>GET /users/me/</code> answers for a live Eventbrite token.</li>
           </ul>
