@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
 import LoadingState from '../LoadingState.jsx';
+import WaitingBuddy from '../WaitingBuddy.jsx';
 import ConnectionPanel, { ConnectionNotice } from '../setup/ConnectionPanel.jsx';
 import { PROVIDER_COPY } from '../setup/connections.js';
 import { BUILD_FAILED_LABEL, BUILD_PHASES, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
@@ -49,10 +50,13 @@ function BuildUnderway({ app }) {
   const now = current ? BUILD_PHASES[at]?.label : 'Starting the build';
   const next = !current || at >= 0 ? BUILD_PHASES[at + 1]?.label : null;
   return (
-    <aside className="note stack" role="note">
-      <p className="note-title">You can close this page</p>
-      <p>{app.myRole === 'owner' ? 'You' : 'The Owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
-      <LoadingState long>{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</LoadingState>
+    <aside className="note build-note" role="note">
+      <WaitingBuddy />
+      <div className="stack">
+        <p className="note-title">You can close this page</p>
+        <p>{app.myRole === 'owner' ? 'You' : 'The Owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
+        <p role="status" aria-atomic="true" className="console-loading">{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</p>
+      </div>
     </aside>
   );
 }

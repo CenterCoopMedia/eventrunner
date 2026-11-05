@@ -304,6 +304,13 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
    and moves only without a reduced-motion preference; otherwise it stands
    still with its confetti in place. */
 .console-loading-long { align-items: center; }
+/* The build note gives the badge its own column, beside all of the note's text. */
+.build-note { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-lg); }
+.build-note .wait-buddy { width: 6rem; height: 6.75rem; margin-inline: var(--space-xs); }
+@media (max-width: 30rem) {
+  .build-note { gap: var(--space-md); }
+  .build-note .wait-buddy { width: 4rem; height: 4.5rem; margin-inline: 0; }
+}
 .wait-buddy { flex: none; width: 4.5rem; height: 5rem; overflow: visible; }
 .wait-buddy * { transform-box: view-box; }
 .wb-line { fill: none; stroke: rgb(var(--ink)); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
