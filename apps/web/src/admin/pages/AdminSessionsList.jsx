@@ -29,49 +29,53 @@ export default function AdminSessionsList() {
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [resumeQueueId, setResumeQueueId] = useState(null);
+  const [resume, setResume] = useState(null);
   const placeNames = new Map(
     (eventConfig.venue?.places ?? []).map((place) => [place.id, place.name]),
   );
   const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
 
-  function reportPublish(response) {
-    const verdict = summarizePublish(response, 'cmsSchedule', pendingIds, 'sessions');
+  function reportPublish(response, ids) {
+    const verdict = summarizePublish(response, 'cmsSchedule', ids, 'sessions');
     setNotice({ tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
-    showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
+    showToast(verdict.message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
-  function reportFailure(err) {
+  function reportFailure(err, ids) {
     setNotice({ tone: 'error', message: err.message });
-    showToast(err.message, { tone: 'error' });
-    if (err?.queueId) setResumeQueueId(err.queueId);
+    showToast(err.message, { tone: 'error', announce: false });
+    if (err?.queueId) setResume({ queueId: err.queueId, ids });
   }
 
   async function publishAll() {
+    if (publishing !== null) return;
+    const ids = pendingIds;
     setPublishing('all');
     setNotice(null);
-    setResumeQueueId(null);
+    setResume(null);
     try {
       const response = await call('cmsPublish', {
         collection: 'cmsSchedule',
-        docIds: pendingIds,
+        docIds: ids,
       });
-      reportPublish(response);
+      reportPublish(response, ids);
     } catch (err) {
-      reportFailure(err);
+      reportFailure(err, ids);
     } finally {
       setPublishing(null);
     }
   }
 
   async function resumePublish() {
+    if (!resume || publishing !== null) return;
+    const { queueId, ids } = resume;
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId: resumeQueueId });
-      setResumeQueueId(null);
-      reportPublish(response);
+      const response = await call('cmsPublish', { queueId });
+      setResume(null);
+      reportPublish(response, ids);
     } catch (err) {
-      reportFailure(err);
+      reportFailure(err, ids);
     } finally {
       setPublishing(null);
     }
@@ -85,7 +89,7 @@ export default function AdminSessionsList() {
         description="The programme in event-day order. Child sessions stay directly below their parent."
         actions={
           <>
-            {resumeQueueId ? (
+            {resume ? (
               <button
                 type="button"
                 className={secondaryButtonClass}

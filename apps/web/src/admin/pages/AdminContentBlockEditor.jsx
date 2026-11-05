@@ -57,7 +57,6 @@ import {
   DestructiveConfirm,
   Notice,
   Panel,
-  SaveStatus,
   SelectField,
   ServerErrorSummary,
   TextField,
@@ -65,6 +64,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -273,6 +273,7 @@ export default function AdminContentBlockEditor({ mode }) {
   const [fieldId, setFieldId] = useState(mode === 'edit' ? fieldParam ?? '' : '');
   const [content, setContent] = useState(() => blankContent());
   const [error, setError] = useState(null);
+  const [errorTitle, setErrorTitle] = useState(undefined);
   const [busy, setBusy] = useState(null); // null | 'draft' | 'publish' | 'delete'
   const [status, setStatus] = useState('');
   const [savedDocId, setSavedDocId] = useState(null);
@@ -442,6 +443,7 @@ export default function AdminContentBlockEditor({ mode }) {
 
   async function save({ publish }) {
     setError(null);
+    setErrorTitle(undefined);
     setStatus('');
     setResumeQueueId(null);
     // Give immediate field feedback before the server repeats the same
@@ -492,6 +494,7 @@ export default function AdminContentBlockEditor({ mode }) {
       visible: savedContent.visible,
     };
     if (!isExisting) request.pageId = pageId;
+    let stage = 'save';
     try {
       const response = await call(endpoint, request);
       if (!mountedRef.current) return;
@@ -507,9 +510,9 @@ export default function AdminContentBlockEditor({ mode }) {
       setSavedEdit(contentEditSnapshot(nextFieldId, savedContent));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
-        showToast('Draft saved.');
         return;
       }
+      stage = 'publish';
       const publishResponse = await call('cmsPublish', {
         collection: 'cmsContent',
         docIds: [docId],
@@ -518,6 +521,7 @@ export default function AdminContentBlockEditor({ mode }) {
       reportPublish(publishResponse, [docId]);
     } catch (err) {
       if (!mountedRef.current) return;
+      if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
       setError(err);
       if (err?.queueId) setResumeQueueId(err.queueId);
     } finally {
@@ -528,13 +532,15 @@ export default function AdminContentBlockEditor({ mode }) {
   /** cmsPublish answers 200 even when it skipped what you asked for. */
   function reportPublish(response, requestedIds) {
     const verdict = summarizePublish(response, 'cmsContent', requestedIds, 'content blocks');
+    if (!verdict.ok) throw new Error(verdict.message);
     setStatus(verdict.message);
-    showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
   }
 
   async function resumePublish() {
     setBusy('publish');
     setError(null);
+    setErrorTitle('The draft is saved, and it is not published');
+    setStatus('');
     try {
       const response = await call('cmsPublish', { queueId: resumeQueueId });
       setResumeQueueId(null);
@@ -550,11 +556,13 @@ export default function AdminContentBlockEditor({ mode }) {
   async function remove() {
     setBusy('delete');
     setError(null);
+    setErrorTitle(undefined);
     try {
       await call('cmsDeleteContent', { section: sectionId, field: currentFieldId });
       showToast('Block deleted.');
       navigate('..', { relative: 'path' });
     } catch (err) {
+      setErrorTitle('The server refused the delete');
       setError(err);
       setBusy(null);
     }
@@ -675,17 +683,19 @@ export default function AdminContentBlockEditor({ mode }) {
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to section
             </Link>
-            <button type="submit" className={secondaryButtonClass} disabled={busy !== null}>
+            <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
               {busy === 'draft' ? 'Saving…' : 'Save draft'}
             </button>
             <button
               type="button"
               className={primaryButtonClass}
               disabled={busy !== null}
+              aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
               {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
             </button>
+            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />
@@ -693,9 +703,8 @@ export default function AdminContentBlockEditor({ mode }) {
       <ServerErrorSummary
         error={error}
         errorRef={errorRef}
-        title={error?.clientValidation ? 'Fill in the required fields' : undefined}
+        title={error?.clientValidation ? 'Fill in the required fields' : errorTitle}
       />
-      {status ? <SaveStatus message={status} /> : null}
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog
           onStay={leaveGuard.stay}
