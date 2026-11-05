@@ -265,7 +265,8 @@ describe('content browsing', () => {
     expect(within(row).queryByText('Live with unpublished changes')).not.toBeInTheDocument();
     expect(screen.getByText('Page state is for the page’s structure. Open a section to review its content drafts.')).toBeInTheDocument();
     fireEvent.click(within(row).getByRole('link', { name: 'Intro' }));
-    expect(await screen.findByText('Live with unpublished changes')).toBeInTheDocument();
+    const block = (await screen.findByRole('link', { name: 'Scholarships open in spring.' })).closest('li');
+    expect(within(block).getByText('Live with unpublished changes')).toBeInTheDocument();
   });
 
   it('offers verified destinations for sectionless system pages without guessing from editable labels or paths', async () => {

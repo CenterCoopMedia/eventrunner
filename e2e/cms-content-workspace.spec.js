@@ -7,12 +7,15 @@ import { ADMIN_EMAIL, adminDb, signIn } from './helpers.mjs';
 
 async function captureWorkspace(page, evidenceDir, name, viewport) {
   await page.setViewportSize(viewport);
+  await page.mouse.move(viewport.width - 1, viewport.height - 1);
   await page.locator('html').evaluate((element) => {
     element.ownerDocument.defaultView.scrollTo(0, 0);
     return element.ownerDocument.fonts.ready;
   });
   const geometry = await page.locator('#admin-content').evaluate((main) => {
     const root = main.ownerDocument.documentElement;
+    const view = main.ownerDocument.defaultView;
+    const adminFont = view.getComputedStyle(main).fontFamily;
     const visible = (element) => element.getClientRects().length > 0;
     return {
       viewport: root.clientWidth,
@@ -23,11 +26,14 @@ async function captureWorkspace(page, evidenceDir, name, viewport) {
         const box = control.getBoundingClientRect();
         return box.left >= -1 && box.right <= root.clientWidth + 1;
       }),
+      headingsUseAdminFont: [...main.querySelectorAll('.admin-content-index th, .admin-content-section h2')]
+        .every((heading) => view.getComputedStyle(heading).fontFamily === adminFont),
     };
   });
   expect(geometry.page, `${name} page width at ${viewport.width}`).toBeLessThanOrEqual(geometry.viewport + 1);
   expect(geometry.panelsFit, `${name} rows contain their content at ${viewport.width}`).toBe(true);
   expect(geometry.controlsFit, `${name} controls fit at ${viewport.width}`).toBe(true);
+  expect(geometry.headingsUseAdminFont, `${name} headings use the admin typeface at ${viewport.width}`).toBe(true);
   await page.screenshot({
     path: path.join(evidenceDir, `${name}-${viewport.width}.png`),
     fullPage: true,

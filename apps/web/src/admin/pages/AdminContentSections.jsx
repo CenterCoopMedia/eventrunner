@@ -80,7 +80,7 @@ export default function AdminContentSections() {
               return (
                 <li key={section.id} className="admin-content-section">
                   <div className="admin-content-section__description">
-                    <h2>
+                    <h2 className="font-admin-ui">
                       <Link to={to} className={`${rowTitleLinkClass} admin-content-page-name`}>{sectionName}</Link>
                     </h2>
                     {section.description ? <p>{section.description}</p> : null}
