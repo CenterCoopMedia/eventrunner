@@ -5,7 +5,7 @@
 // adds: the injected theme base, and that it loads without the scripts tree.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildConfigDocs, mergeTheme } = require('./answers.cjs');
+const { buildConfigDocs, mergeTheme, buildFeatures } = require('./answers.cjs');
 
 const tierA = { emailProvider: 'console', ticketingProvider: 'none', publicUrl: 'https://example.org' };
 
@@ -54,4 +54,15 @@ test('setPath refuses a prototype key in the path', () => {
   const target = {};
   internals.setPath(target, 'event.venue.name', 'Hall');
   assert.deepEqual(target, { event: { venue: { name: 'Hall' } } });
+});
+
+
+test('new sites enable features that need no setup and keep explicit off values', () => {
+  const keys = ['badges', 'customBadges', 'liveUpdates', 'changeRequests'];
+  const overrides = Object.fromEntries(keys.map((key) => [key, false]));
+  for (const key of keys) {
+    assert.equal(buildFeatures().features[key], true, key);
+    assert.equal(buildFeatures(overrides).features[key], false, key);
+  }
+  assert.equal(buildFeatures().features.updates, false);
 });

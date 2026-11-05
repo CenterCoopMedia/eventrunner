@@ -54,6 +54,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { BLOCK_TYPE_IDS } from '../blockTypes.js';
 import { sectionEditPath } from '../../components/SectionEditLink.jsx';
 
 const SCHOLARSHIPS_PAGE = {
@@ -282,7 +283,7 @@ describe('content browsing', () => {
     expect(await screen.findByRole('link', { name: 'Intro' })).toBeInTheDocument();
     expect(screen.getByText(/1 block/)).toBeInTheDocument();
     expect(screen.getByText('Who the scholarships are for.')).toBeInTheDocument();
-    expect(screen.getByText('Rich text, Statistic', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('All block types', { exact: false })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit content in Intro' })).toHaveAttribute('href', '/admin/content/scholarships/intro');
 
     fireEvent.click(screen.getByRole('link', { name: 'Intro', exact: true }));
@@ -554,6 +555,7 @@ describe('creating and editing a block', () => {
     await renderAt('/admin/content/scholarships/intro/_new');
 
     expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'richtext' } });
     await replaceRichText(await findRichText(), '<p>Hello</p>', 'Hello');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
@@ -580,19 +582,17 @@ describe('creating and editing a block', () => {
     expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
   });
 
-  it('offers only the section’s allowed block types, driven by the registry', async () => {
+  it('offers every block type for a custom section, driven by the registry', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     await renderAt('/admin/content/scholarships/intro/_new');
 
     const picker = screen.getByLabelText('Block type');
     await waitFor(() => {
-      expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual([
-        'Rich text',
-        'Statistic',
-      ]);
+      expect(within(picker).getAllByRole('option').map((option) => option.value)).toEqual(BLOCK_TYPE_IDS);
     });
 
     // Switching the block type swaps the value fields the registry declares.
+    fireEvent.change(picker, { target: { value: 'richtext' } });
     expect(await findRichText()).toBeInTheDocument();
     fireEvent.change(picker, { target: { value: 'stat' } });
     expect(screen.getByLabelText(/^Caption/)).toBeInTheDocument();
@@ -764,6 +764,7 @@ describe('server errors and publish skips', () => {
     // Fill the required value field so this reaches the network call at
     // all — an empty one is caught by client-side validation first, which
     // has its own test.
+    fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'richtext' } });
     await replaceRichText(await findRichText(), '<p>Hi</p>', 'Hi');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 

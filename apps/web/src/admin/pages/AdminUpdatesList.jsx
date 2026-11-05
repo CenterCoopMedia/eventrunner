@@ -24,7 +24,6 @@ import { summarizePublish } from '../publishResult.js';
 import { useAdminUpdates } from '../useAdminUpdates.js';
 import {
   NEW_UPDATE_PATH,
-  UPDATES_OFF_MESSAGE,
   UPDATES_ROOT,
   categoryOf,
   dirtyUpdateIds,
@@ -37,6 +36,7 @@ import {
   rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import FeatureSwitch from '../components/FeatureSwitch.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -54,7 +54,7 @@ const CELL_CLASS = 'px-sm py-xs align-top';
 
 export default function AdminUpdatesList() {
   const { rows, loading, error } = useAdminUpdates();
-  const { features, eventConfig } = useEventConfig();
+  const { eventConfig } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
@@ -156,7 +156,7 @@ export default function AdminUpdatesList() {
         }
       />
 
-      {features?.updates ? null : <Notice tone="caution" message={UPDATES_OFF_MESSAGE} />}
+      <FeatureSwitch featureKeys={['updates']} />
 
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 

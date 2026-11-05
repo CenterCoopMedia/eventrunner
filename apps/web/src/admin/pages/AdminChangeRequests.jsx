@@ -51,6 +51,7 @@ import {
   OutcomeDetails,
   readEmailSettings,
 } from '../components/ChangeRequestEmails.jsx';
+import FeatureSwitch from '../components/FeatureSwitch.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -366,11 +367,8 @@ export default function AdminChangeRequests() {
         </div>
       ) : null}
 
-      {enabled ? (
-        <RequestForm call={call} />
-      ) : (
-        <Notice tone="info" message="Change requests are off. An operator can turn them on under Features." />
-      )}
+      <FeatureSwitch featureKeys={['changeRequests']} />
+      {enabled ? <RequestForm call={call} /> : null}
 
       <section aria-labelledby="change-requests-heading" className="flex flex-col gap-sm">
         <h2

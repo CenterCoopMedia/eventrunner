@@ -110,6 +110,34 @@
   display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm);
 }
 .admin-content-fields > :only-child { grid-column: 1 / -1; }
+.admin-field { row-gap: 0; }
+/* Each field shares label, hint, control, and feedback rows with its neighbour.
+   Empty hints keep their row; errors stay below the aligned controls. */
+:is(.grid, .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields):has(> .admin-field) {
+  row-gap: 0;
+}
+:is(.grid, .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields):has(> .admin-field) > * {
+  grid-row: span 4; margin-block-end: var(--space-sm);
+}
+:is(.grid, .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields):has(> .admin-field) > :is(.admin-field, .admin-field-toggle, :has(> .admin-field-toggle), :has(> .admin-field:only-child)) {
+  display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0;
+  min-width: 0; align-self: stretch; margin-block-end: var(--space-sm);
+}
+:is(.grid, .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields):has(> .admin-field) > :has(> .admin-field:only-child) > .admin-field {
+  display: grid; grid-row: 1 / -1; grid-template-rows: subgrid; row-gap: 0;
+}
+.admin-field__label { grid-row: 1; margin-block-end: var(--space-3xs); }
+.admin-field__hint { grid-row: 2; margin-block-end: var(--space-3xs); }
+.admin-field__control { grid-row: 3; align-self: start; }
+.admin-field__feedback { grid-row: 4; margin-block-start: var(--space-3xs); }
+.admin-field__feedback > :not(:first-child) { margin-block-start: var(--space-3xs); }
+:is(.grid, .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields) > .admin-field-toggle > *,
+:is(.grid, .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields) > :has(> .admin-field-toggle) > .admin-field-toggle {
+  grid-row: 3; align-self: start;
+}
+:is(.grid, .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields) > :has(> .admin-field-toggle) > :not(.admin-field-toggle) {
+  grid-row: 4;
+}
 .admin-settings-field--wide { grid-column: 1 / -1; }
 .admin-page-section-list > li:has(> .admin-editor-disclosure[data-open='true']) { grid-column: 1 / -1; }
 .admin-page-block-list > li { min-width: 0; }
@@ -163,7 +191,7 @@
 .admin-settings-grid > .admin-panel .sm\:col-span-2,
 .admin-settings-grid > .admin-panel .sm\:col-span-3 { grid-column: 1 / -1; }
 @container admin-card (min-width: 30rem) {
-  .admin-editor-fields, .admin-page-fields, .admin-settings-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-settings-grid > .admin-panel .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

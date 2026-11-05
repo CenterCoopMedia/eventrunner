@@ -23,7 +23,8 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
-const { draftCollectionFor, requiredBlockErrors } = require('./blockTypes.cjs');
+const { BLOCK_TYPES, draftCollectionFor, requiredBlockErrors } = require('./blockTypes.cjs');
+const { builtInSectionBlockTypes, sectionBlockTypes } = require('shared/page');
 const {
   writeDraft,
   deleteBoth,
@@ -321,7 +322,7 @@ async function checkContentCreateSection({ db, tx, collection, pageId, sectionId
       message: `section: "${sectionId}" does not exist on page "${pageId}".`,
     };
   }
-  if (!Array.isArray(section.allowedBlocks) || !section.allowedBlocks.includes(blockType)) {
+  if (!sectionBlockTypes({ ...page, id: pageId }, section, Object.keys(BLOCK_TYPES)).includes(blockType)) {
     return {
       ok: false,
       message: `allowedBlocks: section "${sectionId}" does not allow block type "${String(blockType)}".`,
@@ -598,6 +599,22 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
           ),
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
+
+        // A type change must also fit the dedicated Home renderer. Other
+        // sections use the generic renderer and accept every registered type.
+        if (collection === 'cmsContent' && checked.fields.blockType &&
+            builtInSectionBlockTypes({ id: 'home', systemPage: true }, { id: extraFields.section })) {
+          const [draftHome, liveHome] = await tx.getAll(
+            db.collection(PAGES_DRAFTS).doc('home'),
+            db.collection(PAGES_COLLECTION).doc('home'),
+          );
+          const home = draftHome.exists ? draftHome.data() : liveHome.exists ? liveHome.data() : null;
+          const section = home?.sections?.find((entry) => entry.id === extraFields.section);
+          const allowed = section && builtInSectionBlockTypes({ ...home, id: 'home' }, section);
+          if (allowed && !allowed.includes(references.fields.blockType)) {
+            throw new RequestError(400, 'bad-request', 'blockType: this built-in section cannot show that type.');
+          }
+        }
 
         const contract = checkBlockContract({ collection, fields: references.fields });
         if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);

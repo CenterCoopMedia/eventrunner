@@ -65,7 +65,7 @@ vi.mock('firebase/firestore', () => ({
 
 import App from '../../App.jsx';
 import { markTourDone } from '../tourState.js';
-import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
+import { BLOCK_TYPE_IDS } from '../blockTypes.js';
 import { NAV_PLACEMENT_LABELS } from '../../lib/themeRuntime.js';
 
 const SCHOLARSHIPS_DRAFT = {
@@ -552,20 +552,10 @@ describe('page editor', () => {
     expect(screen.getByLabelText('Section 1 label')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('names the reserved route segments from the shared registry', async () => {
-    // Root-level paths are canonical (issue #52), so an operator needs to
-    // know which first segments the built-in routes already own. The list is
-    // read from shared/routing — the same registry cmsSavePage validates
-    // against — rather than restated here.
+  it('describes the public path in plain words', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
-
-    const hint = (await screen.findByLabelText('Path')).getAttribute('aria-describedby');
-    const hintText = document.getElementById(hint.split(' ')[0]).textContent;
-    for (const segment of RESERVED_PATH_SEGMENTS) {
-      expect(hintText).toContain(segment);
-    }
-    expect(hintText).not.toMatch(/\/p\//);
+    expect(screen.getByLabelText('Path')).toHaveAccessibleDescription('The page’s web address, such as /scholarships.');
   });
 
   it('surfaces the server’s reserved-path and collision rejections verbatim', async () => {
@@ -604,7 +594,7 @@ describe('page editor', () => {
     const path = await screen.findByLabelText('Path');
     expect(path).toHaveAttribute('readonly');
     expect(path).toHaveValue('/schedule');
-    expect(screen.getByText(/served at a fixed address, which cannot change/i))
+    expect(screen.getByText(/This built-in page has a fixed web address/i))
       .toBeInTheDocument();
 
     // Everything else about the page is still the operator's to change.
@@ -627,7 +617,7 @@ describe('page editor', () => {
 
     await screen.findByLabelText('Navigation label');
     expect(screen.queryByLabelText('Page heading')).toBeNull();
-    expect(screen.getByText('This page draws its own heading.')).toBeInTheDocument();
+    expect(screen.getByText('This built-in page sets its own heading.')).toBeInTheDocument();
   });
 
   it('offers the page heading on a content page, whose heading it sets', async () => {
@@ -635,7 +625,7 @@ describe('page editor', () => {
     await renderAt('/admin/pages/scholarships');
 
     expect(await screen.findByLabelText('Page heading')).toBeInTheDocument();
-    expect(screen.queryByText('This page draws its own heading.')).toBeNull();
+    expect(screen.queryByText('This built-in page sets its own heading.')).toBeNull();
   });
 
   it('leaves a regular page’s address editable', async () => {
@@ -654,7 +644,7 @@ describe('page editor', () => {
 
     // The server refuses this delete, so the room states the refusal in
     // words instead of offering a control that will be rejected.
-    expect(await screen.findByText(/cannot be deleted/i)).toBeInTheDocument();
+    expect(await screen.findByText(/you cannot delete it/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete this page' })).toBeNull();
   });
 
@@ -680,7 +670,7 @@ describe('page editor', () => {
   it('starts existing sections collapsed and keeps changes through reopening', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
-    const section = await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' });
+    const section = await screen.findByRole('button', { name: 'Intro 1 block' });
     expect(section).toHaveAttribute('aria-expanded', 'false');
     // Hidden number constraints must not stop the server validation path.
     expect(section.closest('form')).toHaveAttribute('novalidate');
@@ -690,22 +680,20 @@ describe('page editor', () => {
     fireEvent.click(section);
     fireEvent.click(section);
     expect(screen.getByLabelText('Section 1 label')).toHaveValue('Introduction');
-    expect(screen.getByLabelText('Rich text — section 1')).not.toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: /Allowed block types Choose/ }));
-    expect(screen.getByLabelText('Rich text — section 1')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Allowed block types/ })).toBeNull();
   });
 
   it('keeps the open section and focused move control with their record after reordering', async () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, sections: ['Intro', 'Details', 'Closing'].map((label, index) => ({ ...SCHOLARSHIPS_DRAFT.sections[0], id: `section-${index}`, label })) }];
     await renderAt('/admin/pages/scholarships');
-    const intro = await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' });
+    const intro = await screen.findByRole('button', { name: 'Intro 1 block' });
     fireEvent.click(intro);
     expect(screen.getByRole('button', { name: 'Drag section 1' })).toBeInTheDocument();
     const move = screen.getByRole('button', { name: 'Move section 1 down' });
     move.focus();
     fireEvent.click(move);
     expect(intro).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: 'Details 1 block · 1 allowed type' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Details 1 block' })).toHaveAttribute('aria-expanded', 'false');
     expect(document.activeElement).toBe(move);
     expect(move).toHaveAccessibleName('Move section 2 down');
     fireEvent.click(move);
@@ -713,15 +701,15 @@ describe('page editor', () => {
     expect(intro).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('reveals a collapsed section and palette when their validation fails', async () => {
+  it('reveals a collapsed section when its validation fails', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
-    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'Invalid page: sections[0].allowedBlocks: choose at least one type'));
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'Invalid page: sections[0].maxBlocks: must be an integer >= 1'));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await screen.findByRole('alert');
-    expect(screen.getByRole('button', { name: 'Intro 1 block · 1 allowed type' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: /Allowed block types Choose/ })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByLabelText('Rich text — section 1')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Intro 1 block' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Section 1 max blocks')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Allowed block types/ })).not.toBeInTheDocument();
   });
 
   it('reveals a rejected individual layout setting', async () => {
@@ -774,7 +762,7 @@ describe('page editor', () => {
     fireEvent.click(add);
     expect(screen.getByLabelText('Section 2 label')).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: 'Remove section 2' }));
-    const intro = screen.getByRole('button', { name: 'Intro 1 block · 1 allowed type' });
+    const intro = screen.getByRole('button', { name: 'Intro 1 block' });
     expect(intro).toHaveFocus();
     fireEvent.click(intro);
     const addBlock = screen.getByRole('button', { name: 'Add block to section 1' });
@@ -788,7 +776,7 @@ describe('page editor', () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
-    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add block to section 1' }));
     fireEvent.change(screen.getByLabelText('Block 2 description — section 1'), {
@@ -973,7 +961,7 @@ describe('page editor', () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'home', label: 'Home page', systemPage: true }];
     fetch.mockResolvedValueOnce(okResponse({ id: 'home', status: 'dirty' }));
     await renderAt('/admin/pages/home');
-    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block' }));
 
     // A section stored before this schema landed carries no slot; it reads
     // as main, which is where it has always rendered — and "after the main
@@ -1022,23 +1010,57 @@ describe('page editor', () => {
     expect(screen.queryByLabelText('Section 1 position')).toBeNull();
   });
 
-  it('offers only the section’s allowed block types in the block picker', async () => {
+  it('offers all block types for a custom section without a palette disclosure', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
-    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' }));
-
-    const picker = await screen.findByLabelText('Block 1 type — section 1');
-    expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual(['Rich text']);
-
-    // Widening the palette widens the picker — the registry drives both.
-    fireEvent.click(screen.getByRole('button', { name: /Allowed block types Choose/ }));
-    fireEvent.click(screen.getByLabelText('Statistic — section 1'));
-    expect(
-      within(screen.getByLabelText('Block 1 type — section 1'))
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual(['Rich text', 'Statistic']);
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block' }));
+    expect(within(screen.getByLabelText('Block 1 type — section 1')).getAllByRole('option').map((option) => option.value)).toEqual(BLOCK_TYPE_IDS);
+    expect(screen.queryByRole('button', { name: /Allowed block types/ })).toBeNull();
   });
+
+  it('keeps the Home hero restriction in the picker and saved data', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'home', path: '/', systemPage: true, sections: [{ ...SCHOLARSHIPS_DRAFT.sections[0], id: 'hero', label: 'Hero', allowedBlocks: ['text', 'cta', 'image'], defaultBlocks: [] }] }];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'home', status: 'dirty' }));
+    await renderAt('/admin/pages/home');
+    fireEvent.click(await screen.findByRole('button', { name: 'Hero 0 blocks' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add block to section 1' }));
+    expect(within(screen.getByLabelText('Block 1 type — section 1')).getAllByRole('option').map((option) => option.value)).toEqual(['text', 'cta', 'image']);
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.sections[0].allowedBlocks).toEqual(['text', 'cta', 'image']);
+  });
+
+  it('hides internal ids and the icon name while preserving them on save', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, icon: 'book-open' }];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    await renderAt('/admin/pages/scholarships');
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block' }));
+    expect(screen.queryByLabelText('Page id')).toBeNull();
+    expect(screen.queryByLabelText('Section 1 id')).toBeNull();
+    expect(screen.queryByLabelText('Icon')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: '' } });
+    expect(screen.getByRole('heading', { level: 1, name: 'Page' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Support' } });
+    fireEvent.change(screen.getByLabelText('Section 1 label'), { target: { value: 'Apply' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page).toMatchObject({ id: 'scholarships', icon: 'book-open', sections: [{ id: 'intro', allowedBlocks: [] }] });
+  });
+
+  it('uses shared label, hint, and control rows for the page and section fields', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block' }));
+    for (const label of ['Navigation label', 'Page heading', 'Path', 'Section 1 label', 'Section 1 max blocks']) {
+      const input = screen.getByLabelText(label);
+      const field = input.closest('.admin-field');
+      expect(field.querySelector('.admin-field__label')).toHaveTextContent(label);
+      expect(input).toHaveClass('admin-field__control');
+      if (input.getAttribute('aria-describedby')) expect(field.querySelector('.admin-field__hint')).toBeInTheDocument();
+    }
+    expect(screen.getByLabelText('Section 1 is reorderable').closest('.admin-field-toggle')).toBeInTheDocument();
+  });
+
 });
 
 describe('publish results and recovery', () => {
@@ -1191,7 +1213,12 @@ describe('publish results and recovery', () => {
     await screen.findByRole('alert');
     // The draft landed, so the id must stop being editable: retrying under a
     // different id would create a second document and orphan this draft.
-    expect(screen.getByLabelText('Page id')).toHaveAttribute('readonly');
+    expect(screen.queryByLabelText('Page id')).toBeNull();
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Support' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+    expect(bodyOf(2).page.id).toBe('scholarships');
     expect(screen.getByRole('button', { name: 'Delete this page' })).toBeInTheDocument();
   });
 

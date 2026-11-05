@@ -296,7 +296,7 @@ test('the sponsors page seeds an empty Sponsorship packages section (issue 193)'
   assert.deepEqual(sponsors.sections.map((section) => section.id), ['sponsor_packages']);
   const [packages] = sponsors.sections;
   assert.equal(packages.label, 'Sponsorship packages');
-  assert.deepEqual(packages.allowedBlocks, ['sponsor_package', 'richtext']);
+  assert.deepEqual(packages.allowedBlocks, []);
   assert.deepEqual(packages.defaultBlocks, []);
   assert.ok(isNonEmptyDescription(packages.description));
   assert.equal(packages.slot, undefined, 'it sits in the main slot, after the logo wall');
@@ -337,11 +337,11 @@ test('the city guide page has an intro section, then three empty variable-length
     assert.ok(section.maxBlocks >= 20, `city_guide.${section.id} must accept a variable number of entries`);
     assert.deepEqual(
       section.allowedBlocks,
-      ['list_item', 'richtext'],
-      `city_guide.${section.id} should allow only list_item and richtext blocks`,
+      [],
+      `city_guide.${section.id} should allow all block types`,
     );
   }
-  assert.deepEqual(intro.allowedBlocks, ['richtext'], 'city_guide_intro should allow only richtext');
+  assert.deepEqual(intro.allowedBlocks, [], 'city_guide_intro should allow all block types');
 });
 
 test('the city guide page\'s first section is the intro, ahead of its three content sections', () => {
@@ -403,7 +403,7 @@ test('every DEMO_PAGE_EXTRA_CONTENT entry targets a real section, an allowed blo
     const section = sectionsById.get(doc.section);
     assert.ok(section, `${doc.id}: section "${doc.section}" does not exist in demoEvent().pages`);
     assert.ok(
-      section.allowedBlocks.includes(doc.blockType),
+      section.allowedBlocks.length === 0 || section.allowedBlocks.includes(doc.blockType),
       `${doc.id}: blockType "${doc.blockType}" is not allowed on section "${doc.section}" (allows ${section.allowedBlocks.join(', ')})`,
     );
     countBySection.set(doc.section, (countBySection.get(doc.section) ?? 0) + 1);

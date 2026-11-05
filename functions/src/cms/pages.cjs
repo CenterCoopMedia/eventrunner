@@ -36,6 +36,7 @@ const { PAGE_TEMPLATE_IDS, isKnownPageTemplate } = require('./pageTemplates.cjs'
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { PAGE_PATH_SEGMENT_RE, isReservedPathSegment } = require('shared/routing');
+const { builtInSectionBlockTypes } = require('shared/page');
 
 const PAGES_COLLECTION = 'cmsPages';
 const PAGES_DRAFTS = 'cmsPages_drafts';
@@ -243,14 +244,20 @@ function validatePageDoc(doc) {
     if (section.description !== null && typeof section.description !== 'string') {
       errors.push(`${at}.description: must be a string or null`);
     }
-    if (!Array.isArray(section.allowedBlocks) || section.allowedBlocks.length === 0) {
-      errors.push(`${at}.allowedBlocks: must be a non-empty array of block type ids`);
+    const builtInTypes = builtInSectionBlockTypes(doc, section);
+    if (!Array.isArray(section.allowedBlocks)) {
+      errors.push(`${at}.allowedBlocks: must be an array of block type ids`);
     } else {
       section.allowedBlocks.forEach((blockId, j) => {
         if (!isKnownBlockType(blockId)) {
           errors.push(`${at}.allowedBlocks[${j}]: unknown block type '${String(blockId)}'`);
+        } else if (builtInTypes && !builtInTypes.includes(blockId)) {
+          errors.push(`${at}.allowedBlocks[${j}]: this built-in section cannot show '${blockId}'`);
         }
       });
+      if (builtInTypes && section.allowedBlocks.length === 0) {
+        errors.push(`${at}.allowedBlocks: must list the types this built-in section can show`);
+      }
     }
     if (!Number.isInteger(section.maxBlocks) || section.maxBlocks < 1) {
       errors.push(`${at}.maxBlocks: must be an integer >= 1`);
@@ -283,6 +290,8 @@ function validatePageDoc(doc) {
       if (!isNonEmptyString(block.field)) errors.push(`${bat}.field: must be a non-empty string`);
       if (!isKnownBlockType(block.blockType)) {
         errors.push(`${bat}.blockType: unknown block type '${String(block.blockType)}'`);
+      } else if (builtInTypes && !builtInTypes.includes(block.blockType)) {
+        errors.push(`${bat}.blockType: this built-in section cannot show '${block.blockType}'`);
       }
       if (typeof block.description !== 'string') {
         errors.push(`${bat}.description: must be a string`);

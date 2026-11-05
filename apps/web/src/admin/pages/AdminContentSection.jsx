@@ -4,6 +4,7 @@
 // (set in Pages) — offered only when the section allows at least one block
 // type, and disabled once the section is at its cap, same guardrail
 // AdminPageEditor's block picker applies to defaultBlocks.
+import { sectionBlockTypes } from 'shared/page';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router';
@@ -12,7 +13,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
-import { blockTypeLabel } from '../blockTypes.js';
+import { BLOCK_TYPE_IDS, blockTypeLabel } from '../blockTypes.js';
 import { contentBlockTitle } from '../contentDoc.js';
 import { byStoredOrder, orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
@@ -75,7 +76,7 @@ export default function AdminContentSection() {
     }
   }
   const leaveGuard = useUnsavedNavigation(draft.dirty, { blocked: savingOrder || busy !== null });
-  const allowed = section?.allowedBlocks ?? [];
+  const allowed = sectionBlockTypes(page?.current, section, BLOCK_TYPE_IDS);
   const maxBlocks = Number.isFinite(section?.maxBlocks) ? section.maxBlocks : Infinity;
   // While either cmsContent revision is still loading, `blocks` can be an
   // undercount (e.g. the live listener reported an empty result but the
@@ -211,7 +212,7 @@ export default function AdminContentSection() {
   }
 
   const addBlockButton =
-    allowed.length === 0 ? null : atMax ? (
+    atMax ? (
       <button
         type="button"
         className={primaryButtonClass}
@@ -241,9 +242,7 @@ export default function AdminContentSection() {
         identifiers={`${page?.current?.label || pageId} · ${section?.label || sectionId} · ${blocks.length} block${
           blocks.length === 1 ? '' : 's'
         }`}
-        description={`${page?.current?.label ?? pageId} · allows ${
-          allowed.length ? allowed.map(blockTypeLabel).join(', ') : 'no block types yet'
-        }`}
+        description={allowed.length === BLOCK_TYPE_IDS.length ? 'Add and edit content in this section.' : `Available content: ${allowed.map(blockTypeLabel).join(', ')}.`}
         actions={
           <>
             <OrderDraftButtons
