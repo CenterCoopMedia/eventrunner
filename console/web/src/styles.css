@@ -456,9 +456,8 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 .application-address { display: grid; gap: 0.25rem; margin: 0 0 var(--space-lg); }
 .application-address > span { color: rgb(var(--ink-muted)); font-size: 0.875rem; }
 .application-address strong { font-weight: 600; }
-.application-actions { display: grid; justify-items: start; gap: var(--space-sm); margin-top: var(--space-lg); }
+.application-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-top: var(--space-lg); }
 .application-actions p { margin: 0; }
-.application-actions a:not(.button) { display: inline-flex; align-items: center; min-height: 44px; }
 .application-progress { border-top: 1px solid rgb(var(--rule)); padding-top: var(--space-lg); }
 .application-progress h2 { margin: 0 0 var(--space-lg); font-size: 1.0625rem; }
 .application-progress .stages { margin: 0; gap: var(--space-xs); }
