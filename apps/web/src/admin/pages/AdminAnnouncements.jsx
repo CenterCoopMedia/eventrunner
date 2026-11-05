@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { ANNOUNCEMENT_LEVELS, announcementTimeMs } from 'shared/announcement';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
 import {
   DestructiveConfirm,
@@ -12,6 +13,7 @@ import {
   ServerErrorSummary,
   TextAreaField,
   TextField,
+  ghostButtonClass,
   linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
@@ -275,7 +277,7 @@ export default function AdminAnnouncements() {
                       <p className="mt-3xs text-admin-base text-admin-ink">{row.message}</p>
                     </div>
                     <div className="flex shrink-0 gap-xs">
-                      <button type="button" className={linkButtonClass} onClick={() => startEdit(row)}>Edit</button>
+                      <AdminIconControl className={ghostButtonClass} onClick={() => startEdit(row)} label="Edit" icon="edit" />
                       <DestructiveConfirm
                         trigger="Remove"
                         title="Remove this announcement"

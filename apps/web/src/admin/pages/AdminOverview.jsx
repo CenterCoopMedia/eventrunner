@@ -28,6 +28,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { zoneLabel } from '../../lib/eventTime.js';
 import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { Notice, primaryButtonClass, secondaryButtonClass } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState } from '../components/adminChrome.jsx';
 import EventFigures, { SystemHealth } from '../overview/EventFigures.jsx';
@@ -97,15 +98,15 @@ export default function AdminOverview() {
         description={`${eventConfig.shortName || eventConfig.name || 'Your event'} at a glance. Check progress and go straight to the work that needs you.`}
         actions={
           <>
-            <button
-              type="button"
+            <AdminIconControl
               className={secondaryButtonClass}
               onClick={refresh}
               aria-busy={busy || undefined}
               aria-disabled={busy || undefined}
-            >
-              {busy ? 'Refreshing…' : 'Refresh figures'}
-            </button>
+              busy={busy}
+              label={busy ? 'Refreshing…' : 'Refresh figures'}
+              icon="refresh"
+            />
             <Link to="/admin/unpublished" className={primaryButtonClass}>Review unpublished changes</Link>
           </>
         }

@@ -31,6 +31,7 @@ import ExternalLink from '../../components/ExternalLink.jsx';
 import { downloadSessionMaterialFile } from '../../lib/materialsSource.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { useAdminSessions } from '../useAdminSessions.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { liveSessions, materialsCoverage } from '../materialsCoverage.js';
@@ -44,6 +45,7 @@ import {
   DestructiveConfirm,
   FieldError,
   Notice,
+  ghostButtonClass,
   linkButtonClass,
   primaryButtonClass,
   rowMetaClass,
@@ -312,16 +314,16 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
       <td className={CELL_CLASS}>
         <div className="flex flex-wrap items-center gap-xs">
           {isFile ? (
-            <button
-              type="button"
-              className={linkButtonClass}
+            <AdminIconControl
+              className={ghostButtonClass}
               onClick={download}
               aria-busy={downloading ? 'true' : undefined}
               aria-disabled={downloading ? 'true' : undefined}
               aria-describedby={downloadError ? errorId : undefined}
-            >
-              {downloading ? 'Downloading…' : 'Download'}
-            </button>
+              busy={downloading}
+              label={downloading ? 'Downloading…' : 'Download'}
+              icon="download"
+            />
           ) : null}
           {isLink && isSafeUrl(material.url) ? (
             <ExternalLink href={material.url} className={linkButtonClass}>
@@ -842,15 +844,15 @@ export default function AdminMaterialsTab() {
         title="Materials"
         flush
         actions={
-          <button
-            type="button"
+          <AdminIconControl
             className={secondaryButtonClass}
             onClick={() => refresh()}
             aria-busy={listing ? 'true' : undefined}
             aria-disabled={listing ? 'true' : undefined}
-          >
-            {listing ? 'Refreshing…' : 'Refresh'}
-          </button>
+            busy={listing}
+            label={listing ? 'Refreshing…' : 'Refresh'}
+            icon="refresh"
+          />
         }
       >
         {/* The list is cut at 2,000 rows, so the table says so before an

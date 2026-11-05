@@ -22,6 +22,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import {
   Notice,
   Panel,
@@ -98,9 +99,8 @@ function StatusCard({ status, error, onRefresh, busy }) {
       title="Provider status"
       description="Current provider connection and reconciliation activity."
       actions={
-        <button type="button" className={secondaryButtonClass} onClick={onRefresh} disabled={busy}>
-          {busy ? 'Checking…' : 'Refresh'}
-        </button>
+        <AdminIconControl className={secondaryButtonClass} onClick={onRefresh} disabled={busy}
+          busy={busy} label={busy ? 'Checking…' : 'Refresh'} icon="refresh" />
       }
     >
       {error ? (
