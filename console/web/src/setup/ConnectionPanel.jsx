@@ -17,7 +17,7 @@ export function ConnectionNotice({ message }) {
 }
 
 /** Disconnect asks once, in place. Cancel returns the focus to Disconnect. */
-function Disconnect({ name, onDisconnect }) {
+function Disconnect({ name, draft, onDisconnect }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const button = useRef(null);
@@ -26,7 +26,7 @@ function Disconnect({ name, onDisconnect }) {
   }
   return (
     <div className="confirm" role="group" aria-label={`Disconnect your ${name} account`}>
-      <span>Disconnect your {name} account? Your site cannot be built with this choice until you connect an account again.</span>
+      <span>Disconnect your {name} account?{draft ? ' If your ticket choice uses this account, you will need to connect one again or choose another way to run tickets before we can build your site.' : ''}</span>
       <button
         type="button"
         className="button danger"
@@ -192,7 +192,7 @@ export default function ConnectionPanel({
             <strong>Connected: {account.displayName || copy.name}</strong>
             {account.connectedAt ? <span className="muted"> since {formatDate(account.connectedAt)}</span> : null}
           </p>
-          {connections.canDisconnect ? <p>{CAN_DISCONNECT}</p> : null}
+          {connections.canChange && connections.canDisconnect ? <p>{CAN_DISCONNECT}</p> : null}
           {provider === 'eventbrite' && showPicker ? (
             <EventPicker
               orgId={orgId}
@@ -210,7 +210,7 @@ export default function ConnectionPanel({
           {canConnect || connections.canDisconnect ? (
             <div className="step-actions">
               {canConnect ? <button type="button" className="button" disabled={leaving} onClick={connect}>{connectLabel || 'Connect again'}</button> : null}
-              {connections.canDisconnect ? <Disconnect name={copy.name} onDisconnect={disconnect} /> : null}
+              {connections.canDisconnect ? <Disconnect name={copy.name} draft={connections.canChange} onDisconnect={disconnect} /> : null}
             </div>
           ) : null}
         </>
@@ -219,12 +219,12 @@ export default function ConnectionPanel({
           {account.unfinished && connections.canDisconnect ? (
             <>
               <p>An earlier change to this account did not finish, so we may still have access to it. Disconnect to end that access.</p>
-              <div className="step-actions"><Disconnect name={copy.name} onDisconnect={disconnect} /></div>
+              <div className="step-actions"><Disconnect name={copy.name} draft={connections.canChange} onDisconnect={disconnect} /></div>
             </>
           ) : null}
           {account.available ? (
             <>
-              <p>{copy.explain}{connections.canDisconnect ? ` ${CAN_DISCONNECT}` : ''}</p>
+              <p>{copy.explain}</p>
               {canConnect && copy.consent ? <p>{copy.consent}</p> : null}
               {connectError ? <p id={connectErrorId} className="field-error">{connectError}</p> : null}
               {canConnect ? (

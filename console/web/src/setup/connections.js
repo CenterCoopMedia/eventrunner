@@ -18,7 +18,7 @@ export const PROVIDER_COPY = Object.freeze({
   },
 });
 
-export const CAN_DISCONNECT = 'You can disconnect this account at any time until we build your site.';
+export const CAN_DISCONNECT = 'You can disconnect this account until you accept the agreement. After that, ask us for help if you want to remove it.';
 
 /** The server names the provider's page; the browser goes only to that provider. */
 export function isProviderUrl(url, provider) {
