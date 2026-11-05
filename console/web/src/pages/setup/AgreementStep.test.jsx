@@ -38,9 +38,13 @@ describe('Agreement step', () => {
     });
     renderSetup('agreement');
     fireEvent.change(await screen.findByLabelText('Your full name'), { target: { value: 'Ana Owner' } });
+    fireEvent.change(screen.getByLabelText("Your organization's legal name"), { target: { value: 'NC Local Inc.' } });
+    fireEvent.change(screen.getByLabelText('Your job title'), { target: { value: 'Director' } });
     fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
     expect(await screen.findByText('Status page')).toBeInTheDocument();
-    expect(callsTo('acceptAgreement')).toEqual([{ orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', version: 3 }]);
+    expect(callsTo('acceptAgreement')).toEqual([{
+      orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', legalName: 'NC Local Inc.', title: 'Director', version: 3,
+    }]);
   });
 
   it('shows a refused name at the field', async () => {
@@ -53,6 +57,19 @@ describe('Agreement step', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
     expect(await screen.findByText('Type your full name to accept the agreement.')).toBeInTheDocument();
     expect(screen.getByLabelText('Your full name')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('shows a refused legal name at its own field', async () => {
+    serveApi({
+      getAgreement: { agreement: AGREEMENT, accepted: null },
+      acceptAgreement: () => { throw new ApiError(400, 'legalName-required', "Type your organization's legal name to accept the agreement.", {}, 'legalName'); },
+    });
+    renderSetup('agreement');
+    await screen.findByLabelText("Your organization's legal name");
+    fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
+    expect(await screen.findByText("Type your organization's legal name to accept the agreement.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Your organization's legal name")).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Your full name')).not.toHaveAttribute('aria-invalid', 'true');
   });
 
   it('shows the new text when the agreement changed, and keeps the typed name', async () => {

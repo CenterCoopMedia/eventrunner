@@ -130,10 +130,12 @@ test('the agreement copy holds the full text, the record details and escaped HTM
     body: 'First <b>test</b> paragraph.\n\nSecond test paragraph.',
     sha256: 'abc123',
     typedName: 'Ana Owner',
+    legalName: 'NC Local Inc.',
+    signerTitle: 'Director',
     acceptedAt: '2026-11-04T15:00:00.000Z',
     link: 'https://x.example/a',
   });
-  for (const part of ['Ana Owner', 'Version 3', 'abc123', 'Test agreement', 'First <b>test</b> paragraph.', 'Second test paragraph.', '2026-11-04T15:00:00.000Z']) {
+  for (const part of ['Ana Owner, Director', 'NC Local Inc. (NC Local)', 'Version 3', 'abc123', 'Test agreement', 'First <b>test</b> paragraph.', 'Second test paragraph.', '2026-11-04T15:00:00.000Z']) {
     assert.ok(message.text.includes(part), part);
   }
   assert.ok(message.html.includes('First &lt;b&gt;test&lt;/b&gt; paragraph.'));

@@ -4,6 +4,8 @@
 // Each domain module under src/ exports { handlers }, and every deployable
 // export is re-exported here by name.
 
+require('./src/core/loadDeployEnv.cjs').loadDeployEnv();
+
 const email = require('./src/email/send.cjs');
 const emailLog = require('./src/email/log.cjs');
 const auth = require('./src/auth/otp.cjs');

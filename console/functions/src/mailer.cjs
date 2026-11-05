@@ -11,7 +11,7 @@
  *   mailer.sendOperatorNotice({ to, organizationName, eventName, link, kind, problem })
  *     to a CCM operator. `kind` is 'started', 'build-failed' or
  *     'build-run-failed', which carries the `problem` text
- *   mailer.sendAgreementCopy({ to, organizationName, eventName, title, version, body, sha256, typedName, acceptedAt, link })
+ *   mailer.sendAgreementCopy({ to, organizationName, eventName, title, version, body, sha256, typedName, legalName, signerTitle, acceptedAt, link })
  *     to the person who accepted the agreement
  *
  * Each returns Promise<void> and rejects when the provider refuses the
@@ -106,11 +106,11 @@ function operatorNoticeMessage({ organizationName, eventName, link, kind = 'star
 }
 
 /** The signer's copy: the record's details, then the full text. @returns {{ subject: string, text: string, html: string }} */
-function agreementCopyMessage({ organizationName, eventName, title, version, body, sha256, typedName, acceptedAt, link }) {
+function agreementCopyMessage({ organizationName, eventName, title, version, body, sha256, typedName, legalName, signerTitle, acceptedAt, link }) {
   return compose(
     `Your copy of the agreement: ${eventName}`,
     [
-      `${typedName} accepted this agreement for ${organizationName}, for ${eventName}, at ${acceptedAt}.`,
+      `${typedName}, ${signerTitle}, accepted this agreement for ${legalName} (${organizationName}), for ${eventName}, at ${acceptedAt}.`,
       `Version ${version}. SHA-256 of the text: ${sha256}`,
       title,
       ...body.split(/\n\s*\n/),

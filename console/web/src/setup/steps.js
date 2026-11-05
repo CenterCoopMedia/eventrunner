@@ -78,6 +78,17 @@ export const TICKET_CHOICES = Object.freeze([
 export const BUILD_FAILED_LABEL = 'We did not finish building your site';
 
 /** What the client reads for each status (ADR 0007 §3 and §5). */
+/** The build's steps (scripts/provision-client.cjs), grouped in the client's words. */
+export const BUILD_PHASES = Object.freeze([
+  { steps: ['project', 'firebase', 'deploy-identity'], label: 'Setting up your hosting' },
+  { steps: ['web-address', 'sign-in'], label: 'Setting up your web address' },
+  { steps: ['email', 'tickets'], label: 'Setting up email and tickets' },
+  { steps: ['environment', 'first-deploy', 'mail-webhooks'], label: 'Installing your site' },
+  { steps: ['seed'], label: 'Adding your event details and team' },
+  { steps: ['full-deploy'], label: 'Publishing your site' },
+  { steps: ['ready'], label: 'Emailing the link to your site' },
+]);
+
 export const STATUS_LABELS = Object.freeze({
   draft: 'Setup not finished',
   approved: 'We are building your site',

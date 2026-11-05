@@ -487,7 +487,7 @@ test('a stored token that is gone gives a plain message when reading events', as
 test('a new request cannot start its build until the account it chose is connected', async () => {
   const { db, deps } = setup({ extra: { 'site_names/nclocal': { appId: 'a1', orgId: 'o1' }, ...signupTerms() } });
   const accepting = { ...deps, mailer: fakeMailer(), publicUrl: '', startBuild: async () => {} };
-  const accept = { body: { ...BASE, accept: true, name: 'Ana Owner', version: 1 }, user: ana };
+  const accept = { body: { ...BASE, accept: true, name: 'Ana Owner', legalName: 'NC Local Inc.', title: 'Director', version: 1 }, user: ana };
   await assert.rejects(acceptAgreement(accepting, accept), (err) => {
     assert.equal(err.code, 'incomplete');
     assert.equal(err.fields['tickets.connection'], 'Connect your Stripe account.');
@@ -665,7 +665,7 @@ test('when the console cannot check who uses an account, it keeps the connection
 test('a request cannot go ahead while its token is being stored, and a failed store leaves it a draft', async () => {
   const { db, secrets, deps } = setup({ extra: { 'site_names/nclocal': { appId: 'a1', orgId: 'o1' }, ...signupTerms() } });
   const accepting = { ...deps, mailer: fakeMailer(), publicUrl: '' };
-  const accept = { body: { ...BASE, accept: true, name: 'Ana Owner', version: 1 }, user: ana };
+  const accept = { body: { ...BASE, accept: true, name: 'Ana Owner', legalName: 'NC Local Inc.', title: 'Director', version: 1 }, user: ana };
   const state = await start(deps);
   secrets.writeSecret = async () => {
     await assert.rejects(acceptAgreement(accepting, accept), { code: 'incomplete' });

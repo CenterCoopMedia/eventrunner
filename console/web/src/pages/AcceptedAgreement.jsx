@@ -19,7 +19,7 @@ export default function AcceptedAgreement() {
       <h1 tabIndex={-1}>Your agreement</h1>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       {!data && !error ? <p role="status">Loading the agreement.</p> : null}
-      {data?.accepted ? <p className="muted">{data.accepted.name} accepted this version for your organization.</p> : null}
+      {data?.accepted ? <p className="muted">{data.accepted.name}{data.accepted.title ? `, ${data.accepted.title},` : ''} accepted this version for {data.accepted.legalName || 'your organization'}.</p> : null}
       {data?.accepted && data.agreement ? <AgreementText agreement={data.agreement} /> : null}
       {data && !data.accepted ? <p>Nobody has accepted the agreement on this request yet.</p> : null}
       <p><Link to={statusPath(orgId, appId)}>Back to your request</Link></p>

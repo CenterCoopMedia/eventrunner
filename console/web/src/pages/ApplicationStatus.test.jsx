@@ -43,6 +43,25 @@ describe('ApplicationStatus', () => {
     expect(screen.getByText(/Ana Owner accepted the agreement on 4 November 2026/)).toBeInTheDocument();
   });
 
+  it('tells a client they can leave during a build, and what is next', async () => {
+    serveStatus({ status: 'building', myRole: 'owner', canEdit: false, canWithdraw: false, build: { failed: false, needsReconnect: false, current: 'web-address' } });
+    page();
+    expect(await screen.findByText('You can close this page')).toBeInTheDocument();
+    expect(screen.getByText(/You will receive an email when your site is ready, with a link to finish setting it up/)).toBeInTheDocument();
+    expect(screen.getByText('Now: Setting up your web address. Next: Setting up email and tickets.')).toBeInTheDocument();
+  });
+
+  it('says the build is starting before its first step, and names no next step after the last', async () => {
+    serveStatus({ status: 'approved', myRole: 'editor', canEdit: false, canWithdraw: false });
+    const { unmount } = page();
+    expect(await screen.findByText('Now: Starting the build. Next: Setting up your hosting.')).toBeInTheDocument();
+    expect(screen.getByText(/The Owners will receive an email when your site is ready/)).toBeInTheDocument();
+    unmount();
+    serveStatus({ status: 'building', canEdit: false, canWithdraw: false, build: { failed: false, needsReconnect: false, current: 'ready' } });
+    page();
+    expect(await screen.findByText('Now: Emailing the link to your site.')).toBeInTheDocument();
+  });
+
   it('shows the building and ready states', async () => {
     serveStatus({ status: 'building', canEdit: false, canWithdraw: false });
     page();
@@ -55,6 +74,8 @@ describe('ApplicationStatus', () => {
     page();
     const stages = await screen.findAllByRole('listitem');
     expect(stages[2]).toHaveTextContent('Your site is readyNow');
+    expect(screen.getByRole('link', { name: 'Open your admin panel' })).toHaveAttribute('href', 'https://nclocal.eventrunner.org/admin');
+    expect(screen.queryByText('You can close this page')).not.toBeInTheDocument();
   });
 
   it('offers to continue a draft', async () => {
@@ -193,7 +214,8 @@ describe('ApplicationStatus', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Retry the build' }));
       expect(await screen.findByText(/We started the build again/)).toBeInTheDocument();
       expect(callsTo('retryBuild')).toEqual([{ orgId: 'o1', appId: 'a1' }]);
-      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+      expect(screen.queryByText('The build did not finish')).not.toBeInTheDocument();
+      expect(screen.getByText('You can close this page')).toBeInTheDocument();
     });
 
     it('shows a refused retry', async () => {

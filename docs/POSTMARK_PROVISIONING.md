@@ -260,11 +260,15 @@ environment.
 ## 5. Register the delivery webhook
 
 Per the ADR (§3.1): Postmark does not sign delivery/bounce/complaint webhooks, so authentication is
-HTTP Basic credentials embedded in the webhook URL itself, checked against
+HTTP Basic credentials, set in the webhook's HTTP auth fields and checked against
 `EMAIL_WEBHOOK_BASIC_AUTH` by `verifyDeliveryWebhook()`.
 
+A console build does this section itself in its `mail-webhooks` step (`docs/DEPLOY_RUNBOOK.md` §12).
+Postmark tests the address when a webhook is saved and refuses it unless the function answers `200`,
+so the function must be deployed first. That applies to these manual steps too.
+
 1. Generate a random `user:pass` pair for this deployment — never reused across deployments
-   (rotating it means re-registering the URL below). For example:
+   (rotating it means updating the webhook below). For example:
 
    ```sh
    printf 'eventrunner-demo:%s\n' "$(openssl rand -hex 20)"
@@ -283,21 +287,16 @@ HTTP Basic credentials embedded in the webhook URL itself, checked against
    webhook:
 
    ```
-   https://<user>:<pass>@<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook
+   https://<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook
    ```
 
-   For the `eventrunner-demo` example: `https://eventrunner-demo:9f2c...@us-central1-<GCP_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook`,
-   using the region and project id that deployment's GitHub Environment variables actually name
+   Enter `user` and `pass` in the webhook's HTTP auth username and password fields. Use the region
+   and project id that deployment's GitHub Environment variables actually name
    (`EVENT_FIREBASE_REGION`, `EVENT_FIREBASE_PROJECT_ID`) — copy those from the environment rather
    than guessing.
 
    Enable the **Delivery**, **Bounce**, and **SpamComplaint** triggers only. Leave **Open**, **Click**,
-   and **SubscriptionChange** off: `parseDeliveryEvent()` in `functions/src/email/providers/
-   postmark.cjs` returns `null` for a `SubscriptionChange` record unless `SuppressSending` is
-   exactly `true`, and `emailDeliveryWebhook` treats a `null` parse as a bad request (`400`) — an
-   info-only `SubscriptionChange` payload (`SuppressSending: false`, sent for e.g. a manual
-   resubscribe) would 400 what is otherwise a legitimate webhook call. Nothing in this repo
-   consumes `Open`/`Click` either.
+   and **SubscriptionChange** off on this stream. Nothing in this repo consumes `Open`/`Click`.
    On the **announcements** broadcast stream (section 2a), register the same URL and also turn on
    **SubscriptionChange**. A record with `SuppressSending: true` on an announcement becomes the
    application's suppression record; a resubscribe record (`SuppressSending: false`) is accepted
@@ -329,8 +328,8 @@ Before calling a deployment's Postmark setup done:
       `eventrunner.org`) exactly as Postmark's UI showed them, and the Return-Path CNAME's proxy
       status is "DNS only" (grey cloud), not "Proxied".
 - [ ] `EMAIL_WEBHOOK_BASIC_AUTH` is set (GitHub Environment secret + Secret Manager) and the
-      matching `user:pass` is embedded in the webhook URL registered in Postmark, on the Delivery,
-      Bounce, and SpamComplaint triggers.
+      matching `user:pass` is set in the HTTP auth fields of the webhook registered in Postmark, on
+      the Delivery, Bounce, and SpamComplaint triggers.
 - [ ] A test send (`init-event.cjs`'s welcome mail, or an OTP sign-in) shows up in this
       deployment's Server **Activity** tab, not some other deployment's.
 - [ ] The **announcements** Broadcasts stream exists with Postmark-managed unsubscribe handling
@@ -465,16 +464,15 @@ on that stream, in Postmark: `Event Runner` Server → the identified stream →
 webhook:
 
 ```
-https://<user>:<pass>@<EVENT_FIREBASE_REGION>-eventrunner-demo.cloudfunctions.net/emailDeliveryWebhook
+https://<EVENT_FIREBASE_REGION>-eventrunner-demo.cloudfunctions.net/emailDeliveryWebhook
 ```
 
-using the `user:pass` from §7.3 and this deployment's actual `EVENT_FIREBASE_REGION` GitHub
-Environment variable (do not guess the region).
+using this deployment's actual `EVENT_FIREBASE_REGION` GitHub Environment variable (do not guess the
+region). Enter the `user` and `pass` from §7.3 in the webhook's HTTP auth fields. Postmark tests the
+address when you save, so the function must already be deployed.
 
 Enable only the **Delivery**, **Bounce**, and **SpamComplaint** triggers. Leave **Open**, **Click**,
-and **SubscriptionChange** off — `parseDeliveryEvent()` 400s an info-only `SubscriptionChange`
-payload whose `SuppressSending` isn't exactly `true`, and nothing in this repo consumes
-Open/Click.
+and **SubscriptionChange** off on this stream. Nothing in this repo consumes Open/Click.
 
 **Success check:** the webhook shows registered in Postmark's Server → Webhooks list, on the
 correct stream, with exactly those three triggers enabled.

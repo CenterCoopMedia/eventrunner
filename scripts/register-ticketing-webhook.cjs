@@ -102,7 +102,7 @@ function usage() {
     '  EVENT_TICKETING_EVENT_ID    required when provider is eventbrite or stripe',
     '  EVENT_STRIPE_ACCOUNT_ID     required for stripe; organizer-owned acct_ identifier',
     '  EVENT_STRIPE_MODE           required for stripe; test | live',
-    '  TICKETING_API_TOKEN         required when provider is not none',
+    '  TICKETING_API_TOKEN         required for eventbrite or stripe',
     '  TICKETING_WEBHOOK_SECRET    required for eventbrite or stripe',
     '  Eventbrite: a random secret of 32+ characters; it is registered in the webhook URL.',
     '  Stripe: create the Dashboard endpoint and bind its generated signing secret first.',

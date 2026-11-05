@@ -306,6 +306,16 @@ test('parseDeliveryEvent maps SubscriptionChange only when SuppressSending is tr
     // so the broadcast stream can send SubscriptionChange (issue #490).
     [],
   );
+  assert.deepEqual(
+    provider.parseDeliveryEvent({
+      RecordType: 'SubscriptionChange',
+      MessageID: null,
+      Recipient: 'a@example.com',
+      ChangedAt: '2026-08-19T03:00:00Z',
+      SuppressSending: true,
+    }),
+    [],
+  );
 });
 
 test('parseDeliveryEvent returns null for unrecognized payloads', () => {
