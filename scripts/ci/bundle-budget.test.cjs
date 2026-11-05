@@ -35,8 +35,29 @@ test('measureBundle follows only the initial static graph', () => {
   assert.deepEqual(measured.lazyChunks.map((item) => item.file), ['assets/route.js']);
   assert.equal(checkBudget(measured, {
     initial: { raw: 1, gzip: 1 },
+    initialCss: { raw: 1, gzip: 1 },
     lazyChunk: { raw: 1, gzip: 1 },
   }).length > 0, true);
+});
+
+test('measureBundle counts only the stylesheets index.html names', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bundle-budget-'));
+  fs.mkdirSync(path.join(root, 'assets'));
+  fs.writeFileSync(
+    path.join(root, 'index.html'),
+    '<script type="module" src="./assets/index.js"></script><link rel="stylesheet" href="./assets/initial.css">',
+  );
+  fs.writeFileSync(path.join(root, 'assets/index.js'), 'export default 1;');
+  fs.writeFileSync(path.join(root, 'assets/initial.css'), 'body{color:red}');
+  fs.writeFileSync(path.join(root, 'assets/route.css'), 'p{color:blue}'.repeat(100));
+
+  const measured = measureBundle(root);
+  assert.deepEqual(measured.initialCss.files.map((item) => item.file), ['assets/initial.css']);
+  const roomy = { initial: { raw: 1000, gzip: 1000 }, lazyChunk: { raw: 1000, gzip: 1000 } };
+  assert.deepEqual(checkBudget(measured, { ...roomy, initialCss: { raw: 1000, gzip: 1000 } }), []);
+  assert.deepEqual(checkBudget(measured, { ...roomy, initialCss: { raw: 1, gzip: 1000 } }), [
+    `initial CSS raw: ${measured.initialCss.raw} > 1`,
+  ]);
 });
 
 // --- Source-level guard for the initial graph -------------------------------

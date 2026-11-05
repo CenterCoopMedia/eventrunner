@@ -61,6 +61,7 @@ function measureBundle(distInput) {
   if (!fs.existsSync(indexPath)) throw new Error(`bundle budget: missing ${indexPath}`);
   const html = fs.readFileSync(indexPath, 'utf8');
   const initial = new Set();
+  const stylesheets = new Set();
   for (const tag of html.match(/<(?:script|link)\b[^>]*>/gi) || []) {
     const name = tag.slice(1).split(/\s|>/, 1)[0].toLowerCase();
     const type = htmlAttribute(tag, 'type').toLowerCase();
@@ -70,6 +71,9 @@ function measureBundle(distInput) {
     if ((name === 'script' && type === 'module') || (name === 'link' && rel === 'modulepreload')) {
       const asset = resolveHtmlAsset(dist, href);
       if (asset && fs.existsSync(asset)) initial.add(asset);
+    } else if (name === 'link' && rel === 'stylesheet') {
+      const asset = resolveHtmlAsset(dist, href);
+      if (asset && fs.existsSync(asset)) stylesheets.add(asset);
     }
   }
   if (initial.size === 0) throw new Error('bundle budget: index.html names no module entry');
@@ -86,20 +90,18 @@ function measureBundle(distInput) {
     }
   }
 
-  const details = [...initial]
-    .map((file) => {
-      const buffer = fs.readFileSync(file);
-      return { file: relativeName(dist, file), raw: buffer.length, gzip: gzipBytes(buffer) };
-    })
-    .sort((a, b) => b.raw - a.raw || a.file.localeCompare(b.file));
+  const measureFile = (file) => {
+    const buffer = fs.readFileSync(file);
+    return { file: relativeName(dist, file), raw: buffer.length, gzip: gzipBytes(buffer) };
+  };
+  const bySize = (a, b) => b.raw - a.raw || a.file.localeCompare(b.file);
+  const details = [...initial].map(measureFile).sort(bySize);
+  const cssDetails = [...stylesheets].map(measureFile).sort(bySize);
   const allJs = listFiles(dist).filter((file) => file.endsWith('.js'));
   const lazyChunks = allJs
     .filter((file) => !initial.has(path.resolve(file)))
-    .map((file) => {
-      const buffer = fs.readFileSync(file);
-      return { file: relativeName(dist, file), raw: buffer.length, gzip: gzipBytes(buffer) };
-    })
-    .sort((a, b) => b.raw - a.raw || a.file.localeCompare(b.file));
+    .map(measureFile)
+    .sort(bySize);
 
   return {
     initial: {
@@ -107,6 +109,11 @@ function measureBundle(distInput) {
       gzip: details.reduce((total, item) => total + item.gzip, 0),
       chunks: details.length,
       files: details,
+    },
+    initialCss: {
+      raw: cssDetails.reduce((total, item) => total + item.raw, 0),
+      gzip: cssDetails.reduce((total, item) => total + item.gzip, 0),
+      files: cssDetails,
     },
     lazyChunks,
   };
@@ -117,6 +124,9 @@ function checkBudget(measurement, budget) {
   for (const metric of ['raw', 'gzip']) {
     if (measurement.initial[metric] > budget.initial[metric]) {
       problems.push(`initial ${metric}: ${measurement.initial[metric]} > ${budget.initial[metric]}`);
+    }
+    if (measurement.initialCss[metric] > budget.initialCss[metric]) {
+      problems.push(`initial CSS ${metric}: ${measurement.initialCss[metric]} > ${budget.initialCss[metric]}`);
     }
   }
   for (const chunk of measurement.lazyChunks) {
@@ -155,6 +165,7 @@ function main(argv = process.argv.slice(2)) {
     `bundle budget: ${measurement.initial.chunks} initial chunk(s), ` +
     `${measurement.initial.raw} raw bytes, ${measurement.initial.gzip} gzip bytes`,
   );
+  console.log(`bundle budget: initial CSS ${measurement.initialCss.raw} raw bytes, ${measurement.initialCss.gzip} gzip bytes`);
   if (problems.length > 0) {
     for (const problem of problems) console.error(`- ${problem}`);
     return 1;

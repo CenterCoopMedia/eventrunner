@@ -120,8 +120,20 @@ initial growth; the rest is the call sites. Loading the component on demand
 would save about 35 gzip bytes and add a request and a Suspense boundary for
 every link, so it stays in the initial graph. No limit changed.
 
+## 2026-11-04: the initial stylesheet joins the budget
+
+The tool measured only JavaScript, so the blocking stylesheet could grow with no check. It holds every declared `@font-face`, `index.css` and `styles/schedule.css`.
+
+| Build | Raw bytes | Gzip bytes |
+| --- | --- | --- |
+| Normal | 161,746 | 24,217 |
+| Demo | 162,630 | 24,263 |
+
+The limit is 165,000 raw and 25,000 gzip bytes, the demo measurement plus a small margin. It records today's size. It does not say the size is good: reducing it needs its own measurement.
+
 ## Enforced limits
 
 - The initial graph can use at most 1,080,000 raw bytes and 292,000 gzip bytes.
+- The stylesheets `index.html` names can use at most 165,000 raw bytes and 25,000 gzip bytes.
 - Each deferred chunk can use at most 180,000 raw bytes and 50,000 gzip bytes.
 - CI checks the normal build and the committed demo build.
