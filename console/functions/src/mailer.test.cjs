@@ -1,8 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { PDFDocument } = require('pdf-lib');
-const { agreementPdf } = require('./agreementPdf.cjs');
+const { PDFDict, PDFDocument, PDFName } = require('pdf-lib');
+const { agreementPdf, internals: { drawable, embedFaces } } = require('./agreementPdf.cjs');
 const { test } = require('node:test');
 const {
   STATUS_WORDS, agreementCopyMessage, createPostmarkMailer, inviteMessage, operatorNoticeMessage, statusChangeMessage,
@@ -177,6 +177,25 @@ test('the agreement PDF runs to more pages for a long text and draws text outsid
   const body = Array.from({ length: 60 }, (_, i) => `Paragraph ${i} of the test text, long enough to wrap onto a second line on the page. Nguyễn Văn 東京.`).join('\n\n');
   const pdf = await PDFDocument.load(await agreementPdf({ ...COPY, body, typedName: 'Nguyễn' }));
   assert.ok(pdf.getPageCount() >= 3);
+});
+
+test('the agreement PDF draws text as stored and writes a character no font has as its code point, never "?"', async () => {
+  const doc = await PDFDocument.create();
+  const sample = 'Liability ≤ € — Łódź 李明';
+  const { regular, bold } = await embedFaces(doc, [sample]);
+  for (const face of [regular, bold]) assert.equal(drawable(face, sample), 'Liability ≤ € — Łódź [U+674E U+660E]');
+  // Controls, joiners, the soft hyphen, separators and the U+FFFF sentinel have no glyph of their own.
+  assert.equal(drawable(regular, 'a\u0007b 😀 Jo\u200Dse co\u00ADop A\u2028B Ana\uFFFF'), 'a[U+0007]b [U+1F600] Jo[U+200D]se co[U+00AD]op A[U+2028]B Ana[U+FFFF]');
+
+  // The symbol font is embedded only when the text needs it.
+  const fonts = async (copy) => {
+    const pdf = await PDFDocument.load(await agreementPdf(copy));
+    return pdf.context.enumerateIndirectObjects()
+      .filter(([, o]) => o instanceof PDFDict && o.get(PDFName.of('Type')) === PDFName.of('Font') && o.get(PDFName.of('Subtype')) !== PDFName.of('CIDFontType2'))
+      .map(([, o]) => String(o.get(PDFName.of('BaseFont'))).replace(/-\d+$/, ''));
+  };
+  assert.deepEqual((await fonts(COPY)).sort(), ['/Courier', '/NotoSans-Bold', '/NotoSans-Regular']);
+  assert.ok((await fonts({ ...COPY, body: sample, typedName: '李明' })).includes('/DejaVuSans'));
 });
 
 test('the Postmark mailer sends status and operator email with their own tags', async () => {
