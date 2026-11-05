@@ -33,6 +33,7 @@ test('communications keeps drafts and review state across channels and fits desk
   let tourDismissed = false;
 
   async function capture(name, viewport) {
+    const focusReview = name === 'communications-preview' && viewport.width < 1280;
     // The tour is a lazy chunk and can appear after the initial page check.
     const endTour = page.getByRole('button', { name: 'End tour', exact: true });
     if (!tourDismissed) {
@@ -55,10 +56,10 @@ test('communications keeps drafts and review state across channels and fits desk
       });
       expect(frameGeometry.width, `email document fits its frame at ${viewport.width}`).toBeLessThanOrEqual(frameGeometry.viewport + 1);
     }
-    await page.locator('html').evaluate((element) => {
-      element.ownerDocument.defaultView.scrollTo(0, 0);
+    await page.locator('html').evaluate((element, resetScroll) => {
+      if (resetScroll) element.ownerDocument.defaultView.scrollTo(0, 0);
       return element.ownerDocument.fonts.ready;
-    });
+    }, !focusReview);
     const geometry = await page.evaluate(() => {
       const root = document.documentElement;
       const writer = document.querySelector('.admin-email-workspace__writer').getBoundingClientRect();
@@ -85,7 +86,13 @@ test('communications keeps drafts and review state across channels and fits desk
     } else {
       expect(geometry.review.top).toBeGreaterThan(geometry.writer.bottom);
     }
-    await page.screenshot({ path: path.join(evidenceDir, `${name}-${viewport.width}.png`), fullPage: true, animations: 'disabled' });
+    const screenshot = { path: path.join(evidenceDir, `${name}-${viewport.width}.png`), animations: 'disabled' };
+    if (focusReview) {
+      // Keep the sandboxed frame in view for the mobile review evidence.
+      await page.locator('.admin-email-workspace__review').screenshot(screenshot);
+    } else {
+      await page.screenshot({ ...screenshot, fullPage: true });
+    }
   }
 
   try {
