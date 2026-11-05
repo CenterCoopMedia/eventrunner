@@ -391,7 +391,7 @@ export default function AdminAttendees() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
                       <span className="text-admin-base font-bold text-admin-ink">
-                        {row.displayName || '(no name yet)'}
+                        {row.displayName || 'No name yet'}
                       </span>
                       <RecordState state={registrationState(row.registrationStatus)} />
                       {row.approvalSource ? (

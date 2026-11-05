@@ -5,19 +5,19 @@
 // file says what each row means to the client: who does it, what to do, and
 // where to go. The order is the order a new client meets the work: the
 // steps the client can do today first, then the steps that wait on DNS or
-// the hosting team.
+// the Event Runner team.
 //
 // `slug` is the step's own address (/admin/setup/<slug>), so a link in an
 // email or the browser's Back button lands on one step.
 //
-// `owner` is 'you' (the client's admins), 'host' (the hosting team that
-// deploys the site), or 'both'. `link.operator` marks a screen only an
+// `owner` is 'you' (the client's admins), 'host' (the Event Runner team), or
+// 'both'. `link.operator` marks a screen only an
 // operator can open, so a staff reader sees the step without a dead link.
 
 export const OWNER_WORDS = Object.freeze({
   you: 'You',
-  host: 'Hosting team',
-  both: 'You and the hosting team',
+  host: 'Event Runner team',
+  both: 'You and the Event Runner team',
 });
 
 export const SETUP_STEPS = Object.freeze([
@@ -62,7 +62,7 @@ export const SETUP_STEPS = Object.freeze([
     slug: 'email',
     title: 'Set up your event email',
     owner: 'both',
-    todo: 'The hosting team sets up the address your event sends email from and checks it. If you send from your own domain, they tell you exactly what to add. Until this is done, sign-in codes can go to spam.',
+    todo: 'The Event Runner team sets up the address your event sends email from and checks it. If you send from your own domain, they tell you exactly what to add. Until this is done, sign-in codes can go to spam.',
     done: 'Your event email is set up and checked.',
     link: { to: '/admin/settings', label: 'Open Event settings' },
   },
@@ -70,8 +70,8 @@ export const SETUP_STEPS = Object.freeze([
     id: 'ticketing',
     slug: 'tickets',
     title: 'Connect ticket sales',
-    owner: 'host',
-    todo: 'The hosting team connects your ticket provider and checks that orders reach the site. Send provider keys to the hosting team directly. Never paste a key into this site.',
+    owner: 'you',
+    todo: 'Connect your ticket provider in the Event Runner console. The site then checks that orders reach it. Never paste a provider key into this site.',
     done: 'Ticket sales are connected, or the event has no ticket provider.',
     link: { to: '/admin/ticketing', label: 'Open Ticketing' },
   },
@@ -80,7 +80,7 @@ export const SETUP_STEPS = Object.freeze([
     slug: 'sign-in',
     title: 'Turn on Google sign-in',
     owner: 'host',
-    todo: 'The hosting team turns on Google sign-in and adds your web address to the allowed list.',
+    todo: 'The Event Runner team turns on Google sign-in after your site is built. You do not need to do anything.',
     done: 'Google sign-in works on your web address.',
     link: null,
   },
@@ -89,7 +89,7 @@ export const SETUP_STEPS = Object.freeze([
 /**
  * Join the server's checks to the steps above, in the steps' order. A check
  * this file does not know (a row added to the policy later) is kept, under
- * the server's own label and owned by the hosting team, so a new row is
+ * the server's own label and owned by the Event Runner team, so a new row is
  * never hidden from the client.
  *
  * @param {Array<{ name: string, label: string, state: string }>} checks
@@ -107,7 +107,7 @@ export function joinSetupSteps(checks) {
       slug: check.name,
       title: check.label,
       owner: 'host',
-      todo: 'The hosting team completes this step.',
+      todo: 'The Event Runner team completes this step.',
       done: 'This step is done.',
       link: null,
       ready: check.state === 'ready',

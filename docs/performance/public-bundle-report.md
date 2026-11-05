@@ -129,11 +129,13 @@ The tool measured only JavaScript, so the blocking stylesheet could grow with no
 | Normal | 161,746 | 24,217 |
 | Demo | 162,630 | 24,263 |
 
-The limit is 165,000 raw and 25,000 gzip bytes, the demo measurement plus a small margin. It records today's size. It does not say the size is good: reducing it needs its own measurement.
+The first limit was 165,000 raw and 25,000 gzip bytes, the demo measurement plus a small margin. It records today's size. It does not say the size is good: reducing it needs its own measurement.
+
+The NC Local style added about 5,400 raw bytes, which took the demo to 168,006 raw and 24,370 gzip. The limit is now 190,000 raw and 28,000 gzip bytes. The owner chose this room for design work, including loading animations, because the rest of the site is light.
 
 ## Enforced limits
 
 - The initial graph can use at most 1,080,000 raw bytes and 292,000 gzip bytes.
-- The stylesheets `index.html` names can use at most 165,000 raw bytes and 25,000 gzip bytes.
+- The stylesheets `index.html` names can use at most 190,000 raw bytes and 28,000 gzip bytes.
 - Each deferred chunk can use at most 180,000 raw bytes and 50,000 gzip bytes.
 - CI checks the normal build and the committed demo build.

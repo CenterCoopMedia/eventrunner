@@ -22,7 +22,7 @@ import {
   Notice,
   SaveStatus,
   ServerErrorSummary,
-  TextAreaField,
+  AddOneListField,
   fieldHintClass,
   linkButtonClass,
   primaryButtonClass,
@@ -169,13 +169,13 @@ export default function AttendeeRecordPanel({
       <AttendeeAnswers form={registrationForm} records={answers} />
       <form className="flex flex-col gap-sm" onSubmit={save}>
         <ServerErrorSummary error={error} errorRef={errorRef} />
-        <TextAreaField
+        <AddOneListField
           label="Past attendance"
-          hint="One edition per line, such as a year. Attendees cannot change this list. It is part of the export."
-          value={lines}
-          onChange={setLines}
+          itemName="edition"
+          hint="Add each past event this person attended, such as 2024. Only staff can change this list."
+          items={toList(lines)}
+          onChange={(items) => setLines(items.join('\n'))}
           error={fieldError}
-          rows={3}
         />
         <div className="flex flex-wrap items-center gap-sm">
           <button
@@ -184,7 +184,7 @@ export default function AttendeeRecordPanel({
             disabled={saving}
             aria-busy={saving ? 'true' : undefined}
           >
-            {saving ? 'Saving…' : 'Save record'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
           {status ? <SaveStatus message={status} /> : null}
         </div>

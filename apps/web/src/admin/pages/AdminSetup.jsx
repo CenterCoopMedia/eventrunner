@@ -173,7 +173,7 @@ export default function AdminSetup() {
       <AdminPageHeader
         title="Set up your event"
         identifiers={checks ? `${doneCount} of ${steps.length} steps done` : null}
-        description="Complete these steps before your site goes live. Some steps are yours. The hosting team does the others. When every step is done, the hosting team runs the launch check and publishes the site."
+        description="Complete these steps before you share your site. Some steps are yours. The Event Runner team does the others."
         actions={
           <button
             type="button"
@@ -195,7 +195,7 @@ export default function AdminSetup() {
         />
       ) : null}
       {allDone ? (
-        <Notice tone="ok" message="Every step is done. Tell the hosting team that the site is ready for the launch check." />
+        <Notice tone="ok" message="Every step is done. Your site is ready to share." />
       ) : null}
 
       {checks && current !== -1 ? (

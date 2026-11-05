@@ -75,20 +75,22 @@ const DOC_TARGET = path.join(ROOT, 'design', 'tokens', 'presets', 'README.md');
 /**
  * Preset ids, in the order the style picker offers them.
  *
- * ALL SIX ARE FIRST-CLASS (owner calibration, 2026-08-27). There is no
+ * ALL SEVEN ARE FIRST-CLASS (owner calibration, 2026-08-27). There is no
  * stability tier and no experimental group. Order is the only ranking the
  * catalog carries, and it is a RECOMMENDATION, not a verdict: Institutional
  * leads because it is what a fresh deployment starts on, the two broadly
  * applicable publication looks follow, and the three with the strongest
  * point of view come last — where a client who wants one will still find it
- * complete.
+ * complete. NC Local is last: it is the pilot client's own look, added for
+ * its first conference (2026-11-05). The historical demo still shows it
+ * through Newsroom, so the demo's style menu leaves it out.
  *
  * The brief §4 lists them in a different order. That list is the writing
  * order of the spec, not a picker order, so this supersedes it for the
  * picker only.
  */
 const PRESET_ORDER = Object.freeze([
-  'civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine',
+  'civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine', 'nclocal',
 ]);
 
 /** Strip every `$`-prefixed note key, at every depth. */
