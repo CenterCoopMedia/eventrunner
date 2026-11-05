@@ -1379,9 +1379,9 @@ Nothing needs to be open during a build. Operators get an email when a build fai
 | See a site's deploys, including after launch | `gh run list --workflow deploy.yml`. A dispatched run is titled `Deploy <name>`. A push to `main` keeps its commit message and covers every site in `AUTO_DEPLOY_ENVIRONMENTS` |
 | Follow one run until it ends | `gh run watch <run id>` |
 | Read why a run failed | `gh run view <run id> --log-failed` |
-| Stop a build | `gh run cancel <run id>`. The run records that it stopped and emails like any other failure, so **Retry the build** continues from it |
+| Stop a build | `gh run cancel <run id>`. Once the run has signed in to Google Cloud, it records that it stopped and emails like any other failure, so **Retry the build** continues from it. A run cancelled earlier leaves no record, and Retry appears after the one-hour limit for a silent start |
 | Retry a failed build | **Retry the build** on the review page |
 | Redeploy one live site | `gh workflow run deploy.yml --ref main -f client=<name>` |
 | Check a live site answers | `curl -sI https://<name>.eventrunner.org/` and `curl -sI https://<name>.eventrunner.org/admin` |
 
-Stopping a build also leaves any `Deploy <name>` run it started going, so cancel that too. A retry that follows a code fix won't redeploy on its own, because an earlier successful first deploy still counts: run `gh workflow run deploy.yml --ref main -f client=<name> -f provision=true -f bootstrap=true`, wait for it, then retry.
+Stopping a build also leaves any `Deploy <name>` run it started going, so cancel that too. A retry won't redeploy a code fix on its own, because an earlier successful deploy of the same kind still counts. Run the deploy yourself and wait for it, then retry. For a failure before the full deploy, use `gh workflow run deploy.yml --ref main -f client=<name> -f provision=true -f bootstrap=true`. For a failure after it, use the plain redeploy in the table.

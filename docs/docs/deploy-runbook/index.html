@@ -1367,14 +1367,14 @@
           <tr><td>See a site&#39;s deploys, including after launch</td><td><code>gh run list --workflow deploy.yml</code>. A dispatched run is titled <code>Deploy &lt;name&gt;</code>. A push to <code>main</code> keeps its commit message and covers every site in <code>AUTO_DEPLOY_ENVIRONMENTS</code></td></tr>
           <tr><td>Follow one run until it ends</td><td><code>gh run watch &lt;run id&gt;</code></td></tr>
           <tr><td>Read why a run failed</td><td><code>gh run view &lt;run id&gt; --log-failed</code></td></tr>
-          <tr><td>Stop a build</td><td><code>gh run cancel &lt;run id&gt;</code>. The run records that it stopped and emails like any other failure, so <strong>Retry the build</strong> continues from it</td></tr>
+          <tr><td>Stop a build</td><td><code>gh run cancel &lt;run id&gt;</code>. Once the run has signed in to Google Cloud, it records that it stopped and emails like any other failure, so <strong>Retry the build</strong> continues from it. A run cancelled earlier leaves no record, and Retry appears after the one-hour limit for a silent start</td></tr>
           <tr><td>Retry a failed build</td><td><strong>Retry the build</strong> on the review page</td></tr>
           <tr><td>Redeploy one live site</td><td><code>gh workflow run deploy.yml --ref main -f client=&lt;name&gt;</code></td></tr>
           <tr><td>Check a live site answers</td><td><code>curl -sI https://&lt;name&gt;.eventrunner.org/</code> and <code>curl -sI https://&lt;name&gt;.eventrunner.org/admin</code></td></tr>
           </tbody>
           </table>
           </div>
-          <p>Stopping a build also leaves any <code>Deploy &lt;name&gt;</code> run it started going, so cancel that too. A retry that follows a code fix won&#39;t redeploy on its own, because an earlier successful first deploy still counts: run <code>gh workflow run deploy.yml --ref main -f client=&lt;name&gt; -f provision=true -f bootstrap=true</code>, wait for it, then retry.</p>
+          <p>Stopping a build also leaves any <code>Deploy &lt;name&gt;</code> run it started going, so cancel that too. A retry won&#39;t redeploy a code fix on its own, because an earlier successful deploy of the same kind still counts. Run the deploy yourself and wait for it, then retry. For a failure before the full deploy, use <code>gh workflow run deploy.yml --ref main -f client=&lt;name&gt; -f provision=true -f bootstrap=true</code>. For a failure after it, use the plain redeploy in the table.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>docs/DEPLOY_RUNBOOK.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">
