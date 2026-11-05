@@ -210,6 +210,21 @@ test('the Postmark mailer sends status and operator email with their own tags', 
   assert.deepEqual(bodies.map((b) => [b.To, b.Tag]), [['ana@example.org', 'console-status'], ['ops@ccm.example', 'console-operator']]);
 });
 
+test('every console email is in the Event Runner frame with its link as a button', () => {
+  const messages = [
+    inviteMessage({ organizationName: 'NC Local', inviterEmail: 'a@b.example', role: 'owner', link: 'https://x.example/i', expiresInDays: 7 }),
+    ...Object.keys(STATUS_WORDS).map((status) => statusChangeMessage({ ...change, status, note: 'Use the new logo.' })),
+    ...['started', 'build-failed', 'build-run-failed'].map((kind) => operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a', kind, problem: 'No certificate.' })),
+    agreementCopyMessage(COPY),
+  ];
+  for (const { subject, html } of messages) {
+    assert.match(html, /^<!doctype html>/, subject);
+    assert.match(html, />Event Runner</, subject);
+    assert.match(html, /<h1 /, subject);
+    assert.match(html, /<a href="https:\/\/[^"]+" style="display:inline-block;/, subject);
+  }
+});
+
 test('the Postmark mailer needs a token and a sender', () => {
   assert.throws(() => createPostmarkMailer({ token: '', from: 'a@b.example', fetch() {} }), TypeError);
   assert.throws(() => createPostmarkMailer({ token: 't', from: '', fetch() {} }), TypeError);

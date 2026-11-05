@@ -32,7 +32,7 @@ describe('ApplicationStatus', () => {
     page();
     expect(await screen.findByRole('heading', { level: 1, name: 'NC Local News Summit' })).toBeInTheDocument();
     expect(screen.getAllByText('We are building your site')).toHaveLength(2);
-    const stages = screen.getAllByRole('listitem');
+    const stages = screen.getAllByRole('listitem').filter((item) => item.classList.contains('stage'));
     expect(stages.map((s) => s.textContent)).toEqual([
       'Answer the setup questions and accept the agreementDone',
       'We are building your siteNow',
@@ -51,6 +51,13 @@ describe('ApplicationStatus', () => {
     expect(screen.getByText(/You will receive an email when your site is ready, with a link to finish setting it up/)).toBeInTheDocument();
     expect(screen.getByText('Most sites take about an hour and a half to build. Setting up your web address takes the longest.')).toBeInTheDocument();
     expect(screen.getByText('Now: Setting up your web address. Next: Setting up email and tickets.')).toBeInTheDocument();
+    // Every build step shows in plain words, with the one underway marked and explained.
+    const steps = within(screen.getByRole('list', { name: 'Build steps' })).getAllByRole('listitem');
+    expect(steps).toHaveLength(7);
+    expect(steps[0]).toHaveTextContent('Setting up your hosting, done');
+    expect(steps[1]).toHaveAttribute('aria-current', 'step');
+    expect(steps[1]).toHaveTextContent('This step can take up to an hour.');
+    expect(steps[2]).not.toHaveAttribute('aria-current');
   });
 
   it('says the build is starting before its first step, and names no next step after the last', async () => {

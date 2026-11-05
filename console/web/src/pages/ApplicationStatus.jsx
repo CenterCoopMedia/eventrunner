@@ -60,7 +60,25 @@ function BuildUnderway({ app }) {
         <p className="note-title">You can close this page</p>
         <p>Most sites take about an hour and a half to build. Setting up your web address takes the longest.</p>
         <p>{app.myRole === 'owner' ? 'You' : 'The Owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
-        <p role="status" aria-atomic="true" className="console-loading">{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</p>
+        <p role="status" aria-atomic="true" className="visually-hidden">{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</p>
+        <ol className="build-steps" aria-label="Build steps">
+          {BUILD_PHASES.map((phase, i) => {
+            const state = i < at ? 'done' : i === at ? 'now' : 'later';
+            return (
+              <li key={phase.label} className={`build-step ${state}`} aria-current={state === 'now' ? 'step' : undefined}>
+                <svg className="build-step-mark" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <circle cx="10" cy="10" r="7.5" />
+                  {state === 'done' ? <path d="m6.5 10 2.5 2.5 4.5-5" /> : null}
+                  {state === 'now' ? <circle className="build-step-dot" cx="10" cy="10" r="3" /> : null}
+                </svg>
+                <span className="build-step-text">
+                  <span className="build-step-label">{phase.label}<span className="visually-hidden">{state === 'done' ? ', done' : state === 'now' ? ', happening now' : ''}</span></span>
+                  {state === 'now' ? <span className="build-step-detail">{phase.detail}</span> : null}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </aside>
   );
