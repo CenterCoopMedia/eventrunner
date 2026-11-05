@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
 import ConnectionPanel, { ConnectionNotice } from '../setup/ConnectionPanel.jsx';
 import { PROVIDER_COPY } from '../setup/connections.js';
-import { BUILD_FAILED_LABEL, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
+import { BUILD_FAILED_LABEL, BUILD_PHASES, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
 import { HostName, formatDate, hostName } from '../text.js';
 
 const REFRESH_MS = 30000;
@@ -33,6 +33,21 @@ function Stages({ app }) {
         );
       })}
     </ol>
+  );
+}
+
+/** A build takes a while, so this says the client can leave, then what is happening and what comes next. */
+function BuildUnderway({ app }) {
+  const current = app.build?.current;
+  const at = current ? BUILD_PHASES.findIndex((phase) => phase.steps.includes(current)) : -1;
+  const now = current ? BUILD_PHASES[at]?.label : 'Starting the build';
+  const next = !current || at >= 0 ? BUILD_PHASES[at + 1]?.label : null;
+  return (
+    <aside className="note stack" role="note">
+      <p className="note-title">You can close this page</p>
+      <p>{app.myRole === 'owner' ? 'You' : 'The Owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
+      {now ? <p>Now: {now}.{next ? ` Next: ${next}.` : ''}</p> : null}
+    </aside>
   );
 }
 
@@ -135,7 +150,7 @@ export default function ApplicationStatus() {
     setRetrying(true);
     try {
       const { started } = await callApi('retryBuild', { orgId, appId });
-      if (started) setNotice('We started the build again. We email the Owners when your site is ready.');
+      if (started) setNotice('We started the build again.');
       else setError('The build did not start. Try again in a few minutes.');
       await load();
     } catch (err) {
@@ -154,6 +169,7 @@ export default function ApplicationStatus() {
   // An account that is gone blocks a retry whichever step failed, so it needs the same way back.
   const reconnectProvider = app.build?.failed && PROVIDERS.includes(choice) && (app.build.needsReconnect || !app.connections[choice].connected) ? choice : null;
   const canReconnect = Boolean(reconnectProvider) && app.myRole === 'owner';
+  const underway = ['approved', 'building'].includes(app.status) && !app.build?.failed;
   return (
     <section aria-labelledby="status-title">
       <h1 id="status-title" tabIndex={-1}>{title}</h1>
@@ -168,6 +184,7 @@ export default function ApplicationStatus() {
 
       {state?.copyFailed ? <p className="message error">We could not email your copy of the agreement. Your acceptance is saved, and you can read it below.</p> : null}
       {app.build?.failed ? <BuildFailed app={app} provider={reconnectProvider} retrying={retrying} onRetry={retry} /> : null}
+      {underway ? <BuildUnderway app={app} /> : null}
       {app.status === 'declined' && app.note ? (
         <aside className="note" role="note">
           <p className="note-title">Note from {hostName()}</p>
@@ -179,11 +196,14 @@ export default function ApplicationStatus() {
         <p>{app.status === 'withdrawn' ? `This request is withdrawn. We will not build this site. To start again, ask ${hostName()} for a new signup link.` : 'This request is closed.'}</p>
       ) : <Stages app={app} />}
 
+      {['ready', 'launched'].includes(app.status) && app.address ? (
+        <p><a className="button primary" href={`https://${app.address}/admin`}>Open your admin panel</a></p>
+      ) : null}
       {app.canEdit ? (
         <p><Link className="button primary" to={setupPath(orgId, appId, STEPS[0])}>Continue the setup</Link></p>
       ) : null}
       {app.acceptance ? (
-        <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. <Link to={`${statusPath(orgId, appId)}/accepted-agreement`}>Read the agreement</Link>. We email the Owners when the status changes.</p>
+        <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. <Link to={`${statusPath(orgId, appId)}/accepted-agreement`}>Read the agreement</Link>.{underway ? '' : ' We email the Owners when the status changes.'}</p>
       ) : null}
       {accounts.map((provider) => (
         <div className="section" key={provider}>

@@ -101,7 +101,8 @@ function Acceptance({ acceptance }) {
     <>
       <h2 id="agreement-title">Agreement</h2>
       <dl className="answers">
-        <div className="answer"><dt>Accepted by</dt><dd>{acceptance.name} ({acceptance.email}), {formatDateTime(acceptance.at)}</dd></div>
+        <div className="answer"><dt>Accepted by</dt><dd>{acceptance.name}{acceptance.title ? `, ${acceptance.title}` : ''} ({acceptance.email}), {formatDateTime(acceptance.at)}</dd></div>
+        {acceptance.legalName ? <div className="answer"><dt>Legal name</dt><dd>{acceptance.legalName}</dd></div> : null}
         <div className="answer"><dt>Agreement version</dt><dd>{acceptance.version}</dd></div>
         <div className="answer"><dt>SHA-256 of the text</dt><dd className="break">{acceptance.sha256}</dd></div>
         <div className="answer"><dt>Acceptance record</dt><dd className="break">{acceptance.id}</dd></div>

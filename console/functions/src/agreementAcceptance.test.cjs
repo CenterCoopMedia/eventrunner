@@ -7,7 +7,7 @@ const { agreementHash, saveAgreement } = require('./consoleSettings.cjs');
 const { NOW, ana, applicationDoc, ben, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers, zed } = require('./testData.cjs');
 
 const NAME_HELD = { 'site_names/nclocal': { appId: 'a1', orgId: 'o1', reservedAt: new Date(NOW) } };
-const ACCEPT = { orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', version: 1 };
+const ACCEPT = { orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', legalName: 'NC Local Inc.', title: 'Director', version: 1 };
 const IDS = { orgId: 'o1', appId: 'a1' };
 
 function ready(extra = {}) {
@@ -37,6 +37,8 @@ test('an Owner accepts: the answers freeze, the record is written and the build 
     version: 1,
     sha256: agreementHash(title, body),
     typedName: 'Ana Owner',
+    legalName: 'NC Local Inc.',
+    title: 'Director',
     email: 'ana@example.org',
     uid: 'ana',
     orgId: 'o1',
@@ -51,7 +53,7 @@ test('an Owner accepts: the answers freeze, the record is written and the build 
   assert.deepEqual(stored.submittedAt, new Date(NOW));
   assert.equal(stored.submittedBy, 'ana');
   assert.deepEqual(stored.agreementAcceptance, {
-    id: record.id, version: 1, sha256: record.sha256, name: 'Ana Owner', email: 'ana@example.org', at: new Date(NOW),
+    id: record.id, version: 1, sha256: record.sha256, name: 'Ana Owner', legalName: 'NC Local Inc.', title: 'Director', email: 'ana@example.org', at: new Date(NOW),
   });
   assert.deepEqual(stored.history.at(-1), { status: 'approved', at: new Date(NOW), by: 'ana', note: null });
 
@@ -121,6 +123,8 @@ test('a typed name and an explicit accept are required', async () => {
   const db = ready();
   await assert.rejects(accept(deps(db), { ...ACCEPT, name: ' ' }), { status: 400, code: 'name-required', field: 'name' });
   await assert.rejects(accept(deps(db), { ...ACCEPT, name: undefined }), { code: 'name-required' });
+  await assert.rejects(accept(deps(db), { ...ACCEPT, legalName: ' ' }), { status: 400, code: 'legalName-required', field: 'legalName' });
+  await assert.rejects(accept(deps(db), { ...ACCEPT, title: undefined }), { status: 400, code: 'title-required', field: 'title' });
   await assert.rejects(accept(deps(db), { ...ACCEPT, accept: 'yes' }), { status: 400, code: 'accept-required' });
   assert.equal(db.read('applications/a1').status, 'draft');
 });

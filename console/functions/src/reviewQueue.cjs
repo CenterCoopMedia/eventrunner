@@ -93,7 +93,7 @@ function readableReview(review) {
 function readableProgress(app) {
   const accepted = app.agreementAcceptance;
   return {
-    acceptance: accepted ? { id: accepted.id, version: accepted.version, sha256: accepted.sha256, name: accepted.name, email: accepted.email, at: toIso(accepted.at) } : null,
+    acceptance: accepted ? { id: accepted.id, version: accepted.version, sha256: accepted.sha256, name: accepted.name, legalName: accepted.legalName || null, title: accepted.title || null, email: accepted.email, at: toIso(accepted.at) } : null,
     buildStart: app.buildStart ? { state: app.buildStart.state, at: toIso(app.buildStart.at) } : null,
   };
 }

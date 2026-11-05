@@ -321,6 +321,9 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
     if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
     const record = /** @type {Record<string, any>} */ (body);
     const providerMessageId = record.MessageID;
+    // A manual suppression or reactivation has no message, so nothing here can
+    // record it, and Postmark already keeps its own suppression list.
+    if (record.RecordType === 'SubscriptionChange' && providerMessageId === null) return [];
     if (typeof providerMessageId !== 'string' || !providerMessageId) return null;
     // Postmark's own test of the address, which must answer 200.
     if (providerMessageId === TEST_MESSAGE_ID) return [];

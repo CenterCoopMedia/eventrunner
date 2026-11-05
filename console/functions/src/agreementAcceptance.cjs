@@ -38,7 +38,7 @@ async function getAgreement({ db }, { body, user }) {
   return {
     body: {
       agreement,
-      accepted: accepted ? { version: accepted.version, name: accepted.name, email: accepted.email, at: toIso(accepted.at) } : null,
+      accepted: accepted ? { version: accepted.version, name: accepted.name, legalName: accepted.legalName || null, title: accepted.title || null, email: accepted.email, at: toIso(accepted.at) } : null,
     },
   };
 }
@@ -48,18 +48,18 @@ function refuseStatus(status) {
   throw new ConsoleError(409, 'locked', 'This request already moved past the agreement.');
 }
 
-function typedName(value) {
-  const name = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
-  if (name.length < NAME_MIN || name.length > NAME_MAX) {
-    const err = new ConsoleError(400, 'name-required', 'Type your full name to accept the agreement.');
-    err.field = 'name';
+function typed(value, field, message) {
+  const text = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+  if (text.length < NAME_MIN || text.length > NAME_MAX) {
+    const err = new ConsoleError(400, `${field}-required`, message);
+    err.field = field;
     throw err;
   }
-  return name;
+  return text;
 }
 
 /** Email the signer a copy. A failed email is logged and does not undo the acceptance. */
-async function sendCopy({ db, mailer, log, publicUrl }, { user, orgId, appId, eventName, agreement, name, at }) {
+async function sendCopy({ db, mailer, log, publicUrl }, { user, orgId, appId, eventName, agreement, name, legalName, title, at }) {
   try {
     const organizationName = (await db.collection('organizations').doc(orgId).get()).data().name;
     await mailer.sendAgreementCopy({
@@ -71,6 +71,8 @@ async function sendCopy({ db, mailer, log, publicUrl }, { user, orgId, appId, ev
       body: agreement.body,
       sha256: agreement.sha256,
       typedName: name,
+      legalName,
+      signerTitle: title,
       acceptedAt: at.toISOString(),
       link: statusLink(publicUrl, orgId, appId),
     });
@@ -106,7 +108,9 @@ async function acceptAgreement(deps, { body, user }) {
   const first = await readApplication((r) => r.get(), db, orgId, appId);
   refuseStatus(first.data.status);
   if (body.accept !== true) throw new ConsoleError(400, 'accept-required', 'Select Accept the agreement to continue.');
-  const name = typedName(body.name);
+  const name = typed(body.name, 'name', 'Type your full name to accept the agreement.');
+  const legalName = typed(body.legalName, 'legalName', "Type your organization's legal name to accept the agreement.");
+  const title = typed(body.title, 'title', 'Type your job title to accept the agreement.');
   if (!(await readSignupTerms((r) => r.get(), db)).open) throw signupsClosed();
   refuseIncomplete(checkAnswers(first.data.answers, first.data.connections, { testMode }));
   await takeSubmitSlot(db, user, now);
@@ -123,13 +127,13 @@ async function acceptAgreement(deps, { body, user }) {
     }
     const answers = await answersToFreeze(tx, db, appId, data, { testMode });
     const { version, sha256 } = terms.agreement;
-    tx.create(recordRef, { version, sha256, typedName: name, email: user.email, uid: user.uid, orgId, appId, at });
+    tx.create(recordRef, { version, sha256, typedName: name, legalName, title, email: user.email, uid: user.uid, orgId, appId, at });
     tx.update(ref, {
       status: 'approved',
       frozen: answers,
       submittedAt: at,
       submittedBy: user.uid,
-      agreementAcceptance: { id: recordRef.id, version, sha256, name, email: user.email, at },
+      agreementAcceptance: { id: recordRef.id, version, sha256, name, legalName, title, email: user.email, at },
       buildStart: { state: 'pending', at },
       updatedAt: at,
       updatedBy: user.uid,
@@ -142,7 +146,7 @@ async function acceptAgreement(deps, { body, user }) {
   const buildStarted = await isolated(log, 'the build start', () => runStartBuild(after, { orgId, appId, eventName, by: user.uid }));
   // Right after the start, so a run that fails quickly can't email first and be contradicted.
   const emailed = await isolated(log, 'the Owners email', () => notifyOwners(after, { orgId, appId, status: buildStarted ? 'approved' : 'build-failed', eventName }));
-  const copySent = await isolated(log, 'the copy', () => sendCopy(after, { user, orgId, appId, eventName, agreement, name, at }));
+  const copySent = await isolated(log, 'the copy', () => sendCopy(after, { user, orgId, appId, eventName, agreement, name, legalName, title, at }));
   // runStartBuild has already told operators about a failed start.
   if (buildStarted) await isolated(log, 'the operators email', () => notifyOperators(after, { orgId, appId, eventName, kind: 'started' }));
   return { body: { status: 'approved', acceptanceId: recordRef.id, copySent, emailed, buildStarted } };

@@ -66,14 +66,15 @@ function canRetryBuild(app, build, at) {
     && (app.buildStart?.state === 'failed' || build?.state === 'failed' || buildWentSilent(app, build, at));
 }
 
-/** What a client may know: never the error text, the run address or the step detail. */
+/** What a client may know: never the error text, the run address or the step detail. `current` is a running step's id. */
 function buildForClient(app, build, at, { testMode = false } = {}) {
   const failed = canRetryBuild(app, build, at);
   // A retry whose dispatch failed leaves the record `queued`, with the failed step still on it.
   const ticketsFailed = build?.failedStep === TICKETS_STEP;
   // The same check a retry makes, so the page offers a way out of every connection refusal.
   const refused = Boolean(connectionProblem(reviewedAnswers(app)?.tickets?.choice, app.connections, { testMode }));
-  return { failed, needsReconnect: failed && (ticketsFailed || refused) };
+  const current = !failed && build?.state === 'running' ? build.steps?.at(-1)?.id : null;
+  return { failed, needsReconnect: failed && (ticketsFailed || refused), ...(current ? { current } : {}) };
 }
 
 module.exports = { BUILD_COLLECTION, RETRY_STATUSES, buildForClient, buildWentSilent, canRetryBuild, readBuild };

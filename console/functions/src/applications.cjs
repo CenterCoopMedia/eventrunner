@@ -10,7 +10,7 @@
  *   createdBy, createdAt, updatedAt, updatedBy, submittedAt, submittedBy,
  *   history: [{ status, at, by, note }]  // oldest first
  *   review: null | { note, by, at, settings }  // written by operator review only
- *   agreementAcceptance: null | { id, version, sha256, name, email, at }  // the current acceptance
+ *   agreementAcceptance: null | { id, version, sha256, name, legalName, title, email, at }  // the current acceptance
  *   buildStart: { state: 'pending'|'started'|'failed', at }  // from acceptance on, no detail
  * }
  *
