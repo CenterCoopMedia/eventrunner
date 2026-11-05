@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { PDFDict, PDFDocument, PDFName } = require('pdf-lib');
+const { agreementPdf, internals: { drawable, embedFaces } } = require('./agreementPdf.cjs');
 const { test } = require('node:test');
 const {
   STATUS_WORDS, agreementCopyMessage, createPostmarkMailer, inviteMessage, operatorNoticeMessage, statusChangeMessage,
@@ -121,25 +123,79 @@ test('operatorNoticeMessage says what happened to a build, and nothing about a p
   for (const text of [notStarted, failed.text]) assert.ok(!/pay/i.test(text), text);
 });
 
-test('the agreement copy holds the full text, the record details and escaped HTML', () => {
-  const message = agreementCopyMessage({
-    organizationName: 'NC Local',
-    eventName: 'Summit',
-    title: 'Test agreement',
-    version: 3,
-    body: 'First <b>test</b> paragraph.\n\nSecond test paragraph.',
-    sha256: 'abc123',
-    typedName: 'Ana Owner',
-    legalName: 'NC Local Inc.',
-    signerTitle: 'Director',
-    acceptedAt: '2026-11-04T15:00:00.000Z',
-    link: 'https://x.example/a',
-  });
-  for (const part of ['Ana Owner, Director', 'NC Local Inc. (NC Local)', 'Version 3', 'abc123', 'Test agreement', 'First <b>test</b> paragraph.', 'Second test paragraph.', '2026-11-04T15:00:00.000Z']) {
+const COPY = Object.freeze({
+  to: 'ana@example.org',
+  organizationName: 'NC Local',
+  eventName: 'Summit',
+  title: 'Test agreement',
+  version: 3,
+  body: 'First <b>test</b> paragraph.\nIts second line.\n\nSecond test paragraph.',
+  sha256: 'abc123',
+  typedName: 'Ana <Owner>',
+  legalName: 'NC Local Inc.',
+  signerTitle: 'Director',
+  acceptedAt: '2026-11-04T15:00:00.000Z',
+  link: 'https://x.example/a',
+});
+
+test('the agreement note says who accepted, when and which version, with escaped HTML and no text or hash', () => {
+  const message = agreementCopyMessage(COPY);
+  assert.equal(message.subject, 'Your copy of the agreement: Summit');
+  for (const part of ['Agreement accepted', 'on behalf of NC Local Inc. for Summit.', 'Version: 3', 'Ana <Owner>, Director', 'November 4, 2026 at 10:00 AM EST', 'attached as a PDF', 'https://x.example/a']) {
     assert.ok(message.text.includes(part), part);
   }
-  assert.ok(message.html.includes('First &lt;b&gt;test&lt;/b&gt; paragraph.'));
-  assert.ok(!message.html.includes('<b>'));
+  assert.ok(message.html.includes('Ana &lt;Owner&gt;, Director'));
+  assert.ok(!message.html.includes('<Owner>'));
+  assert.ok(message.html.includes('Event Runner'));
+  for (const body of [message.text, message.html]) {
+    assert.ok(!body.includes('abc123'));
+    assert.ok(!body.includes('test</b> paragraph'));
+    assert.ok(!body.includes('test&lt;/b&gt; paragraph'));
+  }
+  assert.ok(!agreementCopyMessage({ ...COPY, link: '' }).text.includes('Open your request'));
+});
+
+test('the Postmark mailer attaches the agreement as a PDF of its text and record', async () => {
+  const bodies = [];
+  const fetch = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  await createPostmarkMailer({ token: 't', from: 'a@b.example', fetch }).sendAgreementCopy(COPY);
+  const [sent] = bodies;
+  assert.equal(sent.Tag, 'console-agreement');
+  assert.equal(sent.Attachments.length, 1);
+  const [file] = sent.Attachments;
+  assert.equal(file.ContentType, 'application/pdf');
+  assert.equal(file.Name, 'Event Runner agreement, version 3.pdf');
+  const pdf = await PDFDocument.load(Buffer.from(file.Content, 'base64'));
+  assert.equal(pdf.getTitle(), 'Test agreement, version 3');
+  assert.equal(pdf.getPageCount(), 1);
+});
+
+test('the agreement PDF runs to more pages for a long text and draws text outside its font', async () => {
+  const body = Array.from({ length: 60 }, (_, i) => `Paragraph ${i} of the test text, long enough to wrap onto a second line on the page. Nguyễn Văn 東京.`).join('\n\n');
+  const pdf = await PDFDocument.load(await agreementPdf({ ...COPY, body, typedName: 'Nguyễn' }));
+  assert.ok(pdf.getPageCount() >= 3);
+});
+
+test('the agreement PDF draws text as stored and writes a character no font has as its code point, never "?"', async () => {
+  const doc = await PDFDocument.create();
+  const sample = 'Liability ≤ € — Łódź 李明';
+  const { regular, bold } = await embedFaces(doc, [sample]);
+  for (const face of [regular, bold]) assert.equal(drawable(face, sample), 'Liability ≤ € — Łódź [U+674E U+660E]');
+  // Controls, joiners, the soft hyphen, separators and the U+FFFF sentinel have no glyph of their own.
+  assert.equal(drawable(regular, 'a\u0007b 😀 Jo\u200Dse co\u00ADop A\u2028B Ana\uFFFF'), 'a[U+0007]b [U+1F600] Jo[U+200D]se co[U+00AD]op A[U+2028]B Ana[U+FFFF]');
+
+  // The symbol font is embedded only when the text needs it.
+  const fonts = async (copy) => {
+    const pdf = await PDFDocument.load(await agreementPdf(copy));
+    return pdf.context.enumerateIndirectObjects()
+      .filter(([, o]) => o instanceof PDFDict && o.get(PDFName.of('Type')) === PDFName.of('Font') && o.get(PDFName.of('Subtype')) !== PDFName.of('CIDFontType2'))
+      .map(([, o]) => String(o.get(PDFName.of('BaseFont'))).replace(/-\d+$/, ''));
+  };
+  assert.deepEqual((await fonts(COPY)).sort(), ['/Courier', '/NotoSans-Bold', '/NotoSans-Regular']);
+  assert.ok((await fonts({ ...COPY, body: sample, typedName: '李明' })).includes('/DejaVuSans'));
 });
 
 test('the Postmark mailer sends status and operator email with their own tags', async () => {
