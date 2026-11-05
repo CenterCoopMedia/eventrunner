@@ -564,6 +564,44 @@ describe('AdminEmailLog', () => {
     expect(await within(openRow).findByRole('alert')).toHaveTextContent('This message is not in the email log.');
   });
 
+  it('retries a failed preview in place and returns focus after the retry control disappears', async () => {
+    await renderPage('/admin/email-log');
+    callMock.mockRejectedValueOnce(serverError(503, 'unavailable', 'The message could not be loaded.'));
+    const preview = within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' });
+    fireEvent.click(preview);
+    const retry = await screen.findByRole('button', { name: 'Retry preview' });
+    let release;
+    callMock.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+    retry.focus();
+    fireEvent.click(retry);
+    expect(retry).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(retry);
+    expect(getCalls()).toHaveLength(2);
+    await act(async () => release({ row: { ...ROWS[0], html: '<p>Recovered message.</p>', text: 'Recovered message.' } }));
+    expect(screen.queryByRole('button', { name: 'Retry preview' })).not.toBeInTheDocument();
+    expect(preview).toHaveFocus();
+    expect(screen.getByTitle('Message to plain@example.test')).toBeInTheDocument();
+  });
+
+  it('keeps a pagination failure beside its retry without clearing already loaded messages', async () => {
+    const cursor = { sentAt: SENT_AT, id: 'delivered' };
+    await renderPage('/admin/email-log', { lists: [
+      { rows: ROWS, nextCursor: cursor, scanned: 5 },
+      serverError(503, 'unavailable', 'Please try again.'),
+      { rows: [message({ id: 'older', to: 'older@example.test' })], nextCursor: null, scanned: 1 },
+    ] });
+    const more = screen.getByRole('button', { name: 'Load more' });
+    more.focus();
+    fireEvent.click(more);
+    const retry = await screen.findByRole('button', { name: 'Retry loading older messages' });
+    expect(within(retry.parentElement).getByRole('alert')).toHaveTextContent('Older messages could not be loaded. Please try again.');
+    expect(retry).toHaveFocus();
+    expect(screen.getByText('plain@example.test')).toBeInTheDocument();
+    fireEvent.click(retry);
+    expect(await screen.findByText('older@example.test')).toBeInTheDocument();
+    expect(listCalls().slice(1)).toEqual([{ limit: 25, cursor }, { limit: 25, cursor }]);
+  });
+
   it('reads "Searching…" with aria-busy while a search runs, and never disables the button first', async () => {
     await renderPage('/admin/email-log', { lists: [{ rows: ROWS, nextCursor: null, scanned: 5 }, null] });
     const button = screen.getByRole('button', { name: 'Search' });
