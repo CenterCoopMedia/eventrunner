@@ -1,3 +1,5 @@
+import { hostName } from '../text.js';
+
 // The words and checks for connecting a client's own Stripe or Eventbrite
 // account (ADR 0007 §4). The server does the connecting; this file holds
 // what the client reads and where the browser may go.
@@ -18,7 +20,10 @@ export const PROVIDER_COPY = Object.freeze({
   },
 });
 
-export const CAN_DISCONNECT = 'You can disconnect this account here until you accept the agreement. After that, you can cut it off at any time in the account\'s own settings, or ask us for help. Your site stays online, but it stops selling tickets or receiving ticket updates through that account.';
+/** What a client can do about a connected account while the setup is open. */
+export const canDisconnectWords = (provider) => (provider === 'stripe'
+  ? 'You can disconnect this account here at any time, except while we build your site.'
+  : `You can disconnect this account here until you accept the agreement. After that, ask ${hostName()} to remove it from your site.`);
 
 /** The server names the provider's page; the browser goes only to that provider. */
 export function isProviderUrl(url, provider) {

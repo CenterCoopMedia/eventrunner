@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { callApi } from '../api.js';
-import { formatDate } from '../text.js';
-import { CAN_DISCONNECT, PROVIDER_COPY, isProviderUrl, rememberConnectReturn } from './connections.js';
+import { formatDate, hostName } from '../text.js';
+import { PROVIDER_COPY, canDisconnectWords, isProviderUrl, rememberConnectReturn } from './connections.js';
 import { fieldId } from './Field.jsx';
 import { leavePage } from './leavePage.js';
 
@@ -17,7 +17,7 @@ export function ConnectionNotice({ message }) {
 }
 
 /** Disconnect asks once, in place. Cancel returns the focus to Disconnect. */
-function Disconnect({ name, draft, onDisconnect }) {
+function Disconnect({ name, warning, onDisconnect }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const button = useRef(null);
@@ -26,7 +26,7 @@ function Disconnect({ name, draft, onDisconnect }) {
   }
   return (
     <div className="confirm" role="group" aria-label={`Disconnect your ${name} account`}>
-      <span>Disconnect your {name} account?{draft ? ' If your ticket choice uses this account, you will need to connect one again or choose another way to run tickets before we can build your site.' : ''}</span>
+      <span>Disconnect your {name} account?{warning ? ` ${warning}` : ''}</span>
       <button
         type="button"
         className="button danger"
@@ -43,10 +43,11 @@ function Disconnect({ name, draft, onDisconnect }) {
 }
 
 /** The provider's side ended, or was kept because another event site uses the account. */
-function disconnectedWords(name, { revoked, shared }) {
+function disconnectedWords(name, { revoked, shared }, built) {
+  if (revoked && built) return `You disconnected your ${name} account. Your site no longer sells paid tickets through it.`;
   if (revoked) return `You disconnected your ${name} account.`;
   if (shared) return `You disconnected your ${name} account from this request. Another event site still uses this account, so it stays connected there.`;
-  return `You disconnected your ${name} account, and we deleted our access to it. You can also remove Event Runner from the apps listed in your ${name} account settings.`;
+  return `You disconnected your ${name} account, and we deleted our access to it.`;
 }
 
 function eventLabel({ name, start }) {
@@ -149,6 +150,10 @@ export default function ConnectionPanel({
   const connectErrorId = `${fieldId(CONNECTION_FIELD)}-error`;
   // A reconnect after the answers froze keeps the chosen event; it asks only when the new account lost it.
   const showPicker = canConnect && (connections.canChange || !account.event);
+  const mayDisconnect = connections.canDisconnect || account.canEnd;
+  let warning = '';
+  if (connections.canChange) warning = 'If your ticket choice uses this account, you will need to connect one again or choose another way to run tickets before we can build your site.';
+  if (connections.built) warning = `Your site stays online, but it stops selling paid tickets. Orders and attendees already in your site stay there, and you refund orders from your ${copy.name} account. To connect an account again, ask ${hostName()}.`;
 
   async function connect() {
     setError('');
@@ -174,7 +179,7 @@ export default function ConnectionPanel({
     try {
       const reply = await callApi('disconnectAccount', { orgId, appId, provider });
       onConnections(reply);
-      onNotice(disconnectedWords(copy.name, reply));
+      onNotice(disconnectedWords(copy.name, reply, connections.built));
       setTimeout(() => title.current?.focus(), 0);
     } catch (err) {
       setError(err.message);
@@ -192,7 +197,8 @@ export default function ConnectionPanel({
             <strong>Connected: {account.displayName || copy.name}</strong>
             {account.connectedAt ? <span className="muted"> since {formatDate(account.connectedAt)}</span> : null}
           </p>
-          {connections.canChange && connections.canDisconnect ? <p>{CAN_DISCONNECT}</p> : null}
+          {connections.canChange && connections.canDisconnect ? <p>{canDisconnectWords(provider)}</p> : null}
+          {connections.built && provider === 'eventbrite' ? <p>To disconnect this account, ask {hostName()} to remove it from your site.</p> : null}
           {provider === 'eventbrite' && showPicker ? (
             <EventPicker
               orgId={orgId}
@@ -207,22 +213,24 @@ export default function ConnectionPanel({
             <p>Event: {account.event ? eventLabel(account.event) : <span className="muted">Not chosen yet</span>}</p>
           ) : null}
           {canConnect && copy.consent ? <p>{copy.consent}</p> : null}
-          {canConnect || connections.canDisconnect ? (
+          {canConnect || mayDisconnect ? (
             <div className="step-actions">
               {canConnect ? <button type="button" className="button" disabled={leaving} onClick={connect}>{connectLabel || 'Connect again'}</button> : null}
-              {connections.canDisconnect ? <Disconnect name={copy.name} draft={connections.canChange} onDisconnect={disconnect} /> : null}
+              {mayDisconnect ? <Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} /> : null}
             </div>
           ) : null}
         </>
       ) : (
         <>
-          {account.unfinished && connections.canDisconnect ? (
+          {account.unfinished && mayDisconnect ? (
             <>
               <p>An earlier change to this account did not finish, so we may still have access to it. Disconnect to end that access.</p>
-              <div className="step-actions"><Disconnect name={copy.name} draft={connections.canChange} onDisconnect={disconnect} /></div>
+              <div className="step-actions"><Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} /></div>
             </>
           ) : null}
-          {account.available ? (
+          {connections.built ? (
+            account.unfinished ? null : <p>No account is connected, so your site does not sell paid tickets or receive ticket updates through {copy.name}. To connect one, ask {hostName()}.</p>
+          ) : account.available ? (
             <>
               <p>{copy.explain}</p>
               {canConnect && copy.consent ? <p>{copy.consent}</p> : null}
@@ -248,7 +256,7 @@ export default function ConnectionPanel({
         </>
       )}
 
-      {myRole !== 'owner' && !canConnect && !connections.canDisconnect ? (
+      {myRole !== 'owner' && !canConnect && !mayDisconnect ? (
         <p className="muted">Only an Owner can change this account.</p>
       ) : null}
     </section>

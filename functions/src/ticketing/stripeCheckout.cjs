@@ -16,6 +16,9 @@ const {
   configuredPublicUrl, checkoutRequestFor, millis, iso,
 } = require('./stripeCommerce.cjs');
 
+// Written when Stripe refuses the site's key. Functions only, like the catalog.
+const CONNECTION = 'connection';
+
 const ATTEMPT_LEASE_MS = 30 * 1000;
 const RETRY_BACKOFF_MS = 5 * 1000;
 const PURCHASER_WINDOW_MS = 60 * 60 * 1000;
@@ -59,8 +62,8 @@ function checkSeatAnswers(request, form) {
   return perSeat;
 }
 
-function requirePaymentCredentials(provider) {
-  if (provider.hasPaymentCredentials !== true) {
+function requirePaymentCredentials(provider, ended = false) {
+  if (provider.hasPaymentCredentials !== true || ended) {
     throw new CommerceError('ticketing-unavailable', 'Paid ticket sales are not configured. Try again later.', 503);
   }
 }
@@ -131,8 +134,9 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
   };
   let scope;
   try { scope = providerScope(provider); } catch { return closed; }
-  const [catalogSnap, inventorySnap, eventSnap] = await db.getAll(
+  const [catalogSnap, inventorySnap, eventSnap, connectionSnap] = await db.getAll(
     db.collection(CATALOG).doc(CURRENT), db.collection(INVENTORY).doc(CURRENT), db.collection('config').doc('event'),
+    db.collection(CATALOG).doc(CONNECTION),
   );
   const result = validateTicketCatalog(catalogSnap.exists ? catalogSnap.data() : null);
   if (!result.ok || !result.value.published) return closed;
@@ -144,7 +148,7 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
   const at = now();
   const windowOpen = isSalesWindowOpen(catalog, at);
   const salesEnabled = !catalog.salesPaused && catalog.commercialTermsConfirmed && windowOpen && eventRemaining > 0;
-  const paidConfigured = provider.hasPaymentCredentials === true;
+  const paidConfigured = provider.hasPaymentCredentials === true && connectionSnap.data()?.ended !== true;
   const ticketTypes = catalog.ticketTypes.filter((type) => type.visibility === 'public' && type.active).map((type) => {
     const counts = inventory.types[type.id] || { held: 0, sold: 0 };
     const remaining = Math.min(eventRemaining, Math.max(0, type.capacity - counts.held - counts.sold));
@@ -222,9 +226,10 @@ async function reserveCommerceOrder({
     // The form joins the read set only when answers came, so a question edit
     // racing this reservation retries it against the new form. The code joins
     // when one came, so two checkouts racing its last use cannot both take it.
-    const [catalogSnap, inventorySnap, purchaserSnap, formSnap, promoSnap] = await Promise.all([
+    const [catalogSnap, inventorySnap, connectionSnap, purchaserSnap, formSnap, promoSnap] = await Promise.all([
       tx.get(db.collection(CATALOG).doc(CURRENT)),
       tx.get(inventoryRef),
+      tx.get(db.collection(CATALOG).doc(CONNECTION)),
       comp ? Promise.resolve(null) : tx.get(purchaserRef),
       hasAnswers ? tx.get(db.collection('config').doc('registration_form')) : Promise.resolve(null),
       promoCode ? tx.get(promoRef(db, promoCode)) : Promise.resolve(null),
@@ -258,7 +263,7 @@ async function reserveCommerceOrder({
     const promo = promoSnap?.exists ? promoSnap.data() : null;
     const priced = priceSelections({ catalog, request, at, comp, promo });
     const paid = priced.totalAmount > 0;
-    if (paid) requirePaymentCredentials(provider);
+    if (paid) requirePaymentCredentials(provider, connectionSnap.data()?.ended === true);
     const publicUrl = paid ? configuredPublicUrl(config, env) : null;
     // makeSeats copies each attendee as given; keep only the checked answers.
     const seats = makeSeats(id, priced.lines, request).map(({ answers: _given, ...seat }) => {
@@ -428,9 +433,12 @@ async function recoverCheckoutAttempt({ db, provider, orderId, now = () => new D
   let session = null;
   try {
     session = await provider.createCheckoutSession(lease.attempt.stripeRequest, { idempotencyKey: lease.attempt.idempotencyKey });
-  } catch {
+  } catch (err) {
     // A lost/failed response cannot establish that Stripe did not create the
     // session. Keep inventory held and keep the same key and request forever.
+    // Stripe refusing the key says the client ended the connection, so paid
+    // tickets close for the next buyer. docs/DEPLOY_RUNBOOK.md §12.5 reopens them.
+    if (err?.statusCode === 401) await db.collection(CATALOG).doc(CONNECTION).set({ ended: true, at: now() }).catch(() => {});
   }
   return db.runTransaction(async (tx) => {
     const attemptRef = db.collection(ATTEMPTS).doc(lease.order.attemptId);

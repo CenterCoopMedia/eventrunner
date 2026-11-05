@@ -49,6 +49,8 @@ async function request(fetch, label, url, init = {}) {
     const code = typeof body?.error === 'string' && ERROR_CODE.test(body.error) ? ` ${body.error}` : '';
     const err = new Error(`${label}: HTTP ${response.status}${code}`);
     err.status = response.status;
+    // Only this yes or no leaves here: a provider's description can quote a code or a key.
+    err.accountGone = body?.error === 'invalid_client' && /not connected|no such user/i.test(String(body?.error_description));
     throw err;
   }
   return body;
@@ -103,7 +105,12 @@ function createStripeConnector({ clientId, secretKey, fetch }) {
     },
 
     async revoke(accountId) {
-      await post('/oauth/deauthorize', 'stripe revoke', { client_id: clientId, stripe_user_id: accountId });
+      try {
+        await post('/oauth/deauthorize', 'stripe revoke', { client_id: clientId, stripe_user_id: accountId });
+      } catch (err) {
+        // The client already removed us at Stripe, or closed the account. The connection is over.
+        if (!err.accountGone) throw err;
+      }
       return true;
     },
   };
@@ -146,8 +153,7 @@ function createEventbriteConnector({ clientId, clientSecret, fetch }) {
       return { token, accountId: String(me.id), displayName: shortName(me.name), details: {} };
     },
 
-    // Eventbrite documents no way to end a connection from our side. The
-    // client can remove the app in its own account settings.
+    // Eventbrite documents no way to end a connection from our side.
     revoke: async () => false,
 
     async listEvents(token) {

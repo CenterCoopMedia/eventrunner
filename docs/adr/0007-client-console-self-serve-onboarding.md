@@ -98,7 +98,7 @@ bound to the signed-in user and the application, and expires. The provisioner mo
 the client project's Secret Manager and deletes the console copy. ~~The client can disconnect and
 reconnect from the status page until the site is made, and from the admin panel after.~~ The client
 can disconnect and reconnect until accepting the agreement, then only after a failed build (see
-[the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link)), and from the admin panel once the site is made.
+[the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link)). Once the site is made, an Owner can end a Stripe connection from the console, and an operator ends an Eventbrite connection, because Eventbrite has no way to end one from our side. Connecting again goes through an operator ([#676](https://github.com/CenterCoopMedia/eventrunner/issues/676)).
 
 ### 5. Review and approval
 

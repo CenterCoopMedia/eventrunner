@@ -139,6 +139,22 @@ describe('ApplicationStatus', () => {
       expect(callsTo('disconnectAccount')).toEqual([{ orgId: 'o1', appId: 'a1', provider: 'stripe' }]);
     });
 
+    it('an Owner can disconnect Stripe from a built site, and hears what that does', async () => {
+      const built = connections({ canChange: false, canDisconnect: false, built: true, stripe: { available: true, connected: true, canEnd: true, displayName: 'NC Local', connectedAt: '2026-11-02T00:00:00.000Z' } });
+      serveStatus({ status: 'ready', canEdit: false, canWithdraw: false, connections: built });
+      page();
+      fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }));
+      expect(screen.getByRole('group', { name: 'Disconnect your Stripe account' })).toHaveTextContent('Your site stays online, but it stops selling paid tickets.');
+    });
+
+    it('a built site names who removes an Eventbrite account', async () => {
+      const built = connections({ canChange: false, canDisconnect: false, built: true, stripe: { available: true, connected: false, canEnd: true }, eventbrite: { available: true, connected: true, displayName: 'NC Local', connectedAt: '2026-11-02T00:00:00.000Z', event: null } });
+      serveStatus({ status: 'ready', canEdit: false, canWithdraw: false, connections: built });
+      page();
+      expect(await screen.findByText(/To disconnect this account, ask/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Disconnect' })).not.toBeInTheDocument();
+    });
+
     it('a closed request with an unfinished change still offers Disconnect', async () => {
       const unfinished = { available: true, connected: false, unfinished: true, displayName: null, connectedAt: null };
       serveStatus({ status: 'withdrawn', canEdit: false, canWithdraw: false, connections: connections({ canChange: false, stripe: unfinished }) });
