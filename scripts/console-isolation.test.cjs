@@ -63,8 +63,8 @@ test('console hosting refuses framing and keeps sign-in pages out of search', ()
 // functions take from outside console/, and it arrives as the vendored
 // `shared` package (console/functions/vendor/shared.tgz), never as a
 // relative path. Besides it they use only the Firebase SDKs, Stripe,
-// pdf-lib (the signer's copy of the agreement) and Node.
-const FUNCTION_PACKAGES = Object.freeze(['shared', 'firebase-admin', 'firebase-functions', 'pdf-lib', 'stripe']);
+// pdf-lib with its font kit (the signer's copy of the agreement) and Node.
+const FUNCTION_PACKAGES = Object.freeze(['shared', '@pdf-lib/fontkit', 'firebase-admin', 'firebase-functions', 'pdf-lib', 'stripe']);
 
 function allowedFunctionImport(specifier) {
   if (specifier.startsWith('node:')) return true;
