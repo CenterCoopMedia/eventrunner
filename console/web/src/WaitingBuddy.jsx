@@ -1,5 +1,5 @@
 /**
- * A name badge on a lanyard, jogging in place: the console's company while a
+ * Badger: a name badge on a lanyard, jogging in place, the console's company while a
  * long wait runs (loading the setup, a site build). Decorative only; the
  * status sentence beside it is the real message. It fades in after a short
  * wait, so a fast load never shows it, and holds still for reduced motion.
