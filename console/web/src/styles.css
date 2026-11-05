@@ -295,7 +295,8 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
   border-radius: 50%;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .console-spinner { animation: console-spin var(--console-loading-cycle) linear infinite; }
+  /* Turns only after a short wait, so a fast load never shows motion. */
+  .console-spinner { animation: console-spin var(--console-loading-cycle) linear 600ms infinite; }
   @keyframes console-spin { to { transform: rotate(360deg); } }
 }
 
