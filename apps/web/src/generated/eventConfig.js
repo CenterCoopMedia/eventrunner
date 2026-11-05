@@ -122,7 +122,7 @@ export const features = {
   icsExport: false,
   calendarSync: false,
   updates: true,
-  autoApproveTicketHolders: false,
+  autoApproveTicketHolders: true,
   publicAttendeeProfiles: false,
   webmcpPublic: false,
   webmcpAdmin: false,

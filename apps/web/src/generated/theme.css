@@ -1454,6 +1454,136 @@
   --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
+/* nclocal — light. */
+:root[data-theme='nclocal'][data-mode='light'],
+[data-theme='nclocal'][data-mode='light'] {
+  --brand-primary-rgb: 9 58 70;
+  --brand-primary-dark-rgb: 0 28 40;
+  --brand-primary-light-rgb: 193 196 220;
+  --brand-accent-rgb: 9 58 70;
+  --brand-surface-rgb: 253 252 250;
+  --brand-surface-alt-rgb: 244 240 235;
+  --brand-ink-rgb: 17 17 17;
+  --brand-ink-muted-rgb: 103 103 103;
+  --semantic-success-rgb: 22 96 62;
+  --semantic-warning-rgb: 134 82 10;
+  --semantic-danger-rgb: 170 32 44;
+  --semantic-highlight-rgb: 124 90 14;
+  --semantic-keynote-rgb: 9 58 70;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 220 219 217;
+  --rule-strong-rgb: 123 123 122;
+  --rule-nameplate-rgb: 17 17 17;
+  --color-border-control-rgb: 130 130 129;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --schedule-forward-rgb: var(--color-surface-alt-rgb);
+  --schedule-trace-rgb: var(--color-accent-rgb);
+  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+  --back-issue-rule-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
+}
+
+/* nclocal — dark. */
+:root[data-theme='nclocal'][data-mode='dark'],
+[data-theme='nclocal'][data-mode='dark'] {
+  --brand-primary-rgb: 193 196 220;
+  --brand-primary-dark-rgb: 224 225 237;
+  --brand-primary-light-rgb: 9 58 70;
+  --brand-accent-rgb: 194 206 209;
+  --brand-surface-rgb: 0 28 40;
+  --brand-surface-alt-rgb: 9 42 54;
+  --brand-ink-rgb: 249 247 245;
+  --brand-ink-muted-rgb: 194 206 209;
+  --semantic-success-rgb: 116 200 150;
+  --semantic-warning-rgb: 228 174 88;
+  --semantic-danger-rgb: 242 136 142;
+  --semantic-highlight-rgb: 222 190 108;
+  --semantic-keynote-rgb: 193 196 220;
+  --color-surface-rgb: var(--brand-surface-rgb);
+  --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
+  --color-text-primary-rgb: var(--brand-ink-rgb);
+  --color-text-secondary-rgb: var(--brand-ink-muted-rgb);
+  --color-accent-rgb: var(--brand-primary-rgb);
+  --color-accent-strong-rgb: var(--brand-primary-dark-rgb);
+  --color-accent-soft-rgb: var(--brand-primary-light-rgb);
+  --color-accent-secondary-rgb: var(--brand-accent-rgb);
+  --color-ink-motif-rgb: var(--color-text-secondary-rgb);
+  --rule-hairline-rgb: 35 59 69;
+  --rule-strong-rgb: 137 148 153;
+  --rule-nameplate-rgb: 249 247 245;
+  --color-border-control-rgb: 129 142 147;
+  --session-card-rule-rgb: var(--rule-hairline-rgb);
+  --session-card-surface-rgb: var(--color-surface-rgb);
+  --session-card-stamp-rgb: var(--color-accent-rgb);
+  --nameplate-rule-rgb: var(--rule-nameplate-rgb);
+  --nameplate-text-rgb: var(--color-text-primary-rgb);
+  --nameplate-frame-rgb: var(--rule-hairline-rgb);
+  --section-rule-rgb: var(--rule-strong-rgb);
+  --folio-rule-rgb: var(--rule-hairline-rgb);
+  --folio-text-rgb: var(--color-text-secondary-rgb);
+  --schedule-grid-rgb: var(--rule-hairline-rgb);
+  --schedule-forward-rgb: var(--color-surface-alt-rgb);
+  --schedule-trace-rgb: var(--color-accent-rgb);
+  --back-issue-ink-rgb: var(--color-text-secondary-rgb);
+  --back-issue-rule-rgb: var(--rule-hairline-rgb);
+  --plate-frame-rgb: var(--rule-hairline-rgb);
+  --specimen-label-rule-rgb: var(--rule-hairline-rgb);
+  --map-grid-rgb: var(--rule-hairline-rgb);
+  --route-mark-rgb: var(--color-accent-rgb);
+  --route-mark-ink-rgb: var(--color-surface-rgb);
+  --callout-rgb: var(--color-text-primary-rgb);
+  --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
+}
+
 /* Print palette (brief §2.1, §3.3). Paper has no dark mode: a reader who
    prints from a dark screen gets the light edition. Every print rule reads
    these tokens, so re-pointing them here is the whole switch. */

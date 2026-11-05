@@ -16,7 +16,7 @@
 // that clears 3:1, and the error under the field with a mark and a word.
 // `aria-invalid` plus `aria-describedby` carry the failure to a screen
 // reader; nothing is signalled by colour alone.
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 // The field boundary is --admin-rule-control, not the hairline: a form
 // control's boundary is non-text user interface under WCAG 1.4.11 and needs
@@ -256,6 +256,103 @@ export function SelectField({
           </option>
         ))}
       </select>
+      {error ? <FieldError id={errorId} message={error} /> : null}
+    </div>
+  );
+}
+
+/**
+ * A list built one item at a time: type, then press Enter or the plus button.
+ * Text left in the box joins the list when the box loses focus, so a save
+ * never drops it. Pasted lines become one item each. An exact repeat is
+ * ignored; the caller's own check names anything else it refuses.
+ *
+ * @param {{ label: string, items: string[], onChange: (items: string[]) => void,
+ *           itemName: string, hint?: string, error?: string }} props
+ *   Other props go to the input, for example `inputMode`.
+ */
+export function AddOneListField({ label, items, onChange, itemName, hint, error, ...rest }) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const [draft, setDraft] = useState('');
+  const [heldRows, setHeldRows] = useState(null);
+  const mouseIsDown = useRef(false);
+  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
+
+  // A click on Save blurs this input first. A new row drawn at that moment
+  // would move Save away from the pointer and lose the click, so the row
+  // waits for the release. The list value itself updates at once.
+  useEffect(() => {
+    const press = () => { mouseIsDown.current = true; };
+    const release = () => {
+      mouseIsDown.current = false;
+      setTimeout(() => setHeldRows(null), 0);
+    };
+    document.addEventListener('mousedown', press, true);
+    document.addEventListener('mouseup', release, true);
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('blur', release);
+      document.removeEventListener('mousedown', press, true);
+      document.removeEventListener('mouseup', release, true);
+    };
+  }, []);
+
+  const visibleItems = items.slice(0, heldRows ?? items.length);
+
+  const add = (text) => {
+    const added = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const next = [...items];
+    for (const item of added) if (!next.includes(item)) next.push(item);
+    if (next.length !== items.length) onChange(next);
+    setDraft('');
+  };
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3xs">
+      <label htmlFor={id} className={fieldLabelClass}>{label}</label>
+      {hint ? <p id={hintId} className={fieldHintClass}>{hint}</p> : null}
+      <div className="flex items-center gap-2xs">
+        <input
+          id={id}
+          type="text"
+          className={`${inputClass} min-w-0 flex-1`}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            add(draft);
+          }}
+          onPaste={(event) => {
+            const pasted = event.clipboardData?.getData('text') ?? '';
+            if (!pasted.includes('\n')) return;
+            event.preventDefault();
+            const { selectionStart, selectionEnd } = event.target;
+            const start = selectionStart ?? draft.length;
+            add(`${draft.slice(0, start)}${pasted}${draft.slice(selectionEnd ?? start)}`);
+          }}
+          onBlur={() => {
+            if (mouseIsDown.current) setHeldRows(items.length);
+            add(draft);
+          }}
+          aria-invalid={error ? 'true' : undefined}
+          aria-describedby={describedBy || undefined}
+          {...rest}
+        />
+        <button type="button" className={secondaryButtonClass} onClick={() => add(draft)} aria-label={`Add ${itemName}`}>+</button>
+      </div>
+      {visibleItems.length ? (
+        <ul className="flex flex-col gap-3xs" aria-label={`${label} list`}>
+          {visibleItems.map((item) => (
+            <li key={item} className="flex items-center justify-between gap-xs text-admin-base text-admin-ink">
+              <span className="min-w-0 break-words">{item}</span>
+              <button type="button" className={ghostButtonClass} onClick={() => onChange(items.filter((other) => other !== item))} aria-label={`Remove ${item}`}>×</button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {error ? <FieldError id={errorId} message={error} /> : null}
     </div>
   );
