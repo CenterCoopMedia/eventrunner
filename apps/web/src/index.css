@@ -2386,6 +2386,16 @@
    backlight, and a handout is read across a room. */
 /* Event heroes: shared content and controls, authored preset compositions. */
 @layer components {
+  .site-logo {
+    block-size: 1.5rem;
+    inline-size: auto;
+    max-inline-size: 10rem;
+    object-fit: contain;
+  }
+  .site-logo--masthead {
+    block-size: 2.5rem;
+    max-inline-size: 14rem;
+  }
   .historical-demo-logo {
     inline-size: 13.75rem;
     max-inline-size: 65vw;

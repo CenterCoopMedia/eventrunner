@@ -12,13 +12,13 @@
 // the same per-collection shape, so the same reader serves both.
 
 const REASON_TEXT = {
-  'no-draft': 'has no draft to publish',
+  'no-draft': 'had nothing new to publish',
   conflict: 'was edited while publishing, so its newer draft stayed unpublished',
 };
 
 /** @param {string} reason */
 function describeReason(reason) {
-  return REASON_TEXT[reason] ?? `was skipped (${reason})`;
+  return REASON_TEXT[reason] ?? 'was not published';
 }
 
 /**
@@ -29,11 +29,13 @@ function describeReason(reason) {
  * @param {string[]} requestedIds ids the caller asked to publish
  * @param {string} [noun] plural noun for the count message, e.g. 'pages'
  *   (default) or 'content blocks'
+ * @param {Record<string, string>} [titles] docId -> title, used to name a
+ *   skipped item; without one the message says "One item", never the id
  * @returns {{ ok: boolean, published: string[],
  *             skipped: Array<{ docId: string, reason: string }>,
  *             message: string }}
  */
-export function summarizePublish(response, collection, requestedIds, noun = 'pages') {
+export function summarizePublish(response, collection, requestedIds, noun = 'pages', titles = {}) {
   const result = response?.results?.[collection] ?? {};
   const published = Array.isArray(result.published) ? result.published : [];
   const skippedRows = Array.isArray(result.skipped) ? result.skipped : [];
@@ -56,7 +58,10 @@ export function summarizePublish(response, collection, requestedIds, noun = 'pag
     };
   }
   const detail = skipped
-    .map(({ docId, reason }) => `${docId} ${describeReason(reason)}`)
+    .map(({ docId, reason }) => {
+      const title = skippedRows.find((entry) => entry?.docId === docId)?.title || titles?.[docId];
+      return `${title || 'One item'} ${describeReason(reason)}`;
+    })
     .join('; ');
   const publishedCount = requested.length - skipped.length;
   return {

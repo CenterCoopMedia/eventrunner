@@ -33,7 +33,8 @@ describe('summarizePublish', () => {
     expect(verdict.published).toEqual(['faq']);
     expect(verdict.skipped).toEqual([{ docId: 'scholarships', reason: 'conflict' }]);
     expect(verdict.message).toContain('Published 1 of 2 pages');
-    expect(verdict.message).toContain('scholarships was edited while publishing');
+    expect(verdict.message).toContain('One item was edited while publishing');
+    expect(verdict.message).not.toContain('scholarships');
   });
 
   it('reports a no-draft skip', () => {
@@ -44,7 +45,18 @@ describe('summarizePublish', () => {
     );
     expect(verdict.ok).toBe(false);
     expect(verdict.message).toContain('Nothing was published');
-    expect(verdict.message).toContain('faq has no draft to publish');
+    expect(verdict.message).toContain('One item had nothing new to publish');
+  });
+
+  it('names a skipped item by its title when the caller has one', () => {
+    const verdict = summarizePublish(
+      { results: { cmsPages: { published: [], skipped: [{ docId: 'faq', reason: 'no-draft' }] } } },
+      'cmsPages',
+      ['faq'],
+      'pages',
+      { faq: 'Frequently asked questions' },
+    );
+    expect(verdict.message).toBe('Nothing was published: Frequently asked questions had nothing new to publish.');
   });
 
   it('treats an id the response never mentions as not published', () => {

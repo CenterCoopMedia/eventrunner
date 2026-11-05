@@ -643,8 +643,8 @@ describe('the category and the featured flag (issue 191)', () => {
     }, 400));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('The server rejected this save');
+    expect(alert).toHaveTextContent('This was not saved');
     expect(screen.getByLabelText('Category')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Category')).toHaveAccessibleDescription(/category: must be null or 1 to 24 characters on one line/);
+    expect(screen.getByLabelText('Category')).toHaveAccessibleDescription(/Category: must be null or 1 to 24 characters on one line/);
   });
 });
