@@ -52,6 +52,9 @@ test('deliver sends the rendered operator mail through the email core', async ()
   assert.match(message.text, /url: https:\/\/admin\.example\/errors\/e1/);
   assert.match(message.text, /errorId: e1/);
   assert.match(message.html, /ERROR: \[EX27\] sync failed/);
+  assert.match(message.html, /Event Runner operator alert/);
+  assert.match(message.html, /tickets-r-us/);
+  assert.match(message.html, /href="https:\/\/admin\.example\/errors\/e1"/);
 });
 
 test('deliver maps a failed EmailSendResult to delivered:false with the error', async () => {
