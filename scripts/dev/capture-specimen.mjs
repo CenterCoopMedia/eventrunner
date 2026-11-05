@@ -59,7 +59,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..');
 
 /**
- * The six site styles, in picker order, and the list --styles is checked
+ * The site styles, in picker order, and the list --styles is checked
  * against. It mirrors THEME_PRESET_IDS (packages/shared/src/theme.cjs);
  * capture-specimen.test.cjs fails when the two drift apart.
  */
@@ -70,6 +70,7 @@ export const DEFAULT_STYLES = Object.freeze([
   'atlas',
   'field-guide',
   'zine',
+  'nclocal',
 ]);
 
 export const DEFAULT_MODES = Object.freeze(['light', 'dark']);

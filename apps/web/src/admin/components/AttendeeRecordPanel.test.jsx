@@ -1,7 +1,7 @@
 // AttendeeRecordPanel — one attendee's organizer record (issue 185).
 import { useState } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { AdminApiError } from '../adminApi.js';
 
 const callMock = vi.fn();
@@ -80,12 +80,13 @@ describe('AttendeeRecordPanel', () => {
     expect(screen.queryByRole('region', { name: 'Record for Ada Quill' })).toBeNull();
   });
 
-  it('prefills one edition per line, with the hint that says who owns the list', () => {
+  it('prefills each edition, with the hint that says who owns the list', () => {
     openPanel();
-    const field = screen.getByLabelText('Past attendance');
-    expect(field).toHaveValue('2024\n2025');
+    const list = screen.getByRole('list', { name: 'Past attendance list' });
+    expect(within(list).getByText('2024')).toBeInTheDocument();
+    expect(within(list).getByText('2025')).toBeInTheDocument();
     expect(screen.getByText(
-      'One edition per line, such as a year. Attendees cannot change this list. It is part of the export.',
+      'Add each past event this person attended, such as 2024. Only staff can change this list.',
     )).toBeInTheDocument();
   });
 
@@ -93,30 +94,31 @@ describe('AttendeeRecordPanel', () => {
     callMock.mockResolvedValueOnce({ ok: true, uid: 'uid-ada', pastAttendance: ['2023', '2024', 'Spring 2025'] });
     openPanel();
 
-    fireEvent.change(screen.getByLabelText('Past attendance'), {
-      target: { value: '  2023 \n\n2024\r\n   \nSpring 2025  ' },
+    fireEvent.click(screen.getByRole('button', { name: 'Remove 2025' }));
+    fireEvent.paste(screen.getByLabelText('Past attendance'), {
+      clipboardData: { getData: () => '  2023 \n\n2024\r\n   \nSpring 2025  ' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save record' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await flush();
 
     expect(callMock).toHaveBeenCalledWith('updateAttendee', {
       uid: 'uid-ada',
-      pastAttendance: ['2023', '2024', 'Spring 2025'],
+      pastAttendance: ['2024', '2023', 'Spring 2025'],
     });
     expect(screen.getByRole('status')).toHaveTextContent('Past attendance saved.');
-    expect(screen.getByLabelText('Past attendance')).toHaveValue('2023\n2024\nSpring 2025');
+    expect(screen.getByText('Spring 2025')).toBeInTheDocument();
   });
 
   it('is busy while the save is in flight', async () => {
     let finish;
     callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     openPanel();
-    fireEvent.click(screen.getByRole('button', { name: 'Save record' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const busy = screen.getByRole('button', { name: 'Saving…' });
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute('aria-busy', 'true');
     await act(async () => { finish({ ok: true, pastAttendance: [] }); });
-    expect(screen.getByRole('button', { name: 'Save record' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
 
   it('marks the field and moves focus to the summary when the server refuses the list', async () => {
@@ -126,7 +128,7 @@ describe('AttendeeRecordPanel', () => {
       message: 'pastAttendance: "2024" is listed twice.',
     }));
     openPanel();
-    fireEvent.click(screen.getByRole('button', { name: 'Save record' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await flush();
 
     const summary = screen.getByRole('alert');
@@ -134,7 +136,7 @@ describe('AttendeeRecordPanel', () => {
     expect(document.activeElement).toBe(summary);
     expect(screen.getByLabelText('Past attendance')).toHaveAttribute('aria-invalid', 'true');
     // The rejected value is kept for the fix.
-    expect(screen.getByLabelText('Past attendance')).toHaveValue('2024\n2025');
+    expect(screen.getByRole('button', { name: 'Remove 2025' })).toBeInTheDocument();
   });
 
   it('deletes through deleteAttendee only after the confirm step, and reports the result up', async () => {

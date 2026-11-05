@@ -51,7 +51,7 @@ const { safeUrlHref } = require('./urlSafety.cjs');
 const { isEmailAddress } = require('./email.cjs');
 
 /** Feature toggles default false except the first four (spec §2.2). */
-const DEFAULT_ON_FEATURES = Object.freeze(['schedule', 'speakers', 'sponsors', 'attendeeDirectory']);
+const DEFAULT_ON_FEATURES = Object.freeze(['schedule', 'speakers', 'sponsors', 'attendeeDirectory', 'autoApproveTicketHolders']);
 
 /**
  * The interactive prompt set. Declared as data so the question list, its
@@ -260,7 +260,8 @@ function parseAnswersFile(text) {
 }
 
 /**
- * The features doc: every known key present, the §2.2 four on, the rest
+ * The features doc: every known key present, the §2.2 four and automatic
+ * ticket approval on, the rest
  * off, answers-file overrides applied on top. Unknown keys are dropped
  * here rather than passed through, so a typo surfaces as a validation
  * error naming the key instead of a silently ignored toggle.

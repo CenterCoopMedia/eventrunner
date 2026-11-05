@@ -30,6 +30,7 @@ const {
   internals: { TICKETS, safeDocId },
 } = require('./index.cjs');
 const { upsertTickets } = require('./sync.cjs');
+const { holdsPaidTicket } = require('./entitlement.cjs');
 const { ANSWERS, HOLDS } = require('./ticketAnswers.cjs');
 const { ORDERS } = require('./stripeCommerce.cjs');
 
@@ -77,7 +78,7 @@ async function applyTicketClaimToUser({ db, uid, now = () => new Date() }) {
     if (isValidTransition(current, 'ticketed', 'ticket_claimed')) {
       next = 'ticketed';
     }
-    if (autoApprove && isValidTransition(next, 'approved', 'auto_approve')) {
+    if (autoApprove && isValidTransition(next, 'approved', 'auto_approve') && await holdsPaidTicket({ db, tx, uid })) {
       next = 'approved';
       patch.approvalSource = 'ticket';
     }

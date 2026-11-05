@@ -75,11 +75,12 @@ service cloud.firestore {
       return isOperator() || isStaff();
     }
 
-    // config/* is public runtime configuration, EXCEPT config/bootstrap,
-    // which holds the admin allowlist and is server-only: no client read,
-    // not even for admins (the token check happens server-side).
+    // config/* is public runtime configuration, EXCEPT two server-only docs:
+    // config/bootstrap holds the admin allowlist (the token check happens
+    // server-side), and config/providers holds the operator's notice address
+    // and provider ids. No client reads either, not even admins.
     match /config/{docId} {
-      allow read: if docId != 'bootstrap';
+      allow read: if docId != 'bootstrap' && docId != 'providers';
       allow write: if false;
     }
 

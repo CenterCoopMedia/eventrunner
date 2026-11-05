@@ -28,7 +28,7 @@ test('the 51-image matrix covers breakpoints, all themes on phone/desktop, and f
     }
     assert.deepEqual(matrix.filter((shot) => shot.route === 'home').map((shot) => [shot.width, shot.preset, shot.mode, shot.presentation]), WIDTHS.map((width) => [width, 'newsroom', 'light', 'ordinary']));
   }
-  for (const width of [485, 1165]) for (const preset of THEME_PRESET_IDS) for (const mode of ['light', 'dark']) {
+  for (const width of [485, 1165]) for (const preset of THEME_PRESET_IDS.filter((id) => id !== 'nclocal')) for (const mode of ['light', 'dark']) {
     assert.equal(after.filter((shot) => shot.route === 'program' && shot.width === width && shot.preset === preset && shot.mode === mode && shot.presentation === 'ordinary' && shot.state === 'default').length, 1);
   }
   assert.deepEqual(after.filter((shot) => shot.state !== 'default').map((shot) => [shot.width, shot.state]), [

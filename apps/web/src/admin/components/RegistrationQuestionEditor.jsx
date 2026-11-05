@@ -1,8 +1,8 @@
 // One custom registration question in the operator's editor (ADR 0008 §4).
-// Choices are written one per line; the shared check trims them and refuses
-// a repeat or a list shorter than two.
+// Choices are added one at a time; the shared check refuses a repeat or a
+// list shorter than two.
 import { CUSTOM_KINDS, LIMITS, MAX_CHOICES } from 'shared/registrationForm';
-import { CheckboxField, SelectField, TextAreaField, TextField, ghostButtonClass } from './formControls.jsx';
+import { AddOneListField, CheckboxField, SelectField, TextField, ghostButtonClass } from './formControls.jsx';
 
 export const KIND_LABELS = Object.freeze({
   short_text: 'Short answer',
@@ -49,12 +49,12 @@ export default function RegistrationQuestionEditor({ question, index, count, err
       </div>
       <TextField label="Help text (optional)" value={question.help} onChange={(help) => onChange({ help })} maxLength={LIMITS.help} error={errorFor(`${at}.help`)} />
       {isChoiceKind(question.kind) ? (
-        <TextAreaField
+        <AddOneListField
           label="Choices"
-          hint={`One per line, 2 to ${MAX_CHOICES}.`}
-          rows={4}
-          value={question.choicesText}
-          onChange={(choicesText) => onChange({ choicesText })}
+          itemName="choice"
+          hint={`Add 2 to ${MAX_CHOICES}.`}
+          items={question.choicesText.split('\n').filter(Boolean)}
+          onChange={(choices) => onChange({ choicesText: choices.join('\n') })}
           error={errorFor(`${at}.choices`)}
         />
       ) : null}
