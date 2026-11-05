@@ -302,10 +302,16 @@ export default function Layout() {
   // actually serves it. A runtime config/theme doc is unvalidated Firestore
   // data (§2.4 fail-soft overlay), so a value that is not a usable path
   // resolves to null and no logo is rendered at all.
+  // An uploaded primary logo (a `branding/{assetId}/{name}` path, never a
+  // flat seeded placeholder) leads the header; the square icon is the
+  // fallback, so a client who uploads only their main logo still sees it.
+  const primary = typeof theme?.logos?.primary === 'string' ? theme.logos.primary.trim() : '';
+  const uploadedPrimary = primary.split('/').length > 2 ? brandingSrc(primary) : null;
   const markSrc = brandingSrc(theme?.logos?.mark);
   // A slot can point at an object that has since been deleted from the
   // bucket. The shell must degrade to the wordmark, never to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
   // A runtime config/event doc can replace `legal` wholesale (shallow
   // overlay) with a partial or malformed object; fall back per-field so one
   // bad admin write never white-screens the shell that wraps every route.
@@ -523,7 +529,16 @@ export default function Layout() {
             dates={plate.dates}
             place={plate.edition}
             mark={
-              markSrc && !markFailed ? (
+              !historicalDemo && uploadedPrimary && !logoFailed ? (
+                // A wide logo keeps its own proportions at the mark's height.
+                <img
+                  src={uploadedPrimary}
+                  alt=""
+                  className={`site-logo ${headerVariant === 'masthead' ? 'site-logo--masthead' : ''}`}
+                  height={markSize.px}
+                  onError={() => setLogoFailed(true)}
+                />
+              ) : markSrc && !markFailed ? (
                 // width/height must match the box the class draws. They
                 // reserve the space before the stylesheet applies, so a
                 // wrong pair moves the header on first paint.

@@ -338,11 +338,11 @@ describe('the timeline entry editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const summary = await screen.findByRole('alert');
-    expect(summary).toHaveTextContent('year: enter a year from 1900 to 2100 as four digits');
+    expect(summary).toHaveTextContent('Year: enter a year from 1900 to 2100 as four digits');
     await waitFor(() => expect(document.activeElement).toBe(summary));
     expect(screen.getByLabelText('Year')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Year')).toHaveAccessibleDescription(
-      expect.stringContaining('year: enter a year from 1900 to 2100 as four digits'),
+      expect.stringContaining('Year: enter a year from 1900 to 2100 as four digits'),
     );
     expect(screen.getByLabelText('Title')).not.toHaveAttribute('aria-invalid');
   });

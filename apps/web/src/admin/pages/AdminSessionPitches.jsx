@@ -71,7 +71,7 @@ export default function AdminSessionPitches() {
         <SelectField label="Decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...PITCH_STATUS_OPTIONS]} />
         <TextField label="Search" value={search} onChange={setSearch} hint="Title, email, organization or presenter." />
       </div>
-      {listError ? <Notice tone="caution" message="Cannot load the queue. Reconnecting; the list may be out of date." /> : null}
+      {listError ? <Notice tone="caution" message="The list did not refresh. Trying again…" /> : null}
       {rows === null ? <AdminLoadingState label="Loading session pitches…" /> : (
         <>
           <p role="status" className="text-admin-sm text-admin-ink-secondary">Showing {shown.length} of {total}.</p>

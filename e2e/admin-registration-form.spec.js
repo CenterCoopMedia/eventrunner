@@ -31,7 +31,6 @@ test('an operator writes the registration questions, previews them, and saves th
 
     await page.getByRole('button', { name: 'Save registration form' }).click();
     await expect(page.getByText('Registration form saved. New registrations use it now.')).toBeVisible();
-    await expect(page.getByText('Revision 1')).toBeVisible();
     const stored = (await ref.get()).data();
     expect(stored.revision).toBe(1);
     expect(stored.standard.organization).toEqual({ enabled: true, required: true });

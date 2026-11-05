@@ -786,8 +786,8 @@ describe('event settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('timezone: must be a valid IANA timezone (got "Mars/Olympus")');
-    expect(alert).toHaveTextContent('sender.email: must be an email address');
+    expect(alert).toHaveTextContent('Timezone: must be a valid IANA timezone (got "Mars/Olympus")');
+    expect(alert).toHaveTextContent('Email: must be an email address');
     expect(screen.getByRole('combobox', { name: 'Time zone' })).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Sender email')).toHaveAttribute('aria-invalid', 'true');
   });
@@ -843,7 +843,7 @@ describe('event settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('registration.externalUrl: must be null or an https:// URL');
+    expect(alert).toHaveTextContent('External url: must be null or an https:// URL');
     expect(screen.getByLabelText('External registration URL')).toHaveAttribute(
       'aria-invalid',
       'true',
@@ -1133,12 +1133,12 @@ describe('feature flags', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save features' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'features.schedule: must be a boolean, got "yes"',
+      'Schedule: must be a boolean, got "yes"',
     );
     const schedule = screen.getByRole('checkbox', { name: 'Public schedule' });
     expect(schedule).toBeChecked();
     expect(schedule).toHaveAttribute('aria-invalid', 'true');
-    expect(schedule).toHaveAccessibleDescription(/Show the public schedule\..*features\.schedule: must be a boolean/);
+    expect(schedule).toHaveAccessibleDescription(/Show the public schedule\..*Schedule: must be a boolean/);
     expect(await screen.findByRole('alert')).toHaveFocus();
   });
 });
@@ -1316,9 +1316,9 @@ describe('milestones and the registration goal', () => {
     // and names the field; the field itself is marked.
     const alert = await screen.findByRole('alert');
     await waitFor(() => expect(document.activeElement).toBe(alert));
-    expect(alert).toHaveTextContent('milestones[0].date: must match YYYY-MM-DD');
+    expect(alert).toHaveTextContent('Date: must match YYYY-MM-DD');
     expect(screen.getByLabelText('Milestone 1 date')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Milestone 1 date')).toHaveAccessibleDescription(/milestones\[0\]\.date: must match/);
+    expect(screen.getByLabelText('Milestone 1 date')).toHaveAccessibleDescription(/Date: must match/);
     expect(screen.getByLabelText('Milestone 2 name')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Milestone 1 name')).not.toHaveAttribute('aria-invalid');
   });

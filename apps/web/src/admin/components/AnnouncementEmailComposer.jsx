@@ -626,7 +626,7 @@ export default function AnnouncementEmailComposer() {
         {channel && !channel.canSend ? <Notice tone="caution" message={channel.blocker} /> : null}
         {history ? (
           <form className="mt-sm flex flex-col gap-sm" onSubmit={runPreview} noValidate>
-            <ServerErrorSummary error={error} errorRef={errorRef} title="The server refused this email" />
+            <ServerErrorSummary error={error} errorRef={errorRef} title="This email was not sent" />
             {retry ? (
               <div className="flex flex-col gap-2xs">
                 <Notice

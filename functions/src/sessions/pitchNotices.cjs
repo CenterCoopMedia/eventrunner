@@ -384,7 +384,7 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
       record: claimed.record, pitch: claimed.pitch, settings: claimed.settings,
     });
     if (result.state === 'unknown') {
-      return sendError(res, 502, 'delivery-unknown', 'The email service did not answer. The email may have been sent. Check the Email log before you retry. The decision is still saved.');
+      return sendError(res, 502, 'delivery-unknown', 'We do not know if the email went out. Check the Email log before you send it again. The decision is still saved.');
     }
     if (result.state !== 'sent') {
       return sendError(res, 502, 'delivery-failed', 'The email was not sent. The decision is still saved. Retry the email later.');
