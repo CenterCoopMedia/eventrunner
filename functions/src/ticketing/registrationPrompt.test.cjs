@@ -256,6 +256,23 @@ for (const [label, makeProvider] of [
 // onceKey: exactly one send per uid, even across repeat trigger deliveries.
 // ---------------------------------------------------------------------------
 
+for (const list of ['adminEmails', 'staffEmails']) {
+  test(`someone on ${list} gets no prompt on their first sign-in, whichever case the address uses`, async () => {
+    const db = makeFakeDb({
+      'users/uid-ada': user(),
+      'config/bootstrap': { [list]: [user().email.toUpperCase()] },
+    });
+    const getConfig = async () => baseConfig({ event: { registration: { externalUrl: 'https://example.org/x' } } });
+    const calls = [];
+    const result = await sendRegistrationPrompt({
+      db, provider: manual(db, getConfig), sendEmail: makeSendEmail(calls), getConfig,
+      uid: 'uid-ada', now: () => T0, log: QUIET,
+    });
+    assert.equal(result.reason, 'site-team');
+    assert.equal(calls.length, 0);
+  });
+}
+
 test('a repeat delivery of the same trigger sends at most once (onceKey get-ticket:{uid})', async () => {
   const db = makeFakeDb({ 'users/uid-ada': user() });
   const getConfig = async () => baseConfig({ event: { registration: { externalUrl: 'https://example.org/x' } } });
@@ -368,6 +385,7 @@ test('registration trigger retries when policy becomes unavailable at the final 
       } };
       if (name !== 'config') return store.collection(name);
       return { doc(id) {
+        if (id === 'bootstrap') return { async get() { return { exists: false }; } };
         assert.equal(id, 'event');
         return { async get() {
           policyReads += 1;

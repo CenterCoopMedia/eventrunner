@@ -12,15 +12,19 @@
 //     navigates away from /profile without finishing is not dragged back.
 //   • It waits for status 'ready': during 'pending-account' there is
 //     nothing to complete yet.
+//   • It skips an admin, who opens the site to see it, not to attend, and
+//     waits for that answer, because a redirect can't be taken back.
 //
 // ProfileSidebar carries the standing invitation for everyone this skips.
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 
 const LANDING_PATHS = ['/', '/signin'];
 
 export default function ProfileSetupRedirect() {
+  const { adminStatus } = useAuth();
   const { status, needsProfileSetup } = useProfile();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -28,11 +32,11 @@ export default function ProfileSetupRedirect() {
 
   useEffect(() => {
     if (redirected.current) return;
-    if (status !== 'ready' || !needsProfileSetup) return;
+    if (adminStatus !== 'denied' || status !== 'ready' || !needsProfileSetup) return;
     if (!LANDING_PATHS.includes(pathname)) return;
     redirected.current = true;
     navigate('/profile', { replace: true });
-  }, [status, needsProfileSetup, pathname, navigate]);
+  }, [adminStatus, status, needsProfileSetup, pathname, navigate]);
 
   return null;
 }
