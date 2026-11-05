@@ -40,7 +40,7 @@ describe('Tickets step', () => {
     const panel = screen.getByRole('region', { name: 'Your Stripe account' });
     expect(panel).toHaveTextContent('You own this account');
     expect(panel).toHaveTextContent('the money from ticket sales goes straight to it');
-    expect(panel).toHaveTextContent('You can disconnect this account');
+    expect(panel).not.toHaveTextContent('You can disconnect this account');
     expect(screen.queryByText(CONSENT)).not.toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: 'Connect with Stripe' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: /Use Eventbrite/ }));

@@ -29,3 +29,13 @@ test('admin rewrites retain noindex alongside the global framing policy', () => 
       rule.headers.some(({ key, value }) => key === 'X-Robots-Tag' && value === 'noindex')));
   }
 });
+
+test('no static app page outlives a deploy in a browser', () => {
+  const pages = ['/', '/index.html', ...config.hosting.rewrites.filter((rule) => rule.destination === '/index.html').map((rule) => rule.source)];
+  for (const source of pages) {
+    const rule = config.hosting.headers.find((candidate) => candidate.source === source
+      && candidate.headers.some(({ key }) => key === 'Cache-Control'));
+    assert.ok(rule, `${source} needs a Cache-Control header`);
+    assert.match(rule.headers.find(({ key }) => key === 'Cache-Control').value, /max-age=0.*must-revalidate/);
+  }
+});

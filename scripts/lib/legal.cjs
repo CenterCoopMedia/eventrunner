@@ -160,7 +160,7 @@ function buildPrivacyBlocks(ctx) {
           'It does not receive or store full card numbers or card security codes. ' +
           'Stripe describes its data handling at https://stripe.com/privacy.'
         : `Registration is handled through ${ticketing}. Information you give that platform is covered ` +
-          'by its own privacy policy, and we receive the attendee details it passes back to us.'),
+          'by its own privacy policy, and we receive the order and attendee details it passes back to us.'),
     });
   }
   return blocks;

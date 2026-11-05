@@ -19,7 +19,7 @@ export default function TicketsStep({ value, errors, onChange, app, orgId, appId
   const shown = PROVIDERS.filter((provider) => provider === value.choice || connections[provider].connected);
   return (
     <div className="stack">
-      <p className="lead">Choose how people get tickets. You can change this until you accept the agreement.</p>
+      <p className="lead">Choose how people get tickets. You can change your choice until you accept the agreement.</p>
       {notice ? null : <ConnectionNotice message={state?.connectionMessage} />}
       <div aria-live="polite" className="live">
         {notice ? <p className="message success">{notice}</p> : null}
