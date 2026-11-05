@@ -151,6 +151,13 @@ async function sendRegistrationPrompt({
     return { sent: false, reason: 'no-email' };
   }
 
+  // Whoever runs the site does not register for it, so a first sign-in by an
+  // Owner or an Editor gets no prompt. The lists are seeded before any account exists.
+  if (trigger === 'account_created') {
+    const { listedAdminTier, loadBootstrap } = require('../core/auth.cjs');
+    if (listedAdminTier(await loadBootstrap({ db }), userDoc.email)) return { sent: false, reason: 'site-team' };
+  }
+
   const claimed = await hasClaimedTicket({ db, uid });
   const context = buildContext({ uid, userDoc, hasClaimedTicket: claimed, trigger });
 

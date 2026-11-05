@@ -5,6 +5,10 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
 let profileValue;
+let authValue;
+vi.mock('../contexts/AuthContext.jsx', () => ({
+  useAuth: () => authValue,
+}));
 vi.mock('../contexts/ProfileContext.jsx', () => ({
   useProfile: () => profileValue,
 }));
@@ -28,6 +32,7 @@ function renderAt(path) {
 }
 
 beforeEach(() => {
+  authValue = { adminStatus: 'denied' };
   profileValue = { status: 'ready', needsProfileSetup: true };
 });
 
@@ -35,6 +40,18 @@ describe('ProfileSetupRedirect', () => {
   it('sends a new account from the post-sign-in landing to the setup flow', () => {
     renderAt('/');
     expect(screen.getByText('path:/profile')).toBeInTheDocument();
+  });
+
+  it('leaves an admin on the site they opened', () => {
+    authValue = { adminStatus: 'admin' };
+    renderAt('/');
+    expect(screen.getByText('path:/')).toBeInTheDocument();
+  });
+
+  it('waits until it knows whether this is an admin', () => {
+    authValue = { adminStatus: 'unknown' };
+    renderAt('/');
+    expect(screen.getByText('path:/')).toBeInTheDocument();
   });
 
   it('also catches the /signin landing', () => {

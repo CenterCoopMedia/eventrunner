@@ -1368,3 +1368,20 @@ The tests run against a fake of each service, and the fake answers as the rehear
 - Postmark: `ApiTokens[0]` on the account's `/servers` answer. `/message-streams` accepts a `Broadcasts` stream with Postmark-managed unsubscribe. Webhooks accept `HttpAuth`, pass Postmark's test of each trigger, and list the URL back in a form this comparison matches.
 - Cloudflare: a TXT value comes back in the form it was stored. A `pm-bounces` CNAME and the certificate's records are not proxied.
 - Stripe and Eventbrite: `GET /v1/account` answers with the connected account's id for a Connect OAuth token. Creating a webhook endpoint on that account with that token works. `GET /users/me/` answers for a live Eventbrite token.
+
+### 12.5 Watching a site and stepping in
+
+Nothing needs to be open during a build. Operators get an email when a build fails or goes silent, and the review page at `/review/<application id>` shows every step. These commands cover the rest. `<name>` is the client's Environment, which is also its web-address name.
+
+| To | Do this |
+|---|---|
+| See which builds are going | `gh run list --workflow provision-client.yml` |
+| See a site's deploys, including after launch | `gh run list --workflow deploy.yml`. A dispatched run is titled `Deploy <name>`. A push to `main` keeps its commit message and covers every site in `AUTO_DEPLOY_ENVIRONMENTS` |
+| Follow one run until it ends | `gh run watch <run id>` |
+| Read why a run failed | `gh run view <run id> --log-failed` |
+| Stop a build | `gh run cancel <run id>`. Once the run has signed in to Google Cloud, it records that it stopped and emails like any other failure, so **Retry the build** continues from it. A run cancelled earlier leaves no record, and Retry appears after the one-hour limit for a silent start |
+| Retry a failed build | **Retry the build** on the review page |
+| Redeploy one live site | `gh workflow run deploy.yml --ref main -f client=<name>` |
+| Check a live site answers | `curl -sI https://<name>.eventrunner.org/` and `curl -sI https://<name>.eventrunner.org/admin` |
+
+Stopping a build also leaves any `Deploy <name>` run it started going, so cancel that too. A retry won't redeploy a code fix on its own, because an earlier successful deploy of the same kind still counts. Run the deploy yourself and wait for it, then retry. For a failure before the full deploy, use `gh workflow run deploy.yml --ref main -f client=<name> -f provision=true -f bootstrap=true`. For a failure after it, use the plain redeploy in the table.

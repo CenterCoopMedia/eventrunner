@@ -11,6 +11,7 @@ vi.mock('../../setup/leavePage.js', () => ({ leavePage: vi.fn() }));
 const STRIPE_PAGE = 'https://connect.stripe.com/oauth/authorize?state=s1';
 const notConnected = { available: true, connected: false, displayName: null, connectedAt: null };
 const answersWith = (choice) => ({ ...fullAnswers(), tickets: { choice } });
+const CONSENT = /By connecting, you authorize Event Runner to read your Eventbrite/;
 const eventbriteAccount = (event = null) => ({ available: true, connected: true, displayName: 'Ana', connectedAt: '2026-11-02T00:00:00.000Z', event });
 
 function serve(app, extra = {}) {
@@ -40,13 +41,34 @@ describe('Tickets step', () => {
     expect(panel).toHaveTextContent('You own this account');
     expect(panel).toHaveTextContent('the money from ticket sales goes straight to it');
     expect(panel).toHaveTextContent('You can disconnect this account');
+    expect(screen.queryByText(CONSENT)).not.toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: 'Connect with Stripe' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: /Use Eventbrite/ }));
     expect(screen.getByRole('button', { name: 'Connect with Eventbrite' })).toBeInTheDocument();
+    expect(screen.getByText(CONSENT)).toBeInTheDocument();
     for (const name of [/Import a spreadsheet later/, /No tickets/]) {
       fireEvent.click(screen.getByRole('radio', { name }));
       expect(screen.queryByRole('button', { name: /Connect with/ })).not.toBeInTheDocument();
     }
+  });
+
+  it('shows the Eventbrite consent before connecting again', async () => {
+    serve({ answers: answersWith('eventbrite'), connections: connections({ eventbrite: eventbriteAccount() }) }, { listEventbriteEvents: { events: [] } });
+    renderSetup('tickets');
+    const panel = await screen.findByRole('region', { name: 'Your Eventbrite account' });
+    expect(within(panel).getByRole('button', { name: 'Connect again' })).toBeInTheDocument();
+    expect(within(panel).getByText(CONSENT)).toBeInTheDocument();
+  });
+
+  it('does not ask an Editor, who cannot connect, for the Eventbrite consent', async () => {
+    serve({
+      answers: answersWith('eventbrite'),
+      myRole: 'editor',
+      connections: connections({ canChange: false, canDisconnect: false, eventbrite: eventbriteAccount() }),
+    });
+    renderSetup('tickets');
+    await screen.findByRole('region', { name: 'Your Eventbrite account' });
+    expect(screen.queryByText(CONSENT)).not.toBeInTheDocument();
   });
 
   it('asks nothing to be typed: the step has no text box', async () => {
