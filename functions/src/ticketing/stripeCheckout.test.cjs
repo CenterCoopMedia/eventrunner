@@ -551,7 +551,7 @@ test('free multi-seat orders deliver one stable email-bound ticket per attendee 
   const claim = await claimTicketsForUser({ ...deps, uid: ADA.uid, email: ADA.email, externalIds: res.body.ticketIds });
   assert.equal(claim.claimed.length, 1);
   assert.equal(claim.refused[0].reason, 'email_mismatch');
-  assert.equal(db.read('users', ADA.uid).registrationStatus, 'approved');
+  assert.equal(db.read('users', ADA.uid).registrationStatus, 'ticketed');
   assert.equal(db.read('users', BOB.uid).registrationStatus, 'pending');
 });
 

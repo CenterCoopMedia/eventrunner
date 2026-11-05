@@ -91,7 +91,7 @@ export function captureMatrix(source = 'after') {
     const baseline = [{ ...base, route: 'home' }, base, { ...base, presentation: 'preview' }];
     if (source === 'before') return baseline;
     const extremes = width === 485 || width === 1165;
-    const themes = extremes ? DEFAULT_STYLES.flatMap((preset) => MODES
+    const themes = extremes ? DEFAULT_STYLES.filter((preset) => preset !== 'nclocal').flatMap((preset) => MODES
       .filter((mode) => preset !== 'newsroom' || mode !== 'light')
       .map((mode) => ({ ...base, preset, mode }))) : [];
     const states = [

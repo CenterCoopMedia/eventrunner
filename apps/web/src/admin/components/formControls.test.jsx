@@ -1,9 +1,11 @@
 // The copy bench and the destructive moment
 // (docs/plans/2026-08-27-admin-identity-story.md, part 2 and moment 3).
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import {
+  AddOneListField,
   DestructiveConfirm,
   FieldError,
   Panel,
@@ -177,5 +179,52 @@ describe('a destructive moment', () => {
 
     expect(screen.queryByText(/This cannot be undone/)).toBeNull();
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('AddOneListField and a click that leaves the input', () => {
+  function Harness({ onChange }) {
+    const [items, setItems] = useState(['2024']);
+    return (
+      <AddOneListField
+        label="Past events"
+        itemName="event"
+        items={items}
+        onChange={(next) => { setItems(next); onChange(next); }}
+      />
+    );
+  }
+
+  it('updates the value on blur but draws the row after the mouse is released', async () => {
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    const input = screen.getByLabelText('Past events');
+    fireEvent.change(input, { target: { value: '2025' } });
+
+    fireEvent.mouseDown(document.body);
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenCalledWith(['2024', '2025']);
+    expect(screen.queryByText('2025')).toBeNull();
+
+    fireEvent.mouseUp(document.body);
+    expect(await screen.findByText('2025')).toBeTruthy();
+  });
+
+  it('draws the row if the window loses focus before the release', async () => {
+    render(<Harness onChange={vi.fn()} />);
+    const input = screen.getByLabelText('Past events');
+    fireEvent.change(input, { target: { value: '2025' } });
+    fireEvent.mouseDown(document.body);
+    fireEvent.blur(input);
+    fireEvent.blur(window);
+    expect(await screen.findByText('2025')).toBeTruthy();
+  });
+
+  it('draws the row at once when the keyboard leaves the input', () => {
+    render(<Harness onChange={vi.fn()} />);
+    const input = screen.getByLabelText('Past events');
+    fireEvent.change(input, { target: { value: '2025' } });
+    fireEvent.blur(input);
+    expect(screen.getByText('2025')).toBeTruthy();
   });
 });

@@ -32,6 +32,12 @@ beforeEach(() => {
   callMock.mockReset();
 });
 
+function addChoice(value) {
+  const box = screen.getByLabelText('Choices');
+  fireEvent.change(box, { target: { value } });
+  fireEvent.keyDown(box, { key: 'Enter' });
+}
+
 describe('AdminRegistrationForm', () => {
   it('loads the saved form into the editor and the preview', async () => {
     await renderPage();
@@ -59,7 +65,7 @@ describe('AdminRegistrationForm', () => {
     await renderPage({ ...SAVED, custom: [] });
     fireEvent.click(screen.getByRole('button', { name: 'Add a question' }));
     fireEvent.change(screen.getByLabelText('Answer type'), { target: { value: 'one_choice' } });
-    fireEvent.change(screen.getByLabelText('Choices'), { target: { value: 'Only one' } });
+    addChoice('Only one');
     fireEvent.click(screen.getByRole('button', { name: 'Save registration form' }));
     // In the summary, and on the field it names.
     expect((await screen.findAllByText(/custom\.0\.label: required/)).length).toBe(2);
@@ -70,7 +76,9 @@ describe('AdminRegistrationForm', () => {
   it('saves the form with the revision it loaded, with choices one per line', async () => {
     callMock.mockResolvedValue({ revision: 3 });
     await renderPage();
-    fireEvent.change(screen.getByLabelText('Choices'), { target: { value: 'S\n M \n\nL' } });
+    addChoice('S');
+    addChoice(' M ');
+    addChoice('L');
     fireEvent.click(screen.getByRole('button', { name: 'Save registration form' }));
     await waitFor(() => expect(callMock).toHaveBeenCalledTimes(1));
     const [name, body] = callMock.mock.calls[0];

@@ -1370,6 +1370,17 @@ The tests run against a fake of each service, and the fake answers as the rehear
 - Cloudflare: a TXT value comes back in the form it was stored. A `pm-bounces` CNAME and the certificate's records are not proxied.
 - Stripe and Eventbrite: `GET /v1/account` answers with the connected account's id for a Connect OAuth token. Creating a webhook endpoint on that account with that token works. `GET /users/me/` answers for a live Eventbrite token.
 
+### 12.4.1 Turn on Google sign-in after a build
+
+The builder cannot turn on Google sign-in, because Firebase creates that sign-in client only in its console. Do this as soon as a build finishes:
+
+1. Open the new project in the Firebase console as the admin account. It has `roles/firebase.admin` on the client folder.
+2. Open **Authentication**, then **Sign-in method**. Add **Google**, and set the public name and the support email.
+3. Sign in on the site with **Continue with Google**.
+4. Run `node scripts/init-event.cjs --attest-auth` for that client, so the setup step shows **Done**.
+
+To undo the folder role, remove the `roles/firebase.admin` binding for the admin account from the client folder.
+
 ### 12.5 Watching a site and stepping in
 
 Nothing needs to be open during a build. Operators get an email when a build fails or goes silent, and the review page at `/review/<application id>` shows every step. These commands cover the rest. `<name>` is the client's Environment, which is also its web-address name.

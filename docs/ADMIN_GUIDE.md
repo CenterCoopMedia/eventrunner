@@ -45,17 +45,17 @@ Open **Set up your event**, under **Overview** on the rail. It is a stepper: one
 | Upload your logos | You | Settings → Branding |
 | Replace the placeholder text | You | Content |
 | Approve the privacy policy and terms | You | The privacy policy in Content, then this page |
-| Set up your event email | You and the hosting team | The hosting team tells you if anything is needed from you |
-| Connect ticket sales | The hosting team | Ticketing shows the result |
-| Turn on Google sign-in | The hosting team | Nothing to do in the admin panel |
+| Set up your event email | You and the Event Runner team | The Event Runner team tells you if anything is needed from you |
+| Connect ticket sales | You | The Event Runner console. Ticketing shows the result |
+| Turn on Google sign-in | The Event Runner team | Nothing to do in the admin panel |
 
-Each step shows **Done** or **To do**. The server decides the state. It uses the same check that the hosting team runs before launch. Select **Check again** after you finish a step.
+Each step shows **Done** or **To do**. The server decides the state. It uses the same check that the Event Runner team runs. Select **Check again** after you finish a step.
 
 **Approve the privacy policy and terms.** The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens the **Approve the privacy policy and terms** step, ticks **Our counsel reviewed and approved the privacy policy and the terms**, and selects **Mark the review complete**. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.
 
 The first-visit tour of the admin panel does not open over this page. It opens on the next admin page you visit.
 
-When every step is done, tell the hosting team. They run the launch check and publish the site.
+When every step is done, your site is ready to share.
 
 ## Set the site up: Six steps
 
@@ -512,7 +512,7 @@ A cell with more than one entry joins them with a semicolon. The file carries no
 
 **Answers given at checkout.** With Stripe tickets, `/tickets` asks the buyer the registration questions for every attendee on the order, between Attendees and Review. The server checks them when it reserves the order and keeps them on that attendee's seat. When the attendee claims their ticket, the answers move to their own account and leave the order. Until then they live only on the order, which no client can read: deleting an account cannot reach them, because they belong to other people, so they go when the seat is claimed or when the project is deleted. Correcting a seat's email gives the ticket to a different person and drops that seat's answers; correcting only the name keeps them.
 
-**Past attendance.** Select **Edit record** on a row to open that account's record. **Past attendance** takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select **Save record** to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.
+**Past attendance.** Select **Edit record** on a row to open that account's record. In **Past attendance**, add each past event this person attended, such as a year: at most 20, of up to 40 characters each, with no repeats. Select **Save** to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.
 
 **Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, its shared schedule, and its access as an organization representative, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, the profile photo, the change requests the person sent, any organization edit the person sent that is still waiting for review, and the person's registration answers. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.
 

@@ -34,7 +34,7 @@ const STYLE_COPY = Object.freeze({
 });
 
 export const DEMO_STYLE_OPTIONS = Object.freeze(
-  PRESET_IDS.map((id) =>
+  PRESET_IDS.filter((id) => id !== 'nclocal').map((id) =>
     Object.freeze({
       id,
       label: STYLE_COPY[id]?.label ?? id,

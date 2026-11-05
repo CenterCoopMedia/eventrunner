@@ -1257,6 +1257,165 @@ const PRESET_REMAPS = Object.freeze({
         },
       },
     },
+    nclocal: {
+      tokens: {
+        '--folio-font': 'var(--font-data)',
+        '--section-rule-width': 'var(--rule-strong-width)',
+        '--definition-list-term-width': '10rem',
+        '--pull-quote-mark-display': 'block',
+        '--pull-quote-quotes-display': 'none',
+        '--pull-quote-pad-block': 'var(--space-lg)',
+        '--notice-bar-urgent-rule-width': 'var(--rule-nameplate-width)',
+        '--table-head-transform': 'uppercase',
+        '--table-head-tracking': '0.04em',
+        '--hero-art-width': '50%',
+        '--hero-copy-pad-inline-start': '0',
+        '--hero-copy-border-inline-start': '0',
+        '--hero-veil-background': 'linear-gradient(90deg, rgb(var(--color-surface-alt-rgb) / .95) 0%, rgb(var(--color-surface-alt-rgb) / 0) 34%)',
+        '--standfirst-font': 'var(--font-heading)',
+        '--standfirst-weight': 'var(--weight-regular)',
+      },
+      options: {
+        headingFace: {
+          merriweather: {
+            fonts: {
+              heading: 'merriweather',
+            },
+          },
+          cabin: {
+            fonts: {
+              heading: 'cabin',
+            },
+          },
+        },
+        nameplate: {
+          'rule-bounded-bar': {
+            tokens: {
+              '--nameplate-align': 'start',
+              '--nameplate-rule-width': 'var(--rule-strong-width)',
+              '--nameplate-meta-placement': 'inline',
+            },
+          },
+          'stacked-with-deck': {
+            tokens: {
+              '--nameplate-align': 'start',
+              '--nameplate-rule-width': 'var(--rule-hairline-width)',
+              '--nameplate-meta-placement': 'block',
+              '--nameplate-gap': 'var(--space-xs)',
+            },
+          },
+          'section-aware-bar': {
+            tokens: {
+              '--nameplate-align': 'start',
+              '--nameplate-size': 'var(--text-h1)',
+              '--nameplate-rule-width': 'var(--rule-strong-width)',
+              '--nameplate-meta-placement': 'inline',
+            },
+          },
+        },
+        component: {
+          'hairline-row': {
+            tokens: {
+              '--session-card-lead-scale': '1',
+              '--session-card-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+          'lead-and-rest': {
+            tokens: {
+              '--session-card-lead-scale': '1.35',
+              '--session-card-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+        },
+        longReadOpening: {
+          'drop-cap': {
+            tokens: {
+              '--drop-cap-float': 'left',
+              '--drop-cap-size': '3.1em',
+              '--drop-cap-pad-inline-end': 'var(--space-xs)',
+            },
+          },
+          standfirst: {
+            tokens: {
+              '--long-read-opening-size': 'var(--text-lead)',
+              '--long-read-opening-leading': 'var(--text-lead-leading)',
+            },
+          },
+          plain: {
+            tokens: {
+              '--drop-cap-float': 'none',
+            },
+          },
+        },
+        quote: {
+          'ruled-with-mark': {
+            tokens: {
+              '--pull-quote-rule-block-width': 'var(--rule-strong-width)',
+            },
+          },
+          'side-rule': {
+            tokens: {
+              '--pull-quote-rule-block-width': '0',
+              '--pull-quote-rule-inline-width': 'var(--rule-strong-width)',
+              '--pull-quote-pad-inline': 'var(--space-md)',
+              '--pull-quote-mark-display': 'none',
+              '--pull-quote-quotes-display': 'inline',
+            },
+          },
+          'mark-only': {
+            tokens: {
+              '--pull-quote-rule-block-width': '0',
+            },
+          },
+        },
+        directory: {
+          'portrait-shelf': {
+            tokens: {
+              '--directory-portrait-aspect': '1 / 1',
+            },
+          },
+          'tall-portraits': {
+            tokens: {
+              '--directory-portrait-aspect': '3 / 4',
+            },
+          },
+        },
+        sectionBoundary: {
+          'rule-and-folio': {
+            tokens: {
+              '--section-folio-display': 'inline',
+            },
+          },
+          'rule-only': {
+            tokens: {
+              '--section-folio-display': 'none',
+            },
+          },
+          'folio-in-margin': {
+            tokens: {
+              '--section-folio-placement': 'margin',
+            },
+          },
+        },
+        tableRules: {
+          'hairline-rows': {
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+          'ruled-head': {
+            tokens: {
+              '--table-head-rule-width': 'var(--rule-strong-width)',
+            },
+          },
+          'full-grid': {
+            tokens: {
+              '--table-column-rule-width': 'var(--rule-hairline-width)',
+            },
+          },
+        },
+      },
+    },
   },
 });
 

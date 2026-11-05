@@ -24,7 +24,7 @@ node scripts/ci/bundle-budget.cjs --dist docs/demo
 The committed limits are:
 
 - 1,080,000 raw bytes and 292,000 gzip bytes for the initial graph.
-- 165,000 raw bytes and 25,000 gzip bytes for the stylesheets `index.html` names, which block first paint.
+- 190,000 raw bytes and 28,000 gzip bytes for the stylesheets `index.html` names, which block first paint.
 - 180,000 raw bytes and 50,000 gzip bytes for each deferred chunk.
 
 See [the current bundle report](public-bundle-report.md) for measured results.

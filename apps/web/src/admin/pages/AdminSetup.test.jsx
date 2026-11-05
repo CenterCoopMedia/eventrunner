@@ -156,7 +156,7 @@ describe('the setup stepper', () => {
     const last = await openStep('Turn on Google sign-in');
     expect(within(last).getByText('Step 7 of 7')).toBeInTheDocument();
     expect(within(last).queryByRole('link', { name: /^Next/ })).toBeNull();
-    expect(within(last).getByText('Hosting team')).toBeInTheDocument();
+    expect(within(last).getByText('Event Runner team')).toBeInTheDocument();
   });
 
   it('sends an unknown step address to the first open step', async () => {
@@ -169,7 +169,7 @@ describe('the setup stepper', () => {
     fetch.mockResolvedValueOnce(okResponse(readiness([])));
     await renderSetup('/admin/setup/email');
     const step = await openStep('Set up your event email');
-    expect(within(step).getByText('You and the hosting team')).toBeInTheDocument();
+    expect(within(step).getByText('You and the Event Runner team')).toBeInTheDocument();
     expect(step.textContent).not.toMatch(/SPF|DKIM|DMARC|DNS/);
   });
 

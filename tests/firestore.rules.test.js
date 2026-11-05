@@ -345,6 +345,11 @@ describe("config", () => {
     await assertFails(getDoc(doc(anon(), "config/bootstrap")));
   });
 
+  it("denies config/providers to every client", async () => {
+    await assertFails(getDoc(doc(anon(), "config/providers")));
+    await assertFails(getDoc(doc(nonAdmin(), "config/providers")));
+  });
+
   it("denies config/bootstrap to non-admin clients", async () => {
     await assertFails(getDoc(doc(nonAdmin(), "config/bootstrap")));
   });
