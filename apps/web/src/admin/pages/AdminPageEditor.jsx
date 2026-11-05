@@ -433,7 +433,6 @@ export default function AdminPageEditor({ mode }) {
       setSavedSnapshot(pageSnapshot(assigned));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
-        showToast('Draft saved.', { announce: false });
         return;
       }
       // Separate call by design: cmsSavePage only ever writes the draft
@@ -467,7 +466,6 @@ export default function AdminPageEditor({ mode }) {
     const verdict = summarizePublish(response, 'cmsPages', requestedIds);
     if (!verdict.ok) throw new Error(verdict.message);
     setStatus(verdict.message);
-    showToast(verdict.message, { announce: false });
   }
 
   /**

@@ -157,12 +157,10 @@ export default function AdminTimelineEditor({ mode }) {
         const verdict = summarizePublish(response, COLLECTION, [docId], 'timeline entries');
         if (!verdict.ok) throw new Error(verdict.message);
         setStatus(verdict.message);
-        // The line above is the record and it announces; the toast repeats
-        // it where the operator is looking, and says nothing.
-        showToast(verdict.message, { announce: false });
+        if (mode === 'create') showToast(verdict.message, { announce: false });
       } else {
         setStatus('Draft saved. It is not live until you publish it.');
-        showToast('Draft saved. It is not live until you publish it.', { announce: false });
+        if (mode === 'create') showToast('Draft saved. It is not live until you publish it.', { announce: false });
       }
       if (mode === 'create') {
         navigate(`${TIMELINE_LIST}/${encodeURIComponent(docId)}`, { replace: true });

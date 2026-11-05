@@ -201,10 +201,10 @@ export default function AdminOrganizationEditor({ mode }) {
         const verdict = summarizePublish(response, COLLECTION, [id], 'organizations');
         if (!verdict.ok) throw new Error(verdict.message);
         setStatus(verdict.message);
-        showToast(verdict.message, { announce: false });
+        if (creating) showToast(verdict.message, { announce: false });
       } else {
         setStatus('Draft saved. It is not live until you publish it.');
-        showToast('Organization draft saved.', { announce: false });
+        if (creating) showToast('Organization draft saved.', { announce: false });
       }
     } catch (err) {
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');

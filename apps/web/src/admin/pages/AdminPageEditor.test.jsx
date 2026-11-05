@@ -747,6 +747,26 @@ describe('page editor', () => {
     expect(screen.getByText(/Newer edits are still unsaved/)).toHaveAttribute('role', 'status');
   });
 
+  it('keeps repeated save and publish results in the action band without stacking notifications', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    const actions = screen.getByRole('button', { name: 'Save draft' }).closest('header');
+    for (const label of ['First revision', 'Second revision', 'Third revision']) {
+      fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+      fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: label } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+      const result = await within(actions).findByRole('status');
+      expect(result).toHaveTextContent('Draft saved. It is not public until you publish.');
+      expect(screen.queryByRole('button', { name: 'Dismiss notification' })).not.toBeInTheDocument();
+    }
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }))
+      .mockResolvedValueOnce(okResponse({ results: { cmsPages: { published: ['scholarships'], skipped: [] } } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    expect(await within(actions).findByRole('status')).toHaveTextContent('Published. The public site picks it up live.');
+    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(screen.queryByRole('button', { name: 'Dismiss notification' })).not.toBeInTheDocument();
+  });
+
   it('takes focus to added sections and blocks, and restores it after their removal', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
@@ -1112,7 +1132,7 @@ describe('publish results and recovery', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
-    // Both the inline status and the toast carry the verdict.
+    // The error summary carries the refused-publish verdict.
     expect(
       (await screen.findAllByText(/One item was edited while publishing/i)).length,
     ).toBeGreaterThan(0);
@@ -1148,7 +1168,7 @@ describe('publish results and recovery', () => {
     // { queueId } — NOT a fresh { collection, docIds }, which would publish
     // the chunks that already committed a second time.
     expect(bodyOf(2)).toEqual({ queueId: 'queue-42' });
-    expect((await screen.findAllByText(/picks it up live/i)).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/picks it up live/i, { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 
   it('keeps a created page’s id fixed when the publish half fails', async () => {

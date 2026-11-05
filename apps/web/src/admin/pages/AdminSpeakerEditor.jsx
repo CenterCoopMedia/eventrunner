@@ -248,7 +248,6 @@ export default function AdminSpeakerEditor({ mode }) {
         });
         setSavedSnapshot(editorSnapshot(form));
         setStatus('Saved. The public directory updates within moments.');
-        showToast('Speaker saved.', { announce: false });
       }
     } catch (err) {
       setError(err);

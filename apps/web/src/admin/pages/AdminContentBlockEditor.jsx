@@ -510,7 +510,6 @@ export default function AdminContentBlockEditor({ mode }) {
       setSavedEdit(contentEditSnapshot(nextFieldId, savedContent));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
-        showToast('Draft saved.', { announce: false });
         return;
       }
       stage = 'publish';
@@ -535,7 +534,6 @@ export default function AdminContentBlockEditor({ mode }) {
     const verdict = summarizePublish(response, 'cmsContent', requestedIds, 'content blocks');
     if (!verdict.ok) throw new Error(verdict.message);
     setStatus(verdict.message);
-    showToast(verdict.message, { announce: false });
   }
 
   async function resumePublish() {

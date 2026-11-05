@@ -560,7 +560,7 @@ describe('creating and editing a block', () => {
     expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
     expect(urlOf(1)).toMatch(/\/cmsPublish$/);
     expect(bodyOf(1)).toEqual({ collection: 'cmsContent', docIds: ['intro__body'] });
-    expect((await screen.findAllByText(/picks it up live/i)).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/picks it up live/i, { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 
   it('blocks the save when a required registry field is left blank', async () => {
@@ -739,7 +739,7 @@ describe('server errors and publish skips', () => {
     fireEvent.click(resume);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
     expect(bodyOf(2)).toEqual({ queueId: 'queue-9' });
-    expect((await screen.findAllByText(/picks it up live/i)).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/picks it up live/i, { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 });
 

@@ -210,10 +210,8 @@ export default function AdminUpdateEditor({ mode }) {
         message = verdict.message;
       }
       setStatus(message);
-      // The status line is the record and it announces; the toast repeats
-      // it where the operator is looking and says nothing.
-      showToast(message, { announce: false });
       if (mode === 'create') {
+        showToast(message, { announce: false });
         navigate(`${UPDATES_ROOT}/${encodeURIComponent(id)}`, { replace: true });
       }
     } catch (err) {

@@ -60,6 +60,7 @@ test('long CMS pages keep save and row outcomes with the action at desktop and p
       ]);
       const result = page.locator('.admin-job-line__actions').getByRole('status');
       await expect(result).toHaveText('Draft saved. It is not public until you publish.');
+      await expect(page.getByRole('button', { name: 'Dismiss notification' })).toHaveCount(0);
       await fitsViewport(page, result);
       await page.locator('html').evaluate(() => document.fonts.ready);
       await page.screenshot({ path: path.join(evidenceDir, `editor-save-feedback-${width}.png`), animations: 'disabled' });
