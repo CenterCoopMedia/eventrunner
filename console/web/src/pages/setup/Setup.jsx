@@ -5,6 +5,7 @@ import {
   ANSWER_STEPS, STEPS, errorsOfStep, openStepIds, setupPath, statusPath, stepById, stepByPath,
 } from '../../setup/steps.js';
 import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
+import ActionFeedback from '../../ActionFeedback.jsx';
 import AgreementStep from './AgreementStep.jsx';
 import EmailStep from './EmailStep.jsx';
 import EventStep from './EventStep.jsx';
@@ -23,7 +24,7 @@ const STEP_VIEWS = {
 };
 
 /** The step list: where the reader is, which steps are done, and which are open now. */
-function StepList({ step, progress, open, orgId, appId, onGo }) {
+function StepList({ step, progress, open, orgId, appId, onGo, disabled }) {
   const done = STEPS.filter((s) => progress[s.id]).length;
   return (
     <nav aria-label="Setup steps" className="step-nav">
@@ -47,6 +48,7 @@ function StepList({ step, progress, open, orgId, appId, onGo }) {
               <Link
                 to={setupPath(orgId, appId, s)}
                 aria-current={current ? 'step' : undefined}
+                aria-disabled={disabled || undefined}
                 onClick={(e) => onGo(e, s)}
               >
                 <span className="step-number" aria-hidden="true">{progress[s.id] ? '✓' : i + 1}</span>
@@ -106,6 +108,9 @@ export default function Setup() {
   const step = stepByPath(stepPath);
   const { app, setApp, error, reload } = useApplication(orgId, appId);
   const [touched, setTouched] = useState(() => new Set());
+  const [navigating, setNavigating] = useState(false);
+  const navigationPending = useRef(false);
+  const actionArea = useRef(null);
   // Steps whose last save the server refused (saved: false), for example a
   // taken web address. The server keeps the older answer, so the review
   // holds the request until a new answer saves.
@@ -157,10 +162,19 @@ export default function Setup() {
   }, [showAll, app, location.key]);
 
   const go = useCallback(async (target) => {
-    // A failed save keeps the reader here, next to the "Not saved" words.
-    if (!(await flush())) return;
-    navigate(setupPath(orgId, appId, target));
-  }, [flush, navigate, orgId, appId]);
+    if (navigationPending.current) return;
+    navigationPending.current = true;
+    setNavigating(true);
+    const saved = await flush();
+    navigationPending.current = false;
+    setNavigating(false);
+    if (!saved) {
+      // A top step link can be far from the save result on a long form.
+      actionArea.current?.focus();
+      return;
+    }
+    navigate(target);
+  }, [flush, navigate]);
 
   const stepErrors = useMemo(() => (app && step ? errorsOfStep(app.errors, step.id) : {}), [app, step]);
 
@@ -185,11 +199,13 @@ export default function Setup() {
         open={open}
         orgId={orgId}
         appId={appId}
-        onGo={(e, target) => { e.preventDefault(); go(target); }}
+        disabled={navigating}
+        onGo={(e, target) => { e.preventDefault(); go(setupPath(orgId, appId, target)); }}
       />
       <section className="step-body" aria-labelledby="step-title">
         <p className="muted">Step {index + 1} of {STEPS.length}</p>
         <h1 id="step-title" tabIndex={-1}>{step.title}</h1>
+        <fieldset disabled={navigating} className="console-feedback-fields">
         {View ? (
           <View
             value={app.answers[step.id]}
@@ -225,12 +241,19 @@ export default function Setup() {
             onAccepted={(result) => navigate(statusPath(orgId, appId), { state: { copyFailed: result.copySent === false } })}
           />
         ) : null}
-        <p className="save-status" role="status" aria-live="polite">{saveStatusText(saveStatus, saveError)}</p>
-        <div className="step-actions">
-          {previous ? <button type="button" className="button" onClick={() => go(previous)}>Back</button> : null}
-          {next ? <button type="button" className="button primary" onClick={() => go(next)}>Next</button> : null}
+        </fieldset>
+        <div className="console-feedback-actions" ref={actionArea} tabIndex={-1} aria-label="Save and continue">
+          {saveStatus === 'error' || saveStatus === 'unsaved' ? (
+            <ActionFeedback kind="error">{saveStatusText(saveStatus, saveError)}</ActionFeedback>
+          ) : <p className="save-status" role="status" aria-live="polite">{saveStatusText(saveStatus, saveError)}</p>}
+          <div className="step-actions">
+            {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous))}>Back</button> : null}
+            {next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next</button> : null}
+            {saveStatus === 'error' ? <button type="button" className="button" disabled={navigating} onClick={async () => { await flush(); actionArea.current?.focus(); }}>Retry save</button> : null}
+          </div>
+          <p><Link to={statusPath(orgId, appId)} aria-disabled={navigating || undefined}
+            onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId)); }}>Leave the setup</Link></p>
         </div>
-        <p><Link to={statusPath(orgId, appId)}>Leave the setup. Your answers are saved.</Link></p>
       </section>
     </div>
   );

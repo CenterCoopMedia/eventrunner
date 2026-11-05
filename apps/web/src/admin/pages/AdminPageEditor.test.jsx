@@ -724,6 +724,66 @@ describe('page editor', () => {
     expect(screen.getByLabelText('Rich text — section 1')).toBeVisible();
   });
 
+  it('reveals a rejected individual layout setting', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'Invalid page: layout.navPlacement: choose a supported position'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Navigation on this page')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Hide the individual settings' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('qualifies a completed save when a newer edit was typed while it ran', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    let answer;
+    fetch.mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Newer label' } });
+    await act(async () => { answer(okResponse({ id: 'scholarships', status: 'dirty' })); });
+    expect(screen.getByLabelText('Navigation label')).toHaveValue('Newer label');
+    expect(screen.getByText(/Newer edits are still unsaved/)).toHaveAttribute('role', 'status');
+  });
+
+  it('keeps repeated save and publish results in the action band without stacking notifications', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    const actions = screen.getByRole('button', { name: 'Save draft' }).closest('header');
+    for (const label of ['First revision', 'Second revision', 'Third revision']) {
+      fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+      fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: label } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+      const result = await within(actions).findByRole('status');
+      expect(result).toHaveTextContent('Draft saved. It is not public until you publish.');
+      expect(screen.queryByRole('button', { name: 'Dismiss notification' })).not.toBeInTheDocument();
+    }
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }))
+      .mockResolvedValueOnce(okResponse({ results: { cmsPages: { published: ['scholarships'], skipped: [] } } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    expect(await within(actions).findByRole('status')).toHaveTextContent('Published. The public site picks it up live.');
+    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(screen.queryByRole('button', { name: 'Dismiss notification' })).not.toBeInTheDocument();
+  });
+
+  it('takes focus to added sections and blocks, and restores it after their removal', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    const add = await screen.findByRole('button', { name: 'Add section' });
+    fireEvent.click(add);
+    expect(screen.getByLabelText('Section 2 label')).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove section 2' }));
+    const intro = screen.getByRole('button', { name: 'Intro 1 block · 1 allowed type' });
+    expect(intro).toHaveFocus();
+    fireEvent.click(intro);
+    const addBlock = screen.getByRole('button', { name: 'Add block to section 1' });
+    fireEvent.click(addBlock);
+    expect(screen.getByLabelText('Block 2 type — section 1')).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove block 2 from section 1' }));
+    expect(screen.getByLabelText('Block 1 type — section 1')).toHaveFocus();
+  });
+
   it('adds, reorders, and removes blocks within a section', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
@@ -1072,7 +1132,7 @@ describe('publish results and recovery', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
 
-    // Both the inline status and the toast carry the verdict.
+    // The error summary carries the refused-publish verdict.
     expect(
       (await screen.findAllByText(/One item was edited while publishing/i)).length,
     ).toBeGreaterThan(0);
@@ -1108,7 +1168,7 @@ describe('publish results and recovery', () => {
     // { queueId } — NOT a fresh { collection, docIds }, which would publish
     // the chunks that already committed a second time.
     expect(bodyOf(2)).toEqual({ queueId: 'queue-42' });
-    expect((await screen.findAllByText(/picks it up live/i)).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/picks it up live/i, { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 
   it('keeps a created page’s id fixed when the publish half fails', async () => {

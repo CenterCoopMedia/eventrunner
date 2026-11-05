@@ -179,6 +179,27 @@ describe('a destructive moment', () => {
 
     expect(screen.queryByText(/This cannot be undone/)).toBeNull();
     expect(onConfirm).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Delete this page' })).toHaveFocus();
+  });
+
+  it('focuses the consequence and restores the trigger on Escape', () => {
+    const onConfirm = vi.fn();
+    render(<DestructiveConfirm {...props} onConfirm={onConfirm} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this page' }));
+    const heading = screen.getByRole('heading', { name: 'Delete this page' });
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAccessibleDescription(`${props.consequence} ${props.permanence}`);
+    fireEvent.keyDown(heading, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Delete this page' })).toHaveFocus();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('does not dismiss an in-flight deletion', () => {
+    render(<DestructiveConfirm {...props} initiallyOpen busy onConfirm={vi.fn()} />);
+    const heading = screen.getByRole('heading', { name: 'Delete this page' });
+    fireEvent.keyDown(heading, { key: 'Escape' });
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keep it' })).toBeDisabled();
   });
 });
 

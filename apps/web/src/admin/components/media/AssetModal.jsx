@@ -16,7 +16,7 @@
 // and the delete are the operator's, the server refuses both, and the modal
 // says so once instead of offering controls that fail. `operator` is the
 // caller's tier; it defaults closed.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatBytes } from '../../../lib/mediaSource.js';
 import {
   DestructiveConfirm,
@@ -37,9 +37,17 @@ import {
 } from './mediaErrors.js';
 import ModalShell from './ModalShell.jsx';
 
-function UsageList({ references }) {
+function UsageList({ references, error, onRetry }) {
+  if (error) {
+    return (
+      <div className="space-y-xs">
+        <Notice tone="error" message="Usage could not be checked. Retry before deleting this file." />
+        <button type="button" className={secondaryButtonClass} onClick={onRetry}>Retry usage check</button>
+      </div>
+    );
+  }
   if (references === null) {
-    return <p className="text-admin-sm text-admin-ink-secondary">Checking usage…</p>;
+    return <p role="status" className="flex items-center gap-xs text-admin-sm text-admin-ink-secondary"><span className="admin-busy-mark" aria-hidden="true" />Checking usage…</p>;
   }
   if (references.length === 0) {
     return (
@@ -75,18 +83,26 @@ export default function AssetModal({
   updateMetadata,
   remove,
   operator = false,
+  returnFocusRef,
 }) {
   const [alt, setAlt] = useState(asset.alt ?? '');
   const [title, setTitle] = useState(asset.title ?? '');
   const [references, setReferences] = useState(null);
+  const [usageError, setUsageError] = useState(false);
+  const [scanAttempt, setScanAttempt] = useState(0);
   const [status, setStatus] = useState('');
-  const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
+  const [action, setAction] = useState('');
+  const pending = useRef(false);
+  const busy = Boolean(action);
   const [confirming, setConfirming] = useState(false);
   const locked = !operator && (isBrandingAsset(asset) || referencedByBranding(references));
 
   useEffect(() => {
     let active = true;
+    setReferences(null);
+    setUsageError(false);
     scanUsage([asset.path])
       .then((usage) => {
         if (active) setReferences(usage?.[asset.path] ?? []);
@@ -94,35 +110,41 @@ export default function AssetModal({
       .catch(() => {
         // A scan that cannot run must not read as "unused": the delete
         // button below stays honest by saying the check failed.
-        if (active) setReferences(null);
+        if (active) setUsageError(true);
       });
     return () => {
       active = false;
     };
-  }, [asset.path, scanUsage]);
+  }, [asset.path, scanUsage, scanAttempt]);
 
   async function save(event) {
     event.preventDefault();
-    setBusy(true);
-    setError(null);
+    if (pending.current || locked) return;
+    pending.current = true;
+    setAction('save');
+    setSaveError(null);
+    setDeleteError(null);
     setStatus('');
     try {
       await updateMetadata({ assetId: asset.id, alt: alt.trim(), title: title.trim() });
-      setStatus('Saved.');
-      onChanged?.();
+      setStatus('Description saved.');
     } catch (err) {
-      setError(mediaErrorMessage(err));
+      setSaveError(mediaErrorMessage(err));
     } finally {
-      setBusy(false);
+      pending.current = false;
+      setAction('');
     }
   }
 
   async function destroy(force) {
-    setBusy(true);
-    setError(null);
+    if (pending.current || locked || references === null || usageError) return;
+    pending.current = true;
+    setAction('delete');
+    setDeleteError(null);
+    setSaveError(null);
     try {
       await remove({ assetId: asset.id, force });
-      onChanged?.();
+      onChanged?.({ type: 'deleted', asset });
       onClose();
     } catch (err) {
       if (err.code === 'asset-in-use') {
@@ -131,14 +153,15 @@ export default function AssetModal({
         setReferences(err.usage ?? references ?? []);
         setConfirming(true);
       }
-      setError(mediaErrorMessage(err));
+      setDeleteError(mediaErrorMessage(err));
     } finally {
-      setBusy(false);
+      pending.current = false;
+      setAction('');
     }
   }
 
   return (
-    <ModalShell title={asset.title || asset.filename || 'Asset'} onClose={onClose}>
+    <ModalShell title={asset.title || asset.filename || 'Asset'} onClose={onClose} busy={busy} returnFocusRef={returnFocusRef}>
       <div className="grid gap-md sm:grid-cols-2">
         <AssetImage
           path={asset.path}
@@ -158,15 +181,16 @@ export default function AssetModal({
       </div>
 
       <form className="mt-md flex flex-col gap-sm" onSubmit={save}>
-        <TextAreaField label="Alt text" value={alt} onChange={setAlt} rows={2} readOnly={locked} />
-        <TextField label="Title" value={title} onChange={setTitle} readOnly={locked} />
+        <TextAreaField label="Alt text" value={alt} onChange={(value) => { setAlt(value); setStatus(''); }} rows={2} readOnly={locked} disabled={busy} />
+        <TextField label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} readOnly={locked} disabled={busy} />
         {status ? <SaveStatus message={status} /> : null}
-        {error ? <Notice tone="error" message={error} /> : null}
+        {saveError ? <Notice tone="error" message={saveError} /> : null}
         {locked ? <p className="text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p> : null}
         <div className="flex flex-wrap gap-xs">
           {locked ? null : (
             <button type="submit" className={primaryButtonClass} disabled={busy}>
-              {busy ? 'Saving…' : 'Save description'}
+              {action === 'save' ? <span className="admin-busy-mark" aria-hidden="true" /> : null}
+              {action === 'save' ? 'Saving…' : 'Save description'}
             </button>
           )}
           <button type="button" className={secondaryButtonClass} onClick={onClose} disabled={busy}>
@@ -178,13 +202,14 @@ export default function AssetModal({
       <section className="mt-md border-admin-rule-hairline border-t-admin-hairline pt-sm">
         <h3 className="text-admin-lg font-bold text-admin-ink">Where this is used</h3>
         <div className="mt-2xs">
-          <UsageList references={references} />
+          <UsageList references={references} error={usageError} onRetry={() => setScanAttempt((attempt) => attempt + 1)} />
         </div>
         {/* Moment 3: the delete states what it costs before it runs, and
             the in-use case says how many live documents lose their file.
             A locked asset offers no delete at all: the note above says whose
             it is. */}
         <div className="mt-sm flex flex-wrap gap-xs">
+          {deleteError ? <Notice tone="error" message={deleteError} /> : null}
           {locked ? null : confirming || (references?.length ?? 0) > 0 ? (
             <DestructiveConfirm
               trigger="Delete this file anyway"
@@ -192,6 +217,7 @@ export default function AssetModal({
               confirmLabel="Delete this file anyway"
               busyLabel="Deleting…"
               busy={busy}
+              disabled={busy || references === null || usageError}
               consequence={`The object is removed from storage, and the ${
                 references?.length ?? 0
               } document${
@@ -207,6 +233,7 @@ export default function AssetModal({
               confirmLabel="Delete this file"
               busyLabel="Deleting…"
               busy={busy}
+              disabled={busy || references === null || usageError}
               consequence="The object is removed from storage. Its library row goes with it."
               permanence="This cannot be undone."
               onConfirm={() => destroy(false)}

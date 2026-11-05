@@ -14,72 +14,33 @@
 // panel — never a shadow. No `--admin-shadow-*` family exists; a modal is
 // lifted by tint and rule, not by depth.
 //
-// Escape closes ONE dialog — the topmost. These modals nest: ImagePicker
-// opens a library, and a tile inside it opens the asset detail dialog. With
-// every mounted shell handling the same document-level keydown, one Escape
-// would collapse the whole stack and throw away the picker the person was
-// only stepping out of. A module-level stack of open shells decides which
-// handler acts; the rest ignore the key.
-import { useEffect, useId, useRef } from 'react';
+// Native dialogs keep the page inert, including when ImagePicker opens an
+// asset detail on top of its library. Only the topmost receives cancel.
+// Pending writes use the same dismissal guard for Escape, X, and Cancel.
+import { useId, useRef } from 'react';
 import { secondaryButtonClass } from '../formControls.jsx';
+import AdminIconControl from '../AdminIconControl.jsx';
+import useModalDialog, { wrapModalTab } from '../useModalDialog.js';
 
-/** Open shells, oldest first. The last entry is the topmost dialog. */
-const openShells = [];
-
-export default function ModalShell({ title, description = null, onClose, children }) {
+export default function ModalShell({ title, description = null, onClose, busy = false, returnFocusRef, children }) {
   const headingId = useId();
+  const descriptionId = useId();
   const panelRef = useRef(null);
-  const openerRef = useRef(null);
-
-  // The token identifies THIS shell in the stack for its whole lifetime.
-  const tokenRef = useRef(null);
-  if (tokenRef.current === null) tokenRef.current = Symbol('modal');
-
-  // Registration is mount/unmount ONLY. Re-registering on every render (an
-  // `onClose` identity that changes with a parent re-render) would move a
-  // parent shell back to the top of the stack while its own child dialog is
-  // still open, and Escape would then close the wrong one.
-  useEffect(() => {
-    const token = tokenRef.current;
-    openShells.push(token);
-    openerRef.current = document.activeElement;
-    panelRef.current?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      const index = openShells.indexOf(token);
-      if (index !== -1) openShells.splice(index, 1);
-      // A parent shell keeps the page locked; only the last one out
-      // restores scrolling.
-      if (openShells.length === 0) document.body.style.overflow = previousOverflow;
-      const opener = openerRef.current;
-      if (opener && typeof opener.focus === 'function') opener.focus();
-    };
-  }, []);
-
-  useEffect(() => {
-    const token = tokenRef.current;
-    const onKeyDown = (event) => {
-      if (event.key !== 'Escape') return;
-      // Only the topmost dialog answers, and it stops the event so a
-      // handler mounted outside this component cannot also act on it.
-      if (openShells[openShells.length - 1] !== token) return;
-      event.stopPropagation();
-      onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  useModalDialog(panelRef, { returnFocusRef });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-admin-ink/40 p-md">
-      <div
+      <dialog
         ref={panelRef}
-        role="dialog"
-        aria-modal="true"
         aria-labelledby={headingId}
+        aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className="my-lg w-full max-w-3xl rounded-admin-panel border-admin-strong border-admin-rule-strong bg-admin-ground-raised p-md font-admin-ui text-admin-base text-admin-ink"
+        className="admin-modal max-w-3xl rounded-admin-panel border-admin-strong border-admin-rule-strong bg-admin-ground-raised p-md font-admin-ui text-admin-base text-admin-ink"
+        onKeyDown={wrapModalTab}
+        onCancel={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!busy) onClose();
+        }}
       >
         <div className="flex items-start justify-between gap-sm">
           <div className="min-w-0">
@@ -87,23 +48,19 @@ export default function ModalShell({ title, description = null, onClose, childre
               {title}
             </h2>
             {description ? (
-              <p className="mt-3xs text-admin-sm text-admin-ink-secondary">{description}</p>
+              <p id={descriptionId} className="mt-3xs text-admin-sm text-admin-ink-secondary">{description}</p>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
+          <AdminIconControl
+            onClick={() => { if (!busy) onClose(); }}
+            label="Close"
+            icon="close"
             title="Close dialog"
+            disabled={busy}
             className={`${secondaryButtonClass} min-w-[var(--admin-control-height)] shrink-0`}
-          >
-            <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
-          </button>
+          />
         </div>
         <div className="mt-sm">{children}</div>
-      </div>
-    </div>
+      </dialog>
   );
 }
