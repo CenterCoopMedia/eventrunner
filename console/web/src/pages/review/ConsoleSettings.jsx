@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { callApi } from '../../api.js';
+import LoadingState from '../../LoadingState.jsx';
 import { firstSettingError } from '../../reviewText.js';
 import AgreementSettings from './AgreementSettings.jsx';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
@@ -40,7 +41,7 @@ export default function ConsoleSettings() {
 
   if (isNotOperator(loadError)) return <HostingOnly />;
   if (loadError) return <p className="message error" role="alert">{loadError.message}</p>;
-  if (!values) return <p role="status">Loading the settings.</p>;
+  if (!values) return <LoadingState>Loading the settings.</LoadingState>;
 
   function change(field, value) {
     setValues((current) => ({ ...current, [field]: value }));

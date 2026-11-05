@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
+import LoadingState from '../LoadingState.jsx';
 import ConnectionPanel, { ConnectionNotice } from '../setup/ConnectionPanel.jsx';
 import { PROVIDER_COPY } from '../setup/connections.js';
 import { BUILD_FAILED_LABEL, BUILD_PHASES, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
@@ -27,6 +28,11 @@ function Stages({ app }) {
         return (
           <li key={stage.label} className={`stage ${i === at ? 'now' : ''} ${state === 'Done' ? 'done' : ''}`.trim()}
             aria-current={i === at ? 'step' : undefined}>
+            <svg className="stage-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="9" />
+              {state === 'Done' ? <path d="m8 12 3 3 5-6" /> : null}
+              {i === at ? <circle className="stage-current-dot" cx="12" cy="12" r="3" /> : null}
+            </svg>
             <span className="stage-label">{stopped ? 'We started building your site' : stage.label}</span>
             <span className="tag">{state}</span>
           </li>
@@ -46,7 +52,7 @@ function BuildUnderway({ app }) {
     <aside className="note stack" role="note">
       <p className="note-title">You can close this page</p>
       <p>{app.myRole === 'owner' ? 'You' : 'The Owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
-      {now ? <p>Now: {now}.{next ? ` Next: ${next}.` : ''}</p> : null}
+      <LoadingState>{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</LoadingState>
     </aside>
   );
 }
@@ -160,7 +166,7 @@ export default function ApplicationStatus() {
     }
   }
 
-  if (!app) return error ? <p className="message error" role="alert">{error}</p> : <p role="status">Loading your request.</p>;
+  if (!app) return error ? <p className="message error" role="alert">{error}</p> : <LoadingState>Loading your request.</LoadingState>;
 
   const title = app.answers.event.name || 'New event site';
   const closed = ['withdrawn', 'declined'].includes(app.status);
@@ -171,60 +177,79 @@ export default function ApplicationStatus() {
   const canReconnect = Boolean(reconnectProvider) && app.myRole === 'owner';
   const underway = ['approved', 'building'].includes(app.status) && !app.build?.failed;
   return (
-    <section aria-labelledby="status-title">
-      <h1 id="status-title" tabIndex={-1}>{title}</h1>
-      <p className="lead">{app.build?.failed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status]}</p>
-      {app.address ? <p>Web address: <strong>{app.address}</strong></p> : null}
+    <section aria-labelledby="status-title" className="console-workspace application-workspace">
+      <div className={`application-layout${closed ? ' application-closed' : ''}`}>
+        <div className="application-summary">
+          <header className="workspace-heading">
+            <h1 id="status-title" tabIndex={-1}>{title}</h1>
+            <p className="lead application-state">{app.build?.failed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status]}</p>
+          </header>
+          {app.address ? <p className="application-address"><span>Web address</span><strong>{app.address}</strong></p> : null}
 
-      {notice ? null : <ConnectionNotice message={state?.connectionMessage} />}
-      <div aria-live="polite" className="live">
-        {notice ? <p className="message success">{notice}</p> : null}
-      </div>
-      {error ? <p className="message error" role="alert">{error}</p> : null}
+          {notice ? null : <ConnectionNotice message={state?.connectionMessage} />}
+          <div aria-live="polite" className="live">
+            {notice ? <p className="message success">{notice}</p> : null}
+          </div>
+          {error ? <p className="message error" role="alert">{error}</p> : null}
 
-      {state?.copyFailed ? <p className="message error">We could not email your copy of the agreement. Your acceptance is saved, and you can read it below.</p> : null}
-      {app.build?.failed ? <BuildFailed app={app} provider={reconnectProvider} retrying={retrying} onRetry={retry} /> : null}
-      {underway ? <BuildUnderway app={app} /> : null}
-      {app.status === 'declined' && app.note ? (
-        <aside className="note" role="note">
-          <p className="note-title">Note from {hostName()}</p>
-          <p className="pre">{app.note}</p>
-        </aside>
-      ) : null}
+          {state?.copyFailed ? <p className="message error">We could not email your copy of the agreement. Your acceptance is saved, and you can read it below.</p> : null}
+          {app.build?.failed ? <BuildFailed app={app} provider={reconnectProvider} retrying={retrying} onRetry={retry} /> : null}
+          {underway ? <BuildUnderway app={app} /> : null}
+          {app.status === 'declined' && app.note ? (
+            <aside className="note" role="note">
+              <p className="note-title">Note from {hostName()}</p>
+              <p className="pre">{app.note}</p>
+            </aside>
+          ) : null}
 
-      {closed ? (
-        <p>{app.status === 'withdrawn' ? `This request is withdrawn. We will not build this site. To start again, ask ${hostName()} for a new signup link.` : 'This request is closed.'}</p>
-      ) : <Stages app={app} />}
+          {closed ? (
+            <p>{app.status === 'withdrawn' ? `This request is withdrawn. We will not build this site. To start again, ask ${hostName()} for a new signup link.` : 'This request is closed.'}</p>
+          ) : null}
 
-      {['ready', 'launched'].includes(app.status) && app.address ? (
-        <p><a className="button primary" href={`https://${app.address}/admin`}>Open your admin panel</a></p>
-      ) : null}
-      {app.canEdit ? (
-        <p><Link className="button primary" to={setupPath(orgId, appId, STEPS[0])}>Continue the setup</Link></p>
-      ) : null}
-      {app.acceptance ? (
-        <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. <Link to={`${statusPath(orgId, appId)}/accepted-agreement`}>Read the agreement</Link>.{underway ? '' : ' We email the Owners when the status changes.'}</p>
-      ) : null}
-      {accounts.map((provider) => (
-        <div className="section" key={provider}>
-          <ConnectionPanel
-            provider={provider}
-            orgId={orgId}
-            appId={appId}
-            connections={app.connections}
-            errors={provider === choice ? app.errors : {}}
-            // Once the answers are frozen, only the account they chose can connect, and only to recover a failed build.
-            canConnect={(app.connections.canChange && app.canEdit) || (canReconnect && provider === reconnectProvider)}
-            connectLabel={provider === reconnectProvider && canReconnect ? 'Reconnect' : undefined}
-            myRole={app.myRole}
-            returnPath={statusPath(orgId, appId)}
-            onConnections={load}
-            onNotice={setNotice}
-          />
+          <div className="application-actions">
+            {['ready', 'launched'].includes(app.status) && app.address ? (
+              <p><a className="button primary" href={`https://${app.address}/admin`}>Open your admin panel</a></p>
+            ) : null}
+            {app.canEdit ? (
+              <p><Link className="button primary" to={setupPath(orgId, appId, STEPS[0])}>Continue the setup</Link></p>
+            ) : null}
+            <p><Link to={`/organizations/${orgId}`}>Back to your event sites</Link></p>
+          </div>
         </div>
-      ))}
-      {app.canWithdraw ? <div className="section"><Withdraw onWithdraw={withdraw} /></div> : null}
-      <p className="section"><Link to={`/organizations/${orgId}`}>Back to your event sites</Link></p>
+        {closed ? null : (
+          <aside className="application-progress" aria-labelledby="progress-title">
+            <h2 id="progress-title">Setup progress</h2>
+            <Stages app={app} />
+          </aside>
+        )}
+        <div className="application-details">
+          {app.acceptance ? (
+            <section className="application-agreement" aria-labelledby="accepted-agreement-title">
+              <h2 id="accepted-agreement-title">Agreement</h2>
+              <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. <Link to={`${statusPath(orgId, appId)}/accepted-agreement`}>Read the agreement</Link>.{underway ? '' : ' We email the Owners when the status changes.'}</p>
+            </section>
+          ) : null}
+          {accounts.map((provider) => (
+            <div className="section" key={provider}>
+              <ConnectionPanel
+                provider={provider}
+                orgId={orgId}
+                appId={appId}
+                connections={app.connections}
+                errors={provider === choice ? app.errors : {}}
+                // Once the answers are frozen, only the account they chose can connect, and only to recover a failed build.
+                canConnect={(app.connections.canChange && app.canEdit) || (canReconnect && provider === reconnectProvider)}
+                connectLabel={provider === reconnectProvider && canReconnect ? 'Reconnect' : undefined}
+                myRole={app.myRole}
+                returnPath={statusPath(orgId, appId)}
+                onConnections={load}
+                onNotice={setNotice}
+              />
+            </div>
+          ))}
+          {app.canWithdraw ? <div className="section"><Withdraw onWithdraw={withdraw} /></div> : null}
+        </div>
+      </div>
     </section>
   );
 }
