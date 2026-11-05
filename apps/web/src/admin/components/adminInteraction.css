@@ -1,7 +1,7 @@
-.admin-icon-control {
+.admin-icon-control.admin-icon-control {
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   min-width: var(--admin-control-height); min-height: var(--admin-control-height);
-  width: var(--admin-control-height); padding: 0;
+  width: var(--admin-control-height); height: var(--admin-control-height); padding: 0;
 }
 .admin-icon-control svg { flex: none; }
 .admin-control-tooltip {
