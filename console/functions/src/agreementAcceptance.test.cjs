@@ -265,3 +265,21 @@ test('with no agreement set, the read says so', async () => {
   const db = seededDb({ 'applications/a1': applicationDoc(), ...NAME_HELD });
   assert.equal((await getAgreement({ db }, { body: IDS, user: ana })).body.agreement, null);
 });
+
+test('legacy, quarantined, forged and mismatched signup provenance cannot approve or dispatch', async () => {
+  for (const extra of [
+    { 'applications/a1': applicationDoc({ signupLinkId: null }) },
+    { 'applications/a1': applicationDoc({ legacyQuarantined: true }) },
+    { 'applications/a1': applicationDoc({ signupLinkId: 'missing' }) },
+    ...[
+      { status: 'open' }, { orgId: 'other' }, { appId: 'other' }, { usedBy: 'other' },
+    ].map((patch) => ({ 'signup_links/paid-o1': { status: 'used', orgId: 'o1', appId: 'a1', usedBy: 'ana', ...patch } })),
+  ]) {
+    const db = ready(extra);
+    let dispatched = false;
+    await assert.rejects(accept(deps(db, { startBuild: async () => { dispatched = true; } })), { code: 'signup-link-required' });
+    assert.equal(dispatched, false);
+    assert.equal(db.read('applications/a1').status, 'draft');
+    assert.deepEqual(records(db), []);
+  }
+});

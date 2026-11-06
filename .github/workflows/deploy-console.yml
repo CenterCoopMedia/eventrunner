@@ -75,6 +75,11 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
+      - name: Migrate signup-link provenance and quarantine unpaid legacy drafts
+        env:
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+        run: node scripts/migrate-console-signup-links.cjs
+
       - name: Deploy
         working-directory: console
         env:

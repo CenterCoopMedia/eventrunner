@@ -11,6 +11,27 @@ const { transactionalStream } = require('../email/stream.cjs');
 const TEMPLATE_ID = 'admin.access_granted';
 const SEND_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
+/** Reserve all abuse budgets atomically before email claims or provider contact. */
+async function takeResendBudget({ db, uid, email, sendId, now = Date.now }) {
+  const { createHash } = require('node:crypto');
+  const hash = (value) => createHash('sha256').update(value).digest('hex');
+  const attempt = hash(`${uid}:${email}:${sendId}`);
+  const at = now();
+  const windowMs = 60 * 60 * 1000;
+  const scopes = [['global', 60], [`actor-${hash(uid)}`, 20], [`recipient-${hash(email)}`, 3]];
+  return db.runTransaction(async (tx) => {
+    const refs = scopes.map(([key]) => db.collection('admin_mail_limits').doc(key));
+    const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+    const entries = snaps.map((snap) => (snap.data()?.attempts || [])
+      .filter((entry) => Number.isFinite(entry.at) && entry.at > at - windowMs));
+    if (entries[0].some((entry) => entry.id === attempt)) return { ok: true };
+    const full = entries.findIndex((list, index) => list.length >= scopes[index][1]);
+    if (full >= 0) return { ok: false, retryAfter: Math.max(1, Math.ceil((entries[full][0].at + windowMs - at) / 1000)) };
+    refs.forEach((ref, index) => tx.set(ref, { attempts: [...entries[index], { id: attempt, at }] }));
+    return { ok: true };
+  });
+}
+
 async function activeAccount({ db, email, now = Date.now }) {
   const snap = await db.collection('config').doc('bootstrap').get();
   const bootstrap = snap.exists ? snap.data() : null;
@@ -94,4 +115,4 @@ async function sendAccessInstructions({ db, getConfig, sendEmail, email, onceKey
   }
 }
 
-module.exports = { activeAccount, sendAccessInstructions, SEND_ID_RE };
+module.exports = { takeResendBudget, activeAccount, sendAccessInstructions, SEND_ID_RE };

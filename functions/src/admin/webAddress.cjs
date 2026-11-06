@@ -77,17 +77,18 @@ function view(record, env) {
 /**
  * Read Hosting's state for the stored domain and move the record on. Live
  * means Hosting serves the domain with a certificate; the domain is then
- * added to the sign-in authorized domains before the state says so.
+ * already authorized by the hosting team before the state says so. Checks
+ * never grant sign-in access: a stale check cannot revive a removed domain.
  */
 async function checkRecord({ db, hosting, identity, env, now, record }) {
+  if (record.state === 'removing') return record;
   const at = now();
   const read = await hosting.readDomain(record.domain);
   const next = { ...record, lastCheckedAt: at, updatedAt: at };
-  if (!read.live) {
+  if (!read.live || !await identity.hasAuthorizedDomain(record.domain)) {
     next.state = WAITING;
     next.records = read.records;
   } else {
-    await identity.addAuthorizedDomain(record.domain);
     next.state = publicOrigin(env) === `https://${record.domain}` ? 'done' : 'switch';
     next.records = [];
     next.liveAt = record.liveAt ?? at;
@@ -98,7 +99,7 @@ async function checkRecord({ db, hosting, identity, env, now, record }) {
   const ref = db.collection(COLLECTION).doc(DOC);
   return db.runTransaction(async (tx) => {
     const current = await tx.get(ref);
-    if (!current.exists || current.data().domain !== record.domain) return current.exists ? current.data() : null;
+    if (!current.exists || current.data().domain !== record.domain || current.data().state === 'removing') return current.exists ? current.data() : null;
     tx.set(ref, next);
     return next;
   });
@@ -210,7 +211,7 @@ function createHostingClient({ projectId, site, fetchImpl = globalThis.fetch, ge
     async readDomain(domain) {
       const found = await read(domain);
       if (!found) return { live: false, records: [] };
-      const live = found.hostState === 'HOST_ACTIVE' && found.ownershipState === 'OWNERSHIP_ACTIVE' && found.cert?.state === 'CERT_ACTIVE';
+      const live = !found.deleteTime && found.hostState === 'HOST_ACTIVE' && found.ownershipState === 'OWNERSHIP_ACTIVE' && found.cert?.state === 'CERT_ACTIVE';
       return { live, records: recordsToChange(found) };
     },
     async removeDomain(domain) {
@@ -223,6 +224,17 @@ function createHostingClient({ projectId, site, fetchImpl = globalThis.fetch, ge
 function createIdentityClient({ projectId, fetchImpl = globalThis.fetch, getAccessToken }) {
   const url = `${IDENTITY_API}/projects/${encodeURIComponent(projectId)}/config`;
   return {
+    async hasAuthorizedDomain(domain) {
+      const config = await googleCall({ fetchImpl, getAccessToken, url });
+      return Array.isArray(config.authorizedDomains) && config.authorizedDomains.includes(domain);
+    },
+    async removeAuthorizedDomain(domain) {
+      const config = await googleCall({ fetchImpl, getAccessToken, url });
+      const domains = Array.isArray(config.authorizedDomains) ? config.authorizedDomains : [];
+      if (!domains.includes(domain)) return;
+      await googleCall({ fetchImpl, getAccessToken, method: 'PATCH', url: `${url}?updateMask=authorizedDomains`,
+        body: { authorizedDomains: domains.filter((entry) => entry !== domain) } });
+    },
     async addAuthorizedDomain(domain) {
       const config = await googleCall({ fetchImpl, getAccessToken, url });
       const domains = Array.isArray(config.authorizedDomains) ? config.authorizedDomains : [];
@@ -230,6 +242,22 @@ function createIdentityClient({ projectId, fetchImpl = globalThis.fetch, getAcce
       await googleCall({ fetchImpl, getAccessToken, method: 'PATCH', url: `${url}?updateMask=authorizedDomains`, body: { authorizedDomains: [...domains, domain] } });
     },
   };
+}
+
+/** Operator tooling only. Preserve the record until both revocations succeed. */
+async function removeWebAddress({ db, hosting, identity, domain }) {
+  const ref = db.collection(COLLECTION).doc(DOC);
+  await db.runTransaction(async (tx) => {
+    const current = await tx.get(ref);
+    if (!current.exists || current.data().domain !== domain) throw new Error('Domain does not match the stored web address');
+    tx.update(ref, { state: 'removing' });
+  });
+  await identity.removeAuthorizedDomain(domain);
+  await hosting.removeDomain(domain);
+  await db.runTransaction(async (tx) => {
+    const current = await tx.get(ref);
+    if (current.exists && current.data().domain === domain && current.data().state === 'removing') tx.delete(ref);
+  });
 }
 
 function realClients(env = process.env) {
@@ -267,6 +295,6 @@ function buildHandlers() {
 }
 
 module.exports = {
-  normalizeDomain, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
+  normalizeDomain, removeWebAddress, realClients, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
   get handlers() { return buildHandlers(); },
 };

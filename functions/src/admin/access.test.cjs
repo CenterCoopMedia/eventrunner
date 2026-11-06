@@ -1027,3 +1027,18 @@ test('only sending access endpoints bind provider secrets', () => {
     else process.env.EVENT_EMAIL_PROVIDER = previous;
   }
 });
+
+test('resends have a recipient budget independent of caller-chosen send ids and operator identity', async () => {
+  const { deps, messages } = world();
+  const handler = createResendAdminAccessInstructionsHandler(deps);
+  for (let index = 0; index < 4; index += 1) {
+    const res = makeRes();
+    await handler(req(index % 2 ? 'second' : 'ops', { email: STAFF, sendId: `attempt-${index}` }), res);
+    assert.equal(res.statusCode, index < 3 ? 200 : 429);
+  }
+  assert.equal(messages.length, 3);
+  const retry = makeRes();
+  await handler(req('ops', { email: STAFF, sendId: 'attempt-0' }), retry);
+  assert.equal(retry.statusCode, 200);
+  assert.equal(messages.length, 3);
+});

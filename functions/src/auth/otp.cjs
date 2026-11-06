@@ -303,7 +303,7 @@ function createSendOtpHandler({
         hasLegalFooterText: rendered.hasLegalFooterText,
       });
     } catch (err) {
-      await releaseCeiling();
+      // Ambiguous provider contact still consumes the global attempt budget.
       throw err;
     }
     if (result.status !== 'sent') {

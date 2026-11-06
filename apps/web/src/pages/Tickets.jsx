@@ -129,6 +129,12 @@ export default function Tickets() {
   const submittingRef = useRef(false);
   const activeUid = useRef(user?.uid);
   activeUid.current = user?.uid;
+  // A new account session invalidates callbacks even after A → B → A.
+  const promoOwnerRef = useRef({ uid: user?.uid, generation: 0 });
+  if (promoOwnerRef.current.uid !== user?.uid) {
+    promoOwnerRef.current = { uid: user?.uid, generation: promoOwnerRef.current.generation + 1 };
+  }
+  const promoOwner = promoOwnerRef.current;
   // A refusal that moves the buyer to another step focuses its error there,
   // not the step heading. The move can commit after the error does.
   const currentSlug = useRef(stepSlug);
@@ -178,6 +184,9 @@ export default function Tickets() {
     setRequestError('');
     setPassed([]);
     setFormNotice('');
+    setPromo(null);
+    setPromoRefusal('');
+    setPromoPending(false);
   }, [user?.uid]);
 
   useEffect(() => {
@@ -208,7 +217,7 @@ export default function Tickets() {
   // A code priced one cart. Another cart or catalog drops it without an effect.
   const cart = lines.map(({ ticketTypeId, quantity }) => ({ ticketTypeId, quantity }));
   const cartKey = JSON.stringify([catalog?.catalogRevision, cart]);
-  const applied = promo?.cartKey === cartKey ? promo.preview : null;
+  const applied = promo?.owner === promoOwner && promo?.cartKey === cartKey ? promo.preview : null;
   const payable = applied ? applied.totalAmount : total;
   const attempt = saved && user && saved.uid === user.uid ? saved.attempt : null;
   // Every attendee in order, numbered across ticket types.
@@ -556,8 +565,8 @@ export default function Tickets() {
                     </div>
                   </dl>
                   {count ? <PromoCodeField
-                    key={cartKey} user={user} cart={cart} catalogRevision={catalog.catalogRevision} applied={applied} refusal={promoRefusal} onPendingChange={setPromoPending}
-                    onApplied={(preview) => { setPromoRefusal(''); setPromo(preview ? { cartKey, preview } : null); }}
+                    key={`${promoOwner.generation}:${cartKey}`} user={user} cart={cart} catalogRevision={catalog.catalogRevision} applied={applied} refusal={promoRefusal} onPendingChange={(pending) => { if (promoOwnerRef.current === promoOwner) setPromoPending(pending); }}
+                    onApplied={(preview) => { if (promoOwnerRef.current !== promoOwner) return; setPromoRefusal(''); setPromo(preview ? { owner: promoOwner, cartKey, preview } : null); }}
                   /> : null}
                   <p className="text-caption text-text-secondary">{catalog.taxTreatment === 'inclusive' ? 'Any applicable tax is included in these prices.' : 'The organizer has configured this event not to collect tax.'} The organizer pays processing fees; no additional fees are added to your total.</p>
                   <h3 className="font-heading text-h3 font-semibold">Attendees</h3>

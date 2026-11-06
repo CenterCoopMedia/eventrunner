@@ -355,12 +355,15 @@ function splitChoices(raw, choices) {
   // Case and the spacing around each ";" do not matter.
   const key = (value) => value.split(';').map((part) => part.trim()).join(';').toLowerCase();
   const known = new Map(choices.map((choice) => [key(choice), choice]));
+  // Only configured choices can consume multiple components. Work is bounded
+  // by input length and the longest configured choice, never the entire tail.
+  const maxParts = Math.max(1, ...choices.map((choice) => choice.split(';').length));
   const parts = raw.split(';');
   const picked = [];
   let index = 0;
   while (index < parts.length) {
     let taken = 0;
-    for (let end = parts.length; end > index; end -= 1) {
+    for (let end = Math.min(parts.length, index + maxParts); end > index; end -= 1) {
       const joined = key(parts.slice(index, end).join(';'));
       if (known.has(joined)) { picked.push(known.get(joined)); taken = end - index; break; }
     }

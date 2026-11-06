@@ -1029,15 +1029,16 @@ steps below in this order.
 
 ### 10.1 Switch the site to eventrunner.org
 
-1. **DNS.** For `eventrunner.org`, add `A` records to `185.199.108.153`, `185.199.109.153`,
+1. **Verify ownership first.** In organization settings, open Pages → Verified domains and
+   verify `eventrunner.org` with the required TXT record. Keep that verification record.
+   Do not publish Pages DNS until GitHub confirms ownership.
+2. **DNS.** For `eventrunner.org`, add `A` records to `185.199.108.153`, `185.199.109.153`,
    `185.199.110.153` and `185.199.111.153`, `AAAA` records to `2606:50c0:8000::153`,
    `2606:50c0:8001::153`, `2606:50c0:8002::153` and `2606:50c0:8003::153`, and
    `CNAME www → centercoopmedia.github.io`. On Cloudflare, set each record to **DNS only** (grey
    cloud). If a record is proxied, GitHub cannot issue the certificate. Leave the `MX` and `TXT`
    records alone: they carry the domain's email. Wait until `dig +short eventrunner.org A` returns
    the four addresses.
-2. **Optional: verify the domain.** In the organization settings, go to Pages → Verified domains
-   and verify `eventrunner.org`. This prevents a domain takeover.
 3. **Variables.** Go to Settings → Secrets and variables → Actions → Variables. Add the repository
    variables `PAGES_SUPPORT_NAME` and `PAGES_SUPPORT_EMAIL`, which fill in who clients reach on the
    homepage and the support, privacy and terms pages, and `PAGES_BASE_URL` with the value
@@ -1080,7 +1081,10 @@ load from the new host.
    generated pages already send a reader to the configured address.
 4. After that pull request is merged, you can delete the `PAGES_BASE_URL` variable.
 
-**To go back** to the github.io address, delete the custom domain in Settings → Pages. Then delete
+**To go back** to the github.io address, first remove every Pages A, AAAA and CNAME record
+for the custom hostname, including `www`, and wait for their previous DNS TTLs to expire.
+Keep the Pages custom-domain binding and organization verification until those cached records
+have expired. Then delete the custom domain in Settings → Pages. Finally delete
 the `PAGES_BASE_URL` variable, or set it to `https://centercoopmedia.github.io/eventrunner/`. Run
 the Pages workflow again.
 

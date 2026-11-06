@@ -159,7 +159,7 @@ test('a refunded order is the same 404 and does not approve the account', async 
   assert.equal(res.statusCode, 404);
   assert.deepEqual(res.body, { error: { code: 'not-found', message: 'No ticket matches that order number.' } });
   assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
-  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.ok(!db.read('tickets', 'tkt-1').claimedByUid);
   assert.equal(db.read('users', 'uid-ada').registrationStatus, 'pending');
   assert.equal(db.read('users', 'uid-ada').approvalSource, null);
 });
@@ -183,7 +183,7 @@ test('a mixed order claims the valid ticket and leaves the refunded one', async 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.claimed, 1);
   assert.equal(res.body.registrationStatus, 'ticketed');
-  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.ok(!db.read('tickets', 'tkt-1').claimedByUid);
   assert.equal(db.read('tickets', 'tkt-2').claimedByUid, 'uid-ada');
 });
 
@@ -207,7 +207,7 @@ test('a manual claim does not write a stale valid status over a newer refund', a
 
   assert.equal(res.statusCode, 404);
   assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
-  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.ok(!db.read('tickets', 'tkt-1').claimedByUid);
   assert.equal(db.read('users', 'uid-ada').registrationStatus, 'pending');
   assert.equal(db.read('users', 'uid-ada').approvalSource, null);
 });
@@ -673,7 +673,7 @@ test('createUserFromTicket does not mint an account for a ticket that is not val
 
     assert.equal(res.statusCode, 409);
     assert.equal(authImpl.created.length, 0);
-    assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+    assert.ok(!db.read('tickets', 'tkt-1').claimedByUid);
     assert.deepEqual(db.ids('users'), []);
   }
 });
@@ -693,7 +693,7 @@ test('a refund during account creation removes the account this request created'
   assert.equal(res.statusCode, 409);
   assert.deepEqual(authImpl.deleted, ['new-1']);
   assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
-  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.ok(!db.read('tickets', 'tkt-1').claimedByUid);
   assert.equal(db.read('users', 'new-1'), undefined);
   await assert.rejects(() => authImpl.getUserByEmail('attendee@example.com'));
 });
@@ -746,7 +746,7 @@ test('createUserFromTicket fails closed on unavailable policy and still creates 
   assert.equal(authImpl.created.length, 1);
 });
 
-test('a directory answer given at checkout sets the holder\'s profile visibility at claim, behind the public profiles feature', async () => {
+test('a directory answer given at checkout cannot change the holder\'s privacy at claim', async () => {
   const withDirectory = (directoryListing, extra = {}) => orderDb({
     [`ticket_orders/${ORDER_ID}`]: {
       id: ORDER_ID, registrationFormRevision: 4, registrationQuestions: QUESTIONS,
@@ -757,11 +757,18 @@ test('a directory answer given at checkout sets the holder\'s profile visibility
   const claim = (db) => claimTicket({ db, externalId: `${ORDER_ID}_0_0`, uid: 'uid-ada', email: 'attendee@example.com', now: () => T0 });
   const hidden = withDirectory('private');
   await claim(hidden);
-  assert.equal(hidden.read('users', 'uid-ada').profileVisibility, 'private');
+  assert.equal(hidden.read('users', 'uid-ada').profileVisibility, undefined);
   const publicOff = withDirectory('public');
   await claim(publicOff);
-  assert.equal(publicOff.read('users', 'uid-ada').profileVisibility, 'attendees_only');
+  assert.equal(publicOff.read('users', 'uid-ada').profileVisibility, undefined);
   const publicOn = withDirectory('public', { 'config/features': { publicAttendeeProfiles: true } });
   await claim(publicOn);
-  assert.equal(publicOn.read('users', 'uid-ada').profileVisibility, 'public');
+  assert.equal(publicOn.read('users', 'uid-ada').profileVisibility, undefined);
+});
+
+test('a ticket claim cannot attach a ticket to a deleted account', async () => {
+  const db = makeFakeDb({ 'tickets/tkt-1': fakeTicket() });
+  const result = await claimTicket({ db, externalId: 'tkt-1', uid: 'deleted', email: 'attendee@example.com' });
+  assert.deepEqual(result, { claimed: false, reason: 'account_missing' });
+  assert.ok(!db.read('tickets', 'tkt-1').claimedByUid);
 });

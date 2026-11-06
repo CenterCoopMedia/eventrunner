@@ -178,3 +178,10 @@ test('answerFromText keeps a choice that contains a semicolon, and reads Other w
   answerFromText(dietary, `other${'\t'.repeat(50000)}x`);
   assert.ok(Date.now() - started < 200);
 });
+
+test('choice import parsing bounds work by configured choices even for a delimiter-filled cell', () => {
+  const { answerFromText } = require('./registrationForm.cjs');
+  const question = { kind: 'many_choices', choices: ['News; local', 'Revenue'] };
+  assert.deepEqual(answerFromText(question, ';'.repeat(4990) + 'unknown'), ['unknown']);
+  assert.deepEqual(answerFromText(question, 'news ; LOCAL; Revenue'), ['News; local', 'Revenue']);
+});

@@ -73,7 +73,7 @@ const {
 const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { randomUUID, createHash } = require('node:crypto');
-const { activeAccount, sendAccessInstructions, SEND_ID_RE } = require('./accessMail.cjs');
+const { takeResendBudget, activeAccount, sendAccessInstructions, SEND_ID_RE } = require('./accessMail.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 
 const BOOTSTRAP = { collection: 'config', doc: 'bootstrap' };
@@ -450,6 +450,15 @@ function createResendAdminAccessInstructionsHandler({ db, auth, getConfig, sendE
       if (!account.tier) return sendError(res, 409, 'inactive-access', 'This account no longer has active access. No instructions were sent.');
     } catch {
       return internal(res, 'Active access could not be checked. No instructions were sent.');
+    }
+    try {
+      const budget = await takeResendBudget({ db, uid: gate.uid, email, sendId, now });
+      if (!budget.ok) {
+        res.set('Retry-After', String(budget.retryAfter));
+        return sendError(res, 429, 'rate-limited', 'Too many instruction emails. Try again later.');
+      }
+    } catch {
+      return internal(res, 'Email sending limits could not be checked. No instructions were sent.');
     }
     const addressKey = createHash('sha256').update(email).digest('hex');
     const emailResult = await sendAccessInstructions({

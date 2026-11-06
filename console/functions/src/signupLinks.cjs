@@ -175,7 +175,7 @@ async function redeemSignupLink({ db, now = Date.now }, { body, user }) {
     }
     tx.create(orgRef, { name: organizationName, createdAt: at, createdBy: user.uid });
     tx.create(orgRef.collection('members').doc(user.uid), { uid: user.uid, email: user.email, role: 'owner', joinedAt: at });
-    tx.create(appRef, newApplicationData({ orgId: orgRef.id, organizationName, timezone: body.timezone, uid: user.uid, at }));
+    tx.create(appRef, { ...newApplicationData({ orgId: orgRef.id, organizationName, timezone: body.timezone, uid: user.uid, at }), signupLinkId: ref.id });
     tx.update(ref, { status: 'used', usedBy: user.uid, usedEmail: user.email, usedAt: at, orgId: orgRef.id, appId: appRef.id });
     return { status: 201, body: { orgId: orgRef.id, appId: appRef.id } };
   });
