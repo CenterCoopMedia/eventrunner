@@ -279,3 +279,15 @@ describe('promo code on an order', () => {
     expect(screen.queryByText('Promo code')).not.toBeInTheDocument();
   });
 });
+
+describe('StripeOrderDetail: audit trail', () => {
+  it('names each entry by the action the server stores', async () => {
+    const audit = ['tickets-cancelled', 'refund-allocated', 'checked-in', 'unknown-thing'].map((action, index) => (
+      { id: `audit-${index}`, action: `ticketing.${action}`, at: '2026-01-02T12:00:00Z', actorUid: 'staff', reason: null, ticketIds: [] }
+    ));
+    const call = vi.fn(async () => ({ ...DETAIL, audit }));
+    render(<StripeOrderDetail call={call} orderId="order-1" isOperator timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
+    expect(await screen.findByText('Tickets cancelled')).toBeInTheDocument();
+    for (const label of ['Refund recorded', 'Attendee checked in', 'Order updated']) expect(screen.getByText(label)).toBeInTheDocument();
+  });
+});

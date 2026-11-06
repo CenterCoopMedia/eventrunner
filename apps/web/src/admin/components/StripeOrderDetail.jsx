@@ -43,6 +43,21 @@ function confirmationOutcome(result, unconfirmed) {
   return { tone: 'ok', message: `${sentMessage} Stripe’s payment receipt is separate.`, complete: true };
 }
 
+// Keyed by the action names functions/src/ticketing writes to the audit log.
+const AUDIT_LABELS = {
+  'tickets-cancelled': 'Tickets cancelled',
+  'refund-allocated': 'Refund recorded',
+  'attendee-corrected': 'Attendee updated',
+  'reconciliation-requested': 'Payment checked',
+  'checked-in': 'Attendee checked in',
+  'check-in-corrected': 'Check-in corrected',
+  'confirmation-sent': 'Confirmation sent',
+  'confirmation-needs-attention': 'Confirmation needs attention',
+  comp: 'Complimentary tickets issued',
+  order_reserved: 'Order placed',
+  free_order: 'Free order placed',
+};
+
 export default function StripeOrderDetail({ call, orderId, isOperator, timezone, onChanged, onClose }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -218,7 +233,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       {order.disputes?.length ? <section className="space-y-sm"><h3 className="text-admin-lg font-bold">Payment disputes</h3><p className="text-admin-sm text-admin-ink-secondary">Review and respond in Stripe Dashboard. A dispute does not automatically change admission; check each ticket before deciding whether to cancel it.</p><ul className="space-y-xs">{order.disputes.map((dispute) => <li key={dispute.id} className="wrap-anywhere">{formatTicketMoney(dispute.amount, dispute.currency || order.currency)} — {ticketStatusLabel(dispute.status)}</li>)}</ul></section> : null}
       <section className="space-y-sm">
         <h3 className="text-admin-lg font-bold">Audit trail</h3>
-        {data.audit?.length ? <ol className="space-y-sm">{data.audit.map((entry) => <li key={entry.id} className="space-y-3xs border-b-admin-hairline border-admin-rule-hairline pb-sm"><p className="font-semibold">{({ cancelTickets: 'Tickets cancelled', allocateRefund: 'Refund recorded', updateAttendee: 'Attendee updated', reconcile: 'Payment checked', resend: 'Confirmation requested', issueComp: 'Complimentary tickets issued', pauseSales: 'Sales changed', checkIn: 'Attendee checked in', undo: 'Check-in undone' }[String(entry.action).replace(/^ticketing[.:]/, '')] || 'Order updated')}</p><p className="wrap-anywhere font-admin-data text-admin-xs">{formatTicketTime(entry.at, timezone)} · {entry.actorEmail || 'Staff'}</p>{entry.reason ? <p className="wrap-anywhere text-admin-sm">{entry.reason}</p> : null}{entry.ticketIds?.length ? <p className="wrap-anywhere font-admin-data text-admin-xs">{entry.ticketIds.length} tickets affected</p> : null}</li>)}</ol> : <p className="text-admin-sm text-admin-ink-secondary">No staff actions have been recorded for this order.</p>}
+        {data.audit?.length ? <ol className="space-y-sm">{data.audit.map((entry) => <li key={entry.id} className="space-y-3xs border-b-admin-hairline border-admin-rule-hairline pb-sm"><p className="font-semibold">{AUDIT_LABELS[String(entry.action).replace(/^ticketing\./, '')] || 'Order updated'}</p><p className="wrap-anywhere font-admin-data text-admin-xs">{formatTicketTime(entry.at, timezone)} · {entry.actorEmail || 'Staff'}</p>{entry.reason ? <p className="wrap-anywhere text-admin-sm">{entry.reason}</p> : null}{entry.ticketIds?.length ? <p className="wrap-anywhere font-admin-data text-admin-xs">{entry.ticketIds.length} tickets affected</p> : null}</li>)}</ol> : <p className="text-admin-sm text-admin-ink-secondary">No staff actions have been recorded for this order.</p>}
       </section>
     </div> : null}
     {confirm ? <TicketingConfirmation title={confirm === 'cancel' ? 'Cancel the selected admission tickets?' : confirm === 'refund' ? 'Record this refund’s admission consequences?' : 'Correct attendee details'} confirmLabel={confirm === 'cancel' ? `Cancel ${selected.length} admission tickets` : confirm === 'refund' ? preserveAdmission ? 'Record refund with admission retained' : `Remove admission from ${selected.length} tickets` : 'Save attendee correction'} destructive={confirm === 'cancel' || (confirm === 'refund' && !preserveAdmission)} error={error} busy={busy} onClose={closeConfirmation} onConfirm={performConfirmed}>

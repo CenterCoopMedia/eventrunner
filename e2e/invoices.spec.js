@@ -123,7 +123,7 @@ test.describe.serial('invoice drafts', () => {
     await page.getByLabel('Discount row 1 amount').fill('1,000.10');
     await expect(total).toHaveText(/Total: \$13,999\.90/);
 
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Draft saved.' })).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/invoices\/inv_[a-z0-9]+$/);
     invoiceId = page.url().split('/').pop();
@@ -234,7 +234,8 @@ test.describe.serial('issued invoices', () => {
     await page.getByRole('button', { name: 'Issue this invoice' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'INV-0001' })).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: 'Issued as INV-0001.' })).toBeVisible();
-    await expect(page.getByLabel('Name to bill')).toBeDisabled();
+    // An issued invoice shows its billing details as a record, not a form.
+    await expect(page.getByLabel('Name to bill')).toHaveCount(0);
 
     const issued = (await adminDb().collection('invoices').doc(FIRST).get()).data();
     expect(issued.status).toBe('issued');
@@ -345,14 +346,14 @@ test.describe.serial('issued invoices', () => {
     const form = page.getByRole('region', { name: `Email ${number}` });
     await form.getByLabel('Copy to').fill('finance@example.test');
     await form.getByLabel('Note').fill('Thank you for sponsoring.');
-    await form.getByRole('button', { name: 'Preview email' }).click();
+    await form.getByRole('button', { name: 'Preview', exact: true }).click();
     const preview = form.getByRole('region', { name: 'Email preview' });
     await expect(preview).toContainText(`Invoice ${number} from ${stored.issuer.name}`);
     await expect(preview).toContainText(`${number}.pdf`);
     await expect(preview).toContainText('Thank you for sponsoring.');
 
     const since = mailFileSize();
-    await form.getByRole('button', { name: 'Send to sponsor@example.test' }).click();
+    await form.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByRole('status').filter({ hasText: `Emailed ${number} to sponsor@example.test` })).toBeVisible();
     const mail = await waitForTaggedMail(since, 'sponsor@example.test', 'invoice.send');
     expect(mail.cc).toBe('finance@example.test');
@@ -383,9 +384,9 @@ test.describe.serial('issued invoices', () => {
 
     // A second send minutes later needs a confirmation; without one nothing goes.
     await page.getByRole('button', { name: 'Email invoice' }).click();
-    await form.getByRole('button', { name: 'Preview email' }).click();
+    await form.getByRole('button', { name: 'Preview', exact: true }).click();
     await expect(form).toContainText('less than 15 minutes ago');
-    await form.getByRole('button', { name: 'Send to sponsor@example.test' }).click();
+    await form.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(form.getByLabel('Send it again anyway')).toBeFocused();
     const again = await callFunction('invoiceAdmin', { action: 'previewSend', invoiceId: id }, staffToken);
     const refused = await callFunction('invoiceAdmin', {
@@ -413,8 +414,8 @@ test.describe.serial('issued invoices', () => {
     await page.goto(`/admin/invoices/${id}`);
     await expect(page.getByRole('heading', { level: 1, name: number })).toBeVisible();
     const card = page.getByRole('region', { name: 'Pay by card' });
-    await expect(card).toContainText('Card payment links need Stripe.');
-    await expect(card.getByRole('button', { name: 'Make a card payment link' })).toHaveCount(0);
+    await expect(card).toContainText('Card payments are not connected.');
+    await expect(card.getByRole('button', { name: 'Create payment link' })).toHaveCount(0);
     const refused = await callFunction('invoiceAdmin', { action: 'createPayLink', invoiceId: id }, staffToken);
     expect(refused.status).toBe(409);
     expect(refused.body.error.code).toBe('pay-links-unavailable');
@@ -446,9 +447,9 @@ test.describe.serial('issued invoices', () => {
     const since = mailFileSize();
     await page.getByRole('button', { name: 'Email invoice' }).click();
     const form = page.getByRole('region', { name: `Email ${number}` });
-    await form.getByRole('button', { name: 'Preview email' }).click();
+    await form.getByRole('button', { name: 'Preview', exact: true }).click();
     await expect(form.getByRole('region', { name: 'Email preview' })).toContainText('Pay by card');
-    await form.getByRole('button', { name: 'Send to sponsor@example.test' }).click();
+    await form.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByRole('status').filter({ hasText: `Emailed ${number} to sponsor@example.test` })).toBeVisible();
     const mail = await waitForTaggedMail(since, 'sponsor@example.test', 'invoice.send');
     const hrefs = [...mail.html.matchAll(/href="([^"]*)"/g)].map(([, value]) => value.replace(/&amp;/g, '&'));
@@ -483,7 +484,7 @@ test.describe.serial('issued invoices', () => {
     await page.goto(`/admin/invoices/${FIRST}`);
     const panel = page.getByRole('region', { name: 'A card payment needs review' });
     await expect(panel).toContainText('after it was voided');
-    await expect(panel).toContainText('pi_test_e2e0002');
+    await expect(panel).toContainText('Received');
     const staffResolve = await callFunction('invoiceAdmin', { action: 'resolvePaymentReview', invoiceId: FIRST, reviewId, note: 'x' }, staffToken);
     expect(staffResolve.status).toBe(403);
     await panel.getByRole('button', { name: 'Mark reviewed' }).click();

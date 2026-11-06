@@ -142,6 +142,8 @@ function readSettings(stored) {
 // changes the stored document) never closes it or clears its result.
 function ConnectionSettings({ stored, call }) {
   const [form, setForm] = useState(() => readSettings(stored));
+  // A saved table ID stays hidden behind a placeholder; anything typed shows.
+  const savedTableId = form.table === (stored?.table || '') && /^tbl[A-Za-z0-9]{14}$/.test(form.table);
   const [errors, setErrors] = useState({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -187,7 +189,7 @@ function ConnectionSettings({ stored, call }) {
         <PlannerSwitch label="Import from Airtable" checked={form.enabled} onChange={set('enabled')} hint="Turn off to stop imports. Existing pitches stay." />
         <div className="planner-fields grid gap-sm sm:grid-cols-2">
           <TextField name="baseUrl" label="Airtable base link" type="url" value={form.baseUrl} onChange={set('baseUrl')} required maxLength={2048} error={errors.baseUrl} hint="Copy the link from Airtable." />
-          <TextField name="table" label="Table name" value={/^tbl[A-Za-z0-9]{14}$/.test(form.table) ? '' : form.table} placeholder={/^tbl[A-Za-z0-9]{14}$/.test(form.table) ? 'Connected table' : undefined} onChange={set('table')} required maxLength={100} error={errors.table} />
+          <TextField name="table" label="Table name" value={savedTableId ? '' : form.table} placeholder={savedTableId ? 'Connected table' : undefined} onChange={set('table')} required maxLength={100} error={errors.table} />
         </div>
         <TextField name="view" label="View (optional)" value={form.view} onChange={set('view')} maxLength={100} hint="Only records in this view come in. A record that leaves the view is flagged as removed, not deleted." />
         <fieldset className="space-y-sm">

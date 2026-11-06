@@ -155,7 +155,7 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await page.getByRole('button', { name: 'Edit pitch' }).click();
     await page.getByLabel('Lead presenter name').fill('Example Presenter');
     await page.getByLabel('Title', { exact: true }).fill(`${fixture.title} (edited)`);
-    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Changes saved. The submitted copy is kept. No email was sent.')).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: `${fixture.title} (edited)` })).toBeVisible();
     expect((await ref.get()).data()).toMatchObject({ title: `${fixture.title} (edited)`, submitted: { title: fixture.title } });
@@ -189,7 +189,7 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await page.getByRole('combobox', { name: 'Decision', exact: true }).selectOption('accepted');
     await expect(page.getByRole('link', { name: `${fixture.title} (edited)`, exact: true })).toBeVisible();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export the shown pitches' }).click();
+    await page.getByRole('button', { name: 'Download pitches' }).click();
     const file = await download;
     const text = await fs.readFile(await file.path(), 'utf8');
     expect(text).toContain(fixture.title);
@@ -206,7 +206,7 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await page.getByLabel('Start time', { exact: true }).fill('10:00');
     await page.getByLabel('End time', { exact: true }).fill('11:00');
     await page.getByRole('checkbox', { name: /I reviewed the proposal/ }).check();
-    await page.getByRole('button', { name: 'Create reviewed drafts' }).click();
+    await page.getByRole('button', { name: 'Create drafts', exact: true }).click();
     await expect(page.getByRole('link', { name: 'Review session draft' })).toBeVisible();
     await expect(page.getByText(`Invite sent to ${email}.`, { exact: false })).toBeVisible();
     const invite = await waitForTaggedMail(inviteSince, email, 'speaker.invite');

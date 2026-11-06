@@ -35,13 +35,16 @@ async function mock(page, name, handler) {
 }
 
 // What a screen reader is handed for the focused element: its role, its
-// accessible name from aria-labelledby or its label, and its checked state.
+// accessible name from aria-labelledby, aria-label or its label, and its
+// checked state.
 async function focusedControl(page) {
   return page.evaluate(() => {
     const el = document.activeElement;
     const text = (id) => document.getElementById(id)?.textContent.trim() ?? '';
     const name = el.getAttribute('aria-labelledby')?.split(' ').map(text).join(' ')
+      || el.getAttribute('aria-label')
       || (el.id && document.querySelector(`label[for="${el.id}"]`)?.textContent.trim())
+      || el.closest('label')?.textContent.trim()
       || el.textContent.trim();
     const role = el.tagName === 'INPUT' ? `${el.type}` : el.tagName.toLowerCase();
     return `${role}: ${name}${el.type === 'radio' || el.type === 'checkbox' ? (el.checked ? ' (checked)' : ' (not checked)') : ''}`;
@@ -110,7 +113,7 @@ test.describe.serial('event-time fields', () => {
 
     // Wide: one line of panel description, and the filter and search inputs on one baseline.
     await page.setViewportSize(VIEWPORTS[0][1]);
-    const description = page.getByText('Only operators can open or close intake.', { exact: true });
+    const description = page.getByText('Choose when and where people can submit proposals.', { exact: true });
     const lineHeight = await description.evaluate((node) => parseFloat(window.getComputedStyle(node).lineHeight));
     expect((await description.boundingBox()).height).toBeLessThan(lineHeight * 1.5);
     // 200% zoom on a 1280px screen is a 640px CSS viewport.
@@ -178,7 +181,7 @@ test.describe.serial('event-time fields', () => {
     await page.setViewportSize(VIEWPORTS[0][1]);
     await page.goto('/admin/ticketing');
     await endTour(page);
-    await page.getByText('Configure ticket catalog', { exact: true }).click();
+    await page.getByText('Ticket settings', { exact: true }).click();
     const typeGroup = page.getByRole('group', { name: 'General admission' });
     await expect(page.getByRole('group', { name: 'Event sales start', exact: true }).getByLabel('Date', { exact: true })).toHaveValue('2026-11-16');
     await expect(page.getByRole('group', { name: 'Event sales start', exact: true }).getByLabel('Time', { exact: true })).toHaveValue('09:00');
@@ -201,12 +204,12 @@ test.describe.serial('event-time fields', () => {
     // The repeated hour asks which one before the catalog can save.
     await page.getByRole('group', { name: 'Event sales end', exact: true }).getByLabel('Date', { exact: true }).fill('2027-11-07');
     await page.getByRole('group', { name: 'Event sales end', exact: true }).getByLabel('Time', { exact: true }).fill('01:30');
-    await page.getByRole('button', { name: 'Save catalog' }).click();
+    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Correct the marked sales times before saving.')).toBeVisible();
     expect(saves).toHaveLength(0);
     await page.getByRole('radio', { name: /EST \(UTC−05:00\), after the clocks go back/ }).check();
     await typeGroup.getByRole('group', { name: 'Ticket sales end', exact: true }).getByLabel('Time', { exact: true }).fill('22:00');
-    await page.getByRole('button', { name: 'Save catalog' }).click();
+    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Catalog saved. Existing orders keep the prices they were issued with.')).toBeVisible();
     expect(saves).toHaveLength(1);
     expect(saves[0]).toMatchObject({ salesStartAt: '2026-11-16T14:00:00.000Z', salesEndAt: '2027-11-07T06:30:00.000Z' });
@@ -249,7 +252,7 @@ test.describe.serial('event-time fields', () => {
     const openChoice = page.getByRole('radio', { name: 'Open until I close it' });
     await expect(openChoice).toBeChecked();
     await expect(openChoice).toBeFocused();
-    await expect(openChoice).toHaveAccessibleDescription('Intake stays open until an operator clears “Accept session pitches” and saves. The public page shows no deadline.');
+    await expect(openChoice).toHaveAccessibleDescription('Turn off “Accept session pitches” to close the call.');
     await expect(page.getByRole('group', { name: 'Deadline', exact: true })).toHaveCount(0);
     expect(await tabPath(page, 3)).toEqual([
       'radio: Open until I close it (checked)',

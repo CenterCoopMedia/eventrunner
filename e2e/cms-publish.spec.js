@@ -299,7 +299,7 @@ test.describe.serial('organizations: admin editor -> publish -> sponsor pages', 
     await page.getByLabel('Name', { exact: true }).fill(name);
     await expect(page.getByLabel(/^Page address/)).toHaveValue(slug);
     await page.getByLabel(/^Tier/).fill('supporting');
-    await page.getByRole('button', { name: 'Save and publish' }).click();
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
 
     await page.waitForURL((url) => url.pathname === `/admin/organizations/${slug}`);
     await expect(page.locator('header [data-record-state]')).toHaveText('Live');

@@ -85,7 +85,7 @@ test.describe.serial('organization representatives', () => {
     await expect(reps.getByText('No representatives yet.')).toBeVisible();
     await reps.getByLabel('Account address').fill(REP_EMAIL);
     await reps.getByRole('button', { name: 'Add representative' }).click();
-    await expect(reps.getByText('Representative added. They edit at /profile/organization.')).toBeVisible();
+    await expect(reps.getByText('Representative added. They can edit this organization from their profile.')).toBeVisible();
     await expect(reps.getByText(REP_EMAIL, { exact: true })).toBeVisible();
     await reps.screenshot({ path: test.info().outputPath('staff-representatives-panel.png') });
 
@@ -181,7 +181,7 @@ test.describe.serial('organization representatives', () => {
       expect.objectContaining({ action: 'applyOrganizationEdit', email: STAFF_EMAIL }),
     ]));
 
-    await staff.getByRole('button', { name: 'Save and publish' }).click();
+    await staff.getByRole('button', { name: 'Publish', exact: true }).click();
     await expect(staff.locator('header [data-record-state]')).toHaveText('Live');
     const live = (await adminDb().collection('cmsOrganizations').doc(orgA).get()).data();
     expect(live.description).toBe(newText);
