@@ -1480,6 +1480,15 @@
           builder&#39;s original records, add only those exact entries to the private build&#39;s
           <code>resources.dnsRecords</code>, and set <code>resources.dnsInventoryComplete</code> to <code>true</code> after
           that review. Never add unrelated records.</p>
+          <p>To find an old build&#39;s records, look up the site name, <code>_acme-challenge.&lt;site&gt;</code>
+          and <code>pm-bounces.&lt;site&gt;</code> in public DNS. Postmark names the DKIM record
+          <code>&lt;YYYYMMDDHHMMSS&gt;pm._domainkey.&lt;site&gt;</code>, where the time is when the builder
+          created the sender domain (UTC), so a lookup over the build run&#39;s time window
+          finds it. The first purge, of <code>signuptest-nov5</code> on November 5, 2026, used this.</p>
+          <p>Postmark refuses <code>DELETE /servers/{id}</code> with HTTP 422 until Postmark support
+          turns on server deletion through the API for the account. The purge then logs
+          the refusal, removes everything else, and <code>verify</code> still lists <code>mail:servers</code>.
+          Delete the server in Postmark, then run <code>verify</code> again.</p>
           <p>Operators can also use the CLI with the workflow&#39;s credentials:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/decommission-client.cjs --application &lt;id&gt; --archive
           node scripts/decommission-client.cjs --application &lt;id&gt; --restore
