@@ -538,7 +538,12 @@ export default function Layout() {
               </button>
             }
             variant={headerVariant}
-            actions={navPlacement === 'side' ? accountActions : null}
+            actions={navPlacement === 'side' ? (
+              <div className="site-header-actions no-print">
+                {accountActions}
+                <RegistrationAction placement="header" />
+              </div>
+            ) : null}
             name={historicalDemo && markSrc && !markFailed ? '' : plate.name}
             dates={plate.dates}
             place={plate.edition}
@@ -568,11 +573,7 @@ export default function Layout() {
             }
           >
             {navPlacement === 'side' ? null : nav}
-            {/* The event's configured registration action (M7 issue 8).
-                It owns its own row and renders nothing at all when no
-                destination is configured, so mounting it is this one line
-                and no other control in the header has to move. */}
-            <RegistrationAction placement="header" />
+            {navPlacement === 'side' ? null : <RegistrationAction placement="header" />}
           </Header>
         </div>
       </header>

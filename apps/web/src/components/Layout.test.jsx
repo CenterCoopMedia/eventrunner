@@ -550,9 +550,12 @@ describe('Layout account control', () => {
     expect(links.at(-1)).toBe(accountLink(container));
   });
 
-  it.each(['standard', 'masthead', 'compact', 'minimal'])('%s keeps one header account group for either nav placement', (header) => {
+  it.each(['standard', 'masthead', 'compact', 'minimal'])('%s keeps account and registration actions at the header end for either nav placement', (header) => {
     for (const navPlacement of ['top', 'side']) {
-      const { container, unmount } = renderShell({}, { path: '/schedule', header, themeDoc: { navPlacement } });
+      const { container, unmount } = renderShell({}, {
+        path: '/schedule', header, themeDoc: { navPlacement },
+        event: { ...FIXTURE_EVENT, registration: { externalUrl: 'https://register.example.org/tickets' } },
+      });
       const actions = container.querySelector('.site-header-account-actions');
       expect(container.querySelector('header')).toContainElement(actions);
       expect(container.querySelectorAll('.site-header-account-actions')).toHaveLength(1);
@@ -560,8 +563,18 @@ describe('Layout account control', () => {
       expect(signIn).toHaveAttribute('href','/signin');
       const nav = within(container).getByRole('navigation', {name:'Main'});
       expect(within(nav).getByRole('link', {name:'Schedule'})).toHaveAttribute('href','/schedule');
-      if (navPlacement === 'side') expect(nav).not.toContainElement(actions);
-      else expect(actions.previousElementSibling).toContainElement(within(nav).getByRole('link', {name:'Schedule'}));
+      const registration = container.querySelector('header a[href="https://register.example.org/tickets"]');
+      expect(registration).not.toBeNull();
+      expect(registration.closest('nav')).toBeNull();
+      if (navPlacement === 'side') {
+        expect(nav).not.toContainElement(actions);
+        const group = actions.parentElement;
+        expect(group).toHaveClass('site-header-actions', 'no-print');
+        expect(group).toContainElement(registration);
+        expect(actions.nextElementSibling).toBe(registration.parentElement);
+      } else {
+        expect(actions.previousElementSibling).toContainElement(within(nav).getByRole('link', {name:'Schedule'}));
+      }
       fireEvent.click(signIn);
       expect(signIn).toHaveAttribute('aria-current','page');
       unmount();
