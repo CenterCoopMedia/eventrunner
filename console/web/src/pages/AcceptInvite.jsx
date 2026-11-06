@@ -68,7 +68,7 @@ export default function AcceptInvite() {
           ) : null}
         </div>
       ) : null}
-      <button type="button" className="button primary" disabled={busy} onClick={accept}>{busy ? 'Joining…' : 'Join team'}</button>
+      <button type="button" className="button primary" disabled={busy} aria-busy={busy || undefined} onClick={accept}>{busy ? 'Joining…' : 'Join team'}</button>
     </section>
   );
 }

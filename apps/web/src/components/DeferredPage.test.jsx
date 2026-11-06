@@ -9,10 +9,12 @@ describe('DeferredPage', () => {
     const Route = lazy(
       () => new Promise((resolve) => { finish = () => resolve({ default: () => <h1>Schedule</h1> }); }),
     );
-    render(<DeferredPage component={Route} label="schedule" />);
+    const { container } = render(<DeferredPage component={Route} label="schedule" shape="schedule" />);
     expect(screen.getByRole('status')).toHaveAccessibleName('Loading schedule…');
+    expect(container.querySelector('.loading-state')).toHaveAttribute('data-loading-shape', 'schedule');
     await act(async () => finish());
     expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('routes a rejected import through the existing recovery boundary', async () => {

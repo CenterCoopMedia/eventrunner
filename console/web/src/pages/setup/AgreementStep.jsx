@@ -116,7 +116,7 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
             autoComplete="name"
             maxLength={200}
           />
-          <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Accepting' : 'Accept agreement'}</button></div>
+          <div><button type="submit" className="button primary" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Accepting' : 'Accept agreement'}</button></div>
           </fieldset>
           {error ? <ActionFeedback kind="error" revealKey={error}>
             <p>{error}</p>

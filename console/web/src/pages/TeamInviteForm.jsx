@@ -56,7 +56,7 @@ export default function TeamInviteForm({ onInvite, outcome, disabled, onRefresh,
             </label>
           ))}
         </fieldset>
-        <button type="submit" className="button primary" disabled={busy || disabled}>{busy ? 'Sending invite…' : 'Send invite'}</button>
+        <button type="submit" className="button primary" disabled={busy || disabled} aria-busy={busy || undefined}>{busy ? 'Sending invite…' : 'Send invite'}</button>
         <ActionResult result={outcome} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh team" />
       </form>
     </section>

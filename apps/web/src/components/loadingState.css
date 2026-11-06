@@ -1,0 +1,119 @@
+/* Activity explains a real wait; reserved content stays still at every stage. */
+.loading-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  min-inline-size: 0;
+  line-height: 1.5;
+}
+
+.loading-status__activity-slot {
+  display: inline-flex;
+  flex: 0 0 1.25rem;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin-block-start: 0.1em;
+  color: var(--loading-activity-color, rgb(var(--color-accent-rgb)));
+}
+
+.loading-status__activity {
+  inline-size: 100%;
+  block-size: 100%;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.loading-status__track {
+  opacity: 0.2;
+}
+
+.loading-status__copy {
+  min-inline-size: 0;
+  margin: 0;
+}
+
+.loading-status__label,
+.loading-status__detail {
+  display: block;
+}
+
+.loading-status__detail {
+  max-inline-size: 52ch;
+  margin-block-start: var(--space-2xs);
+  color: var(--loading-detail-color, rgb(var(--color-text-secondary-rgb)));
+  overflow-wrap: break-word;
+}
+
+.loading-state {
+  min-inline-size: 0;
+}
+
+.loading-state .loading-status {
+  font-family: var(--font-data);
+  font-size: var(--text-caption);
+  color: rgb(var(--color-text-secondary-rgb));
+}
+
+.loading-state__actions {
+  padding-inline-start: calc(1.25rem + var(--space-xs));
+}
+
+.loading-state__placeholder {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.loading-state__row {
+  display: flex;
+  min-inline-size: 0;
+  min-block-size: 4rem;
+}
+
+.loading-state__space {
+  display: block;
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.loading-state__placeholder[data-loading-shape='schedule'] .loading-state__row {
+  min-block-size: 8rem;
+}
+
+.loading-state__time {
+  flex: 0 0 clamp(2.75rem, 12%, 5rem);
+  margin-block: var(--space-sm);
+  border-inline-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+.loading-state__placeholder[data-loading-shape='directory'] {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-md);
+}
+
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__row {
+  min-block-size: 12rem;
+  border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loading-status[data-loading-stage='active'] .loading-status__activity,
+  .loading-status[data-loading-stage='slow'] .loading-status__activity {
+    animation: loading-status-turn 1.2s linear infinite;
+  }
+
+  @keyframes loading-status-turn {
+    to { transform: rotate(360deg); }
+  }
+}
+
+@media (forced-colors: active) {
+  .loading-status__activity-slot {
+    color: CanvasText;
+  }
+
+  .loading-state__row,
+  .loading-state__time {
+    border-color: CanvasText;
+  }
+}

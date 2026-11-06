@@ -116,7 +116,7 @@ function ConfirmEmail({ user }) {
       {sent ? (
         <p className="message success" role="status">We sent a sign-in link to {user.email}. Open it on this device.</p>
       ) : (
-        <button type="button" className="button primary" disabled={sending} onClick={send}>{sending ? 'Sending…' : 'Send link'}</button>
+        <button type="button" className="button primary" disabled={sending} aria-busy={sending || undefined} onClick={send}>{sending ? 'Sending…' : 'Send link'}</button>
       )}
     </section>
   );

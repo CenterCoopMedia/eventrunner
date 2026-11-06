@@ -94,7 +94,7 @@ export default function ConsoleSettings() {
       <p>Choose the hosting settings for new sites.</p>
       <form noValidate onSubmit={onSubmit} className="stack">
         <SettingsFields fields={FIELDS} values={values} onChange={change} error={fieldError} fieldRefs={fieldRefs} idPrefix="settings" disabled={busy} />
-        <button type="submit" className="button primary" aria-label="Save settings" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+        <button type="submit" className="button primary" aria-label="Save settings" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Saving…' : 'Save'}</button>
         {notice ? <p className="message success" role="status" ref={resultRef}>{notice}</p> : null}
         {error ? <p className="message error" role="alert" ref={resultRef}>{error}</p> : null}
       </form>

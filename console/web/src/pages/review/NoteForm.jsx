@@ -53,7 +53,7 @@ export default function NoteForm({ id, title, help, submitLabel, danger = false,
         {fieldError ? <p id={`${fieldId}-error`} className="field-error">{fieldError}</p> : null}
       </div>
       <div className="row-actions">
-        <button type="submit" className={`button ${danger ? 'danger' : 'primary'}`} disabled={busy || disabled}>{busy ? 'Saving decision…' : submitLabel}</button>
+        <button type="submit" className={`button ${danger ? 'danger' : 'primary'}`} disabled={busy || disabled} aria-busy={busy || undefined}>{busy ? 'Saving decision…' : submitLabel}</button>
         <button type="button" className="button" disabled={busy || disabled} onClick={onCancel}>Cancel</button>
       </div>
       <ActionResult result={result} />

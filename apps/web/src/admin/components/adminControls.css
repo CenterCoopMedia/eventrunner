@@ -1,0 +1,57 @@
+/* Shared control feedback. Colour identifies action hierarchy; motion only
+   acknowledges an available action. See the November 6 interaction guidance. */
+.admin-button {
+  min-inline-size: var(--admin-control-height);
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.admin-button > svg { flex-shrink: 0; }
+.admin-button:disabled:not([aria-busy='true']),
+.admin-button[aria-disabled='true']:not([aria-busy='true']) {
+  color: rgb(var(--admin-ink-disabled-rgb));
+  background-color: rgb(var(--admin-ground-soft-rgb));
+  border-color: rgb(var(--admin-rule-strong-rgb));
+  cursor: not-allowed;
+}
+.admin-button[aria-busy='true'] { cursor: progress; }
+
+/* Compact control paint is inexpensive; avoid transitions on the page or
+   form layout. Destructive confirmations keep their position throughout. */
+@media (prefers-reduced-motion: no-preference) {
+  .admin-button:not(.admin-button--danger) {
+    transition:
+      background-color var(--motion-fast) var(--motion-ease),
+      border-color var(--motion-fast) var(--motion-ease),
+      color var(--motion-fast) var(--motion-ease),
+      transform var(--motion-fast) var(--motion-ease);
+  }
+  .admin-button:not(.admin-button--danger):not(:disabled):not([aria-disabled='true']):not([aria-busy='true']):active {
+    transform: translateY(1px);
+  }
+}
+
+@media (pointer: coarse) {
+  /* 16px editable text avoids the common mobile focus-zoom threshold.
+     Keep native zoom available and retain the existing control height. */
+  .admin-room input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):not([type='hidden']),
+  .admin-room select,
+  .admin-room textarea,
+  .admin-room .admin-rich-text {
+    font-size: max(1rem, 16px);
+  }
+}
+
+@media (forced-colors: active) {
+  .admin-button { border-color: ButtonText; }
+  .admin-button:disabled:not([aria-busy='true']),
+  .admin-button[aria-disabled='true']:not([aria-busy='true']) { color: GrayText; border-color: GrayText; }
+  .admin-button[aria-pressed='true'],
+  .admin-button--choice { outline: 2px solid Highlight; outline-offset: -4px; }
+
+  .admin-button:focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }
+}

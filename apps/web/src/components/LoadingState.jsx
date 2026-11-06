@@ -1,53 +1,63 @@
-// Loading state (design brief §2.2): loading is a stated line, not a loop.
-//
-// Ambient animation — anything that pulses, drifts, or breathes on its own —
-// is banned outright, a shimmering skeleton included. So this states what is
-// loading in words, and holds the space the content will take with a block
-// of hairline rows that does not move.
-//
-// THE ROWS ARE NOT A SKELETON. A skeleton imitates the shape of content that
-// is not there yet, and it animates so a reader knows it is fake. These rows
-// are RULES: the same hairline the rest of the page uses to separate items,
-// drawn where the items will be. Nothing pretends to be a heading, nothing
-// pretends to be a photograph, and nothing moves.
-//
-// Reserving the space is the point. Without it the page reflows the moment
-// the content lands, and a reader who had started reading loses their place
-// (interface guidelines, Animation: nothing that a reader is reading may
-// re-wrap under them).
-//
-// Every label trails off, and it trails off the same way everywhere: One
-// ellipsis CHARACTER, closed up against the last word — never a space before
-// it, never three full stops (interface guidelines, Typography: smart
-// punctuation, the single ellipsis character). Callers pass the whole label,
-// so the convention lives at every call site and this is the note that keeps
-// them in step.
+import useLoadingStage from '../lib/useLoadingStage.js';
+import { secondaryActionClass } from './controlClasses.js';
+import LoadingStatus from './LoadingStatus.jsx';
+
+const SHAPES = new Set(['rows', 'schedule', 'directory']);
 
 /**
- * @param {object} props
- * @param {string} [props.label] what is loading, as a sentence
- * @param {number} [props.rows] how many rows of space to hold
+ * The same renderer powers real requests and the specimen’s explicit previews.
+ * Placeholder rules reserve space without pretending that content has arrived.
  */
-export default function LoadingState({ label = 'Loading…', rows = 3 }) {
+export function LoadingStateView({
+  label = 'Loading…',
+  rows = 3,
+  shape = 'rows',
+  stage = 'initial',
+  onRetry,
+}) {
+  const layout = SHAPES.has(shape) ? shape : 'rows';
+  const rowCount = Number.isFinite(rows) ? Math.max(0, Math.floor(rows)) : 3;
   return (
-    <div className="py-xl">
-      {/* The label is also the region's name. A `role="status"` region takes
-          no name from its content, and every caller's test finds this line
-          by the label it passed. */}
-      <p
-        role="status"
-        aria-label={label}
-        className="font-data text-caption text-text-secondary"
-      >
-        {label}
-      </p>
-      {/* The reserved block is decoration for a screen reader: the line
-          above already says everything there is to say. */}
-      <div aria-hidden="true" className="mt-md flex flex-col">
-        {Array.from({ length: Math.max(0, rows) }, (_, index) => (
-          <span key={index} className="block border-t-hairline border-rule-hairline py-md" />
-        ))}
-      </div>
+    <div
+      className="loading-state py-xl"
+      data-loading-stage={stage}
+      data-loading-shape={layout}
+    >
+      <LoadingStatus label={label} stage={stage} />
+      {stage === 'prolonged' && typeof onRetry === 'function' ? (
+        <div className="loading-state__actions mt-sm">
+          <button type="button" className={secondaryActionClass} onClick={onRetry}>
+            Try loading again
+          </button>
+        </div>
+      ) : null}
+      {rowCount > 0 ? (
+        <div
+          aria-hidden="true"
+          className="loading-state__placeholder mt-md"
+          data-loading-shape={layout}
+        >
+          {Array.from({ length: rowCount }, (_, index) => (
+            <div
+              key={index}
+              className="loading-state__row border-t-hairline border-rule-hairline"
+            >
+              {layout === 'schedule' ? <span className="loading-state__time" /> : null}
+              <span className="loading-state__space" />
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+/** Retry is available only when a caller supplies an explicit, safe request. */
+export default function LoadingState({ onRetry, ...props }) {
+  const { stage, restart } = useLoadingStage();
+  const retry = typeof onRetry === 'function' ? () => {
+    onRetry();
+    restart();
+  } : undefined;
+  return <LoadingStateView {...props} stage={stage} onRetry={retry} />;
 }

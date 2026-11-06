@@ -1,0 +1,82 @@
+/* Shared public controls retain the active preset's ink, grounds and focus
+   ring. Keep long labels inside their available width, including at zoom. */
+.public-action,
+.public-text-control {
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.public-action > svg,
+.public-text-control > svg {
+  flex-shrink: 0;
+}
+
+/* Both labels reserve the same space so an asynchronous action does not
+   move its neighbours. Only the visible label names the button. */
+.public-action-label {
+  display: inline-grid;
+  min-inline-size: 0;
+}
+
+.public-action-label > span {
+  grid-area: 1 / 1;
+}
+
+.public-action-label > [aria-hidden='true'] {
+  visibility: hidden;
+}
+
+/* Pending actions keep their original hierarchy. Their handlers must also
+   refuse activation; aria-disabled does not enforce that on its own. */
+.public-action:disabled:not([aria-busy='true']),
+.public-action[aria-disabled='true']:not([aria-busy='true']) {
+  background-color: rgb(var(--color-surface-alt-rgb));
+  color: rgb(var(--color-text-secondary-rgb));
+}
+
+.public-text-control:disabled:not([aria-busy='true']),
+.public-text-control[aria-disabled='true']:not([aria-busy='true']) {
+  color: rgb(var(--color-text-secondary-rgb));
+}
+
+.public-action[aria-busy='true'],
+.public-text-control[aria-busy='true'] {
+  cursor: progress;
+}
+
+.public-action.control-tint[aria-busy='true'] {
+  --control-tint-share: 0;
+}
+
+/* Only compact controls transition paint. Press feedback is short and
+   stays entirely inside the motion preference and availability guards. */
+@media (prefers-reduced-motion: no-preference) {
+  .public-action,
+  .public-text-control {
+    transition:
+      background-color var(--motion-fast) var(--motion-ease),
+      border-color var(--motion-fast) var(--motion-ease),
+      color var(--motion-fast) var(--motion-ease),
+      transform var(--motion-fast) var(--motion-ease);
+  }
+
+  .public-action:not(:disabled):not([aria-disabled='true']):not([aria-busy='true']):active,
+  .public-text-control:not(:disabled):not([aria-disabled='true']):not([aria-busy='true']):active {
+    transform: scale(0.98);
+  }
+}
+
+@media (forced-colors: active) {
+  .public-action { border-color: ButtonText; }
+  .public-action:disabled:not([aria-busy='true']),
+  .public-action[aria-disabled='true']:not([aria-busy='true']),
+  .public-text-control:disabled:not([aria-busy='true']),
+  .public-text-control[aria-disabled='true']:not([aria-busy='true']) {
+    color: GrayText;
+    border-color: GrayText;
+  }
+}

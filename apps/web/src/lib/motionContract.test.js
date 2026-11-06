@@ -1,13 +1,14 @@
 // THE MOTION CONTRACT, as a test rather than as a paragraph.
 //
-// The design brief settles what may move and what may not (§2.2, §2.4), and
+// The design brief and its November 6 owner update settle what may move, and
 // the expansion record settles the choreography (§2.2). Every one of those
 // rules was a sentence somebody had to remember. A sentence does not fail a
 // build, and the refusals that matter here are the ones a single hurried
 // class string undoes: one `transition-all`, one `animate-pulse`, one hover
 // tint that a phone holds lit for the rest of the session.
 //
-// So the rules are read off the SOURCE. This file parses `index.css` with
+// So the rules are read off the SOURCE. This file parses `index.css` and
+// the shared control, dialog and loading stylesheets with
 // PostCSS, walks every rule with its at-rule ancestry intact, and scans
 // every shipped `.js` and `.jsx` under `apps/web/src`. It knows nothing
 // about components; it knows what the stylesheet and the class strings are
@@ -111,7 +112,8 @@ const RULES = [];
 root.walkRules((rule) => RULES.push(rule));
 
 const MOTION_PROPS = /^(transition|animation)(-|$)/;
-/** The only properties that may animate. Both run off the main thread. */
+/** Page movement uses compositor-friendly properties. Compact controls also
+ * transition explicit paint properties, checked in their own styles below. */
 const ANIMATABLE = new Set(['transform', 'opacity']);
 /** The only durations the system owns. */
 const DURATION_TOKENS = ['--motion-fast', '--motion-base', '--motion-slow', '--motion-signature'];
@@ -126,7 +128,7 @@ describe('the stylesheet', () => {
     expect(offenders, '`transition: all` animates properties nobody chose').toEqual([]);
   });
 
-  it('animates transform and opacity, and nothing else', () => {
+  it('keeps page-level transitions on transform and opacity', () => {
     const offenders = [];
     for (const decl of DECLARATIONS) {
       if (decl.prop !== 'transition' && decl.prop !== 'transition-property') continue;
@@ -138,7 +140,7 @@ describe('the stylesheet', () => {
         if (!ANIMATABLE.has(property)) offenders.push(`${place(decl)} → ${property}`);
       }
     }
-    expect(offenders, 'colour and layout repaint on every frame').toEqual([]);
+    expect(offenders, 'paint transitions belong to compact shared controls').toEqual([]);
   });
 
   it('keeps every move inside the no-preference query', () => {
@@ -183,13 +185,20 @@ describe('the stylesheet', () => {
     expect(offenders, 'wrap it in @media (hover: hover) and (pointer: fine)').toEqual([]);
   });
 
-  it('runs nothing on its own, and nothing for ever', () => {
+  it('keeps ambient loops out of page styles', () => {
     const looping = DECLARATIONS.filter(
       (decl) =>
         (decl.prop === 'animation' || decl.prop === 'animation-iteration-count')
         && decl.value.includes('infinite'),
     ).map(place);
-    expect(looping, 'ambient animation is banned outright').toEqual([]);
+    expect(looping, 'a pending loop belongs to its request-owned component').toEqual([]);
+  });
+
+  it('removes reduced-motion animation instead of compressing its duration', () => {
+    const reduced = DECLARATIONS.filter(motionReduced);
+    expect(reduced.some((decl) => decl.prop === 'animation' && decl.value === 'none' && decl.important)).toBe(true);
+    expect(reduced.some((decl) => decl.prop === 'transition' && decl.value === 'none' && decl.important)).toBe(true);
+    expect(reduced.filter((decl) => decl.prop === 'animation-duration').map(place)).toEqual([]);
   });
 
   it('draws no shadow and no blurred panel', () => {
@@ -369,30 +378,93 @@ describe('every class string the app ships', () => {
   });
 });
 
-describe('the operator loading indicator', () => {
-  const loadingFile = path.join(SRC, 'admin/components/adminLoading.css');
-  const loadingRoot = postcss.parse(fs.readFileSync(loadingFile, 'utf8'), { from: loadingFile });
+// Compact controls may transition paint, while content motion stays on
+// transform/opacity. Dedicated files are checked rather than silently exempt.
+const INTERACTION_STYLES = [
+  'components/publicControls.css',
+  'components/loadingState.css',
+  'admin/components/adminControls.css',
+  'admin/components/adminInteraction.css',
+  'admin/components/adminLoading.css',
+];
+const CONTROL_PAINT = new Set(['background-color', 'border-color', 'color']);
+const CONTROL_STYLES = new Set(['components/publicControls.css', 'admin/components/adminControls.css']);
 
-  it('limits the loop to the loading ring and the no-preference query', () => {
-    const animations = [];
-    loadingRoot.walkDecls(/^animation(?:-|$)/, (decl) => animations.push(decl));
-    expect(animations).toHaveLength(1);
-    expect(animations[0].parent.selector).toBe('.admin-loading-state__spinner');
-    expect(motionAllowed(animations[0])).toBe(true);
-    expect(animations[0].value).toBe('admin-loading-spin var(--admin-loading-cycle) linear 600ms infinite');
+describe.each(INTERACTION_STYLES)('shared interaction motion: %s', (file) => {
+  const filename = path.join(SRC, file);
+  const stylesheet = postcss.parse(fs.readFileSync(filename, 'utf8'), { from: filename });
+  const declarations = [];
+  stylesheet.walkDecls((decl) => declarations.push(decl));
+
+  it('opts movement and transitions into the motion preference', () => {
+    expect(declarations.filter((decl) => (
+      MOTION_PROPS.test(decl.prop) && decl.value !== 'none'
+      && !motionAllowed(decl) && !motionReduced(decl)
+    )).map(place)).toEqual([]);
+    // Removing a transition is not sufficient: an active transform would
+    // still jump immediately unless the transform itself is guarded.
+    expect(declarations.filter((decl) => (
+      ['transform', 'translate', 'scale', 'rotate'].includes(decl.prop)
+      && decl.parent.selector?.includes(':active') && !motionAllowed(decl)
+    )).map(place)).toEqual([]);
   });
 
-  it('rotates only transform and owns a restrained cycle', () => {
-    const cycles = [];
-    loadingRoot.walkDecls('--admin-loading-cycle', (decl) => cycles.push(decl.value));
-    expect(cycles).toEqual(['1.2s']);
-    const keyframes = [];
-    loadingRoot.walkAtRules('keyframes', (atRule) => keyframes.push(atRule));
-    expect(keyframes).toHaveLength(1);
-    expect(keyframes[0].params).toBe('admin-loading-spin');
-    expect(motionAllowed(keyframes[0])).toBe(true);
-    const properties = [];
-    keyframes[0].walkDecls((decl) => properties.push(decl.prop));
-    expect(properties).toEqual(['transform']);
+  it('uses explicit properties and shared durations for control transitions', () => {
+    const offenders = [];
+    for (const decl of declarations) {
+      if (decl.prop !== 'transition' && decl.prop !== 'transition-property') continue;
+      for (const part of topLevelParts(decl.value)) {
+        const property = part.split(/\s+/)[0];
+        if (property === 'none') continue;
+        if (!ANIMATABLE.has(property) && !(CONTROL_STYLES.has(file) && CONTROL_PAINT.has(property))) {
+          offenders.push(place(decl));
+        }
+        if (decl.prop === 'transition' && !DURATION_TOKENS.some((token) => part.includes(token))) {
+          offenders.push(place(decl));
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps keyframes on compositor properties and inside the preference', () => {
+    const offenders = [];
+    stylesheet.walkAtRules('keyframes', (keyframes) => {
+      if (!motionAllowed(keyframes)) offenders.push(keyframes.params);
+      keyframes.walkDecls((decl) => {
+        if (!ANIMATABLE.has(decl.prop)) offenders.push(place(decl));
+      });
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('permits loops only on named pending-work indicators', () => {
+    const offenders = [];
+    for (const decl of declarations) {
+      if (!/^animation(?:-|$)/.test(decl.prop) || !decl.value.includes('infinite')) continue;
+      const selector = decl.parent.selector;
+      const sharedRing = file === 'components/loadingState.css'
+        && decl.value === 'loading-status-turn 1.2s linear infinite'
+        && selector.split(',').every((part) => /^\.loading-status\[data-loading-stage='(?:active|slow)'\] \.loading-status__activity$/.test(part.trim()));
+      const actionRing = file === 'admin/components/adminInteraction.css'
+        && selector === '.admin-busy-mark'
+        && decl.value === 'admin-request-spin 900ms linear infinite';
+      if (!sharedRing && !actionRing) offenders.push(place(decl));
+    }
+    expect(offenders, 'ambient loops are not pending feedback').toEqual([]);
+  });
+
+  it('keeps press movement off unavailable and pending controls', () => {
+    if (!CONTROL_STYLES.has(file)) return;
+    const offenders = [];
+    stylesheet.walkRules((rule) => {
+      if (!rule.selector.includes(':active')) return;
+      for (const selector of rule.selector.split(',')) {
+        if (![":not(:disabled)", ":not([aria-disabled='true'])", ":not([aria-busy='true'])"].every((guard) => selector.includes(guard))) {
+          offenders.push(selector.trim());
+        }
+      }
+    });
+    expect(offenders).toEqual([]);
   });
 });

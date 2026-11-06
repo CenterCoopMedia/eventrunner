@@ -11,6 +11,24 @@
 [#112](https://github.com/CenterCoopMedia/eventrunner/pull/112).
 **Surfaces:** the public event site, the admin CMS, and the documentation/marketing site.
 
+## Owner update: Color and motion (November 6, 2026)
+
+The owner approved relaxing the earlier restrictions on animation and color. This update
+supersedes blanket limits below, including public-only press feedback, the general ban on
+spinners, and the restriction to transform and opacity for every interaction.
+
+Use theme color to strengthen action hierarchy, selected state, progress, and results. Keep
+semantic meanings consistent, support both display modes, and retain words or symbols for
+states. Use short motion for control feedback and dialog entrance; compact controls may
+transition background, border, and text color as well as transform. Loading indicators may
+loop while work is pending on all three application surfaces. They must respect reduced
+motion and disappear when the work ends. Do not delay content or invent progress.
+
+The [current interaction rules](../interface-guidelines.md#animation) define the implementation
+contract. The [research record](2026-11-06-interface-experience.md) lists evidence, scope, and
+remaining verification. Existing rules about accessibility, token ownership, event neutrality,
+readable content, and safe workflows still apply.
+
 ## How to read this document
 
 Every sentence in this document is a rule, a fact, or a named decision. Treat a sentence with

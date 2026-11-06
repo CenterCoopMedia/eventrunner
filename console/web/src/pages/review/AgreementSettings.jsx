@@ -64,7 +64,7 @@ export default function AgreementSettings({ agreement, onSaved }) {
           maxLength={BODY_MAX}
           className="agreement-text-field"
         />
-        <div><button type="submit" className="button primary" aria-label="Save agreement" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button></div>
+        <div><button type="submit" className="button primary" aria-label="Save agreement" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Saving…' : 'Save'}</button></div>
         </fieldset>
         {notice ? <ActionFeedback revealKey={notice}>{notice}</ActionFeedback> : null}
         {error ? <ActionFeedback kind="error" revealKey={error}>{error}</ActionFeedback> : null}

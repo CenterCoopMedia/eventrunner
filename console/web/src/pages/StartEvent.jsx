@@ -125,7 +125,7 @@ export default function StartEvent() {
           />
           {fieldError ? <p id="start-org-name-error" className="field-error">{fieldError}</p> : null}
         </div>
-        <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Starting…' : 'Start'}</button></div>
+        <div><button type="submit" className="button primary" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Starting…' : 'Start'}</button></div>
       </form>
     </Panel>
   );

@@ -104,7 +104,7 @@ function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onR
       ) : null}
       {canRetry ? (
         <p>
-          <button type="button" className="button primary" disabled={retrying || disabled} onClick={onRetry}>
+          <button type="button" className="button primary" disabled={retrying || disabled} aria-busy={retrying || undefined} onClick={onRetry}>
             {retrying ? 'Retrying…' : 'Retry'}
           </button>
         </p>

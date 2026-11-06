@@ -11,6 +11,12 @@ Foundational rules for every `apps/web` surface — attendee pages, admin panel,
 - **The reference is the other half.** [`design-reference.md`](design-reference.md) documents what the system contains — every site style, option, illustration set, layout axis, token, and extension point. This document is the rules a review applies; that one is the material those rules apply to.
 - **The design brief binds.** [`plans/2026-08-27-design-system-overhaul.md`](plans/2026-08-27-design-system-overhaul.md) is the design contract; this document is the standing rulebook that carries it into review. Where the two disagree, the brief wins and this document gets fixed in the same pull request.
 
+## Color and motion direction (November 6, 2026)
+
+The owner approved relaxing the earlier limits on animation and color. Use both to clarify hierarchy, acknowledge actions, explain progress, and add restrained character. This direction applies to the public site, admin panel, and client console. It supersedes earlier blanket restrictions in the design records. The token system, accessible contrast, clear state labels, and reduced-motion support remain requirements.
+
+The [research and implementation record](plans/2026-11-06-interface-experience.md) maps the current improvements and remaining checks to primary sources and existing issues.
+
 ## Vocabulary: The words staff see
 
 Staff meet this system through words, not through token names. One term per flow (Writing, below), and the staff term is the one that ships in every operator-facing surface: Admin labels and hints, `docs/ADMIN_GUIDE.md`, the handbook, and any message a person reads.
@@ -33,7 +39,7 @@ Staff meet this system through words, not through token names. One term per flow
 
 ## Editorial devices
 
-Typography and rules do the visual work. Color decorates very little, and shadow decorates nothing (design brief §2.1). Each device below has one job: Use it where its job applies, and never as decoration. The shared implementations live in `apps/web/src/components/editorial/`, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.
+Typography, spacing, and rules establish structure. Use the brand and semantic color roles to distinguish actions, selection, progress, and results. Color supplements readable labels and symbols. Each device below has one job: Use it where its job applies, and never as decoration. The shared implementations live in `apps/web/src/components/editorial/`, and each one resolves through its tier-3 token contract, so a preset retunes a device by remapping tokens rather than by changing a component.
 
 | Device | Component | What it is | The rule |
 |---|---|---|---|
@@ -123,17 +129,17 @@ Every control and every interactive row defines these ten states, in both modes,
 | Rest | The style's own ink and ground | The desk's ink and ground |
 | Hover | The control's own ink mixed into its own ground at `--state-hover-share`, inside `@media (hover: hover)`. A control set as text takes no tint: its hover is the ink and the underline | The same device, with the desk's tints |
 | Focus-visible | The 3px ring in the accent, outside the element, never removed | The 3px action ring; the light ring on the rail |
-| Active (pressed) | Scale 0.98 at `--motion-slow` on `transform`, inside `motion-safe:`, plus the firmer tint at `--state-pressed-share` | The pressed action ground; no scale |
+| Active (pressed) | A small press response inside the no-preference query, plus the firmer tint at `--state-pressed-share`. Busy and unavailable controls do not move | A 1px press response and the pressed action ground. Destructive, busy, and unavailable controls stay still |
 | Selected or current | Weight, plus one of: the tint at `--state-selected-share` on `aria-pressed`, the filled ground on `aria-checked`, the strong rule on `aria-selected`, `aria-current` on a link | The rail's four signals; a filled row marker elsewhere |
 | Disabled | `disabled` where the control must not act; `aria-disabled="true"` where it must stay focusable to explain itself, and then its handler refuses every activation path. The disabled ink on the alternate ground, the pointer unchanged. Never a removed control | The same |
-| Busy | `aria-busy="true"` and a stated word inside the control ("Saving…"); never a spinner, never a shimmer | The same, and the result stays in place after |
+| Busy | `aria-busy="true"` and a stated action inside the control ("Saving…"). A delayed decorative activity indicator is allowed. Reject duplicate activation immediately | The same, and the result stays in place after |
 | Error | `aria-invalid="true"`, the alarm rule, a message under the field named by `aria-describedby`, and focus moved to the first error on submit (`lib/focusFirstError.js`) | The same |
 | Success | A stated line in place, in a `role="status"` region, that stays. A toast may repeat it, and a repeat carries no live role, so one result is announced once | The same |
 | Empty | A sentence that names what was searched or filtered, plus one action | The desk's empty state |
 
 **A submit control is never disabled for a validation state.** A disabled control announces nothing, so a person who presses it learns nothing. Keep it enabled until the request starts, mark the fields, and move focus to the first one that refused.
 
-**A hover state never transitions.** Colour is repainted on every frame, and a state a reader caused has to land at once. Only `transform` and `opacity` animate.
+**A compact control may transition its color.** Use an explicit short transition on background, border, or text color. Keep text readable throughout. Large surfaces and dense table rows do not animate their color on every pointer movement. Never use `transition: all`.
 
 **A tap is not a hover.** A touch screen reports a tap as a hover and holds it until the reader taps elsewhere, so an unguarded hover tint looks like a selection nobody made. Tailwind's `hoverOnlyWhenSupported` puts every `hover:` utility inside the query; a raw `:hover` rule in `index.css` carries `@media (hover: hover) and (pointer: fine)` by hand.
 
@@ -165,27 +171,33 @@ Each one is keyboard-first, reads the tier-2 tokens, and lives in `apps/web/src/
 
 ## Animation
 
-The system has two motion classes and there is no third (design brief §2.2).
+Motion communicates an action or a change. It may appear on public controls, admin controls, console controls, dialogs, feedback, disclosures, and loading indicators. It must never delay an available result, block input, or move the keyboard focus after a cosmetic delay.
 
-- **Functional motion** shows a state change: Menus, filters, tabs, disclosure, toasts. Keep it between 120ms and 200ms, animate `transform` and `opacity` only, and use `ease-out`. The `duration-fast` / `duration-base` / `duration-slow` and `ease-motion` utilities map to the motion tokens.
-- **Expressive motion** is one designed signature interaction per surface. The schedule grid holds that slot on the public site: A track column comes forward when a reader presses or focuses its head. Focus previews it, the press keeps it, and `aria-pressed` is the record. The state is a tint of the column's own ground and the motion is a small lift, so the state lands in both motion settings and only the lift is animated — under `prefers-reduced-motion` the column still comes forward and nothing moves. No other column is dimmed, so no text drops below its contrast bar at any frame.
+- Use the existing `--motion-fast`, `--motion-base`, `--motion-slow`, and `--motion-ease` tokens. The usual range is 120–200ms for a compact interaction. The isolated console owns equivalent local values.
+- Prefer `transform` and `opacity` for entrance and positional movement. A compact button may also transition `background-color`, `border-color`, and `color` at the fast step. Do not animate layout dimensions or use `transition: all`.
+- Keep travel short. A pressed admin or console button moves 1px; a public button may scale slightly. Gate the transform itself, not just its transition, behind `prefers-reduced-motion: no-preference`.
+- Apply press feedback only to an available action. Native disabled, `aria-disabled`, and busy controls do not move. Consequential confirmations remain stable while the person reads and chooses.
+- Put every moving rule inside `@media (prefers-reduced-motion: no-preference)`. Reduced motion removes animation and transitions entirely while preserving the full, readable result. Do not substitute a near-zero animation duration.
+- Hover needs a hover-capable pointer. Focus indicators appear immediately and remain visible while the control is focused.
+- Use CSS transitions for interrupted state changes and keyframes for a finite entrance. Do not stagger essential content or animate the whole page on every refresh. Navigation and focus changes remain immediate.
 
-Both classes: Never trigger motion from scroll position, never run ambient animation, and keep wayfinding instant — navigation, route changes, and focus moves never animate. Support `prefers-reduced-motion` in full; the reduced state is truly static, and a shortened animation is not a fallback.
+### Waiting and progress
 
-**Loading and active builds.** The owner-directed asynchronous-work amendment in brief §2.2 permits a small rotating indicator while an operator CMS or client-console request is pending or a site build is active. Keep a visible status label and hide the decorative ring from assistive technology. Unmount it on success, error, or a stopped build; never imply a percentage the server has not supplied. Use a component-owned cycle around 1.2 seconds, animate only `transform`, and enable the loop only inside `prefers-reduced-motion: no-preference`. Reduced motion keeps the same label and a static ring. This is the sole loop exception; shimmer, pulse, bounce, and decorative animation remain excluded. `AdminLoadingState` applies it consistently to CMS loading surfaces, and the console owns an equivalent loading component.
+Name the work at once. The public, admin, and console loading components retain their existing immediate status labels. A decorative indicator starts after about one second, so a fast response does not flash a spinner. Completion renders immediately and removes the indicator and its timers.
 
-**Enter and exit are the two moves, and there is no third.** An element that arrives fades up over at most 8px at `--motion-base`; an element that leaves fades back down it at `--motion-fast`. Both take `--motion-ease`: there is ONE curve, and the asymmetry is carried by duration alone. An enter never opens on an ease-in, which would delay the response at the exact moment the reader is watching. The utilities are `.motion-enter` and `.motion-exit` in `index.css`, both inside `@media (prefers-reduced-motion: no-preference)`, and the reduced state is the END state, not a shorter animation. **Enter, exit and press are public only**: the admin has no expressive motion and a state change in the room is instant, so the shared toast carries no motion class there.
+At ten seconds, add a plain explanation that the wait is longer than expected. At sixty seconds, say that no result has arrived. These are elapsed-time messages, not a claim that the server has failed or a prediction of completion. Announce only meaningful stage changes, never every animation frame.
 
-**The refusals are a test, not a paragraph.** `apps/web/src/lib/motionContract.test.js` parses `index.css` with PostCSS and scans every shipped `.js` and `.jsx`. It fails on `transition: all` or `transition-all`; on a numeric or arbitrary `duration-*` or `delay-*` utility and on any millisecond value outside the four duration tokens; on an animated property other than `transform` and `opacity`; on a `:hover` rule outside the hover query; on generic `animate-pulse`, `animate-spin`, `animate-bounce` and `animate-ping` utilities; on any ambient keyframe run `infinite`; on a `transition` or `animation` declaration outside a no-preference block, the global reduce block and the mode swap excepted; on `rounded-full` outside a file listed in its `CHIP_FILES`, and on a listed chip that lacks a remove button named for its value at the full control height; on `box-shadow` and `backdrop-filter`; and on a gradient whose colour stops differ. The dedicated loading stylesheet is checked separately for its single, transform-only, motion-guarded loop. Flat paint written as a one-colour gradient, or two colours meeting at one exact position, is a rule, a frame, a grid, or a dot pattern, and it passes. **When it fails, fix the source.** A new exception belongs in the binding brief before it belongs in the test.
+Only show **Try again** when the caller supplies a safe retry. A panel must not reload an editor or repeat a potentially successful write. Page loading does not gain an automatic reload control through this component. Chunk failures keep their existing explicit recovery mechanism.
 
-- Never `transition: all`; list the exact properties that change.
-- Scale pressed buttons to 0.95–0.98 with `transition: scale 200ms ease-out`.
-- Cross-fade swapped icons on opacity and scale only: Entering scales 0.9→1 with opacity 0→1; exiting reverses. No blur — a filter repaints on every frame and `filter` is not on the animated-property list.
-- CSS transitions for interruptible interactions; keyframes for one-time sequences.
-- Disable transitions while switching between light and dark themes.
-- `will-change` only on properties that actually change: `transform`, `opacity`, `filter`. Add `will-change: transform` to elements that jitter 1–2px mid-animation (iOS Safari especially).
-- Stagger entrance animations by group or element.
-- Don't animate frequent interactions (e.g. color changes on list hover).
+Use an indeterminate ring when completion cannot be measured. Use a determinate progress control only for a real total or server-reported progress. Hide decorative artwork from assistive technology and keep the visible words. The existing console waiting character is allowed while work is pending, with a static reduced-motion state.
+
+The public loading component supports rows, schedule, and directory placeholders. These use still rules and layout space. They do not shimmer, pretend to be loaded content, or promise a measured layout-shift score. The specimen book exposes the loading shapes and stages for review.
+
+### Verification
+
+`apps/web/src/lib/motionContract.test.js` checks the shared stylesheet and shipped class strings. The interaction checks additionally cover the dedicated public controls, admin controls, and loading styles. They require motion preference guards, explicit properties, and scoped waiting loops. Hosted browser checks verify computed motion, focus, viewport fit, and static reduced-motion behavior.
+
+These checks support source review; they do not prove screen-reader behavior, real-device usability, or all visual states. Verify consequential flows with keyboard input, narrow layouts, zoom, slow responses, and failure recovery.
 
 ## Typography
 
@@ -231,7 +243,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 - **A page header is the title band:** The page's name at the title step on the raised ground, running to the edges of the work surface, with the mark in the client's colour beside the name, the record's state badge and identifiers beside the name or under it — never above it — and the page's own actions at the trailing end. The band holds the top of the viewport while the page scrolls from the 640px breakpoint upward. On a phone it scrolls with the work so its wrapped actions do not cover the form. The description is a paragraph under the band.
 - **Three state words, everywhere:** `Draft`, `Live`, and `Live with unpublished changes` (`admin/recordState.js`), each set as a word in a badge whose tinted ground and ink agree with it (`StatusBadge`; seven tones, never a pill). A record with a draft also sits on `--admin-ground-proof` (an internal token name — Vocabulary above), and a successful publish resolves that tint to the base ground over 160ms on `opacity` — instantly under `prefers-reduced-motion`. The tint is the second signal; the word is always present.
 - **One action colour.** `--admin-action` carries the filled primary button, the current rail item, the link ink, and the focus ring. It is authored navy and at runtime follows the main brand colour, worked to its bars, unless **Admin colours** names a house scheme; it is never the raw client accent, and a component never reads the brand colour to paint an admin control. One filled action per surface; the secondary control is white inside a strong rule, and the destructive control sits on the alarm ground and fills only under the pointer.
-- **Controls hold one height.** A field and a button are `--admin-control-height` (2.75rem) tall on every pointer and set at the base step of the admin scale. Density comes from the gutters, never from the targets. A quiet in-row link may drop to the 24px minimum on a pointer surface and holds 44px on touch.
+- **Controls hold one height.** A field and a button are `--admin-control-height` (2.75rem) tall on every pointer and set at the base step of the admin scale. Editable text is at least 16px on coarse pointers to reduce mobile focus zoom; fine-pointer admin typography retains its own scale. Density comes from the gutters, never from the targets. A quiet in-row link may drop to the 24px minimum on a pointer surface and holds 44px on touch.
 - **A bulk action sits in a row above its table:** A `role="status"` count of what is selected ("No files selected", "3 files selected"), the actions, and one **Clear selection** control. A row that can be selected carries a labelled checkbox with a 44px target; the tick is the first signal, and the soft action ground on the row is the second. The head checkbox selects every row shown and turns indeterminate part way. A change to a filter clears the selection, so an action never reaches a row that is not on screen. The action is never `disabled`: With nothing or too much selected it says why, and while it runs it carries `aria-busy` and `aria-disabled` and ignores a press. A sortable column head holds a button that states the order in words ("A to Z", "Newest first"), and the sorted head carries `aria-sort`.
 - **A destructive action stands still and states what it costs** (`DestructiveConfirm`): The alarm ground inside the alarm rule, a sentence naming what is removed and whether anything survives, and a confirm button that repeats the consequence at normal size. Nothing animates in a destructive moment.
 - **Two faces, fixed, on the admin's own scale:** Source Sans 3 carries everything a person reads as language, across its 400 to 700 weights, on the six-step `--admin-text-*` scale (13px to a fluid 26–32px title, base 15px). IBM Plex Mono with tabular figures carries everything the machine owns. If an operator would ever copy it, paste it, or compare it character by character, it is set in the mono.
@@ -271,11 +283,11 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 - Never block paste — especially not on the OTP code field.
 - Tooltips on disabled controls don't open via keyboard or touch; use visible text or `aria-disabled="true"`.
 - Keep submit buttons enabled until the request starts; validate on submit with `aria-invalid="true"` and move focus to the error.
-- Hit areas: 24×24px minimum, 44×44px on touch, 40×40px desktop where possible.
+- Hit areas: Meet the WCAG 2.2 24×24 CSS pixel minimum or its stated spacing exception. Use 44×44px on touch and for shared buttons. Keep compact visual controls inside comfortable targets.
 - `pointer-events: none` on decorative elements (glows, texture overlays).
 - Wrap hover styles in `@media (hover: hover)`; wrap motion in `@media (prefers-reduced-motion: no-preference)`.
 - `role="status"` for routine updates, `role="alert"` for urgent errors only.
-- Never color alone for a status — pair it with an icon, label, or underline.
+- Never color alone for a status — pair it with an icon, label, or underline. Essential boundaries, selected states, errors, and focus must remain distinguishable in forced colors.
 - Skip-to-content link is the first focusable element; anchored headings get `scroll-margin-top`.
 
 ## Layout

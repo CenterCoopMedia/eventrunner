@@ -86,7 +86,7 @@ export default function SignInFinish() {
             />
             {fieldError ? <p id="finish-email-error" className="field-error">{fieldError}</p> : null}
           </div>
-          <button type="submit" className="button primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+          <button type="submit" className="button primary" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Signing in…' : 'Sign in'}</button>
         </form>
       ) : null}
     </section>

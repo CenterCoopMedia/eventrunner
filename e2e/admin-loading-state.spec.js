@@ -21,15 +21,15 @@ test('CMS loading activity is labelled, motion-aware, and removed when the reque
     await page.goto('/admin/overview');
     const loading = page.getByRole('status', { name: 'Loading the event figures…' });
     await expect(loading).toBeVisible();
-    await expect(loading).toHaveText('Loading the event figures…');
-    const spinner = loading.locator('svg');
+    await expect(loading).toContainText('Loading the event figures…');
+    const spinner = page.locator('.admin-loading-state .loading-status__activity');
     await expect(spinner).toHaveAttribute('aria-hidden', 'true');
-    await expect(spinner).toHaveCSS('animation-name', 'admin-loading-spin');
+    await expect(spinner).toHaveCSS('animation-name', 'loading-status-turn');
     await expect(spinner).toHaveCSS('animation-duration', '1.2s');
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(spinner).toHaveCSS('animation-name', 'none');
-    await expect(loading).toHaveText('Loading the event figures…');
+    await expect(loading).toContainText('Loading the event figures…');
     const endTour = page.getByRole('button', { name: 'End tour', exact: true });
     if (await endTour.isVisible()) await endTour.click();
     const evidenceDir = path.resolve('test-results/admin-visual-evidence');
@@ -39,7 +39,7 @@ test('CMS loading activity is labelled, motion-aware, and removed when the reque
     release();
     await expect(page.getByRole('heading', { name: 'Event figures', exact: true })).toBeVisible();
     await expect(loading).toHaveCount(0);
-    await expect(page.locator('.admin-loading-state__spinner')).toHaveCount(0);
+    await expect(page.locator('.admin-loading-state .loading-status__activity')).toHaveCount(0);
   } finally {
     release();
   }

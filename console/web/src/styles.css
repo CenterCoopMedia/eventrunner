@@ -22,6 +22,9 @@
   --space-md: 1rem;
   --space-lg: 1.5rem;
   --space-xl: 2.5rem;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
   font-family: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 100%;
   line-height: 1.6;
@@ -148,12 +151,22 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
   border: 1px solid rgb(var(--control-border));
   border-radius: var(--radius);
   cursor: pointer;
+  min-width: 44px;
+  max-width: 100%;
+  gap: 0.375rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 .button.primary { background: rgb(var(--accent)); border-color: rgb(var(--accent)); color: rgb(var(--on-accent)); }
 .button.danger { border-color: rgb(var(--danger)); color: rgb(var(--danger)); }
 .button.quiet { border-color: transparent; text-decoration: underline; }
 .button.provider { width: 100%; }
-.button:disabled { opacity: 0.6; cursor: progress; }
+.button:disabled:not([aria-busy="true"]), .button[aria-disabled="true"]:not([aria-busy="true"]) {
+  color: rgb(var(--ink-muted)); background: rgb(var(--surface-alt));
+  border-color: rgb(var(--control-border)); cursor: not-allowed;
+}
+.button[aria-busy="true"] { cursor: progress; }
 .icon-control-wrap { position: relative; display: inline-flex; vertical-align: middle; flex: none; justify-self: start; }
 .button.icon-control { width: 44px; height: 44px; padding: var(--space-xs); }
 .icon-control svg { width: 1.25rem; height: 1.25rem; flex: none; }
@@ -174,15 +187,24 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
   font-weight: 400;
   pointer-events: none;
 }
-.icon-control-wrap:hover .icon-control-tooltip,
 .icon-control-wrap:focus-within .icon-control-tooltip { display: block; }
+@media (hover: hover) and (pointer: fine) {
+  .icon-control-wrap:hover .icon-control-tooltip { display: block; }
+}
 .directory-heading .icon-control-tooltip,
 .step-heading .icon-control-tooltip,
 .summary-heading .icon-control-tooltip,
 .card .row-actions .icon-control-tooltip { left: auto; right: 0; }
 @media (hover: hover) {
-  .button:hover:not(:disabled) { background: rgb(var(--surface-alt)); }
-  .button.primary:hover:not(:disabled) { background: rgb(var(--accent-strong)); }
+  .button:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) { background: rgb(var(--surface-alt)); }
+  .button.primary:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) { background: rgb(var(--accent-strong)); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button:not(.danger) {
+    transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
+  }
+  .button:not(.danger):not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]):active { transform: translateY(1px); }
 }
 
 .message { padding: var(--space-sm) var(--space-md); border-radius: var(--radius); border-inline-start: 4px solid; background: rgb(var(--surface-alt)); }
@@ -313,6 +335,10 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 .decision h3 { margin-top: 0; }
 
 .console-loading { display: flex; align-items: flex-start; gap: var(--space-sm); color: rgb(var(--ink-muted)); }
+.console-loading-indicator { display: inline-flex; flex: none; }
+.console-loading[data-loading-stage="initial"] .console-loading-indicator { visibility: hidden; }
+.console-loading-copy { display: grid; gap: 0.25rem; min-width: 0; }
+.console-loading-detail { font-size: 0.9375rem; }
 .console-spinner {
   --console-loading-cycle: 1.2s;
   display: inline-block;
@@ -326,7 +352,7 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 }
 @media (prefers-reduced-motion: no-preference) {
   /* Turns only after a short wait, so a fast load never shows motion. */
-  .console-spinner { animation: console-spin var(--console-loading-cycle) linear 600ms infinite; }
+  .console-loading:not([data-loading-stage="initial"]) .console-spinner { animation: console-spin var(--console-loading-cycle) linear infinite; }
   @keyframes console-spin { to { transform: rotate(360deg); } }
 }
 
@@ -367,9 +393,12 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 .wb-c1 { --wb-dx: -6px; }
 .wb-c2 { --wb-dx: 6px; }
 .wb-c3 { --wb-dx: 8px; }
-.wait-buddy { animation: wb-appear 200ms ease-out 1.2s both; }
-@keyframes wb-appear { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: no-preference) {
+  .wait-buddy { animation: wb-appear var(--motion-base) var(--motion-ease) 1.2s both; }
+  .console-loading .wait-buddy { animation-delay: 0s; }
+  .console-loading[data-loading-stage="initial"] .wait-buddy,
+  .console-loading[data-loading-stage="initial"] .wait-buddy * { animation-play-state: paused; }
+  @keyframes wb-appear { from { opacity: 0; } to { opacity: 1; } }
   .wb-body { animation: wb-bob 380ms ease-in-out infinite alternate; }
   .wb-shadow { transform-origin: 32px 69px; animation: wb-squash 380ms ease-in-out infinite alternate; }
   .wb-leg-a { transform-origin: 27px 50px; }
@@ -393,6 +422,19 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
     15%, 70% { opacity: 1; }
     100% { opacity: 0; transform: translate(var(--wb-dx), -14px) rotate(160deg); }
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+@media (forced-colors: active) {
+  .button, .filter { border-color: ButtonText; }
+  .button:disabled:not([aria-busy="true"]), .button[aria-disabled="true"]:not([aria-busy="true"]) { color: GrayText; border-color: GrayText; }
+  .filter[aria-current="page"], .steps a[aria-current="step"] { outline: 2px solid Highlight; outline-offset: -4px; }
+  .button:focus-visible, .filter:focus-visible, .steps a:focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }
+  .console-spinner { border-color: GrayText; border-top-color: Highlight; }
+  .icon-control-tooltip { background: Canvas; color: CanvasText; border-color: CanvasText; }
 }
 
 /* Badger stands outside the widest page when there is enough left margin.

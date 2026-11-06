@@ -16,6 +16,8 @@
 // state is always a word — set in a badge whose tinted ground and ink agree
 // with the word, and never colour alone (§8.1).
 import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
+import LoadingStatus from '../../components/LoadingStatus.jsx';
+import useLoadingStage from '../../lib/useLoadingStage.js';
 import './adminLoading.css';
 
 export { RECORD_STATE_IDS, RECORD_STATE_WORDS };
@@ -121,14 +123,11 @@ export function AdminEmptyState({ title, description, action = null }) {
  * @param {{ label: string }} props
  */
 export function AdminLoadingState({ label }) {
+  const { stage } = useLoadingStage();
   return (
-    <p role="status" aria-label={label} className="admin-loading-state py-md text-admin-sm text-admin-ink-secondary">
-      <svg className="admin-loading-state__spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
-        <circle cx="12" cy="12" r="9" className="admin-loading-state__track" />
-        <path d="M12 3a9 9 0 0 1 9 9" />
-      </svg>
-      <span>{label}</span>
-    </p>
+    <div className="admin-loading-state py-md text-admin-sm text-admin-ink-secondary">
+      <LoadingStatus label={label} stage={stage} />
+    </div>
   );
 }
 

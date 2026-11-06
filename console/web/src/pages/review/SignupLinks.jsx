@@ -52,7 +52,7 @@ function Revoke({ name, onRevoke, disabled }) {
   return (
     <div className="confirm" role="group" aria-label={`Revoke the link for ${name}`}>
       <span>Revoke this link? It stops working, and you cannot undo this.</span>
-      <button type="button" className="button danger" disabled={busy || disabled}
+      <button type="button" className="button danger" disabled={busy || disabled} aria-busy={busy || undefined}
         onClick={async () => {
           if (busy || disabled) return;
           setBusy(true);
@@ -185,7 +185,7 @@ export default function SignupLinks() {
           />
           {fieldError ? <p id="link-org-name-error" className="field-error">{fieldError}</p> : null}
         </div>
-        <div><button type="submit" className="button primary" disabled={busy || Boolean(pending)}>{busy ? 'Creating…' : 'Create link'}</button></div>
+        <div><button type="submit" className="button primary" disabled={busy || Boolean(pending)} aria-busy={busy || undefined}>{busy ? 'Creating…' : 'Create link'}</button></div>
         {error ? <ActionFeedback kind="error" revealKey={error.message}>
           {error.code === 'signups-closed' ? <>Sign-ups are closed. <Link to="/review/settings">Save hosting settings and an agreement</Link> to open them.</> : error.message}
         </ActionFeedback> : null}

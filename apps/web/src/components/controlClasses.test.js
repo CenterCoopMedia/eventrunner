@@ -5,6 +5,10 @@
 // (expansion record §2.1). A per-component test cannot prove that; a test
 // over the shared strings can, and it is the one place a drifted copy shows
 // up — which is the failure this module exists to stop.
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
 import {
   controlStateClass,
@@ -16,6 +20,18 @@ import {
   secondaryButtonClass,
 } from './controlClasses.js';
 import { chipActionClass, rowActionClass } from './session/sessionActionClass.js';
+
+const stylesheet = path.join(path.dirname(fileURLToPath(import.meta.url)), 'publicControls.css');
+const css = postcss.parse(readFileSync(stylesheet, 'utf8'), { from: stylesheet });
+
+function declarationsFor(selector) {
+  const declarations = {};
+  css.walkRules((rule) => {
+    if (!rule.selectors.includes(selector) || rule.parent.type !== 'root') return;
+    rule.walkDecls(({ prop, value }) => { declarations[prop] = value; });
+  });
+  return declarations;
+}
 
 /** The boxed shapes: a ground of their own, so a tint has somewhere to go. */
 const BOXED = [
@@ -38,7 +54,7 @@ describe.each(BOXED)('%s', (_name, className) => {
   });
 
   it('states that it is unavailable on its own ground', () => {
-    expect(className).toContain('aria-disabled:bg-surface-alt');
+    expect(className).toContain('public-action');
   });
 });
 
@@ -56,15 +72,13 @@ describe.each(TEXT)('%s', (_name, className) => {
 
 describe.each(SHAPES)('%s', (_name, className) => {
 
-  it('presses on transform alone, and only where motion is welcome', () => {
-    expect(className).toContain('active:scale-[0.98]');
-    for (const utility of ['transition-transform', 'duration-slow', 'ease-motion']) {
-      expect(className, `${utility} sits inside motion-safe`).toContain(`motion-safe:${utility}`);
-    }
+  it('leaves press feedback to the guarded shared stylesheet', () => {
+    expect(className).not.toMatch(/(?:^|\s)active:scale-/);
+    expect(className).toMatch(/(?:^|\s)public-(?:action|text-control)(?:\s|$)/);
   });
 
   it('states that it is unavailable instead of leaving the tab order', () => {
-    expect(className).toContain('aria-disabled:text-text-secondary');
+    expect(className).not.toContain('disabled:opacity-');
     // A removed control announces nothing, and a changed pointer says
     // nothing a screen reader can hear.
     expect(className).not.toContain('cursor-not-allowed');
@@ -74,7 +88,7 @@ describe.each(SHAPES)('%s', (_name, className) => {
     expect(className).toContain('aria-pressed:font-bold');
   });
 
-  it('never fades a colour and never animates anything but transform', () => {
+  it('does not add a broad transition that bypasses shared motion preferences', () => {
     expect(className).not.toContain('transition-colors');
     expect(className).not.toContain('transition-all');
     expect(className).not.toMatch(/(^|[\s:])transition-opacity/);
@@ -98,10 +112,10 @@ describe('the shared state string', () => {
   });
 
   it('gives the two registers the same press and the same selected weight', () => {
-    for (const shared of ['active:scale-[0.98]', 'aria-pressed:font-bold']) {
-      expect(controlStateClass).toContain(shared);
-      expect(textControlStateClass).toContain(shared);
-    }
+    expect(controlStateClass).toContain('public-action');
+    expect(textControlStateClass).toContain('public-text-control');
+    expect(controlStateClass).toContain('aria-pressed:font-bold');
+    expect(textControlStateClass).toContain('aria-pressed:font-bold');
   });
 
   it('leaves the focus ring to the one rule that draws it', () => {
@@ -109,5 +123,75 @@ describe('the shared state string', () => {
     // its own would be the start of eight different rings.
     expect(controlStateClass).not.toContain('focus-visible:');
     expect(controlStateClass).not.toContain('focus:outline-none');
+  });
+});
+
+describe('shared public control feedback', () => {
+  it('guards every press transform with motion preference and action availability', () => {
+    const transforms = [];
+    css.walkDecls('transform', (declaration) => transforms.push(declaration));
+    expect(transforms.length).toBeGreaterThan(0);
+    for (const declaration of transforms) {
+      const rule = declaration.parent;
+      expect(rule.parent.name).toBe('media');
+      expect(rule.parent.params).toBe('(prefers-reduced-motion: no-preference)');
+      for (const selector of rule.selectors) {
+        expect(selector).toContain(':active');
+        expect(selector).toContain(':not(:disabled)');
+        expect(selector).toContain(":not([aria-disabled='true'])");
+        expect(selector).toContain(":not([aria-busy='true'])");
+      }
+    }
+  });
+
+  it('limits transitions to short control paint and transform feedback', () => {
+    const transitions = [];
+    css.walkDecls('transition', (declaration) => transitions.push(declaration));
+    expect(transitions.length).toBeGreaterThan(0);
+    for (const declaration of transitions) {
+      expect(declaration.parent.parent.params).toBe('(prefers-reduced-motion: no-preference)');
+      const properties = declaration.value.split(',').map((entry) => entry.trim().split(/\s+/)[0]);
+      expect(properties).toEqual(['background-color', 'border-color', 'color', 'transform']);
+      expect(declaration.value).not.toMatch(/\ball\b/);
+      expect(declaration.value.match(/var\(--motion-fast\)/g)).toHaveLength(4);
+    }
+  });
+
+  it('excludes pending actions from unavailable paint for both native and aria disabled states', () => {
+    for (const unavailable of [':disabled', "[aria-disabled='true']"]) {
+      const boxed = declarationsFor(`.public-action${unavailable}:not([aria-busy='true'])`);
+      expect(boxed).toMatchObject({
+        'background-color': 'rgb(var(--color-surface-alt-rgb))',
+        color: 'rgb(var(--color-text-secondary-rgb))',
+      });
+      const text = declarationsFor(`.public-text-control${unavailable}:not([aria-busy='true'])`);
+      expect(text.color).toBe('rgb(var(--color-text-secondary-rgb))');
+      expect(text['background-color']).toBeUndefined();
+    }
+    expect(declarationsFor(".public-action.control-tint[aria-busy='true']")['--control-tint-share']).toBe('0');
+  });
+
+  it('uses a control boundary for the secondary and quiet actions', () => {
+    for (const action of [secondaryActionClass, secondaryButtonClass, quietActionClass]) {
+      expect(action).toContain('border-control');
+      expect(action).not.toContain('border-rule-hairline');
+    }
+  });
+
+  it('allows long labels to wrap while keeping icons intact', () => {
+    for (const selector of ['.public-action', '.public-text-control']) {
+      expect(declarationsFor(selector)).toMatchObject({
+        'max-inline-size': '100%',
+        'white-space': 'normal',
+        'overflow-wrap': 'anywhere',
+      });
+      expect(declarationsFor(`${selector} > svg`)['flex-shrink']).toBe('0');
+    }
+  });
+
+  it('reserves asynchronous action labels without exposing both names', () => {
+    expect(declarationsFor('.public-action-label').display).toBe('inline-grid');
+    expect(declarationsFor('.public-action-label > span')['grid-area']).toBe('1 / 1');
+    expect(declarationsFor(".public-action-label > [aria-hidden='true']").visibility).toBe('hidden');
   });
 });

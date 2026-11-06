@@ -34,6 +34,7 @@ function Disconnect({ name, warning, onDisconnect, disabled }) {
         type="button"
         className="button danger"
         disabled={busy || disabled}
+        aria-busy={busy || undefined}
         onClick={async () => {
           if (busy || disabled) return;
           setBusy(true);
@@ -238,7 +239,7 @@ export default function ConnectionPanel({
           {canConnect && copy.consent ? <p>{copy.consent}</p> : null}
           {canConnect || mayDisconnect ? (
             <div className="step-actions">
-              {canConnect ? <button type="button" className="button" disabled={leaving || disconnecting} onClick={connect}>{leaving ? 'Opening account provider…' : connectLabel || 'Connect again'}</button> : null}
+              {canConnect ? <button type="button" className="button" disabled={leaving || disconnecting} aria-busy={leaving || undefined} onClick={connect}>{leaving ? 'Opening account provider…' : connectLabel || 'Connect again'}</button> : null}
               {mayDisconnect ? <Disconnect name={copy.name} warning={warning} onDisconnect={disconnect} disabled={leaving} /> : null}
             </div>
           ) : null}
@@ -264,6 +265,7 @@ export default function ConnectionPanel({
                     type="button"
                     className="button primary"
                     disabled={leaving || disconnecting}
+                    aria-busy={leaving || undefined}
                     data-group-error={connectError ? CONNECTION_FIELD : undefined}
                     aria-describedby={connectError ? connectErrorId : undefined}
                     onClick={connect}

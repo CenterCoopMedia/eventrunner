@@ -29,7 +29,7 @@ export default class ChunkErrorBoundary extends Component {
 
   componentDidCatch(error) {
     // Only a missing chunk is worth reloading for. Any other error in the
-    // admin subtree would still be there after a reload, so it stops here and
+    // page subtree would still be there after a reload, so it stops here and
     // shows the panel instead of bouncing the reader through a refresh.
     if (isChunkLoadError(error)) reloadOnce({ reload: this.reload });
   }
@@ -48,7 +48,7 @@ export default class ChunkErrorBoundary extends Component {
           This part of the site did not load
         </h1>
         <p className="mt-xs text-body text-text-secondary">
-          The admin area may have been updated while this tab was open. Reloading usually fixes it.
+          This page may have been updated while this tab was open, or the connection may have been interrupted. Check your connection and reload to try again.
         </p>
         <div className="mt-lg flex justify-center">
           <button type="button" onClick={this.reload} className={primaryActionClass}>

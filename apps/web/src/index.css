@@ -325,12 +325,14 @@
      costs a full-screen filter on every frame. The ink is the page's own
      text colour at low alpha, so the scrim follows the mode and the preset
      without a token of its own. */
-  .public-dialog {
+  dialog.public-dialog {
     /* The UA stylesheet sizes a dialog to its content and lets it run off a
        short viewport. The dialog holds a form, so it scrolls inside itself
        and leaves the page behind it still. */
     max-block-size: calc(100dvh - 2 * var(--space-xl));
     overflow-y: auto;
+    overscroll-behavior: contain;
+    inline-size: min(32rem, calc(100% - 2 * var(--space-md)));
     color: rgb(var(--color-text-primary-rgb));
   }
   /* The backdrop is in the top layer. A modern browser lets it inherit from
@@ -344,8 +346,8 @@
   /* THE TWO MOVES (expansion record §2.2).
      ------------------------------------------------------------------
      An element that arrives fades up over a short distance; an element that
-     leaves fades back down it. There is no third move, and nothing else on
-     the public site animates.
+     leaves fades back down it. Shared controls and request-owned indicators
+     add their own compact feedback under the November 6 motion direction.
 
      ONE CURVE, TWO DURATIONS. The exit is faster than the enter that brought
      the element in, and that is the whole of the asymmetry. A second curve
@@ -361,9 +363,9 @@
      Animation). Nothing here loops, and the `both` fill is what holds the
      element at its end state when the sequence finishes.
 
-     ADMIN PAGES TAKE NEITHER. The admin has no expressive motion and no
-     enter or exit: a state change in the room is instant. Only public
-     surfaces put these classes on an element.
+     ADMIN PAGES USE THEIR OWN SHARED CONTROLS. Public entrance classes do not
+     cross that boundary; adminControls.css and adminInteraction.css own the
+     operator buttons and dialog entrances with the same motion preference.
 
      The two sequences themselves are declared at the foot of this file, at
      the top level: a components-layer rule is dropped when its class name is
@@ -2358,9 +2360,8 @@
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0s !important;
+    animation: none !important;
+    transition: none !important;
     scroll-behavior: auto !important;
   }
 }

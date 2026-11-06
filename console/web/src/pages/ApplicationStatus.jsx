@@ -119,7 +119,7 @@ function Withdraw({ onWithdraw }) {
   return (
     <div className="confirm" role="group" aria-label="Withdraw the request">
       <span>Withdraw this request? We will not build the site, the web address becomes free, and your signup link stops working. To start again, you need a new link from {hostName()}.</span>
-      <button type="button" className="button danger" disabled={busy}
+      <button type="button" className="button danger" disabled={busy} aria-busy={busy || undefined}
         onClick={async () => {
           if (busy) return;
           setBusy(true);
@@ -157,7 +157,7 @@ function BuildFailed({ app, provider, retrying, onRetry, disabled }) {
       <p>{HostName()} is told about every build that does not finish.</p>
       {mayRetry && !waitsForAccount ? (
         <div>
-          <button type="button" className="button primary" disabled={retrying || disabled} onClick={onRetry}>
+          <button type="button" className="button primary" disabled={retrying || disabled} aria-busy={retrying || undefined} onClick={onRetry}>
             {retrying ? 'Starting…' : 'Retry'}
           </button>
         </div>

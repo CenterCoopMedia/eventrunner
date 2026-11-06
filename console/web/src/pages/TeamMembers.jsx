@@ -55,7 +55,7 @@ export default function TeamMembers({ members, myUid, canEdit, onChange, outcome
             {confirming === member.uid ? (
               <span className="confirm" role="group" aria-label={`Remove ${member.email}`}>
                 <span>Remove {member.email} from the team?</span>
-                <button type="button" className="button danger" disabled={disabled} onClick={() => remove(member, index)}>
+                <button type="button" className="button danger" disabled={disabled} aria-busy={pending === member.uid || undefined} onClick={() => remove(member, index)}>
                   {pending === member.uid ? 'Removing…' : 'Remove'}
                 </button>
                 <button type="button" className="button" disabled={Boolean(pending)} autoFocus onClick={() => cancel(member.uid)}>Cancel</button>

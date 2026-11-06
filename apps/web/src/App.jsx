@@ -109,16 +109,16 @@ export function AppRoutes() {
       <Route element={<LaunchGate />}>
       <Route element={<Layout />}>
         <Route index element={<Home />} />
-        <Route path="schedule" element={<DeferredPage component={Schedule} label="schedule" />} />
-        <Route path="schedule/mine" element={<DeferredPage component={MySchedule} label="your schedule" />} />
+        <Route path="schedule" element={<DeferredPage component={Schedule} shape="schedule" label="schedule" />} />
+        <Route path="schedule/mine" element={<DeferredPage component={MySchedule} shape="schedule" label="your schedule" />} />
         {/* A shared personal schedule (issue #173): reads the projection of
             issue #172 — never users_public — and answers denial as privacy.
             It sits under the reserved `schedule` segment, beside /mine. */}
-        <Route path="schedule/user/:uid" element={<DeferredPage component={SharedSchedule} label="shared schedule" />} />
+        <Route path="schedule/user/:uid" element={<DeferredPage component={SharedSchedule} shape="schedule" label="shared schedule" />} />
         <Route path="schedule/:sessionId" element={<DeferredPage component={SessionDetail} label="session" />} />
-        <Route path="speakers" element={<DeferredPage component={Speakers} label="speakers" />} />
+        <Route path="speakers" element={<DeferredPage component={Speakers} shape="directory" label="speakers" />} />
         <Route path="speakers/:slug" element={<DeferredPage component={SpeakerDetail} label="speaker" />} />
-        <Route path="sponsors" element={<DeferredPage component={Sponsors} label="sponsors" />} />
+        <Route path="sponsors" element={<DeferredPage component={Sponsors} shape="directory" label="sponsors" />} />
         <Route path="sponsors/:slug" element={<DeferredPage component={SponsorDetail} label="sponsor" />} />
         <Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />
         <Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />
@@ -161,7 +161,7 @@ export function AppRoutes() {
             is reserved in shared/routing, so a generic cmsPages path can never
             claim the segment. */}
         <Route path="dashboard" element={<DeferredPage component={Dashboard} label="dashboard" />} />
-        <Route path="attendees" element={<DeferredPage component={Attendees} label="attendees" />} />
+        <Route path="attendees" element={<DeferredPage component={Attendees} shape="directory" label="attendees" />} />
         <Route path="attendees/:uid" element={<DeferredPage component={AttendeeProfile} label="attendee" />} />
         {SpecimenPage ? (
           <Route

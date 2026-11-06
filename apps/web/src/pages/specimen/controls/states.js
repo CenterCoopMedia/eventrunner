@@ -55,8 +55,8 @@ export function stateLabel(id) {
  */
 export const FORCED_FOCUS = 'focus-ring-forced';
 
-/** The forced press: the scale the motion grammar gives a press. */
-export const FORCED_PRESS = 'scale-[0.98]';
+/** The forced press respects the same preference as the live control. */
+export const FORCED_PRESS = 'motion-safe:scale-[0.98]';
 
 /**
  * The tint a state applies, as the custom property the shared rule reads.

@@ -58,12 +58,12 @@ export default function SignIn() {
       {providers.length > 0 ? (
         <div className="stack">
           {providers.includes('google') ? (
-            <button type="button" className="button provider" disabled={busy} onClick={() => run(auth.signInWithGoogle)}>
+            <button type="button" className="button provider" disabled={Boolean(busy)} aria-busy={busy === 'google' || undefined} onClick={() => run(auth.signInWithGoogle, 'google')}>
               Continue with Google
             </button>
           ) : null}
           {providers.includes('microsoft') ? (
-            <button type="button" className="button provider" disabled={busy} onClick={() => run(auth.signInWithMicrosoft)}>
+            <button type="button" className="button provider" disabled={Boolean(busy)} aria-busy={busy === 'microsoft' || undefined} onClick={() => run(auth.signInWithMicrosoft, 'microsoft')}>
               Continue with Microsoft
             </button>
           ) : null}
@@ -99,7 +99,7 @@ export default function SignIn() {
             />
             {fieldError ? <p id="signin-email-error" className="field-error">{fieldError}</p> : null}
           </div>
-          <button type="submit" className="button primary" disabled={Boolean(busy)}>{busy === 'email' ? 'Sending…' : 'Send link'}</button>
+          <button type="submit" className="button primary" disabled={Boolean(busy)} aria-busy={busy === 'email' || undefined}>{busy === 'email' ? 'Sending…' : 'Send link'}</button>
         </form>
       )}
     </section>
