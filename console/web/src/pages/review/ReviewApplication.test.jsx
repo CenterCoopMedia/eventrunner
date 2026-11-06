@@ -67,6 +67,15 @@ const DRAFT = () => request({ status: 'draft', answers: null, ticketChoice: null
 beforeEach(() => serve());
 
 describe('ReviewApplication', () => {
+  it('says when a header refresh fails and keeps the loaded request', async () => {
+    let calls = 0;
+    serve(() => { calls += 1; if (calls > 1) throw new Error('The network is down.'); return request(); });
+    page();
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh request' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not refresh the request.');
+    expect(screen.getByRole('heading', { level: 1, name: 'NC Local Summit' })).toBeInTheDocument();
+  });
+
   it('shows the frozen answers in plain words', async () => {
     page();
     expect(await screen.findByRole('heading', { level: 1, name: 'NC Local Summit' })).toBeInTheDocument();

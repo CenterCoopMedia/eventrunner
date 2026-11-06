@@ -142,6 +142,8 @@ export default function ReviewApplication() {
   const [working, setWorking] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState(false);
+  // A header refresh can fail before any decision or retry has a result to carry it.
+  const [refreshError, setRefreshError] = useState('');
   const inFlight = useRef(false);
 
   const load = useCallback(async () => {
@@ -210,7 +212,9 @@ export default function ReviewApplication() {
     setRefreshing(true);
     const problem = await load();
     setStale(Boolean(problem));
-    const update = (current) => current ? { ...current, refreshError: problem ? `We could not refresh the request. ${problem}` : '' } : current;
+    const message = problem ? `We could not refresh the request. ${problem}` : '';
+    setRefreshError(message);
+    const update = (current) => current ? { ...current, refreshError: message } : current;
     setRetryResult(update);
     setDecisionResult(update);
     setRefreshing(false);
@@ -230,6 +234,7 @@ export default function ReviewApplication() {
         <IconControl icon="refresh" label="Refresh request" disabled={Boolean(working) || refreshing} onClick={refresh} />
       </div>
       <p><span className="tag">{STATUS_LABELS[app.status] || 'In progress'}</span></p>
+      {refreshError && !retryResult && !decisionResult ? <p className="message error" role="alert">{refreshError}</p> : null}
 
       {app.buildStart?.state === 'failed' && data.build?.state !== 'failed' ? (
         <aside className="note" role="note">
