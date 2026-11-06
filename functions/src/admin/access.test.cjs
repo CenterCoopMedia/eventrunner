@@ -849,9 +849,10 @@ test('new grant sends once with the configured admin link, exact address, role, 
   assert.equal(mail.Tag, 'admin.access_granted');
   assert.match(mail.HtmlBody, /href="https:\/\/summit.example.org\/admin"/);
   for (const body of [mail.HtmlBody, mail.TextBody]) {
-    for (const value of ['Community Summit', email, 'staff', 'Sep 23, 2026, 6:01 AM EDT', 'Request an emailed sign-in code', '1 Main Street']) {
+    for (const value of ['Community Summit', email, 'staff', 'Request an emailed sign-in code', '1 Main Street']) {
       assert.ok(body.includes(value), value);
     }
+    assert.match(body, /Sep 23, 2026, 6:01\sAM EDT/);
     assert.doesNotMatch(body, /Google|one-time invitation/);
     assert.equal(body.match(/1 Main Street/g).length, 1, 'footer occurs once');
   }
