@@ -112,6 +112,8 @@ test('console directories and application progress are readable across widths an
       if (width === 1440 && colorScheme === 'light') {
         await page.getByRole('button', { name: 'Sign out' }).focus();
         await page.keyboard.press('Tab');
+        await expect(page.getByRole('button', { name: 'Refresh organizations' })).toBeFocused();
+        await page.keyboard.press('Tab');
         await expect(organizationLink).toBeFocused();
         await page.keyboard.press('Enter');
         await expect(page.getByRole('heading', { level: 1, name: 'Community Newsroom' })).toBeVisible();
@@ -196,9 +198,9 @@ test('status withdrawal and settings saves keep their outcome beside the action'
   await page.getByLabel('Region').fill('us-east1');
   await page.getByRole('button', { name: 'Save settings' }).click();
   await expect(page.getByLabel('Region')).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Saving settings…' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Save settings' })).toBeDisabled();
   finishSettings();
-  await expect(page.getByRole('status')).toHaveText('The settings are saved. New builds use them.');
+  await expect(page.getByRole('status')).toHaveText('Settings saved. New sites will use them.');
   await expect(page.getByRole('status')).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Save settings' })).toBeInViewport();
   await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
