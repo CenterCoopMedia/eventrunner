@@ -3,15 +3,12 @@ import TeamInviteForm from './TeamInviteForm.jsx';
 import TeamMembers from './TeamMembers.jsx';
 
 /** A recommendation, not a condition: a second Owner keeps one lost inbox from locking the team out. */
-function SecondOwner({ ownersNeeded }) {
+function SecondOwner({ ownersNeeded, canInvite }) {
   const covered = ownersNeeded === 0;
-  let detail = 'One lost inbox can\'t lock you out of your event site.';
-  if (ownersNeeded === 1) detail = 'With two, one lost inbox can\'t lock you out of your event site. You can add 1 more Owner at any time.';
-  if (ownersNeeded > 1) detail = `With two, one lost inbox can't lock you out of your event site. You can add ${ownersNeeded} more Owners at any time.`;
   return (
     <aside className="note" role="note" aria-labelledby="second-owner-title">
-      <p id="second-owner-title" className="note-title">{covered ? 'Your team has two Owners.' : 'We recommend two Owners.'}</p>
-      <p>{detail}</p>
+      <p id="second-owner-title" className="note-title">{covered ? 'Your team has at least two owners.' : canInvite ? 'Add a second owner' : 'Ask an owner to add a second owner'}</p>
+      <p>{covered ? 'Owners can manage the team.' : 'Invite another owner so the team can still sign in if someone loses access to their email.'}</p>
     </aside>
   );
 }
@@ -25,7 +22,7 @@ export default function TeamSections({ team, myUid }) {
   const isOwner = data.myRole === 'owner';
   return (
     <>
-      <SecondOwner ownersNeeded={data.ownersNeeded} />
+      <SecondOwner ownersNeeded={data.ownersNeeded} canInvite={isOwner} />
 
       {!isOwner && data.myRole ? <p className="muted">Only an Owner can invite people or change roles.</p> : null}
       {!data.myRole && data.operator ? (
@@ -39,7 +36,7 @@ export default function TeamSections({ team, myUid }) {
 
       {data.invites.length > 0 ? (
         <>
-          <h2 id="invites-title">Invites waiting for an answer</h2>
+          <h2 id="invites-title">Pending invites</h2>
           <ul className="cards" aria-labelledby="invites-title">
             {data.invites.map((invite) => (
               <li key={invite.id} className="card">

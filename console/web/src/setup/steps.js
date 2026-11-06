@@ -80,13 +80,13 @@ export const BUILD_FAILED_LABEL = 'We did not finish building your site';
 /** What the client reads for each status (ADR 0007 §3 and §5). */
 /** The build's steps (scripts/provision-client.cjs), grouped in the client's words. */
 export const BUILD_PHASES = Object.freeze([
-  { steps: ['project', 'firebase', 'deploy-identity'], label: 'Setting up your hosting', detail: 'A private space for your site on Google’s servers.' },
-  { steps: ['web-address', 'sign-in'], label: 'Setting up your web address', detail: 'Pointing your address at the site and securing it. This step can take up to an hour.' },
-  { steps: ['email', 'tickets'], label: 'Setting up email and tickets', detail: 'Connecting the service that sends your site’s emails, and your ticket choice.' },
-  { steps: ['environment', 'first-deploy', 'mail-webhooks'], label: 'Installing your site', detail: 'Putting a first copy of the site online.' },
-  { steps: ['seed'], label: 'Adding your event details and team', detail: 'Filling in your setup answers and adding your team.' },
-  { steps: ['full-deploy'], label: 'Publishing your site', detail: 'Putting the finished site online.' },
-  { steps: ['ready'], label: 'Emailing the link to your site', detail: 'Sending the link to finish setting it up.' },
+  { steps: ['project', 'firebase', 'deploy-identity'], label: 'Setting up your hosting' },
+  { steps: ['web-address', 'sign-in'], label: 'Setting up your web address', detail: 'This step can take up to an hour.' },
+  { steps: ['email', 'tickets'], label: 'Setting up email and tickets' },
+  { steps: ['environment', 'first-deploy', 'mail-webhooks'], label: 'Installing your site' },
+  { steps: ['seed'], label: 'Adding your event details and team' },
+  { steps: ['full-deploy'], label: 'Publishing your site' },
+  { steps: ['ready'], label: 'Emailing the link to your site' },
 ]);
 
 export const STATUS_LABELS = Object.freeze({

@@ -64,7 +64,7 @@ describe('ApplicationStatus', () => {
     serveStatus({ status: 'approved', myRole: 'editor', canEdit: false, canWithdraw: false });
     const { unmount } = page();
     expect(await screen.findByText('Now: Starting the build. Next: Setting up your hosting.')).toBeInTheDocument();
-    expect(screen.getByText(/The Owners will receive an email when your site is ready/)).toBeInTheDocument();
+    expect(screen.getByText(/Your team owners will receive an email when your site is ready/)).toBeInTheDocument();
     unmount();
     serveStatus({ status: 'building', canEdit: false, canWithdraw: false, build: { failed: false, needsReconnect: false, current: 'ready' } });
     page();
@@ -180,7 +180,7 @@ describe('ApplicationStatus', () => {
       page();
       expect(await screen.findByText('Connected: NC Local')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Yes, disconnect' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
       expect(await screen.findByText('You disconnected your Stripe account.')).toBeInTheDocument();
       expect(await screen.findByRole('button', { name: 'Connect with Stripe' })).toBeInTheDocument();
       expect(callsTo('disconnectAccount')).toEqual([{ orgId: 'o1', appId: 'a1', provider: 'stripe' }]);
@@ -274,7 +274,7 @@ describe('ApplicationStatus', () => {
       page();
       expect(await screen.findByRole('note')).toHaveTextContent('The build did not finish');
       expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Retry the build' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
       expect(await screen.findByText(/We started the build again/)).toBeInTheDocument();
       expect(callsTo('retryBuild')).toEqual([{ orgId: 'o1', appId: 'a1' }]);
       expect(screen.queryByText('The build did not finish')).not.toBeInTheDocument();
@@ -287,7 +287,7 @@ describe('ApplicationStatus', () => {
         retryBuild: () => { throw new Error('You have retried this build too many times today.'); },
       });
       page();
-      fireEvent.click(await screen.findByRole('button', { name: 'Retry the build' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
       expect(await screen.findByRole('alert')).toHaveTextContent('too many times today');
     });
 
@@ -300,7 +300,7 @@ describe('ApplicationStatus', () => {
       page();
       expect(await screen.findByRole('note')).toHaveTextContent('could not use your Stripe account');
       expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
 
     it('shows the Eventbrite consent to an Owner who can reconnect, and not to an Editor', async () => {
@@ -330,13 +330,13 @@ describe('ApplicationStatus', () => {
       });
       page();
       expect(await screen.findByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
 
     it('once the account is connected again, an Owner can retry', async () => {
       serveStatus({ ...FAILED, build: { failed: true, needsReconnect: true } });
       page();
-      expect(await screen.findByRole('button', { name: 'Retry the build' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
     });
 
@@ -344,14 +344,14 @@ describe('ApplicationStatus', () => {
       serveStatus({ ...FAILED, myRole: 'editor', build: { failed: true, needsReconnect: true } });
       page();
       expect(await screen.findByText(/Only an Owner can reconnect an account or retry the build/)).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
     });
 
     it('an operator can retry and cannot reconnect', async () => {
       serveStatus({ ...FAILED, myRole: null, operator: true, build: { failed: true, needsReconnect: true } });
       page();
-      expect(await screen.findByRole('button', { name: 'Retry the build' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
     });
   });

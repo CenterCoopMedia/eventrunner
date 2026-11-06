@@ -36,8 +36,8 @@ export function TextField({
   return (
     <div className={`field ${className}`.trim()}>
       <label htmlFor={id}>{label}</label>
-      {hint ? <p id={`${id}-hint`} className="hint">{hint}</p> : null}
       {multiline ? <textarea rows={3} {...common} /> : <input type={type} inputMode={inputMode} {...common} />}
+      {hint ? <p id={`${id}-hint`} className="hint">{hint}</p> : null}
       {error ? <p id={`${id}-error`} className="field-error">{error}</p> : null}
     </div>
   );
@@ -49,7 +49,6 @@ export function SelectField({ path, label, value, onChange, onBlur, error, hint,
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      {hint ? <p id={`${id}-hint`} className="hint">{hint}</p> : null}
       <select
         id={id}
         name={path}
@@ -60,8 +59,13 @@ export function SelectField({ path, label, value, onChange, onBlur, error, hint,
         aria-describedby={describedBy(id, hint, error)}
       >
         <option value="">Choose one</option>
-        {options.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
+        {options.map((option) => {
+          const value = typeof option === 'string' ? option : option.value;
+          const label = typeof option === 'string' ? option.replaceAll('_', ' ') : option.label;
+          return <option key={value} value={value}>{label}</option>;
+        })}
       </select>
+      {hint ? <p id={`${id}-hint`} className="hint">{hint}</p> : null}
       {error ? <p id={`${id}-error`} className="field-error">{error}</p> : null}
     </div>
   );
