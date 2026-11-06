@@ -55,7 +55,12 @@ async function call(ctx, label, url, { method = 'GET', headers = {}, json, allow
     }
     if (allow.includes(response.status)) return null;
     // Provider bodies can contain tokens or a webhook URL with its password.
-    if (!response.ok) throw Object.assign(new Error(`${label}: HTTP ${response.status}`), { status: response.status });
+    // Only a numeric provider error code is safe to report.
+    if (!response.ok) {
+      let code = null;
+      try { const body = JSON.parse(await response.text()); if (Number.isInteger(body?.ErrorCode)) code = body.ErrorCode; } catch { /* no code */ }
+      throw Object.assign(new Error(`${label}: HTTP ${response.status}${code !== null ? ` (error code ${code})` : ''}`), { status: response.status, code });
+    }
     const text = await response.text();
     try { return text ? JSON.parse(text) : {}; }
     catch { throw new Error(`${label}: invalid JSON answer`); }
@@ -496,8 +501,15 @@ async function mail(ctx) {
         }
         if (((await postmark(ctx, path, {}, token)).Webhooks || []).some(ours)) throw new Error('mail: a webhook remains');
       }
-      await postmark(ctx, `/servers/${encode(r.postmarkServerId)}`, { method: 'DELETE', allow: [404] });
-      if ((await postmarkList(ctx, '/servers', 'Servers')).some((s) => String(s.ID) === String(r.postmarkServerId))) throw new Error('mail: server remains');
+      try {
+        await postmark(ctx, `/servers/${encode(r.postmarkServerId)}`, { method: 'DELETE', allow: [404] });
+        if ((await postmarkList(ctx, '/servers', 'Servers')).some((s) => String(s.ID) === String(r.postmarkServerId))) throw new Error('mail: server remains');
+      } catch (err) {
+        // Postmark refuses API server deletion until its support enables it.
+        // Its webhooks are gone, so continue; verify still lists the server.
+        if (err.status !== 422) throw err;
+        ctx.deps.log.log(`mail: Postmark refused to delete server ${r.postmarkServerId} (${err.message}); delete it in Postmark`);
+      }
     }
   }
   if (r.postmarkDomainId) {
@@ -554,12 +566,19 @@ async function database(ctx) {
   if (await google(ctx, 'verify deleted database', base, { allow: [404] })) throw new Error('database: database remains');
 }
 
+// Hosting keeps a deleted custom domain for 30 days with a deleteTime, and
+// project deletion removes it. Only a domain without one is still live.
+async function liveDomain(ctx, label, url) {
+  const domain = await google(ctx, label, url, { allow: [404] });
+  return domain && !domain.deleteTime ? domain : null;
+}
+
 async function customDomain(ctx) {
   if (!ctx.resources.site) return;
   const url = `${siteUrl(ctx)}/customDomains/${encode(ctx.resources.domain)}`;
-  if (!await google(ctx, 'custom domain', url, { allow: [404] })) return;
+  if (!await liveDomain(ctx, 'custom domain', url)) return;
   await finish(ctx, 'delete custom domain', HOSTING, await google(ctx, 'delete custom domain', url, { method: 'DELETE' }));
-  if (await google(ctx, 'verify custom domain', url, { allow: [404] })) throw new Error('custom-domain: domain remains');
+  if (await liveDomain(ctx, 'verify custom domain', url)) throw new Error('custom-domain: domain remains');
 }
 
 async function dnsRecords(ctx) {
@@ -701,7 +720,7 @@ async function inspect(ctx) {
       const release = await latestRelease(ctx);
       return { state: release && release.type !== 'SITE_DISABLE' ? 'present' : 'absent', serving: Boolean(release && release.type !== 'SITE_DISABLE') };
     });
-    await projectCheck('custom-domain', async () => ({ state: r.site && await google(ctx, 'verify custom domain', `${siteUrl(ctx)}/customDomains/${encode(r.domain)}`, { allow: [404] }) ? 'present' : 'absent' }));
+    await projectCheck('custom-domain', async () => ({ state: r.site && await liveDomain(ctx, 'verify custom domain', `${siteUrl(ctx)}/customDomains/${encode(r.domain)}`) ? 'present' : 'absent' }));
     // Project secrets disappear with Google's project deletion. This reports
     // their lifecycle rather than claiming immediate physical destruction.
     await projectCheck('client-secrets', async () => {

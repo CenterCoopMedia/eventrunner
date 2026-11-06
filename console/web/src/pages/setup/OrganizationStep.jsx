@@ -5,7 +5,7 @@ export default function OrganizationStep({ value, errors, onChange, onBlur }) {
   const set = (key) => (next) => onChange({ ...value, [key]: next }, `organization.${key}`);
   return (
     <div className="stack">
-      <p className="lead">Tell us who runs the event. Your audience sees these details.</p>
+      <p className="lead">Add the organization that runs the event.</p>
       <TextField
         path="organization.name"
         label="Organization name"
@@ -30,7 +30,7 @@ export default function OrganizationStep({ value, errors, onChange, onBlur }) {
       <TextField
         path="organization.address"
         label="Mailing address"
-        hint="Every email your site sends shows this address at the foot."
+        hint="This address appears at the bottom of your event emails."
         multiline
         autoComplete="street-address"
         value={value.address}

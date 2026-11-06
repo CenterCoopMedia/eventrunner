@@ -6,6 +6,7 @@ import { PROVIDER_COPY, canDisconnectWords, isProviderUrl, rememberConnectReturn
 import { fieldId } from './Field.jsx';
 import { leavePage } from './leavePage.js';
 import LoadingState from '../LoadingState.jsx';
+import IconControl from '../IconControl.jsx';
 
 const NOT_SAVED = 'We could not save your last change. Try again.';
 const CONNECTION_FIELD = 'tickets.connection';
@@ -24,7 +25,7 @@ function Disconnect({ name, warning, onDisconnect, disabled }) {
   const [busy, setBusy] = useState(false);
   const button = useRef(null);
   if (!asking) {
-    return <button type="button" className="button danger" ref={button} disabled={disabled} onClick={() => setAsking(true)}>Disconnect</button>;
+    return <IconControl icon="disconnect" label="Disconnect" className="danger" ref={button} disabled={disabled} onClick={() => setAsking(true)} />;
   }
   return (
     <div className="confirm" role="group" aria-label={`Disconnect your ${name} account`}>
@@ -39,7 +40,7 @@ function Disconnect({ name, warning, onDisconnect, disabled }) {
           try { if (await onDisconnect()) setAsking(false); } finally { setBusy(false); }
         }}
       >
-        {busy ? 'Disconnecting…' : 'Yes, disconnect'}
+        {busy ? 'Disconnecting…' : 'Disconnect'}
       </button>
       <button type="button" className="button" disabled={busy || disabled} autoFocus onClick={() => { setAsking(false); setTimeout(() => button.current?.focus(), 0); }}>
         Cancel
@@ -96,7 +97,7 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, disabled }) {
     setBusy(false);
   }
 
-  const again = <button type="button" className="button" disabled={busy} onClick={load}>Check again</button>;
+  const again = <IconControl icon="refresh" label="Refresh Eventbrite events" disabled={busy} aria-busy={busy} onClick={load} />;
   if (problem && !events) {
     return <div className="stack"><p className="message error" role="alert">{problem}</p><p>{again}</p></div>;
   }
@@ -105,7 +106,7 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, disabled }) {
     return (
       <div className="stack">
         {error ? <p id={`${id}-error`} className="field-error">{error}</p> : null}
-        <p>We did not find an upcoming event in your Eventbrite account. Make the event on Eventbrite, then check again.</p>
+        <p>Create an upcoming event on Eventbrite, then refresh this list.</p>
         <p>{again}</p>
       </div>
     );
@@ -116,7 +117,6 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, disabled }) {
   return (
     <div className="field">
       <label htmlFor={id}>Your Eventbrite event</label>
-      <p id={`${id}-hint`} className="hint">Your site shows the tickets for this event.</p>
       <select
         id={id}
         name={EVENT_FIELD}
@@ -129,6 +129,7 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, disabled }) {
         <option value="">Choose one</option>
         {options.map((event) => <option key={event.id} value={event.id}>{eventLabel(event)}</option>)}
       </select>
+      <p id={`${id}-hint`} className="hint">Your site shows the tickets for this event.</p>
       {error ? <p id={`${id}-error`} className="field-error">{error}</p> : null}
       {problem ? <ActionFeedback kind="error" revealKey={problem}>{problem}</ActionFeedback> : null}
       {notice ? <ActionFeedback revealKey={notice}>{notice}</ActionFeedback> : null}

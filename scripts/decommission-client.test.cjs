@@ -111,7 +111,9 @@ function setup(options = {}) {
           return answer({ releases: state.release ? [state.release, ...(state.oldReleases || [])].slice(0, Number(url.searchParams.get('pageSize') || 100)) : [] });
         }
         if (p.endsWith(`/customDomains/${DOMAIN}`)) {
-          if (method === 'DELETE') { state.customDomain = false; return done(); }
+          // Hosting soft-deletes: the domain stays readable with a deleteTime.
+          if (method === 'DELETE') { state.customDomain = 'deleted'; return done(); }
+          if (state.customDomain === 'deleted') return answer({ deleteTime: '2026-11-06T00:00:00Z', purgeTime: '2026-12-06T00:00:00Z' });
           return state.customDomain ? answer({ requiredDnsUpdates: { desired: [] } }) : answer({}, 404);
         }
       }
@@ -324,6 +326,18 @@ test('a partial purge resumes from verified checkpoints after a database failure
   assert.equal(await s.run('purge'), 0, s.logs.join('\n'));
   assert.equal(mutations(s).filter((c) => c.p === '/v1/webhook_endpoints/we_own').length, 1);
   assert.ok(mutations(s).length > firstDeletes);
+});
+
+test('a refused Postmark server deletion is reported and the rest of the purge continues', async () => {
+  const s = archived();
+  s.failures.set('DELETE api.postmarkapp.com/servers/10', 422);
+  const code = await s.run('purge');
+  const log = s.logs.join('\n');
+  assert.match(log, /mail: Postmark refused to delete server 10 \(Postmark: HTTP 422\); delete it in Postmark/);
+  assert.equal(s.state.project.state, 'DELETE_REQUESTED');
+  assert.ok(s.state.server, 'the server is left for the operator');
+  assert.equal(code, 1, 'the leftover server keeps the run from passing');
+  assert.match(s.logs.at(-1), /resources remain or cannot be checked: mail:servers$/);
 });
 
 test('draft without a project deletes console data and tokens without client or provider calls', async () => {
