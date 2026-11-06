@@ -31,6 +31,7 @@ function Dateline({ dates, place, className = '' }) {
  *   mark?: import('react').ReactNode,
  *   to?: string,                 // where the identity links
  *   mobileControl?: import('react').ReactNode, // small-screen navigation disclosure
+ *   actions?: import('react').ReactNode, // account controls when navigation is beside the page
  *   children?: import('react').ReactNode,  // the navigation
  * }} props
  */
@@ -43,6 +44,7 @@ export default function Header({
   to = '/',
   children = null,
   mobileControl = null,
+  actions = null,
 }) {
   // A theme document is unvalidated runtime data (spec §2.4 fail-soft
   // overlay), so an unrecognized value renders the base header.
@@ -80,6 +82,7 @@ export default function Header({
         <div className="site-masthead__bar">
           <p className="site-masthead__identity font-heading">{identityLink(wordmark)}</p>
           {mobileControl}
+          {actions}
           {children}
         </div>
       </div>
@@ -104,6 +107,7 @@ export default function Header({
           )}
         </p>
         {mobileControl}
+        {actions}
         {children}
       </div>
     );
@@ -123,6 +127,7 @@ export default function Header({
             mark={mark}
           />
           {mobileControl}
+          {actions}
         </div>
         {children}
       </div>
@@ -137,6 +142,7 @@ export default function Header({
         <p className="site-header-identity font-heading text-h3 text-text-primary">{identityLink(wordmark)}</p>
         <Dateline dates={dates} place={place} className="site-header-dateline" />
         {mobileControl}
+        {actions}
       </div>
       {children}
     </div>

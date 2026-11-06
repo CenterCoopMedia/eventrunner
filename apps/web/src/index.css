@@ -2420,7 +2420,18 @@
     letter-spacing: -.025em;
   }
   .site-masthead__bar nav { border: 0; }
-  .site-masthead__bar nav ul { justify-content: flex-end; }
+  .site-header-nav[data-placement='top'] {
+    display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center;
+    gap: var(--space-xs) var(--space-md); min-inline-size: 0;
+  }
+  .site-header-nav[data-placement='top'] > ul:first-child { flex: 1 1 auto; min-inline-size: 0; }
+  .site-header-account-actions {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs);
+    margin-inline-start: auto; min-inline-size: 0; max-inline-size: 100%;
+  }
+  .site-header-account-actions[hidden] { display: none; }
+  .site-header-identity-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); }
+  .site-header-identity-row > .nameplate { flex: 1 1 0; min-inline-size: 0; }
   .event-hero {
     position: relative;
     isolation: isolate;
@@ -2607,7 +2618,8 @@
       flex-shrink: 0;
     }
   }
-  .site-header-nav[data-mobile-hidden="true"] { display: none; }
+  .site-header-nav[data-mobile-hidden="true"],
+  .site-header-account-actions[data-mobile-hidden="true"] { display: none; }
   .disclosure-chevron { flex: none; }
   [aria-expanded="true"] > .disclosure-chevron { transform: rotate(180deg); }
   @media (prefers-reduced-motion: no-preference) {
@@ -2641,9 +2653,10 @@
     .demo-toolbar > p { flex-basis: 100%; }
     .demo-toolbar > button { flex: 1 1 auto; }
 
-    .site-masthead__bar nav ul { justify-content: flex-start; }
     .site-header-nav a,
-    .site-header-nav summary { font-size: var(--text-body); }
+    .site-header-nav summary,
+    .site-header-account-actions a,
+    .site-header-account-actions summary { font-size: var(--text-body); }
     .site-masthead__identity { max-inline-size: 18rem; }
     .event-hero { min-block-size: 0; display: flex; flex-direction: column; }
     .event-hero__copy {
@@ -2824,9 +2837,6 @@
     padding: var(--space-sm);
     border: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
     background: rgb(var(--color-surface-rgb));
-  }
-  .site-header-nav[data-placement='side'] .site-account-menu__content {
-    inset: 100% auto auto 0;
   }
   .site-account-sheet {
     position: fixed;

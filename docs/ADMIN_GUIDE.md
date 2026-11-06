@@ -14,8 +14,6 @@ Open **Session pitches** to review private proposals. Share `/pitch` for public 
 
 **On a phone, the compact top bar names the event and current section.** Open **Menu** to use the grouped admin sections and account controls in a full-screen sheet. The groups open and close there too. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
 
-**Choose an account view at the foot of the rail.** If your account has more than one view, the **View** selector shows the current view and lets you open **Attendee**, **Speaker**, or **Admin**, as available. A view changes where you work, not your permissions. The read-only demo has no view selector. Below your account details, **Take the tour**, **Report a problem**, and **View site** share one row. **Sign out** fills the row below them. Each icon shows its name on hover or keyboard focus.
-
 ## Find your way: The tour
 
 The first time you open the admin panel, a short tour opens above the page. It has one step for each group on the rail that your tier can open, and one step on the edit links on the public site. Move with **Next** and **Back**. End it at any step with **End tour** or the Escape key. The tour does not block the page: You can open a section it names while it stays on screen.
