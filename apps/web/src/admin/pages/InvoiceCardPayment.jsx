@@ -148,14 +148,14 @@ export function PayByCard({ invoice, cardPayments, timeZone, busy, onCreatePayLi
     <section aria-labelledby={headingId} className="flex flex-col gap-xs border-admin-rule-hairline border-t-admin-hairline pt-sm">
       <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Pay by card</h3>
       {issued && !available ? (
-        <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">{cardPayments?.reason || NO_STRIPE}</p>
+        <p className="text-admin-sm text-admin-ink-secondary">{cardPayments?.reason || NO_STRIPE}</p>
       ) : null}
       {available && cardPayments.testMode && issued ? (
-        <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">Stripe test mode. No real money moves through these links.</p>
+        <p className="text-admin-sm text-admin-ink-secondary">Stripe test mode. No real money moves through these links.</p>
       ) : null}
       {current ? (
         <div className="flex flex-col gap-3xs">
-          <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+          <p className="text-admin-sm text-admin-ink">
             {`The billing contact can pay ${total} by card at this link. It is printed on the PDF and included when you email the invoice. When Stripe confirms the payment, the invoice is marked paid.`}
           </p>
           <p>
@@ -169,13 +169,13 @@ export function PayByCard({ invoice, cardPayments, timeZone, busy, onCreatePayLi
               Open the card payment link<span className="sr-only"> (opens in a new tab)</span>
             </a>
           </p>
-          <p className="max-w-[65ch] break-all font-admin-data text-admin-sm text-admin-ink-secondary">{current.url}</p>
+          <p className="break-all font-admin-data text-admin-sm text-admin-ink-secondary">{current.url}</p>
           <p className="text-admin-sm text-admin-ink">{`Works until ${formatPayLinkEnd(current.expiresAt, timeZone)}.`}</p>
         </div>
       ) : null}
       {!current && issued && available ? (
         <div className="flex flex-col gap-xs">
-          <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+          <p className="text-admin-sm text-admin-ink">
             {`Make a Stripe link the billing contact can use to pay ${total} by card. It works for 23 hours. When Stripe confirms the payment, the invoice is marked paid.`}
           </p>
           <ServerErrorSummary error={error} title="The link was not made" />
@@ -255,7 +255,6 @@ function ReviewForm({ busy, onSubmit, onCancel }) {
         onChange={setNote}
         error={error}
         maxLength={INVOICE_LIMITS.reviewNote}
-        className="sm:max-w-[28rem]"
       />
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={primaryButtonClass} disabled={busy} aria-busy={busy || undefined} onClick={submit}>
@@ -301,8 +300,8 @@ export function PaymentReviews({ invoice, canResolve, busy, onResolve }) {
           </h3>
           {waiting.map((entry) => (
             <div key={entry.reviewId} className="flex flex-col gap-3xs text-admin-sm text-admin-ink">
-              <p className="max-w-[65ch] font-bold">{`Stripe took ${money(entry)} for this invoice ${reviewPhrase(entry)}.`}</p>
-              <p className="max-w-[65ch]">
+              <p className="font-bold">{`Stripe took ${money(entry)} for this invoice ${reviewPhrase(entry)}.`}</p>
+              <p>
                 It was recorded here and not applied to the invoice. Check it in the Stripe Dashboard, then refund it or record it another way.
               </p>
               {entry.paymentIntentId ? (

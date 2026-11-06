@@ -62,7 +62,7 @@ function AnswerList({ form, record }) {
 
 function Shell({ children }) {
   return (
-    <article className="mx-auto max-w-5xl space-y-lg">
+    <article className="w-full space-y-lg">
       <header className="max-w-prose space-y-xs">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Complete your registration</h1>
         <p className="text-body text-text-secondary">The organizers ask everyone attending a few questions. Each step saves when you move on.</p>

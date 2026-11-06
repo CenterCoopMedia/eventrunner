@@ -162,11 +162,11 @@ export default function SessionPitch() {
     </header>
   );
 
-  if (!modeKnown) return <article className="mx-auto max-w-5xl space-y-lg">{header}</article>;
+  if (!modeKnown) return <article className="w-full space-y-lg">{header}</article>;
 
   if (externalForm) {
     return (
-      <article className="mx-auto max-w-5xl space-y-lg">
+      <article className="w-full space-y-lg">
         {header}
         <section className="max-w-prose space-y-sm border-hairline border-rule-hairline bg-surface-alt p-md sm:p-lg" aria-labelledby="pitch-form-heading">
           <h2 id="pitch-form-heading" className="font-heading text-h2 font-semibold">Pitch form</h2>
@@ -181,7 +181,7 @@ export default function SessionPitch() {
 
   if (saved) {
     return (
-      <article className="mx-auto max-w-5xl space-y-lg">
+      <article className="w-full space-y-lg">
         {header}
         <section ref={savedRef} tabIndex={-1} className="space-y-sm border-hairline border-rule-hairline bg-surface-alt p-lg">
           <h2 className="font-heading text-h2 font-semibold">Your pitch is saved</h2>
@@ -208,7 +208,7 @@ export default function SessionPitch() {
   );
 
   return (
-    <article className="mx-auto max-w-5xl space-y-lg">
+    <article className="w-full space-y-lg">
       {header}
       <div className="grid items-start gap-lg lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
         <StepList steps={steps} current={current} hrefFor={hrefFor} wide={wide} label="Pitch steps" />

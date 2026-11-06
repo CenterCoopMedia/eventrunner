@@ -82,7 +82,7 @@ export default function ConsoleSettings() {
   }
 
   return (
-    <section aria-labelledby="settings-title" className="narrow">
+    <section aria-labelledby="settings-title">
       <p className="folio">Hosting team</p>
       <h1 id="settings-title" tabIndex={-1}>Console settings</h1>
       {!agreement || !FIELDS.every((field) => saved?.[field]) ? (
@@ -92,7 +92,7 @@ export default function ConsoleSettings() {
         </aside>
       ) : null}
       <p>Choose the hosting settings for new sites.</p>
-      <form noValidate onSubmit={onSubmit} className="stack">
+      <form noValidate onSubmit={onSubmit} className="stack narrow">
         <SettingsFields fields={FIELDS} values={values} onChange={change} error={fieldError} fieldRefs={fieldRefs} idPrefix="settings" disabled={busy} />
         <button type="submit" className="button primary" aria-label="Save settings" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
         {notice ? <p className="message success" role="status" ref={resultRef}>{notice}</p> : null}

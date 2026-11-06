@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { secondaryButtonClass } from './formControls.jsx';
+import { ActionLabel, secondaryButtonClass } from './formControls.jsx';
 import { dragIndex } from '../reorder.js';
 
 const quietMoveClass =
@@ -203,7 +203,7 @@ export function OrderDraftButtons({ dirty, saving, onSave, onCancel, saveDisable
         Cancel
       </button>
       <button type="button" className={secondaryButtonClass} onClick={onSave} disabled={saving || saveDisabled}>
-        {saving ? 'Saving…' : 'Save draft'}
+        <ActionLabel busy={saving} pending="Saving…">Save draft</ActionLabel>
       </button>
     </>
   );

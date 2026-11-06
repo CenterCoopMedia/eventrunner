@@ -5,7 +5,7 @@ import { uniqueEditorialId } from '../editorialId.js';
 import { byStoredOrder, nextStoredOrder } from '../reorder.js';
 import { summarizePublish } from '../publishResult.js';
 import { EditorActionFeedback } from './ActionFeedback.jsx';
-import { Notice, Panel, ServerErrorSummary, TextField, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
+import { ActionLabel, Notice, Panel, ServerErrorSummary, TextField, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
 import ImagePicker from './media/ImagePicker.jsx';
 
 // Both entry points edit cmsContent/hero__<field>. Theme configuration never
@@ -108,7 +108,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
         />
         <div className="flex flex-wrap gap-xs">
           <button type="button" className={secondaryButtonClass} onClick={() => save(false)}>
-            {busy ? 'Saving…' : 'Save draft'}
+            <ActionLabel busy={busy} pending="Saving…">Save draft</ActionLabel>
           </button>
           <button type="button" className={primaryButtonClass} onClick={() => save(true)}>
             Publish

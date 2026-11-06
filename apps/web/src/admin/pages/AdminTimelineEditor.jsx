@@ -25,6 +25,7 @@ import { timelineFields, validateTimelineForm } from '../timelineDoc.js';
 import { useAdminTimeline } from '../useAdminTimeline.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import {
+  ActionLabel,
   CheckboxField,
   DestructiveConfirm,
   Notice,
@@ -228,6 +229,7 @@ export default function AdminTimelineEditor({ mode }) {
       <AdminPageHeader
         title={creating ? 'New entry' : form.title.trim() || 'Untitled entry'}
         state={!creating && row ? <RecordState state={row.state} /> : null}
+        feedback={status || error ? <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
           <>
             <button
@@ -236,7 +238,7 @@ export default function AdminTimelineEditor({ mode }) {
               disabled={saving}
               aria-busy={action === 'draft' || undefined}
             >
-              {action === 'draft' ? 'Saving…' : 'Save'}
+              <ActionLabel busy={action === 'draft'} pending="Saving…">Save</ActionLabel>
             </button>
             <button
               type="button"
@@ -245,9 +247,8 @@ export default function AdminTimelineEditor({ mode }) {
               aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {action === 'publish' ? 'Publishing…' : 'Publish'}
+              <ActionLabel busy={action === 'publish'} pending="Publishing…">Publish</ActionLabel>
             </button>
-            <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />

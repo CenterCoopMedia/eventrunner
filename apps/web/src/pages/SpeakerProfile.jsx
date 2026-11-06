@@ -413,7 +413,7 @@ export default function SpeakerProfile() {
   );
 
   return (
-    <article className="mx-auto max-w-5xl space-y-lg">
+    <article className="w-full space-y-lg">
       <header className="max-w-prose space-y-xs">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Your speaker profile</h1>
         <p className="text-body text-text-secondary">

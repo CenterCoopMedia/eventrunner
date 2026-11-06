@@ -30,6 +30,7 @@ import SpeakerLogisticsPanel from '../components/SpeakerLogisticsPanel.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import {
+  ActionLabel,
   DestructiveConfirm,
   Panel,
   SelectField,
@@ -311,12 +312,12 @@ export default function AdminSpeakerEditor({ mode }) {
         )}
         identifiers={null}
         description="Manage this speaker’s profile and contact details."
+        feedback={status || error ? <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
           <>
             <button type="submit" className={primaryButtonClass} disabled={saving || photoBusy} aria-busy={action === 'draft' || undefined}>
-              {action === 'draft' ? 'Saving…' : mode === 'create' ? 'Create' : 'Save'}
+              <ActionLabel busy={action === 'draft'} pending="Saving…">{mode === 'create' ? 'Create' : 'Save'}</ActionLabel>
             </button>
-            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />
@@ -506,7 +507,7 @@ export default function AdminSpeakerEditor({ mode }) {
 
       {deleteBlocked ? (
         <Panel title="This speaker could not be deleted">
-          <p className="max-w-[65ch] text-admin-base text-admin-ink">
+          <p className="text-admin-base text-admin-ink">
             Nothing was changed. Marking the speaker removed hides them from the
             public directory and every public surface, and leaves the sessions
             that reference them untouched.

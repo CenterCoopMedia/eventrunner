@@ -147,7 +147,7 @@ export default function AdminTour({ docket, takeFocus = false, onEnd }) {
       <p id={stepLineId} className="text-admin-sm text-admin-ink-secondary">
         Step {at + 1} of {steps.length}
       </p>
-      <div className="mt-sm flex max-w-[65ch] flex-col gap-xs text-admin-base text-admin-ink">
+      <div className="mt-sm flex flex-col gap-xs text-admin-base text-admin-ink">
         <StepBody step={step} />
       </div>
       <div className="mt-md flex flex-wrap items-center gap-xs">

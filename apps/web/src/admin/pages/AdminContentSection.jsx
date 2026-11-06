@@ -243,6 +243,12 @@ export default function AdminContentSection() {
           blocks.length === 1 ? '' : 's'
         }`}
         description={allowed.length === BLOCK_TYPE_IDS.length ? 'Add and edit content in this section.' : `Available content: ${allowed.map(blockTypeLabel).join(', ')}.`}
+        feedback={notice?.message || (allowed.length > 0 && blockedReason) ? (
+          <>
+            {allowed.length > 0 && blockedReason ? <p id={blockedReasonId} className="text-admin-sm text-admin-ink-secondary">{blockedReason}</p> : null}
+            <ActionFeedback message={notice?.message} tone={notice?.tone} className="admin-editor-action-feedback" />
+          </>
+        ) : null}
         actions={
           <>
             <OrderDraftButtons
@@ -256,8 +262,6 @@ export default function AdminContentSection() {
               Back to content
             </Link>
             {addBlockButton}
-            {allowed.length > 0 && blockedReason ? <p id={blockedReasonId} className="basis-full text-admin-sm text-admin-ink-secondary">{blockedReason}</p> : null}
-            <ActionFeedback message={notice?.message} tone={notice?.tone} className="admin-editor-action-feedback" />
           </>
         }
       />

@@ -104,7 +104,7 @@ function SpreadsheetRow({ sheet, busy, result, onExport }) {
       <div className={rowClass}>
         <div className="min-w-0 flex-1">
           <h3 className="text-admin-base font-bold text-admin-ink">{sheet.label}</h3>
-          <p id={descriptionId} className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+          <p id={descriptionId} className="text-admin-sm text-admin-ink-secondary">
             {sheet.description}
           </p>
         </div>

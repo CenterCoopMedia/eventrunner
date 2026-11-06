@@ -38,6 +38,7 @@ import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
+  ActionLabel,
   DestructiveConfirm,
   Notice,
   Panel,
@@ -286,6 +287,7 @@ export default function AdminOrganizationEditor({ mode }) {
           state={!creating && row ? <RecordState state={row.state} /> : null}
           identifiers={null}
           description="Edit the details attendees see on the sponsors page."
+          feedback={status || error ? <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} /> : null}
           actions={
             <>
               {!creating ? (
@@ -305,7 +307,7 @@ export default function AdminOrganizationEditor({ mode }) {
                 disabled={saving}
                 aria-busy={action === 'draft' || undefined}
               >
-                {action === 'draft' ? 'Saving…' : 'Save'}
+                <ActionLabel busy={action === 'draft'} pending="Saving…">Save</ActionLabel>
               </button>
               <button
                 type="button"
@@ -314,9 +316,8 @@ export default function AdminOrganizationEditor({ mode }) {
                 aria-busy={action === 'publish' || undefined}
                 onClick={() => save({ publish: true })}
               >
-                {action === 'publish' ? 'Publishing…' : 'Publish'}
+                <ActionLabel busy={action === 'publish'} pending="Publishing…">Publish</ActionLabel>
               </button>
-              <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} />
           </>
           }
         />

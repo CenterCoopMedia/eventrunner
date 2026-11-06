@@ -154,7 +154,7 @@ function RestoreConfirm({ entry, removed, busy, disabled, error, onConfirm, onCa
       <h3 id={headingId} ref={headingRef} tabIndex={-1} className="font-admin-ui text-admin-base font-bold text-admin-ink">
         {`Restore version ${entry.revision}?`}
       </h3>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+      <p className="text-admin-sm text-admin-ink">
         {`Version ${entry.revision} becomes the draft of this record.`}
         {removed ? ' The record is saved again as a draft.' : ''}
         {' The site does not change until you publish.'}

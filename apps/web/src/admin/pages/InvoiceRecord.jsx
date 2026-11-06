@@ -132,7 +132,6 @@ function MarkPaidForm({ timeZone, busy, onSubmit, onCancel }) {
         onChange={(value) => set({ note: value })}
         error={errors.get('note')}
         maxLength={INVOICE_LIMITS.paymentNote}
-        className="sm:max-w-[28rem]"
       />
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={primaryButtonClass} disabled={busy} aria-busy={busy || undefined} onClick={submit}>
@@ -194,7 +193,7 @@ function ReasonForm({ title, explanation, label, hint, maxLength, validate, conf
         : 'flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-raised px-md py-sm'}
     >
       <h3 id={headingId} className={`text-admin-base font-bold ${alarm ? 'text-admin-state-error' : 'text-admin-ink'}`}>{title}</h3>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">{explanation}</p>
+      <p className="text-admin-sm text-admin-ink">{explanation}</p>
       <ServerErrorSummary error={serverError} title={errorTitle} />
       <TextField
         label={label}
@@ -203,7 +202,6 @@ function ReasonForm({ title, explanation, label, hint, maxLength, validate, conf
         onChange={setReason}
         error={error}
         maxLength={maxLength}
-        className="sm:max-w-[28rem]"
       />
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={alarm ? dangerButtonClass : primaryButtonClass} disabled={busy} aria-busy={busy || undefined} onClick={submit}>
@@ -294,7 +292,7 @@ export default function InvoiceRecord({
     <section aria-labelledby={headingId} className={panelClass}>
       <div className="mb-sm border-admin-rule-hairline border-b-admin-hairline pb-sm">
         <h2 id={headingId} className="font-admin-ui text-admin-lg font-bold text-admin-ink">Invoice record</h2>
-        <p className="mt-3xs max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+        <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
           Fixed when the invoice was issued. Later changes to the invoice settings do not change it.
         </p>
       </div>
@@ -340,7 +338,7 @@ export default function InvoiceRecord({
         <PayByCard invoice={invoice} cardPayments={cardPayments} timeZone={timeZone} busy={busy} onCreatePayLink={onCreatePayLink} />
         <EmailHistory sends={invoice.emailSends} />
         {status === 'void' ? (
-          <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+          <p className="text-admin-sm text-admin-ink-secondary">
             {invoice.number} stays used. It is never given to another invoice. To bill again, duplicate this invoice as a new draft.
           </p>
         ) : null}
