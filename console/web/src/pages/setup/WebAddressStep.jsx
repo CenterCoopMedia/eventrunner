@@ -58,7 +58,7 @@ export default function WebAddressStep({ value, errors, onChange, onBlur, appId 
         <span className="preview-value">{shown}.{SITE_DOMAIN}</span>
       </p>
       <p role="status" className="availability">
-        {current?.available ? `${current.address} is available. We keep it for you while you finish.` : ''}
+        {current?.available ? `${current.address} is available.` : ''}
       </p>
     </div>
   );

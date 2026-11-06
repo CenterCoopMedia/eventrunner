@@ -21,7 +21,7 @@ describe('Your team step', () => {
   it('reuses the team tools: the two-Owner note, the members and the invite form', async () => {
     renderSetup('team');
     expect(await screen.findByRole('heading', { level: 1, name: 'Your team' })).toBeInTheDocument();
-    expect(await screen.findByRole('note')).toHaveTextContent('You can add 1 more Owner at any time.');
+    expect(await screen.findByRole('note')).toHaveTextContent('Invite another owner so the team can still sign in if someone loses access to their email.');
     expect(within(screen.getByRole('list', { name: 'Members' })).getByText('ana@example.org (you)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send invite' })).toBeInTheDocument();
     expect(callsTo('getTeam')[0]).toEqual({ orgId: 'o1' });
@@ -45,6 +45,6 @@ describe('Your team step', () => {
     expect(callsTo('inviteMember')[0]).toEqual({ orgId: 'o1', email: 'dee@example.org', role: 'owner' });
     expect(callsTo('saveApplicationStep')).toHaveLength(0);
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Setup steps' })).getByRole('link', { name: /Review/ }));
-    expect(await screen.findByText('The team has two Owners.')).toBeInTheDocument();
+    expect(await screen.findByText('Your team has at least two owners.')).toBeInTheDocument();
   });
 });

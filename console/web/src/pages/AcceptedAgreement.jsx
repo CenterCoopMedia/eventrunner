@@ -22,7 +22,7 @@ export default function AcceptedAgreement() {
       {!data && !error ? <LoadingState>Loading the agreement.</LoadingState> : null}
       {data?.accepted ? <p className="muted">{data.accepted.name}{data.accepted.title ? `, ${data.accepted.title},` : ''} accepted this version for {data.accepted.legalName || 'your organization'}.</p> : null}
       {data?.accepted && data.agreement ? <AgreementText agreement={data.agreement} /> : null}
-      {data && !data.accepted ? <p>Nobody has accepted the agreement on this request yet.</p> : null}
+      {data && !data.accepted ? <p>Open your request to read and accept the agreement.</p> : null}
       <p><Link to={statusPath(orgId, appId)}>Back to your request</Link></p>
     </section>
   );

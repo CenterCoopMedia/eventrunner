@@ -25,7 +25,8 @@ export default function ConnectReturn() {
     const state = search.get('state');
     const code = search.get('code');
     const denied = search.has('error');
-    const name = PROVIDER_COPY[provider]?.name || 'your';
+    const name = PROVIDER_COPY[provider]?.name;
+    const account = name ? `${name} account` : 'account';
     let target = takeConnectReturn();
     setSearch({}, { replace: true });
 
@@ -35,8 +36,8 @@ export default function ConnectReturn() {
         const body = await callApi('completeConnection', { provider, state, ...(denied ? { denied: true } : { code }) });
         target = target || setupPath(body.orgId, body.appId, stepById('tickets'));
         message = body.connected
-          ? { kind: 'success', text: `Your ${name} account is connected.` }
-          : { kind: 'info', text: `You did not connect your ${name} account. You can try again when you are ready.` };
+          ? { kind: 'success', text: `Your ${account} is connected.` }
+          : { kind: 'info', text: `Your ${account} is not connected. Try again.` };
       } catch (err) {
         message = { kind: 'error', text: err.message };
       }

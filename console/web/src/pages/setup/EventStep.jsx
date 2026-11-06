@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { GroupError, SelectField, TextField, fieldId } from '../../setup/Field.jsx';
 import { MAX_DAYS } from '../../setup/steps.js';
+import IconControl from '../../IconControl.jsx';
 
 const NEW_DAY = Object.freeze({ date: '', startTime: '09:00', endTime: '17:00' });
 
@@ -22,7 +23,9 @@ function timeZones(current) {
   }
   const all = new Set(zones);
   for (const extra of [current, browserTimeZone(), 'UTC']) if (extra) all.add(extra);
-  return [...all].sort();
+  return [...all]
+    .map((zone) => ({ value: zone, label: zone.replaceAll('_', ' ').split('/').reverse().join(', ') }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function DayRow({ day, index, errors, onDay, onRemove, onBlur, canRemove }) {
@@ -42,9 +45,7 @@ function DayRow({ day, index, errors, onDay, onRemove, onBlur, canRemove }) {
         <TextField path={`${base}.label`} label="Name of the day (optional)" hint="For example, Workshops"
           value={day.label || ''} onChange={set('label')} onBlur={blur('label')} error={errors[`${base}.label`]} />
         {canRemove ? (
-          <button type="button" className="button" onClick={() => onRemove(index)}>
-            Remove day {index + 1}
-          </button>
+          <IconControl icon="remove" label={`Remove day ${index + 1}`} onClick={() => onRemove(index)} />
         ) : null}
       </fieldset>
     </li>
@@ -88,14 +89,14 @@ export default function EventStep({ value, errors, onChange, onBlur }) {
 
   return (
     <div className="stack">
-      <p className="lead">The name and dates your site shows. You can change the details later in your admin panel.</p>
+      <p className="lead">Add the event details your attendees will see.</p>
       <TextField path="event.name" label="Event name" hint="For example, 2027 Local News Summit"
         value={value.name} onChange={set('name')} onBlur={() => onBlur('event.name')} error={errors['event.name']} />
       <TextField path="event.shortName" label="Short name" hint="Used in email subjects. For example, News Summit"
         value={value.shortName} onChange={set('shortName')} onBlur={() => onBlur('event.shortName')} error={errors['event.shortName']} />
       <TextField path="event.tagline" label="One-line description (optional)"
         value={value.tagline} onChange={set('tagline')} onBlur={() => onBlur('event.tagline')} error={errors['event.tagline']} />
-      <SelectField path="event.timezone" label="Time zone" hint="We set this from your browser. Change it if the event is in another time zone."
+      <SelectField path="event.timezone" label="Time zone" hint="Use the time zone where the event takes place."
         value={value.timezone} options={zones} onChange={set('timezone')} onBlur={() => onBlur('event.timezone')} error={errors['event.timezone']} />
 
       <section aria-labelledby="days-title" className="stack">

@@ -52,6 +52,7 @@ export default function StartEvent() {
 
   async function onSubmit(event) {
     event.preventDefault();
+    if (busy) return;
     const clean = cleanOrganizationName(name);
     if (!clean) {
       setFieldError(ORGANIZATION_NAME_ERROR);
@@ -104,7 +105,7 @@ export default function StartEvent() {
 
   return (
     <Panel>
-      <p className="lead">This link works once. You are signed in as {auth.user?.email}, and you become the first Owner of your organization.</p>
+      <p className="lead">Set up an event site for your organization.</p>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       <form noValidate onSubmit={onSubmit} className="stack">
         <div className="field">
@@ -117,13 +118,14 @@ export default function StartEvent() {
             autoComplete="organization"
             maxLength={120}
             value={name}
+            disabled={busy}
             onChange={(e) => setName(e.target.value)}
             aria-invalid={fieldError ? 'true' : undefined}
             aria-describedby={['start-org-name-hint', fieldError ? 'start-org-name-error' : null].filter(Boolean).join(' ')}
           />
           {fieldError ? <p id="start-org-name-error" className="field-error">{fieldError}</p> : null}
         </div>
-        <div><button type="submit" className="button primary" disabled={busy}>Start the setup</button></div>
+        <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Starting…' : 'Start'}</button></div>
       </form>
     </Panel>
   );
