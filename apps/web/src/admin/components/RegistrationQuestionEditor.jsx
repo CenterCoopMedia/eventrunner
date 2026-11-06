@@ -1,6 +1,7 @@
 // One custom registration question in the operator's editor (ADR 0008 §4).
 // Choices are added one at a time; the shared check refuses a repeat or a
 // list shorter than two.
+import AdminIconControl from './AdminIconControl.jsx';
 import { CUSTOM_KINDS, LIMITS, MAX_CHOICES } from 'shared/registrationForm';
 import { AddOneListField, CheckboxField, SelectField, TextField, ghostButtonClass } from './formControls.jsx';
 
@@ -34,7 +35,7 @@ export default function RegistrationQuestionEditor({ question, index, count, err
         <div className="flex flex-wrap gap-2xs" role="group" aria-label={`Arrange ${name}`}>
           <button type="button" className={ghostButtonClass} onClick={() => onMove(-1)} disabled={index === 0} aria-label={`Move ${name} up`}>Move up</button>
           <button type="button" className={ghostButtonClass} onClick={() => onMove(1)} disabled={index === count - 1} aria-label={`Move ${name} down`}>Move down</button>
-          <button type="button" className={ghostButtonClass} onClick={onRemove} aria-label={`Remove ${name}`}>Remove</button>
+          <AdminIconControl className={ghostButtonClass} onClick={onRemove} label={`Remove ${name}`} icon="remove" />
         </div>
       </div>
       <div className="grid gap-sm sm:grid-cols-2">

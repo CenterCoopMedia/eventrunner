@@ -3,10 +3,11 @@
 // only its author can edit it. The list comes from the live pitch row, so a
 // note another reviewer adds appears without a reload. A note does not
 // change the pitch revision, so it never blocks a decision.
+import AdminIconControl from './AdminIconControl.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import {
-  SaveStatus, ServerErrorSummary, TextAreaField, linkButtonClass, secondaryButtonClass,
+  SaveStatus, ServerErrorSummary, TextAreaField, ghostButtonClass, linkButtonClass, secondaryButtonClass,
 } from './formControls.jsx';
 
 const MAX_LENGTH = 5000;
@@ -51,7 +52,7 @@ function NoteEntry({ note, mine, busy, onSave, feedback }) {
       </p>
       <p className="whitespace-pre-line">{note.text}</p>
       {mine ? (
-        <div><button type="button" className={linkButtonClass} disabled={busy} onClick={() => { setBase(note.text); setDraft(note.text); }}>Edit</button></div>
+        <div><AdminIconControl className={ghostButtonClass} disabled={busy} onClick={() => { setBase(note.text); setDraft(note.text); }} label="Edit" icon="edit" /></div>
       ) : null}
       {feedback}
     </li>

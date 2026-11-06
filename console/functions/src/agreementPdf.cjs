@@ -17,7 +17,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const fontkit = require('@pdf-lib/fontkit');
-const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const { PDFDocument, StandardFonts, LineCapStyle, rgb } = require('pdf-lib');
 
 const PAGE = [612, 792]; // US Letter, in points
 const MARGIN_X = 64;
@@ -36,9 +36,13 @@ const COLORS = Object.freeze({
 });
 const color = (name) => rgb(...COLORS[name].map((v) => v / 255));
 
-// The four-stroke Event Runner mark on its tile (console/web/public/favicon.svg), in a 24-unit box.
+// Badger's face on the accent tile, in the favicon's 24-unit box.
+// Face paths match design/brand/badger-face.svg; draw them at 75% inside the tile.
 const TILE_PATH = 'M4 0H20A4 4 0 0 1 24 4V20A4 4 0 0 1 20 24H4A4 4 0 0 1 0 20V4A4 4 0 0 1 4 0Z';
-const MARK_PATH = 'M5.35 5H7.45V19H5.35Z M7.45 5H18.65V7.1H7.45Z M7.45 11.3H14.1V12.7H7.45Z M7.45 17.25H16.55V19H7.45Z';
+const BADGE_PATH = 'M7 4.5H17A4 4 0 0 1 21 8.5V18.5A4 4 0 0 1 17 22.5H7A4 4 0 0 1 3 18.5V8.5A4 4 0 0 1 7 4.5Z';
+const BAND_PATH = 'M4 8.5A3 3 0 0 1 7 5.5H17A3 3 0 0 1 20 8.5V10H4Z';
+const MARK_PATH = 'M10.2 1H13.8A1.2 1.2 0 0 1 15 2.2V5.3A1.2 1.2 0 0 1 13.8 6.5H10.2A1.2 1.2 0 0 1 9 5.3V2.2A1.2 1.2 0 0 1 10.2 1Z M10.15 13.75A1.65 1.65 0 1 1 6.85 13.75A1.65 1.65 0 1 1 10.15 13.75Z M17.15 13.75A1.65 1.65 0 1 1 13.85 13.75A1.65 1.65 0 1 1 17.15 13.75Z';
+const SMILE_PATH = 'M8.5 18.25Q12 21.25 15.5 18.25';
 
 const BODY_SIZE = 10.5;
 const BODY_LEADING = 15.5;
@@ -245,7 +249,11 @@ function truncate(font, size, text, width) {
 function drawMark(page, x, top, size) {
   const scale = size / 24;
   page.drawSvgPath(TILE_PATH, { x, y: top, scale, color: color('accent') });
-  page.drawSvgPath(MARK_PATH, { x, y: top, scale, color: color('onAccent') });
+  const face = { x: x + size / 8, y: top - size / 8, scale: scale * 0.75 };
+  page.drawSvgPath(BADGE_PATH, { ...face, color: color('accent'), borderColor: color('onAccent'), borderWidth: 2 });
+  page.drawSvgPath(BAND_PATH, { ...face, color: color('onAccent'), opacity: 0.45 });
+  page.drawSvgPath(MARK_PATH, { ...face, color: color('onAccent') });
+  page.drawSvgPath(SMILE_PATH, { ...face, borderColor: color('onAccent'), borderWidth: 2, borderLineCap: LineCapStyle.Round });
 }
 
 /**

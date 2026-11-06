@@ -265,8 +265,8 @@ a {
   text-decoration: none;
 }
 
-/* The mark: a stem and the system's three rule weights, at mark size. It
-   takes the masthead's ink, and it sits beside the name, never behind it. */
+/* Running Badger takes the masthead's ink and accent tokens.
+   Its rendered box stays the same size beside the name. */
 .brand-mark {
   flex: none;
   width: calc(var(--text-h3) * 1.3);

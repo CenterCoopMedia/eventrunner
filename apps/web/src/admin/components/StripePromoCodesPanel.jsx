@@ -1,6 +1,7 @@
 // Promo codes for Stripe ticket sales (ADR 0004 amendment 2026-11-04,
 // ADR 0008 §6). Staff and operators list, add, change and delete codes. A
 // used code cannot be deleted: its orders name it, so it is made inactive.
+import AdminIconControl from './AdminIconControl.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatTicketMoney, formatTicketTime } from '../../lib/ticketingCommerce.js';
 import { AdminLoadingState, StatusBadge } from './adminChrome.jsx';
@@ -95,10 +96,10 @@ export default function StripePromoCodesPanel({ call, catalog, timezone }) {
                   {windowText(code, timezone) ? <p className="text-admin-xs text-admin-ink-secondary">{windowText(code, timezone)}</p> : null}
                 </div>
                 <div className="flex flex-wrap gap-xs">
-                  <button type="button" className={secondaryButtonClass} aria-label={`Edit ${code.code}`} onClick={() => { setNotice(null); setEditing({ creating: false, promo: editable(code) }); }}>Edit</button>
+                  <AdminIconControl className={secondaryButtonClass} label={`Edit ${code.code}`} icon="edit" onClick={() => { setNotice(null); setEditing({ creating: false, promo: editable(code) }); }} />
                   {code.used === 0 ? (
                     <DestructiveConfirm
-                      trigger={<span aria-label={`Delete ${code.code}`}>Delete</span>}
+                      trigger={`Delete ${code.code}`} triggerIcon="delete"
                       title={`Delete ${code.code}?`} confirmLabel="Delete code" busy={busy} busyLabel="Deleting…"
                       consequence="Attendees can no longer use this code." permanence="This cannot be undone."
                       onConfirm={() => run({ action: 'deletePromoCode', code: code.code })}
