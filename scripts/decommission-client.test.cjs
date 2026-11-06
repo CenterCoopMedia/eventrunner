@@ -326,6 +326,18 @@ test('a partial purge resumes from verified checkpoints after a database failure
   assert.ok(mutations(s).length > firstDeletes);
 });
 
+test('a refused Postmark server deletion is reported and the rest of the purge continues', async () => {
+  const s = archived();
+  s.failures.set('DELETE api.postmarkapp.com/servers/10', 422);
+  const code = await s.run('purge');
+  const log = s.logs.join('\n');
+  assert.match(log, /mail: Postmark refused to delete server 10 \(Postmark: HTTP 422\); delete it in Postmark/);
+  assert.equal(s.state.project.state, 'DELETE_REQUESTED');
+  assert.ok(s.state.server, 'the server is left for the operator');
+  assert.equal(code, 1, 'the leftover server keeps the run from passing');
+  assert.match(s.logs.at(-1), /resources remain or cannot be checked: mail:servers$/);
+});
+
 test('draft without a project deletes console data and tokens without client or provider calls', async () => {
   const s = setup({ noBuild: true, app: { status: 'draft' } });
   assert.equal(await s.run('purge', true), 0, s.logs.join('\n'));
