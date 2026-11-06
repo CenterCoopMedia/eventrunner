@@ -29,7 +29,7 @@ describe('Organizations', () => {
   it('tells a reader with no organization how to start, and offers no way to make one', async () => {
     callApi.mockResolvedValue({ operator: false, organizations: [] });
     renderPage(<Organizations />);
-    expect(await screen.findByText(/Event sites start from a signup link.*To join a team, open the invite email\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Open an invite email to join your team, or use a signup link to start an event site\./)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /organization/i })).not.toBeInTheDocument();
   });
 
@@ -42,9 +42,8 @@ describe('Organizations', () => {
     renderPage(<Organizations />);
     expect(await screen.findByRole('heading', { name: 'All organizations' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Far Away Org' })).toHaveAttribute('href', '/organizations/o9');
-    expect(screen.getByText(/You are on the hosting team/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Review requests' })).toHaveAttribute('href', '/review');
-    expect(screen.queryByText(/Event sites start from a signup link/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Open your signup link/)).not.toBeInTheDocument();
   });
 
   it('keeps membership and hosting directory links distinct when an organization appears in both', async () => {

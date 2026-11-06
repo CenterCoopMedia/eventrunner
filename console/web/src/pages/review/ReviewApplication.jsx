@@ -9,13 +9,14 @@ import ReviewActions from './ReviewActions.jsx';
 import ReviewAnswers from './ReviewAnswers.jsx';
 import ReviewHistory from './ReviewHistory.jsx';
 import LoadingState from '../../LoadingState.jsx';
+import IconControl from '../../IconControl.jsx';
 
 /** What the page says after a decision, with the email result. */
 function decidedMessage(name, result) {
   const done = name === 'closeApplication'
-    ? 'You closed the request. If no build ever began, its web address is free again.'
+    ? 'You closed the request. Its web address is free again if site setup never began.'
     : 'You declined the request. Its web address is free again.';
-  return result.mailFailed ? `${done} We could not email every Owner. Contact them another way.` : `${done} We emailed the Owners.`;
+  return result.mailFailed ? `${done} Some owners did not receive the email. Contact them another way.` : `${done} The owners received an email.`;
 }
 
 function Team({ team }) {
@@ -25,7 +26,7 @@ function Team({ team }) {
         {team.members.map((member) => (
           <li key={member.uid} className="card">
             <span className="card-title break">{member.email}</span>
-            <span className="tag">{ROLE_LABELS[member.role] || member.role}</span>
+            <span className="tag">{ROLE_LABELS[member.role] || 'Team member'}</span>
           </li>
         ))}
       </ul>
@@ -36,7 +37,7 @@ function Team({ team }) {
             {team.invites.map((invite) => (
               <li key={invite.id} className="card">
                 <span className="card-title break">{invite.email}</span>
-                <span className="tag">{ROLE_LABELS[invite.role] || invite.role}</span>
+                <span className="tag">{ROLE_LABELS[invite.role] || 'Team member'}</span>
                 <span className="muted">Link expires {formatDate(invite.expiresAt)}</span>
               </li>
             ))}
@@ -48,51 +49,64 @@ function Team({ team }) {
 }
 
 const BUILD_STATE_LABELS = Object.freeze({
-  queued: 'Waiting to run',
-  running: 'Running',
+  queued: 'Waiting',
+  running: 'In progress',
   done: 'Finished',
-  failed: 'Failed',
+  failed: 'Needs attention',
 });
 
-/** The build record, in full. Only the hosting team sees it. */
+const SETUP_STEP_LABELS = Object.freeze({
+  project: 'Hosting',
+  firebase: 'Site services',
+  'deploy-identity': 'Site access',
+  'web-address': 'Web address',
+  'sign-in': 'Sign-in',
+  email: 'Email',
+  tickets: 'Tickets',
+  environment: 'Site settings',
+  'first-deploy': 'Initial site',
+  'mail-webhooks': 'Email delivery',
+  seed: 'Content and team',
+  'full-deploy': 'Complete site',
+  ready: 'Team notification',
+});
+
+/** Site setup progress without internal build data. */
 function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onRefresh, refreshing }) {
   if (!build && !canRetry && !result) return null;
   return (
     <>
-      <h2 id="build-title">Build</h2>
+      <h2 id="build-title">Site setup</h2>
       {build ? (
         <>
           <p>
-            <span className="tag">{BUILD_STATE_LABELS[build.state] || build.state}</span>
-            {build.testMode ? <span className="tag">Test mode</span> : null}
+            <span className="tag">{BUILD_STATE_LABELS[build.state] || 'In progress'}</span>
           </p>
           {build.error ? (
             <aside className="note" role="note">
-              <p className="note-title">The build failed</p>
-              <p className="break">{build.error}</p>
-              <p>Fix the cause, then retry. The steps that finished are not done twice.</p>
+              <p className="note-title">Site setup stopped</p>
+              <p>Review the setup details, correct the problem, then retry.</p>
             </aside>
           ) : null}
           <ol className="stack" aria-labelledby="build-title">
             {build.steps.map((step) => (
               <li key={step.id}>
-                <strong>{step.label}</strong>: {BUILD_STATE_LABELS[step.state] || step.state}
+                <strong>{SETUP_STEP_LABELS[step.id] || 'Site setup'}</strong>: {BUILD_STATE_LABELS[step.state] || 'In progress'}
                 {step.at ? `, ${formatDateTime(step.at)}` : ''}
-                {step.detail ? <span className="muted break"> {step.detail}</span> : null}
               </li>
             ))}
           </ol>
-          {build.runUrl ? <p><a href={build.runUrl}>Open the run</a></p> : null}
+          {build.runUrl ? <p><a href={build.runUrl}>View setup details</a></p> : null}
         </>
       ) : null}
       {canRetry ? (
         <p>
           <button type="button" className="button primary" disabled={retrying || disabled} onClick={onRetry}>
-            {retrying ? 'Starting the build' : 'Retry the build'}
+            {retrying ? 'Retrying…' : 'Retry'}
           </button>
         </p>
       ) : null}
-      <ActionResult result={result} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh build record" />
+      <ActionResult result={result} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh site setup" />
     </>
   );
 }
@@ -107,8 +121,6 @@ function Acceptance({ acceptance }) {
         <div className="answer"><dt>Accepted by</dt><dd>{acceptance.name}{acceptance.title ? `, ${acceptance.title}` : ''} ({acceptance.email}), {formatDateTime(acceptance.at)}</dd></div>
         {acceptance.legalName ? <div className="answer"><dt>Legal name</dt><dd>{acceptance.legalName}</dd></div> : null}
         <div className="answer"><dt>Agreement version</dt><dd>{acceptance.version}</dd></div>
-        <div className="answer"><dt>SHA-256 of the text</dt><dd className="break">{acceptance.sha256}</dd></div>
-        <div className="answer"><dt>Acceptance record</dt><dd className="break">{acceptance.id}</dd></div>
       </dl>
     </>
   );
@@ -152,7 +164,7 @@ export default function ReviewApplication() {
       const revision = name === 'deleteSpamApplication' ? {} : { revision: data?.application.revision };
       const result = await callApi(name, { appId, ...revision, ...body });
       if (name === 'deleteSpamApplication') {
-        navigate('/review', { state: { notice: 'The request is deleted. If no build ever began, its web address is free again.' } });
+        navigate('/review', { state: { notice: 'The request is deleted. Its web address is free again if site setup never began.' } });
         return true;
       }
       const problem = await load();
@@ -179,8 +191,8 @@ export default function ReviewApplication() {
       const problem = await load();
       setStale(Boolean(problem));
       setRetryResult({ kind: started ? 'success' : 'error',
-        message: started ? 'The build started again.' : 'The build did not start. Read the function logs and fix the cause, then retry.',
-        refreshError: problem ? `We could not refresh the build record. ${problem}` : '' });
+        message: started ? 'Site setup started again.' : 'Site setup did not start. Review the setup details, then retry.',
+        refreshError: problem ? `Site setup could not be refreshed. ${problem}` : '' });
     } catch (err) {
       setRetryResult({ kind: 'error', message: err.message });
     } finally {
@@ -189,35 +201,39 @@ export default function ReviewApplication() {
     }
   }, [appId, load, stale]);
 
-  async function refresh(kind) {
+  async function refresh() {
     setRefreshing(true);
     const problem = await load();
     setStale(Boolean(problem));
-    const update = kind === 'retry' ? setRetryResult : setDecisionResult;
-    update((current) => current ? { ...current, refreshError: problem ? `We could not refresh the request. ${problem}` : '' } : current);
+    const update = (current) => current ? { ...current, refreshError: problem ? `We could not refresh the request. ${problem}` : '' } : current;
+    setRetryResult(update);
+    setDecisionResult(update);
     setRefreshing(false);
   }
 
   if (isNotOperator(loadError)) return <HostingOnly />;
   if (!data) {
-    return loadError ? <p className="message error" role="alert">{loadError.message}</p> : <LoadingState>Loading the request.</LoadingState>;
+    return loadError ? <div className="stack"><p className="message error" role="alert">{loadError.message}</p><IconControl icon="refresh" label="Refresh request" disabled={refreshing} onClick={refresh} /></div> : <LoadingState>Loading the request.</LoadingState>;
   }
 
   const { application: app, organization, team, connection } = data;
   return (
     <section aria-labelledby="review-title">
       <p className="folio">{organization.name}</p>
-      <h1 id="review-title" tabIndex={-1}>{app.answers?.event?.name || 'Request'}</h1>
-      <p><span className="tag">{STATUS_LABELS[app.status] || app.status}</span></p>
+      <div className="directory-heading">
+        <h1 id="review-title" tabIndex={-1}>{app.answers?.event?.name || 'Request'}</h1>
+        <IconControl icon="refresh" label="Refresh request" disabled={Boolean(working) || refreshing} onClick={refresh} />
+      </div>
+      <p><span className="tag">{STATUS_LABELS[app.status] || 'In progress'}</span></p>
 
       {app.buildStart?.state === 'failed' && data.build?.state !== 'failed' ? (
         <aside className="note" role="note">
-          <p className="note-title">The build did not start</p>
-          <p>The request stays approved. Read the function logs and fix the cause, then retry the build.</p>
+          <p className="note-title">Site setup did not start</p>
+          <p>The request stays approved. Retry setup or contact the hosting team for help.</p>
         </aside>
       ) : null}
       <BuildRecord build={data.build} canRetry={data.canRetryBuild} retrying={working === 'retry'} onRetry={retry}
-        disabled={Boolean(working) || stale || refreshing} result={retryResult} onRefresh={() => refresh('retry')} refreshing={refreshing} />
+        disabled={Boolean(working) || stale || refreshing} result={retryResult} onRefresh={refresh} refreshing={refreshing} />
 
       <h2 id="decision-title">Decision</h2>
       {app.review?.note ? (
@@ -228,10 +244,10 @@ export default function ReviewApplication() {
       ) : null}
       <ReviewActions key={app.status} status={app.status} canClose={data.canRetryBuild} onDecide={decide}
         busy={working === 'decision'} disabled={stale || working === 'retry' || refreshing}
-        result={decisionResult} onRefresh={() => refresh('decision')} refreshing={refreshing} />
+        result={decisionResult} onRefresh={refresh} refreshing={refreshing} />
 
       <h2 id="answers-title">Answers</h2>
-      {app.acceptance ? <p className="muted">These are the answers the client accepted. The client cannot change them now.</p> : null}
+      {app.acceptance ? <p className="muted">Details confirmed by the client.</p> : null}
       <ReviewAnswers answers={app.answers} />
 
       <Acceptance acceptance={app.acceptance} />

@@ -64,10 +64,32 @@ describe('callApi', () => {
     vi.stubGlobal('fetch', async () => { throw new TypeError('Failed to fetch'); });
     await expect(callApi('getTeam', {})).rejects.toThrow('We could not reach the server. Check your connection and try again.');
     vi.stubGlobal('fetch', async () => ({ ok: false, status: 500, json: async () => { throw new SyntaxError('bad'); } }));
-    await expect(callApi('getTeam', {})).rejects.toThrow('Something went wrong. Try again.');
+    await expect(callApi('getTeam', {})).rejects.toThrow('We could not complete this action. Try again.');
   });
 
   it('refuses to call when nobody is signed in', async () => {
     await expect(callApi('getTeam', {})).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('keeps sign-in diagnostics out of page errors and never sends an unconfirmed request', async () => {
+    auth.currentUser = { getIdToken: vi.fn().mockRejectedValue(new Error('Firebase: auth/user-token-expired')) };
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await expect(callApi('getTeam')).rejects.toMatchObject({
+      status: 401, message: 'We could not confirm your sign-in. Sign out, then sign in again.',
+    });
+    auth.currentUser.getIdToken.mockRejectedValue({ code: 'auth/network-request-failed' });
+    await expect(callApi('getTeam')).rejects.toMatchObject({
+      status: 0, message: 'We could not reach the server. Check your connection and try again.',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps server diagnostics out of page errors', async () => {
+    auth.currentUser = { getIdToken: async () => 't' };
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 500,
+      json: async () => ({ error: { code: 'internal', message: 'getTeam failed at organizations/o1' } }),
+    }));
+    await expect(callApi('getTeam')).rejects.toThrow('We could not complete this action. Try again.');
   });
 });

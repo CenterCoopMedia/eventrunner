@@ -102,12 +102,12 @@ function ConfirmEmail({ user }) {
   return (
     <section className="panel narrow" aria-labelledby="confirm-title">
       <h1 id="confirm-title" tabIndex={-1}>Confirm your email address</h1>
-      <p>We could not confirm your email address, {user.email}. Get a sign-in link by email to confirm it. You can then set up your organization.</p>
+      <p>Send a sign-in link to {user.email}, then open it to continue.</p>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       {sent ? (
         <p className="message success" role="status">We sent a sign-in link to {user.email}. Open it on this device.</p>
       ) : (
-        <button type="button" className="button primary" disabled={sending} onClick={send}>{sending ? 'Sending link…' : 'Email me a link'}</button>
+        <button type="button" className="button primary" disabled={sending} onClick={send}>{sending ? 'Sending…' : 'Send link'}</button>
       )}
     </section>
   );

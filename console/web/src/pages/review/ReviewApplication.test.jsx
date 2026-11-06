@@ -139,7 +139,7 @@ describe('ReviewApplication', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Decline' }));
     fireEvent.change(screen.getByLabelText('Note to the client'), { target: { value: 'Not an event.' } });
     fireEvent.click(within(screen.getByRole('form', { name: 'Decline this request' })).getByRole('button', { name: 'Decline' }));
-    expect(await screen.findByText(/We could not email every Owner/)).toBeInTheDocument();
+    expect(await screen.findByText(/Some owners did not receive the email/)).toBeInTheDocument();
   });
 
   it('shows a refusal when another operator acted first', async () => {
@@ -163,14 +163,14 @@ describe('ReviewApplication', () => {
     expect(callApi).not.toHaveBeenCalledWith('deleteSpamApplication', expect.anything());
     expect(screen.getByRole('button', { name: 'Delete as spam' })).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: 'Delete as spam' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(await screen.findByText('The queue')).toBeInTheDocument();
     expect(callApi).toHaveBeenCalledWith('deleteSpamApplication', { appId: 'a1', confirm: true });
   });
 
   it('offers no decision on an approved request with a run going', async () => {
     page();
-    expect(await screen.findByText(/cancel its run first/)).toBeInTheDocument();
+    expect(await screen.findByText(/Stop site setup before/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete as spam' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
   });
@@ -178,7 +178,7 @@ describe('ReviewApplication', () => {
   it('says when the client has not accepted the agreement yet', async () => {
     serve(DRAFT());
     page();
-    expect(await screen.findByText(/has not accepted the agreement yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/Event details will appear/)).toBeInTheDocument();
     expect(screen.queryByText(/answers the client accepted/)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Request' })).toBeInTheDocument();
   });
@@ -197,14 +197,15 @@ describe('ReviewApplication', () => {
       page();
       expect(await screen.findByRole('heading', { level: 2, name: 'Agreement' })).toBeInTheDocument();
       expect(screen.getByText(/Ana Owner \(ana@example.org\)/)).toBeInTheDocument();
-      expect(screen.getByText('abc123')).toBeInTheDocument();
+      expect(screen.queryByText('abc123')).not.toBeInTheDocument();
+      expect(screen.queryByText('r1')).not.toBeInTheDocument();
     });
 
     it('says when the build did not start', async () => {
       serve(request({ buildStart: { state: 'failed', at: '2026-11-04T15:00:00.000Z' } }));
       page();
       const note = await screen.findByRole('note');
-      expect(note).toHaveTextContent('The build did not start');
+      expect(note).toHaveTextContent('Site setup did not start');
       expect(note).toHaveTextContent('The request stays approved');
     });
 
@@ -218,13 +219,13 @@ describe('ReviewApplication', () => {
         return { ...request({ buildStart: { state: 'failed', at: '2026-11-04T15:00:00.000Z' } }), canRetryBuild: calls === 0, build: null };
       });
       page();
-      fireEvent.click(await screen.findByRole('button', { name: 'Retry the build' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
       expect(callApi).toHaveBeenCalledWith('retryBuild', { appId: 'a1' });
-      expect(await screen.findByText('The build started again.')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+      expect(await screen.findByText('Site setup started again.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
 
-    it('shows the failed run in full and names the step', async () => {
+    it('shows setup progress without technical details', async () => {
       serve({
         ...request({ status: 'building' }),
         canRetryBuild: true,
@@ -241,12 +242,13 @@ describe('ReviewApplication', () => {
       });
       page();
       const note = await screen.findByRole('note');
-      expect(note).toHaveTextContent('The build failed');
-      expect(note).toHaveTextContent('the certificate is not active');
+      expect(note).toHaveTextContent('Site setup stopped');
+      expect(note).not.toHaveTextContent('the certificate is not active');
+      expect(screen.queryByText('already right')).not.toBeInTheDocument();
       expect(note).not.toHaveTextContent('did not start');
-      expect(screen.getByText('Project and billing')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Open the run' })).toHaveAttribute('href', 'https://github.example/run/1');
-      expect(screen.getByRole('button', { name: 'Retry the build' })).toBeInTheDocument();
+      expect(screen.getByText('Hosting')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'View setup details' })).toHaveAttribute('href', 'https://github.example/run/1');
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     });
 
     it('has no retry while a build runs', async () => {
@@ -256,8 +258,8 @@ describe('ReviewApplication', () => {
         build: { state: 'running', runUrl: null, testMode: false, error: null, steps: [] },
       });
       page();
-      expect(await screen.findByRole('heading', { level: 2, name: 'Build' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 2, name: 'Site setup' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
   });
 
@@ -268,18 +270,18 @@ describe('ReviewApplication', () => {
         return { emailed: 1, mailFailed: false };
       });
       page();
-      fireEvent.click(await screen.findByRole('button', { name: 'Close this request' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Close request' }));
       expect(screen.getByText(/stays until you remove it/)).toBeInTheDocument();
       fireEvent.change(screen.getByLabelText('Note to the client'), { target: { value: 'Wrong person.' } });
-      fireEvent.click(within(screen.getByRole('form', { name: 'Close this request' })).getByRole('button', { name: 'Close the request' }));
+      fireEvent.click(within(screen.getByRole('form', { name: 'Close this request' })).getByRole('button', { name: 'Close request' }));
       await vi.waitFor(() => expect(callApi).toHaveBeenCalledWith('closeApplication', { appId: 'a1', revision: 2, note: 'Wrong person.' }));
     });
 
     it('says to cancel the run while one may be alive', async () => {
       callApi.mockImplementation(async () => ({ ...request({ status: 'building' }), canRetryBuild: false }));
       page();
-      expect(await screen.findByText(/cancel its run first/)).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Close this request' })).not.toBeInTheDocument();
+      expect(await screen.findByText(/Stop site setup before/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Close request' })).not.toBeInTheDocument();
     });
   });
 });

@@ -17,16 +17,16 @@ describe('Review step', () => {
     expect(screen.getByText('nclocal.eventrunner.org')).toBeInTheDocument();
     expect(screen.getByText('Thursday, 13 May 2027, 9:00 a.m. to 5:00 p.m.')).toBeInTheDocument();
     expect(screen.getByText('Sell with Stripe')).toBeInTheDocument();
-    expect(screen.getByText('Connected: NC Local')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Tickets' })).getByText('NC Local')).toBeInTheDocument();
     expect(screen.getByText('NC Local <hello@nclocal.eventrunner.org>')).toBeInTheDocument();
-    expect(screen.getByText('The team has two Owners.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Change your event' })).toHaveAttribute('href', '/organizations/o1/applications/a1/event');
+    expect(screen.getByText('Your team has at least two owners.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Edit your event' })).toHaveAttribute('href', '/organizations/o1/applications/a1/event');
   });
 
   it('moves on with Next, and says what comes next', async () => {
     renderSetup('review');
     expect(await screen.findByRole('button', { name: 'Next' })).toBeInTheDocument();
-    expect(screen.getByText(/Next you read and accept the agreement, and we start building your site/)).toBeInTheDocument();
+    expect(screen.getByText(/Check your event details, then continue to the hosting agreement/)).toBeInTheDocument();
   });
 
   it('shows the open problems, and a missing second Owner is not one of them', async () => {
@@ -39,7 +39,7 @@ describe('Review step', () => {
     expect(problems.getByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/organizations/o1/applications/a1/tickets?check=1');
     expect(problems.getByText(/Choose how you sell tickets\./)).toBeInTheDocument();
     expect(screen.queryByText(/Add a second Owner/)).not.toBeInTheDocument();
-    expect(screen.getByText(/You can finish the setup now\. We recommend a second Owner/)).toBeInTheDocument();
+    expect(screen.getByText(/A second owner can help manage your team/)).toBeInTheDocument();
     expect(screen.getByText('Finish the answers above first. Then you can continue.')).toBeInTheDocument();
   });
 });

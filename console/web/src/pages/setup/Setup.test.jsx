@@ -73,6 +73,15 @@ describe('Setup', () => {
     expect(callsTo('saveApplicationStep')[0].answers.website).toBe('nclocal.org');
   });
 
+  it('closing setup saves waiting changes before opening the status page', async () => {
+    serveApi({ getApplication: { application: application({ answers: emptyAnswers() }) } });
+    renderSetup('organization');
+    fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'nclocal.org' } });
+    fireEvent.click(screen.getByRole('link', { name: 'Close setup' }));
+    await screen.findByText('Status page');
+    expect(callsTo('saveApplicationStep')[0].answers.website).toBe('nclocal.org');
+  });
+
   it('shows an error by field once the reader has touched the field', async () => {
     serveApi({
       getApplication: { application: application({ answers: emptyAnswers(), errors: { 'organization.address': 'Enter the mailing address.' } }) },
@@ -144,10 +153,21 @@ describe('Setup', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
   });
 
-  it('shows a load error', async () => {
-    serveApi({ getApplication: () => { throw new Error('We could not find that request.'); } });
+  it('updates load errors and recovers when setup can be reloaded', async () => {
+    let failure = 'We could not load setup. Try again.';
+    serveApi({ getApplication: () => {
+      if (failure) throw new Error(failure);
+      return { application: application() };
+    } });
     renderSetup('event');
-    expect(await screen.findByRole('alert')).toHaveTextContent('We could not find that request.');
+    expect(await screen.findByRole('alert')).toHaveTextContent(failure);
+    failure = 'The event is still unavailable. Try again later.';
+    fireEvent.click(screen.getByRole('button', { name: 'Reload setup' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(failure));
+    failure = '';
+    fireEvent.click(screen.getByRole('button', { name: 'Reload setup' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('says when a save fails', async () => {

@@ -41,8 +41,7 @@ describe('OrganizationHome', () => {
   it('says how a new event site starts, and offers no way to start one here', async () => {
     serveApi({ listApplications: list({ applications: [] }), getTeam: team() });
     page();
-    expect(await screen.findByText('No event sites yet.')).toBeInTheDocument();
-    expect(screen.getByText(/Event sites start from a signup link/)).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(await screen.findByText(/Open your signup link to start an event site/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh event sites' })).toBeInTheDocument();
   });
 });

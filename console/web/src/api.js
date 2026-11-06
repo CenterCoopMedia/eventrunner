@@ -28,7 +28,15 @@ export class ApiError extends Error {
 export async function callApi(name, body = {}) {
   const user = auth.currentUser;
   if (!user) throw new ApiError(401, 'unauthorized', 'Sign in to continue.');
-  const token = await user.getIdToken();
+  let token;
+  try {
+    token = await user.getIdToken();
+  } catch (error) {
+    if (error?.code === 'auth/network-request-failed') {
+      throw new ApiError(0, 'network', 'We could not reach the server. Check your connection and try again.');
+    }
+    throw new ApiError(401, 'unauthorized', 'We could not confirm your sign-in. Sign out, then sign in again.');
+  }
   let response;
   try {
     response = await fetch(`${BASE}/api/${name}`, {
@@ -50,7 +58,7 @@ export async function callApi(name, body = {}) {
     throw new ApiError(
       response.status,
       error?.code || 'internal',
-      typeof error?.message === 'string' ? error.message : 'Something went wrong. Try again.',
+      response.status < 500 && typeof error?.message === 'string' ? error.message : 'We could not complete this action. Try again.',
       error?.fields && typeof error.fields === 'object' ? error.fields : {},
       typeof error?.field === 'string' ? error.field : null,
     );

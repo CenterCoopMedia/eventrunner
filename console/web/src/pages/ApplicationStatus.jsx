@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
 import LoadingState from '../LoadingState.jsx';
 import WaitingBuddy from '../WaitingBuddy.jsx';
+import IconControl from '../IconControl.jsx';
 import ConnectionPanel, { ConnectionNotice } from '../setup/ConnectionPanel.jsx';
 import { PROVIDER_COPY } from '../setup/connections.js';
 import { BUILD_FAILED_LABEL, BUILD_PHASES, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
@@ -59,7 +60,7 @@ function BuildUnderway({ app }) {
       <div className="stack">
         <p className="note-title">You can close this page</p>
         <p>Most sites take about an hour and a half to build. Setting up your web address takes the longest.</p>
-        <p>{app.myRole === 'owner' ? 'You' : 'The Owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
+        <p>{app.myRole === 'owner' ? 'You' : 'Your team owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
         <p role="status" aria-atomic="true" className="visually-hidden">{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</p>
         <ol className="build-steps" aria-label="Build steps">
           {BUILD_PHASES.map((phase, i) => {
@@ -73,7 +74,7 @@ function BuildUnderway({ app }) {
                 </svg>
                 <span className="build-step-text">
                   <span className="build-step-label">{phase.label}<span className="visually-hidden">{state === 'done' ? ', done' : state === 'now' ? ', happening now' : ''}</span></span>
-                  {state === 'now' ? <span className="build-step-detail">{phase.detail}</span> : null}
+                  {state === 'now' && phase.detail ? <span className="build-step-detail">{phase.detail}</span> : null}
                 </span>
               </li>
             );
@@ -101,7 +102,7 @@ function ActionNotice({ result, onRefresh, refreshing, focus = false }) {
       <p>{result.message}</p>
       {result.refreshError ? <>
         <p>{result.refreshError}</p>
-        <button type="button" className="button" disabled={refreshing} onClick={onRefresh}>{refreshing ? 'Refreshing…' : 'Refresh request'}</button>
+        <IconControl icon="refresh" label="Refresh request" disabled={refreshing} aria-busy={refreshing} onClick={onRefresh} />
       </> : null}
     </div>
   );
@@ -143,7 +144,7 @@ function BuildFailed({ app, provider, retrying, onRetry, disabled }) {
   const name = provider ? PROVIDER_COPY[provider].name : null;
   const mayRetry = app.myRole === 'owner' || app.operator;
   const waitsForAccount = Boolean(provider) && !app.connections[provider].connected;
-  let words = 'We did not finish building your site. You can retry the build. The steps that finished are not done twice.';
+  let words = 'Your site setup did not finish. Select Retry to continue.';
   if (provider) {
     words = waitsForAccount
       ? `We did not finish building your site, because we could not use your ${name} account. Reconnect the account below. You can then retry the build.`
@@ -157,7 +158,7 @@ function BuildFailed({ app, provider, retrying, onRetry, disabled }) {
       {mayRetry && !waitsForAccount ? (
         <div>
           <button type="button" className="button primary" disabled={retrying || disabled} onClick={onRetry}>
-            {retrying ? 'Starting the build' : 'Retry the build'}
+            {retrying ? 'Starting…' : 'Retry'}
           </button>
         </div>
       ) : null}
@@ -248,7 +249,7 @@ export default function ApplicationStatus() {
     } }));
   }
 
-  if (!app) return error ? <p className="message error console-workspace" role="alert">{error}</p> : <LoadingState long className="console-workspace">Loading your request.</LoadingState>;
+  if (!app) return error ? <div className="console-workspace"><p className="message error" role="alert">{error}</p><IconControl icon="refresh" label="Refresh request" onClick={() => load()} /></div> : <LoadingState long className="console-workspace">Loading your request.</LoadingState>;
 
   const title = app.answers.event.name || 'New event site';
   const closed = ['withdrawn', 'declined'].includes(app.status);

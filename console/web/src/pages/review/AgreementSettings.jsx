@@ -34,8 +34,8 @@ export default function AgreementSettings({ agreement, onSaved }) {
       setBody(result.agreement.body);
       onSaved(result.agreement);
       setNotice(result.created
-        ? `Version ${result.agreement.version} is saved. New acceptances use it.`
-        : `This is the same text as version ${result.agreement.version}, so nothing changed.`);
+        ? `Version ${result.agreement.version} saved. New clients will see this text.`
+        : `No changes to save. Version ${result.agreement.version} is current.`);
     } catch (err) {
       if (err.field) {
         setErrors({ [err.field]: err.message });
@@ -49,7 +49,7 @@ export default function AgreementSettings({ agreement, onSaved }) {
       <h2 id="agreement-settings-title">Agreement</h2>
       <p>
         {agreement ? `The current text is version ${agreement.version}, saved ${formatDateTime(agreement.savedAt)}. ` : 'No agreement is saved. '}
-        Saving a changed text makes a new version. A saved version never changes, and a client who accepted one keeps it.
+        Changes apply to new clients. Existing clients keep the agreement they accepted.
       </p>
       <form noValidate onSubmit={onSubmit} className="stack">
         <fieldset className="console-feedback-fields stack" disabled={busy}>
@@ -57,7 +57,6 @@ export default function AgreementSettings({ agreement, onSaved }) {
         <TextField
           path="agreementBody"
           label="Text"
-          hint="Plain text. A blank line starts a new paragraph."
           value={body}
           onChange={(value) => { setBody(value); setNotice(''); }}
           error={errors.agreementBody}
@@ -65,7 +64,7 @@ export default function AgreementSettings({ agreement, onSaved }) {
           maxLength={BODY_MAX}
           className="agreement-text-field"
         />
-        <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Saving agreement…' : 'Save as a new version'}</button></div>
+        <div><button type="submit" className="button primary" aria-label="Save agreement" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button></div>
         </fieldset>
         {notice ? <ActionFeedback revealKey={notice}>{notice}</ActionFeedback> : null}
         {error ? <ActionFeedback kind="error" revealKey={error}>{error}</ActionFeedback> : null}

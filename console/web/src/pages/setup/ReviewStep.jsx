@@ -2,12 +2,13 @@ import { Link } from 'react-router';
 import { STEPS, SIGNUPS_CLOSED, SITE_DOMAIN, TICKET_CHOICES, setupPath, stepById, stepOfField } from '../../setup/steps.js';
 import { senderPreview } from './EmailStep.jsx';
 import { eventDayText } from '../../reviewText.js';
+import IconControl from '../../IconControl.jsx';
 
 function Row({ label, children }) {
   return (
     <div className="summary-row">
       <dt>{label}</dt>
-      <dd>{children || <span className="muted">Not answered</span>}</dd>
+      <dd>{children || <span className="muted">Not added</span>}</dd>
     </div>
   );
 }
@@ -17,59 +18,53 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
   const choice = TICKET_CHOICES.find((c) => c.value === tickets.choice);
   const account = choice?.connect ? connections[choice.value] : null;
   const edit = (id, title) => (
-    <Link to={`${setupPath(orgId, appId, STEPS.find((s) => s.id === id))}`}>Change {title.toLowerCase()}</Link>
+    <IconControl icon="edit" label={`Edit ${title.toLowerCase()}`} to={setupPath(orgId, appId, STEPS.find((s) => s.id === id))} />
   );
   return (
     <>
       <section aria-labelledby="sum-org" className="summary">
-        <h2 id="sum-org">Your organization</h2>
+        <div className="summary-heading"><h2 id="sum-org">Your organization</h2>{edit('organization', 'Your organization')}</div>
         <dl>
           <Row label="Name">{organization.name}</Row>
           <Row label="Website">{organization.website}</Row>
           <Row label="Mailing address"><span className="pre">{organization.address}</span></Row>
         </dl>
-        {edit('organization', 'Your organization')}
       </section>
       <section aria-labelledby="sum-event" className="summary">
-        <h2 id="sum-event">Your event</h2>
+        <div className="summary-heading"><h2 id="sum-event">Your event</h2>{edit('event', 'Your event')}</div>
         <dl>
           <Row label="Event name">{event.name}</Row>
           <Row label="Short name">{event.shortName}</Row>
           <Row label="Description">{event.tagline}</Row>
-          <Row label="Time zone">{event.timezone}</Row>
+          <Row label="Time zone">{event.timezone.replaceAll('_', ' ').split('/').reverse().join(', ')}</Row>
           <Row label="Dates">
             {event.days.length > 0 ? <ul className="plain">{event.days.map((d, i) => <li key={i}>{eventDayText(d)}</li>)}</ul> : null}
           </Row>
           <Row label="Venue">{[event.venue.name, event.venue.address].filter(Boolean).join(', ')}</Row>
         </dl>
-        {edit('event', 'Your event')}
       </section>
       <section aria-labelledby="sum-web" className="summary">
-        <h2 id="sum-web">Your web address</h2>
+        <div className="summary-heading"><h2 id="sum-web">Your web address</h2>{edit('webAddress', 'Your web address')}</div>
         <dl><Row label="Address">{webAddress.name ? `${webAddress.name}.${SITE_DOMAIN}` : ''}</Row></dl>
-        {edit('webAddress', 'Your web address')}
       </section>
       <section aria-labelledby="sum-team" className="summary">
-        <h2 id="sum-team">Your team</h2>
-        <p>{ownersNeeded === 0 ? 'The team has two Owners.' : 'You can finish the setup now. We recommend a second Owner, and you can add one at any time.'}</p>
-        {edit('team', 'Your team')}
+        <div className="summary-heading"><h2 id="sum-team">Your team</h2>{edit('team', 'Your team')}</div>
+        <p>{ownersNeeded === 0 ? 'Your team has at least two owners.' : 'A second owner can help manage your team. You can invite one at any time.'}</p>
       </section>
       <section aria-labelledby="sum-tickets" className="summary">
-        <h2 id="sum-tickets">Tickets</h2>
+        <div className="summary-heading"><h2 id="sum-tickets">Tickets</h2>{edit('tickets', 'Tickets')}</div>
         <dl>
           <Row label="Ticket sales">{choice?.label}</Row>
-          {account ? <Row label="Account">{account.connected ? `Connected: ${account.displayName || 'yes'}` : 'Not connected yet'}</Row> : null}
+          {account ? <Row label="Account">{account.connected ? account.displayName || 'Connected' : 'Not connected yet'}</Row> : null}
           {choice?.value === 'eventbrite' ? <Row label="Eventbrite event">{account.event?.name}</Row> : null}
         </dl>
-        {edit('tickets', 'Tickets')}
       </section>
       <section aria-labelledby="sum-email" className="summary">
-        <h2 id="sum-email">Email</h2>
+        <div className="summary-heading"><h2 id="sum-email">Email</h2>{edit('email', 'Email')}</div>
         <dl>
-          <Row label="From">{senderPreview(email.senderName, webAddress.name)}</Row>
+          <Row label="From">{senderPreview(email.senderName || event.shortName || event.name, webAddress.name)}</Row>
           <Row label="Replies go to">{email.replyTo}</Row>
         </dl>
-        {edit('email', 'Email')}
       </section>
     </>
   );
@@ -116,7 +111,7 @@ export default function ReviewStep({ app, answers, errors, ownersNeeded, refused
   const notSaved = refusedSteps.map(stepById).filter(Boolean);
   return (
     <div className="stack">
-      <p className="lead">Read your answers. Next you read and accept the agreement, and we start building your site. We email you at each step.</p>
+      <p className="lead">Check your event details, then continue to the hosting agreement.</p>
       <NotSaved steps={notSaved} orgId={orgId} appId={appId} />
       <Problems fields={errors} orgId={orgId} appId={appId} />
       <Summary answers={answers} connections={app.connections} ownersNeeded={ownersNeeded} orgId={orgId} appId={appId} />

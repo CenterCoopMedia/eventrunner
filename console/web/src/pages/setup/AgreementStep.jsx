@@ -4,6 +4,7 @@ import ActionFeedback from '../../ActionFeedback.jsx';
 import { SIGNUPS_CLOSED } from '../../setup/steps.js';
 import { fieldId, TextField } from '../../setup/Field.jsx';
 import LoadingState from '../../LoadingState.jsx';
+import IconControl from '../../IconControl.jsx';
 
 /** Blank lines part the paragraphs. Each one renders as text, so nothing in it can run as HTML. */
 export function AgreementText({ agreement }) {
@@ -72,14 +73,16 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
     }
   }
 
-  if (!data) return error ? <p className="message error" role="alert">{error}</p> : <LoadingState>Loading the agreement.</LoadingState>;
+  if (!data) return error ? (
+    <ActionFeedback kind="error"><p>{error}</p><IconControl icon="refresh" label="Reload agreement" onClick={() => { setError(''); load(); }} /></ActionFeedback>
+  ) : <LoadingState>Loading the agreement.</LoadingState>;
 
   const { agreement } = data;
   if (!agreement) return <p className="message error">{SIGNUPS_CLOSED}</p>;
 
   return (
     <div className="stack">
-      <p className="lead">Read the agreement between your organization and the hosting team. When you accept it, we start building your site. You do not need to wait on the page: we email you when the site is ready.</p>
+      <p className="lead">Accept the hosting agreement to start your site. We email you when it is ready.</p>
       <AgreementText agreement={agreement} />
       {app.canAccept ? (
         <form noValidate onSubmit={accept} className="stack">
@@ -87,7 +90,7 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
           <TextField
             path="agreement.legalName"
             label="Your organization's legal name"
-            hint="The name on your contracts. This organization is the party to the agreement."
+            hint="Use the name on your organization's contracts."
             value={signer.legalName}
             onChange={(legalName) => setSigner((prev) => ({ ...prev, legalName }))}
             error={fieldErrors.legalName}
@@ -106,14 +109,14 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
           <TextField
             path="agreement.name"
             label="Your full name"
-            hint="Typing your name and selecting Accept the agreement is your signature for your organization. We email you a copy."
+            hint="Your name is your signature for your organization when you select Accept agreement. We email you a copy."
             value={signer.name}
             onChange={(name) => setSigner((prev) => ({ ...prev, name }))}
             error={fieldErrors.name}
             autoComplete="name"
             maxLength={200}
           />
-          <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Starting the build' : 'Accept the agreement'}</button></div>
+          <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Accepting' : 'Accept agreement'}</button></div>
           </fieldset>
           {error ? <ActionFeedback kind="error" revealKey={error}>
             <p>{error}</p>
@@ -124,7 +127,7 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
       {!app.canAccept ? (
         <>
           {error ? <ActionFeedback kind="error" revealKey={error}>{error}</ActionFeedback> : null}
-          <p className="muted">Only an Owner can accept the agreement. Ask an Owner on your team to open this step.</p>
+          <p className="muted">Ask an owner on your team to accept the agreement.</p>
         </>
       ) : null}
     </div>

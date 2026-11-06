@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { callApi } from '../../api.js';
 import LoadingState from '../../LoadingState.jsx';
+import IconControl from '../../IconControl.jsx';
 import { firstSettingError } from '../../reviewText.js';
 import AgreementSettings from './AgreementSettings.jsx';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
@@ -15,6 +16,7 @@ export default function ConsoleSettings() {
   const [saved, setSaved] = useState(null);
   const [agreement, setAgreement] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [fieldError, setFieldError] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -24,6 +26,7 @@ export default function ConsoleSettings() {
 
   useEffect(() => {
     let live = true;
+    setLoadError(null);
     callApi('getConsoleSettings', {})
       .then((body) => {
         if (!live) return;
@@ -33,7 +36,7 @@ export default function ConsoleSettings() {
       })
       .catch((err) => { if (live) setLoadError(err); });
     return () => { live = false; };
-  }, []);
+  }, [refreshKey]);
 
   // Focus the field an error is about once it shows.
   useEffect(() => {
@@ -47,7 +50,7 @@ export default function ConsoleSettings() {
   }, [notice, error]);
 
   if (isNotOperator(loadError)) return <HostingOnly />;
-  if (loadError) return <p className="message error" role="alert">{loadError.message}</p>;
+  if (loadError) return <div className="stack"><p className="message error" role="alert">{loadError.message}</p><IconControl icon="refresh" label="Refresh settings" onClick={() => setRefreshKey((value) => value + 1)} /></div>;
   if (!values) return <LoadingState>Loading the settings.</LoadingState>;
 
   function change(field, value) {
@@ -70,7 +73,7 @@ export default function ConsoleSettings() {
       const body = await callApi('saveConsoleSettings', { settings: values });
       setValues(body.settings);
       setSaved(body.settings);
-      setNotice('The settings are saved. New builds use them.');
+      setNotice('Settings saved. New sites will use them.');
     } catch (err) {
       if (err.field && FIELDS.includes(err.field)) setFieldError({ field: err.field, message: err.message });
       else setError(err.message);
@@ -85,13 +88,13 @@ export default function ConsoleSettings() {
       {!agreement || !FIELDS.every((field) => saved?.[field]) ? (
         <aside className="note" role="note">
           <p className="note-title">Sign-ups are closed</p>
-          <p>Signup links do not work until the Google Cloud folder, billing account, region and agreement are saved.</p>
+          <p>Save hosting settings and an agreement to open sign-ups.</p>
         </aside>
       ) : null}
-      <p>Every new build uses these values.</p>
+      <p>Choose the hosting settings for new sites.</p>
       <form noValidate onSubmit={onSubmit} className="stack">
         <SettingsFields fields={FIELDS} values={values} onChange={change} error={fieldError} fieldRefs={fieldRefs} idPrefix="settings" disabled={busy} />
-        <button type="submit" className="button primary" disabled={busy}>{busy ? 'Saving settings…' : 'Save settings'}</button>
+        <button type="submit" className="button primary" aria-label="Save settings" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
         {notice ? <p className="message success" role="status" ref={resultRef}>{notice}</p> : null}
         {error ? <p className="message error" role="alert" ref={resultRef}>{error}</p> : null}
       </form>

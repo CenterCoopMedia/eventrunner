@@ -15,6 +15,7 @@ import TeamStep from './TeamStep.jsx';
 import TicketsStep from './TicketsStep.jsx';
 import WebAddressStep from './WebAddressStep.jsx';
 import LoadingState from '../../LoadingState.jsx';
+import IconControl from '../../IconControl.jsx';
 
 const STEP_VIEWS = {
   organization: OrganizationStep,
@@ -81,7 +82,13 @@ function useApplication(orgId, appId) {
     return () => { live = false; };
   }, [orgId, appId]);
   const reload = useCallback(async () => {
-    setApp((await callApi('getApplication', { orgId, appId })).application);
+    try {
+      setApp((await callApi('getApplication', { orgId, appId })).application);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
   }, [orgId, appId]);
   return { app, setApp, error, reload };
 }
@@ -185,7 +192,7 @@ export default function Setup() {
   const stepErrors = useMemo(() => (app && step ? errorsOfStep(app.errors, step.id) : {}), [app, step]);
 
   if (!step) return <Navigate to={setupPath(orgId, appId, STEPS[0])} replace />;
-  if (error) return <p className="message error" role="alert">{error}</p>;
+  if (error && !app) return <ActionFeedback kind="error"><p>{error}</p><IconControl icon="refresh" label="Reload setup" onClick={() => reload().catch(() => {})} /></ActionFeedback>;
   if (!app) return <LoadingState long>Loading your setup.</LoadingState>;
   if (!app.canEdit) return <Navigate to={statusPath(orgId, appId)} replace />;
   const open = openStepIds(app, refused);
@@ -210,7 +217,12 @@ export default function Setup() {
       />
       <section className="step-body" aria-labelledby="step-title">
         <p className="muted">Step {index + 1} of {STEPS.length}</p>
-        <h1 id="step-title" tabIndex={-1}>{step.title}</h1>
+        <div className="step-heading">
+          <h1 id="step-title" tabIndex={-1}>{step.title}</h1>
+          <IconControl icon="close" label="Close setup" to={statusPath(orgId, appId)} aria-disabled={navigating || undefined}
+            onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId), { leaving: true }); }} />
+        </div>
+        {error ? <ActionFeedback kind="error"><p>{error}</p><IconControl icon="refresh" label="Reload setup" onClick={() => reload().catch(() => {})} /></ActionFeedback> : null}
         <fieldset disabled={navigating} className="console-feedback-fields">
         {View ? (
           <View
@@ -255,10 +267,8 @@ export default function Setup() {
           <div className="step-actions">
             {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous), { leaving: true })}>Back</button> : null}
             {next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next</button> : null}
-            {saveStatus === 'error' ? <button type="button" className="button" disabled={navigating} onClick={async () => { await flush(); actionArea.current?.focus(); }}>Retry save</button> : null}
+            {saveStatus === 'error' ? <button type="button" className="button" disabled={navigating} onClick={async () => { await flush(); actionArea.current?.focus(); }}>Save</button> : null}
           </div>
-          <p><Link to={statusPath(orgId, appId)} aria-disabled={navigating || undefined}
-            onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId), { leaving: true }); }}>Leave the setup</Link></p>
         </div>
       </section>
     </div>

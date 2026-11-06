@@ -40,7 +40,7 @@ describe('Agreement step', () => {
     fireEvent.change(await screen.findByLabelText('Your full name'), { target: { value: 'Ana Owner' } });
     fireEvent.change(screen.getByLabelText("Your organization's legal name"), { target: { value: 'NC Local Inc.' } });
     fireEvent.change(screen.getByLabelText('Your job title'), { target: { value: 'Director' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept agreement' }));
     expect(await screen.findByText('Status page')).toBeInTheDocument();
     expect(callsTo('acceptAgreement')).toEqual([{
       orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', legalName: 'NC Local Inc.', title: 'Director', version: 3,
@@ -54,7 +54,7 @@ describe('Agreement step', () => {
     });
     renderSetup('agreement');
     await screen.findByLabelText('Your full name');
-    fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept agreement' }));
     expect(await screen.findByText('Type your full name to accept the agreement.')).toBeInTheDocument();
     expect(screen.getByLabelText('Your full name')).toHaveAttribute('aria-invalid', 'true');
   });
@@ -66,7 +66,7 @@ describe('Agreement step', () => {
     });
     renderSetup('agreement');
     await screen.findByLabelText("Your organization's legal name");
-    fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept agreement' }));
     expect(await screen.findByText("Type your organization's legal name to accept the agreement.")).toBeInTheDocument();
     expect(screen.getByLabelText("Your organization's legal name")).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Your full name')).not.toHaveAttribute('aria-invalid', 'true');
@@ -83,7 +83,7 @@ describe('Agreement step', () => {
     });
     renderSetup('agreement');
     fireEvent.change(await screen.findByLabelText('Your full name'), { target: { value: 'Ana Owner' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept agreement' }));
     expect(await screen.findByText('A changed test paragraph.')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('The agreement changed.');
     expect(screen.getByText('Version 4')).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('Agreement step', () => {
       getApplication: { application: application({ myRole: 'editor', canAccept: false }) },
     });
     renderSetup('agreement');
-    expect(await screen.findByText(/Only an Owner can accept the agreement/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ask an owner on your team to accept the agreement/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Your full name')).not.toBeInTheDocument();
   });
 });

@@ -74,7 +74,7 @@ describe('Tickets step', () => {
   it('asks nothing to be typed: the step has no text box', async () => {
     serve({ answers: answersWith('eventbrite'), connections: connections({ eventbrite: eventbriteAccount() }) }, { listEventbriteEvents: { events: [] } });
     renderSetup('tickets');
-    await screen.findByText(/did not find an upcoming event/);
+    await screen.findByText(/Create an upcoming event on Eventbrite/);
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
@@ -148,7 +148,7 @@ describe('Tickets step', () => {
     fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }));
     expect(await screen.findByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, disconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
     expect(await screen.findByRole('button', { name: 'Connect with Stripe' })).toBeInTheDocument();
     expect(screen.getByText('You disconnected your Stripe account.')).toBeInTheDocument();
     expect(callsTo('disconnectAccount')).toEqual([{ orgId: 'o1', appId: 'a1', provider: 'stripe' }]);
@@ -161,7 +161,7 @@ describe('Tickets step', () => {
     });
     renderSetup('tickets');
     fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, disconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
     expect(await screen.findByText(/we deleted our access to it/)).toBeInTheDocument();
   });
 
@@ -171,7 +171,7 @@ describe('Tickets step', () => {
     });
     renderSetup('tickets');
     fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, disconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
     expect(await screen.findByText(/Another event site still uses this account/)).toBeInTheDocument();
     expect(screen.queryByText(/account settings/)).not.toBeInTheDocument();
   });
@@ -195,9 +195,9 @@ describe('Tickets step', () => {
     let answer = { events: [] };
     serve({ answers: answersWith('eventbrite'), connections: connections({ eventbrite: eventbriteAccount() }) }, { listEventbriteEvents: () => answer });
     renderSetup('tickets');
-    await screen.findByText(/Make the event on Eventbrite/);
+    await screen.findByText(/Create an upcoming event on Eventbrite/);
     answer = { events: [{ id: 'e1', name: 'Summit', start: null }] };
-    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Eventbrite events' }));
     expect(await screen.findByRole('combobox', { name: 'Your Eventbrite event' })).toBeInTheDocument();
   });
 
@@ -207,7 +207,7 @@ describe('Tickets step', () => {
     });
     renderSetup('tickets');
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not read your Eventbrite events.');
-    expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh Eventbrite events' })).toBeInTheDocument();
   });
 
   it('an Editor sees the state but no buttons', async () => {
