@@ -55,10 +55,14 @@ export async function callApi(name, body = {}) {
   }
   if (!response.ok) {
     const error = payload?.error;
+    const code = error?.code || 'internal';
+    // ConsoleError messages are safe to show at any status.
+    const message = code !== 'internal' && typeof error?.message === 'string' && error.message.trim()
+      ? error.message : 'We could not complete this action. Try again.';
     throw new ApiError(
       response.status,
-      error?.code || 'internal',
-      response.status < 500 && typeof error?.message === 'string' ? error.message : 'We could not complete this action. Try again.',
+      code,
+      message,
       error?.fields && typeof error.fields === 'object' ? error.fields : {},
       typeof error?.field === 'string' ? error.field : null,
     );

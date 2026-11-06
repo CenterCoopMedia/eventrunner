@@ -45,7 +45,7 @@ describe('Tickets step', () => {
     expect(within(panel).getByRole('button', { name: 'Connect with Stripe' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: /Use Eventbrite/ }));
     expect(screen.getByRole('button', { name: 'Connect with Eventbrite' })).toBeInTheDocument();
-    expect(screen.getByText(CONSENT)).toBeInTheDocument();
+    expect(screen.getByText(CONSENT)).toHaveTextContent('add a webhook to your Eventbrite account so your site hears about order and attendee changes.');
     for (const name of [/Import a spreadsheet later/, /No tickets/]) {
       fireEvent.click(screen.getByRole('radio', { name }));
       expect(screen.queryByRole('button', { name: /Connect with/ })).not.toBeInTheDocument();
@@ -57,7 +57,7 @@ describe('Tickets step', () => {
     renderSetup('tickets');
     const panel = await screen.findByRole('region', { name: 'Your Eventbrite account' });
     expect(within(panel).getByRole('button', { name: 'Connect again' })).toBeInTheDocument();
-    expect(within(panel).getByText(CONSENT)).toBeInTheDocument();
+    expect(within(panel).getByText(CONSENT)).toHaveTextContent('add a webhook to your Eventbrite account so your site hears about order and attendee changes.');
   });
 
   it('does not ask an Editor, who cannot connect, for the Eventbrite consent', async () => {

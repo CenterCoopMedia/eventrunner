@@ -71,7 +71,7 @@ const SETUP_STEP_LABELS = Object.freeze({
   ready: 'Team notification',
 });
 
-/** Site setup progress without internal build data. */
+/** The build record, in full. Only the hosting team sees it. */
 function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onRefresh, refreshing }) {
   if (!build && !canRetry && !result) return null;
   return (
@@ -81,10 +81,12 @@ function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onR
         <>
           <p>
             <span className="tag">{BUILD_STATE_LABELS[build.state] || 'In progress'}</span>
+            {build.testMode ? <span className="tag">Test mode</span> : null}
           </p>
           {build.error ? (
             <aside className="note" role="note">
               <p className="note-title">Site setup stopped</p>
+              <p className="break">{build.error}</p>
               <p>Review the setup details, correct the problem, then retry.</p>
             </aside>
           ) : null}
@@ -93,6 +95,7 @@ function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onR
               <li key={step.id}>
                 <strong>{SETUP_STEP_LABELS[step.id] || 'Site setup'}</strong>: {BUILD_STATE_LABELS[step.state] || 'In progress'}
                 {step.at ? `, ${formatDateTime(step.at)}` : ''}
+                {step.detail ? <span className="muted break"> {step.detail}</span> : null}
               </li>
             ))}
           </ol>
@@ -121,6 +124,8 @@ function Acceptance({ acceptance }) {
         <div className="answer"><dt>Accepted by</dt><dd>{acceptance.name}{acceptance.title ? `, ${acceptance.title}` : ''} ({acceptance.email}), {formatDateTime(acceptance.at)}</dd></div>
         {acceptance.legalName ? <div className="answer"><dt>Legal name</dt><dd>{acceptance.legalName}</dd></div> : null}
         <div className="answer"><dt>Agreement version</dt><dd>{acceptance.version}</dd></div>
+        <div className="answer"><dt>Text fingerprint (SHA-256)</dt><dd className="break">{acceptance.sha256}</dd></div>
+        <div className="answer"><dt>Acceptance record</dt><dd className="break">{acceptance.id}</dd></div>
       </dl>
     </>
   );
@@ -229,7 +234,7 @@ export default function ReviewApplication() {
       {app.buildStart?.state === 'failed' && data.build?.state !== 'failed' ? (
         <aside className="note" role="note">
           <p className="note-title">Site setup did not start</p>
-          <p>The request stays approved. Retry setup or contact the hosting team for help.</p>
+          <p>The request stays approved. Read the function logs and fix the cause, then retry the build.</p>
         </aside>
       ) : null}
       <BuildRecord build={data.build} canRetry={data.canRetryBuild} retrying={working === 'retry'} onRetry={retry}

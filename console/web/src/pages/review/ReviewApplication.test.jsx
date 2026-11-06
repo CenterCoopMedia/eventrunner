@@ -80,6 +80,14 @@ describe('ReviewApplication', () => {
     expect(screen.getByText('Not connected yet')).toBeInTheDocument();
   });
 
+  it.each(['', undefined])('marks an unset sender name as Not added (%s)', async (senderName) => {
+    serve(request({ answers: { ...ANSWERS, email: { ...ANSWERS.email, senderName } } }));
+    page();
+    await screen.findByRole('heading', { level: 1, name: 'NC Local Summit' });
+    expect(screen.getByText('Sender name').closest('.answer')).toHaveTextContent('Not added');
+    expect(screen.getByText('Sender preview').closest('.answer')).toHaveTextContent('Not added');
+  });
+
   it('shows the team, the open invites and the history, oldest first', async () => {
     page();
     const team = within(await screen.findByRole('list', { name: 'Team' })).getAllByRole('listitem');
@@ -197,8 +205,8 @@ describe('ReviewApplication', () => {
       page();
       expect(await screen.findByRole('heading', { level: 2, name: 'Agreement' })).toBeInTheDocument();
       expect(screen.getByText(/Ana Owner \(ana@example.org\)/)).toBeInTheDocument();
-      expect(screen.queryByText('abc123')).not.toBeInTheDocument();
-      expect(screen.queryByText('r1')).not.toBeInTheDocument();
+      expect(screen.getByText('Text fingerprint (SHA-256)').closest('.answer')).toHaveTextContent('abc123');
+      expect(screen.getByText('Acceptance record').closest('.answer')).toHaveTextContent('r1');
     });
 
     it('says when the build did not start', async () => {
@@ -207,6 +215,7 @@ describe('ReviewApplication', () => {
       const note = await screen.findByRole('note');
       expect(note).toHaveTextContent('Site setup did not start');
       expect(note).toHaveTextContent('The request stays approved');
+      expect(note).toHaveTextContent('Read the function logs');
     });
 
     it('offers a retry when the build did not start, and shows the result', async () => {
@@ -225,26 +234,29 @@ describe('ReviewApplication', () => {
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
 
-    it('shows setup progress without technical details', async () => {
+    it('shows build errors, step details and test mode to the hosting team', async () => {
       serve({
         ...request({ status: 'building' }),
         canRetryBuild: true,
         build: {
           state: 'failed',
           runUrl: 'https://github.example/run/1',
-          testMode: false,
+          testMode: true,
           error: 'Web address: the certificate is not active',
           steps: [
             { id: 'project', label: 'Project and billing', state: 'done', at: '2026-11-04T15:00:00.000Z', detail: 'already right' },
-            { id: 'web-address', label: 'Web address', state: 'failed', at: '2026-11-04T15:05:00.000Z', detail: null },
+            { id: 'web-address', label: 'Web address', state: 'failed', at: '2026-11-04T15:05:00.000Z', detail: 'certificate pending' },
           ],
         },
       });
       page();
       const note = await screen.findByRole('note');
       expect(note).toHaveTextContent('Site setup stopped');
-      expect(note).not.toHaveTextContent('the certificate is not active');
-      expect(screen.queryByText('already right')).not.toBeInTheDocument();
+      expect(note).toHaveTextContent('Web address: the certificate is not active');
+      const steps = within(screen.getByRole('list', { name: 'Site setup' })).getAllByRole('listitem');
+      expect(steps[0]).toHaveTextContent('already right');
+      expect(steps[1]).toHaveTextContent('certificate pending');
+      expect(screen.getByText('Test mode', { selector: '.tag' })).toBeInTheDocument();
       expect(note).not.toHaveTextContent('did not start');
       expect(screen.getByText('Hosting')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'View setup details' })).toHaveAttribute('href', 'https://github.example/run/1');
@@ -260,6 +272,7 @@ describe('ReviewApplication', () => {
       page();
       expect(await screen.findByRole('heading', { level: 2, name: 'Site setup' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Test mode')).not.toBeInTheDocument();
     });
   });
 

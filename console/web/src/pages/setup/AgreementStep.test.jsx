@@ -19,6 +19,7 @@ describe('Agreement step', () => {
     expect(screen.getByText('Version 3')).toBeInTheDocument();
     expect(screen.getByText('First test paragraph.')).toBeInTheDocument();
     expect(screen.getByText('Second test paragraph.')).toBeInTheDocument();
+    expect(screen.getByLabelText("Your organization's legal name")).toHaveAccessibleDescription('This organization is the party to the agreement. Use the name on its contracts.');
   });
 
   it('renders the text as text, never as HTML', async () => {

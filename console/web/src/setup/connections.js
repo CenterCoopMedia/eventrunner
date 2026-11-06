@@ -16,7 +16,7 @@ export const PROVIDER_COPY = Object.freeze({
     button: 'Connect with Eventbrite',
     host: 'www.eventbrite.com',
     explain: 'You own this account, and the money from ticket sales goes to you as it does now. Your site shows the tickets people buy on Eventbrite.',
-    consent: 'By connecting, you authorize Event Runner to read your Eventbrite organizations, events, orders and attendees, keep your chosen event’s orders and attendees for your site, and receive updates when orders or attendees change. The orders and attendees stay in your site for you to use until the site is removed or you ask us to delete them. We use them only to run and improve your site. We do not sell them, profit from them, or use them for marketing.',
+    consent: 'By connecting, you authorize Event Runner to read your Eventbrite organizations, events, orders and attendees, and keep your chosen event’s orders and attendees for your site. You also authorize Event Runner to add a webhook to your Eventbrite account so your site hears about order and attendee changes. The orders and attendees stay in your site for you to use until the site is removed or you ask us to delete them. We use them only to run and improve your site. We do not sell them, profit from them, or use them for marketing.',
   },
 });
 

@@ -62,7 +62,7 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
       <section aria-labelledby="sum-email" className="summary">
         <div className="summary-heading"><h2 id="sum-email">Email</h2>{edit('email', 'Email')}</div>
         <dl>
-          <Row label="From">{senderPreview(email.senderName || event.shortName || event.name, webAddress.name)}</Row>
+          <Row label="From">{email.senderName ? senderPreview(email.senderName, webAddress.name) : null}</Row>
           <Row label="Replies go to">{email.replyTo}</Row>
         </dl>
       </section>

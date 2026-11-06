@@ -30,7 +30,7 @@ export default function ReviewAnswers({ answers }) {
   if (!answers) return <p>Event details will appear when the client accepts the agreement.</p>;
   const { organization = {}, event = {}, webAddress = {}, tickets = {}, email = {} } = answers;
   const host = webAddress.name ? `${webAddress.name}.eventrunner.org` : '';
-  const sender = host ? `${email.senderName || event.shortName || event.name || ''} <hello@${host}>` : '';
+  const sender = email.senderName && host ? `${email.senderName} <hello@${host}>` : 'Not added';
   return (
     <>
       <h3>Organization</h3>
@@ -59,7 +59,7 @@ export default function ReviewAnswers({ answers }) {
       </dl>
       <h3>Email</h3>
       <dl className="answers">
-        <Row term="Sender name">{email.senderName}</Row>
+        <Row term="Sender name">{email.senderName || 'Not added'}</Row>
         <Row term="Replies go to">{email.replyTo}</Row>
         <Row term="Sender preview">{sender}</Row>
       </dl>

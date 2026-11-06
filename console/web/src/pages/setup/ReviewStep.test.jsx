@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { application, serveApi } from '../../test/application.js';
+import { application, fullAnswers, serveApi } from '../../test/application.js';
 import { renderSetup } from '../../test/setupPage.jsx';
 
 vi.mock('../../api.js', async (importOriginal) => ({ ...(await importOriginal()), callApi: vi.fn() }));
@@ -21,6 +21,15 @@ describe('Review step', () => {
     expect(screen.getByText('NC Local <hello@nclocal.eventrunner.org>')).toBeInTheDocument();
     expect(screen.getByText('Your team has at least two owners.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit your event' })).toHaveAttribute('href', '/organizations/o1/applications/a1/event');
+  });
+
+  it.each(['', undefined])('marks an unset sender as Not added (%s)', async (senderName) => {
+    const answers = fullAnswers();
+    answers.email.senderName = senderName;
+    serveApi({ getApplication: { application: application({ answers }) } });
+    renderSetup('review');
+    const email = await screen.findByRole('region', { name: 'Email' });
+    expect(within(email).getByText('From').closest('.summary-row')).toHaveTextContent('Not added');
   });
 
   it('moves on with Next, and says what comes next', async () => {

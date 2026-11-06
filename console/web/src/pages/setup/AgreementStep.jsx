@@ -90,7 +90,7 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
           <TextField
             path="agreement.legalName"
             label="Your organization's legal name"
-            hint="Use the name on your organization's contracts."
+            hint="This organization is the party to the agreement. Use the name on its contracts."
             value={signer.legalName}
             onChange={(legalName) => setSigner((prev) => ({ ...prev, legalName }))}
             error={fieldErrors.legalName}
