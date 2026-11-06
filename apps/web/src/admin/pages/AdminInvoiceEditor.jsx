@@ -961,14 +961,14 @@ function IssueConfirm({ confirm, busy, onIssue, onCancel }) {
       <h2 id={headingId} className="text-admin-base font-bold text-admin-ink">Issue this invoice?</h2>
       {confirm.unsaved ? (
         <>
-          <p className="max-w-[65ch] text-admin-sm text-admin-ink">Save your changes before issuing this invoice.</p>
+          <p className="text-admin-sm text-admin-ink">Save your changes before issuing this invoice.</p>
           <div>
             <button type="button" className={secondaryButtonClass} onClick={onCancel}>Keep editing</button>
           </div>
         </>
       ) : (
         <>
-          <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+          <p className="text-admin-sm text-admin-ink">
             {confirm.nextNumber ? `The next number is ${confirm.nextNumber}. ` : 'It takes the next invoice number. '}
             Issue gives the invoice its number and today's date, and copies the invoice settings onto it. Its details then cannot change. To correct it later, an operator voids it and you duplicate it.
           </p>

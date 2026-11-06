@@ -18,6 +18,7 @@ const { validateTemplateBody } = require('./render.cjs');
 /** @type {Record<string, object>} shipped defaults, keyed by template id */
 const DEFAULTS = {
   'auth.otp': require('./templates/auth.otp.cjs'),
+  'admin.access_granted': require('./templates/admin.access_granted.cjs'),
   'account.welcome': require('./templates/account.welcome.cjs'),
   // ADR 0008 §5: an organizer approved an attendee (users/approval.cjs).
   'attendee.approved': require('./templates/attendee.approved.cjs'),

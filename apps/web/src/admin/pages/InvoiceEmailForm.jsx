@@ -190,7 +190,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
   return (
     <section ref={sectionRef} aria-labelledby={headingId} className="flex flex-col gap-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
       <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">{`Email ${invoice.number}`}</h3>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+      <p className="text-admin-sm text-admin-ink">
         {'The PDF goes to the billing email on the invoice: '}
         <strong className="font-semibold">{to}</strong>
         {'. Preview the email before you send it.'}
@@ -215,7 +215,6 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
         error={errors.get('note')}
         maxLength={INVOICE_LIMITS.sendNote}
         rows={3}
-        className="sm:max-w-[40rem]"
       />
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={secondaryButtonClass} disabled={busy || previewing} aria-busy={previewing || undefined} onClick={showPreview}>

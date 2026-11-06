@@ -301,7 +301,7 @@ export default function AnnouncementSavedMessages({
                     </div>
                     {open?.kind === 'replace' ? (
                       <RowQuestion title={`Replace your draft with "${open.name}"?`} headingRef={questionRef}>
-                        <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+                        <p className="text-admin-sm text-admin-ink">
                           Your unsaved changes will be replaced by this saved message.
                         </p>
                         <div className="flex flex-wrap gap-xs">
@@ -329,7 +329,7 @@ export default function AnnouncementSavedMessages({
                     ) : null}
                     {open?.kind === 'remove' ? (
                       <RowQuestion title={`Remove "${open.name}"?`} headingRef={questionRef}>
-                        <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+                        <p className="text-admin-sm text-admin-ink">
                           This removes the saved message. Emails already sent are kept. This cannot be undone.
                         </p>
                         <div className="flex flex-wrap gap-xs">

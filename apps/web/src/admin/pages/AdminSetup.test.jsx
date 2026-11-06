@@ -106,37 +106,40 @@ describe('joinSetupSteps', () => {
 });
 
 describe('the setup stepper', () => {
-  it('opens the first step that is not done, and lists every step with its state', async () => {
+  it('opens the first client task that is not done, and lists client tasks with their state', async () => {
     fetch.mockResolvedValueOnce(okResponse(readiness(['admins', 'ticketing'])));
     await renderSetup();
 
-    await screen.findByText('2 of 7 steps done');
+    await screen.findByText('2 of 6 steps done');
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness']);
 
     const step = await openStep('Upload your logos');
-    expect(within(step).getByText('Step 2 of 7')).toBeInTheDocument();
+    expect(within(step).getByText('Step 2 of 6')).toBeInTheDocument();
     expect(within(step).getByText('To do')).toBeInTheDocument();
     expect(within(step).getByText('You')).toBeInTheDocument();
     expect(within(step).getByRole('link', { name: 'Open Branding' })).toHaveAttribute('href', '/admin/branding');
     expect(within(step).getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/admin/setup/team');
     expect(within(step).getByRole('link', { name: 'Next: Replace the placeholder text' })).toHaveAttribute('href', '/admin/setup/text');
 
-    // Every step is in the list, in order, with its state in words.
+    // Only client-owned and shared tasks are numbered, in order, with state in words.
     const items = within(stepList()).getAllByRole('link');
-    expect(items.map((link) => link.getAttribute('href'))).toEqual(SETUP_STEPS.map((s) => `/admin/setup/${s.slug}`));
+    expect(items.map((link) => link.getAttribute('href'))).toEqual([
+      '/admin/setup/team', '/admin/setup/logos', '/admin/setup/text',
+      '/admin/setup/legal', '/admin/setup/email', '/admin/setup/tickets',
+    ]);
     expect(items[0]).toHaveTextContent('Add a second operatorDone');
     expect(items[1]).toHaveTextContent('Upload your logosTo do');
     expect(items[1]).toHaveAttribute('aria-current', 'step');
     expect(items.filter((link) => link.hasAttribute('aria-current'))).toHaveLength(1);
     // On a narrow screen the list folds into one line above the step.
-    expect(screen.getByText('Show all 7 steps')).toBeInTheDocument();
+    expect(screen.getByText('Show all 6 steps')).toBeInTheDocument();
   });
 
   it('moves between steps by address, and puts the focus on the new step', async () => {
     fetch.mockResolvedValueOnce(okResponse(readiness([])));
     await renderSetup('/admin/setup/text');
     const step = await openStep('Replace the placeholder text');
-    expect(within(step).getByText('Step 3 of 7')).toBeInTheDocument();
+    expect(within(step).getByText('Step 3 of 6')).toBeInTheDocument();
 
     fireEvent.click(within(step).getByRole('link', { name: 'Next: Approve the privacy policy and terms' }));
     const next = await openStep('Approve the privacy policy and terms');
@@ -152,17 +155,29 @@ describe('the setup stepper', () => {
     const first = await openStep('Add a second operator');
     expect(within(first).queryByRole('link', { name: 'Back' })).toBeNull();
 
-    fireEvent.click(within(stepList()).getByRole('link', { name: /Turn on Google sign-in/ }));
-    const last = await openStep('Turn on Google sign-in');
-    expect(within(last).getByText('Step 7 of 7')).toBeInTheDocument();
+    fireEvent.click(within(stepList()).getByRole('link', { name: /Connect ticket sales/ }));
+    const last = await openStep('Connect ticket sales');
+    expect(within(last).getByText('Step 6 of 6')).toBeInTheDocument();
     expect(within(last).queryByRole('link', { name: /^Next/ })).toBeNull();
-    expect(within(last).getByText('Event Runner team')).toBeInTheDocument();
+    expect(within(last).getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/admin/setup/email');
   });
 
   it('sends an unknown step address to the first open step', async () => {
     fetch.mockResolvedValueOnce(okResponse(readiness(['admins'])));
     await renderSetup('/admin/setup/no-such-step');
     await openStep('Upload your logos');
+  });
+
+  it('redirects a hosting step address to client setup and keeps hosting status visible', async () => {
+    fetch.mockResolvedValueOnce(okResponse(readiness(['admins'])));
+    await renderSetup('/admin/setup/sign-in');
+    await openStep('Upload your logos');
+    const hosting = screen.getByRole('region', { name: 'Hosting status' });
+    expect(within(hosting).getByRole('heading', { level: 3, name: 'Google sign-in' })).toBeInTheDocument();
+    expect(within(hosting).getByText('Awaiting Event Runner setup')).toBeInTheDocument();
+    expect(within(hosting).queryByRole('link')).toBeNull();
+    expect(within(hosting).queryByRole('button')).toBeNull();
+    expect(within(stepList()).queryByRole('link', { name: /Google sign-in/ })).toBeNull();
   });
 
   it('speaks of the event email in plain words', async () => {
@@ -189,7 +204,7 @@ describe('the setup stepper', () => {
     fireEvent.click(within(legal).getByRole('checkbox'));
     fireEvent.click(within(legal).getByRole('button', { name: 'Approve' }));
 
-    await screen.findByText('1 of 7 steps done');
+    await screen.findByText('1 of 6 steps done');
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness', 'updateEventConfig', 'webMcpCheckEventReadiness']);
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ event: { legal: { reviewRequired: false } } });
     const done = await openStep('Approve the privacy policy and terms');
@@ -224,14 +239,55 @@ describe('the setup stepper', () => {
     const legal = await openStep('Approve the privacy policy and terms');
     expect(within(legal).queryByRole('checkbox')).toBeNull();
     expect(within(legal).getByRole('link', { name: 'Open the privacy policy' })).toBeInTheDocument();
+    const hosting = screen.getByRole('region', { name: 'Hosting status' });
+    expect(within(hosting).getByText('Awaiting Event Runner setup')).toBeInTheDocument();
+    expect(within(hosting).queryByRole('link')).toBeNull();
+    expect(within(hosting).queryByRole('button')).toBeNull();
+    expect(endpoints()).toEqual(['webMcpCheckEventReadiness']);
   });
 
   it('says so when every step is done', async () => {
     fetch.mockResolvedValueOnce(okResponse(readiness(ROW_IDS)));
     await renderSetup();
-    expect(await screen.findByText(/Every step is done/)).toBeInTheDocument();
-    expect(screen.getByText('7 of 7 steps done')).toBeInTheDocument();
+    expect(await screen.findByText('Every setup task and hosting check is ready. Your site is ready to share.')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Hosting status' })).getByText('Ready', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
     await openStep('Add a second operator');
+  });
+
+  it('finishes client tasks while hosting is pending, and rechecks before announcing readiness', async () => {
+    fetch
+      .mockResolvedValueOnce(okResponse(readiness(['admins', 'branding', 'seeded', 'legal', 'sender', 'ticketing'])))
+      .mockResolvedValueOnce(okResponse(readiness(ROW_IDS)));
+    await renderSetup();
+    await screen.findByText('6 of 6 steps done');
+    expect(screen.getByText('Your setup tasks are done. Awaiting Event Runner setup before you share your site.')).toBeInTheDocument();
+    expect(screen.queryByText(/Your site is ready to share/)).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Hosting status' })).getByText('Awaiting Event Runner setup')).toBeInTheDocument();
+    await openStep('Add a second operator');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(await screen.findByText(/Your site is ready to share/)).toBeInTheDocument();
+    expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Hosting status' })).getByText('Ready', { exact: true })).toBeInTheDocument();
+  });
+
+  it('keeps a future host check read-only and outside completed client tasks', async () => {
+    const result = readiness(ROW_IDS);
+    result.ready = false;
+    result.checks.items.push({ name: 'future-row', label: 'Future hosting check', state: 'action-required' });
+    result.checks.total += 1;
+    fetch.mockResolvedValueOnce(okResponse(result));
+    await renderSetup('/admin/setup/future-row');
+    await openStep('Add a second operator');
+    expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
+    expect(within(stepList()).getAllByRole('link')).toHaveLength(6);
+    const hosting = screen.getByRole('region', { name: 'Hosting status' });
+    expect(within(hosting).getByRole('heading', { name: 'Future hosting check' })).toBeInTheDocument();
+    expect(within(hosting).getByText('Awaiting Event Runner setup')).toBeInTheDocument();
+    expect(within(hosting).queryByRole('link')).toBeNull();
+    expect(within(hosting).queryByRole('button')).toBeNull();
+    expect(screen.queryByText(/Your site is ready to share/)).toBeNull();
   });
 
   it('states a failed first check with the server words and no steps', async () => {
@@ -243,13 +299,18 @@ describe('the setup stepper', () => {
 
   it('keeps the last results under a caution when a second check fails', async () => {
     fetch
-      .mockResolvedValueOnce(okResponse(readiness(['auth'])))
+      .mockResolvedValueOnce(okResponse(readiness(ROW_IDS)))
       .mockResolvedValueOnce(errorResponse(503, 'unavailable', 'Down.'));
     await renderSetup();
-    await screen.findByText('1 of 7 steps done');
+    await screen.findByText('6 of 6 steps done');
+    expect(screen.getByText(/Your site is ready to share/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(screen.queryByText(/Your site is ready to share/)).toBeNull();
     await waitFor(() => expect(screen.getByText(/The setup could not be checked/)).toBeInTheDocument());
     expect(stepList()).toBeInTheDocument();
+    expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Hosting status' })).getByText('Ready', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText(/Your site is ready to share/)).toBeNull();
   });
 });
 

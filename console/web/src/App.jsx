@@ -135,7 +135,7 @@ function RequireAuth() {
 
 function NotFound() {
   return (
-    <section className="panel narrow" aria-labelledby="missing-title">
+    <section className="panel" aria-labelledby="missing-title">
       <h1 id="missing-title" tabIndex={-1}>Page not found</h1>
       <p><Link to="/">Go to your organizations</Link></p>
     </section>

@@ -2,7 +2,7 @@
 .not-found__intro { align-self: center; }
 .not-found__code { font-family: var(--font-mono); font-size: var(--text-caption); margin-block: var(--space-md); }
 .not-found__intro h1 { font-family: var(--font-heading); font-size: var(--text-nameplate); line-height: 1.04; letter-spacing: -.035em; overflow-wrap: anywhere; }
-.not-found__description { max-width: 42ch; margin-block: var(--space-lg); font-size: var(--text-lead); }
+.not-found__description { margin-block: var(--space-lg); font-size: var(--text-lead); }
 .not-found__scene { min-width: 0; position: relative; padding-inline: var(--space-lg); }
 .not-found__ticket-control { display: block; width: 100%; min-height: 25rem; padding: 0 1rem 2rem; color: inherit; background: transparent; border: 0; cursor: grab; touch-action: pan-y pinch-zoom; }
 .not-found__ticket-control:active { cursor: grabbing; }

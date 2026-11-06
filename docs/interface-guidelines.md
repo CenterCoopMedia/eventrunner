@@ -215,6 +215,8 @@ These checks support source review; they do not prove screen-reader behavior, re
 - `text-underline-position: from-font` with `text-decoration-skip-ink: auto`.
 - Truncated text stays fully accessible via tooltip or an expanded view.
 
+**Editor action stability.** Content record editors keep Save and Publish in position when work starts or feedback appears. `AdminPageHeader` puts editor feedback in its own full-width row outside the action toolbar and top-aligns desktop actions beside the title. Feedback wraps normally and keeps its existing live-region behavior. `ActionLabel` reserves the width of both idle and pending wording while exposing only the active label. The Page, content-block, Update, Timeline, Session, Speaker and Organization editors and the content-section header use these owners; inline image-editor feedback stays with its image controls.
+
 ## Colors
 
 - Every palette step must earn its place — no unused steps.
@@ -296,6 +298,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 
 - **The stage** (`--stage-max`) is the frame. The header, the navigation, the schedule grid, the four directories, the logo wall, the footer, and every section head run to it. It is a maximum inline size of 95 percent, centered, with a gutter from the spacing scale. It is never a fixed width.
 - **The measure** (`--measure-text`) is running text. Paragraphs, lists, rich text, descriptions and answers fill the same content box as the section rule. `max-w-prose` resolves to this token too.
+- **Context belongs to its container.** Page introductions, panel descriptions, field hints, notices, errors, empty states and confirmation copy use the available content width in Admin, Console and the public app. Admin page headers, panels and confirmations own this rule; local copy does not add a character cap. Narrative inputs and multi-step forms fill their workspace too. The console frame uses 95 percent at desktop widths with responsive gutters. Keep a narrower size only for a named task: long-form agreement reading, a focused sign-in or identity handoff, a short date/code/email control, a compact table column, a tooltip, an authentic email preview or a bounded modal. Context inside those surfaces fills that surface; it does not acquire another reading column.
 - **The stage split** uses one full-width track without an empty margin column. Folios, including margin-style folios, stay inside the stage at the end of the rule.
 - **The frame token defaults to `95%` and the measure token defaults to `100%`.** They are declared in the `page` contract (`design/tokens/components.json`) over the tier-2 stage family. At viewports of 1024px and wider, the stage content box after its gutter uses at least 90 percent of the viewport.
 - **The arrangement variant maps onto the stage.** `grid` gives a section the stage's columns; `list` sets it on the measure. The section head runs to the stage either way, because a section boundary is the width of the page it opens.

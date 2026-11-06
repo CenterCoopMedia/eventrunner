@@ -2,12 +2,14 @@
 
 /**
  * Admin access — who may sign in to the admin panel, and at which tier
- * (issue #187). Two operator-only POST endpoints, following admin/config.cjs's
+ * (issue #187). Operator-only POST endpoints, following admin/config.cjs's
  * gate + audit conventions:
  *
  *   listAdminAccess {}  → { accounts: [{ email, tier, expiresAt?, expiryState? }], callerEmail }
  *   setAdminAccess  { email, tier, expiresAt? }
  *                       → { ok, email, tier, previousTier, changed, expiresAt?, previousExpiresAt? }
+ *   resendAdminAccessInstructions { email, sendId } → { ok, email, emailResult }
+ * A new grant also returns emailResult, independently of the saved access.
  *
  * `config/bootstrap` is server-only in both directions (firestore.rules
  * denies even an operator a direct read), so these two endpoints are the
@@ -70,6 +72,9 @@ const {
 } = require('../core/auth.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { randomUUID, createHash } = require('node:crypto');
+const { activeAccount, sendAccessInstructions, SEND_ID_RE } = require('./accessMail.cjs');
+const { checkDemoWrites } = require('../core/demoWrites.cjs');
 
 const BOOTSTRAP = { collection: 'config', doc: 'bootstrap' };
 /** Every value setAdminAccess accepts for `tier`. */
@@ -349,7 +354,7 @@ function createListAdminAccessHandler({ db, auth, getConfig, now = Date.now, log
  *           refreshConfig?: () => Promise<unknown>, now?: () => number,
  *           log?: Pick<Console, 'error'|'warn'> }} deps
  */
-function createSetAdminAccessHandler({ db, auth, getConfig, refreshConfig, now = Date.now, log = console }) {
+function createSetAdminAccessHandler({ db, auth, getConfig, refreshConfig, sendEmail, env, now = Date.now, log = console }) {
   return async function setAdminAccess(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const gate = await requireAdmin({ auth, db, getConfig, now }, req, { tier: 'operator' });
@@ -405,6 +410,17 @@ function createSetAdminAccessHandler({ db, auth, getConfig, refreshConfig, now =
         }
       }
     }
+    // Only an actual new grant sends automatically. A replay, ordinary tier
+    // change, renewal, normalization or removal never sends another email.
+    const emailResult = result.changed && result.previousTier === null && nextTier !== null
+      ? await sendAccessInstructions({ db, getConfig, sendEmail, env, email, now, log, onceKey: `admin-access:grant:${randomUUID()}` })
+      : null;
+    if (emailResult) {
+      await logAdminAction({
+        db, actor: gate, action: 'sendAdminAccessInstructions', docPath: 'config/bootstrap', now, log,
+        details: { email, emailResult },
+      });
+    }
     res.status(200).json({
       ok: true,
       email,
@@ -412,7 +428,39 @@ function createSetAdminAccessHandler({ db, auth, getConfig, refreshConfig, now =
       previousTier: result.previousTier,
       changed: result.changed,
       ...expiryFields,
+      ...(emailResult ? { emailResult } : {}),
     });
+  };
+}
+
+/** One stable sendId per explicit operator resend, including lost replies. */
+function createResendAdminAccessInstructionsHandler({ db, auth, getConfig, sendEmail, env, now = Date.now, log = console }) {
+  return async function resendAdminAccessInstructions(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const gate = await requireAdmin({ auth, db, getConfig, now }, req, { tier: 'operator' });
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+    const email = readEmail(req.body?.email);
+    if (!email) return badRequest(res, 'email: must be an email address.');
+    const sendId = req.body?.sendId;
+    if (typeof sendId !== 'string' || !SEND_ID_RE.test(sendId)) return badRequest(res, 'sendId: must identify this send attempt.');
+    const policy = await checkDemoWrites({ db });
+    if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
+    try {
+      const account = await activeAccount({ db, email, now });
+      if (!account.tier) return sendError(res, 409, 'inactive-access', 'This account no longer has active access. No instructions were sent.');
+    } catch {
+      return internal(res, 'Active access could not be checked. No instructions were sent.');
+    }
+    const addressKey = createHash('sha256').update(email).digest('hex');
+    const emailResult = await sendAccessInstructions({
+      db, getConfig, sendEmail, env, email, now, log,
+      onceKey: `admin-access:resend:${gate.uid}:${addressKey}:${sendId}`,
+    });
+    await logAdminAction({
+      db, actor: gate, action: 'resendAdminAccessInstructions', docPath: 'config/bootstrap', now, log,
+      details: { email, sendId, emailResult },
+    });
+    return res.status(200).json({ ok: true, email, emailResult });
   };
 }
 
@@ -485,9 +533,12 @@ async function endExpiredStaffAccess({ db, now = Date.now }) {
   });
 }
 
-/** Deployable exports (spec §1.3 admin/): listAdminAccess, setAdminAccess, endExpiredStaffAccess. */
+/** Access HTTP endpoints and the staff-expiry sweep. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
+  const { defineSecret } = require('firebase-functions/params');
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  const secrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
 
   const buildDeps = () => {
@@ -512,15 +563,16 @@ function buildHandlers() {
     await handler(req, res);
   };
 
-  const expose = (create) =>
-    onRequest({ region }, withCors(async (req, res) => {
+  const expose = (create, options = {}) =>
+    onRequest({ region, ...options }, withCors(async (req, res) => {
       await create(buildDeps())(req, res);
     }));
 
   const { onSchedule } = require('firebase-functions/v2/scheduler');
   return {
     listAdminAccess: expose(createListAdminAccessHandler),
-    setAdminAccess: expose(createSetAdminAccessHandler),
+    setAdminAccess: expose(createSetAdminAccessHandler, { secrets }),
+    resendAdminAccessInstructions: expose(createResendAdminAccessInstructionsHandler, { secrets }),
     // Takes ended staff grants off the list (see endExpiredStaffAccess).
     endExpiredStaffAccess: onSchedule({ region, schedule: 'every 1 minutes' }, async () => {
       const { getDb } = require('../core/firestore.cjs');
@@ -542,6 +594,7 @@ module.exports = {
   endExpiredStaffAccess,
   createListAdminAccessHandler,
   createSetAdminAccessHandler,
+  createResendAdminAccessInstructionsHandler,
   get handlers() {
     return buildHandlers();
   },

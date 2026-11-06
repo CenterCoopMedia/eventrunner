@@ -1,11 +1,10 @@
-// The steps of the "Set up your event" page (ADR 0007 §6), one per
-// launch-readiness row in packages/shared/src/readiness.cjs.
+// The tasks and hosting status on "Set up your event" (ADR 0007 §6),
+// joined to launch-readiness rows in packages/shared/src/readiness.cjs.
 //
 // The server says only which rows are met (webMcpCheckEventReadiness). This
 // file says what each row means to the client: who does it, what to do, and
-// where to go. The order is the order a new client meets the work: the
-// steps the client can do today first, then the steps that wait on DNS or
-// the Event Runner team.
+// where to go. Client tasks (owner you or both) keep this order in the
+// stepper. Host-only rows appear separately as read-only hosting status.
 //
 // `slug` is the step's own address (/admin/setup/<slug>), so a link in an
 // email or the browser's Back button lands on one step.
@@ -78,9 +77,9 @@ export const SETUP_STEPS = Object.freeze([
   {
     id: 'auth',
     slug: 'sign-in',
-    title: 'Turn on Google sign-in',
+    title: 'Google sign-in',
     owner: 'host',
-    todo: 'The Event Runner team turns on Google sign-in after your site is built. You do not need to do anything.',
+    todo: 'The Event Runner team configures Google sign-in for your web address. No action is needed from you.',
     done: 'Google sign-in works on your web address.',
     link: null,
   },
@@ -107,8 +106,8 @@ export function joinSetupSteps(checks) {
       slug: check.name,
       title: check.label,
       owner: 'host',
-      todo: 'The Event Runner team completes this step.',
-      done: 'This step is done.',
+      todo: 'The Event Runner team completes this hosting check. No action is needed from you.',
+      done: 'This hosting check is ready.',
       link: null,
       ready: check.state === 'ready',
     }));

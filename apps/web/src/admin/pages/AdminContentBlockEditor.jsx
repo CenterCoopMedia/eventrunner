@@ -54,6 +54,7 @@ import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedCha
 import { summarizePublish } from '../publishResult.js';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
+  ActionLabel,
   CheckboxField,
   DestructiveConfirm,
   Notice,
@@ -659,13 +660,14 @@ export default function AdminContentBlockEditor({ mode }) {
           </>
         )}
         identifiers={`${page?.current?.label || 'Untitled page'} · ${section?.label || 'Untitled section'}`}
+        feedback={status || error ? <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
           <>
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to section
             </Link>
             <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
-              {busy === 'draft' ? 'Saving…' : 'Save'}
+              <ActionLabel busy={busy === 'draft'} pending="Saving…">Save</ActionLabel>
             </button>
             <button
               type="button"
@@ -674,9 +676,8 @@ export default function AdminContentBlockEditor({ mode }) {
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {busy === 'publish' ? 'Publishing…' : 'Publish'}
+              <ActionLabel busy={busy === 'publish'} pending="Publishing…">Publish</ActionLabel>
             </button>
-            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />

@@ -90,7 +90,10 @@ a { color: rgb(var(--accent)); text-underline-offset: 0.15em; }
 }
 
 .masthead { border-block-start: 3px solid rgb(var(--accent)); border-block-end: 1px solid rgb(var(--rule)); }
-.masthead-inner, .page { max-width: 46rem; margin: 0 auto; padding-inline: var(--space-md); }
+.masthead-inner, .page { margin: 0 auto; padding-inline: var(--space-md); }
+@media (min-width: 64rem) {
+  .masthead-inner, .page { max-width: 95%; }
+}
 .masthead-inner {
   display: flex;
   flex-wrap: wrap;
@@ -238,7 +241,6 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
    screen, above it on a narrow one. */
 .setup { display: grid; gap: var(--space-lg); }
 @media (min-width: 52rem) {
-  .page:has(.setup) { max-width: 64rem; }
   .setup { grid-template-columns: 15rem minmax(0, 1fr); align-items: start; }
 }
 .step-nav p { margin: 0 0 var(--space-xs); font-size: 0.9rem; }
@@ -263,7 +265,7 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
   padding: 0.25rem var(--space-xs);
   color: rgb(var(--ink-muted));
 }
-.agreement { padding: var(--space-md); border: 1px solid rgb(var(--rule)); border-radius: var(--radius); overflow-wrap: anywhere; }
+.agreement { max-width: 75ch; padding: var(--space-md); border: 1px solid rgb(var(--rule)); border-radius: var(--radius); overflow-wrap: anywhere; }
 .agreement h2 { margin-top: 0; }
 .agreement-text-field textarea { min-height: 20rem; }
 .step-number {
@@ -446,13 +448,10 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
     display: block;
     position: fixed;
     top: 7rem;
-    right: calc(50% + 24rem);
-    width: 4rem;
-    height: 4.5rem;
+    right: 97.5%;
+    width: min(4rem, 2.5vw);
   }
-  .margin-badger .wait-buddy { width: 4rem; height: 4.5rem; transform-box: fill-box; transform-origin: 50% 70%; }
-  body:has(.setup) .margin-badger { right: calc(50% + 33rem); }
-  body:has(.console-workspace) .margin-badger { right: calc(50% + 37rem); }
+  .margin-badger .wait-buddy { width: 100%; height: auto; transform-box: fill-box; transform-origin: 50% 70%; }
 }
 @media (min-width: 84rem) and (hover: hover) and (prefers-reduced-motion: no-preference) {
   .margin-badger:hover .wait-buddy { animation: margin-badger-wiggle 500ms ease-in-out; }
@@ -467,13 +466,12 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 /* Organization and application workspaces share the console's palette,
    with more room for the directory and a secondary progress column. */
 .page:has(.console-workspace), body:has(.console-workspace) .masthead-inner {
-  max-width: 72rem;
   padding-inline: clamp(var(--space-md), 4vw, var(--space-xl));
 }
 .page:has(.console-workspace) { padding-block: clamp(var(--space-xl), 5vw, 4rem); }
 .workspace-heading { margin-bottom: var(--space-xl); }
 .workspace-heading h1 { margin-bottom: var(--space-sm); }
-.workspace-heading .lead { margin: 0; max-width: 46rem; }
+.workspace-heading .lead { margin: 0; }
 .directory-columns, .directory-link {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(9rem, 15rem) 1.25rem;
@@ -519,7 +517,7 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 }
 .directory-heading > div { flex: 1 1 24rem; }
 .directory-heading h2 { margin: 0 0 var(--space-xs); font-size: 1.5rem; }
-.directory-heading p { margin: 0; max-width: 42rem; }
+.directory-heading p { margin: 0; }
 .directory-heading .button { flex-shrink: 0; }
 .application-layout { display: grid; gap: var(--space-xl); }
 .application-summary, .application-details, .application-progress { min-width: 0; }
@@ -561,7 +559,7 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
   .application-layout { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); column-gap: clamp(var(--space-xl), 5vw, 4rem); align-items: start; }
   .application-progress { grid-column: 2; grid-row: 1 / span 2; border-top: 0; border-inline-start: 1px solid rgb(var(--rule)); padding-top: 0; padding-inline-start: var(--space-xl); }
   .application-details { grid-column: 1; }
-  .application-closed { grid-template-columns: minmax(0, 42rem); }
+  .application-closed { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 35.99rem) {
   .directory-columns { display: none; }

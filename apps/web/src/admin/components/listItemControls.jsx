@@ -96,7 +96,7 @@ export function RemovalWarning({ title, consequence, confirmLabel, keepLabel, on
       className="mt-sm flex flex-col gap-xs rounded-admin border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm"
     >
       <p id={headingId} className="text-admin-base font-bold text-admin-state-error">{title}</p>
-      <p id={consequenceId} className="max-w-[65ch] text-admin-sm text-admin-ink">{consequence}</p>
+      <p id={consequenceId} className="text-admin-sm text-admin-ink">{consequence}</p>
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={dangerButtonClass} onClick={onConfirm}>{confirmLabel}</button>
         <button type="button" className={secondaryButtonClass} onClick={onKeep}>{keepLabel}</button>
