@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { timelineFields, validateTimelineForm } from '../timelineDoc.js';
 import { useAdminTimeline } from '../useAdminTimeline.js';
@@ -155,9 +156,9 @@ export default function AdminTimelineEditor({ mode }) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: COLLECTION, docIds: [docId] });
         const verdict = summarizePublish(response, COLLECTION, [docId], 'timeline entries');
-        if (!verdict.ok) throw new Error(verdict.message);
-        setStatus(verdict.message);
-        if (mode === 'create') showToast(verdict.message, { announce: false });
+        if (!verdict.ok) throw Object.assign(new Error(verdict.message), { contentPublishResult: true });
+        setStatus('Published.');
+        if (mode === 'create') showToast('Published.', { announce: false });
       } else {
         setStatus('Draft saved. It is not live until you publish it.');
         if (mode === 'create') showToast('Draft saved. It is not live until you publish it.', { announce: false });
@@ -167,7 +168,7 @@ export default function AdminTimelineEditor({ mode }) {
       }
     } catch (err) {
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
-      setError(err);
+      setError(contentError(err, { fallback: stage === 'publish' ? 'Publishing did not finish. Your draft is saved. Try again.' : undefined, labels: { year: 'Year', title: 'Title', description: 'Description' } }));
     } finally {
       setAction(null);
     }
@@ -182,8 +183,8 @@ export default function AdminTimelineEditor({ mode }) {
       showToast('Timeline entry deleted.');
       navigate(TIMELINE_LIST);
     } catch (err) {
-      setErrorTitle('The server refused the delete');
-      setError(err);
+      setErrorTitle('Could not delete. Try again.');
+      setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: { year: 'Year', title: 'Title', description: 'Description' } }));
     } finally {
       setAction(null);
     }
@@ -197,7 +198,7 @@ export default function AdminTimelineEditor({ mode }) {
       return (
         <Notice
           tone="caution"
-          message="We could not load this entry and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+          message="This entry could not load. Check your connection and try again."
         />
       );
     }
@@ -225,10 +226,8 @@ export default function AdminTimelineEditor({ mode }) {
       onSubmit={(event) => { event.preventDefault(); save(); }}
     >
       <AdminPageHeader
-        title={creating ? 'New entry' : form.title.trim() || docId}
+        title={creating ? 'New entry' : form.title.trim() || 'Untitled entry'}
         state={!creating && row ? <RecordState state={row.state} /> : null}
-        identifiers={creating ? null : docId}
-        description="Save builds a draft. Publish sends it to the home page's History section."
         actions={
           <>
             <button
@@ -237,7 +236,7 @@ export default function AdminTimelineEditor({ mode }) {
               disabled={saving}
               aria-busy={action === 'draft' || undefined}
             >
-              {action === 'draft' ? 'Saving…' : 'Save draft'}
+              {action === 'draft' ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
@@ -246,7 +245,7 @@ export default function AdminTimelineEditor({ mode }) {
               aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {action === 'publish' ? 'Publishing…' : 'Save and publish'}
+              {action === 'publish' ? 'Publishing…' : 'Publish'}
             </button>
             <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} />
           </>
@@ -259,7 +258,6 @@ export default function AdminTimelineEditor({ mode }) {
         <div className="flex flex-col gap-sm">
           <TextField
             label="Year"
-            hint="Four digits. The site shows the year beside the title and uses it to order the list."
             inputMode="numeric"
             autoComplete="off"
             value={form.year}
@@ -270,7 +268,7 @@ export default function AdminTimelineEditor({ mode }) {
           />
           <TextField
             label="Title"
-            hint="What the event is remembered for that year, in a few words. Leave the year out; the site shows it."
+            hint="What made this event memorable?"
             value={form.title}
             onChange={(value) => set('title', value)}
             error={errorFor('title')}
@@ -278,7 +276,7 @@ export default function AdminTimelineEditor({ mode }) {
           />
           <TextAreaField
             label="Description"
-            hint="One or two sentences of plain text. The page shows it as one paragraph."
+            hint="One or two sentences about this event."
             rows={3}
             value={form.description}
             onChange={(value) => set('description', value)}
@@ -300,7 +298,8 @@ export default function AdminTimelineEditor({ mode }) {
           <DestructiveConfirm
             className="ms-auto"
             trigger="Delete this entry"
-            title={`Delete ${form.title.trim() || docId}`}
+            triggerIcon="delete"
+            title={`Delete ${form.title.trim() || 'Untitled entry'}`}
             confirmLabel="Delete this entry"
             busyLabel="Deleting…"
             busy={action === 'delete'}

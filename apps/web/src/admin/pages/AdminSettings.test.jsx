@@ -1054,10 +1054,10 @@ describe('per-document adoption', () => {
     await pushConfig('event', LIVE_EVENT);
     await pushConfig('features', { schedule: false, speakers: true });
 
-    expect(screen.getByRole('checkbox', { name: 'Public schedule' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Public schedule' })).not.toBeChecked();
 
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save features' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     // The snapshot has schedule: true. Saving it would have silently
     // re-enabled a flag production had turned off.
@@ -1086,10 +1086,10 @@ describe('feature flags', () => {
     await renderAt('/admin/features');
     await pushConfig('features', { schedule: true });
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save features' }));
-    expect(await screen.findByText('Saved. The site picks the change up live.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Public schedule' }));
-    expect(screen.queryByText('Saved. The site picks the change up live.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Features saved.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: 'Public schedule' }));
+    expect(screen.queryByText('Features saved.')).not.toBeInTheDocument();
   });
   it('keeps future schema keys visible in a fallback group without duplicating known features', async () => {
     const { featureGroupsFor } = await import('./AdminFeatureSettings.jsx');
@@ -1114,14 +1114,14 @@ describe('feature flags', () => {
       expect(inputs[0]).toHaveAccessibleDescription();
       const card = inputs[0].closest('.admin-feature-card');
       expect(card).toHaveAttribute('data-enabled', key === 'schedule' ? 'true' : 'false');
-      expect(within(card).getByText(key === 'schedule' ? 'Enabled' : 'Disabled')).toBeInTheDocument();
+      expect(within(card).getByText(key === 'schedule' ? 'On' : 'Off')).toBeInTheDocument();
     }
     for (const heading of ['Public content', 'Attendees and access', 'Session tools', 'Feedback and browser tools']) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
     }
-    expect(screen.getByText('1 of 20 features enabled. Changes take effect after you save.')).toBeInTheDocument();
+    expect(screen.getByText('1 of 20 features on. Changes take effect after you save.')).toBeInTheDocument();
 
-    const schedule = screen.getByRole('checkbox', { name: 'Public schedule' });
+    const schedule = screen.getByRole('switch', { name: 'Public schedule' });
     fireEvent.click(screen.getByText('Show the public schedule.'));
     expect(schedule).not.toBeChecked();
     expect(schedule.closest('.admin-feature-card')).toHaveAttribute('data-enabled', 'false');
@@ -1134,12 +1134,12 @@ describe('feature flags', () => {
     await renderAt('/admin/features');
     await pushConfig('features', { schedule: true, speakers: false });
 
-    expect(screen.getByRole('checkbox', { name: 'Public schedule' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Speaker directory' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Public schedule' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Speaker directory' })).not.toBeChecked();
 
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Speaker directory' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save features' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Speaker directory' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/updateFeatures$/);
@@ -1158,15 +1158,15 @@ describe('feature flags', () => {
     fetch.mockResolvedValueOnce(
       errorResponse(400, 'bad-request', 'features.schedule: must be a boolean, got "yes"'),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Save features' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Schedule: must be a boolean, got "yes"',
+      'Check public schedule and try again.',
     );
-    const schedule = screen.getByRole('checkbox', { name: 'Public schedule' });
+    const schedule = screen.getByRole('switch', { name: 'Public schedule' });
     expect(schedule).toBeChecked();
     expect(schedule).toHaveAttribute('aria-invalid', 'true');
-    expect(schedule).toHaveAccessibleDescription(/Show the public schedule\..*Schedule: must be a boolean/);
+    expect(schedule).toHaveAccessibleDescription(/Show the public schedule\..*Check public schedule/);
     expect(await screen.findByRole('alert')).toHaveFocus();
   });
 });

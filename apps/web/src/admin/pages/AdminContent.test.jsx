@@ -283,7 +283,7 @@ describe('content browsing', () => {
     expect(await screen.findByRole('link', { name: 'Intro' })).toBeInTheDocument();
     expect(screen.getByText(/1 block/)).toBeInTheDocument();
     expect(screen.getByText('Who the scholarships are for.')).toBeInTheDocument();
-    expect(screen.getByText('All block types', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('Any content', { exact: false })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit content in Intro' })).toHaveAttribute('href', '/admin/content/scholarships/intro');
 
     fireEvent.click(screen.getByRole('link', { name: 'Intro', exact: true }));
@@ -322,7 +322,7 @@ describe('content browsing', () => {
     expect(screen.getByRole('heading', { name: 'No matching pages' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(search).toHaveAccessibleDescription('0 of 3 pages');
-    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Clear search' })[0]);
     expect(search).toHaveValue('');
     expect(search).toHaveFocus();
     expect(search).toHaveAccessibleDescription('3 pages');
@@ -351,7 +351,7 @@ describe('content browsing', () => {
     const row = within(screen.getByRole('table')).getByRole('link', { name: 'Scholarships', exact: true }).closest('tr');
     expect(within(row).getByText('Live', { exact: true })).toBeInTheDocument();
     expect(within(row).queryByText('Live with unpublished changes')).not.toBeInTheDocument();
-    expect(screen.getByText('Page state is for the page’s structure. Open a section to review its content drafts.')).toBeInTheDocument();
+    expect(screen.queryByText('Page state is for the page’s structure. Open a section to review its content drafts.')).not.toBeInTheDocument();
     fireEvent.click(within(row).getByRole('link', { name: 'Intro' }));
     const block = (await screen.findByRole('link', { name: 'Scholarships open in spring.' })).closest('li');
     expect(within(block).getByText('Live with unpublished changes')).toBeInTheDocument();
@@ -486,7 +486,7 @@ describe('content browsing', () => {
     expect((await findRichText()).innerHTML).toBe('<p>Scholarships open in spring.</p>');
 
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__body', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).fields.value).toBe('<p>Scholarships open in spring.</p>');
   });
@@ -500,7 +500,7 @@ describe('content browsing', () => {
     await waitFor(() => expect(adminErrors.has('cmsContent_drafts')).toBe(true));
     act(() => adminErrors.get('cmsContent_drafts')(new Error('permission denied')));
 
-    expect(await screen.findByText(/could not load this block and its saved draft/i)).toBeInTheDocument();
+    expect(await screen.findByText(/This block could not load/i)).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Text' })).toBeNull();
   });
 
@@ -515,7 +515,7 @@ describe('content browsing', () => {
     await renderAt('/admin/content/scholarships/intro/new');
 
     expect((await findRichText()).innerHTML).toBe('<p>Scholarships open in spring.</p>');
-    expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
+    expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete this block' })).toBeInTheDocument();
   });
 });
@@ -557,7 +557,7 @@ describe('creating and editing a block', () => {
     expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'richtext' } });
     await replaceRichText(await findRichText(), '<p>Hello</p>', 'Hello');
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsCreateContent$/);
@@ -579,7 +579,7 @@ describe('creating and editing a block', () => {
     silentCollections = ['cmsContent_drafts'];
     await renderAt('/admin/content/scholarships/intro/_new');
     expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save', exact: true })).toBeNull();
   });
 
   it('offers every block type for a custom section, driven by the registry', async () => {
@@ -613,7 +613,7 @@ describe('creating and editing a block', () => {
     const editor = await findRichText();
     expect(editor.innerHTML).toBe('<p>Scholarships open in spring.</p>');
     await replaceRichText(editor, '<p>Updated copy.</p>', 'Updated copy.');
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
@@ -641,13 +641,13 @@ describe('creating and editing a block', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish', exact: true }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
     expect(urlOf(1)).toMatch(/\/cmsPublish$/);
     expect(bodyOf(1)).toEqual({ collection: 'cmsContent', docIds: ['intro__body'] });
-    expect(await screen.findByText(/picks it up live/i, { selector: 'p[role="status"]' })).toBeInTheDocument();
+    expect(await screen.findByText('Published.', { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 
   it('blocks the save when a required registry field is left blank', async () => {
@@ -655,7 +655,7 @@ describe('creating and editing a block', () => {
     await renderAt('/admin/content/scholarships/intro/_new');
 
     fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Figure: is required.');
@@ -678,7 +678,7 @@ describe('creating and editing a block', () => {
     fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
     fireEvent.change(screen.getByLabelText(/^Figure/), { target: { value: '42' } });
     fireEvent.change(screen.getByLabelText(/^Caption/), { target: { value: 'scholarships awarded' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
 
     const alert = await screen.findByRole('alert');
     for (const label of ['Finding', 'What it counts', 'Source', 'Screen reader text']) {
@@ -716,7 +716,7 @@ describe('creating and editing a block', () => {
     fireEvent.change(screen.getByLabelText('Screen reader text'), {
       target: { value: 'The fund awarded 42 scholarships in 2026.' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     // cta's `url`/`external` are not part of stat's fields — cmsUpdateContent
@@ -754,7 +754,7 @@ describe('creating and editing a block', () => {
 });
 
 describe('server errors and publish skips', () => {
-  it('surfaces the server’s rejection verbatim', async () => {
+  it('replaces server diagnostics with a recovery message', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     fetch.mockResolvedValueOnce(
       errorResponse(400, 'bad-request', 'fields may not set reserved keys: revision, status.'),
@@ -766,10 +766,10 @@ describe('server errors and publish skips', () => {
     // has its own test.
     fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'richtext' } });
     await replaceRichText(await findRichText(), '<p>Hi</p>', 'Hi');
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('fields may not set reserved keys: revision, status.');
+    expect(alert).toHaveTextContent('The change could not be saved. Try again.');
   });
 
   it('does not claim success when cmsPublish skipped the block', async () => {
@@ -791,12 +791,12 @@ describe('server errors and publish skips', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish', exact: true }));
 
     expect(
       (await screen.findAllByText(/One item was edited while publishing/i)).length,
     ).toBeGreaterThan(0);
-    expect(screen.queryByText(/picks it up live/i)).toBeNull();
+    expect(screen.queryByText('Published.', { exact: true })).toBeNull();
   });
 
   it('resumes a part-way publish with its queueId instead of republishing', async () => {
@@ -821,13 +821,13 @@ describe('server errors and publish skips', () => {
       );
 
     await renderAt('/admin/content/scholarships/intro/body');
-    fireEvent.click(await screen.findByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish', exact: true }));
     const resume = await screen.findByRole('button', { name: 'Resume publish' });
 
     fireEvent.click(resume);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
     expect(bodyOf(2)).toEqual({ queueId: 'queue-9' });
-    expect(await screen.findByText(/picks it up live/i, { selector: 'p[role="status"]' })).toBeInTheDocument();
+    expect(await screen.findByText('Published.', { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 });
 

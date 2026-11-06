@@ -41,6 +41,7 @@ import { Link, useSearchParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { zoneLabel } from '../../lib/eventTime.js';
 import { useAdminApi } from '../adminApi.js';
+import { communicationsError } from '../components/communicationsErrors.js';
 import AdminIconControl from '../components/AdminIconControl.jsx';
 import { buildPreviewDoc } from '../emailPreview.js';
 import {
@@ -82,9 +83,9 @@ export const SOURCE_LABELS = Object.freeze({
 const DELIVERY_WORDS = Object.freeze({
   delivered: { label: 'Delivered', tone: 'ok' },
   bounced: { label: 'Bounced', tone: 'error' },
-  complained: { label: 'Complained', tone: 'caution', gloss: 'The recipient marked it as spam.' },
+  complained: { label: 'Marked as spam', tone: 'caution', gloss: 'The recipient marked it as spam.' },
   suppressed: {
-    label: 'Suppressed',
+    label: 'Not sent',
     tone: 'caution',
     gloss: 'The mail provider did not send it, because the address is on its block list.',
   },
@@ -207,7 +208,7 @@ const quietWordClass = 'text-admin-ink-secondary';
 function SourceCell({ source }) {
   if (!source) return <span className={quietWordClass}>None</span>;
   if (known(SOURCE_LABELS, source)) return SOURCE_LABELS[source];
-  return <span className="font-admin-data text-admin-ink-data">{source}</span>;
+  return <span className={quietWordClass}>Other email</span>;
 }
 
 /**
@@ -221,8 +222,8 @@ function StatusCell({ row }) {
   if (row.status === 'failed') word = <StatusBadge tone="error">Failed</StatusBadge>;
   else if (delivery) word = <StatusBadge tone={delivery.tone}>{delivery.label}</StatusBadge>;
   else if (row.status === 'sent') word = <span className={quietWordClass}>Sent</span>;
-  else word = <span className="font-admin-data text-admin-ink-data">{row.status ?? 'Unknown'}</span>;
-  const reason = row.status === 'failed' ? row.error : row.bounceReason;
+  else word = <span className={quietWordClass}>Status unavailable</span>;
+  const reason = row.status === 'failed' ? 'Delivery failed. Check the email address before trying again.' : row.bounceReason ? 'The message could not be delivered. Check the email address.' : null;
   const gloss = row.status !== 'failed' ? delivery?.gloss : null;
   return (
     <>
@@ -247,7 +248,7 @@ function PreviewFrame({ srcDoc, to }) {
         className="block h-[24rem] w-full rounded-admin border-admin-hairline border-admin-rule-hairline [color-scheme:light]"
       />
       <p className="text-admin-xs text-admin-ink-secondary">
-        Links and remote images are turned off in this preview.
+        Links are inactive and images are hidden.
       </p>
     </>
   );
@@ -269,21 +270,21 @@ function StoredBody({ message }) {
       {refused ? (
         <p className="text-admin-sm text-admin-ink">
           {text
-            ? 'This message’s HTML cannot be shown safely, so its plain text version is shown instead.'
-            : 'This message’s HTML cannot be shown safely, and it has no plain text version.'}
+            ? 'The formatted preview is unavailable. The text preview is shown below.'
+            : 'This message has no preview available.'}
         </p>
       ) : null}
       {text ? (
         <details open={!srcDoc} className="text-admin-sm">
-          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version</summary>
-          <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
+          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview</summary>
+          <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
             {text}
           </pre>
         </details>
       ) : null}
-      {!html && !text ? <p className="text-admin-sm text-admin-ink">This message has no stored body.</p> : null}
+      {!html && !text ? <p className="text-admin-sm text-admin-ink">This message has no preview available.</p> : null}
       {bodyTruncated ? (
-        <p className="text-admin-sm text-admin-ink-secondary">The stored body stops at 100 KB.</p>
+        <p className="text-admin-sm text-admin-ink-secondary">Only part of this message is available.</p>
       ) : null}
     </div>
   );
@@ -294,7 +295,7 @@ function PreviewBody({ row, detail, onRetry }) {
   if (!row.bodyStored) {
     return (
       <p className="text-admin-sm text-admin-ink">
-        This message’s body was not stored because it held a sign-in code or an invitation link.
+        This message is private because it contains a sign-in code or invitation link.
       </p>
     );
   }
@@ -302,7 +303,7 @@ function PreviewBody({ row, detail, onRetry }) {
     const failed = detail?.state === 'error';
     return (
       <div className="flex flex-col items-start gap-xs">
-        {failed ? <Notice tone="error" message={detail.error.message} /> : <AdminLoadingState label="Loading the message…" />}
+        {failed ? <Notice tone="error" message={communicationsError(detail.error, 'This message could not be loaded. Try again.')} /> : <AdminLoadingState label="Loading the message…" />}
         {failed || detail?.retrying ? (
           <button type="button" className={secondaryButtonClass} aria-disabled={!failed} aria-busy={!failed} onClick={() => { if (failed) onRetry(); }}>
             {failed ? 'Retry preview' : 'Loading preview…'}
@@ -527,7 +528,7 @@ export default function AdminEmailLog() {
       // The link is the instruction, so a message that already ends with it
       // (adminApi's "Your session has expired. Sign in again.") drops it.
       notice = (
-        <Notice tone="error" message={error.message.replace(/\s*Sign in again\.?\s*$/i, '')}>
+        <Notice tone="error" message={'Your session has expired.'}>
           {' '}
           <Link to="/signin" className="font-semibold underline underline-offset-2">
             Sign in again
@@ -542,7 +543,7 @@ export default function AdminEmailLog() {
         />
       );
     } else {
-      notice = <Notice tone="error" message={error.message} />;
+      notice = <Notice tone="error" message={communicationsError(error, 'The email log could not be loaded. Refresh to try again.')} />;
     }
   }
 
@@ -553,14 +554,15 @@ export default function AdminEmailLog() {
     body = (
       <AdminEmptyState
         title={`No match in ${recentWindow(result.scanned)}`}
-        description="Each search reads 500 messages at a time. Search older messages to keep looking."
+        description="Search older messages to keep looking."
       />
     );
   } else if (rows.length === 0 && !narrowed) {
     body = (
       <AdminEmptyState
         title="No email sent yet"
-        description="A message shows here as soon as the site sends one."
+        description="Send an announcement to keep attendees informed."
+        action={<Link to="/admin/announcements" className={secondaryButtonClass}>Write announcement</Link>}
       />
     );
   } else if (rows.length === 0) {
@@ -656,7 +658,7 @@ export default function AdminEmailLog() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Email log"
-        description="Every message this site sent, newest first. Messages stay in this log for 90 days after the site sends them. Automatic maintenance then removes them. Sign-in codes and speaker invitations never store their body."
+        description="Emails from the past 90 days, newest first. Sign-in codes and private invitation links are hidden."
         actions={
           <AdminIconControl
             className={secondaryButtonClass}
@@ -727,9 +729,7 @@ export default function AdminEmailLog() {
               >
                 {pending === 'search' ? 'Searching…' : 'Search'}
               </button>
-              <button type="button" className={secondaryButtonClass} onClick={clearSearch}>
-                Clear
-              </button>
+              <AdminIconControl className={secondaryButtonClass} onClick={clearSearch} label="Clear" icon="close" />
             </div>
           </form>
 
@@ -759,7 +759,7 @@ export default function AdminEmailLog() {
 
           {result?.nextCursor ? (
             <div className="flex flex-col items-start gap-xs">
-              {pageError ? <Notice tone="error" message={`Older messages could not be loaded. ${pageError.message}`} /> : null}
+              {pageError ? <Notice tone="error" message="Older messages could not be loaded. Try again." /> : null}
               <button
                 ref={pagerRef}
                 type="button"

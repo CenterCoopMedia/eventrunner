@@ -27,7 +27,7 @@ function Stage({ stage, total }) {
   return (
     <li className="flex flex-col gap-2xs">
       <p id={lineId} className="text-admin-base text-admin-ink">
-        <span className="font-semibold">{STAGE_WORDS[stage.id] ?? stage.id}:</span>{' '}
+        <span className="font-semibold">{STAGE_WORDS[stage.id] ?? 'Registration progress'}:</span>{' '}
         <Figure value={stage.count} /> of <Figure value={total} />
       </p>
       <progress
@@ -49,7 +49,7 @@ export default function FunnelPanel({ funnel, revoked = 0 }) {
   return (
     <Panel
       title="Registration funnel"
-      description="Every account, then the ones that hold a ticket or were approved, then the approved ones."
+      description="See how many attendees have signed up, got tickets, and been approved."
     >
       {total === 0 ? (
         <p className="text-admin-base text-admin-ink">No one has signed up yet.</p>

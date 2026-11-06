@@ -5,7 +5,7 @@ import { builtInSectionBlockTypes } from 'shared/page';
 import { Link, useParams } from 'react-router';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
-import { blockTypeLabel } from '../blockTypes.js';
+import { blockTypeFor } from '../blockTypes.js';
 import { contentManagementTarget, contentSectionPath, pageStructurePath } from '../contentBrowser.js';
 import {
   Notice,
@@ -18,6 +18,7 @@ import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
 } from '../components/adminChrome.jsx';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import '../contentBrowser.css';
 
 export default function AdminContentSections() {
@@ -32,38 +33,38 @@ export default function AdminContentSections() {
     return (
       <AdminEmptyState
         title={pagesReady ? 'No such page' : 'The page is not available yet'}
-        description={pagesReady ? 'That page id has neither a published nor a draft revision.' : 'We are waiting for the page list to reconnect.'}
+        description={pagesReady ? 'This page is no longer available. Choose another page.' : 'Check your connection to load the page.'}
         action={<Link to="/admin/content" className={linkButtonClass}>Back to content</Link>}
       />
     );
   }
 
-  const pageName = page.current?.label || page.id;
+  const pageName = page.current?.label || 'Untitled page';
   const target = contentManagementTarget(page);
-  const identifiers = [page.current?.path, `${sections.length} section${sections.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+  const identifiers = `${sections.length} section${sections.length === 1 ? '' : 's'}`;
 
   return (
     <div className="admin-content-browser flex flex-col gap-md">
       <AdminPageHeader
         title={pageName}
         identifiers={identifiers}
-        description="Choose a section to edit its content. Change the sections themselves in the page structure."
+        description="Choose a section to edit."
         actions={
           <>
             <Link to="/admin/content" className={linkButtonClass}>Back to content</Link>
-            <Link to={pageStructurePath(page.id)} className={linkButtonClass}>Edit page structure</Link>
+            <AdminIconControl as={Link} to={pageStructurePath(page.id)} icon="edit" label="Edit page structure" />
           </>
         }
       />
 
       {pagesError || contentError ? (
-        <Notice tone="caution" message="We lost the connection to part of this page; showing the last values we received and retrying." />
+        <Notice tone="caution" message="Some content could not refresh. Check your connection." />
       ) : null}
 
       {sections.length === 0 ? (
         <AdminEmptyState
           title="No sections"
-          description={target ? `This page’s main content is managed in ${target.name}.` : 'Add a section to this page in Pages before editing its content.'}
+          description={target ? `This page’s main content is managed in ${target.name}.` : 'Add a section to start writing.'}
           action={
             <Link to={target?.to ?? pageStructurePath(page.id)} className={secondaryButtonClass}>
               {target?.action ?? 'Edit page structure'}
@@ -74,9 +75,9 @@ export default function AdminContentSections() {
         <Panel flush className="admin-content-browser__panel">
           <ol className="admin-content-sections" role="list" aria-label={`Sections in ${pageName}`}>
             {sections.map((section) => {
-              const sectionName = section.label || section.id;
+              const sectionName = section.label || 'Untitled section';
               const count = contentRows.filter((row) => row.current?.section === section.id).length;
-              const types = (builtInSectionBlockTypes(page, section) ?? []).map(blockTypeLabel);
+              const types = (builtInSectionBlockTypes(page, section) ?? []).map((type) => blockTypeFor(type)?.label ?? 'Content block');
               const to = contentSectionPath(page.id, section.id);
               return (
                 <li key={section.id} className="admin-content-section">
@@ -86,16 +87,14 @@ export default function AdminContentSections() {
                     </h2>
                     {section.description ? <p>{section.description}</p> : null}
                     <p className="admin-content-section__types">
-                      <span>Allowed content: </span>{types.length ? types.join(', ') : 'All block types'}
+                      <span>Content: </span>{types.length ? types.join(', ') : 'Any content'}
                     </p>
                   </div>
                   <div className="admin-content-section__count">
                     <p>{contentReady ? `${count} block${count === 1 ? '' : 's'}` : contentError ? 'Block count unavailable' : 'Loading blocks…'}</p>
                     {Number.isFinite(section.maxBlocks) ? <p className="admin-content-section__limit">Limit: {section.maxBlocks} block{section.maxBlocks === 1 ? '' : 's'}</p> : null}
                   </div>
-                  <Link to={to} className={`${linkButtonClass} admin-content-section__action`} aria-label={`Edit content in ${sectionName}`}>
-                    Edit content <span aria-hidden="true">→</span>
-                  </Link>
+                  <AdminIconControl as={Link} to={to} icon="edit" label={`Edit content in ${sectionName}`} className="admin-content-section__action" />
                 </li>
               );
             })}

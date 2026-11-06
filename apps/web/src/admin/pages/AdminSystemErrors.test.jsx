@@ -114,15 +114,16 @@ describe('system errors list', () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN, ROW_ALERTED], nextCursor: null }));
     await renderPage();
 
-    expect(await screen.findByText('TypeError: boom')).toBeInTheDocument();
+    expect(await screen.findByText('A visitor had a problem')).toBeInTheDocument();
     expect(urlOf(0)).toMatch(/\/listSystemErrors$/);
-    expect(screen.getByText('token missing')).toBeInTheDocument();
-    expect(screen.getByText('client-error')).toBeInTheDocument();
+    expect(screen.getByText('Email wording needs attention')).toBeInTheDocument();
+    expect(screen.queryByText('client-error')).not.toBeInTheDocument();
+    expect(screen.queryByText('TypeError: boom')).not.toBeInTheDocument();
     // "attempted" wording, not "alerted": alertedAt is stamped when a notify
     // attempt is CLAIMED, before the notifier runs, so it does not mean the
     // notification was actually delivered (Codex review finding).
-    expect(screen.getByText('No alert attempted')).toBeInTheDocument();
-    expect(screen.getByText('Alert attempted')).toBeInTheDocument();
+    expect(screen.queryByText('No alert attempted')).not.toBeInTheDocument();
+    expect(screen.queryByText('Alert attempted')).not.toBeInTheDocument();
   });
 
   it('shows an empty state when nothing is unresolved and there is no further page', async () => {
@@ -144,24 +145,13 @@ describe('system errors list', () => {
     expect(await screen.findByText('No unresolved errors')).toBeInTheDocument();
   });
 
-  it('a long message is truncated behind a keyboard-accessible <details> expansion, collapsed by default', async () => {
-    const longMessage = 'X'.repeat(200);
-    fetch.mockResolvedValueOnce(
-      okResponse({ rows: [{ ...ROW_OPEN, message: longMessage }], nextCursor: null }),
-    );
+  it('keeps raw diagnostic messages out of the page and gives a next action', async () => {
+    const longMessage = 'TypeError: internalFunction failed at private/document/path';
+    fetch.mockResolvedValueOnce(okResponse({ rows: [{ ...ROW_OPEN, message: longMessage }], nextCursor: null }));
     await renderPage();
-
-    const summary = await screen.findByText(/show full message/i);
-    const details = summary.closest('details');
-    expect(details).not.toBeNull();
-    // <details>/<summary> is natively keyboard-focusable (Tab) and
-    // Enter/Space-activatable with no bespoke ARIA wiring; collapsed by
-    // default is what keeps the full 200-char message out of the way until
-    // asked for.
-    expect(details.open).toBe(false);
-    fireEvent.click(summary);
-    expect(details.open).toBe(true);
-    expect(screen.getByText(longMessage)).toBeInTheDocument();
+    expect(await screen.findByText('A visitor had a problem')).toBeInTheDocument();
+    expect(screen.queryByText(longMessage)).toBeNull();
+    expect(screen.getByText(/Ask the Event Runner team to check it/)).toBeInTheDocument();
   });
 });
 
@@ -169,25 +159,25 @@ describe('manual refresh', () => {
   it('preserves the last rows when refresh fails', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('TypeError: boom');
+    await screen.findByText('A visitor had a problem');
     fetch.mockRejectedValueOnce(new Error('offline'));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText(/showing the last values/)).toBeInTheDocument();
-    expect(screen.getByText('TypeError: boom')).toBeInTheDocument();
+    expect(screen.getByText('A visitor had a problem')).toBeInTheDocument();
     expect(screen.queryByText('No unresolved errors')).not.toBeInTheDocument();
   });
   it('refetches the list on demand', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('TypeError: boom');
+    await screen.findByText('A visitor had a problem');
 
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_ALERTED], nextCursor: null }));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(urlOf(1)).toMatch(/\/listSystemErrors$/);
-    expect(await screen.findByText('token missing')).toBeInTheDocument();
-    expect(screen.queryByText('TypeError: boom')).toBeNull();
+    expect(await screen.findByText('Email wording needs attention')).toBeInTheDocument();
+    expect(screen.queryByText('A visitor had a problem')).toBeNull();
   });
 });
 
@@ -199,16 +189,16 @@ describe('load more', () => {
     const more = await screen.findByRole('button', { name: 'Load more' });
     fireEvent.click(more);
     const notice = await screen.findByRole('alert');
-    expect(notice).toHaveTextContent('The next page could not be loaded. We could not reach the server. Check your connection and try again.');
+    expect(notice).toHaveTextContent('The next page could not be loaded. Try again.');
     expect(notice.parentElement).toContainElement(more);
-    expect(screen.getByText('TypeError: boom')).toBeInTheDocument();
+    expect(screen.getByText('A visitor had a problem')).toBeInTheDocument();
     expect(more).toBeEnabled();
   });
   it('fetches the next page with the server cursor and appends it', async () => {
     const cursor = { createdAt: 1700000000000, id: 'e-open-1' };
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: cursor }));
     await renderPage();
-    await screen.findByText('TypeError: boom');
+    await screen.findByText('A visitor had a problem');
     expect(screen.getByRole('button', { name: 'Load more' })).toBeInTheDocument();
 
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_ALERTED], nextCursor: null }));
@@ -218,8 +208,8 @@ describe('load more', () => {
     expect(urlOf(1)).toMatch(/\/listSystemErrors$/);
     expect(bodyOf(1)).toEqual({ limit: 100, cursor });
     // Both pages' rows are visible, and the exhausted cursor removes the button.
-    expect(await screen.findByText('token missing')).toBeInTheDocument();
-    expect(screen.getByText('TypeError: boom')).toBeInTheDocument();
+    expect(await screen.findByText('Email wording needs attention')).toBeInTheDocument();
+    expect(screen.getByText('A visitor had a problem')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
   });
 });
@@ -228,7 +218,7 @@ describe('resolving a row', () => {
   it('reloads from the server after a successful resolve, rather than only patching local state', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('TypeError: boom');
+    await screen.findByText('A visitor had a problem');
 
     fetch.mockResolvedValueOnce(okResponse({ id: 'e-open-1', resolved: true }));
     // The reload can surface a row that was past this page's limit — assert
@@ -242,14 +232,14 @@ describe('resolving a row', () => {
     expect(bodyOf(1)).toEqual({ id: 'e-open-1', expectedLastSeenAt: ROW_OPEN.lastSeenAt });
     expect(urlOf(2)).toMatch(/\/listSystemErrors$/);
 
-    await waitFor(() => expect(screen.queryByText('TypeError: boom')).toBeNull());
-    expect(await screen.findByText('token missing')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('A visitor had a problem')).toBeNull());
+    expect(await screen.findByText('Email wording needs attention')).toBeInTheDocument();
   });
 
   it('reloads to an empty state when the server confirms nothing unresolved remains', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('TypeError: boom');
+    await screen.findByText('A visitor had a problem');
 
     fetch.mockResolvedValueOnce(okResponse({ id: 'e-open-1', resolved: true }));
     fetch.mockResolvedValueOnce(okResponse({ rows: [], nextCursor: null }));
@@ -261,14 +251,14 @@ describe('resolving a row', () => {
   it('reports a reopen race instead of pretending the resolve worked, and does not reload', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('TypeError: boom');
+    await screen.findByText('A visitor had a problem');
 
     fetch.mockResolvedValueOnce(okResponse({ id: 'e-open-1', resolved: false, reopened: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Resolve' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/recurred since the list loaded/i);
     // The row stays visible — it was NOT actually resolved.
-    expect(screen.getByText('TypeError: boom')).toBeInTheDocument();
+    expect(screen.getByText('A visitor had a problem')).toBeInTheDocument();
     // Not a "successful" resolve, so no reload — only the initial list call.
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -276,11 +266,11 @@ describe('resolving a row', () => {
   it('surfaces a server rejection against the row it came from', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('TypeError: boom');
+    await screen.findByText('A visitor had a problem');
 
     fetch.mockResolvedValueOnce(errorResponse(404, 'not-found', 'system_errors/e-open-1 does not exist.'));
     fireEvent.click(screen.getByRole('button', { name: 'Resolve' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('does not exist');
+    expect(await screen.findByRole('alert')).toHaveTextContent('This error could not be marked as resolved. Refresh and try again.');
   });
 });

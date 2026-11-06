@@ -18,6 +18,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from './AdminIconControl.jsx';
+import { communicationsError } from './communicationsErrors.js';
 import {
   Notice,
   Panel,
@@ -225,18 +227,17 @@ export default function AnnouncementSavedMessages({
     <div ref={wrapRef}>
       <Panel
         title="Saved messages"
-        description="Save a message you send often, then load it into a new email. Loading changes the subject, the message and the link. The audience stays as it is. Saved messages stay until you remove them."
+        description="Save messages you send often and reuse them in a new email."
       >
         <div className="flex flex-col gap-sm">
-          <ServerErrorSummary error={error} errorRef={errorRef} title="This message was not saved" />
+          <ServerErrorSummary error={error ? { message: communicationsError(error, 'The message could not be saved. Check the message and try again.') } : null} errorRef={errorRef} title="This message was not saved" />
           {loaded ? (
             <p className="text-admin-sm text-admin-ink">
-              {`Loaded from "${loaded.name}". Changes here do not change the saved message until you update it.`}
+              {`Using “${loaded.name}”. Save changes to update the saved message.`}
             </p>
           ) : null}
           <TextField
             label="Name for this message"
-            hint="A label for you. Two saved messages can have the same name."
             value={name}
             maxLength={MAX_NAME_LENGTH}
             onChange={setName}
@@ -249,7 +250,7 @@ export default function AnnouncementSavedMessages({
               aria-disabled={busy || full ? 'true' : undefined}
               onClick={() => { if (!full) save(null); }}
             >
-              {busy === 'save' ? 'Saving…' : 'Save as a new message'}
+              {busy === 'save' ? 'Saving…' : 'Save new message'}
             </button>
             {loaded ? (
               <button
@@ -259,19 +260,19 @@ export default function AnnouncementSavedMessages({
                 aria-disabled={busy ? 'true' : undefined}
                 onClick={() => save(loaded.id)}
               >
-                {busy === 'update' ? 'Saving…' : `Update "${loaded.name}"`}
+                {busy === 'update' ? 'Saving…' : 'Save changes'}
               </button>
             ) : null}
           </div>
           {full ? (
             <Notice
               tone="caution"
-              message={`You have ${list.max} saved messages, the most the site keeps. Remove one before you save a new one.`}
+              message={`You have ${list.max} saved messages. Remove one to save a new message.`}
             />
           ) : null}
 
           {list === null && !listError ? <AdminLoadingState label="Loading the saved messages…" /> : null}
-          {listError ? <Notice tone="error" message={listError.message} /> : null}
+          {listError ? <Notice tone="error" message={communicationsError(listError, 'Saved messages could not be loaded. Refresh the page to try again.')} /> : null}
           {list && messages.length === 0 ? (
             <p className="text-admin-sm text-admin-ink-secondary">No saved messages yet. Write a message, name it, then save it.</p>
           ) : null}
@@ -295,27 +296,13 @@ export default function AnnouncementSavedMessages({
                       >
                         Load
                       </button>
-                      <button
-                        type="button"
-                        ref={controlRef('rename', message.id)}
-                        className={linkButtonClass}
-                        onClick={() => askRename(message)}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        ref={controlRef('remove', message.id)}
-                        className={linkButtonClass}
-                        onClick={() => { if (!busy) setQuestion({ kind: 'remove', id: message.id, name: message.name }); }}
-                      >
-                        Remove
-                      </button>
+                      <AdminIconControl ref={controlRef('rename', message.id)} className={linkButtonClass} onClick={() => askRename(message)} label="Rename" icon="edit" />
+                      <AdminIconControl ref={controlRef('remove', message.id)} className={linkButtonClass} onClick={() => { if (!busy) setQuestion({ kind: 'remove', id: message.id, name: message.name }); }} label="Remove" icon="remove" />
                     </div>
                     {open?.kind === 'replace' ? (
                       <RowQuestion title={`Replace your draft with "${open.name}"?`} headingRef={questionRef}>
                         <p className="max-w-[65ch] text-admin-sm text-admin-ink">
-                          Your draft has changes that are not saved. Loading replaces its subject, message and link, and drops its preview.
+                          Your unsaved changes will be replaced by this saved message.
                         </p>
                         <div className="flex flex-wrap gap-xs">
                           <button type="button" className={secondaryButtonClass} onClick={() => load(message)}>
@@ -343,7 +330,7 @@ export default function AnnouncementSavedMessages({
                     {open?.kind === 'remove' ? (
                       <RowQuestion title={`Remove "${open.name}"?`} headingRef={questionRef}>
                         <p className="max-w-[65ch] text-admin-sm text-admin-ink">
-                          The saved message is deleted. A draft you loaded from it and past sends keep their own copy. This cannot be undone.
+                          This removes the saved message. Emails already sent are kept. This cannot be undone.
                         </p>
                         <div className="flex flex-wrap gap-xs">
                           <button

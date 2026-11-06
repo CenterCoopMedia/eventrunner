@@ -1,7 +1,7 @@
 // Media tab: the cut file — the media library (issue #24; admin story part 2
 // "the cut file"). A print shop's cabinet of engravings, not a photo
 // gallery: MediaLibrary and its modals live in ../components/media/, which
-// is where the whole engravings-cabinet idiom (path and size in the mono,
+// is where the whole engravings-cabinet idiom (file name and size,
 // thumbnail as evidence) is drawn.
 //
 // Two drawers, kept apart because they answer different questions —
@@ -22,7 +22,7 @@ const FOLDERS = [
   {
     id: 'branding',
     label: 'Branding',
-    hint: 'Logos, marks, favicons, and the social sharing card. Slots are assigned on the Branding tab.',
+    hint: 'Logos, favicons, and social sharing images.',
   },
 ];
 
@@ -44,7 +44,7 @@ export default function AdminMedia() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Media"
-        description="Every file uploaded to this event, with what references it. Uploads and deletes run server-side — the browser never writes to storage."
+        description="Upload images and see where they are used."
       />
 
       <nav aria-label="Media folders">

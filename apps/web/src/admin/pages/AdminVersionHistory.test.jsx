@@ -195,7 +195,7 @@ describe('one record’s versions', () => {
     const table = within(item).getByRole('table', { name: 'What changed in version 2' });
     expect(within(table).getAllByRole('columnheader').map((head) => head.textContent)).toEqual(['Field', 'Before', 'After']);
     const cells = within(table).getAllByRole('row')[1];
-    expect(within(cells).getByRole('rowheader')).toHaveTextContent('value');
+    expect(within(cells).getByRole('rowheader')).toHaveTextContent('Content');
     expect(within(cells).getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
       'Three days of workshops.',
       'Four days of workshops.',
@@ -209,9 +209,9 @@ describe('one record’s versions', () => {
   it('heads the page with the record’s name, state and path, and says how many versions it shows', async () => {
     await renderPage();
     reportRecord();
-    expect(screen.getByRole('heading', { level: 1, name: 'hero › subtitle' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Four days of workshops.' })).toBeInTheDocument();
     expect(screen.getByText('Live')).toBeInTheDocument();
-    expect(screen.getByText(DOC_PATH)).toBeInTheDocument();
+    expect(screen.queryByText(DOC_PATH)).not.toBeInTheDocument();
     expect(screen.getByText(/^2 versions shown, newest first, read at \d{1,2}:\d{2} (AM|PM) E[SD]T\.$/)).toHaveAttribute('role', 'status');
     expect(screen.getByRole('link', { name: 'Back to the list' })).toHaveAttribute('href', '/admin/versions?collection=cmsContent');
   });
@@ -229,7 +229,7 @@ describe('one record’s versions', () => {
     await renderPage();
     reportRecord({ live: [], drafts: [] });
     expect(screen.getByText('Removed')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'hero__subtitle' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Four days of workshops.' })).toBeInTheDocument();
     expect(versionItem(2)).toBeInTheDocument();
   });
 
@@ -237,7 +237,7 @@ describe('one record’s versions', () => {
     await renderPage();
     const item = versionItem(1);
     expect(item).toHaveTextContent('First published.');
-    expect(item).toHaveTextContent('by init-event-script');
+    expect(item).toHaveTextContent('by Team member');
     const table = within(item).getByRole('table', { name: 'What changed in version 1' });
     expect(within(table).getAllByRole('columnheader').map((head) => head.textContent)).toEqual(['Field', 'Value']);
     expect(within(table).getByText('Three days of workshops.')).toBeInTheDocument();
@@ -254,9 +254,25 @@ describe('one record’s versions', () => {
       pages: [{ entries: [entry(2, { changes: [{ path: 'url', kind: 'changed', before: 'javascript:alert(1)', after: hostile }] })], nextCursor: null }],
     });
     const item = versionItem(2);
-    expect(within(item).getByText(hostile)).toBeInTheDocument();
+    expect(within(item).getByText('No text')).toBeInTheDocument();
+    expect(within(item).queryByText(hostile)).toBeNull();
     expect(item.querySelector('img')).toBeNull();
-    expect(within(item).getByText('javascript:alert(1)').closest('a')).toBeNull();
+    expect(within(item).getByText('Link unavailable').closest('a')).toBeNull();
+  });
+
+  it('shows file names while keeping internal fields and paths out of change details', async () => {
+    await renderPage(undefined, {
+      pages: [{ entries: [entry(2, { changes: [
+        { path: 'value', before: 'cms-images/private/hero.jpg?token=private', after: 'profile-photos/person/portrait.jpg' },
+        { path: 'speakerIds', before: ['private-speaker-id'], after: ['another-private-id'] },
+        { path: 'constructor', before: 'private-field', after: 'private-value' },
+      ] })], nextCursor: null }],
+    });
+    const item = versionItem(2);
+    expect(item).toHaveTextContent('hero.jpg');
+    expect(item).toHaveTextContent('portrait.jpg');
+    expect(item).toHaveTextContent('Other content changed.');
+    expect(item.textContent).not.toMatch(/cms-images|profile-photos|token=private|speakerIds|constructor|private-speaker-id|private-value/);
   });
 
   it('shows the start of a long value and the rest behind a disclosure', async () => {
@@ -293,8 +309,8 @@ describe('one record’s versions', () => {
       }],
     });
     const rows = within(versionItem(2)).getAllByRole('row');
-    expect(rows[1]).toHaveTextContent('publishAtNot setSep 23, 2026, 2:02 PM EDT');
-    expect(within(rows[2]).getByRole('rowheader')).toHaveTextContent('sections › item 2 › label');
+    expect(rows[1]).toHaveTextContent('Publish timeNot setSep 23, 2026, 2:02 PM EDT');
+    expect(within(rows[2]).getByRole('rowheader')).toHaveTextContent('Sections: Item 2: Label');
   });
 
   it('says when more changes than it lists were made, and when none were', async () => {
@@ -308,7 +324,7 @@ describe('one record’s versions', () => {
       }],
     });
     expect(versionItem(3)).toHaveTextContent('12 more changes are not listed.');
-    expect(versionItem(2)).toHaveTextContent('No field changed in this publish.');
+    expect(versionItem(2)).toHaveTextContent('No content changed in this publish.');
     expect(within(versionItem(2)).queryByRole('table')).toBeNull();
   });
 
@@ -412,13 +428,13 @@ describe('one record’s versions', () => {
         </MemoryRouter>
       </Profiler>,
     );
-    await screen.findByText('Four days of workshops.');
+    await screen.findAllByText('Four days of workshops.');
     commits.length = 0;
 
     await act(async () => {
       go('/admin/versions/cmsContent/hero__title');
     });
-    const underNewAddress = commits.filter((text) => text.includes('hero__title'));
+    const underNewAddress = commits;
     expect(underNewAddress.length).toBeGreaterThan(0);
     for (const text of underNewAddress) expect(text).not.toContain('Four days of workshops.');
   });
@@ -438,7 +454,7 @@ describe('one record’s versions', () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByRole('heading', { name: 'No such collection' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Version history is unavailable' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to the list' })).toHaveAttribute('href', '/admin/versions');
     expect(callMock).not.toHaveBeenCalled();
     expect(listeners.size).toBe(0);
@@ -566,7 +582,7 @@ describe('restoring a version', () => {
       status: 'done', results: { cmsContent: { published: ['hero__subtitle'], skipped: [] } },
     }));
     expect(historyCalls()).toHaveLength(reads);
-    expect(screen.queryByText('Published. The public site picks it up live.')).toBeNull();
+    expect(screen.queryByText('Published.')).toBeNull();
   });
 
   it('keeps a full snapshot restorable when its change details are omitted for size', async () => {
@@ -575,7 +591,7 @@ describe('restoring a version', () => {
     });
     reportRecord();
     expect(screen.getByText('Change details are too large to show. This version can still be restored.')).toBeInTheDocument();
-    expect(screen.queryByText('No field changed in this publish.')).toBeNull();
+    expect(screen.queryByText('No content changed in this publish.')).toBeNull();
     expect(screen.getByRole('button', { name: 'Restore version 1' })).toBeEnabled();
   });
 
@@ -666,7 +682,7 @@ describe('restoring a version', () => {
     expect(screen.getByText(/is now the draft/).closest('[tabindex="-1"]')).toHaveFocus();
 
     fireEvent.click(screen.getByRole('button', { name: 'Publish now' }));
-    await waitFor(() => expect(screen.getByText('Published. The public site picks it up live.')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Published.')).toBeInTheDocument());
     expect(callMock).toHaveBeenCalledWith('cmsPublish', { collection: 'cmsContent', docIds: ['hero__subtitle'] });
     await waitFor(() => expect(screen.getAllByRole('heading', { level: 2 })[0]).toHaveTextContent('Version 3'));
   });
@@ -680,7 +696,7 @@ describe('restoring a version', () => {
     const confirm = screen.getByRole('region', { name: 'Restore version 1?' });
     fireEvent.click(within(confirm).getByRole('button', { name: 'Restore as draft' }));
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('title: enter a public title');
+    expect(alert).toHaveTextContent('This version could not be restored. Try again or edit the current draft.');
     expect(alert.parentElement).toHaveFocus();
     expect(screen.getByRole('region', { name: 'Restore version 1?' })).toBeInTheDocument();
     expect(within(confirm).getByRole('button', { name: 'Restore as draft' })).toBeEnabled();

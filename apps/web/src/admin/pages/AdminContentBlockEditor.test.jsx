@@ -157,7 +157,7 @@ describe('AdminContentBlockEditor value fields', () => {
 
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Banner' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
@@ -206,16 +206,16 @@ describe('AdminContentBlockEditor value fields', () => {
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Explore the program' } });
     const urlInput = screen.getByLabelText('Destination');
     fireEvent.change(urlInput, { target: { value: '/speakers' } });
-    expect(screen.queryByText(/is off in Features/)).toBeNull();
+    expect(screen.queryByText(/is off/)).toBeNull();
 
     fireEvent.change(urlInput, { target: { value: '/schedule' } });
     const warning = screen.getByText(
-      'Public schedule is off in Features. The public site does not show this link until you turn it on.',
+      'Public schedule is off. This link is hidden until it is turned on.',
     );
     expect(warning).toHaveAttribute('id');
     expect(urlInput.getAttribute('aria-describedby')).toContain(warning.id);
 
-    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsCreateContent'))).toBe(true));
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
     expect(JSON.parse(call[1].body).fields).toMatchObject({ label: 'Explore the program', url: '/schedule' });
@@ -231,10 +231,10 @@ describe('AdminContentBlockEditor value fields', () => {
     });
     const urlInput = screen.getByLabelText('Destination');
     fireEvent.change(urlInput, { target: { value: '/schedule' } });
-    expect(screen.queryByText(/is off in Features/)).toBeNull();
+    expect(screen.queryByText(/is off/)).toBeNull();
     fireEvent.change(urlInput, { target: { value: '/speakers/a-speaker' } });
     expect(screen.getByText(
-      'Speaker directory is off in Features. The public site does not show this link until you turn it on.',
+      'Speaker directory is off. This link is hidden until it is turned on.',
     )).toBeInTheDocument();
   });
 
@@ -283,7 +283,7 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(region).toBeEmptyDOMElement();
     fireEvent.change(urlInput, { target: { value: '/schedule' } });
     expect(urlInput.parentElement.querySelector('[aria-live="polite"]')).toBe(region);
-    expect(region).toHaveTextContent('Public schedule is off in Features.');
+    expect(region).toHaveTextContent('Public schedule is off.');
   });
 
   // Issue 193: the sponsors page's package section takes the new block, and
@@ -324,7 +324,7 @@ describe('AdminContentBlockEditor value fields', () => {
       '<p>Signs</p>',
       'Signs',
     );
-    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
@@ -359,7 +359,7 @@ describe('AdminContentBlockEditor value fields', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Block type' }), { target: { value: 'richtext' } });
     const editor = await screen.findByRole('textbox', { name: 'Text' });
     await pasteHtml(editor, '<p><strong>Formatted</strong> body</p>', 'Formatted body');
-    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
@@ -410,7 +410,7 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(editor.querySelector('strong')).toHaveTextContent('Saved draft answer.');
     expect(editor).not.toHaveTextContent('Published answer.');
 
-    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
     expect(JSON.parse(call[1].body).fields.answer).toBe('<p><strong>Saved draft answer.</strong></p>');
@@ -454,7 +454,7 @@ describe('AdminContentBlockEditor value fields', () => {
     const limit = await screen.findByLabelText('Limit (optional)');
     expect(limit).toHaveValue(3);
     fireEvent.change(limit, { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
@@ -472,13 +472,13 @@ describe('content editing workspace', () => {
     }];
   });
 
-  it('puts the value first and keeps existing technical settings behind a summary', async () => {
+  it('puts content first and keeps type and visibility behind a summary', async () => {
     await renderAt('/admin/content/home/hero/register');
     expect(screen.getByLabelText('Button text')).toBeVisible();
     const valueHeading = screen.getByRole('heading', { name: 'Content' });
     const settingsHeading = screen.getByRole('heading', { name: 'Block settings' });
     expect(valueHeading.compareDocumentPosition(settingsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText('Call to action · Order 2 · Visible')).toBeVisible();
+    expect(screen.getByText('Call to action · Visible')).toBeVisible();
     const toggle = screen.getByRole('button', { name: 'Edit block settings' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('combobox', { name: 'Block type' })).not.toBeInTheDocument();
@@ -486,13 +486,13 @@ describe('content editing workspace', () => {
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Reserve a place' } });
     fireEvent.click(toggle);
     expect(screen.getByRole('combobox', { name: 'Block type' })).toHaveValue('cta');
-    expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
+    expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Order')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Hide block settings' }));
-    expect(screen.getByText('Call to action · Order 2 · Visible')).toBeVisible();
+    expect(screen.getByText('Call to action · Visible')).toBeVisible();
     expect(screen.getByLabelText('Button text')).toHaveValue('Reserve a place');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsUpdateContent'))).toBe(true));
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
     expect(JSON.parse(call[1].body)).toMatchObject({
@@ -503,7 +503,7 @@ describe('content editing workspace', () => {
 
   it('keeps creation setup visible before the value and retains it after saving', async () => {
     await renderAt('/admin/content/home/hero/_new');
-    const setupHeading = screen.getByRole('heading', { name: 'Set up the block' });
+    const setupHeading = screen.getByRole('heading', { name: 'Content type' });
     const valueHeading = screen.getByRole('heading', { name: 'Content' });
     expect(setupHeading.compareDocumentPosition(valueHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'Block type' })).toBeVisible();
@@ -511,11 +511,10 @@ describe('content editing workspace', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Block type' }), { target: { value: 'image' } });
     fireEvent.change(screen.getByLabelText('Image'), { target: { value: 'cms-images/banner.jpg' } });
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Event banner' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await screen.findByText('Draft saved. It is not public until you publish.');
-    expect(screen.getByLabelText('Field id')).toHaveValue('event-banner');
-    expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
-    expect(screen.getByLabelText('Field id')).toBeVisible();
+    expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Block type' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
   });
 
@@ -531,14 +530,14 @@ describe('content editing workspace', () => {
       status: 500,
       json: async () => ({ error: { message: 'The draft service is down.' } }),
     }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    expect(await screen.findByText('The draft service is down.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    expect(await screen.findByText('The change could not be saved. Try again.')).toBeInTheDocument();
     const first = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
     expect(JSON.parse(first[1].body).field).toBe('register-now');
 
     fetch.mockImplementationOnce(() => Promise.resolve(okResponse({ docId: 'hero__register-now' })));
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Join us' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await screen.findByText('Draft saved. It is not public until you publish.');
     const creates = fetch.mock.calls.filter(([url]) => String(url).includes('cmsCreateContent'));
     expect(creates).toHaveLength(2);
@@ -546,24 +545,24 @@ describe('content editing workspace', () => {
     expect(JSON.parse(creates[1][1].body).fields.label).toBe('Join us');
   });
 
-  it('opens block settings when a server error names a hidden setting', async () => {
+  it('gives a recovery message without exposing a setting people cannot change', async () => {
     await renderAt('/admin/content/home/hero/register');
     fetch.mockImplementation((url) => Promise.resolve(String(url).includes('cmsUpdateContent')
       ? { ok: false, status: 400, json: async () => ({ error: { code: 'bad-request', message: 'order: must be a non-negative number' } }) }
       : okResponse({})));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveFocus();
-    expect(alert).toHaveTextContent('Order: must be a non-negative number');
+    expect(alert).toHaveTextContent('The change could not be saved. Try again.');
     expect(screen.queryByLabelText('Order')).toBeNull();
-    expect(await screen.findByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Edit block settings' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByLabelText('Button text')).toHaveValue('Register now');
   });
 
   it('keeps value validation in view without expanding unrelated settings', async () => {
     await renderAt('/admin/content/home/hero/register');
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     expect(await screen.findByRole('alert')).toHaveFocus();
     expect(screen.getByLabelText('Button text')).toBeVisible();
     expect(screen.getByLabelText('Button text')).toHaveAttribute('aria-invalid', 'true');
@@ -585,7 +584,7 @@ describe('content editing workspace', () => {
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
 
     fireEvent.change(label, { target: { value: 'Reserve a place' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument());
     expect(label).toHaveValue('Reserve a place');
@@ -595,7 +594,7 @@ describe('content editing workspace', () => {
     await renderAt('/admin/content/home/hero/register');
     const label = screen.getByLabelText('Button text');
     fireEvent.change(label, { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     expect(await screen.findByRole('alert')).toHaveFocus();
     expect(label).toHaveValue('');
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
@@ -607,8 +606,8 @@ describe('content editing workspace', () => {
       status: 500,
       json: async () => ({ error: { message: 'The draft service is down.' } }),
     }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    expect(await screen.findByText('The draft service is down.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    expect(await screen.findByText('The change could not be saved. Try again.')).toBeInTheDocument();
     expect(label).toHaveValue('Reserve a place');
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
   });
@@ -646,7 +645,7 @@ describe('content editing workspace', () => {
   it('still reports a saved draft after the development remount', async () => {
     await renderAt('/admin/content/home/hero/register', { strict: true });
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Reserve a place' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
   });
 
@@ -657,7 +656,7 @@ describe('content editing workspace', () => {
     }));
     await renderAt('/admin/content/home/hero/register');
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Reserve a place' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
     expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();

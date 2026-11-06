@@ -170,7 +170,7 @@ describe('the admin overview', () => {
 
     // Readiness offers the same management routes as the navigation, so
     // a count can lead straight to the work without another menu search.
-    const readiness = screen.getByRole('table', { name: /by collection/ });
+    const readiness = screen.getByRole('table', { name: /by content type/ });
     for (const [name, href] of [
       ['Pages', '/admin/pages'], ['Content blocks', '/admin/content'],
       ['Sessions', '/admin/sessions'], ['Organizations', '/admin/organizations'],
@@ -249,7 +249,7 @@ describe('the admin overview', () => {
     await renderAt('/admin/overview');
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('The event figures are not available right now. Try again.');
+    expect(alert).toHaveTextContent('The event figures could not be loaded. Refresh to try again.');
     expect(screen.queryByRole('heading', { name: 'Event figures' })).toBeNull();
     expect(screen.queryByText(/Read at/)).toBeNull();
   });
@@ -257,7 +257,7 @@ describe('the admin overview', () => {
   it('refuses a non-admin answer the same way, with the server’s words', async () => {
     fetch.mockResolvedValueOnce(errorResponse(403, 'forbidden', 'Admin access required.'));
     await renderAt('/admin/overview');
-    expect(await screen.findByRole('alert')).toHaveTextContent('Admin access required.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The event figures could not be loaded. Refresh to try again.');
     expect(screen.queryByRole('heading', { name: 'Event figures' })).toBeNull();
   });
 
@@ -309,7 +309,7 @@ describe('the admin overview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh figures' }));
 
     expect(
-      await screen.findByText('We could not refresh the figures. These are the figures read at 9:14 AM EDT.'),
+      await screen.findByText('The figures could not be refreshed. Showing the figures from 9:14 AM EDT; refresh to try again.'),
     ).toBeInTheDocument();
     expect(total('Attendees')).toBe('412 accounts');
     expect(screen.queryByRole('alert')).toBeNull();
@@ -415,9 +415,9 @@ describe('the admin overview', () => {
       await renderAt('/admin/overview');
       await screen.findByRole('heading', { name: 'Content readiness' });
 
-      const table = screen.getByRole('table', { name: 'Records on the site and records with unpublished changes, by collection.' });
+      const table = screen.getByRole('table', { name: 'Records on the site and records with unpublished changes, by content type.' });
       expect(within(table).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
-        'Collection', 'On the site', 'Unpublished changes',
+        'Content', 'On the site', 'Unpublished changes',
       ]);
       const rows = within(table).getAllByRole('row').slice(1)
         .map((row) => within(row).getAllByRole('cell').map((cell) => cell.textContent));
@@ -466,13 +466,13 @@ describe('the admin overview', () => {
         .filter((el) => el.getAttribute('tabindex') !== '-1');
       expect(stops.map((el) => el.getAttribute('aria-label') ?? el.textContent.replace('→', '').trim())).toEqual([
         'Refresh figures',
-        'Review unpublished changes',
+        'Review changes',
         'Manage attendees',
         'Open ticketing',
         'Manage speakers',
         'Manage sessions',
         'Review changes',
-        'Records on the site and records with unpublished changes, by collection.',
+        'Records on the site and records with unpublished changes, by content type.',
         'Pages',
         'Content blocks',
         'Sessions',
@@ -481,7 +481,7 @@ describe('the admin overview', () => {
         'Updates',
         'Review system errors',
       ]);
-      const region = screen.getByRole('region', { name: 'Records on the site and records with unpublished changes, by collection.' });
+      const region = screen.getByRole('region', { name: 'Records on the site and records with unpublished changes, by content type.' });
       expect(region).toHaveAttribute('tabindex', '0');
       const funnel = screen.getByRole('heading', { name: 'Registration funnel' }).closest('section');
       expect(funnel.textContent).toContain('1 revoked. It counts as an account but not in the later stages.');

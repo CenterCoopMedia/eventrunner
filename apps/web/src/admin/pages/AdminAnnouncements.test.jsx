@@ -53,9 +53,9 @@ describe('AdminAnnouncements', () => {
     fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Use the east entrance.' } });
     fireEvent.change(screen.getByLabelText('Starts'), { target: { value: '2026-10-02T09:00' } });
     fireEvent.change(screen.getByLabelText('Ends'), { target: { value: '2026-10-02T11:00' } });
-    fireEvent.change(screen.getByLabelText('Link URL (optional)'), { target: { value: 'https://example.org/details' } });
-    fireEvent.change(screen.getByLabelText('Link label (optional)'), { target: { value: 'Read details' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create announcement' }));
+    fireEvent.change(screen.getByLabelText('Link (optional)'), { target: { value: 'https://example.org/details' } });
+    fireEvent.change(screen.getByLabelText('Link text (optional)'), { target: { value: 'Read details' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await act(async () => Promise.resolve());
     expect(call).toHaveBeenCalledWith('saveAnnouncement', {
       announcement: {
@@ -77,8 +77,8 @@ describe('AdminAnnouncements', () => {
     }]));
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(screen.getByLabelText('Message')).toHaveValue('Old message');
-    expect(screen.getByLabelText('Level')).toHaveValue('urgent');
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Priority')).toHaveValue('urgent');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 
   it('keeps both drafts mounted while switching between site banners and email', () => {

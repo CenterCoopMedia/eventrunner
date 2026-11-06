@@ -33,6 +33,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 
 const stepPath = (step) => `/admin/setup/${step.slug}`;
 
@@ -57,8 +58,8 @@ function LegalSignOff({ onSaved }) {
     try {
       await call('updateEventConfig', { event: { legal: { reviewRequired: false } } });
       await onSaved();
-    } catch (err) {
-      setError(err);
+    } catch {
+      setError(new Error('The legal review could not be approved. Try again.'));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -86,7 +87,7 @@ function LegalSignOff({ onSaved }) {
           aria-busy={busy || undefined}
           aria-disabled={busy || undefined}
         >
-          {busy ? 'Saving…' : 'Mark the review complete'}
+          {busy ? 'Saving…' : 'Approve'}
         </button>
       </div>
       {error ? <Notice tone="error" message={error.message} /> : null}
@@ -148,8 +149,8 @@ export default function AdminSetup() {
       const result = await call('webMcpCheckEventReadiness', {});
       setChecks(Array.isArray(result?.checks?.items) ? result.checks.items : []);
       setError(null);
-    } catch (err) {
-      setError(err);
+    } catch {
+      setError(new Error('The setup could not be checked. Try again.'));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -175,15 +176,15 @@ export default function AdminSetup() {
         identifiers={checks ? `${doneCount} of ${steps.length} steps done` : null}
         description="Complete these steps before you share your site. Some steps are yours. The Event Runner team does the others."
         actions={
-          <button
-            type="button"
+          <AdminIconControl
+            icon="refresh"
+            label={busy ? 'Checking…' : 'Check again'}
+            busy={busy}
             className={secondaryButtonClass}
             onClick={refresh}
             aria-busy={busy || undefined}
             aria-disabled={busy || undefined}
-          >
-            {busy ? 'Checking…' : 'Check again'}
-          </button>
+          />
         }
       />
 
@@ -191,7 +192,7 @@ export default function AdminSetup() {
       {error ? (
         <Notice
           tone={checks ? 'caution' : 'error'}
-          message={checks ? 'We could not check again. These are the results of the last check.' : error.message}
+          message={checks ? 'The setup could not be checked. Showing the last results; check your connection and try again.' : error.message}
         />
       ) : null}
       {allDone ? (

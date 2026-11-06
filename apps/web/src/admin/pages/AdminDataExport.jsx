@@ -38,6 +38,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader from '../components/adminChrome.jsx';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 
 /** The spreadsheets, in page order. `tier` matches the server's DATASETS. */
 export const SPREADSHEETS = Object.freeze([
@@ -46,7 +47,7 @@ export const SPREADSHEETS = Object.freeze([
     label: 'Sessions',
     tier: 'staff',
     noun: ['session', 'sessions'],
-    description: 'Title, state, whether it is hidden, day, times, location, speakers, and description of every session.',
+    description: 'Title, status, visibility, day, times, location, speakers, and description of every session.',
   },
   {
     dataset: 'speakers',
@@ -67,14 +68,14 @@ export const SPREADSHEETS = Object.freeze([
     label: 'Organizations and sponsors',
     tier: 'staff',
     noun: ['organization', 'organizations'],
-    description: 'Name, state, whether it is hidden, tier, website, and description of every organization.',
+    description: 'Name, status, visibility, sponsorship level, website, and description of every organization.',
   },
   {
     dataset: 'orders',
     label: 'Ticket orders',
     tier: 'operator',
     noun: ['order', 'orders'],
-    description: 'Purchaser email address, amounts, payment state, and refunds of every order.',
+    description: 'Purchaser email address, amounts, payment status, and refunds of every order.',
   },
   {
     dataset: 'admissions',
@@ -107,16 +108,16 @@ function SpreadsheetRow({ sheet, busy, result, onExport }) {
             {sheet.description}
           </p>
         </div>
-        <button
-          type="button"
+        <AdminIconControl
+          icon="download"
+          label={`Export ${sheet.label.toLowerCase()}`}
+          busy={busy}
           className={secondaryButtonClass}
           onClick={() => onExport(sheet)}
           aria-describedby={descriptionId}
           aria-busy={busy ? 'true' : undefined}
           aria-disabled={busy ? 'true' : undefined}
-        >
-          {busy ? 'Exporting…' : `Export ${sheet.label.toLowerCase()}`}
-        </button>
+        />
       </div>
       {result ? (
         <div className="px-md pb-sm">
@@ -156,11 +157,11 @@ export default function AdminDataExport() {
         ...current,
         [sheet.dataset]: {
           tone: 'ok',
-          message: `Exported ${countOf(result.rowCount, sheet.noun)} to ${result.filename}. The export is in the admin log.`,
+          message: `Exported ${countOf(result.rowCount, sheet.noun)} to ${result.filename}.`,
         },
       }));
     } catch (err) {
-      setResults((current) => ({ ...current, [sheet.dataset]: { tone: 'error', message: err.message } }));
+      setResults((current) => ({ ...current, [sheet.dataset]: { tone: 'error', message: err?.status === 403 ? 'You do not have access to this download. Ask an operator to export it.' : 'The spreadsheet could not be downloaded. Try again.' } }));
     } finally {
       busyRef.current = null;
       setBusyDataset(null);
@@ -197,10 +198,10 @@ export default function AdminDataExport() {
       });
       setPackageResult({
         tone: 'ok',
-        message: `Downloaded ${filename}. The download is in the admin log. The file holds personal data: store it with access control.`,
+        message: `Downloaded ${filename}. This file contains personal data; share it only with people who need it.`,
       });
     } catch (err) {
-      setPackageResult({ tone: 'error', message: err.message });
+      setPackageResult({ tone: 'error', message: /too large/i.test(err?.message ?? '') ? 'This event is too large for one download. Choose fewer parts and try again.' : 'The package could not be downloaded. Try again.' });
     } finally {
       packageBusyRef.current = false;
       setPackageBusy(false);
@@ -211,13 +212,13 @@ export default function AdminDataExport() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Data export"
-        description="Download the event’s records as spreadsheets, or as one package for the handoff after the event. Every export is recorded in the admin log."
+        description="Download spreadsheets or a package of your event’s records."
       />
 
       <Panel
         flush
         title="Spreadsheets"
-        description="One CSV file for each list. Each file shows the current version of every record, drafts included, with its state. A cell that starts with =, +, - or @ gains a leading apostrophe, so a spreadsheet shows it as text and does not run it."
+        description="Each spreadsheet includes current records and drafts, with their status."
       >
         <ul>
           {sheets.map((sheet) => (
@@ -233,8 +234,8 @@ export default function AdminDataExport() {
         <div className="flex flex-col gap-2xs border-admin-rule-hairline border-t-admin-hairline px-md py-sm text-admin-sm text-admin-ink-secondary">
           <p>Attendees and session pitches export from their own pages, with the page’s filter applied.</p>
           <div className="flex flex-wrap gap-sm">
-            <Link className={linkButtonClass} to="/admin/attendees">Go to the Attendees page</Link>
-            <Link className={linkButtonClass} to="/admin/pitches">Go to the Session pitches page</Link>
+            <Link className={linkButtonClass} to="/admin/attendees">Attendees</Link>
+            <Link className={linkButtonClass} to="/admin/pitches">Session pitches</Link>
           </div>
           {isOperator ? null : (
             <p>An operator exports ticket orders, admissions, and the event data package.</p>
@@ -245,7 +246,7 @@ export default function AdminDataExport() {
       {isOperator ? (
         <Panel
           title="Event data package"
-          description="One zip file for the handoff. It holds a JSON file for each record type, CSV files for the main lists, a manifest with record counts and checksums, and a README that describes each file. It holds live records only: no drafts. A hidden record is in it and marked hidden. It leaves out credentials, the admin allowlist, and raw payment provider records. Uploaded files stay in Storage; the package lists their paths."
+          description="Download published records, including hidden records, in one file. Drafts and uploaded files are not included."
         >
           <div className="flex flex-col gap-md">
             <fieldset className="flex flex-col gap-sm">
@@ -256,7 +257,7 @@ export default function AdminDataExport() {
                 <CheckboxField
                   key={section.id}
                   label={section.label}
-                  hint={section.hint}
+                  hint={section.id === 'organizations' ? 'Names, sponsorship levels, websites, and logos.' : section.id === 'materials' ? 'Links to slides and handouts, with their review status.' : section.id === 'content' ? 'Event details, pages, updates, announcements, and images.' : section.hint}
                   checked={chosen.has(section.id)}
                   onChange={(on) => toggleSection(section.id, on)}
                 />
@@ -269,25 +270,20 @@ export default function AdminDataExport() {
               onChange={setIncludeStaffNotes}
             />
             <div className="flex flex-col items-start gap-xs">
-              <button
-                type="button"
+              <AdminIconControl
+                icon="download"
+                label="Download event data package"
+                busy={packageBusy}
                 className={primaryButtonClass}
                 onClick={downloadPackage}
                 aria-busy={packageBusy ? 'true' : undefined}
                 aria-disabled={packageBusy ? 'true' : undefined}
-              >
-                {packageBusy ? 'Preparing package…' : 'Download event data package'}
-              </button>
+              />
               {packageResult?.tone === 'ok' ? <SaveStatus message={packageResult.message} /> : null}
               {packageResult && packageResult.tone !== 'ok' ? (
                 <Notice tone={packageResult.tone} message={packageResult.message} />
               ) : null}
             </div>
-            <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
-              A large event can pass the size this page can send. Run{' '}
-              <code className="font-admin-data text-admin-xs text-admin-ink-data">scripts/export-event-package.cjs</code>{' '}
-              from a terminal instead. The operator guide for the archive handoff also covers a full Firebase backup and how to keep the past site online.
-            </p>
           </div>
         </Panel>
       ) : null}

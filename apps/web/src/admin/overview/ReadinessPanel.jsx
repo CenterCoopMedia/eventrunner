@@ -28,7 +28,7 @@ const COLLECTIONS = Object.freeze([
 ]);
 
 const COLUMNS = Object.freeze([
-  { id: 'collection', label: 'Collection' },
+  { id: 'collection', label: 'Content' },
   { id: 'published', label: 'On the site', numeric: true },
   { id: 'drafts', label: 'Unpublished changes', numeric: true },
 ]);
@@ -51,7 +51,7 @@ export default function ReadinessPanel({ content }) {
           <p className="text-admin-base text-admin-ink">Nothing is on the site yet.</p>
         ) : null}
         <RuledTable
-          caption="Records on the site and records with unpublished changes, by collection."
+          caption="Records on the site and records with unpublished changes, by content type."
           columns={COLUMNS}
           rows={rows}
           tableClassName="admin-readiness-table"

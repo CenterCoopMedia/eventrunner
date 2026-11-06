@@ -82,7 +82,7 @@ function renderPage(path = '/admin/versions') {
 const location = () => screen.getByTestId('location').textContent;
 const table = () => screen.getByRole('region', { name: 'Records' });
 const recordLinks = () => within(table()).getAllByRole('link').map((link) => link.textContent);
-const searchField = () => screen.getByRole('searchbox', { name: 'Search by name or id' });
+const searchField = () => screen.getByRole('searchbox', { name: 'Search by name' });
 // The figure sentence: the one status line that is not the loading line.
 const figure = () => document.querySelector('p[role="status"]:not([aria-label])');
 
@@ -95,12 +95,12 @@ describe('the record list', () => {
   it('opens on content blocks, listing each record with its state, live version and last publish', () => {
     renderPage();
     expect(screen.getByRole('heading', { level: 1, name: 'Version history' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Collection' })).toHaveValue('cmsContent');
+    expect(screen.getByRole('combobox', { name: 'Content type' })).toHaveValue('cmsContent');
     expect(subscribed).toEqual(['cmsContent', 'cmsContent_drafts']);
     reportContent();
 
-    expect(recordLinks()).toEqual(['hero › subtitle', 'Where do I park?', 'about › intro']);
-    const hero = within(table()).getByRole('link', { name: 'hero › subtitle' }).closest('tr');
+    expect(recordLinks()).toEqual(['Hello', 'Where do I park?', 'New']);
+    const hero = within(table()).getByRole('link', { name: 'Hello' }).closest('tr');
     expect(within(hero).getByText('Live')).toBeInTheDocument();
     expect(within(hero).getByText('3')).toBeInTheDocument();
     const time = hero.querySelector('time');
@@ -108,8 +108,8 @@ describe('the record list', () => {
     expect(time).toHaveAttribute('dateTime', '2026-09-23T18:02:00.000Z');
     const faq = within(table()).getByRole('link', { name: 'Where do I park?' }).closest('tr');
     expect(within(faq).getByText('Live with unpublished changes')).toBeInTheDocument();
-    expect(within(faq).getByText('faq__parking')).toBeInTheDocument();
-    const about = within(table()).getByRole('link', { name: 'about › intro' }).closest('tr');
+    expect(within(faq).queryByText('faq__parking')).not.toBeInTheDocument();
+    const about = within(table()).getByRole('link', { name: 'New' }).closest('tr');
     expect(within(about).getByText('Draft')).toBeInTheDocument();
     expect(within(about).getByText('Not published')).toBeInTheDocument();
     expect(within(about).getByText('Never')).toBeInTheDocument();
@@ -120,7 +120,7 @@ describe('the record list', () => {
     renderPage();
     report('cmsContent', [{ ...CONTENT_LIVE[0], visible: false }, CONTENT_LIVE[1]]);
     report('cmsContent_drafts', []);
-    const hidden = within(table()).getByRole('link', { name: 'hero › subtitle' }).closest('tr');
+    const hidden = within(table()).getByRole('link', { name: 'Hello' }).closest('tr');
     expect(within(hidden).getByText('Live')).toBeInTheDocument();
     expect(within(hidden).getByText('Hidden')).toBeInTheDocument();
     const shown = within(table()).getByRole('link', { name: 'Where do I park?' }).closest('tr');
@@ -137,14 +137,14 @@ describe('the record list', () => {
   it('switches collection from the filter, keeps it in the URL, and shows no row of the last one while the next loads', () => {
     renderPage();
     reportContent();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Collection' }), { target: { value: 'cmsPages' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Content type' }), { target: { value: 'cmsPages' } });
 
     expect(location()).toBe('/admin/versions?collection=cmsPages');
     expect(subscribed.slice(-2)).toEqual(['cmsPages', 'cmsPages_drafts']);
     // The content listeners are closed, and nothing of theirs is drawn.
     expect(listeners.has('cmsContent')).toBe(false);
     expect(screen.getByRole('status', { name: 'Loading the records…' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'hero › subtitle' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Hello' })).toBeNull();
 
     report('cmsPages', [{ id: 'about', label: 'About', title: 'About the event', revision: 2, publishedAt: at('2026-09-20T10:00:00Z') }]);
     expect(screen.getByRole('status', { name: 'Loading the records…' })).toBeInTheDocument();
@@ -156,13 +156,13 @@ describe('the record list', () => {
 
   it('reads an unknown or missing collection as content blocks', () => {
     renderPage('/admin/versions?collection=users');
-    expect(screen.getByRole('combobox', { name: 'Collection' })).toHaveValue('cmsContent');
+    expect(screen.getByRole('combobox', { name: 'Content type' })).toHaveValue('cmsContent');
     expect(subscribed).toEqual(['cmsContent', 'cmsContent_drafts']);
   });
 
   it('opens on the collection a shared link names', () => {
     renderPage('/admin/versions?collection=cmsTimeline');
-    expect(screen.getByRole('combobox', { name: 'Collection' })).toHaveValue('cmsTimeline');
+    expect(screen.getByRole('combobox', { name: 'Content type' })).toHaveValue('cmsTimeline');
     expect(subscribed).toEqual(['cmsTimeline', 'cmsTimeline_drafts']);
   });
 
@@ -175,11 +175,9 @@ describe('the record list', () => {
     expect(screen.getByTestId('navigation')).toHaveTextContent('REPLACE');
     expect(figure()).toHaveTextContent('1 of 3 content blocks matches “PARK”.');
 
-    // The id matches too.
+    // Internal ids are not search labels.
     fireEvent.change(searchField(), { target: { value: 'hero__' } });
-    expect(recordLinks()).toEqual(['hero › subtitle']);
-    fireEvent.change(searchField(), { target: { value: '_' } });
-    expect(figure()).toHaveTextContent('3 of 3 content blocks match “_”.');
+    expect(screen.queryByRole('region', { name: 'Records' })).toBeNull();
   });
 
   it('orders by name from the sort control, in the URL, with aria-sort on the sorted column', () => {
@@ -191,7 +189,7 @@ describe('the record list', () => {
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Order records by' }), { target: { value: 'name' } });
     expect(location()).toBe('/admin/versions?sort=name');
-    expect(recordLinks()).toEqual(['about › intro', 'hero › subtitle', 'Where do I park?']);
+    expect(recordLinks()).toEqual(['Hello', 'New', 'Where do I park?']);
     expect(heads()[0]).toHaveAttribute('aria-sort', 'ascending');
     expect(heads()[3]).not.toHaveAttribute('aria-sort');
     expect(figure()).toHaveTextContent('3 content blocks, by name.');
@@ -211,7 +209,7 @@ describe('the record list', () => {
   it('clears the search from the Clear button beside the field', () => {
     renderPage('/admin/versions?q=hero');
     reportContent();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(searchField()).toHaveValue('');
     expect(searchField()).toHaveFocus();
   });

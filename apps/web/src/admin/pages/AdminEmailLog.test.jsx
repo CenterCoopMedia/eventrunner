@@ -128,7 +128,7 @@ describe('AdminEmailLog', () => {
     await renderPage();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Email log' })).toBeInTheDocument();
-    expect(screen.getByText(/Messages stay in this log for 90 days/)).toBeInTheDocument();
+    expect(screen.getByText(/Emails from the past 90 days/)).toBeInTheDocument();
     expect(listCalls()).toEqual([{ limit: 25 }]);
 
     const region = screen.getByRole('region', { name: 'Sent messages' });
@@ -155,13 +155,15 @@ describe('AdminEmailLog', () => {
     // States are words: the quiet "Sent", and badges that carry a word.
     expect(within(rowOf('plain@example.test')).getByText('Sent')).toBeInTheDocument();
     expect(within(rowOf('bounced@example.test')).getByText('Bounced')).toBeInTheDocument();
-    // Markup in a stored field is text, never HTML.
-    expect(within(rowOf('bounced@example.test')).getByText('Mailbox <full>')).toBeInTheDocument();
+    // Provider error details stay out of the visible error copy.
+    expect(within(rowOf('bounced@example.test')).getByText('The message could not be delivered. Check the email address.')).toBeInTheDocument();
+    expect(within(rowOf('bounced@example.test')).queryByText('Mailbox <full>')).not.toBeInTheDocument();
     const failed = rowOf('No recipient');
     expect(within(failed).getByText('Failed')).toBeInTheDocument();
-    expect(within(failed).getByText('no recipient')).toBeInTheDocument();
-    // An unknown source shows its id in the data face.
-    expect(within(failed).getByText('future-sender').className).toContain('font-admin-data');
+    expect(within(failed).getByText('Delivery failed. Check the email address before trying again.')).toBeInTheDocument();
+    // Unknown source keys are kept out of the interface.
+    expect(within(failed).getByText('Other email')).toBeInTheDocument();
+    expect(within(failed).queryByText('future-sender')).not.toBeInTheDocument();
     expect(within(rowOf('delivered@example.test')).getByText('Delivered')).toBeInTheDocument();
     expect(within(rowOf('delivered@example.test')).getByText('Feedback receipt')).toBeInTheDocument();
   });
@@ -262,15 +264,15 @@ describe('AdminEmailLog', () => {
       }],
     });
     const spam = rowOf('spam@example.test');
-    expect(within(spam).getByText('Complained')).toBeInTheDocument();
+    expect(within(spam).getByText('Marked as spam')).toBeInTheDocument();
     expect(within(spam).getByText('The recipient marked it as spam.')).toBeInTheDocument();
     const blocked = rowOf('blocked@example.test');
-    expect(within(blocked).getByText('Suppressed')).toBeInTheDocument();
+    expect(within(blocked).getByText('Not sent')).toBeInTheDocument();
     expect(within(blocked).getByText('The mail provider did not send it, because the address is on its block list.')).toBeInTheDocument();
-    expect(within(blocked).getByText('Previously bounced')).toBeInTheDocument();
+    expect(within(blocked).getByText('The message could not be delivered. Check the email address.')).toBeInTheDocument();
   });
 
-  it('shows a source or a delivery state it does not know as data, never as an object key’s value', async () => {
+  it('hides unknown source keys and keeps delivery states in plain words', async () => {
     await renderPage('/admin/email-log', {
       lists: [{
         rows: [message({ id: 'odd', to: 'odd@example.test', source: 'constructor', deliveryStatus: 'toString' })],
@@ -279,7 +281,8 @@ describe('AdminEmailLog', () => {
       }],
     });
     const odd = rowOf('odd@example.test');
-    expect(within(odd).getByText('constructor').className).toContain('font-admin-data');
+    expect(within(odd).getByText('Other email')).toBeInTheDocument();
+    expect(within(odd).queryByText('constructor')).not.toBeInTheDocument();
     expect(within(odd).getByText('Sent')).toBeInTheDocument();
     expect(odd.textContent).not.toMatch(/function|native code/);
   });
@@ -471,9 +474,9 @@ describe('AdminEmailLog', () => {
     expect(policy.getAttribute('http-equiv')).toBe('Content-Security-Policy');
     expect(policy.getAttribute('content')).toBe(PREVIEW_POLICY);
     expect(framed.body.innerHTML).toBe('<p>Hello there.</p>');
-    expect(within(openRow).getByText('Links and remote images are turned off in this preview.')).toBeInTheDocument();
+    expect(within(openRow).getByText('Links are inactive and images are hidden.')).toBeInTheDocument();
     // The plain text sits closed under the frame, as React text.
-    const summary = within(openRow).getByText('Plain text version');
+    const summary = within(openRow).getByText('Text preview');
     expect(summary.closest('details').open).toBe(false);
     expect(summary.closest('details').querySelector('pre').textContent).toBe('Hello there.');
 
@@ -516,7 +519,7 @@ describe('AdminEmailLog', () => {
     fireEvent.click(button);
     const openRow = document.getElementById(button.getAttribute('aria-controls'));
     expect(within(openRow).getByText(
-      'This message’s body was not stored because it held a sign-in code or an invitation link.',
+      'This message is private because it contains a sign-in code or invitation link.',
     )).toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();
     expect(getCalls()).toEqual([]);
@@ -527,11 +530,11 @@ describe('AdminEmailLog', () => {
       details: { plain: { ...message({ id: 'plain' }), html: null, text: 'Only <text>.', bodyTruncated: true } },
     });
     fireEvent.click(within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' }));
-    const summary = await screen.findByText('Plain text version');
+    const summary = await screen.findByText('Text preview');
     expect(summary.closest('details').open).toBe(true);
     expect(screen.getByText('Only <text>.')).toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();
-    expect(screen.getByText('The stored body stops at 100 KB.')).toBeInTheDocument();
+    expect(screen.getByText('Only part of this message is available.')).toBeInTheDocument();
   });
 
   it('shows the plain text, and no frame, when the stored HTML cannot be shown safely', async () => {
@@ -542,15 +545,15 @@ describe('AdminEmailLog', () => {
       },
     });
     fireEvent.click(within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' }));
-    expect(await screen.findByText('This message’s HTML cannot be shown safely, so its plain text version is shown instead.')).toBeInTheDocument();
+    expect(await screen.findByText('The formatted preview is unavailable. The text preview is shown below.')).toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();
-    const summary = screen.getByText('Plain text version');
+    const summary = screen.getByText('Text preview');
     expect(summary.closest('details').open).toBe(true);
     expect(screen.getByText('The plain words.')).toBeInTheDocument();
-    expect(screen.queryByText('Links and remote images are turned off in this preview.')).toBeNull();
+    expect(screen.queryByText('Links are inactive and images are hidden.')).toBeNull();
 
     fireEvent.click(within(rowOf('bounced@example.test')).getByRole('button', { name: 'Preview' }));
-    expect(await screen.findByText('This message’s HTML cannot be shown safely, and it has no plain text version.')).toBeInTheDocument();
+    expect(await screen.findByText('This message has no preview available.')).toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();
   });
 
@@ -561,7 +564,7 @@ describe('AdminEmailLog', () => {
     const button = within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' });
     fireEvent.click(button);
     const openRow = document.getElementById(button.getAttribute('aria-controls'));
-    expect(await within(openRow).findByRole('alert')).toHaveTextContent('This message is not in the email log.');
+    expect(await within(openRow).findByRole('alert')).toHaveTextContent('This message could not be loaded. Try again.');
   });
 
   it('retries a failed preview in place and returns focus after the retry control disappears', async () => {
@@ -594,7 +597,7 @@ describe('AdminEmailLog', () => {
     more.focus();
     fireEvent.click(more);
     const retry = await screen.findByRole('button', { name: 'Retry loading older messages' });
-    expect(within(retry.parentElement).getByRole('alert')).toHaveTextContent('Older messages could not be loaded. Please try again.');
+    expect(within(retry.parentElement).getByRole('alert')).toHaveTextContent('Older messages could not be loaded. Try again.');
     expect(retry).toHaveFocus();
     expect(screen.getByText('plain@example.test')).toBeInTheDocument();
     fireEvent.click(retry);
@@ -634,13 +637,13 @@ describe('AdminEmailLog', () => {
   it('adds the sign-in link to a server 401 that gives no instruction of its own', async () => {
     await renderPage('/admin/email-log', { lists: [serverError(401, 'unauthorized', 'Authentication required.')] });
     const alert = screen.getByRole('alert');
-    expect(alert.textContent).toBe('Authentication required. Sign in again');
+    expect(alert.textContent).toBe('Your session has expired. Sign in again');
     expect(within(alert).getByRole('link', { name: 'Sign in again' })).toHaveAttribute('href', '/signin');
   });
 
-  it('shows a first-load failure as an error with the server message', async () => {
+  it('hides server details in a first-load error', async () => {
     await renderPage('/admin/email-log', { lists: [serverError(500, 'internal', 'The email log is temporarily unavailable.')] });
-    expect(screen.getByRole('alert')).toHaveTextContent('The email log is temporarily unavailable.');
+    expect(screen.getByRole('alert')).toHaveTextContent('The email log could not be loaded. Refresh to try again.');
     expect(screen.queryByRole('region', { name: 'Sent messages' })).toBeNull();
   });
 

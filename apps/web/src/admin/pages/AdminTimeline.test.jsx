@@ -152,11 +152,11 @@ describe('the timeline list', () => {
   it('offers the first entry when there is none', async () => {
     await renderAt('/admin/timeline');
     expect(await screen.findByRole('heading', { name: 'No timeline entries yet' })).toBeInTheDocument();
-    expect(screen.getByText('Add the first entry. It stays a draft until you publish it.')).toBeInTheDocument();
+    expect(screen.getByText('Add your first past event.')).toBeInTheDocument();
     // One noun for the record: "past editions" only says what the entries are.
     const main = screen.getByRole('main');
     expect(main.textContent.match(/edition/gi)).toEqual(['edition']);
-    expect(within(main).getByText(/^Past editions of the event\./)).toBeInTheDocument();
+    expect(within(main).getByText(/^Past editions of the event,/)).toBeInTheDocument();
     const add = screen.getAllByRole('link', { name: 'Add an entry' });
     expect(add.length).toBeGreaterThan(0);
     for (const link of add) expect(link).toHaveAttribute('href', '/admin/timeline/new/entry');
@@ -174,7 +174,7 @@ describe('the timeline list', () => {
       'A planning day', 'A hidden year', 'The first meeting', 'Two workshop tracks, edited',
     ]);
     const rows = links.map((link) => link.closest('li'));
-    expect(within(rows[0]).getByText('2019 · edition-2019')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('2019')).toBeInTheDocument();
     expect(within(rows[0]).getByText('Draft')).toBeInTheDocument();
     expect(within(rows[1]).getByText('Live')).toBeInTheDocument();
     expect(within(rows[1]).getByText('Hidden')).toBeInTheDocument();
@@ -197,7 +197,7 @@ describe('the timeline list', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsPublish');
     expect(bodyOf(0)).toEqual({ collection: 'cmsTimeline', docIds: ['edition-2019', 'edition-2025'] });
-    expect(await screen.findAllByText('Published. The public site picks it up live.')).not.toHaveLength(0);
+    expect(await screen.findAllByText('Published.')).not.toHaveLength(0);
   });
 
   // Codex review on #288, the same flaw #281 found in the organizations
@@ -219,7 +219,7 @@ describe('the timeline list', () => {
     pushTimeline(LIVE, [...DRAFTS.filter((doc) => doc.id !== 'edition-2024'), { ...DRAFTS[1], title: 'The first meeting, again', status: 'dirty' }]);
     fetch.mockResolvedValueOnce(published(['edition-2019', 'edition-2025']));
     fireEvent.click(resume);
-    expect(await screen.findByText('Published. The public site picks it up live.', { selector: 'p[role="status"]' })).toBeInTheDocument();
+    expect(await screen.findByText('Published.', { selector: 'p[role="status"]' })).toBeInTheDocument();
     expect(bodyOf(1)).toEqual({ queueId: 'queue-7' });
   });
 
@@ -229,7 +229,7 @@ describe('the timeline list', () => {
     await renderAt('/admin/timeline');
     await screen.findByRole('heading', { level: 1, name: 'Timeline' });
     pushTimeline(LIVE, DRAFTS);
-    const lost = 'We lost the connection to the timeline; showing the last values we received and retrying.';
+    const lost = 'The timeline could not refresh. Check your connection.';
     act(() => adminErrors.get('cmsTimeline_drafts')(new Error('unavailable')));
     expect(screen.getByText(lost)).toBeInTheDocument();
     act(() => adminSubscriptions.get('cmsTimeline')(LIVE));
@@ -243,11 +243,10 @@ describe('the timeline list', () => {
     await screen.findByRole('heading', { level: 1, name: 'Timeline' });
     const warning = (_content, element) =>
       element?.tagName === 'P'
-      && element.textContent === 'The home page has no section with the id history, so published entries do not appear on the site. Add one to the home page under Pages.';
+      && element.textContent === 'Add a History section to the home page to show these entries. Edit home page';
     // The historical snapshot has no invented past-edition history.
     const notice = screen.getByText(warning);
-    const id = within(notice).getByText('history', { selector: 'code' });
-    expect(id).toHaveClass('font-admin-data');
+    expect(within(notice).getByRole('link', { name: 'Edit home page' })).toHaveAttribute('href', '/admin/pages/home');
 
     const home = snapshotPages.find((page) => page.id === 'home');
     act(() => {
@@ -272,7 +271,7 @@ describe('the timeline entry editor', () => {
     fetch.mockResolvedValueOnce(response({ docId: 'x', status: 'dirty' }));
     fillNewEntry();
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: '  One day of talks.  ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsCreateContent');
@@ -299,13 +298,13 @@ describe('the timeline entry editor', () => {
       .mockImplementationOnce(async () => response({ status: 'dirty' }))
       .mockImplementationOnce(async (_url, init) => published(JSON.parse(init.body).docIds));
     fillNewEntry();
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish', exact: true }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(endpointOf(0)).toBe('cmsCreateContent');
     expect(endpointOf(1)).toBe('cmsPublish');
     expect(bodyOf(1)).toEqual({ collection: 'cmsTimeline', docIds: [bodyOf(0).docId] });
-    expect(await screen.findAllByText('Published. The public site picks it up live.')).not.toHaveLength(0);
+    expect(await screen.findAllByText('Published.')).not.toHaveLength(0);
     await waitFor(() => expect(currentPath).toBe(`/admin/timeline/${bodyOf(0).docId}`));
   });
 
@@ -317,12 +316,12 @@ describe('the timeline entry editor', () => {
       .mockImplementationOnce(async () => response({ status: 'dirty' }))
       .mockImplementationOnce(async (_url, init) => published(JSON.parse(init.body).docIds));
     fillNewEntry();
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
-    expect(await screen.findByText('Publish failed.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish', exact: true }));
+    expect(await screen.findByText('Publishing did not finish. Your draft is saved. Try again.')).toBeInTheDocument();
     // The form keeps what was typed.
     expect(screen.getByLabelText('Title')).toHaveValue('A new edition');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
     expect(fetch.mock.calls.map((_, index) => endpointOf(index))).toEqual([
       'cmsCreateContent', 'cmsPublish', 'cmsUpdateContent', 'cmsPublish',
@@ -335,14 +334,14 @@ describe('the timeline entry editor', () => {
     await openNewEntry();
     fetch.mockResolvedValueOnce(refusal(400, 'year: enter a year from 1900 to 2100 as four digits'));
     fillNewEntry();
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
 
     const summary = await screen.findByRole('alert');
-    expect(summary).toHaveTextContent('Year: enter a year from 1900 to 2100 as four digits');
+    expect(summary).toHaveTextContent('Check year and try again.');
     await waitFor(() => expect(document.activeElement).toBe(summary));
     expect(screen.getByLabelText('Year')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Year')).toHaveAccessibleDescription(
-      expect.stringContaining('Year: enter a year from 1900 to 2100 as four digits'),
+      expect.stringContaining('Check year and try again.'),
     );
     expect(screen.getByLabelText('Title')).not.toHaveAttribute('aria-invalid');
   });
@@ -351,13 +350,13 @@ describe('the timeline entry editor', () => {
     await openNewEntry();
     // A blank form shows no errors until the operator acts.
     expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish', exact: true }));
     expect(fetch).not.toHaveBeenCalled();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Year')));
     expect(screen.getByText('Enter a year as four digits.')).toBeInTheDocument();
     expect(screen.getByText('Enter a title.')).toBeInTheDocument();
     // The controls stay enabled, so the next press says the same.
-    expect(screen.getByRole('button', { name: 'Save and publish' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
   });
 
   it('names the record an entry in every control, heading and hint', async () => {
@@ -372,7 +371,7 @@ describe('the timeline entry editor', () => {
     fillNewEntry({ year: '20245' });
     expect(screen.getByLabelText('Year')).toHaveValue('20245');
     expect(screen.getByLabelText('Year')).not.toHaveAttribute('maxlength');
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     expect(fetch).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Year')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByText('Enter a year as four digits.')).toBeInTheDocument();
@@ -385,7 +384,7 @@ describe('the timeline entry editor', () => {
     const title = screen.getByLabelText('Title');
     // Enter in a one-line field submits its form through the first submit
     // control, which is Save draft.
-    expect(title.form.querySelector('[type="submit"]')).toHaveTextContent('Save draft');
+    expect(title.form.querySelector('[type="submit"]')).toHaveTextContent('Save');
     fireEvent.submit(title.form);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsCreateContent');
@@ -395,13 +394,13 @@ describe('the timeline entry editor', () => {
     await openEntry('edition-2025');
     expect(await screen.findByDisplayValue('Two workshop tracks, edited')).toBeInTheDocument();
     expect(screen.getByLabelText('Year')).toHaveValue('2025');
-    expect(screen.getByText('edition-2025')).toBeInTheDocument();
+    expect(screen.queryByText('edition-2025')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /preview/i })).toBeNull();
 
     fetch.mockResolvedValueOnce(response({ status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Practice and planning.' } });
     fireEvent.click(screen.getByLabelText('Show this entry when it is published'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsUpdateContent');
     expect(bodyOf(0)).toEqual({
@@ -427,7 +426,7 @@ describe('the timeline entry editor', () => {
     act(() => adminSubscriptions.get('cmsTimeline_drafts')(DRAFTS));
     expect(await screen.findByLabelText('Title')).toHaveValue('Two workshop tracks, edited');
     fetch.mockResolvedValueOnce(response({ ok: true }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).fields).toMatchObject({ title: 'Two workshop tracks, edited' });
   });
@@ -440,7 +439,7 @@ describe('the timeline entry editor', () => {
     act(() => adminErrors.get('cmsTimeline_drafts')(new Error('unavailable')));
 
     expect(screen.getByText(
-      'We could not load this entry and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again.',
+      'This entry could not load. Check your connection and try again.',
     )).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
     act(() => adminSubscriptions.get('cmsTimeline_drafts')(DRAFTS));

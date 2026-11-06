@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { ANNOUNCEMENT_LEVELS, announcementTimeMs } from 'shared/announcement';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { communicationsError } from '../components/communicationsErrors.js';
 import AdminIconControl from '../components/AdminIconControl.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
 import {
@@ -43,10 +44,15 @@ function isoValue(value) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : value;
 }
 
+function formatAnnouncementWhen(value) {
+  const millis = announcementTimeMs(value);
+  return millis === null ? 'Date not set' : new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(millis));
+}
+
 function stateOf(row, nowMs = Date.now()) {
   const startsAt = announcementTimeMs(row.startsAt);
   const endsAt = announcementTimeMs(row.endsAt);
-  if (startsAt === null || endsAt === null) return 'Invalid window';
+  if (startsAt === null || endsAt === null) return 'Check dates';
   if (nowMs < startsAt) return 'Scheduled';
   if (nowMs >= endsAt) return 'Ended';
   return 'Active';
@@ -65,6 +71,9 @@ export default function AdminAnnouncements() {
   const [deletingId, setDeletingId] = useState(null);
   const [channel, setChannel] = useState('banners');
   const channelRefs = useRef({});
+  const formRef = useRef(null);
+
+  function focusMessage() { formRef.current?.querySelector('textarea')?.focus(); }
 
   function changeChannelWithKeyboard(event) {
     const channels = ['banners', 'email'];
@@ -114,6 +123,7 @@ export default function AdminAnnouncements() {
       linkLabel: row.link?.label ?? '',
     });
     setError(null);
+    requestAnimationFrame(focusMessage);
   }
 
   function cancelEdit() {
@@ -154,7 +164,7 @@ export default function AdminAnnouncements() {
       showToast('Announcement removed.');
       if (editingId === id) cancelEdit();
     } catch (err) {
-      showToast(err.message, { tone: 'error' });
+      showToast(communicationsError(err, 'The announcement could not be removed. Try again.'), { tone: 'error' });
     } finally {
       setDeletingId(null);
     }
@@ -197,10 +207,10 @@ export default function AdminAnnouncements() {
       >
         <Panel
           title={editingId ? 'Edit announcement' : 'Create an announcement'}
-          description="Site banners show during their active window. Saving a banner that is active now makes it live immediately."
+          description="Banners appear on your site between the start and end times. A banner that starts now appears as soon as you save."
         >
-          <form className="flex flex-col gap-sm" onSubmit={submit}>
-            <ServerErrorSummary error={error} />
+          <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit}>
+            <ServerErrorSummary error={error ? { message: communicationsError(error, "The announcement could not be saved. Check the message and dates, then try again.") } : null} />
             <TextAreaField
               label="Message"
               value={form.message}
@@ -209,7 +219,7 @@ export default function AdminAnnouncements() {
               onChange={(message) => setForm((current) => ({ ...current, message }))}
             />
             <SelectField
-              label="Level"
+              label="Priority"
               value={form.level}
               options={[{ value: 'info', label: 'Notice' }, { value: 'urgent', label: 'Urgent' }]}
               onChange={(level) => setForm((current) => ({ ...current, level }))}
@@ -232,14 +242,14 @@ export default function AdminAnnouncements() {
             </div>
             <div className="grid gap-sm md:grid-cols-2">
               <TextField
-                label="Link URL (optional)"
+                label="Link (optional)"
                 type="url"
                 value={form.linkUrl}
                 placeholder="https://example.org/details"
                 onChange={(linkUrl) => setForm((current) => ({ ...current, linkUrl }))}
               />
               <TextField
-                label="Link label (optional)"
+                label="Link text (optional)"
                 value={form.linkLabel}
                 maxLength={80}
                 onChange={(linkLabel) => setForm((current) => ({ ...current, linkLabel }))}
@@ -247,7 +257,7 @@ export default function AdminAnnouncements() {
             </div>
             <div className="flex flex-wrap gap-xs">
               <button type="submit" className={primaryButtonClass} disabled={saving}>
-                {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create announcement'}
+                {saving ? 'Saving…' : 'Save'}
               </button>
               {editingId ? (
                 <button type="button" className={secondaryButtonClass} onClick={cancelEdit}>Cancel</button>
@@ -256,11 +266,11 @@ export default function AdminAnnouncements() {
           </form>
         </Panel>
 
-        {listError ? <Notice tone="caution" message="We lost the announcement list connection. We will retry." /> : null}
+        {listError ? <Notice tone="caution" message="Announcements could not be updated. Check your connection; the list will retry." /> : null}
         {rows === null ? (
           <AdminLoadingState label="Loading announcements…" />
         ) : ordered.length === 0 ? (
-          <AdminEmptyState title="No announcements yet" description="Create one using the form above." />
+          <AdminEmptyState title="No announcements yet" description="Add a banner to share news with attendees." action={<button type="button" className={secondaryButtonClass} onClick={focusMessage}>Add banner</button>} />
         ) : (
           <Panel flush>
             <ul>
@@ -271,7 +281,7 @@ export default function AdminAnnouncements() {
                       <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
                         <StatusBadge tone={stateOf(row, nowMs) === 'Active' ? 'ok' : 'info'}>{stateOf(row, nowMs)}</StatusBadge>
                         <span className="font-admin-data text-admin-xs text-admin-ink-secondary">
-                          {localInputValue(row.startsAt).replace('T', ' ')}–{localInputValue(row.endsAt).replace('T', ' ')}
+                          {formatAnnouncementWhen(row.startsAt)} – {formatAnnouncementWhen(row.endsAt)}
                         </span>
                       </div>
                       <p className="mt-3xs text-admin-base text-admin-ink">{row.message}</p>
@@ -280,6 +290,7 @@ export default function AdminAnnouncements() {
                       <AdminIconControl className={ghostButtonClass} onClick={() => startEdit(row)} label="Edit" icon="edit" />
                       <DestructiveConfirm
                         trigger="Remove"
+                        triggerIcon="remove"
                         title="Remove this announcement"
                         confirmLabel="Remove this announcement"
                         busyLabel="Removing…"

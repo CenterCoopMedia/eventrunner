@@ -31,7 +31,7 @@ export function SystemHealth({ errors, isOperator }) {
     <article className="admin-overview-health" aria-labelledby={titleId}>
       <h2 id={titleId}>System health</h2>
       <p className="admin-figure-total"><Figure value={unresolved} /> <span>unresolved {plural(unresolved, 'error', 'errors')}</span></p>
-      <p className="admin-figure-note">{unresolved > 0 ? 'Unresolved errors need an operator’s review.' : 'No unresolved errors were reported in this snapshot.'}</p>
+      <p className="admin-figure-note">{unresolved > 0 ? 'Unresolved errors need an operator’s review.' : 'No unresolved errors at the last check.'}</p>
       {isOperator ? (
         <Link className="admin-register-action" to="/admin/system-errors">Review system errors<span aria-hidden="true">→</span></Link>
       ) : <p className="admin-figure-note">Only operators can open the error details.</p>}
@@ -65,7 +65,6 @@ export default function EventFigures({ stats }) {
           <Breakdown values={tickets.byStatus} labels={[
             ['valid', 'valid'], ['refunded', 'refunded'], ['cancelled', 'cancelled'], ['pending_info', 'waiting for details'],
           ]} />
-          <p className="admin-figure-note">One ticket record, not one seat.</p>
         </FigureItem>
         <FigureItem title="Speakers" to="/admin/speakers" action="Manage speakers">
           <p className="admin-figure-total"><Figure value={speakers.total} /> <span>{plural(speakers.total ?? 0, 'speaker', 'speakers')}</span></p>
@@ -76,7 +75,7 @@ export default function EventFigures({ stats }) {
         <FigureItem title="Program" to="/admin/sessions" action="Manage sessions">
           <p className="admin-figure-total"><Figure value={sessions.published} /> <span>{plural(sessions.published ?? 0, 'session', 'sessions')} on the site</span></p>
           <p className="admin-figure-note"><Figure value={sessions.drafts} /> with unpublished changes.</p>
-          <p className="admin-figure-note">Review the running order, session details, and publishing state.</p>
+          <p className="admin-figure-note">Review the running order and session details.</p>
         </FigureItem>
       </div>
     </section>

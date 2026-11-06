@@ -203,7 +203,7 @@ describe('AdminReminderSchedules', () => {
     route({ speakers: [state(), new Promise((resolve) => { finish = resolve; })] });
     renderPage();
     await screen.findByTestId('schedule-state');
-    fireEvent.click(screen.getByRole('button', { name: 'Save settings', exact: true }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save', exact: true })[0]);
     expect(screen.getByLabelText('Send time')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Preview', exact: true })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Saving…' })).toHaveAttribute('aria-busy', 'true');
@@ -225,7 +225,7 @@ describe('AdminReminderSchedules', () => {
     expect(callMock).toHaveBeenCalledWith('reminderSchedules', { action: 'get', schedule: 'speakers' });
     const next = screen.getByTestId('next-run');
     expect(next).toHaveTextContent('Next: the 14-day reminder, Friday, November 6, 2026 at 10:00 AM Eastern Standard Time');
-    expect(next).toHaveTextContent('America/New_York');
+    expect(next).not.toHaveTextContent('America/New_York');
     expect(screen.getByText('It would reach 1 speaker: Ada Lee.')).toBeInTheDocument();
     expect(screen.getByText(/1 speaker waits on the 24-hour limit/)).toBeInTheDocument();
     expect(screen.getByText(/Ben Ode, from/)).toBeInTheDocument();
@@ -254,7 +254,7 @@ describe('AdminReminderSchedules', () => {
     });
     expect(screen.getByText('Approved. Scheduled speaker reminders are on.')).toHaveAttribute('role', 'status');
     expect(screen.getByRole('heading', { name: 'Result' })).toHaveFocus();
-    expect(screen.getByRole('button', { name: 'Turn off' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Scheduled speaker reminders' })).toBeInTheDocument();
   });
 
   it('warns when the schedule is on but the wording is no longer the approved wording', async () => {
@@ -270,9 +270,9 @@ describe('AdminReminderSchedules', () => {
       }), state()] });
     renderPage();
     expect(await screen.findByTestId('schedule-state')).toHaveTextContent('Scheduled speaker reminders are paused.');
-    expect(screen.getByText('Paused: The reminder wording changed after it was approved. Preview the wording, then approve it again.')).toHaveAttribute('role', 'status');
+    expect(screen.getByText('Reminders are paused because the message or settings changed. Preview and approve them to resume.')).toHaveAttribute('role', 'status');
     expect(screen.getByText(/Nothing sends while the schedule is paused/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Turn off' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Scheduled speaker reminders' }));
     await waitFor(() => expect(screen.getByTestId('schedule-state')).toHaveTextContent('Scheduled speaker reminders are off.'));
     expect(callMock).toHaveBeenLastCalledWith('reminderSchedules', { schedule: 'speakers', action: 'disable' });
   });
@@ -287,7 +287,7 @@ describe('AdminReminderSchedules', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     expect(await screen.findByText('Save the settings first, then preview.')).toBeInTheDocument();
     expect(callsFor('speakers')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save' })[0]);
     await waitFor(() => expect(screen.getByText('Settings saved.')).toBeInTheDocument());
     expect(callMock).toHaveBeenLastCalledWith('reminderSchedules', {
       schedule: 'speakers', action: 'save', offsetsDays: [14, 7, 3], sendTime: '09:30', dueAt: '2026-11-20T22:00:00.000Z', topics: ['headshot', 'description', 'materials'],
@@ -298,7 +298,7 @@ describe('AdminReminderSchedules', () => {
     route({ speakers: [state()] });
     renderPage();
     fireEvent.change(await screen.findByLabelText('Reminder 1, days before'), { target: { value: '7' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save' })[0]);
     expect(await screen.findAllByText('Each number of days may appear once.')).not.toHaveLength(0);
     expect(callsFor('speakers')).toHaveLength(1);
   });
@@ -308,7 +308,7 @@ describe('AdminReminderSchedules', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Preview' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Approve and turn on' }));
-    expect(await screen.findByText('The change is saved, but the schedule could not be read again. Reload the page.')).toHaveAttribute('role', 'status');
+    expect(await screen.findByText('The change is saved, but the schedule could not be loaded. Refresh the page.')).toHaveAttribute('role', 'status');
     await waitFor(() => expect(screen.getByTestId('schedule-state')).toHaveTextContent('Scheduled speaker reminders are on.'));
     expect(callMock).toHaveBeenLastCalledWith('reminderSchedules', { action: 'get', schedule: 'speakers' });
   });
@@ -318,7 +318,7 @@ describe('AdminReminderSchedules', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Preview' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Approve and turn on' }));
-    expect(await screen.findByText('The reminder wording changed after the preview. Preview again, then approve.')).toHaveAttribute('role', 'alert');
+    expect(await screen.findByText('The message or recipients changed. Preview the email again before sending.')).toHaveAttribute('role', 'alert');
     expect(screen.getByTestId('schedule-state')).toHaveTextContent('off');
   });
 });
@@ -347,8 +347,8 @@ describe('AdminReminderSchedules, attendees', () => {
     expect(screen.getByTestId('attendee-next-run')).toHaveTextContent('Next: the 7-day reminder, Tuesday, November 24, 2026 at 10:00 AM Eastern Standard Time');
     expect(panel.getByText('It would reach 2 attendees. 1 address unsubscribed and is left out.')).toBeInTheDocument();
     expect(screen.getByTestId('attendee-last-run')).toHaveTextContent('The schedule has not run yet.');
-    expect(panel.getByLabelText('Attendee reminder subject')).toHaveValue(DEFAULT_DRAFT.subject);
-    expect(panel.getByLabelText('Attendee reminder message')).toHaveValue(DEFAULT_DRAFT.message);
+    expect(panel.getByLabelText('Attendee reminder subject')).toHaveValue(DEFAULT_DRAFT.subject.replaceAll('{{days_until}}', '[Days until event]'));
+    expect(panel.getByLabelText('Attendee reminder message')).toHaveValue(DEFAULT_DRAFT.message.replaceAll('{{days_until}}', '[Days until event]'));
     expect(panel.queryByRole('button', { name: 'Turn off attendee reminders' })).toBeNull();
   });
 
@@ -373,7 +373,7 @@ describe('AdminReminderSchedules, attendees', () => {
     expect(await panel.findByText('Save the settings first, then preview.')).toBeInTheDocument();
     expect(callsFor('attendees')).toHaveLength(1);
 
-    fireEvent.click(panel.getByRole('button', { name: 'Save attendee settings' }));
+    fireEvent.click(panel.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(panel.getByText('Attendee settings saved.')).toBeInTheDocument());
     expect(callMock).toHaveBeenLastCalledWith('reminderSchedules', {
       schedule: 'attendees', action: 'save', offsetsDays: [7, 2], sendTime: '09:30', draft: { subject: 'See you in {{days_until}}', message: 'Doors open at 8.' },
@@ -410,7 +410,7 @@ describe('AdminReminderSchedules, attendees', () => {
     });
     renderPage();
     expect(await screen.findByTestId('attendee-schedule-state')).toHaveTextContent('Scheduled attendee reminders are paused.');
-    expect(screen.getByText('Paused: The event start, the venue or the ticket link changed after the reminders were approved. Preview the reminders, then approve them again.')).toHaveAttribute('role', 'status');
+    expect(screen.getByText('Reminders are paused because the message or event details changed. Preview and approve them to resume.')).toHaveAttribute('role', 'status');
   });
 
   it('warns while on when the facts or the wording are no longer the approved ones', async () => {
@@ -435,12 +435,12 @@ describe('AdminReminderSchedules, attendees', () => {
       ],
     });
     renderPage();
-    expect(await screen.findByText(`Announcement email cannot be sent now: ${blocker}`)).toBeInTheDocument();
+    expect(await screen.findByText('Email is not available. Ask an event administrator to check email settings.')).toBeInTheDocument();
     const panel = within(attendeePanel());
     fireEvent.click(panel.getByRole('button', { name: 'Preview attendee reminders' }));
     expect(await panel.findByRole('heading', { name: 'Attendee reminder preview' })).toBeInTheDocument();
     expect(panel.queryByRole('button', { name: 'Approve and turn on attendee reminders' })).toBeNull();
-    expect(panel.getByText(`These reminders cannot be approved yet: ${blocker}`)).toBeInTheDocument();
+    expect(panel.getByText('These reminders cannot be sent yet. Check the event details and ask an event administrator to check email settings.')).toBeInTheDocument();
   });
 
   it('refuses a draft with another placeholder before any request', async () => {
@@ -449,8 +449,8 @@ describe('AdminReminderSchedules, attendees', () => {
     await screen.findByTestId('attendee-schedule-state');
     const panel = within(attendeePanel());
     fireEvent.change(panel.getByLabelText('Attendee reminder subject'), { target: { value: 'Hi {{name}}' } });
-    fireEvent.click(panel.getByRole('button', { name: 'Save attendee settings' }));
-    expect(await panel.findAllByText('Only {{days_until}} can be used. Remove {{name}}.')).not.toHaveLength(0);
+    fireEvent.click(panel.getByRole('button', { name: 'Save' }));
+    expect(await panel.findAllByText('Use [Days until event] for the time left, then save again.')).not.toHaveLength(0);
     expect(callsFor('attendees')).toHaveLength(1);
   });
 });
@@ -468,7 +468,7 @@ describe('reminderSchedules helpers', () => {
     expect(nextRunWords({ status: 'due', offsetDays: 7 }, ZONE)).toBe('The 7-day reminder is due now. The next hourly run sends it.');
     expect(nextRunWords({ status: 'none', message: 'No reminder is left before the due date.' }, ZONE)).toBe('No reminder is left before the due date.');
     expect(lastRunWords({ finishedAt: '2026-11-13T15:31:00.000Z', outcome: 'completed', offsetDays: 7, counts: { sent: 2, waiting: 1 } }, ZONE))
-      .toMatch(/^Last run Friday, November 13, 2026 at 10:31 AM Eastern Standard Time \(UTC.05:00\), America\/New_York: the 7-day reminder: sent 2 reminders, 1 speaker waited on the 24-hour limit\.$/);
+      .toMatch(/^Last run Friday, November 13, 2026 at 10:31 AM Eastern Standard Time \(UTC.05:00\): the 7-day reminder: sent 2 reminders, 1 speaker waited on the 24-hour limit\.$/);
     expect(lastRunWords({ finishedAt: '2026-11-13T15:31:00.000Z', outcome: 'nothing-due', counts: {} }, ZONE)).toMatch(/nothing was due\.$/);
     expect(lastRunWords({ finishedAt: '2026-11-14T01:00:30.000Z', outcome: 'completed', reason: 'quiet-hours', offsetDays: 7, counts: { sent: 1, deferred: 1 } }, ZONE))
       .toMatch(/sent 1 reminder, quiet hours began, so 1 speaker waits for the next run\.$/);
@@ -496,6 +496,6 @@ describe('reminderSchedules helpers', () => {
     expect(attendeeLastRunWords({ finishedAt: at, outcome: 'paused', reason: 'facts-changed', counts: {} }, ZONE))
       .toMatch(/the event start, the venue or the ticket link was not the approved one, so it sent nothing and paused the schedule\.$/);
     expect(attendeeLastRunWords({ finishedAt: at, outcome: 'failed', error: { message: 'The announcement stream is archived.' }, counts: {} }, ZONE))
-      .toMatch(/it stopped: The announcement stream is archived\.\.?$/);
+      .toMatch(/it stopped before completing; preview the reminders and try again\.$/);
   });
 });
