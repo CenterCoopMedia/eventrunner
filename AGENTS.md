@@ -63,3 +63,23 @@ PR conversation comments) use default-branch issue events. The workflow never
 checks out PR code. There is no privileged `workflow_run` bridge, extra secret,
 or bypass of GitHub's fork token restriction. This keeps the workflow's trust
 boundary small while leaving fork-review cleanup failures visible.
+
+## Operator notes
+
+- Run `node scripts/build-pages.cjs` after any change under `docs/` and commit
+  the regenerated `docs/docs/` output. "Documentation checks" and "Shared
+  package tests" fail on a stale build.
+- Merge a pull request only after "CI gate" passes and every review thread is
+  resolved. Update the branch first when it is behind `main`.
+- Deploy the console with `deploy-console.yml` on `main`. Deploy a client site
+  with the Deploy workflow and that client's environment.
+- Never start a browser (agent-browser, Playwright or any other) inside a Codex
+  sandbox.
+- Archive, restore and delete client sites with `decommission-client.yml`
+  (runbook §12.6). Its Workload Identity condition accepts only the provision
+  and decommission workflows on `main`.
+- Postmark refuses to delete a server through the API (HTTP 422) until Postmark
+  support enables it. The purge continues; delete the server in Postmark and
+  run `verify` again.
+- Clients cannot change the From address, the mailing address in the email
+  footer, or a custom domain. An operator sets those for them.
