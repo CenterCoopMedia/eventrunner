@@ -125,9 +125,9 @@ describe('StartEvent', () => {
     expect(screen.getByLabelText('Organization name')).toHaveAttribute('aria-invalid', 'true');
   });
 
-  it('says to open the link again when it has no token, and calls nothing', () => {
+  it('says to open the emailed link again when it has no token, and calls nothing', () => {
     page('/start/l1');
-    expect(screen.getByRole('alert')).toHaveTextContent('Open the link again');
+    expect(screen.getByRole('alert')).toHaveTextContent('Open the signup link in your email again');
     expect(callApi).not.toHaveBeenCalled();
   });
 });

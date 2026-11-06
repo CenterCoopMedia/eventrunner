@@ -45,7 +45,7 @@ describe('SignInFinish', () => {
 
   it('returns to the signup link from the link itself when another tab already cleared the saved path', () => {
     window.localStorage.removeItem(RETURN_KEY);
-    window.history.replaceState(null, '', '/signin/finish?next=%2Fstart%2Fabc%23token%3Dt1&oobCode=1');
+    window.history.replaceState(null, '', '/signin/finish?next=%2Fstart%2Fabc&oobCode=1');
     const auth = linkAuth({ user: { uid: 'u1', email: 'sam@example.org', emailVerified: true } });
     renderPage(<SignInFinish />, { path: '/signin/finish', auth, routes: { '/start/abc': 'Start page', '/': 'Home page' } });
     expect(screen.getByText('Start page')).toBeInTheDocument();

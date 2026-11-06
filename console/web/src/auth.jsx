@@ -109,7 +109,9 @@ export function AuthProvider({ children }) {
     },
     async sendEmailLink(rawEmail) {
       const email = String(rawEmail).trim().toLowerCase();
-      const next = localPath(readStored(RETURN_KEY));
+      // The path only: a link's #token stays out of the query string, so the
+      // reader reopens the emailed signup or invite link for it.
+      const next = localPath(readStored(RETURN_KEY))?.split('#')[0];
       await sendSignInLinkToEmail(auth, email, {
         url: `${window.location.origin}/signin/finish${next && next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`,
         handleCodeInApp: true,

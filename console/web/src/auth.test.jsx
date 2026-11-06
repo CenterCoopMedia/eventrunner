@@ -69,12 +69,12 @@ describe('AuthProvider', () => {
     expect(window.localStorage.getItem(EMAIL_KEY)).toBe('sam@example.org');
   });
 
-  it('carries the saved return path in the email link', async () => {
+  it('carries the saved return path in the email link, without the link token', async () => {
     window.localStorage.setItem(RETURN_KEY, '/start/abc#token=t1');
     render(<AuthProvider><Probe /></AuthProvider>);
     await act(() => api.sendEmailLink('sam@example.org'));
     expect(sendSignInLinkToEmail.mock.calls.at(-1)[2].url)
-      .toBe(`${window.location.origin}/signin/finish?next=%2Fstart%2Fabc%23token%3Dt1`);
+      .toBe(`${window.location.origin}/signin/finish?next=%2Fstart%2Fabc`);
     window.localStorage.removeItem(RETURN_KEY);
   });
 
