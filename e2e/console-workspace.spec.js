@@ -200,7 +200,7 @@ test('status withdrawal and settings saves keep their outcome beside the action'
   await expect(page.getByLabel('Region')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Save settings' })).toBeDisabled();
   finishSettings();
-  await expect(page.getByRole('status')).toHaveText('The settings are saved. New builds use them.');
+  await expect(page.getByRole('status')).toHaveText('Settings saved. New sites will use them.');
   await expect(page.getByRole('status')).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Save settings' })).toBeInViewport();
   await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
