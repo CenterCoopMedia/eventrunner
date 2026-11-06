@@ -414,7 +414,7 @@ test.describe.serial('issued invoices', () => {
     await page.goto(`/admin/invoices/${id}`);
     await expect(page.getByRole('heading', { level: 1, name: number })).toBeVisible();
     const card = page.getByRole('region', { name: 'Pay by card' });
-    await expect(card).toContainText('Card payments are not connected.');
+    await expect(card).toContainText('Card payment links need Stripe.');
     await expect(card.getByRole('button', { name: 'Create payment link' })).toHaveCount(0);
     const refused = await callFunction('invoiceAdmin', { action: 'createPayLink', invoiceId: id }, staffToken);
     expect(refused.status).toBe(409);
