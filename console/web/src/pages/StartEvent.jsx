@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { callApi } from '../api.js';
@@ -14,7 +15,7 @@ const LINK_REFUSALS = ['link-invalid', 'link-used', 'link-revoked', 'link-expire
 function Panel({ children }) {
   return (
     <section className="panel narrow" aria-labelledby="start-title">
-      <h1 id="start-title" tabIndex={-1}>Start your event site</h1>
+      <PageHeading id="start-title" tabIndex={-1}>Start your event site</PageHeading>
       {children}
     </section>
   );
@@ -125,7 +126,7 @@ export default function StartEvent() {
           />
           {fieldError ? <p id="start-org-name-error" className="field-error">{fieldError}</p> : null}
         </div>
-        <div><button type="submit" className="button primary" disabled={busy}>{busy ? 'Starting…' : 'Start'}</button></div>
+        <div><button type="submit" className="button primary" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Starting…' : 'Start'}</button></div>
       </form>
     </Panel>
   );

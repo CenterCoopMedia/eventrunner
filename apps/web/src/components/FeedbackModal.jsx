@@ -24,20 +24,14 @@
 // a control label is the one exemption the eyebrow ban names (§2.4), never
 // an eyebrow to "fix".
 //
-// A NATIVE <dialog>, OPENED WITH showModal(). This used to be a z-50 <div>
-// over the page, so Tab walked straight out of it and into the page behind
-// — including the fixed back-to-top control. `showModal()` is the platform's
-// own answer and it is four behaviours in one call: focus is trapped inside
-// the dialog, everything behind it is inert to the pointer and to assistive
-// technology, Escape fires `cancel`, and the top layer puts the dialog above
-// every stacking context without a z-index. None of that is reimplemented
-// here, because a hand-written trap is a list of focusable selectors that
-// goes stale the moment a control is added.
+// Native <dialog>, opened with showModal(), owns the inert background,
+// Escape cancellation and top-layer placement. Native Tab navigation can
+// still leave the document for browser controls at a boundary, so the shared
+// modal focus helper wraps the first and last available controls. The
+// browser handles ordinary focus traversal inside those boundaries.
 //
-// The one thing the component still owns is the RETURN of focus. React
-// unmounts the dialog on close, and an element removed while it holds focus
-// drops focus to the body, so the opener is remembered on mount and focused
-// again on the way out.
+// The component chooses the initial field and receipt focus, locks page
+// scrolling, and returns focus to the opener when React removes the dialog.
 //
 // TWO KINDS OF REFUSAL, TWO PLACES (issue 219). A field that refuses states
 // it on the field: `aria-invalid`, the message under it named by
@@ -50,8 +44,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
 import { createSubmissionKey } from '../lib/submissionKey.js';
+import { available, wrapModalTab } from '../lib/modalFocus.js';
+import useLoadingStage from '../lib/useLoadingStage.js';
 import { focusFirstError, SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
+import LoadingStatus from './LoadingStatus.jsx';
 
 /**
  * The dialog's frame: the strong rule on the page ground, at the reading
@@ -76,8 +73,14 @@ const CATEGORY_OPTIONS = [
 
 export default function FeedbackModal({ onClose }) {
   const titleId = useId();
+  const receiptId = `${titleId}-receipt`;
   const startedAtRef = useRef(Date.now());
   const [submissionKey] = useState(createSubmissionKey);
+  // React state paints the pending UI; this guard also covers a second
+  // submit or Escape delivered before that render has committed.
+  const submissionStateRef = useRef('idle');
+  const requestAbortRef = useRef(null);
+  const mountedRef = useRef(false);
 
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
@@ -86,30 +89,51 @@ export default function FeedbackModal({ onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [messageError, setMessageError] = useState(null);
-  const [sent, setSent] = useState(false);
+  const [receipt, setReceipt] = useState(null);
+  const { stage: submissionStage } = useLoadingStage({ active: submitting });
 
   const dialogRef = useRef(null);
   const formRef = useRef(null);
-  // The opener is read at the FIRST RENDER, not in the effect. The message
-  // field carries autoFocus, and React applies that during the commit, so by
-  // the time an effect runs the active element is already the field inside
-  // the dialog — and the dialog would then try to give focus back to itself.
+  const receiptHeadingRef = useRef(null);
+  // Capture the opener before showModal moves focus into the dialog.
   const [opener] = useState(() => (typeof document === 'undefined' ? null : document.activeElement));
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    // `showModal` is the whole mechanism. Where it is missing the dialog
-    // still opens and the form still works; what is lost is the trap, and a
-    // visitor can still reach every control and close the dialog.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    mountedRef.current = true;
+    // Native modality owns the inert background. Where it is missing the
+    // dialog still opens and the form remains reachable, but that native
+    // isolation is unavailable.
     if (typeof dialog?.showModal === 'function') dialog.showModal();
     else if (dialog) dialog.setAttribute('open', '');
+    // Native dialog focusing can choose the first select, even when React
+    // has already applied autoFocus to the textarea before showModal.
+    formRef.current?.querySelector('textarea')?.focus();
     return () => {
-      if (opener && typeof opener.focus === 'function' && opener.isConnected) opener.focus();
+      mountedRef.current = false;
+      requestAbortRef.current?.abort();
+      if (dialog?.open && typeof dialog.close === 'function') dialog.close();
+      document.body.style.overflow = previousOverflow;
+      const target = available(opener) ? opener : document.getElementById('main-content');
+      if (available(target)) target.focus({ preventScroll: true });
     };
   }, [opener]);
 
+  useEffect(() => {
+    if (receipt) receiptHeadingRef.current?.focus();
+  }, [receipt]);
+
+  function closeDialog() {
+    // Closing is not cancellation: the server may already be saving the
+    // message. Keep its result visible until the request has settled.
+    if (submissionStateRef.current !== 'pending') onClose();
+  }
+
   async function submit(event) {
     event.preventDefault();
+    if (submissionStateRef.current !== 'idle') return;
     const normalizedMessage = message.trim();
     if (!normalizedMessage) {
       // The field says it, and the reader is put in front of the field.
@@ -130,6 +154,7 @@ export default function FeedbackModal({ onClose }) {
       window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
+    submissionStateRef.current = 'pending';
     setSubmitting(true);
     setError(null);
     setMessageError(null);
@@ -138,18 +163,32 @@ export default function FeedbackModal({ onClose }) {
       email: email.trim().toLowerCase() || undefined,
       category,
     };
-    const result = await submitFeedback({
-      ...payload,
-      honeypot: website,
-      startedAt: startedAtRef.current,
-      submissionKey: submissionKey.keyFor(payload),
-    });
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    requestAbortRef.current = controller;
+    let result;
+    try {
+      result = await submitFeedback({
+        ...payload,
+        honeypot: website,
+        startedAt: startedAtRef.current,
+        submissionKey: submissionKey.keyFor(payload),
+      }, { signal: controller?.signal });
+    } catch {
+      // The API normally returns a fail-soft result. Preserve a retry even
+      // if an unexpected client failure breaks that contract.
+      result = { ok: false, error: 'We could not confirm your feedback was received. Please try again.' };
+    }
+    if (requestAbortRef.current === controller) requestAbortRef.current = null;
+    submissionStateRef.current = result.ok ? 'sent' : 'idle';
+    if (!mountedRef.current) return;
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    setSent(true);
+    // Receipt copy describes the payload that actually completed, never a
+    // later edit to the form while a response was on its way.
+    setReceipt(payload);
   }
 
   return (
@@ -159,19 +198,39 @@ export default function FeedbackModal({ onClose }) {
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
+      tabIndex={-1}
       className={`public-dialog motion-enter ${DIALOG_FRAME_CLASS}`}
+      onKeyDown={wrapModalTab}
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        closeDialog();
+      }}
+      onClose={(event) => {
+        const dialog = event.currentTarget;
+        if (!mountedRef.current || dialog.open) return;
+        // A repeated native close request can bypass cancel prevention.
+        // Keep the pending result reachable until its deadline settles it.
+        if (submissionStateRef.current === 'pending') {
+          dialog.showModal();
+          formRef.current?.querySelector('textarea')?.focus({ preventScroll: true });
+        } else {
+          onClose();
+        }
       }}
     >
       <div>
-        {sent ? (
+        {receipt ? (
           <div className="flex flex-col gap-md">
-            <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
+            <h2
+              ref={receiptHeadingRef}
+              id={titleId}
+              tabIndex={-1}
+              aria-describedby={receiptId}
+              className="font-heading text-h3 font-semibold text-text-primary"
+            >
               Thanks for letting us know
             </h2>
-            <p role="status" className="font-data text-caption text-text-secondary">
+            <p id={receiptId} className="font-data text-caption text-text-secondary">
               {/* Receipt-only wording: the backend's confirmation send is
                   best-effort and swallows its own failures (spec: a failed
                   send never turns an already-durable submission into a
@@ -179,10 +238,10 @@ export default function FeedbackModal({ onClose }) {
                   email was actually delivered — only that the message
                   itself was received. */}
               We got your feedback.
-              {email.trim() ? ' If you left an email, we’ll try to send a confirmation.' : null}
+              {receipt.email ? ' If you left an email, we’ll try to send a confirmation.' : null}
             </p>
             <div>
-              <button type="button" className={primaryActionClass} onClick={onClose}>
+              <button type="button" className={primaryActionClass} onClick={closeDialog}>
                 Close
               </button>
             </div>
@@ -202,8 +261,11 @@ export default function FeedbackModal({ onClose }) {
             <SelectField
               label="What is this about?"
               value={category}
-              onChange={setCategory}
+              onChange={(next) => {
+                if (submissionStateRef.current === 'idle') setCategory(next);
+              }}
               options={CATEGORY_OPTIONS}
+              disabled={submitting}
             />
             <TextAreaField
               label="Message"
@@ -214,6 +276,7 @@ export default function FeedbackModal({ onClose }) {
               // itself as invalid after it was not. A value that is still
               // only whitespace has not answered it, so the mark stays.
               onChange={(next) => {
+                if (submissionStateRef.current !== 'idle') return;
                 setMessage(next);
                 if (messageError && next.trim() && next.trim().length <= MAX_MESSAGE_LENGTH) {
                   setMessageError(null);
@@ -223,14 +286,17 @@ export default function FeedbackModal({ onClose }) {
               hint={`Up to ${MAX_MESSAGE_LENGTH.toLocaleString('en-US')} characters.`}
               rows={5}
               maxLength={MAX_MESSAGE_LENGTH}
-              autoFocus
+              readOnly={submitting}
             />
             <TextField
               label="Email (optional)"
               type="email"
               value={email}
-              onChange={setEmail}
+              onChange={(next) => {
+                if (submissionStateRef.current === 'idle') setEmail(next);
+              }}
               hint="Leave your email if you’d like a reply."
+              readOnly={submitting}
             />
 
             {/* Honeypot: visually hidden, out of tab order, and never
@@ -243,23 +309,41 @@ export default function FeedbackModal({ onClose }) {
                 tabIndex={-1}
                 autoComplete="off"
                 value={website}
-                onChange={(event) => setWebsite(event.target.value)}
+                disabled={submitting}
+                onChange={(event) => {
+                  if (submissionStateRef.current === 'idle') setWebsite(event.target.value);
+                }}
+              />
+            </div>
+
+            <div className="font-data text-caption text-text-secondary">
+              <LoadingStatus
+                stage={submissionStage}
+                label={submitting ? 'Sending your feedback. Keep this window open until we confirm it was received.' : ''}
               />
             </div>
 
             <div className="flex flex-wrap justify-end gap-xs">
-              <button type="button" className={secondaryActionClass} onClick={onClose}>
+              <button
+                type="button"
+                className={secondaryActionClass}
+                aria-disabled={submitting || undefined}
+                onClick={closeDialog}
+              >
                 Cancel
               </button>
-              {/* Busy is a stated word and `aria-busy`, never a spinner. The
-                  control is disabled only once the request has started. */}
+              {/* Keep focus on the action while the request runs. The ref
+                  guard refuses duplicate submits from every input path. */}
               <button
                 type="submit"
                 className={primaryActionClass}
-                disabled={submitting}
+                aria-disabled={submitting || undefined}
                 aria-busy={submitting || undefined}
               >
-                {submitting ? 'Sending…' : 'Send feedback'}
+                <span className="public-action-label">
+                  <span aria-hidden={submitting || undefined}>Send feedback</span>
+                  <span aria-hidden={!submitting || undefined}>Sending feedback…</span>
+                </span>
               </button>
             </div>
           </form>

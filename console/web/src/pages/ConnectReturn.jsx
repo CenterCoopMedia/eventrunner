@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../api.js';
@@ -51,7 +52,7 @@ export default function ConnectReturn() {
   if (failure) {
     return (
       <section className="panel narrow" aria-labelledby="connect-title">
-        <h1 id="connect-title" tabIndex={-1}>We could not connect your account</h1>
+        <PageHeading id="connect-title" tabIndex={-1}>We could not connect your account</PageHeading>
         <p className="message error" role="alert">{failure}</p>
         <p><Link to="/">Go to your organizations</Link></p>
       </section>

@@ -119,6 +119,7 @@ for (const width of [1440, 390, 320]) {
     await page.getByLabel('Your full name').fill('Alex Organizer');
     await page.getByRole('button', { name: 'Accept agreement' }).click();
     await expect(page.getByRole('button', { name: 'Accepting' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Accepting' })).toHaveAttribute('aria-busy', 'true');
     await expect(page.getByLabel('Your full name')).toBeDisabled();
     pending.resolve();
     const result = page.getByRole('alert');
@@ -200,6 +201,97 @@ for (const width of [1440, 390, 320]) {
     expect(errors).toEqual([]);
   });
 }
+
+test('console waiting stages remain readable and current-step focus stays distinct at 390px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+  // Install before application timers exist, let the first page load, then
+  // pause before navigating to the held read. Only elapsed time is simulated.
+  await page.clock.install({ time: new Date('2026-11-01T12:00:00.000Z') });
+  const pending = deferred();
+  let reads = 0;
+  const errors = await intercept(page, async (name) => {
+    if (name === 'getApplication') return { application: application() };
+    if (name === 'getTeam') { reads += 1; await pending.promise; return team(); }
+  });
+
+  try {
+    await page.goto(`${origin}${APP_PATH}/organization`);
+    await expect(page.getByLabel('Website (optional)')).toBeVisible();
+    await page.clock.pauseAt(new Date('2026-11-01T12:10:00.000Z'));
+    const steps = page.getByRole('navigation', { name: 'Setup steps' });
+    const teamLink = steps.getByRole('link', { name: /Your team/ });
+    // Keyboard activation does not require animation-frame stability while
+    // the application clock is paused, and exercises the actual step link.
+    await teamLink.focus();
+    await page.keyboard.press('Enter');
+
+    const loading = page.getByRole('status').filter({ hasText: 'Loading the team.' });
+    const indicator = loading.locator('.console-loading-indicator');
+    const spinner = loading.locator('.console-spinner');
+    await expect(loading).toHaveText('Loading the team.');
+    await expect(loading).toHaveAttribute('data-loading-stage', 'initial');
+    await expect(loading).toHaveAttribute('aria-atomic', 'true');
+    await expect(indicator).toHaveAttribute('aria-hidden', 'true');
+    await expect(indicator).toBeHidden();
+    await expect.poll(() => reads).toBe(1);
+    await page.clock.fastForward(999);
+    await expect(loading).toHaveAttribute('data-loading-stage', 'initial');
+    await expect(spinner).toBeHidden();
+    await page.clock.fastForward(1);
+    await expect(loading).toHaveAttribute('data-loading-stage', 'active');
+    await expect(spinner).toBeVisible();
+    await expect(spinner).toHaveCSS('animation-name', 'console-spin');
+    await expect(loading).toHaveText('Loading the team.');
+
+    await page.clock.fastForward(9000);
+    await expect(loading).toHaveAttribute('data-loading-stage', 'slow');
+    await expect(loading).toContainText('This is taking longer than expected.');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(spinner).toBeVisible();
+    await expect(spinner).toHaveCSS('animation-name', 'none');
+    await expect(spinner).toHaveCSS('transform', 'none');
+    await capture(page, 'waiting-slow-reduced-motion', 390);
+
+    await page.clock.fastForward(50000);
+    await expect(loading).toHaveAttribute('data-loading-stage', 'extended');
+    await expect(loading).toContainText('No result yet. You can keep waiting or check your connection.');
+    await expect(loading.getByRole('button')).toHaveCount(0);
+    await expect(page.getByRole('progressbar')).toHaveCount(0);
+    await capture(page, 'waiting-extended-reduced-motion', 390);
+
+    pending.resolve();
+    await expect(page.getByText('Invite the people who run the event with you.', { exact: true })).toBeVisible();
+    await expect(loading).toHaveCount(0);
+    await expect(page.locator('.console-spinner')).toHaveCount(0);
+    expect(reads).toBe(1);
+
+    await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+    await page.getByRole('heading', { name: 'Your team', exact: true }).focus();
+    const current = steps.locator('a[aria-current="step"]');
+    await expect(current).toHaveAttribute('href', `${APP_PATH}/team`);
+    const selectedOffset = await current.evaluate((element) => Number.parseFloat(globalThis.getComputedStyle(element).outlineOffset));
+    expect(selectedOffset).toBeLessThan(0);
+    await current.focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(current).toBeFocused();
+    const focus = await current.evaluate((element) => {
+      const style = globalThis.getComputedStyle(element);
+      return { visible: element.matches(':focus-visible'), style: style.outlineStyle,
+        width: Number.parseFloat(style.outlineWidth), offset: Number.parseFloat(style.outlineOffset) };
+    });
+    expect(focus.visible).toBe(true);
+    expect(focus.style).toBe('solid');
+    expect(focus.width).toBeGreaterThan(0);
+    expect(focus.offset).toBeGreaterThan(0);
+    await capture(page, 'current-step-forced-colors-focus', 390);
+    expect(errors).toEqual([]);
+  } finally {
+    pending.resolve();
+    await page.clock.resume();
+  }
+});
 
 test('setup Leave retains a failed save and retries only the waiting answers', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

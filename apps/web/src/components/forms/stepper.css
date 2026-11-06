@@ -37,7 +37,7 @@
   border: 1px solid rgb(var(--stepper-rule-control)); border-radius: var(--stepper-radius); font-weight: 700;
 }
 .stepper-item[data-state='done'] .stepper-marker { border-color: transparent; background: rgb(var(--stepper-done-ground)); color: rgb(var(--stepper-done-ink)); }
-.stepper-text { display: flex; flex-direction: column; min-width: 0; }
+.stepper-text { display: flex; flex-direction: column; min-width: 0; text-align: start; }
 .stepper-title { font-weight: 600; }
 .stepper-item[aria-current='step'] .stepper-title { font-weight: 700; }
 .stepper-state { font-size: 0.8125rem; color: rgb(var(--stepper-ink-secondary)); }

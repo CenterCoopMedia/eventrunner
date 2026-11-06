@@ -1,3 +1,4 @@
+import PageHeading from '../../PageHeading.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { callApi } from '../../api.js';
@@ -84,7 +85,7 @@ export default function ConsoleSettings() {
   return (
     <section aria-labelledby="settings-title">
       <p className="folio">Hosting team</p>
-      <h1 id="settings-title" tabIndex={-1}>Console settings</h1>
+      <PageHeading id="settings-title" tabIndex={-1}>Console settings</PageHeading>
       {!agreement || !FIELDS.every((field) => saved?.[field]) ? (
         <aside className="note" role="note">
           <p className="note-title">Sign-ups are closed</p>
@@ -94,7 +95,7 @@ export default function ConsoleSettings() {
       <p>Choose the hosting settings for new sites.</p>
       <form noValidate onSubmit={onSubmit} className="stack narrow">
         <SettingsFields fields={FIELDS} values={values} onChange={change} error={fieldError} fieldRefs={fieldRefs} idPrefix="settings" disabled={busy} />
-        <button type="submit" className="button primary" aria-label="Save settings" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+        <button type="submit" className="button primary" aria-label="Save settings" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Saving…' : 'Save'}</button>
         {notice ? <p className="message success" role="status" ref={resultRef}>{notice}</p> : null}
         {error ? <p className="message error" role="alert" ref={resultRef}>{error}</p> : null}
       </form>

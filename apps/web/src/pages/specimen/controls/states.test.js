@@ -108,8 +108,8 @@ describe('the state list', () => {
     expect(CONTROL_STATES.every((state) => state.label)).toBe(true);
   });
 
-  it('forces a press as the scale the motion grammar gives it', () => {
-    expect(FORCED_PRESS).toBe('scale-[0.98]');
+  it('forces a press only when the reader permits motion', () => {
+    expect(FORCED_PRESS).toBe('motion-safe:scale-[0.98]');
   });
 
   it('gives the field register a reason for each of the three states it holds', () => {

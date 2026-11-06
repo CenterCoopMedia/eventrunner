@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { callApi } from '../api.js';
@@ -55,7 +56,7 @@ export default function Organizations() {
   return (
     <section aria-labelledby="orgs-title" className="console-workspace organizations-workspace">
       <header className="workspace-heading directory-heading">
-        <h1 id="orgs-title" tabIndex={-1}>Your organizations</h1>
+        <PageHeading id="orgs-title" tabIndex={-1}>Your organizations</PageHeading>
         {refresh}
       </header>
       {error ? <p className="message error" role="alert">{error}</p> : null}

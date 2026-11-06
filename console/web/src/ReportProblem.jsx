@@ -108,7 +108,7 @@ export default function ReportProblem() {
             </div>
             {error && !descriptionError ? <p className="message error" role="alert">{error.message}</p> : null}
             <div className="report-actions">
-              <button type="submit" className="button primary" disabled={busy}>{busy ? 'Sending…' : 'Send'}</button>
+              <button type="submit" className="button primary" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Sending…' : 'Send'}</button>
               <button type="button" className="button" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
             </div>
           </form>

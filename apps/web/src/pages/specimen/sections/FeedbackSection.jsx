@@ -1,14 +1,14 @@
 // What the site says back.
 //
-// Every device here states a result in words. None of them is a spinner,
-// a shimmer, a pulsing dot, or a colour on its own. A toast repeats a
-// result the page already states, so a reader who missed it still has it.
+// Every device here states a result in words. Loading adds restrained
+// activity after a short wait; colour and motion support the explanation.
+// A toast repeats a result the page already states.
 import { useState } from 'react';
 import EmptyState from '../../../components/EmptyState.jsx';
 import EventCountdown from '../../../components/EventCountdown.jsx';
 import FeedbackModal, { DIALOG_FRAME_CLASS } from '../../../components/FeedbackModal.jsx';
 import InfoCards, { groupIntoCards } from '../../../components/InfoCards.jsx';
-import LoadingState from '../../../components/LoadingState.jsx';
+import { LoadingStateView } from '../../../components/LoadingState.jsx';
 import NoticeBar, { NOTICE_LEVELS } from '../../../components/NoticeBar.jsx';
 import Progress from '../../../components/Progress.jsx';
 import Count from '../../../components/editorial/Count.jsx';
@@ -19,6 +19,7 @@ import RegistrationAction, {
   resolveRegistrationLink,
 } from '../../../components/RegistrationAction.jsx';
 import {
+  inputClass,
   primaryActionClass,
   quietActionClass,
   secondaryActionClass,
@@ -132,13 +133,50 @@ function DialogSpecimen() {
   );
 }
 
+function LoadingSpecimen() {
+  const [stage, setStage] = useState('initial');
+  const [shape, setShape] = useState('schedule');
+  const labels = {
+    rows: 'Loading event details…',
+    schedule: 'Loading the schedule…',
+    directory: 'Loading the speaker directory…',
+  };
+  return (
+    <div data-loading-preview>
+      <div className="grid gap-md sm:grid-cols-2">
+        <label className="flex min-w-0 flex-col gap-xs font-data text-caption">
+          Loading preview stage
+          <select className={`${inputClass} w-full`} value={stage} onChange={(event) => setStage(event.target.value)}>
+            <option value="initial">Immediate · task label</option>
+            <option value="active">After 1 second · activity</option>
+            <option value="slow">After 10 seconds · explanation</option>
+            <option value="prolonged">After 60 seconds · continued wait</option>
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-xs font-data text-caption">
+          Loading preview layout
+          <select className={`${inputClass} w-full`} value={shape} onChange={(event) => setShape(event.target.value)}>
+            <option value="rows">Rows</option>
+            <option value="schedule">Schedule</option>
+            <option value="directory">Directory</option>
+          </select>
+        </label>
+      </div>
+      <p className="mt-sm text-caption text-text-secondary">
+        Choose an elapsed waiting stage to preview it immediately. These controls do not start a request.
+      </p>
+      <LoadingStateView label={labels[shape]} rows={3} shape={shape} stage={stage} />
+    </div>
+  );
+}
+
 export default function FeedbackSection({ folio }) {
   return (
     <SpecimenSection
       id="specimen-feedback"
       title="Feedback"
       folio={folio}
-      standfirst="Every result is a word in place. Nothing spins, nothing pulses, and nothing says a thing with colour alone."
+      standfirst="Every result is stated in words. Restrained colour and motion make waiting and changes easier to follow."
     >
       <Figure
         name="Toast"
@@ -255,9 +293,9 @@ export default function FeedbackSection({ folio }) {
         name="Loading"
         file="components/LoadingState.jsx"
         contract={null}
-        note="A stated line that says what is loading, and a block of hairline rules that holds the space the rows will take. The rules are not a skeleton: nothing imitates a heading, nothing imitates a photograph, and nothing moves, so the page does not reflow under a reader when the content lands."
+        note="The task label appears immediately. After one second a decorative activity ring begins; at ten seconds the explanation acknowledges the wait, and after a minute the ring rests while the message remains. Motion respects the reader’s preference. Still text, time, and portrait shapes preview the layout of rows, a schedule, or a responsive directory; elapsed time never claims progress."
       >
-        <LoadingState label="Loading the schedule…" rows={4} />
+        <LoadingSpecimen />
       </Figure>
 
       <Figure

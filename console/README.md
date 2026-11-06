@@ -250,6 +250,12 @@ The one-time setup and the deploy steps are in [docs/DEPLOY_RUNBOOK.md](../docs/
 
 ## Brand files
 
+Page titles use `web/src/PageHeading.jsx`, which keeps the semantic heading
+and its route focus target while placing a still, decorative Badger beside
+wrapping text. The drawing stays in the page flow at 48px, or 36px on phones.
+Refresh and close actions remain beside their existing heading groups.
+Loading and build feedback keep their separate waiting animation.
+
 The masthead uses the running Badger mark. `web/public/favicon.svg` uses the
 face on an accent tile, with a dark-mode variant. `web/public/og-console.png`
 is the dark-panel sharing image. The PNG favicon, Apple touch icon, and app

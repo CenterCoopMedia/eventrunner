@@ -106,7 +106,7 @@ export default function SharedSchedule() {
   if (share === undefined && !denied) {
     return (
       <div className="mt-lg">
-        <LoadingState label="Loading the shared schedule…" />
+        <LoadingState shape="schedule" label="Loading the shared schedule…" />
       </div>
     );
   }
@@ -173,7 +173,7 @@ export default function SharedSchedule() {
 
       {loading ? (
         <div className="mt-lg">
-          <LoadingState label="Loading the shared schedule…" />
+          <LoadingState shape="schedule" label="Loading the shared schedule…" />
         </div>
       ) : sharedDays.length === 0 ? (
         <div className="mt-lg">

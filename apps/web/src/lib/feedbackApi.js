@@ -7,6 +7,12 @@
 import { resolveFunctionsOrigin } from './errorReporting.js';
 import { IS_DEMO } from './demoMode.js';
 
+/** Bound the entire request, including reading the response body. */
+export const FEEDBACK_REQUEST_TIMEOUT_MS = 20_000;
+
+const UNCONFIRMED_RECEIPT =
+  'We could not confirm your feedback was received. Check your connection and try again. Your message is still here.';
+
 /**
  * @param {{ message: string, email?: string, category?: string,
  *           honeypot: string, startedAt: number, submissionKey: string }} payload
@@ -14,11 +20,15 @@ import { IS_DEMO } from './demoMode.js';
  *   resends unchanged on a retry (FeedbackModal.jsx) — the server uses it as
  *   the feedback doc id, so a retry after a dropped response is idempotent
  *   instead of creating a duplicate row and a duplicate confirmation email.
- * @param {{ env?: object, fetchImpl?: typeof fetch }} [deps]
+ * @param {{ env?: object, fetchImpl?: typeof fetch, signal?: AbortSignal }} [deps]
  * @returns {Promise<{ ok: true, id?: string } | { ok: false, error: string }>}
  */
 export async function submitFeedback(payload, deps = {}) {
-  const { env = import.meta.env, fetchImpl = typeof fetch === 'function' ? fetch : null } = deps;
+  const {
+    env = import.meta.env,
+    fetchImpl = typeof fetch === 'function' ? fetch : null,
+    signal,
+  } = deps;
   // Static demo build (lib/demoMode.js): unauthenticated by design, so
   // nothing else gates this — the modal is only reachable when the event
   // config turns the feature on (Layout.jsx), which the demo snapshot does
@@ -36,26 +46,53 @@ export async function submitFeedback(payload, deps = {}) {
     return { ok: false, error: 'Feedback could not be sent. Try again later.' };
   }
 
-  let response;
-  try {
-    response = await fetchImpl(`${origin}/submitFeedback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    return { ok: false, error: 'We could not reach the server. Check your connection and try again.' };
+  const unconfirmed = { ok: false, error: UNCONFIRMED_RECEIPT };
+  if (signal?.aborted) return unconfirmed;
+
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let timeout;
+  let stop;
+  const deadline = new Promise((resolve) => {
+    stop = () => {
+      // Resolve independently of abort: a transport or response reader may
+      // ignore AbortSignal. A late result cannot replace this settled one.
+      resolve(unconfirmed);
+      controller?.abort();
+    };
+    timeout = setTimeout(stop, FEEDBACK_REQUEST_TIMEOUT_MS);
+  });
+  signal?.addEventListener('abort', stop, { once: true });
+
+  async function request() {
+    try {
+      const response = await fetchImpl(`${origin}/submitFeedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        ...(controller || signal ? { signal: controller?.signal ?? signal } : {}),
+      });
+      let body = null;
+      try {
+        body = await response.json();
+      } catch {
+        body = null;
+      }
+      if (!response.ok) {
+        const message = typeof body?.error?.message === 'string' ? body.error.message : null;
+        return { ok: false, error: message || 'Something went wrong. Try again.' };
+      }
+      return { ok: true, id: typeof body?.id === 'string' ? body.id : undefined };
+    } catch {
+      // A lost response does not tell us whether the server committed the
+      // feedback. The modal keeps the draft and its idempotency key.
+      return unconfirmed;
+    }
   }
 
-  let body = null;
   try {
-    body = await response.json();
-  } catch {
-    body = null;
+    return await Promise.race([request(), deadline]);
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', stop);
   }
-  if (!response.ok) {
-    const message = typeof body?.error?.message === 'string' ? body.error.message : null;
-    return { ok: false, error: message || 'Something went wrong. Try again.' };
-  }
-  return { ok: true, id: typeof body?.id === 'string' ? body.id : undefined };
 }

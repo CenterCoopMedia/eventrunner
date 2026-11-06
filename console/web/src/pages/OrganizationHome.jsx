@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { callApi } from '../api.js';
@@ -31,7 +32,7 @@ export default function OrganizationHome() {
 
   return (
     <section aria-labelledby="org-title">
-      <div className="directory-heading"><h1 id="org-title" tabIndex={-1}>{data.organization.name}</h1>{refresh}</div>
+      <div className="directory-heading"><PageHeading id="org-title" tabIndex={-1}>{data.organization.name}</PageHeading>{refresh}</div>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       <p><Link to={`/organizations/${orgId}/team`}>Team</Link></p>
 

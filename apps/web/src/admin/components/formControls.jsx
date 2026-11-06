@@ -18,6 +18,7 @@
 // reader; nothing is signalled by colour alone.
 import { useEffect, useId, useRef, useState } from 'react';
 import AdminIconControl from './AdminIconControl.jsx';
+import './adminControls.css';
 
 // The field boundary is --admin-rule-control, not the hairline: a form
 // control's boundary is non-text user interface under WCAG 1.4.11 and needs
@@ -47,9 +48,9 @@ export const inputClass =
 // controls beside it. An oversized primary action is the pattern §2.4
 // rejects, and the room never shouts (admin story part 5).
 const buttonBase =
-  'inline-flex min-h-admin-control items-center justify-center gap-2xs rounded-admin ' +
+  'admin-button inline-flex min-h-admin-control items-center justify-center gap-2xs rounded-admin ' +
   'border-admin-hairline px-md py-xs font-admin-ui text-admin-base leading-tight ' +
-  'disabled:cursor-not-allowed disabled:opacity-60';
+  'disabled:cursor-not-allowed';
 
 /**
  * The filled control: the admin's action colour. By default that is the
@@ -58,17 +59,17 @@ const buttonBase =
  * picked. Never the raw client accent.
  */
 export const primaryButtonClass =
-  `${buttonBase} border-admin-action bg-admin-action font-bold text-admin-ink-inverse ` +
+  `${buttonBase} admin-button--primary border-admin-action bg-admin-action font-bold text-admin-ink-inverse ` +
   'hover:border-admin-action-hover hover:bg-admin-action-hover active:bg-admin-action-pressed';
 
 /** The quiet control: white, ruled, and lifted to the soft action ground under the pointer. */
 export const secondaryButtonClass =
-  `${buttonBase} border-admin-rule-strong bg-admin-ground-raised font-medium text-admin-ink ` +
+  `${buttonBase} admin-button--secondary border-admin-rule-control bg-admin-ground-raised font-medium text-admin-ink ` +
   'hover:border-admin-action-soft-hover hover:bg-admin-action-soft hover:text-admin-ink-link';
 
 /** A selected choice. It is pressed, not a commit, so it does not use the publish fill. */
 export const choiceButtonClass =
-  `${buttonBase} border-admin-action bg-admin-action-soft font-bold text-admin-ink ` +
+  `${buttonBase} admin-button--choice border-admin-action bg-admin-action-soft font-bold text-admin-ink ` +
   'hover:border-admin-action-hover hover:bg-admin-action-soft';
 
 /**
@@ -85,7 +86,7 @@ export const unavailableButtonClass =
 
 /** The quietest control: no rule until the pointer arrives. */
 export const ghostButtonClass =
-  `${buttonBase} border-transparent bg-transparent font-medium text-admin-ink-secondary ` +
+  `${buttonBase} admin-button--quiet border-transparent bg-transparent font-medium text-admin-ink-secondary ` +
   'hover:bg-admin-ground-soft hover:text-admin-ink';
 
 /**
@@ -95,7 +96,7 @@ export const ghostButtonClass =
  * "Confirm" (admin story moment 3).
  */
 export const dangerButtonClass =
-  `${buttonBase} border-transparent bg-admin-ground-alarm font-semibold text-admin-state-error ` +
+  `${buttonBase} admin-button--danger border-admin-rule-alarm bg-admin-ground-alarm font-semibold text-admin-state-error ` +
   'hover:border-admin-rule-alarm hover:bg-admin-state-error hover:text-admin-ink-inverse';
 
 /** A quiet in-row control: a link-coloured word, still a button, still a 24px target. */
@@ -596,6 +597,7 @@ export function DestructiveConfirm({
           type="button"
           className={dangerButtonClass}
           disabled={busy || disabled}
+          aria-busy={busy || undefined}
           onClick={() => { if (!busy && !disabled) onConfirm(); }}
         >
           {busy ? (busyLabel ?? confirmLabel) : confirmLabel}

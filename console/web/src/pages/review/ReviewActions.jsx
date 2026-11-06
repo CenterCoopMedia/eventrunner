@@ -72,7 +72,7 @@ export default function ReviewActions({ status, canClose = false, onDecide, busy
             <>
               <div className="confirm" role="group" aria-label="Delete as spam">
                 <span>Delete this request and free its web address? You cannot undo this.</span>
-                <button type="button" className="button danger" disabled={busy || disabled}
+                <button type="button" className="button danger" disabled={busy || disabled} aria-busy={busy || undefined}
                   onClick={() => submit('deleteSpamApplication', { confirm: true })}>{busy ? 'Deleting…' : 'Delete'}</button>
                 <button type="button" className="button" autoFocus disabled={busy || disabled} onClick={close}>Cancel</button>
               </div>
