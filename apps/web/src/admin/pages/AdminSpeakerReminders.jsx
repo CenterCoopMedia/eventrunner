@@ -1,4 +1,3 @@
-import { plannerMessage } from '../plannerErrors.js';
 // Speaker reminders: email accepted speakers about the items they still owe
 // (functions/src/speakers/reminders.cjs, one staff endpoint with actions).
 //
@@ -19,8 +18,6 @@ import { plannerMessage } from '../plannerErrors.js';
 // that the server checks against the template's tokens. A save or a reset
 // pauses scheduled reminders (AdminReminderSchedules.jsx) until staff
 // approve the new wording there.
-import AdminIconControl from '../components/AdminIconControl.jsx';
-import { TemplateTextField, TemplateMessageField, emailHtmlFromText, templateProblem } from '../components/EmailTemplateField.jsx';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { READINESS_ITEMS, READINESS_ITEM_LABELS } from 'shared/speakerReadiness';
@@ -47,6 +44,8 @@ import {
   Notice,
   Panel,
   SelectField,
+  TextAreaField,
+  TextField,
   linkButtonClass,
   primaryButtonClass,
   rowMetaClass,
@@ -119,7 +118,7 @@ function PreviewPanel({ preview, onSend }) {
           {preview.skipped.length > 0 ? ` ${speakerCount(preview.skipped.length)} ${preview.skipped.length === 1 ? 'gets' : 'get'} none.` : ''}
         </p>
         {preview.usedFallback ? (
-          <Notice tone="caution" message="The saved wording failed its check, so these messages use the default message. Fix the wording below." />
+          <Notice tone="caution" message="The saved wording failed its check, so these messages use the shipped wording. Fix the wording below." />
         ) : null}
         {preview.skipped.length > 0 ? (
           <section aria-label="Speakers who get no reminder" className="flex flex-col gap-2xs">
@@ -200,7 +199,7 @@ function WordingEditor({ call, timeZone }) {
       setState({ status: 'ready', data, error: null });
       setDraft(data.saved ?? data.shipped);
     } catch (err) {
-      setState({ status: 'error', data: null, error: plannerMessage(err.message) });
+      setState({ status: 'error', data: null, error: err.message });
     }
   }, [call]);
 
@@ -217,7 +216,7 @@ function WordingEditor({ call, timeZone }) {
       setDraft(data.saved ?? data.shipped);
       setResult({ tone: 'ok', message: 'Wording saved. The next preview and send use it.' });
     } catch (err) {
-      setResult({ tone: 'error', message: templateProblem(plannerMessage(err.message)) });
+      setResult({ tone: 'error', message: err.message });
     } finally {
       setBusy(null);
     }
@@ -231,9 +230,9 @@ function WordingEditor({ call, timeZone }) {
       const data = await call('speakerReminders', { action: 'resetTemplate' });
       setState({ status: 'ready', data, error: null });
       setDraft(data.shipped);
-      setResult({ tone: 'ok', message: 'The default message applies again.' });
+      setResult({ tone: 'ok', message: 'The shipped wording applies again.' });
     } catch (err) {
-      setResult({ tone: 'error', message: templateProblem(plannerMessage(err.message)) });
+      setResult({ tone: 'error', message: err.message });
     } finally {
       setBusy(null);
     }
@@ -250,26 +249,51 @@ function WordingEditor({ call, timeZone }) {
         <legend className="sr-only">Reminder wording</legend>
         <p className="text-admin-sm text-admin-ink">
           {data.saved
-            ? `Saved wording, last changed ${formatWhen(data.saved.updatedAt, timeZone)}.`
-            : 'The default message is in use.'}
+            ? `Saved wording, last changed ${formatWhen(data.saved.updatedAt, timeZone)} by ${data.saved.updatedBy ?? 'an admin'}.`
+            : 'The shipped wording is in use.'}
         </p>
-        <TemplateTextField label="Subject" value={draft.subject} onChange={(value) => setDraft({ ...draft, subject: value })} tokens={data.reminderTokens} />
-        <TemplateMessageField label="Message" rows={12} value={draft.text} tokens={[...data.reminderTokens, 'event_name', 'site_url', 'support_email']}
-          onChange={(value) => setDraft({ ...draft, text: value, html: emailHtmlFromText(value) })} />
+        <div className="text-admin-sm text-admin-ink-secondary">
+          <p>
+            Reminder tokens:{' '}
+            <span className="font-admin-data text-admin-ink-data">
+              {data.reminderTokens.map((name) => `{{${name}}}`).join(' ')}
+            </span>
+          </p>
+          <p className="mt-3xs">
+            Both bodies must keep <span className="font-admin-data">{'{{dashboard_url}}'}</span>.
+            Use <span className="font-admin-data">{'{{#if materials_sessions}}…{{/if}}'}</span> to show a line only when the speaker owes that item.
+            Event tokens such as <span className="font-admin-data">{'{{event_name}}'}</span> also work. The server refuses any other token.
+          </p>
+        </div>
+        <TextField label="Subject" value={draft.subject} onChange={(value) => setDraft({ ...draft, subject: value })} />
+        <TextAreaField
+          label="HTML body"
+          rows={10}
+          className="font-admin-data"
+          value={draft.html}
+          onChange={(value) => setDraft({ ...draft, html: value })}
+        />
+        <TextAreaField
+          label="Plain text body"
+          rows={10}
+          className="font-admin-data"
+          value={draft.text}
+          onChange={(value) => setDraft({ ...draft, text: value })}
+        />
         {result ? <Notice tone={result.tone} message={result.message} /> : null}
         <p className="text-admin-sm font-medium text-admin-state-caution">
           Saving pauses scheduled reminders until you approve them again.
         </p>
         <div className="flex flex-wrap items-center gap-xs">
           <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
-            {busy === 'save' ? 'Saving…' : 'Save'}
+            {busy === 'save' ? 'Saving…' : 'Save wording'}
           </button>
           {data.saved ? (
             <DestructiveConfirm
-              trigger="Use the default message"
-              title="Use the default message"
+              trigger="Use the shipped wording"
+              title="Use the shipped wording"
               confirmLabel="Delete the saved wording"
-              consequence="The saved wording is deleted and every later reminder uses the default message."
+              consequence="The saved wording is deleted and every later reminder uses the shipped wording."
               permanence="This cannot be undone."
               busy={busy === 'reset'}
               busyLabel="Deleting…"
@@ -315,7 +339,7 @@ export default function AdminSpeakerReminders() {
       const result = await call('speakerReminders', { action: 'list' });
       setList({ status: 'ready', rows: result.speakers ?? [], error: null });
     } catch (err) {
-      setList((current) => ({ ...current, status: current.rows.length ? 'ready' : 'error', error: plannerMessage(err.message) }));
+      setList((current) => ({ ...current, status: current.rows.length ? 'ready' : 'error', error: err.message }));
     }
   }, [call]);
 
@@ -383,7 +407,7 @@ export default function AdminSpeakerReminders() {
       });
       setPreview({ ...result, topics: chosenTopics, batchId: newBatchId() });
     } catch (err) {
-      setNotice({ tone: 'error', message: templateProblem(plannerMessage(err.message)) });
+      setNotice({ tone: 'error', message: err.message });
     } finally {
       setBusy(null);
     }
@@ -409,7 +433,7 @@ export default function AdminSpeakerReminders() {
       setNotice({ tone: result.failed?.length || result.uncertain?.length ? 'caution' : 'ok', message: sendSummary(result) });
       await refresh();
     } catch (err) {
-      setSendError(plannerMessage(err.message));
+      setSendError(err.message);
     } finally {
       setBusy(null);
     }
@@ -424,10 +448,10 @@ export default function AdminSpeakerReminders() {
       saveTextFile(result.filename, result.csv);
       setNotice({
         tone: 'ok',
-        message: `Exported ${speakerCount(result.rowCount)} to ${result.filename}.`,
+        message: `Exported ${speakerCount(result.rowCount)} to ${result.filename}. The export is in the admin log.`,
       });
     } catch (err) {
-      setNotice({ tone: 'error', message: templateProblem(plannerMessage(err.message)) });
+      setNotice({ tone: 'error', message: err.message });
     } finally {
       setBusy(null);
     }
@@ -443,7 +467,9 @@ export default function AdminSpeakerReminders() {
         description="Email accepted speakers about the items they still owe: biography, headshot, session description, and materials. A speaker gets at most one reminder in 24 hours."
         actions={
           <>
-            <AdminIconControl label="Download speakers" icon="download" className={secondaryButtonClass} onClick={exportList} disabled={busy !== null} busy={busy === 'export'} aria-busy={busy === 'export'} />
+            <button type="button" className={secondaryButtonClass} onClick={exportList} aria-busy={busy === 'export'}>
+              {busy === 'export' ? 'Exporting…' : 'Export this list as CSV'}
+            </button>
             <Link to="/admin/reminders/scheduled" className={linkButtonClass}>Scheduled reminders</Link>
             <Link to="/admin/speakers" className={linkButtonClass}>Back to speakers</Link>
           </>
@@ -455,7 +481,7 @@ export default function AdminSpeakerReminders() {
         <Notice tone="caution" message={`The list did not refresh: ${list.error}`} />
       ) : null}
 
-      <Panel title="Choose speakers" description="Choose speakers to remind about missing profile details or materials.">
+      <Panel title="Choose speakers" description="The list shows speakers who accepted an invitation. Published sessions count. A pending or approved material counts, and a rejected one does not. A pending material also shows as waiting for review. A session marked as needing no materials never asks for them.">
         {list.status === 'loading' ? (
           <AdminLoadingState label="Loading speakers…" />
         ) : list.status === 'error' ? (

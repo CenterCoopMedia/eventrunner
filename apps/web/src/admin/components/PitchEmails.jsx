@@ -1,4 +1,3 @@
-import { plannerError } from '../plannerErrors.js';
 // Session pitch emails (issue #324): the operator's receipt mode and
 // wording, and the delivery state and send controls on one pitch.
 //
@@ -7,14 +6,13 @@ import { plannerError } from '../plannerErrors.js';
 // so a second click or a repeated decision cannot send it twice. An email
 // whose delivery is unknown (the email service did not answer) is retried
 // only after staff confirm that they checked the Email log.
-import { TemplateTextField, TemplateMessageField } from './EmailTemplateField.jsx';
 import { useEffect, useRef, useState } from 'react';
 import {
   PITCH_NOTICE_TEMPLATE_IDS, PITCH_NOTICE_DEFAULTS, DECISION_TEMPLATE_IDS,
   MAX_NOTICE_SUBJECT_LENGTH, MAX_NOTICE_WORDING_LENGTH, MAX_SUBMITTER_FEEDBACK_LENGTH,
 } from 'shared/pitch';
 import { StatusBadge } from './adminChrome.jsx';
-import { Panel, Notice, SaveStatus, TextAreaField, SelectField, CheckboxField,
+import { Panel, Notice, SaveStatus, TextField, TextAreaField, SelectField, CheckboxField,
   ServerErrorSummary, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
 import { toMillis } from '../versionHistory.js';
 
@@ -43,8 +41,7 @@ const receiptModes = [
   { value: 'automatic', label: 'Send automatically when a person pitches through this site’s form' },
   { value: 'manual', label: 'Staff send each receipt from the pitch' },
 ];
-const WORDING_HINT = 'Private review notes are never sent.';
-const DETAILS = ['pitch_title', 'event_name', 'site_url', 'support_email'];
+const WORDING_HINT = 'Plain text. A blank line starts a new paragraph. You can use {{pitch_title}}, {{event_name}}, {{site_url}} and {{support_email}}. Private review notes are never sent.';
 
 function entriesFrom(settings) {
   return Object.fromEntries(PITCH_NOTICE_TEMPLATE_IDS.map((id) => [id, {
@@ -81,7 +78,7 @@ export function PitchEmailSettings({ settings, call }) {
       const response = await call('savePitchNoticeSettings', { expectedRevision: baseRevision, receiptMode, templates: entries });
       setBaseRevision(response.revision);
       setResult('Email settings saved.');
-    } catch (err) { setError(plannerError(err)); }
+    } catch (err) { setError(err); }
     finally { setBusy(false); }
   }
   function loadCurrent() {
@@ -96,15 +93,15 @@ export function PitchEmailSettings({ settings, call }) {
         <SelectField label="Receipts" value={receiptMode} onChange={setReceiptMode} options={receiptModes} hint="Staff always send acceptance and decline emails from the pitch, after a preview." />
         {PITCH_NOTICE_TEMPLATE_IDS.map((id) => <fieldset key={id} className="space-y-sm border-t-admin-hairline border-admin-rule-hairline pt-sm">
           <legend className="font-semibold">{templateNames[id]}</legend>
-          <TemplateTextField tokens={DETAILS} label={`${templateNames[id]} subject`} value={entries[id].subject} onChange={edit(id, 'subject')} required maxLength={MAX_NOTICE_SUBJECT_LENGTH} />
-          <TemplateMessageField tokens={DETAILS} label={`${templateNames[id]} wording`} value={entries[id].wording} onChange={edit(id, 'wording')} required rows={6} maxLength={MAX_NOTICE_WORDING_LENGTH}
+          <TextField label={`${templateNames[id]} subject`} value={entries[id].subject} onChange={edit(id, 'subject')} required maxLength={MAX_NOTICE_SUBJECT_LENGTH} />
+          <TextAreaField label={`${templateNames[id]} wording`} value={entries[id].wording} onChange={edit(id, 'wording')} required rows={6} maxLength={MAX_NOTICE_WORDING_LENGTH}
             hint={id === 'pitch.receipt' ? WORDING_HINT : `${WORDING_HINT} A note that staff write when they send the email appears after this wording.`} />
-          <button type="button" aria-label={`Use default ${templateNames[id].toLowerCase()} message`} className={secondaryButtonClass} onClick={() => { setEntries((previous) => ({ ...previous, [id]: { ...PITCH_NOTICE_DEFAULTS[id] } })); setResult(''); }}>
-            Use default message
+          <button type="button" className={secondaryButtonClass} onClick={() => { setEntries((previous) => ({ ...previous, [id]: { ...PITCH_NOTICE_DEFAULTS[id] } })); setResult(''); }}>
+            Use the shipped {templateNames[id].toLowerCase()} wording
           </button>
         </fieldset>)}
       </fieldset>
-      <button aria-label="Save email settings" className={primaryButtonClass} disabled={busy || conflict}>{busy ? 'Saving…' : 'Save'}</button>
+      <button className={primaryButtonClass} disabled={busy || conflict}>{busy ? 'Saving…' : 'Save email settings'}</button>
       {result ? <SaveStatus message={result} /> : null}
     </form>
   </Panel>;
@@ -116,7 +113,7 @@ function DeliveryState({ slot, record }) {
     <span className="font-semibold">{slotNames[slot]}</span>
     <StatusBadge tone={stateTones[record.state] || 'neutral'}>{stateLabels[record.state] || 'Unknown'}</StatusBadge>
     <span className="text-admin-ink-secondary">
-      {record.mode === 'automatic' ? 'Automatic' : 'Sent by staff'}
+      {record.mode === 'automatic' ? 'Automatic' : `By ${record.queuedBy || 'staff'}`}
       {at !== null ? ` · ${new Date(at).toLocaleString()}` : ''}
       {record.attempt > 1 ? ` · Attempt ${record.attempt}` : ''}
     </span>
@@ -143,7 +140,7 @@ function SendEmail({ pitch, kind, slot, disabled, call, onSent }) {
     if (busy || disabled) return;
     setBusy(true); setError(null); setConfirmed(false); setCheckedLog(false);
     try { setPreview((await call('sendSessionPitchNotice', { ...request, preview: true })).preview); }
-    catch (err) { setError(plannerError(err)); setPreview(null); }
+    catch (err) { setError(err); setPreview(null); }
     finally { setBusy(false); }
   }
   async function send(e) {
@@ -163,7 +160,7 @@ function SendEmail({ pitch, kind, slot, disabled, call, onSent }) {
       onSent(`${slotNames[slot]} sent to ${preview.to}.`);
       setPreview(null); setFeedback('');
     } catch (err) {
-      setError(plannerError(err));
+      setError(err);
       // A refused send needs a fresh preview: the wording or the record changed.
       if (err?.code === 'settings-changed' || err?.code === 'delivery-unknown') setPreview(null);
     }
@@ -186,7 +183,7 @@ function SendEmail({ pitch, kind, slot, disabled, call, onSent }) {
       {preview?.mayHaveBeenSent ? <CheckboxField label="I checked the Email log. The earlier email was not delivered." checked={checkedLog} onChange={setCheckedLog} /> : null}
       {preview ? <CheckboxField label={`I reviewed this email. Send it to ${preview.to}.`} checked={confirmed} onChange={setConfirmed} /> : null}
     </fieldset>
-    {preview ? <button className={primaryButtonClass} disabled={busy || disabled || !confirmed || (preview.mayHaveBeenSent && !checkedLog)}>{busy ? 'Sending…' : 'Send'}</button> : null}
+    {preview ? <button className={primaryButtonClass} disabled={busy || disabled || !confirmed || (preview.mayHaveBeenSent && !checkedLog)}>{busy ? 'Sending…' : `Send the ${name}`}</button> : null}
   </form>;
 }
 

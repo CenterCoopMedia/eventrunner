@@ -1,4 +1,3 @@
-import { displayTemplate, emailHtmlFromText } from '../components/EmailTemplateField.jsx';
 // The speaker email wording page (functions/src/speakers/mailTemplates.cjs).
 // Mocks adminApi directly, as AdminSpeakerReminders.test.jsx does: the
 // endpoint is the only data source, and every preview renders on the server.
@@ -77,15 +76,14 @@ describe('speaker email wording', () => {
     serve();
     renderPage();
     const invite = await invitationForm();
-    expect(invite.getByLabelText('Subject')).toHaveValue(displayTemplate(INVITE.shipped.subject));
-    expect(invite.getByLabelText('Message')).toHaveValue(displayTemplate(INVITE.shipped.text));
-    expect(invite.getByLabelText('Message')).toHaveValue(displayTemplate(INVITE.shipped.text));
-    expect(invite.getByText('The default message is in use.')).toBeInTheDocument();
-    expect(invite.getByRole('option', { name: 'Speaker name' })).toBeInTheDocument();
-    expect(invite.queryByText(/{{speaker_name}}/)).toBeNull();
-    expect(invite.queryByRole('button', { name: 'Use the default message' })).toBeNull();
+    expect(invite.getByLabelText('Subject')).toHaveValue(INVITE.shipped.subject);
+    expect(invite.getByLabelText('HTML body')).toHaveValue(INVITE.shipped.html);
+    expect(invite.getByLabelText('Plain text body')).toHaveValue(INVITE.shipped.text);
+    expect(invite.getByText('The shipped wording is in use.')).toBeInTheDocument();
+    expect(invite.getByText('{{speaker_name}} {{invite_url}} {{invite_type}} {{admin_contact_email}}')).toBeInTheDocument();
+    expect(invite.queryByRole('button', { name: 'Use the shipped wording' })).toBeNull();
     const accepted = within(screen.getByRole('form', { name: 'Acceptance confirmation wording' }));
-    expect(accepted.getByLabelText('Subject')).toHaveValue(displayTemplate(ACCEPTED.shipped.subject));
+    expect(accepted.getByLabelText('Subject')).toHaveValue(ACCEPTED.shipped.subject);
   });
 
   it('marks the field the server refused for an unknown token, moves focus there, and stores nothing', async () => {
@@ -94,19 +92,19 @@ describe('speaker email wording', () => {
     });
     renderPage();
     const invite = await invitationForm();
-    fireEvent.change(invite.getByLabelText('Message'), { target: { value: '{{invite_url}} {{nope}}' } });
-    fireEvent.click(invite.getByRole('button', { name: 'Save' }));
+    fireEvent.change(invite.getByLabelText('Plain text body'), { target: { value: '{{invite_url}} {{nope}}' } });
+    fireEvent.click(invite.getByRole('button', { name: 'Save wording' }));
     const alert = await invite.findByRole('alert');
-    expect(alert).toHaveTextContent('A detail is not recognized. Remove it or choose one from the details menu, then try again.');
-    const field = invite.getByLabelText('Message');
+    expect(alert).toHaveTextContent('text: unknown token {{nope}}');
+    const field = invite.getByLabelText('Plain text body');
     expect(field).toHaveAttribute('aria-invalid', 'true');
     await waitFor(() => expect(field).toHaveFocus());
     expect(callMock).toHaveBeenCalledWith('speakerMailTemplates', {
-      action: 'saveTemplate', templateId: 'speaker.invite', subject: INVITE.shipped.subject, html: emailHtmlFromText('{{invite_url}} {{nope}}'), text: '{{invite_url}} {{nope}}',
+      action: 'saveTemplate', templateId: 'speaker.invite', subject: INVITE.shipped.subject, html: INVITE.shipped.html, text: '{{invite_url}} {{nope}}',
     });
   });
 
-  it('saves the wording, says the next email uses it, and offers the default message back', async () => {
+  it('saves the wording, says the next email uses it, and offers the shipped wording back', async () => {
     serve({
       saveTemplate: (body) => ({ template: saved(INVITE, { subject: body.subject }) }),
       resetTemplate: { template: INVITE },
@@ -115,17 +113,17 @@ describe('speaker email wording', () => {
     const invite = await invitationForm();
     fireEvent.change(invite.getByLabelText('Subject'), { target: { value: 'Join us at {{event_name}}' } });
     expect(invite.getByText(/The form has changes that are not saved\./)).toBeInTheDocument();
-    fireEvent.click(invite.getByRole('button', { name: 'Save' }));
+    fireEvent.click(invite.getByRole('button', { name: 'Save wording' }));
     expect(await invite.findByRole('status')).toHaveTextContent('Invitation wording saved. The next email uses it.');
-    expect(invite.getByText(/Saved wording is in use, last changed Oct 20, 2026, 12:00 PM \(UTC\)\./)).toBeInTheDocument();
-    expect(invite.getByLabelText('Subject')).toHaveValue('Join us at [Event name]');
+    expect(invite.getByText(/Saved wording is in use, last changed Oct 20, 2026, 12:00 PM \(UTC\) by staff@example\.test\./)).toBeInTheDocument();
+    expect(invite.getByLabelText('Subject')).toHaveValue('Join us at {{event_name}}');
 
-    fireEvent.click(invite.getByRole('button', { name: 'Use the default message' }));
+    fireEvent.click(invite.getByRole('button', { name: 'Use the shipped wording' }));
     const confirm = invite.getByRole('region', { name: 'Use the shipped invitation wording' });
-    expect(confirm).toHaveTextContent('The saved wording is deleted and every later invitation email uses the default message.');
+    expect(confirm).toHaveTextContent('The saved wording is deleted and every later invitation email uses the shipped wording.');
     fireEvent.click(within(confirm).getByRole('button', { name: 'Delete the saved wording' }));
-    expect(await invite.findByText('Invitation uses the default message again.')).toBeInTheDocument();
-    expect(invite.getByLabelText('Subject')).toHaveValue(displayTemplate(INVITE.shipped.subject));
+    expect(await invite.findByText('Invitation uses the shipped wording again.')).toBeInTheDocument();
+    expect(invite.getByLabelText('Subject')).toHaveValue(INVITE.shipped.subject);
     expect(callMock).toHaveBeenCalledWith('speakerMailTemplates', { action: 'resetTemplate', templateId: 'speaker.invite' });
   });
 
@@ -181,7 +179,7 @@ describe('speaker email wording', () => {
     expect(callMock).toHaveBeenLastCalledWith('speakerMailTemplates', { action: 'preview', templateId: 'speaker.invite' });
   });
 
-  it('says when saved wording fails its check and speakers get the default message', async () => {
+  it('says when saved wording fails its check and speakers get the shipped wording', async () => {
     serve({
       templates: {
         templates: [{ ...saved(INVITE, { text: 'No link.' }), savedErrors: ['text: missing required token {{invite_url}}'] }, ACCEPTED],
@@ -189,17 +187,17 @@ describe('speaker email wording', () => {
     });
     renderPage();
     const invite = await invitationForm();
-    expect(invite.getByText(/A required link is missing/)).toBeInTheDocument();
+    expect(invite.getByText(/The saved wording fails its check, so speakers get the shipped wording: text: missing required token/)).toBeInTheDocument();
   });
 
-  it('copies the default message into the form without saving', async () => {
+  it('copies the shipped wording into the form without saving', async () => {
     serve({ templates: { templates: [saved(INVITE, { subject: 'Saved {{event_name}}' }), ACCEPTED] } });
     renderPage();
     const invite = await invitationForm();
-    expect(invite.getByLabelText('Subject')).toHaveValue('Saved [Event name]');
-    fireEvent.click(invite.getByText('Default message'));
-    fireEvent.click(invite.getByRole('button', { name: 'Use default message' }));
-    expect(invite.getByLabelText('Subject')).toHaveValue(displayTemplate(INVITE.shipped.subject));
+    expect(invite.getByLabelText('Subject')).toHaveValue('Saved {{event_name}}');
+    fireEvent.click(invite.getByText('Shipped wording'));
+    fireEvent.click(invite.getByRole('button', { name: 'Copy the shipped wording into the form' }));
+    expect(invite.getByLabelText('Subject')).toHaveValue(INVITE.shipped.subject);
     expect(callMock).toHaveBeenCalledTimes(1);
   });
 

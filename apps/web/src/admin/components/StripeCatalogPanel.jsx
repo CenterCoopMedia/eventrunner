@@ -175,7 +175,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
           <button type="button" className={secondaryButtonClass} aria-disabled={draft.ticketTypes.length >= 20} onClick={() => {
             if (draft.ticketTypes.length >= 20) return;
             const id = `type-${crypto.randomUUID()}`;
-            changed('ticketTypes', [...draft.ticketTypes, { id, name: '', description: '', unitAmount: 0, capacity: draft.capacity, active: true, visibility: 'public', minPerOrder: 1, maxPerOrder: draft.maxPerOrder, salesStartAt: null, salesEndAt: null }]);
+            changed('ticketTypes', [...draft.ticketTypes, { id, name: '', description: '', unitAmount: 0, capacity: draft.capacity, active: false, visibility: 'hidden', minPerOrder: 1, maxPerOrder: draft.maxPerOrder, salesStartAt: null, salesEndAt: null }]);
             setPriceInputs((previous) => ({ ...previous, [id]: '0' }));
           }}>{draft.ticketTypes.length >= 20 ? '20 ticket types maximum' : 'Add ticket type'}</button>
         </div>

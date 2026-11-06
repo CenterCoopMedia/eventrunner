@@ -1,4 +1,3 @@
-import { emailHtmlFromText } from '../components/EmailTemplateField.jsx';
 // The speaker reminders page (functions/src/speakers/reminders.cjs). Mocks
 // adminApi directly, as AdminEmailLog.test.jsx does: the endpoint is the
 // only data source, and every reminder is rendered on the server.
@@ -163,7 +162,7 @@ describe('speaker reminders list', () => {
     expect(items).toHaveLength(1);
     expect(within(items[0]).getByText('Missing: Nothing missing.')).toBeInTheDocument();
     expect(within(items[0]).getByText('Waiting for review: Materials (Keynote).')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Download speakers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export this list as CSV' }));
     await screen.findByText(/Exported 1 speaker to speaker-readiness-materialsPending-2026-10-19.csv/);
     expect(callsFor('export')).toEqual([{ action: 'export', group: 'materialsPending' }]);
   });
@@ -186,7 +185,7 @@ describe('speaker reminders list', () => {
     serve({ export: { filename: 'speaker-readiness-any-2026-10-19.csv', csv: 'x', rowCount: 2 } });
     renderPage();
     await screen.findByRole('list', { name: 'Accepted speakers' });
-    fireEvent.click(screen.getByRole('button', { name: 'Download speakers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export this list as CSV' }));
     expect(await screen.findByText(/Exported 2 speakers to speaker-readiness-any-2026-10-19.csv/)).toBeInTheDocument();
     expect(callsFor('export')).toEqual([{ action: 'export', group: 'any' }]);
     expect(saveTextFile).toHaveBeenCalledWith('speaker-readiness-any-2026-10-19.csv', 'x');
@@ -281,9 +280,9 @@ describe('reminder wording', () => {
     let finish;
     serve({ saveTemplate: () => new Promise((resolve) => { finish = resolve; }) });
     renderPage();
-    const text = await screen.findByLabelText('Message');
+    const text = await screen.findByLabelText('Plain text body');
     fireEvent.change(text, { target: { value: 'Open {{dashboard_url}}' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save wording' }));
     await waitFor(() => expect(callsFor('saveTemplate')).toHaveLength(1));
     expect(text).toBeDisabled();
     await act(async () => finish({ ...TEMPLATE, saved: { ...TEMPLATE.shipped, text: 'Open {{dashboard_url}}' } }));
@@ -299,7 +298,7 @@ describe('reminder wording', () => {
     const retry = await screen.findByRole('button', { name: 'Try again' });
     serve();
     fireEvent.click(retry);
-    expect(await screen.findByLabelText('Message')).toHaveValue('[Speaker dashboard link]');
+    expect(await screen.findByLabelText('Plain text body')).toHaveValue(TEMPLATE.shipped.text);
     expect(callsFor('template')).toHaveLength(2);
   });
   it('shows the server refusal of an unknown token and saves valid wording', async () => {
@@ -310,22 +309,22 @@ describe('reminder wording', () => {
       },
     });
     renderPage();
-    const text = await screen.findByLabelText('Message');
-    expect(screen.getByText('The default message is in use.')).toBeInTheDocument();
+    const text = await screen.findByLabelText('Plain text body');
+    expect(screen.getByText('The shipped wording is in use.')).toBeInTheDocument();
     fireEvent.change(text, { target: { value: '{{dashboard_url}} {{nope}}' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByText('A detail is not recognized. Remove it or choose one from the details menu, then try again.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save wording' }));
+    expect(await screen.findByText('text: unknown token {{nope}}')).toBeInTheDocument();
 
     fireEvent.change(text, { target: { value: 'Open {{dashboard_url}}' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save wording' }));
     expect(await screen.findByText('Wording saved. The next preview and send use it.')).toBeInTheDocument();
-    expect(screen.getByText(/Saved wording, last changed Oct 19, 2026, 12:00 PM \(UTC\)\./)).toBeInTheDocument();
+    expect(screen.getByText(/Saved wording, last changed Oct 19, 2026, 12:00 PM \(UTC\) by staff@example.test\./)).toBeInTheDocument();
     expect(callsFor('saveTemplate').at(-1)).toEqual({
       action: 'saveTemplate',
       subject: TEMPLATE.shipped.subject,
-      html: emailHtmlFromText('Open {{dashboard_url}}'),
+      html: TEMPLATE.shipped.html,
       text: 'Open {{dashboard_url}}',
     });
-    expect(screen.getByRole('button', { name: 'Use the default message' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use the shipped wording' })).toBeInTheDocument();
   });
 });
