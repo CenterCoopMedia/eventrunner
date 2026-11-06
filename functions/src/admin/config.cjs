@@ -11,14 +11,11 @@
  *      site's identity is a deployment decision; event and badges admit
  *      staff, because dates, venue, places, tracks, the register link,
  *      social handles, milestones, the registration goal, and the badge
- *      catalogue are the content an organizer runs day to day. One field of config/event is held back:
- *      a CHANGE to `sender` (the outbound address, display name, reply-to)
- *      needs an operator, because it is the email identity
- *      verify-sender-domain.cjs attests — a staff member changing it could
- *      point the deployment's mail at an address nobody verified. The
- *      comparison happens inside the write transaction against the stored
- *      values, so a staff save that carries the sender unchanged (the
- *      form sends the whole editable slice) goes through.
+ *      catalogue are the content an organizer runs day to day. On config/event,
+ *      a CHANGE to the sender name or reply-to needs an operator. The from
+ *      address and legal postal address are set by the team during setup
+ *      and cannot change here, for any role. Comparisons run inside the
+ *      write transaction, so unchanged values in a full form save are safe.
  *   2. Targets only {event, features, theme, badges}. Other domain modules
  *      own their named config documents, including `config/pitch_call`.
  *      `config/bootstrap`
@@ -139,7 +136,7 @@ const SENDER_VERIFICATION_FIELDS = Object.freeze([
  */
 const EVENT_OPERATOR_KEYS = Object.freeze(['sender']);
 
-/** The editable sender fields, the only ones the comparison looks at. */
+/** Sender fields compared for the existing operator-only restriction. */
 const SENDER_EDITABLE_FIELDS = Object.freeze(['email', 'name', 'replyTo']);
 
 /**
@@ -376,12 +373,12 @@ function deepMerge(base, patch) {
   return out;
 }
 
-/** Thrown inside the event transaction when a staff caller changes an
- * operator-only key; applyConfigWrite maps it to a 403. */
-class OperatorKeyRefusedError extends Error {
+/** Thrown inside the event transaction for a restricted field change;
+ * applyConfigWrite maps it to a 403. */
+class ConfigFieldRefusedError extends Error {
   constructor(errors) {
     super(errors.join('; '));
-    this.name = 'OperatorKeyRefusedError';
+    this.name = 'ConfigFieldRefusedError';
     this.errors = errors;
   }
 }
@@ -509,13 +506,31 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
       if (docId === 'event') {
         const snap = await tx.get(ref);
         const stored = snap.exists ? stripStamps(snap.data()) : {};
+        // Compare the merged result so replacing an entire block cannot
+        // clear a setup value. The transaction also protects concurrent setup.
+        const proposed = deepMerge(stored, fields);
+        const setupChanges = [];
+        if (normalizeSenderField('email', proposed.sender?.email)
+          !== normalizeSenderField('email', stored.sender?.email)) {
+          setupChanges.push('To send from a different address, contact us.');
+        }
+        if ((proposed.legal?.postalAddressHtml ?? null) !== (stored.legal?.postalAddressHtml ?? null)) {
+          setupChanges.push('To change your mailing address, contact us.');
+        }
+        if (setupChanges.length > 0) throw new ConfigFieldRefusedError(setupChanges);
         // A staff save may carry the sender unchanged (the form sends the
         // whole editable slice); only a CHANGE to it is the operator's.
         const operatorKeyChanges = findOperatorKeyChanges(docId, fields, stored, tier);
-        if (operatorKeyChanges.length > 0) throw new OperatorKeyRefusedError(operatorKeyChanges);
+        if (operatorKeyChanges.length > 0) throw new ConfigFieldRefusedError(operatorKeyChanges);
         // Proven unchanged, the operator's values are then DROPPED from a
         // staff payload, so the merge keeps the stored bytes for them.
-        const merged = withoutUnchangedOperatorKeys(fields, tier);
+        const merged = { ...withoutUnchangedOperatorKeys(fields, tier) };
+        if (isPlainObject(merged.sender)) {
+          // Keep the saved address bytes even if an older form carries it
+          // with different case or spacing. Other sender fields still merge.
+          merged.sender = { ...merged.sender };
+          delete merged.sender.email;
+        }
         // MERGE the payload over the stored doc, then validate the RESULT:
         // the validator accepts a partial shape, so validating (or writing)
         // the payload alone would let a partial save erase venue/legal/etc.
@@ -574,7 +589,7 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
     if (err instanceof MergedConfigInvalidError) {
       return { ok: false, status: 400, code: 'bad-request', message: err.message };
     }
-    if (err instanceof OperatorKeyRefusedError) {
+    if (err instanceof ConfigFieldRefusedError) {
       return { ok: false, status: 403, code: 'forbidden', message: err.message };
     }
     throw err;

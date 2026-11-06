@@ -29,7 +29,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, closing a flagged card payment, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
 | Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, make a card payment link, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
-Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
+Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Operators can change the sender name, reply-to address, and social sharing image. Staff can read those values. No admin can change the from address or the mailing address in the email footer. Our team manages those settings on request.
 
 An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.
 
@@ -955,7 +955,11 @@ The page sends a package of up to 9 MB built from at most 50,000 stored document
 
 ## Settings → Event settings
 
-The event's own identity fields: Name, dates, time zone, venue, sender address, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
+The event's own identity fields: Name, dates, time zone, venue, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. Saving keeps values that the form does not edit.
+
+**From address.** The address is shown as read-only text for all admins, including operators. To send from a different address, contact us. Operators can still edit the sender name and reply-to address. Staff can read those values.
+
+**Mailing address.** Our team sets the mailing address in the email footer during setup. Admins cannot change it here. Announcements cannot be sent until it is set: "Add your mailing address before sending announcements. Contact us to set it." Receipts and sign-in codes are not blocked by this check.
 
 **The time zone is chosen from a list.** Type part of a city, a region, the zone's usual name, or an offset into **Time zone**, such as `Chicago`, `Eastern Time`, or `UTC+05:30`. Each match shows the city, the zone's name, and its offset today. Use the arrow keys and Enter, or select one. Escape, or leaving the field without a choice, keeps the saved zone. The saved zone is marked **Current**. The site still stores the IANA name, such as `America/Chicago`, and the field states it under the search. A line under the field gives the UTC offset on your event days. If the clocks change during the event, it names both offsets and the day the second one starts.
 
@@ -1099,14 +1103,9 @@ The badge catalog: Categories, each with a max-picks cap and its list of badges,
 
 ## Settings → Web address
 
-Your site already works at its own address. A custom web address, such as `summit.example.org`, is optional. Operators only.
+Operators can see the site's current web address and the status of an existing custom domain. Want to use your own domain? Contact us and we'll set it up. Admins cannot add or remove domains, including through the admin API.
 
-1. Type the domain under **Your domain** and select **Add this address**. Use the plain domain, with no `https://` and no path.
-2. The page shows the records to change. Where you manage your domain (the company you bought it from, or your IT team), add each record marked **Add** and remove each record marked **Remove**: an old record for the same name stops the new address from working. Changes there can take a few hours to reach everyone.
-3. Select **Check now**, or wait: the site checks every hour. While the records are not in place, the state is **Waiting for the records**.
-4. When the domain works, the state is **Ready to switch**: sign-in already accepts the domain. Ask the hosting team to switch the site to it. After the switch the state is **In use**.
-
-**Remove this address** stops the site from answering at that domain. You can add it again later. A custom sender domain for email is a separate step that the hosting team runs.
+For an existing domain, select **Check now**, or wait for the hourly check. The status shows **Waiting for the records**, **Ready to switch**, or **In use**. Our team manages setup and the switch to the new address. Email sender setup is a separate step that our team manages.
 
 ## Settings → Access
 

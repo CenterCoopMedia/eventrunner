@@ -162,6 +162,7 @@ function senderOf(config) {
 }
 
 const CHANNEL_MESSAGES = Object.freeze({
+  'mailing-address-missing': 'Add your mailing address before sending announcements. Contact us to set it.',
   'unsupported-provider': 'Announcement email needs the Postmark or console email provider. The webhook relay has no batch send or unsubscribe contract yet.',
   'stream-missing': 'Set config/providers.email.announcementStream to a Postmark broadcast stream before sending announcements.',
   'stream-not-found': 'The announcement stream does not exist on this Postmark server.',
@@ -184,6 +185,12 @@ function refused(code) {
  *   { ok: false, code: string, message: string }>}
  */
 async function resolveChannel({ provider, config }) {
+  const postalAddress = config?.event?.legal?.postalAddressHtml;
+  if (typeof postalAddress !== 'string'
+    || !postalAddress.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;|&#xA0;/gi, ' ').trim()
+    || /\[Replace/i.test(postalAddress)) {
+    return refused('mailing-address-missing');
+  }
   const configured = config?.providers?.email?.announcementStream;
   const stream = typeof configured === 'string' && configured.trim() ? configured.trim() : null;
   const needsSite = () => !suppressionInternals.siteUrlOf(config);
