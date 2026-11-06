@@ -63,7 +63,7 @@ describe('Coming back from a provider', () => {
     callApi.mockResolvedValue({ ...DONE, connected: false });
     rememberConnectReturn(TICKETS);
     renderReturn('?error=access_denied&state=s1');
-    expect(await screen.findByText(`Landed ${TICKETS}: info: You did not connect your Stripe account. You can try again when you are ready.`)).toBeInTheDocument();
+    expect(await screen.findByText(`Landed ${TICKETS}: info: Your Stripe account is not connected. Try again.`)).toBeInTheDocument();
     expect(callsTo('completeConnection')).toEqual([{ provider: 'stripe', state: 's1', denied: true }]);
   });
 

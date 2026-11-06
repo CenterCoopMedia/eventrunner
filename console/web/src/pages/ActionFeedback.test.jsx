@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api.js';
 import { AppRoutes } from '../App.jsx';
-import { callsTo, fullAnswers, serveApi, team } from '../test/application.js';
+import { application, callsTo, fullAnswers, serveApi, team } from '../test/application.js';
 import { fakeAuth, renderPage } from '../test/renderPage.jsx';
 import { renderSetup } from '../test/setupPage.jsx';
 import Team from './Team.jsx';
@@ -38,14 +38,14 @@ describe('Console action feedback and recovery', () => {
     renderSetup('organization');
     const website = await screen.findByLabelText('Website (optional)');
     fireEvent.change(website, { target: { value: 'https://edited.example.test' } });
-    fireEvent.click(screen.getByRole('link', { name: 'Leave the setup' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Close setup' }));
     expect(website).toBeDisabled();
     expect(screen.queryByText('Status page')).not.toBeInTheDocument();
     await act(async () => save.reject(new Error('Connection interrupted. Try again.')));
     expect(await screen.findByRole('alert')).toHaveTextContent('Not saved. Connection interrupted.');
     expect(website).toHaveValue('https://edited.example.test');
     expect(screen.getByLabelText('Save and continue')).toHaveFocus();
-    fireEvent.click(screen.getByRole('link', { name: 'Leave the setup' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Close setup' }));
     expect(await screen.findByText('Status page')).toBeInTheDocument();
     expect(callsTo('saveApplicationStep').map((body) => body.answers.website)).toEqual(['https://edited.example.test', 'https://edited.example.test']);
   });
@@ -55,10 +55,10 @@ describe('Console action feedback and recovery', () => {
       throw new ApiError(400, 'legalName-required', 'Enter the legal name.', {}, 'legalName');
     } });
     renderSetup('agreement');
-    fireEvent.click(await screen.findByRole('button', { name: 'Accept the agreement' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Accept agreement' }));
     await screen.findByText('Enter the legal name.');
     expect(screen.getByLabelText("Your organization's legal name")).toHaveFocus();
-    expect(screen.getByRole('button', { name: 'Accept the agreement' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Accept agreement' })).toBeEnabled();
   });
 
   it('keeps a changed-agreement error with Accept and gives an explicit way to review the new text', async () => {
@@ -68,9 +68,9 @@ describe('Console action feedback and recovery', () => {
     renderSetup('agreement');
     const name = await screen.findByLabelText('Your full name');
     fireEvent.change(name, { target: { value: 'Alex Organizer' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept agreement' }));
     const error = await screen.findByRole('alert');
-    expect(error.closest('form')).toContainElement(screen.getByRole('button', { name: 'Accept the agreement' }));
+    expect(error.closest('form')).toContainElement(screen.getByRole('button', { name: 'Accept agreement' }));
     expect(name).toHaveValue('Alex Organizer');
     fireEvent.click(within(error).getByRole('button', { name: 'Read the updated agreement' }));
     expect(screen.getByRole('heading', { name: 'Hosting agreement' })).toHaveFocus();
@@ -82,15 +82,36 @@ describe('Console action feedback and recovery', () => {
     const onSaved = vi.fn();
     renderPage(<AgreementSettings agreement={AGREEMENT} onSaved={onSaved} />);
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Updated agreement.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save as a new version' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save agreement' }));
     expect(screen.getByLabelText('Title')).toBeDisabled();
     expect(screen.getByLabelText('Text')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Saving agreement…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save agreement' })).toBeDisabled();
     await act(async () => save.resolve({ created: true, agreement: { ...AGREEMENT, body: 'Updated agreement.', version: 3 } }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Version 3 is saved.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Version 3 saved.');
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'A later draft.' } });
-    expect(screen.queryByText(/Version 3 is saved/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Version 3 saved/)).not.toBeInTheDocument();
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ body: 'Updated agreement.', version: 3 }));
+  });
+
+  it('keeps signer details when the request cannot refresh after an agreement refusal', async () => {
+    let reads = 0;
+    serveApi({ getAgreement: { agreement: AGREEMENT }, getApplication: () => {
+      if (++reads === 2) throw new Error('The request could not be refreshed. Try again.');
+      return { application: application() };
+    }, acceptAgreement: () => {
+      throw new ApiError(409, 'agreement-changed', 'Read the updated agreement before accepting.');
+    } });
+    renderSetup('agreement');
+    const name = await screen.findByLabelText('Your full name');
+    fireEvent.change(name, { target: { value: 'Alex Organizer' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept agreement' }));
+    await screen.findByText('The request could not be refreshed. Try again.');
+    expect(name).toHaveValue('Alex Organizer');
+    expect(name).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Reload setup' }));
+    await waitFor(() => expect(screen.queryByText('The request could not be refreshed. Try again.')).not.toBeInTheDocument());
+    expect(name).toHaveValue('Alex Organizer');
+    expect(callsTo('acceptAgreement')).toHaveLength(1);
   });
 
   it('retains a failed member removal in its row and blocks conflicting actions while pending', async () => {
@@ -98,7 +119,7 @@ describe('Console action feedback and recovery', () => {
     serveApi({ removeMember: () => remove.promise });
     renderPage(<Team />, TEAM_PATH);
     fireEvent.click(await screen.findByRole('button', { name: 'Remove dee@example.org' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     expect(screen.getByRole('button', { name: 'Removing…' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(screen.getByLabelText('Role for ana@example.org')).toBeDisabled();
@@ -106,7 +127,7 @@ describe('Console action feedback and recovery', () => {
     const confirmation = screen.getByRole('group', { name: 'Remove dee@example.org' });
     expect(confirmation).toBeInTheDocument();
     expect(within(confirmation.closest('li')).getByRole('alert')).toHaveTextContent('The team changed.');
-    expect(screen.getByRole('button', { name: 'Yes, remove' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeEnabled();
     expect(callsTo('removeMember')).toHaveLength(1);
   });
 
@@ -116,7 +137,7 @@ describe('Console action feedback and recovery', () => {
       removeMember: () => { removed = true; return { removed: true }; } });
     renderPage(<Team />, TEAM_PATH);
     fireEvent.click(await screen.findByRole('button', { name: 'Remove dee@example.org' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     const result = (await screen.findByText('dee@example.org was removed from the team.')).closest('[role="status"]');
     await waitFor(() => expect(result).toHaveFocus());
     expect(result.closest('li')).toBeInTheDocument();
@@ -156,8 +177,9 @@ describe('Console action feedback and recovery', () => {
     expect(await screen.findByText(/The decision is saved, but we could not refresh/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Note to the client')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh request' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Refresh request' })).not.toBeInTheDocument());
+    const feedback = screen.getByText(/The decision is saved, but we could not refresh/).closest('[role="status"]');
+    fireEvent.click(within(feedback).getByRole('button', { name: 'Refresh request' }));
+    await waitFor(() => expect(screen.queryByText(/The decision is saved, but we could not refresh/)).not.toBeInTheDocument());
     expect(screen.getByText('Declined', { selector: '.tag' })).toBeInTheDocument();
     expect(callsTo('declineApplication')).toHaveLength(1);
     expect(reads).toBe(3);
@@ -168,21 +190,21 @@ describe('Console action feedback and recovery', () => {
     serveApi({ getApplicationForReview: reviewData(), deleteSpamApplication: () => remove.promise });
     reviewPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Delete as spam' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
     await act(async () => remove.reject(new Error('The request could not be deleted.')));
     expect(await screen.findByRole('alert')).toHaveTextContent('The request could not be deleted.');
     expect(screen.getByRole('group', { name: 'Delete as spam' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Yes, delete' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
   });
 
   it('keeps a failed link revocation beside the link and leaves its confirmation open', async () => {
     const revoke = deferred();
     serveApi({ listSignupLinks: { links: [LINK] }, revokeSignupLink: () => revoke.promise });
     renderPage(<SignupLinks />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, revoke' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Revoke link for Community newsroom' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     await act(async () => revoke.reject(new Error('This link could not be revoked.')));
     expect(await screen.findByRole('alert')).toHaveTextContent('This link could not be revoked.');
@@ -197,12 +219,13 @@ describe('Console action feedback and recovery', () => {
       return { links: [{ ...LINK, status: reads > 2 ? 'revoked' : 'open' }] };
     }, revokeSignupLink: {} });
     renderPage(<SignupLinks />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, revoke' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Revoke link for Community newsroom' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
     expect(await screen.findByText(/The link is revoked, but/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Revoke' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh links' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Refresh links' })).not.toBeInTheDocument());
+    const feedback = screen.getByText(/The link is revoked, but/).closest('[role="status"]');
+    fireEvent.click(within(feedback).getByRole('button', { name: 'Refresh links' }));
+    await waitFor(() => expect(screen.queryByText(/The link is revoked, but/)).not.toBeInTheDocument());
     expect(callsTo('revokeSignupLink')).toHaveLength(1);
   });
 
@@ -211,7 +234,7 @@ describe('Console action feedback and recovery', () => {
     serveApi({ disconnectAccount: () => disconnect.promise });
     renderSetup('tickets');
     fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, disconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     await act(async () => disconnect.reject(new Error('Account access could not be removed.')));
     expect(await screen.findByRole('alert')).toHaveTextContent('Account access could not be removed.');
@@ -235,8 +258,8 @@ describe('Console action feedback and recovery', () => {
     const send = deferred();
     const auth = fakeAuth({ user: { uid: 'owner', email: 'owner@example.test', emailVerified: false }, sendEmailLink: vi.fn(() => send.promise) });
     renderPage(<AppRoutes />, { auth });
-    fireEvent.click(screen.getByRole('button', { name: 'Email me a link' }));
-    const sending = screen.getByRole('button', { name: 'Sending link…' });
+    fireEvent.click(screen.getByRole('button', { name: 'Send link' }));
+    const sending = screen.getByRole('button', { name: 'Sending…' });
     expect(sending).toBeDisabled();
     fireEvent.click(sending);
     expect(auth.sendEmailLink).toHaveBeenCalledTimes(1);

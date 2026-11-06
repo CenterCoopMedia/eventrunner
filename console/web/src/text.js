@@ -26,7 +26,7 @@ export function cleanOrganizationName(value) {
 export const ORGANIZATION_NAME_ERROR = 'Enter a name of 2 to 100 characters.';
 
 /** How a new event site starts, for a reader looking for a way to start one. */
-export const SIGNUP_LINK_HELP = 'Event sites start from a signup link, which you get once your invoice is paid. If you already have one, open it again.';
+export const SIGNUP_LINK_HELP = 'Open your signup link to start an event site, or contact the hosting team for one.';
 
 /** A date for people, for example "10 November 2026". */
 export function formatDate(iso) {

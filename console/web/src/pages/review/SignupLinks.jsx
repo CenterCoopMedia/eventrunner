@@ -6,6 +6,7 @@ import { LINK_STATUS_LABELS, formatDateTime } from '../../reviewText.js';
 import { ORGANIZATION_NAME_ERROR, cleanOrganizationName, formatDate } from '../../text.js';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
 import LoadingState from '../../LoadingState.jsx';
+import IconControl from '../../IconControl.jsx';
 
 /** The new link. The server gives it once, so it lives only in this page's memory. */
 function NewLink({ created }) {
@@ -26,15 +27,15 @@ function NewLink({ created }) {
   return (
     <section className="note stack" aria-labelledby="new-link-title">
       <p className="note-title" id="new-link-title" tabIndex={-1} ref={title}>The link for {created.link.organizationName}</p>
-      <p>Copy it now and send it to the client. We will not show it again. It works once and expires on {formatDate(created.link.expiresAt)}.</p>
+      <p>Save this link before leaving. It works once and expires on {formatDate(created.link.expiresAt)}.</p>
       <div className="field">
         <label htmlFor="new-link-url">Signup link</label>
-        <input id="new-link-url" type="text" readOnly value={created.url} onFocus={(e) => e.target.select()} />
+        <output id="new-link-url" className="break">{created.url}</output>
       </div>
-      <div><button type="button" className="button primary" onClick={copy}>Copy</button></div>
+      <div><IconControl icon="copy" label="Copy signup link" onClick={copy} /></div>
       <p role="status">
         {copied === true ? 'Copied.' : null}
-        {copied === false ? 'We could not copy the link. Select it and copy it yourself.' : null}
+        {copied === false ? 'The link was not copied. Select the link and copy it.' : null}
       </p>
     </section>
   );
@@ -46,7 +47,7 @@ function Revoke({ name, onRevoke, disabled }) {
   const [busy, setBusy] = useState(false);
   const button = useRef(null);
   if (!asking) {
-    return <button type="button" className="button danger" ref={button} disabled={disabled} title={`Revoke the link for ${name}`} onClick={() => setAsking(true)}>Revoke</button>;
+    return <IconControl icon="disconnect" label={`Revoke link for ${name}`} className="danger" ref={button} disabled={disabled} onClick={() => setAsking(true)} />;
   }
   return (
     <div className="confirm" role="group" aria-label={`Revoke the link for ${name}`}>
@@ -57,7 +58,7 @@ function Revoke({ name, onRevoke, disabled }) {
           setBusy(true);
           try { if (await onRevoke()) setAsking(false); } finally { setBusy(false); }
         }}>
-        {busy ? 'Revoking…' : 'Yes, revoke'}
+        {busy ? 'Revoking…' : 'Revoke'}
       </button>
       <button type="button" className="button" autoFocus disabled={busy || disabled} onClick={() => { setAsking(false); setTimeout(() => button.current?.focus(), 0); }}>
         Cancel
@@ -78,6 +79,7 @@ export default function SignupLinks() {
   const [pending, setPending] = useState('');
   const [results, setResults] = useState({});
   const [refreshing, setRefreshing] = useState('');
+  const [loading, setLoading] = useState(false);
   const fieldRef = useRef(null);
   const resultRefs = useRef({});
 
@@ -86,6 +88,7 @@ export default function SignupLinks() {
   }, [fieldError, busy]);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       setLinks((await callApi('listSignupLinks', {})).links);
       setLoadError(null);
@@ -93,6 +96,8 @@ export default function SignupLinks() {
     } catch (err) {
       setLoadError(err);
       return err.message;
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -157,31 +162,32 @@ export default function SignupLinks() {
   return (
     <section aria-labelledby="links-title">
       <p className="folio">Hosting team</p>
-      <h1 id="links-title" tabIndex={-1}>Signup links</h1>
-      <p>Create a link once the client's invoice is paid. The client signs in, enters their details and accepts the agreement, and the build starts. Anyone who holds the link can use it, once, for 30 days.</p>
+      <div className="directory-heading">
+        <h1 id="links-title" tabIndex={-1}>Signup links</h1>
+        <IconControl icon="refresh" label="Refresh links" disabled={busy || Boolean(pending) || loading} onClick={load} />
+      </div>
+      <p>Create a signup link after the client's invoice is paid. Each link can be used once within 30 days. Anyone with the link can use it.</p>
 
       <form noValidate onSubmit={onSubmit} className="stack section">
         <div className="field">
           <label htmlFor="link-org-name">Organization name</label>
-          <p id="link-org-name-hint" className="hint">The client can change it when they open the link.</p>
           <input
             id="link-org-name"
             ref={fieldRef}
             type="text"
             autoComplete="off"
-            maxLength={120}
+            maxLength={100}
             value={name}
             disabled={busy}
             onChange={(e) => setName(e.target.value)}
             aria-invalid={fieldError ? 'true' : undefined}
-            aria-describedby={['link-org-name-hint', fieldError ? 'link-org-name-error' : null].filter(Boolean).join(' ')}
+            aria-describedby={fieldError ? 'link-org-name-error' : undefined}
           />
           {fieldError ? <p id="link-org-name-error" className="field-error">{fieldError}</p> : null}
         </div>
-        <div><button type="submit" className="button primary" disabled={busy || Boolean(pending)}>{busy ? 'Creating link…' : 'Create the link'}</button></div>
+        <div><button type="submit" className="button primary" disabled={busy || Boolean(pending)}>{busy ? 'Creating…' : 'Create link'}</button></div>
         {error ? <ActionFeedback kind="error" revealKey={error.message}>
-          {error.message}
-          {error.code === 'signups-closed' ? <> <Link to="/review/settings">Open the console settings</Link></> : null}
+          {error.code === 'signups-closed' ? <>Sign-ups are closed. <Link to="/review/settings">Save hosting settings and an agreement</Link> to open them.</> : error.message}
         </ActionFeedback> : null}
       </form>
 
@@ -189,16 +195,16 @@ export default function SignupLinks() {
 
       <h2 id="links-list-title" tabIndex={-1} className="section">Links</h2>
       {loadError && !Object.values(results).some((result) => result?.refreshError) ? <ActionFeedback kind="error">
-        <p>{loadError.message}</p><button type="button" className="button" onClick={load}>Refresh links</button>
+        <p>{loadError.message}</p>
       </ActionFeedback> : null}
       {!links && !loadError ? <LoadingState>Loading the links.</LoadingState> : null}
-      {links && links.length === 0 ? <p>No links yet.</p> : null}
+      {links && links.length === 0 ? <div className="directory-empty"><p>Create a signup link to invite your first client.</p><button type="button" className="button" onClick={() => fieldRef.current?.focus()}>Invite a client</button></div> : null}
       {links && links.length > 0 ? (
         <ul className="cards" aria-labelledby="links-list-title">
           {links.map((link) => (
             <li key={link.id} className="card console-feedback-row" aria-label={link.organizationName}>
               <span className="card-title">{link.organizationName}</span>
-              <span className="tag">{LINK_STATUS_LABELS[link.status] || link.status}</span>
+              <span className="tag">{LINK_STATUS_LABELS[link.status] || 'Unavailable'}</span>
               <span className="muted">Created {formatDate(link.createdAt)}</span>
               {link.status === 'open' ? <span className="muted">Expires {formatDate(link.expiresAt)}</span> : null}
               {link.status === 'used' ? <span className="muted break">Used by {link.usedEmail}, {formatDateTime(link.usedAt)}</span> : null}
