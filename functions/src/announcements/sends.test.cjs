@@ -223,7 +223,7 @@ function makeConfig(db, providers = { email: { provider: 'console', messageStrea
         ...event,
         name: 'Example Event',
         sender: { email: 'events@example.org', name: 'Example Event', replyTo: 'help@example.org' },
-        legal: { postalAddressHtml: '1 Example Street' },
+        legal: { postalAddressHtml: '1 Example Street', ...event.legal },
       },
       tierA: { publicUrl: SITE },
       providers,
@@ -334,6 +334,51 @@ function unsubscribeQuery(message) {
 
 for (const backend of backends) {
   const t = (name, fn) => test(`[${backend.name}] ${name}`, fn);
+
+  t('announcements refuse a missing mailing address at preview, test send and new send', async () => {
+    for (const postalAddressHtml of ['', '[Replace] Operator postal address for the email footer.']) {
+      const h = await harness({ backend });
+      const preview = await call(h.preview, { body: { draft: DRAFT, audience: 'registered' } });
+      assert.equal(preview.body.canSend, true);
+      await h.db.collection('config').doc('event').set({ legal: { postalAddressHtml } });
+      const blockedPreview = await call(h.preview, { body: { draft: DRAFT, audience: 'registered' } });
+      const message = 'Add your mailing address before sending announcements. Contact us to set it.';
+      assert.equal(blockedPreview.body.canSend, false);
+      assert.equal(blockedPreview.body.receipt, null);
+      assert.equal(blockedPreview.body.blocker, message);
+      for (const result of [
+        await call(h.testSend, { body: { draft: DRAFT } }),
+        await call(h.send, { body: {
+          draft: DRAFT, audience: 'registered', sendId: preview.body.sendId, receipt: preview.body.receipt,
+        } }),
+      ]) {
+        assert.equal(result.status, 409);
+        assert.equal(result.body.error.message, message);
+      }
+      assert.equal(h.mail.length, 0);
+      assert.equal(h.batches(), 0);
+      assert.deepEqual(await docsOf(h.db, 'announcement_sends'), []);
+      assert.deepEqual(await docsOf(h.db, 'sent_emails'), []);
+      assert.deepEqual(await docsOf(h.db, 'email_claims'), []);
+    }
+  });
+
+  t('a continued announcement send stops before another chunk when the mailing address is removed', async () => {
+    const people = Array.from({ length: sendsInternals.CHUNK_SIZE + 1 }, (_, n) => ({
+      uid: `p${n}`, email: `person${n}@example.org`, registrationStatus: 'approved', speakerId: null,
+    }));
+    const h = await harness({ backend, seedOptions: { people } });
+    const { preview, sent } = await previewAndSend(h, { audience: 'approved' });
+    assert.equal(sent.body.send.status, 'sending');
+    const claimsBefore = await docsOf(h.db, 'email_claims');
+    await h.db.collection('config').doc('event').set({ legal: { postalAddressHtml: '' } });
+    const blocked = await call(h.send, { body: { sendId: preview.body.sendId } });
+    assert.equal(blocked.status, 409);
+    assert.equal(blocked.body.error.message, 'Add your mailing address before sending announcements. Contact us to set it.');
+    assert.equal(h.mail.length, sendsInternals.CHUNK_SIZE);
+    assert.equal(h.batches(), 1);
+    assert.deepEqual(await docsOf(h.db, 'email_claims'), claimsBefore);
+  });
 
   // --- Tiers -----------------------------------------------------------------
 

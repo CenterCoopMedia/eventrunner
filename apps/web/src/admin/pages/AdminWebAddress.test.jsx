@@ -1,6 +1,6 @@
 // AdminWebAddress: the custom web address, an optional upgrade (ADR 0007 §8).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 const callMock = vi.fn();
@@ -27,7 +27,7 @@ describe('AdminWebAddress', () => {
     callMock.mockRejectedValueOnce(new Error('Address status could not be loaded.')).mockResolvedValueOnce(NONE);
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
-    expect(await screen.findByLabelText('Your domain')).toBeInTheDocument();
+    expect(await screen.findByText(NONE.currentAddress)).toBeInTheDocument();
     expect(callMock).toHaveBeenCalledTimes(2);
   });
 
@@ -40,27 +40,25 @@ describe('AdminWebAddress', () => {
     expect(outcome.closest('section')).toContainElement(screen.getByRole('button', { name: 'Check now' }));
   });
 
-  it('says the site already works at its address and the upgrade is optional', async () => {
+  it('shows the current address and directs domain setup to the team', async () => {
     callMock.mockResolvedValueOnce(NONE);
     renderPage();
     expect(await screen.findByText('https://example-event.eventrunner.org')).toBeInTheDocument();
-    expect(screen.getByText(/optional/i)).toBeInTheDocument();
+    expect(screen.getByText("Want to use your own domain? Contact us and we'll set it up.")).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /add|remove/i })).toBeNull();
     expect(callMock).toHaveBeenCalledWith('webAddress', { action: 'status' });
   });
 
-  it('adds a domain and shows each record to add in plain words', async () => {
-    callMock.mockResolvedValueOnce(NONE).mockResolvedValueOnce(WAITING);
+  it('shows an existing connection as read-only and keeps the check action', async () => {
+    callMock.mockResolvedValueOnce(WAITING);
     renderPage();
-    fireEvent.change(await screen.findByLabelText('Your domain'), { target: { value: 'summit.example.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add this address' }));
-    const table = await screen.findByRole('table', { name: 'Records to add at your domain provider' });
-    expect(within(table).getAllByRole('row')).toHaveLength(4);
-    expect(within(table).getByText('199.36.158.100')).toBeInTheDocument();
-    // A conflicting record Hosting wants gone is marked Remove.
-    const removal = within(table).getByText('10.0.0.2').closest('tr');
-    expect(within(removal).getByText('Remove')).toBeInTheDocument();
-    expect(callMock).toHaveBeenLastCalledWith('webAddress', { action: 'add', domain: 'summit.example.org' });
+    expect(await screen.findByText('summit.example.org')).toBeInTheDocument();
+    expect(screen.getByText('Waiting for the records')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: /add|remove/i })).toBeNull();
     expect(screen.getByRole('button', { name: 'Check now' })).toBeInTheDocument();
+    expect(callMock).toHaveBeenCalledTimes(1);
   });
 
   it('checks now and says what is left when the domain is live', async () => {
@@ -71,21 +69,20 @@ describe('AdminWebAddress', () => {
     expect(callMock).toHaveBeenLastCalledWith('webAddress', { action: 'check' });
   });
 
-  it('shows a refusal in the server’s words and keeps the typed domain', async () => {
-    callMock.mockResolvedValueOnce(NONE).mockRejectedValueOnce(new Error('Enter a domain such as summit.example.org, with no https:// and no path.'));
+  it('shows a failed check in the server’s words and keeps the connection status', async () => {
+    callMock.mockResolvedValueOnce(WAITING).mockRejectedValueOnce(new Error('The web address service did not answer. Try again in a few minutes.'));
     renderPage();
-    fireEvent.change(await screen.findByLabelText('Your domain'), { target: { value: 'https://summit.example.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add this address' }));
-    expect(await screen.findByText(/with no https:\/\/ and no path/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Your domain')).toHaveValue('https://summit.example.org');
+    fireEvent.click(await screen.findByRole('button', { name: 'Check now' }));
+    expect(await screen.findByText('The web address service did not answer. Try again in a few minutes.')).toBeInTheDocument();
+    expect(screen.getByText('summit.example.org')).toBeInTheDocument();
+    expect(callMock).toHaveBeenLastCalledWith('webAddress', { action: 'check' });
   });
 
-  it('removes the address after a confirmation', async () => {
-    callMock.mockResolvedValueOnce(WAITING).mockResolvedValueOnce(NONE);
+  it('shows the status of a domain already in use without setup controls', async () => {
+    callMock.mockResolvedValueOnce({ ...WAITING, currentAddress: 'https://summit.example.org', state: 'done', records: [] });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Remove this address' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove address' }));
-    expect(await screen.findByLabelText('Your domain')).toBeInTheDocument();
-    expect(callMock).toHaveBeenLastCalledWith('webAddress', { action: 'remove' });
+    expect(await screen.findByText('In use')).toBeInTheDocument();
+    expect(screen.getByText('https://summit.example.org')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add|remove|check/i })).toBeNull();
   });
 });

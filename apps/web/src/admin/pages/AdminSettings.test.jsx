@@ -278,12 +278,13 @@ describe('event settings', () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
 
-    // The sender is the operator's: readable, not editable, and said so.
-    for (const label of ['Sender email', 'Sender name', 'Reply-to']) {
+    // Staff can read the sender details. The from address is text for every role.
+    for (const label of ['Sender name', 'Reply-to']) {
       expect(screen.getByLabelText(label)).toHaveAttribute('readonly');
     }
-    expect(screen.getByLabelText('Sender email')).toHaveValue('summit@example.org');
-    expect(screen.getByText('The From address every transactional email uses. You can read it here. An operator changes it.')).toBeInTheDocument();
+    expect(screen.getByText('summit@example.org')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Sender email' })).toBeNull();
+    expect(screen.getByText('To send from a different address, contact us.')).toBeInTheDocument();
 
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.change(screen.getByLabelText('Event name'), {
@@ -301,16 +302,19 @@ describe('event settings', () => {
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
   }, 20000);
 
-  it('lets an operator edit the sender, and sends it', async () => {
+  it('shows the from address as text and lets an operator edit only the sender name and reply-to', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
-    expect(screen.getByLabelText('Sender email')).not.toHaveAttribute('readonly');
-    expect(screen.queryByText(/You can read it here/)).toBeNull();
+    expect(screen.getByText('summit@example.org')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Sender email' })).toBeNull();
+    expect(screen.getByText('To send from a different address, contact us.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Sender name')).not.toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Reply-to')).not.toHaveAttribute('readonly');
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.change(screen.getByLabelText('Sender name'), { target: { value: 'The Summit desk' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.sender).toEqual({ email: 'summit@example.org', name: 'The Summit desk', replyTo: null });
+    expect(bodyOf(0).event.sender).toEqual({ name: 'The Summit desk', replyTo: null });
   }, 20000);
 
   // The event's concurrent tracks (design brief §4.6): a letter and a name,
@@ -795,16 +799,16 @@ describe('event settings', () => {
       errorResponse(
         400,
         'bad-request',
-        'timezone: must be a valid IANA timezone (got "Mars/Olympus"); sender.email: must be an email address',
+        'timezone: must be a valid IANA timezone (got "Mars/Olympus"); sender.replyTo: must be null or an email address',
       ),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Timezone: must be a valid IANA timezone (got "Mars/Olympus")');
-    expect(alert).toHaveTextContent('Email: must be an email address');
+    expect(alert).toHaveTextContent('Reply to: must be null or an email address');
     expect(screen.getByRole('combobox', { name: 'Time zone' })).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Sender email')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Reply-to')).toHaveAttribute('aria-invalid', 'true');
   });
 
   // THE REGISTRATION ACTION (M7 issue 8). Two fields drive one control the

@@ -5,11 +5,11 @@
  * slice P9a). Operator tier, POST `{ action }`:
  *
  *   status          → the stored address and its state
- *   add { domain }  → ask Firebase Hosting for the domain; answer the records to add
+ *   add { domain }  → refused; the team sets up domains
  *   check           → read Hosting's state now ("Check now")
- *   remove          → ask Hosting to drop the domain; forget it
+ *   remove          → refused; the team removes domains
  *
- * STATES. `none` → `records` (the client adds the records; checks run) →
+ * STATES. `none` → `records` (the team adds the records; checks run) →
  * `switch` (Hosting serves the domain with a certificate, and the domain is
  * an authorized sign-in domain; the site's public address still has to
  * change by a deploy) → `done` (EVENT_PUBLIC_URL is the domain).
@@ -27,7 +27,6 @@
 const { requireAdmin } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError, methodNotAllowed } = require('../core/errors.cjs');
-const { logAdminAction } = require('../cms/store.cjs');
 
 const COLLECTION = 'web_address';
 const DOC = 'current';
@@ -117,30 +116,14 @@ async function runWebAddressCheck({ db, hosting, identity, env = process.env, no
   return { checked: true };
 }
 
-async function act({ db, hosting, identity, env, now, body, actor, log }) {
+async function act({ db, hosting, identity, env, now, body, log }) {
   const ref = db.collection(COLLECTION).doc(DOC);
   const snap = await ref.get();
   const record = snap.exists ? snap.data() : null;
-  const audit = (action, details) => logAdminAction({ db, action: `webAddress.${action}`, docPath: `${COLLECTION}/${DOC}`, actor, now, details, log });
 
   if (body.action === 'status') return view(record, env);
-  if (body.action === 'add') {
-    const domain = normalizeDomain(body.domain);
-    if (!domain) fail(400, 'bad-request', 'Enter a domain such as summit.example.org, with no https:// and no path.');
-    if (record) fail(409, 'conflict', `The site already has ${record.domain} on the way. Remove it first to use another domain.`);
-    let added;
-    try { added = await hosting.addDomain(domain); } catch (err) {
-      log.error('webAddress: hosting refused the domain', { name: err?.name || 'Error' });
-      fail(503, 'unavailable', UNAVAILABLE);
-    }
-    const at = now();
-    const next = { domain, state: WAITING, records: added.records, requestedBy: actor.email, createdAt: at, updatedAt: at, lastCheckedAt: null };
-    await ref.set(next);
-    await audit('add', { domain });
-    return view(next, env);
-  }
   if (body.action === 'check') {
-    if (!record) fail(409, 'conflict', 'Add a domain first.');
+    if (!record) fail(409, 'conflict', 'Contact us to set up your domain first.');
     try {
       return view(await checkRecord({ db, hosting, identity, env, now, record }), env);
     } catch (err) {
@@ -148,32 +131,26 @@ async function act({ db, hosting, identity, env, now, body, actor, log }) {
       fail(503, 'unavailable', UNAVAILABLE);
     }
   }
-  if (body.action === 'remove') {
-    if (!record) return view(null, env);
-    try { await hosting.removeDomain(record.domain); } catch (err) {
-      log.error('webAddress: hosting did not remove the domain', { name: err?.name || 'Error' });
-      fail(503, 'unavailable', UNAVAILABLE);
-    }
-    await ref.delete();
-    await audit('remove', { domain: record.domain });
-    return view(null, env);
-  }
-  return fail(400, 'bad-request', 'Choose status, add, check or remove.');
+  return fail(400, 'bad-request', 'Choose status or check.');
 }
 
 function createWebAddressHandler({ db, auth, getConfig, hosting, identity, env = process.env, now = () => new Date(), log = console }) {
   return async function webAddress(req, res) {
     res.set('Cache-Control', 'private, no-store');
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'operator' });
-    if (!verdict.ok) return sendError(res, verdict.status, verdict.code, verdict.message);
     const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const setupAction = body.action === 'add' || body.action === 'remove';
+    const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: setupAction ? 'staff' : 'operator' });
+    if (!verdict.ok) return sendError(res, verdict.status, verdict.code, verdict.message);
+    if (setupAction) {
+      return sendError(res, 403, 'forbidden', 'To add or remove a custom domain, contact us.');
+    }
     try {
       if (body.action !== 'status') {
         const policy = await checkDemoWrites({ db });
         if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
       }
-      return res.status(200).json(await act({ db, hosting, identity, env, now, body, actor: { uid: verdict.uid, email: verdict.email }, log }));
+      return res.status(200).json(await act({ db, hosting, identity, env, now, body, log }));
     } catch (err) {
       if (err instanceof WebAddressError) return sendError(res, err.status, err.code, err.message);
       log.error('webAddress failed', { name: err?.name || 'Error' });
