@@ -29,6 +29,7 @@
 
 const { VENUE_MAP_SECTION_ID } = require('shared/venue');
 const { SEED_WHEN_PLACEHOLDER } = require('shared/seed');
+const { builtInSectionBlockTypes } = require('shared/page');
 const { buildLegalContent } = require('./legal.cjs');
 const { getDefaultTemplate } = require('../../functions/src/email/templates.cjs');
 
@@ -488,7 +489,13 @@ function defaultPages() {
           ['list_item', 'richtext'], 20),
       ],
     },
-  ];
+  ].map((page) => ({
+    ...page,
+    sections: page.sections.map((entry) => ({
+      ...entry,
+      allowedBlocks: [...(builtInSectionBlockTypes(page, entry) ?? [])],
+    })),
+  }));
 }
 
 /** Page ids seeded from the §5.5 legal templates rather than placeholders. */

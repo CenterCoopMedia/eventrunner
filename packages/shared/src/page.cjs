@@ -10,6 +10,27 @@
 
 const { SYSTEM_PAGE_ROUTES } = require('./routing.cjs');
 
+// These sections have dedicated renderers in Home, InfoCards, and
+// FooterLinkGroups. Other sections use SectionBlocks and accept every type.
+const HOME_SECTION_BLOCK_TYPES = Object.freeze({
+  hero: Object.freeze(['text', 'cta', 'image']),
+  info: Object.freeze(['fact', 'stat', 'list_item']),
+  sponsors: Object.freeze(['text']),
+  footer: Object.freeze(['link_group']),
+});
+
+function builtInSectionBlockTypes(page, section) {
+  if (page?.id !== 'home' || page.systemPage !== true) return null;
+  return Object.hasOwn(HOME_SECTION_BLOCK_TYPES, section?.id)
+    ? HOME_SECTION_BLOCK_TYPES[section.id]
+    : null;
+}
+
+/** Empty allowedBlocks means all types for sections with a generic renderer. */
+function sectionBlockTypes(page, section, allTypes) {
+  return builtInSectionBlockTypes(page, section) ?? allTypes;
+}
+
 /** @param {unknown} v @returns {boolean} */
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
@@ -109,6 +130,8 @@ function isPublicPage(page, features) {
 }
 
 module.exports = {
+  builtInSectionBlockTypes,
+  sectionBlockTypes,
   pageHeading,
   pageFeatureGate,
   isPublicPage,

@@ -229,7 +229,7 @@ A sponsor or partner can keep its own profile current. You give one account acce
 
 ## Content (Pages → Content editor)
 
-Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All eleven block types are editable here.
+Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections and default blocks — is set in the page editor above; this tree of screens is for the block *content*. Every block type is available in a custom section. Home’s Hero, Key facts, Sponsors, and Footer links sections offer only the types their built-in layouts can show. These rules apply automatically; editors do not select an allowed-types list.
 
 **Home hero image.** Open **Home → Hero**. If there is no image block, the **Hero image** slot lets you choose an image and add the required alt text. Save the image draft, or save and publish it. The image then appears in the block list for normal editing. Hero holds at most four blocks. If all four places are in use, remove a block before adding the picture. **Settings → Branding → Identity → Homepage hero image** edits the same image.
 
@@ -867,7 +867,7 @@ Sent messages are closed to every browser, admins included. The page reads them 
 
 Requests for a change to the site, from signed-in visitors and from staff. Both kinds arrive in one list, newest first. Staff and operators can open it.
 
-- **The feature is off by default.** An operator turns on `changeRequests` in Settings → Features. While it is off, the footer has no **Request a change** button, this page has no form, and the server refuses every request. The list, the status changes, and **Remove** still work, so you can clear the list after the feature is off.
+- **Change requests are on for new sites.** An operator can switch them on or off at the top of the Change requests page. Existing sites keep their saved setting. While it is off, the footer has no **Request a change** button, this page has no form, and the server refuses every request. The list, the status changes, and **Remove** still work, so you can clear the list after the feature is off.
 - **Only a signed-in visitor can send one.** The footer shows **Request a change** only to a visitor who is signed in, and the server refuses a request from an address that is not verified. The request is stored with the sender's sign-in address. One account can send 5 requests in 15 minutes. The server refuses more, and the refusal says how many minutes to wait.
 - **Send one yourself** from the **Request a change** panel at the top of the page. It goes through the same server checks and the same limit.
 - **Show** picks the requests the list shows: **Open** (new and in progress, the default), **All**, **New**, **In progress**, **Done**, or **Declined**. The choice stays in the page address.
@@ -1091,13 +1091,15 @@ The questions are stored in `config/registration_form`, which anyone can read, b
 
 Feature flags, wired to a **whole-document replace** — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form's key list comes from the same shared schema the server validates against.
 
-`changeRequests` turns on the change request form in the footer and on the Change requests page. It is off by default. See [Change requests](#change-requests).
+New sites start with attendee badges, custom badges, live updates, and change requests on. These features need no provider setup. Explicit setup choices and stored settings on existing sites stay unchanged. Written updates keep their existing default.
+
+Operators can also switch a feature on or off where they use it: Badges, Live updates, Change requests, and the Written updates list and editor. Each switch saves immediately. Staff see the current state but cannot change it. See [Change requests](#change-requests).
 
 ## Settings → Badges
 
 The badge catalog: Categories, each with a max-picks cap and its list of badges, which attendees self-select from on their profile. Also a whole-document replace: editing one badge sends the complete set of categories back and preserves the configured custom-badge block list.
 
-**Custom badges.** The separate feature is off by default. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; `config/badges.customBadgeBlockList` adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.
+**Custom badges.** This feature is on for new sites. An operator can switch it on or off on the Badges page. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; `config/badges.customBadgeBlockList` adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.
 
 **Remove a custom badge.** In Attendees, select the removal action beside the badge and confirm. The result stays on the page and an `admin_logs` entry records the action. Turning the feature off removes custom badges from the public projection; attendees can still edit their other profile fields.
 

@@ -1,1 +1,1 @@
-export { pageHeading, pageFeatureGate, isPublicPage } from './page.cjs';
+export { pageHeading, pageFeatureGate, isPublicPage, builtInSectionBlockTypes, sectionBlockTypes } from './page.cjs';

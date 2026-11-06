@@ -134,19 +134,19 @@ export function TextField({
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex min-w-0 flex-col gap-3xs">
-      <label htmlFor={id} className={fieldLabelClass}>
+    <div className="admin-field flex min-w-0 flex-col gap-3xs">
+      <label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className={fieldHintClass}>
+        <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
         </p>
       ) : null}
       <input
         id={id}
         type={type}
-        className={`${inputClass} ${className}`}
+        className={`${inputClass} admin-field__control ${className}`}
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? 'true' : undefined}
@@ -159,16 +159,20 @@ export function TextField({
           region that is on the page before it: a region added together with
           its text is not announced. A caller that may warn passes a string,
           empty while there is nothing to say; undefined draws no region. */}
-      {warning !== undefined ? (
-        <div aria-live="polite">
-          {warning ? (
-            <p id={warningId} className="text-admin-sm font-medium text-admin-state-caution">
-              {warning}
-            </p>
+      {warning !== undefined || error ? (
+        <div className="admin-field__feedback">
+          {warning !== undefined ? (
+            <div aria-live="polite">
+              {warning ? (
+                <p id={warningId} className="text-admin-sm font-medium text-admin-state-caution">
+                  {warning}
+                </p>
+              ) : null}
+            </div>
           ) : null}
+          {error ? <FieldError id={errorId} message={error} /> : null}
         </div>
       ) : null}
-      {error ? <FieldError id={errorId} message={error} /> : null}
     </div>
   );
 }
@@ -191,26 +195,26 @@ export function TextAreaField({
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex min-w-0 flex-col gap-3xs">
-      <label htmlFor={id} className={fieldLabelClass}>
+    <div className="admin-field flex min-w-0 flex-col gap-3xs">
+      <label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className={fieldHintClass}>
+        <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
         </p>
       ) : null}
       <textarea
         id={id}
         rows={rows}
-        className={`${inputClass} ${className}`}
+        className={`${inputClass} admin-field__control ${className}`}
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy || undefined}
         {...rest}
       />
-      {error ? <FieldError id={errorId} message={error} /> : null}
+      {error ? <div className="admin-field__feedback"><FieldError id={errorId} message={error} /></div> : null}
     </div>
   );
 }
@@ -233,18 +237,18 @@ export function SelectField({
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex min-w-0 flex-col gap-3xs">
-      <label htmlFor={id} className={fieldLabelClass}>
+    <div className="admin-field flex min-w-0 flex-col gap-3xs">
+      <label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
         {label}
       </label>
       {hint ? (
-        <p id={hintId} className={fieldHintClass}>
+        <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
         </p>
       ) : null}
       <select
         id={id}
-        className={`${inputClass} ${className}`}
+        className={`${inputClass} admin-field__control ${className}`}
         value={value ?? ''}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? 'true' : undefined}
@@ -257,7 +261,7 @@ export function SelectField({
           </option>
         ))}
       </select>
-      {error ? <FieldError id={errorId} message={error} /> : null}
+      {error ? <div className="admin-field__feedback"><FieldError id={errorId} message={error} /></div> : null}
     </div>
   );
 }
@@ -364,25 +368,27 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
   const id = useId();
   const hintId = `${id}-hint`;
   return (
-    <div className="flex items-start gap-xs">
-      <input
-        id={id}
-        type="checkbox"
-        className="mt-3xs h-5 w-5 shrink-0 rounded-admin-small border-admin-rule-control bg-admin-ground-input accent-admin-action"
-        checked={Boolean(checked)}
-        onChange={(event) => onChange(event.target.checked)}
-        aria-describedby={hint ? hintId : undefined}
-        {...rest}
-      />
-      <div className="flex flex-col">
-        <label htmlFor={id} className={fieldLabelClass}>
-          {label}
-        </label>
-        {hint ? (
-          <p id={hintId} className={fieldHintClass}>
-            {hint}
-          </p>
-        ) : null}
+    <div className="admin-field-toggle">
+      <div className="flex items-start gap-xs">
+        <input
+          id={id}
+          type="checkbox"
+          className="mt-3xs h-5 w-5 shrink-0 rounded-admin-small border-admin-rule-control bg-admin-ground-input accent-admin-action"
+          checked={Boolean(checked)}
+          onChange={(event) => onChange(event.target.checked)}
+          aria-describedby={hint ? hintId : undefined}
+          {...rest}
+        />
+        <div className="flex flex-col">
+          <label htmlFor={id} className={fieldLabelClass}>
+            {label}
+          </label>
+          {hint ? (
+            <p id={hintId} className={fieldHintClass}>
+              {hint}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );

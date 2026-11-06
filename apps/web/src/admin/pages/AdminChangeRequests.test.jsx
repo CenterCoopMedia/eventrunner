@@ -498,7 +498,7 @@ describe('AdminChangeRequests: the form and the flag', () => {
     pushRows([request('one')]);
     expect(screen.queryByRole('button', { name: 'Send request' })).toBeNull();
     expect(screen.queryByLabelText('What should change?')).toBeNull();
-    expect(screen.getByText('Change requests are off. An operator can turn them on under Features.')).toBeInTheDocument();
+    expect(screen.getByText('Change requests: Off. Only an operator can change this setting.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
     await flush();
