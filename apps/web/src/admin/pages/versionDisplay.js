@@ -9,6 +9,11 @@ const FIELD_LABELS = {
   image: 'Image', imagePath: 'Image', imageAlt: 'Image description', logo: 'Logo',
   logoPath: 'Logo', buttonLabel: 'Button text', buttonHref: 'Button link',
   publishAt: 'Publish time', expiresAt: 'End time', pinned: 'Pinned',
+  text: 'Text', attribution: 'Attribution', benefits: 'Benefits', external: 'Opens another site',
+  focalX: 'Image focus', focalY: 'Image focus', group: 'Group', limit: 'Limit', note: 'Note',
+  price: 'Price', source: 'Source', takeaway: 'Takeaway', tier: 'Tier', category: 'Category',
+  date: 'Date', dayId: 'Day', track: 'Track', slug: 'Page address', recordingUrl: 'Recording link',
+  materialsNotNeeded: 'No materials needed', parentId: 'Parent page', placeId: 'Place',
 };
 
 export function versionFieldLabel(path) {

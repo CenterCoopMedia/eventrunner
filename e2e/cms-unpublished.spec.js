@@ -91,14 +91,14 @@ test.describe.serial('unpublished changes', () => {
     const table = page.getByRole('table', { name: 'Content blocks with unpublished changes, newest first' });
     const rows = table.locator('tbody tr');
     await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText('hero__subtitle');
+    await expect(rows.first()).toContainText(subtitle);
     await expect(rows.first()).toContainText('Live with unpublished changes');
     await expect(page.locator('main table tbody tr')).toHaveCount(1);
 
     // (b) Publish from the page: the count leaves the page and the banner.
     await page.getByRole('button', { name: 'Publish 1 content block' }).click();
     await expect(page.getByRole('heading', { name: 'Nothing is waiting to be published' })).toBeVisible();
-    await expect(page.locator('main').getByText('Published. The public site picks it up live.')).toBeVisible();
+    await expect(page.locator('main').getByText('Published.', { exact: true })).toBeVisible();
     expect((await countRef.get()).data().counts.cmsContent).toBe(0);
     await expect(figure(page)).toHaveCount(0);
     await page.getByRole('link', { name: 'Pages', exact: true }).click();

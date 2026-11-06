@@ -79,7 +79,7 @@ test.describe.serial('Scheduled reminders', () => {
     await expect(page.getByTestId('schedule-state')).toContainText('Scheduled speaker reminders are on.');
     await expect(page.getByText('Approved. Scheduled speaker reminders are on.')).toBeVisible();
     await expect(page.getByTestId('next-run')).toContainText('Next: the 14-day reminder,');
-    await expect(page.getByTestId('next-run')).toContainText('America/New_York');
+    await expect(page.getByTestId('next-run')).toContainText('Eastern');
     await expect(page.getByText(/It would reach \d+ speakers?:/)).toContainText(speakerName);
     await expect(page.getByTestId('last-run')).toHaveText('The schedule has not run yet.');
 
@@ -123,7 +123,7 @@ test.describe.serial('Scheduled reminders', () => {
     await expect(panel.getByText('Approved. Scheduled attendee reminders are on.')).toBeVisible();
     await expect(panel.getByRole('heading', { name: 'Result' })).toBeFocused();
     await expect(page.getByTestId('attendee-next-run')).toContainText('Next: the 7-day reminder,');
-    await expect(page.getByTestId('attendee-next-run')).toContainText('America/New_York');
+    await expect(page.getByTestId('attendee-next-run')).toContainText('Eastern');
     await expect(panel.getByText(/^It would reach \d+ attendees?\./)).toBeVisible();
     await expect(page.getByTestId('attendee-last-run')).toHaveText('The schedule has not run yet.');
 

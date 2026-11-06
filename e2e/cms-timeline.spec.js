@@ -122,7 +122,7 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
 
       // Published from the editor.
       await page.getByRole('button', { name: 'Publish', exact: true }).click();
-      await expect(page.getByText('Published. The public site picks it up live.').first()).toBeVisible();
+      await expect(page.getByText('Published.', { exact: true }).first()).toBeVisible();
       await expect(page.locator('header [data-record-state]')).toHaveText('Live');
 
       // The open page picks it up with no reload: 2023 is the oldest, so it

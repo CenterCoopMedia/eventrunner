@@ -211,7 +211,7 @@ test.describe.serial('the event statistics endpoint', () => {
         await expect(funnel.getByRole('listitem').nth(1)).toHaveText(`Ticketed or approved: ${later} of ${accounts}`);
         await expect(funnel.getByRole('listitem').nth(2)).toHaveText(`Approved: ${approved} of ${accounts}`);
       }
-      const table = page.getByRole('table', { name: /by collection/ });
+      const table = page.getByRole('table', { name: /by content type/ });
       const { content } = response.body;
       for (const [label, id] of [['Pages', 'cmsPages'], ['Sessions', 'cmsSchedule'], ['Timeline', 'cmsTimeline']]) {
         await expect(table.getByRole('row', { name: new RegExp(`^${label} `) }).getByRole('cell'))

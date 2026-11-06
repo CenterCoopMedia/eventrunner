@@ -38,7 +38,8 @@ import {
 import ModalShell from './ModalShell.jsx';
 
 function usageLocation(reference) {
-  const [collection, id] = (reference.docPath ?? '').split('/');
+  const [stored, id] = (reference.docPath ?? '').split('/');
+  const collection = stored?.replace(/_drafts$/, '');
   const locations = {
     cmsPages: ['Page', `/admin/pages/${encodeURIComponent(id ?? '')}`],
     cmsContent: ['Content block', '/admin/content'],

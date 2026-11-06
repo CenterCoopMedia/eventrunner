@@ -153,7 +153,7 @@ test.describe.serial('the updates editor', () => {
     // A date a year ahead never disables the publish action.
     await expect(publish).toBeEnabled();
     await publish.click();
-    await expect(page.getByRole('status').filter({ hasText: 'Published. The public site picks it up live.' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Published.' })).toBeVisible();
     await expect(page.locator('header [data-record-state]')).toHaveText('Live');
 
     const live = await adminDb().collection('cmsUpdates').doc(updateId).get();

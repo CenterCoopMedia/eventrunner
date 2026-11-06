@@ -120,8 +120,8 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/versions?collection=cmsContent');
     await expect(page.getByRole('heading', { level: 1, name: 'Version history' })).toBeVisible();
-    await expect(page.getByRole('combobox', { name: 'Collection' })).toHaveValue('cmsContent');
-    await page.getByRole('searchbox', { name: 'Search by name' }).fill('hero__subtitle');
+    await expect(page.getByRole('combobox', { name: 'Content type' })).toHaveValue('cmsContent');
+    await page.getByRole('searchbox', { name: 'Search by name' }).fill(newSubtitle);
     const records = page.getByRole('region', { name: 'Records' });
     await expect(records.getByRole('link')).toHaveCount(1);
     await records.getByRole('link').click();
@@ -179,7 +179,7 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
       await expect(subtitle).toHaveText(newSubtitle);
 
       await page.getByRole('button', { name: 'Publish now' }).click();
-      await expect(page.getByText('Published. The public site picks it up live.')).toBeVisible();
+      await expect(page.getByText('Published.', { exact: true })).toBeVisible();
 
       await publicPage.reload();
       await expect(liveContent).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
@@ -256,7 +256,7 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
       await page.getByRole('button', { name: 'Publish', exact: true }).click();
       await Promise.all([updateFinished, publishFinished]);
       await expect(page.locator('#admin-content').getByRole('status').filter({
-        hasText: 'Published. The public site picks it up live.',
+        hasText: 'Published.',
       })).toBeVisible();
 
       await publicPage.reload();

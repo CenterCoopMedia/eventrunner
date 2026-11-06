@@ -453,10 +453,10 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
     .join('')}`;
   await page.getByLabel('Main brand colour').fill(populatedBrandColor);
   await expect(page.getByLabel('Main brand colour picker')).toBeVisible();
-  await page.getByLabel('Primary logo').fill(
+  await page.getByRole('textbox', { name: 'Primary logo' }).fill(
     'branding/a-populated-logo-path-with-a-long-unbroken-file-name-for-phone-width.svg',
   );
-  await page.getByLabel('Square icon').fill(
+  await page.getByRole('textbox', { name: 'Square icon' }).fill(
     'branding/a-populated-square-icon-path-with-a-long-unbroken-file-name.png',
   );
   // Each task owns a separate view. Check the populated identity fields as
