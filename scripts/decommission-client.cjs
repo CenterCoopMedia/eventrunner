@@ -55,7 +55,12 @@ async function call(ctx, label, url, { method = 'GET', headers = {}, json, allow
     }
     if (allow.includes(response.status)) return null;
     // Provider bodies can contain tokens or a webhook URL with its password.
-    if (!response.ok) throw Object.assign(new Error(`${label}: HTTP ${response.status}`), { status: response.status });
+    // Only a numeric provider error code is safe to report.
+    if (!response.ok) {
+      let code = null;
+      try { const body = JSON.parse(await response.text()); if (Number.isInteger(body?.ErrorCode)) code = body.ErrorCode; } catch { /* no code */ }
+      throw Object.assign(new Error(`${label}: HTTP ${response.status}${code !== null ? ` (error code ${code})` : ''}`), { status: response.status, code });
+    }
     const text = await response.text();
     try { return text ? JSON.parse(text) : {}; }
     catch { throw new Error(`${label}: invalid JSON answer`); }
@@ -496,8 +501,15 @@ async function mail(ctx) {
         }
         if (((await postmark(ctx, path, {}, token)).Webhooks || []).some(ours)) throw new Error('mail: a webhook remains');
       }
-      await postmark(ctx, `/servers/${encode(r.postmarkServerId)}`, { method: 'DELETE', allow: [404] });
-      if ((await postmarkList(ctx, '/servers', 'Servers')).some((s) => String(s.ID) === String(r.postmarkServerId))) throw new Error('mail: server remains');
+      try {
+        await postmark(ctx, `/servers/${encode(r.postmarkServerId)}`, { method: 'DELETE', allow: [404] });
+        if ((await postmarkList(ctx, '/servers', 'Servers')).some((s) => String(s.ID) === String(r.postmarkServerId))) throw new Error('mail: server remains');
+      } catch (err) {
+        // Postmark refuses API server deletion until its support enables it.
+        // Its webhooks are gone, so continue; verify still lists the server.
+        if (err.status !== 422) throw err;
+        ctx.deps.log.log(`mail: Postmark refused to delete server ${r.postmarkServerId} (${err.message}); delete it in Postmark`);
+      }
     }
   }
   if (r.postmarkDomainId) {
