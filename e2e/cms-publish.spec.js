@@ -156,7 +156,7 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
 
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/versions/cmsContent/hero__subtitle');
-    await expect(page.getByRole('heading', { level: 1, name: 'hero › subtitle' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: newSubtitle })).toBeVisible();
     const versions = page.getByRole('list', { name: 'Versions' });
     const older = versions.getByRole('listitem').filter({
       has: page.getByRole('heading', { level: 2, name: `Version ${oldRevision}` }),
