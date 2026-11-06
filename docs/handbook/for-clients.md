@@ -28,9 +28,13 @@ What v1 does not include is in the [triage record](https://github.com/CenterCoop
 - Whether tickets are Eventbrite, a spreadsheet, or neither
 - A sender address on **your** domain (for login codes). We will ask you to add SPF, DKIM, and a DMARC policy. Without that, emailed codes get quarantined.
 
-## After your site is made
+## Set up your event
 
-Your first operator signs in to the admin panel and opens **Set up your event**. It lists every step before launch, who does it, and where to do it. Some steps are yours, for example a second operator, your logos, and the legal review of the privacy policy and terms. The hosting team does the others.
+Your first operator signs in to the admin panel and opens **Set up your event**. The numbered steps and progress count include your tasks and tasks you share with the Event Runner team. These include a second operator, your logos, event email, and the legal review of the privacy policy and terms.
+
+**Hosting status** is a separate, read-only area. It shows checks managed by the Event Runner team, including Google sign-in, as **Ready** or **Awaiting Event Runner setup**. These checks do not reduce your task completion count. You do not need to turn on Google sign-in yourself.
+
+Finishing your tasks does not mean the site is ready to share. Every setup task and hosting check must be ready first. Use **Check again** to refresh the results. If a check fails, the page warns you that it is showing the last results.
 
 Never send a provider key or password through the site or in a public thread. The hosting team asks for them directly.
 

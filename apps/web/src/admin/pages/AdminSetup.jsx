@@ -1,4 +1,4 @@
-// "Set up your event" (ADR 0007 §7): the launch-readiness rows as a stepper.
+// "Set up your event" (ADR 0007 §7): client tasks and read-only hosting status.
 // One step shows at a time, at its own address (/admin/setup/<slug>), with a
 // list of every step beside it and Back and Next under it. /admin/setup
 // opens the first step that is not done.
@@ -108,7 +108,7 @@ function SetupStep({ steps, index, isOperator, onLegalSaved, headingRef }) {
         <StatusBadge tone={step.ready ? 'ok' : 'caution'}>{step.ready ? 'Done' : 'To do'}</StatusBadge>
         <StatusBadge tone="neutral">{OWNER_WORDS[step.owner] ?? OWNER_WORDS.host}</StatusBadge>
       </div>
-      <p className="max-w-[65ch] text-admin-base text-admin-ink">{step.ready ? step.done : step.todo}</p>
+      <p className="text-admin-base text-admin-ink">{step.ready ? step.done : step.todo}</p>
       {!step.ready && step.link && !showLink ? (
         <p className="text-admin-sm text-admin-ink-secondary">An operator completes this step.</p>
       ) : null}
@@ -161,9 +161,12 @@ export default function AdminSetup() {
     refresh();
   }, [refresh]);
 
-  const steps = checks ? joinSetupSteps(checks) : [];
+  const rows = checks ? joinSetupSteps(checks) : [];
+  const steps = rows.filter((row) => row.owner === 'you' || row.owner === 'both');
+  const hosting = rows.filter((row) => row.owner === 'host');
   const doneCount = steps.filter((step) => step.ready).length;
-  const allDone = checks !== null && steps.length > 0 && doneCount === steps.length;
+  const clientDone = steps.length > 0 && doneCount === steps.length;
+  const allDone = rows.length > 0 && rows.every((row) => row.ready) && !error && !busy;
   const { index: current, unknown } = resolveStep(steps, stepSlug, firstOpenStep(steps));
   const listed = steps.map((step) => ({ ...step, state: step.ready ? 'done' : 'todo' }));
 
@@ -174,7 +177,7 @@ export default function AdminSetup() {
       <AdminPageHeader
         title="Set up your event"
         identifiers={checks ? `${doneCount} of ${steps.length} steps done` : null}
-        description="Complete these steps before you share your site. Some steps are yours. The Event Runner team does the others."
+        description="Complete your setup tasks before you share your site. Hosting status shows the checks managed by the Event Runner team."
         actions={
           <AdminIconControl
             icon="refresh"
@@ -196,7 +199,10 @@ export default function AdminSetup() {
         />
       ) : null}
       {allDone ? (
-        <Notice tone="ok" message="Every step is done. Your site is ready to share." />
+        <Notice tone="ok" message="Every setup task and hosting check is ready. Your site is ready to share." />
+      ) : null}
+      {clientDone && !allDone && !error && !busy ? (
+        <Notice tone="caution" message="Your setup tasks are done. Awaiting Event Runner setup before you share your site." />
       ) : null}
 
       {checks && current !== -1 ? (
@@ -210,6 +216,23 @@ export default function AdminSetup() {
             headingRef={headingRef}
           />
         </div>
+      ) : null}
+      {hosting.length > 0 ? (
+        <section className="admin-panel flex min-w-0 flex-col gap-sm rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md" aria-labelledby="setup-hosting-heading">
+          <h2 id="setup-hosting-heading" className="font-admin-ui text-admin-lg font-bold text-admin-ink">Hosting status</h2>
+          <p className="text-admin-base text-admin-ink-secondary">The Event Runner team manages these checks. No action is needed from you.</p>
+          <ul className="flex flex-col gap-md" aria-label="Hosting checks">
+            {hosting.map((check) => (
+              <li key={check.id} className="flex flex-col gap-xs">
+                <div className="flex flex-wrap items-center gap-xs">
+                  <h3 className="text-admin-base font-semibold text-admin-ink">{check.title}</h3>
+                  <StatusBadge tone={check.ready ? 'ok' : 'caution'}>{check.ready ? 'Ready' : 'Awaiting Event Runner setup'}</StatusBadge>
+                </div>
+                <p className="text-admin-base text-admin-ink">{check.ready ? check.done : check.todo}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
     </div>
   );
