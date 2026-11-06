@@ -187,7 +187,8 @@ function refused(code) {
 async function resolveChannel({ provider, config }) {
   const postalAddress = config?.event?.legal?.postalAddressHtml;
   if (typeof postalAddress !== 'string'
-    || !postalAddress.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;|&#xA0;/gi, ' ').trim()
+    // Visible text between the tags; a check, not a sanitizer.
+    || !postalAddress.split(/<[^>]*>/).some((text) => text.replace(/&nbsp;|&#160;|&#xA0;/gi, ' ').trim())
     || /\[Replace/i.test(postalAddress)) {
     return refused('mailing-address-missing');
   }
