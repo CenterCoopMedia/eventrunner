@@ -385,7 +385,11 @@ describe('FeedbackModal', () => {
     }
   });
 
-  it('returns focus to the control that opened it', () => {
+  it.each(['available', 'removed', 'hidden', 'disabled'])('returns focus to a useful target when the opener is %s', (state) => {
+    const main = document.createElement('main');
+    main.id = 'main-content';
+    main.tabIndex = -1;
+    document.body.append(main);
     const opener = document.createElement('button');
     opener.textContent = 'Share feedback';
     document.body.append(opener);
@@ -396,9 +400,13 @@ describe('FeedbackModal', () => {
     // React removes the dialog on close, and an element removed while it
     // holds focus drops focus to the body. The opener has to be put back.
     expect(opener).not.toHaveFocus();
+    if (state === 'removed') opener.remove();
+    if (state === 'hidden') opener.hidden = true;
+    if (state === 'disabled') opener.disabled = true;
     view.unmount();
-    expect(opener).toHaveFocus();
+    expect(state === 'available' ? opener : main).toHaveFocus();
     opener.remove();
+    main.remove();
   });
 
   it('carries the honeypot field out of the tab order and off-screen', () => {

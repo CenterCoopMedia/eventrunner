@@ -119,9 +119,10 @@ for (const width of [1440, 390, 320]) {
       await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
       await page.keyboard.press('Tab');
       await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
+      if (width === 320) await opener.evaluate((element) => element.remove());
       await page.getByRole('button', { name: 'Close', exact: true }).click();
       await expect(page.getByRole('dialog')).toHaveCount(0);
-      await expect(opener).toBeFocused();
+      await expect(width === 320 ? page.locator('#main-content') : opener).toBeFocused();
       await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
     } finally {
       first.resolve();

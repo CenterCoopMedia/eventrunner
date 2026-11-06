@@ -44,7 +44,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
 import { createSubmissionKey } from '../lib/submissionKey.js';
-import { wrapModalTab } from '../lib/modalFocus.js';
+import { available, wrapModalTab } from '../lib/modalFocus.js';
 import useLoadingStage from '../lib/useLoadingStage.js';
 import { focusFirstError, SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
@@ -116,9 +116,8 @@ export default function FeedbackModal({ onClose }) {
       requestAbortRef.current?.abort();
       if (dialog?.open && typeof dialog.close === 'function') dialog.close();
       document.body.style.overflow = previousOverflow;
-      if (opener && typeof opener.focus === 'function' && opener.isConnected) {
-        opener.focus({ preventScroll: true });
-      }
+      const target = available(opener) ? opener : document.getElementById('main-content');
+      if (available(target)) target.focus({ preventScroll: true });
     };
   }, [opener]);
 
