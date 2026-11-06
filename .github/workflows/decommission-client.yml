@@ -1,0 +1,168 @@
+name: Decommission client
+
+run-name: Decommission ${{ inputs.application_id || 'sites due for deletion' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      application_id:
+        description: The application's id in the client console.
+        required: true
+        type: string
+      mode:
+        description: Archive, restore, cancel a restore, delete immediately, or check resources.
+        required: true
+        type: choice
+        options:
+          - archive
+          - restore
+          - cancel-restore
+          - purge-now
+          - verify
+      confirm_site:
+        description: For purge-now, enter the application's exact site name (for example, nclocal).
+        required: false
+        type: string
+  schedule:
+    - cron: '23 9 * * *'
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  prepare:
+    name: Guard the run and select applications
+    runs-on: ubuntu-latest
+    environment: provisioning
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      applications: ${{ steps.applications.outputs.ids }}
+    steps:
+      - name: Refuse forks and refs outside main
+        env:
+          IS_FORK: ${{ github.event.repository.fork }}
+          RUN_REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          APPLICATION_ID: ${{ inputs.application_id }}
+          MODE: ${{ inputs.mode }}
+          CONFIRM_SITE: ${{ inputs.confirm_site }}
+        run: |
+          if [ "$IS_FORK" = "true" ] || [ "$RUN_REF" != "refs/heads/main" ]; then
+            echo '::error::Site deletion only runs on main in the original repository.' >&2
+            exit 1
+          fi
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if ! printf '%s' "$APPLICATION_ID" | grep -Eq '^[A-Za-z0-9_-]{1,200}$'; then
+              echo '::error::The application id is not valid.' >&2
+              exit 1
+            fi
+            case "$MODE" in
+              archive|restore|cancel-restore|purge-now|verify) ;;
+              *) echo '::error::The mode is not valid.' >&2; exit 1 ;;
+            esac
+            if [ "$MODE" = "purge-now" ] && [ -z "$CONFIRM_SITE" ]; then
+              echo '::error::Immediate deletion requires the exact application site name in confirm_site.' >&2
+              exit 1
+            fi
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Prepare workspace dependencies
+        run: |
+          npm run prepare:functions
+          node scripts/prepare-functions.cjs --copy
+          npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: github.event_name == 'schedule'
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Select applications
+        id: applications
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          APPLICATION_ID: ${{ inputs.application_id }}
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            ids=$(node scripts/decommission-client.cjs --purge-due --list)
+          else
+            ids=$(node -e 'process.stdout.write(JSON.stringify([process.env.APPLICATION_ID]))')
+          fi
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+
+  decommission:
+    name: Decommission ${{ matrix.application_id }}
+    needs: prepare
+    if: needs.prepare.outputs.applications != '[]'
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        application_id: ${{ fromJSON(needs.prepare.outputs.applications) }}
+    # Share the builder's group so deletion and provisioning for the same
+    # application wait for each other, including scheduled deletion.
+    concurrency:
+      group: provision-${{ matrix.application_id }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    environment: provisioning
+    timeout-minutes: 330
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Prepare workspace dependencies
+        run: |
+          npm run prepare:functions
+          node scripts/prepare-functions.cjs --copy
+          npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Decommission the site
+        env:
+          APPLICATION_ID: ${{ matrix.application_id }}
+          MODE: ${{ inputs.mode }}
+          CONFIRM_SITE: ${{ inputs.confirm_site }}
+          EVENT_NAME: ${{ github.event_name }}
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+          CONSOLE_PUBLIC_URL: ${{ vars.CONSOLE_PUBLIC_URL }}
+          CONSOLE_MAIL_FROM: ${{ vars.CONSOLE_MAIL_FROM }}
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          PROVISIONER_APP_ID: ${{ vars.PROVISIONER_APP_ID }}
+          PROVISIONER_INSTALLATION_ID: ${{ vars.PROVISIONER_INSTALLATION_ID }}
+          CONSOLE_POSTMARK_TOKEN: ${{ secrets.CONSOLE_POSTMARK_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          POSTMARK_ACCOUNT_TOKEN: ${{ secrets.POSTMARK_ACCOUNT_TOKEN }}
+          PROVISIONER_APP_PRIVATE_KEY: ${{ secrets.PROVISIONER_APP_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            node scripts/decommission-client.cjs --purge-due --application "$APPLICATION_ID"
+          else
+            case "$MODE" in
+              archive) node scripts/decommission-client.cjs --application "$APPLICATION_ID" --archive ;;
+              restore) node scripts/decommission-client.cjs --application "$APPLICATION_ID" --restore ;;
+              cancel-restore) node scripts/decommission-client.cjs --application "$APPLICATION_ID" --cancel-restore ;;
+              purge-now) node scripts/decommission-client.cjs --application "$APPLICATION_ID" --purge --now --confirm-site "$CONFIRM_SITE" ;;
+              verify) node scripts/decommission-client.cjs --application "$APPLICATION_ID" --verify ;;
+              *) echo '::error::The mode is not valid.' >&2; exit 1 ;;
+            esac
+          fi
