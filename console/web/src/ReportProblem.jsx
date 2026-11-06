@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { callApi } from './api.js';
 import { recentMessages } from './recentMessages.js';
+import IconControl from './IconControl.jsx';
 
 const KINDS = [
   { value: 'bug', label: 'Something is broken' },
@@ -12,6 +13,7 @@ const KINDS = [
 export default function ReportProblem() {
   const dialog = useRef(null);
   const field = useRef(null);
+  const trigger = useRef(null);
   const id = useId();
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState('bug');
@@ -30,6 +32,7 @@ export default function ReportProblem() {
     } else if (!open && node.open) {
       if (typeof node.close === 'function') node.close();
       else node.removeAttribute('open');
+      trigger.current?.focus();
     }
   }, [open]);
 
@@ -67,19 +70,19 @@ export default function ReportProblem() {
   const descriptionError = error?.field === 'description' ? error.message : null;
   return (
     <>
-      <button type="button" className="button quiet" onClick={start}>Report a problem</button>
+      <button type="button" className="button quiet" ref={trigger} onClick={start}>Report a problem</button>
       <dialog ref={dialog} className="report-dialog" aria-labelledby={`${id}-title`} onClose={() => setOpen(false)}>
-        <h2 id={`${id}-title`}>Report a problem</h2>
+        <div className="directory-heading">
+          <h2 id={`${id}-title`}>Report a problem</h2>
+          <IconControl icon="close" label="Close report" onClick={() => setOpen(false)} disabled={busy} />
+        </div>
         {sent ? (
           <>
-            <p className="message success" role="status">Thanks. The hosting team has your report and will follow up by email.</p>
-            <div className="report-actions">
-              <button type="button" className="button primary" onClick={() => setOpen(false)}>Close</button>
-            </div>
+            <p className="message success" role="status">Report sent. The hosting team will follow up by email.</p>
           </>
         ) : (
           <form onSubmit={send} noValidate>
-            <p className="muted">Tell us what happened and what you expected. We include this page’s address and recent error messages so we can find the problem.</p>
+            <p className="muted">Tell us what happened and what you expected. This report includes the page address and recent error messages.</p>
             <fieldset className="choices" disabled={busy}>
               <legend>What is it?</legend>
               {KINDS.map((option) => (
@@ -105,7 +108,7 @@ export default function ReportProblem() {
             </div>
             {error && !descriptionError ? <p className="message error" role="alert">{error.message}</p> : null}
             <div className="report-actions">
-              <button type="submit" className="button primary" disabled={busy}>{busy ? 'Sending report…' : 'Send report'}</button>
+              <button type="submit" className="button primary" disabled={busy}>{busy ? 'Sending…' : 'Send'}</button>
               <button type="button" className="button" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
             </div>
           </form>

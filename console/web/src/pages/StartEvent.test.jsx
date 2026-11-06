@@ -31,7 +31,7 @@ describe('StartEvent', () => {
     expect(callsTo('getSignupLink')).toEqual([{ linkId: 'l1', token: 'tok123' }]);
     expect(callsTo('redeemSignupLink')).toHaveLength(0);
     fireEvent.change(field, { target: { value: '  Example   Press News ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Start the setup' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
     expect(await screen.findByText('Setup page')).toBeInTheDocument();
     const [body] = callsTo('redeemSignupLink');
     expect(body).toMatchObject({ linkId: 'l1', token: 'tok123', organizationName: 'Example Press News' });
@@ -43,7 +43,7 @@ describe('StartEvent', () => {
     page();
     const field = await screen.findByLabelText('Organization name');
     fireEvent.change(field, { target: { value: 'x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Start the setup' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
     expect(await screen.findByText('Enter a name of 2 to 100 characters.')).toBeInTheDocument();
     expect(field).toHaveFocus();
     expect(callsTo('redeemSignupLink')).toHaveLength(0);
@@ -98,7 +98,7 @@ describe('StartEvent', () => {
       redeemSignupLink: refused('link-revoked', 'This link was revoked. Ask for a new link.'),
     });
     page();
-    fireEvent.click(await screen.findByRole('button', { name: 'Start the setup' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('This link was revoked.');
     expect(screen.queryByLabelText('Organization name')).not.toBeInTheDocument();
   });
@@ -109,9 +109,9 @@ describe('StartEvent', () => {
       redeemSignupLink: refused('signups-closed', 'This site is not taking sign-ups right now. Try again later.'),
     });
     page();
-    fireEvent.click(await screen.findByRole('button', { name: 'Start the setup' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('not taking sign-ups');
-    expect(screen.getByRole('button', { name: 'Start the setup' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
   });
 
   it('shows a server refusal of the name at the field', async () => {
@@ -120,7 +120,7 @@ describe('StartEvent', () => {
       redeemSignupLink: () => { throw Object.assign(new Error('Enter an organization name of 2 to 100 characters.'), { code: 'bad-request', field: 'organizationName' }); },
     });
     page();
-    fireEvent.click(await screen.findByRole('button', { name: 'Start the setup' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
     expect(await screen.findByText('Enter an organization name of 2 to 100 characters.')).toBeInTheDocument();
     expect(screen.getByLabelText('Organization name')).toHaveAttribute('aria-invalid', 'true');
   });

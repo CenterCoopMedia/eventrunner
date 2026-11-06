@@ -21,7 +21,7 @@ describe('SignIn', () => {
     vi.stubEnv('VITE_CONSOLE_SIGN_IN_PROVIDERS', '');
     renderPage(<SignIn />, { path: '/signin', auth: signedOut() });
     expect(screen.queryByRole('button', { name: /Continue with/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Get a sign-in link by email' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Use email' })).toBeInTheDocument();
     vi.unstubAllEnvs();
   });
 
@@ -36,15 +36,20 @@ describe('SignIn', () => {
     const auth = signedOut();
     renderPage(<SignIn />, { path: '/signin', auth });
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'sam@example.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Email me a link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send link' }));
     expect(await screen.findByRole('status')).toHaveTextContent('We sent a sign-in link to sam@example.org.');
     expect(auth.sendEmailLink).toHaveBeenCalledWith('sam@example.org');
+    const edit = screen.getByRole('button', { name: 'Use another email address' });
+    expect(edit).toHaveAttribute('title', 'Use another email address');
+    fireEvent.click(edit);
+    await waitFor(() => expect(screen.getByLabelText('Email address')).toHaveFocus());
+    expect(screen.getByLabelText('Email address')).toHaveValue('sam@example.org');
   });
 
   it('checks the address on submit, marks the field and moves focus to it', async () => {
     const auth = signedOut();
     renderPage(<SignIn />, { path: '/signin', auth });
-    fireEvent.click(screen.getByRole('button', { name: 'Email me a link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send link' }));
     const field = screen.getByLabelText('Email address');
     expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument();
     expect(field).toHaveAttribute('aria-invalid', 'true');

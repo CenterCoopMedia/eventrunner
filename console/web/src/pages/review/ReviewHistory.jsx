@@ -13,7 +13,7 @@ export default function ReviewHistory({ history }) {
     <ol className="history" aria-labelledby="history-title">
       {history.map((entry, i) => (
         <li key={`${entry.at}-${i}`}>
-          <strong>{STATUS_LABELS[entry.status] || entry.status}</strong>
+          <strong>{STATUS_LABELS[entry.status] || 'Updated'}</strong>
           <span className="muted"> {formatDateTime(entry.at)}{actor(entry) ? `, by ${actor(entry)}` : ''}</span>
           {entry.note ? <p className="history-note">{entry.note}</p> : null}
         </li>
