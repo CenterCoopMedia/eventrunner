@@ -82,16 +82,24 @@ const PRELOADED_FONTS = ['source-sans-3-latin.woff2', 'bricolage-grotesque-latin
 
 const EXTERNAL_SCHEME_RE = /^[a-z][a-z\d+.-]*:/i;
 
-// The Event Runner mark, inline so it takes the masthead's own ink. Four
-// strokes: a stem, then the three rule weights the system ships. The link
-// already says the name, so the drawing is decorative. Same markup as
-// docs/index.html, and the same geometry as docs/favicon.svg.
+// Running Badger takes the masthead's ink and palette tokens. The link
+// already says the name, so this drawing is decorative. Keep it in sync
+// with docs/index.html and design/brand/badger-mark.svg.
 const MARK = Object.freeze([
-  '        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
-  '          <rect x="2.5" y="2" width="3" height="20"/>',
-  '          <rect x="5.5" y="2" width="16" height="3"/>',
-  '          <rect x="5.5" y="11" width="9.5" height="2"/>',
-  '          <rect x="5.5" y="19.5" width="13" height="2.5"/>',
+  '        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">',
+  '          <g transform="scale(0.4)" stroke-linecap="round" stroke-linejoin="round">',
+  '            <path d="M7 44h7 M8 50h4" fill="none" stroke="rgb(var(--color-accent-rgb))" stroke-width="3.5"/>',
+  '            <g transform="matrix(1 0 -0.16 1 8 0)">',
+  '              <path d="M28 6 40 23 50 6" fill="none" stroke="rgb(var(--color-accent-rgb))" stroke-width="3.5"/>',
+  '              <path d="m31 59-7 10-7-3-1 2 M43 59l9 12 5-2 M54 42l8-8" fill="none" stroke="currentColor" stroke-width="2.8"/>',
+  '              <rect x="23" y="23" width="32" height="36" rx="5" fill="rgb(var(--color-surface-rgb))" stroke="currentColor" stroke-width="2.5"/>',
+  '              <path d="M24.25 28a3.75 3.75 0 0 1 3.75-3.75h22A3.75 3.75 0 0 1 53.75 28v4.75h-29.5Z" fill="rgb(var(--color-accent-rgb))"/>',
+  '              <rect x="35" y="18" width="8" height="7" rx="1.5" fill="currentColor"/>',
+  '              <circle cx="33" cy="43" r="2.2" fill="currentColor"/>',
+  '              <circle cx="45" cy="43" r="2.2" fill="currentColor"/>',
+  '              <path d="M34 50q5 4 10 0" fill="none" stroke="currentColor" stroke-width="2.5"/>',
+  '            </g>',
+  '          </g>',
   '        </svg>',
 ]);
 
@@ -397,6 +405,8 @@ function head({ site, title, description, canonical, themeTags, ogType }) {
     `  <meta name="description" content="${safeDescription}">`,
     `  <link rel="canonical" href="${escapeHtml(canonical)}">`,
     `  <link rel="icon" type="image/svg+xml" href="${site.base}favicon.svg">`,
+    `  <link rel="icon" type="image/png" sizes="32x32" href="${site.base}favicon-32.png">`,
+    `  <link rel="apple-touch-icon" sizes="180x180" href="${site.base}apple-touch-icon.png">`,
     '',
     `  <meta property="og:type" content="${ogType}">`,
     `  <meta property="og:site_name" content="${PRODUCT}">`,
