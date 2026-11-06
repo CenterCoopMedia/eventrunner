@@ -250,4 +250,15 @@ The one-time setup and the deploy steps are in [docs/DEPLOY_RUNBOOK.md](../docs/
 
 ## Brand files
 
-`web/public/favicon.svg` is the Event Runner mark reversed out of the house accent. `web/public/og-console.png` is the sharing image. `scripts/dev/build-social-cards.mjs` draws it with the docs cards.
+The masthead uses the running Badger mark. `web/public/favicon.svg` uses the
+face on an accent tile, with a dark-mode variant. `web/public/og-console.png`
+is the dark-panel sharing image. The PNG favicon, Apple touch icon, and app
+icons use the same face. `web/public/manifest.webmanifest` lists the app icons
+and uses the dark console theme and background colors.
+
+Sources and the selected concepts are in [design/brand](../design/brand/README.md).
+Run `node scripts/dev/build-social-cards.mjs` from the repository root to
+rebuild the SVG cards, favicons, and all PNGs with system Chrome headless.
+Run the render command in a local terminal outside the agent sandbox.
+Use `--check` to compare without writing repository files. Set `CHROME` if
+Chrome is not at the standard macOS path or on `PATH`.

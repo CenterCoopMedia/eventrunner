@@ -182,6 +182,93 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
+const HOME_PAGE = {
+  id: 'home', label: 'Home', path: '/',
+  sections: [{ id: 'hero', label: 'Hero', allowedBlocks: ['text', 'cta', 'image'], maxBlocks: 4 }],
+};
+const HERO_TEXT = ['title', 'subtitle'].map((field, order) => ({
+  id: `hero__${field}`, section: 'hero', field, blockType: 'text', value: field, order,
+}));
+
+describe('the Home hero image slot', () => {
+  beforeEach(() => {
+    sources.cmsPages = [HOME_PAGE];
+    sources.cmsContent = HERO_TEXT;
+  });
+
+  it('shows a labelled image slot and creates a draft without a block type choice', async () => {
+    fetch.mockResolvedValue(okResponse({ docId: 'hero__image', status: 'dirty' }));
+    await renderAt('/admin/content/home/hero');
+    expect(await screen.findByRole('heading', { name: 'Hero image' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Hero image')).toHaveAttribute('placeholder', 'cms-images/…');
+    expect(screen.getByLabelText('Alt text')).toHaveAttribute('aria-required', 'true');
+    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/hero.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'People at the event' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. Publish to show it on your site.');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(urlOf(0)).toMatch(/\/cmsCreateContent$/);
+    expect(bodyOf(0)).toEqual({
+      pageId: 'home', section: 'hero', field: 'image', visible: true,
+      fields: { blockType: 'image', url: 'cms-images/hero.jpg', alt: 'People at the event', order: 2 },
+    });
+    // The listener hands the created image back to the normal block editor.
+    act(() => adminSubscriptions.get('cmsContent_drafts')([
+      { id: 'hero__image', section: 'hero', field: 'image', blockType: 'image', url: 'cms-images/hero.jpg', alt: 'People at the event' },
+    ]));
+    expect(screen.queryByLabelText('Hero image')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'People at the event' })).toHaveAttribute('href', '/admin/content/home/hero/image');
+  });
+
+  it('requires non-empty alt text before it creates an image', async () => {
+    await renderAt('/admin/content/home/hero');
+    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/hero.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(screen.getByLabelText('Alt text')).toHaveAttribute('aria-invalid', 'true');
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'People at the event' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(screen.getByLabelText('Hero image')).toHaveAttribute('aria-invalid', 'true');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('shows the slot with a plain message when all four places are used', async () => {
+    sources.cmsContent = [...HERO_TEXT, ...['extra', 'another'].map((field) => ({
+      id: `hero__${field}`, section: 'hero', field, blockType: 'text', value: field,
+    }))];
+    await renderAt('/admin/content/home/hero');
+    expect(screen.getByLabelText('Hero image')).toBeDisabled();
+    expect(screen.getByText('The top of your home page is full (4 items). Remove one to add a picture.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+  });
+
+  it('waits for draft content before it permits creation', async () => {
+    silentCollections = ['cmsContent_drafts'];
+    await renderAt('/admin/content/home/hero');
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+  });
+
+  it('keeps an existing image in the normal editor and updates the same field', async () => {
+    sources.cmsContent_drafts = [{
+      id: 'hero__photo', section: 'hero', field: 'photo', blockType: 'image',
+      url: 'cms-images/old.jpg', alt: 'The old picture', order: 2,
+    }];
+    fetch.mockResolvedValue(okResponse({ docId: 'hero__photo', status: 'dirty' }));
+    await renderAt('/admin/content/home/hero');
+    expect(screen.queryByLabelText('Hero image')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'The old picture' }));
+    fireEvent.change(await screen.findByLabelText('Image'), { target: { value: 'cms-images/new.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'The new picture' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
+    expect(bodyOf(0)).toMatchObject({ section: 'hero', field: 'photo', fields: { url: 'cms-images/new.jpg', alt: 'The new picture' } });
+  });
+});
+
 describe('content browsing', () => {
   it('lists pages, then the sections of the one chosen, then its blocks', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
