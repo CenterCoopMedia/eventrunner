@@ -329,12 +329,13 @@ export default function AdminContentBlockEditor({ mode }) {
     if (mode !== 'create') return;
     if (loadedKeyRef.current === 'create-defaults') return;
     if (pagesLoading) return;
-    const fallback = allowed[0] ?? BLOCK_TYPE_IDS[0];
+    // A section's own first type (an FAQ item in the FAQ list) still leads.
+    const fallback = section?.allowedBlocks?.find((type) => allowed.includes(type)) ?? allowed[0] ?? BLOCK_TYPE_IDS[0];
     const baseline = createFormBaseline({ fieldId, content, fallbackType: fallback });
     loadedKeyRef.current = 'create-defaults';
     setSavedEdit(baseline.snapshot);
     if (baseline.nextContent) setContent(baseline.nextContent);
-  }, [mode, allowed, content.blockType, pagesLoading, content, fieldId]);
+  }, [mode, allowed, section, content.blockType, pagesLoading, content, fieldId]);
 
   useEffect(() => {
     // Strict mode runs this cleanup once during development, then the setup

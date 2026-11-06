@@ -85,9 +85,9 @@ test.describe.serial('change requests', () => {
     if (visitorUid) await db.collection('change_request_rate_limits').doc(visitorUid).delete();
   });
 
-  test('the flag is off by default, and no form is reachable with it off', async () => {
-    const features = (await adminDb().collection('config').doc('features').get()).data();
-    expect(features.changeRequests).toBe(false);
+  test('no form is reachable with the flag off', async () => {
+    // New sites start with change requests on; an operator can turn them off.
+    await setFlag(false);
 
     // The public footer offers nothing to a signed-in visitor.
     await visitor.goto('/');
@@ -97,7 +97,7 @@ test.describe.serial('change requests', () => {
     // The admin page states the flag and draws no form.
     await staff.goto('/admin/change-requests');
     await expect(staff.getByRole('heading', { level: 1, name: 'Change requests' })).toBeVisible();
-    await expect(staff.getByText('Change requests are off. An operator can turn them on under Features.')).toBeVisible();
+    await expect(staff.getByText('Change requests: Off. Only an operator can change this setting.')).toBeVisible();
     await expect(staff.getByRole('button', { name: 'Send request' })).toHaveCount(0);
     await expect(staff.getByLabel('What should change?')).toHaveCount(0);
 
