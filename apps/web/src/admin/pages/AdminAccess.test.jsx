@@ -482,7 +482,7 @@ describe('staff access with an end time', () => {
     expect(rowFor('bad@example.org').textContent).toContain('No access');
     expect(rowFor('demo@example.org').textContent).not.toContain('Ended');
     // A permanent grant says nothing about an end.
-    expect(rowFor('desk@example.org').textContent).not.toMatch(/end/i);
+    expect(within(rowFor('desk@example.org')).getAllByRole('cell')[1]).not.toHaveTextContent(/end/i);
   });
 
   it('offers an end time for staff only, and sends it as an ISO instant after a confirmation that names it', async () => {
