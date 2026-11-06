@@ -1,4 +1,6 @@
-import { PRESET_IDS } from '../lib/themeRuntime.js';
+import { DEMO_STYLE_IDS } from './demoStyleIds.js';
+
+export { isDemoStyleId } from './demoStyleIds.js';
 
 const STYLE_COPY = Object.freeze({
   civic: Object.freeze({
@@ -34,7 +36,7 @@ const STYLE_COPY = Object.freeze({
 });
 
 export const DEMO_STYLE_OPTIONS = Object.freeze(
-  PRESET_IDS.filter((id) => id !== 'nclocal').map((id) =>
+  DEMO_STYLE_IDS.map((id) =>
     Object.freeze({
       id,
       label: STYLE_COPY[id]?.label ?? id,
@@ -42,12 +44,6 @@ export const DEMO_STYLE_OPTIONS = Object.freeze(
     }),
   ),
 );
-
-const DEMO_STYLE_ID_SET = new Set(DEMO_STYLE_OPTIONS.map(({ id }) => id));
-
-export function isDemoStyleId(value) {
-  return typeof value === 'string' && DEMO_STYLE_ID_SET.has(value);
-}
 
 export function getDemoStyleOption(id) {
   return DEMO_STYLE_OPTIONS.find((option) => option.id === id) ?? DEMO_STYLE_OPTIONS[0];

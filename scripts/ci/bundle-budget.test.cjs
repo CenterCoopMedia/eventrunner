@@ -136,6 +136,19 @@ test('the first-paint source graph reaches the section edit link and nothing und
   assert.deepEqual(adminFiles, [], 'a file under src/admin is in the first-paint graph');
 });
 
+test('the demo settings panel and style descriptions load only after the disclosure opens', () => {
+  const { files } = eagerSourceGraph(path.join(WEB_SRC, 'main.jsx'));
+  assert.equal(files.has(path.join(WEB_SRC, 'components', 'DemoBanner.jsx')), true);
+  assert.equal(files.has(path.join(WEB_SRC, 'components', 'demoStyleIds.js')), true);
+  for (const file of ['DemoSettings.jsx', 'demoStyleOptions.js']) {
+    assert.equal(
+      files.has(path.join(WEB_SRC, 'components', file)),
+      false,
+      `${file} must stay behind the demo settings disclosure`,
+    );
+  }
+});
+
 // The editor tour is its own chunk, fetched only while it is open, so the
 // admin entry chunk every admin screen waits on carries only its button.
 test('the admin entry graph does not reach the editor tour', () => {

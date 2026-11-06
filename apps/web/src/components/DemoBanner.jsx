@@ -13,12 +13,9 @@ import { IS_DEMO } from '../lib/demoMode.js';
 import { recommendedConfiguration } from '../lib/themeRuntime.js';
 import { loadPresetRemaps } from '../lib/presetRemaps.js';
 import { quietActionClass } from './controlClasses.js';
-import {
-  DEMO_STYLE_OPTIONS,
-  adjacentDemoStyleId,
-  getDemoStyleOption,
-  isDemoStyleId,
-} from './demoStyleOptions.js';
+import LoadingState from './LoadingState.jsx';
+import { DEMO_STYLE_IDS, isDemoStyleId } from './demoStyleIds.js';
+import { loadDemoSettings } from './demoSettingsLoader.js';
 
 const DISPLAY_MODES = Object.freeze(['light', 'dark']);
 
@@ -35,7 +32,7 @@ export function readDemoDisplay(search, fallbackTheme = {}) {
       ? style
       : isDemoStyleId(fallbackTheme.preset)
         ? fallbackTheme.preset
-        : DEMO_STYLE_OPTIONS[0].id,
+        : DEMO_STYLE_IDS[0],
     mode: isDisplayMode(mode)
       ? mode
       : isDisplayMode(fallbackTheme.mode)
@@ -50,14 +47,6 @@ export function writeDemoDisplaySearch(search, style, mode) {
   params.set('mode', mode);
   return `?${params.toString()}`;
 }
-
-// The select carries the control height like the three buttons beside it,
-// so the row reads as one row rather than four sizes. The height is the
-// shared 44px floor `touch-target` sets, not a number written here: a
-// second source for one measurement is a second place for it to drift.
-const selectClass =
-  'touch-target w-full min-w-0 rounded-brand border-hairline border-control bg-surface ' +
-  'px-sm font-data text-caption text-text-primary';
 
 const bandActionClass = `${quietActionClass} justify-center`;
 
@@ -82,15 +71,29 @@ export function DemoBannerContent({
   const [styleId, setStyleId] = useState(initialDisplay.style);
   const [mode, setMode] = useState(initialDisplay.mode);
   const [previewing, setPreviewing] = useState(false);
-  const selectId = useId();
   const settingsId = useId();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [Settings, setSettings] = useState(null);
+  const [settingsFailed, setSettingsFailed] = useState(false);
+  const [settingsAttempt, setSettingsAttempt] = useState(0);
   const settingsButtonRef = useRef(null);
   const previewButtonRef = useRef(null);
   const exitButtonRef = useRef(null);
   const restoreFocusRef = useRef(false);
   const previewDesiredRef = useRef(false);
-  const activeStyle = getDemoStyleOption(styleId);
+
+  // Closed settings cost no panel download. A closed or unmounted disclosure
+  // ignores a late result; a failed request can be retried without changing
+  // the current style, page, or fullscreen preview.
+  useEffect(() => {
+    if (!settingsOpen || Settings) return undefined;
+    let current = true;
+    loadDemoSettings().then(
+      (module) => { if (current) setSettings(() => module.default); },
+      () => { if (current) setSettingsFailed(true); },
+    );
+    return () => { current = false; };
+  }, [settingsOpen, Settings, settingsAttempt]);
 
   const restoreControls = useCallback(() => {
     previewDesiredRef.current = false;
@@ -211,7 +214,10 @@ export function DemoBannerContent({
             className={bandActionClass}
             aria-expanded={settingsOpen}
             aria-controls={settingsId}
-            onClick={() => setSettingsOpen((open) => !open)}
+            onClick={() => {
+              setSettingsFailed(false);
+              setSettingsOpen((open) => !open);
+            }}
           >
             Demo settings
             <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" className="disclosure-chevron">
@@ -228,62 +234,26 @@ export function DemoBannerContent({
           </button>
         </div>
         <div id={settingsId} hidden={!settingsOpen} className="demo-settings pt-sm">
-          <div aria-live="polite" className="mb-sm">
-            <p className="font-heading text-h3 font-semibold text-text-primary">{activeStyle.label}</p>
-            <p className="mt-3xs max-w-prose text-body text-text-secondary text-pretty">{activeStyle.summary}</p>
-          </div>
-        <div
-          className="flex flex-wrap items-center gap-xs"
-          aria-label="Demo display settings"
-        >
-          <button
-            type="button"
-            className={bandActionClass}
-            aria-label="Previous site style"
-            onClick={() => setStyleId(adjacentDemoStyleId(styleId, -1))}
-          >
-            Previous
-          </button>
-
-          <div className="min-w-0 flex-1 basis-40 sm:max-w-xs">
-            <label htmlFor={selectId} className="sr-only">
-              Site style
-            </label>
-            <select
-              id={selectId}
-              className={selectClass}
-              value={styleId}
-              onChange={(event) => setStyleId(event.target.value)}
-            >
-              {DEMO_STYLE_OPTIONS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            type="button"
-            className={bandActionClass}
-            aria-label="Next site style"
-            onClick={() => setStyleId(adjacentDemoStyleId(styleId, 1))}
-          >
-            Next
-          </button>
-
-          <button
-            type="button"
-            className={bandActionClass}
-            aria-pressed={mode === 'dark'}
-            onClick={() =>
-              setMode((current) => (current === 'dark' ? 'light' : 'dark'))
-            }
-          >
-            {mode === 'dark' ? 'Use light mode' : 'Use dark mode'}
-          </button>
-
-        </div>
+          {settingsOpen && (Settings ? (
+            <Settings styleId={styleId} setStyleId={setStyleId} mode={mode} setMode={setMode} />
+          ) : settingsFailed ? (
+            <div className="py-sm">
+              <p role="alert" className="mb-xs text-caption text-text-secondary">
+                Demo settings could not be loaded. Check your connection and try again.
+              </p>
+              <button
+                type="button"
+                className={quietActionClass}
+                onClick={() => {
+                  settingsButtonRef.current?.focus({ preventScroll: true });
+                  setSettingsFailed(false);
+                  setSettingsAttempt((attempt) => attempt + 1);
+                }}
+              >
+                Try loading settings again
+              </button>
+            </div>
+          ) : <LoadingState label="Loading demo settings…" rows={0} />)}
         </div>
       </div>
     </section>
