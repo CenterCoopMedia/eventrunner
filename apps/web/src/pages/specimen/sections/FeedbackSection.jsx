@@ -293,7 +293,7 @@ export default function FeedbackSection({ folio }) {
         name="Loading"
         file="components/LoadingState.jsx"
         contract={null}
-        note="The task label appears immediately. After one second a decorative activity ring begins; at ten seconds the explanation acknowledges the wait, and after a minute the ring rests while the message remains. Motion respects the reader’s preference. Still rules reserve space for rows, a schedule, or a responsive directory; elapsed time never claims progress."
+        note="The task label appears immediately. After one second a decorative activity ring begins; at ten seconds the explanation acknowledges the wait, and after a minute the ring rests while the message remains. Motion respects the reader’s preference. Still text, time, and portrait shapes preview the layout of rows, a schedule, or a responsive directory; elapsed time never claims progress."
       >
         <LoadingSpecimen />
       </Figure>

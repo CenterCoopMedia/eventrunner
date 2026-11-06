@@ -60,30 +60,84 @@
 }
 
 .loading-state__placeholder {
+  --loading-placeholder-fill: rgb(var(--color-text-secondary-rgb) / 0.16);
+  --loading-placeholder-emphasis: rgb(var(--color-accent-rgb) / 0.18);
   display: grid;
   min-inline-size: 0;
 }
 
 .loading-state__row {
   display: flex;
+  align-items: center;
   min-inline-size: 0;
   min-block-size: 4rem;
 }
 
-.loading-state__space {
-  display: block;
+.loading-state__content {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  gap: var(--space-xs);
   min-inline-size: 0;
+  padding-block: var(--space-sm);
+}
+
+/* Unequal, still bars suggest text hierarchy without looking like progress. */
+.loading-state__bar,
+.loading-state__portrait {
+  display: block;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: min(var(--radius-base), 0.25rem);
+  background: var(--loading-placeholder-fill);
+}
+
+.loading-state__bar--title {
+  inline-size: min(62%, 28rem);
+  block-size: 0.875rem;
+  background: var(--loading-placeholder-emphasis);
+}
+
+.loading-state__bar--detail {
+  inline-size: min(78%, 34rem);
+  block-size: 0.5rem;
+}
+
+.loading-state__bar--short {
+  inline-size: min(42%, 18rem);
 }
 
 .loading-state__placeholder[data-loading-shape='schedule'] .loading-state__row {
+  align-items: flex-start;
   min-block-size: 8rem;
 }
 
+.loading-state__placeholder[data-loading-shape='schedule'] .loading-state__content {
+  padding-block: var(--space-md);
+  padding-inline-start: var(--space-md);
+}
+
 .loading-state__time {
+  display: flex;
+  flex-direction: column;
   flex: 0 0 clamp(2.75rem, 12%, 5rem);
+  align-self: stretch;
+  gap: var(--space-xs);
   margin-block: var(--space-sm);
+  padding-block: var(--space-2xs);
+  padding-inline-end: var(--space-sm);
   border-inline-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+.loading-state__bar--time {
+  inline-size: min(100%, 3rem);
+  block-size: 0.625rem;
+  background: var(--loading-placeholder-emphasis);
+}
+
+.loading-state__bar--time-detail {
+  inline-size: min(70%, 2rem);
+  block-size: 0.5rem;
 }
 
 .loading-state__placeholder[data-loading-shape='directory'] {
@@ -92,8 +146,37 @@
 }
 
 .loading-state__placeholder[data-loading-shape='directory'] .loading-state__row {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-sm);
   min-block-size: 12rem;
+  padding-block: var(--space-md);
   border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+.loading-state__portrait {
+  inline-size: 4rem;
+  block-size: 4rem;
+  background: var(--loading-placeholder-emphasis);
+}
+
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__content {
+  flex: none;
+  inline-size: 100%;
+  padding: 0;
+}
+
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__bar--title {
+  inline-size: min(62%, 14rem);
+}
+
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__bar--detail {
+  inline-size: min(85%, 18rem);
+}
+
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__bar--short {
+  inline-size: min(52%, 12rem);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -115,5 +198,11 @@
   .loading-state__row,
   .loading-state__time {
     border-color: CanvasText;
+  }
+
+  .loading-state__bar,
+  .loading-state__portrait {
+    border: var(--rule-hairline-width) solid GrayText;
+    background: Canvas;
   }
 }

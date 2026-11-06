@@ -58,7 +58,8 @@ describe('RegistrationAction', () => {
     expect(link).toHaveAttribute('href', 'https://register.example.org/summit');
     // The header's own register: a ruled rectangle, never the filled one —
     // the identity row is not where the site shouts.
-    expect(link.className).toContain('border-rule-hairline');
+    expect(link.className).toContain('border-control');
+    expect(link.className).not.toContain('border-rule-hairline');
     expect(link.className).not.toContain('bg-accent');
   });
 

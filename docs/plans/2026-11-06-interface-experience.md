@@ -1,7 +1,8 @@
 # Interface experience: research, changes, and audit record
 
 Date: 2026-11-06. Surfaces: public event site, operator admin, and client console.
-Status: implementation in progress; final hosted checks and visual evidence remain to be recorded.
+Status: implemented for review in [PR #752](https://github.com/CenterCoopMedia/eventrunner/pull/752).
+The pull request records the tested revision, hosted results, and inspected visual evidence.
 
 ## Direction and scope
 
@@ -23,30 +24,33 @@ change as proof that every call site, theme, mode, and browser now behaves corre
 
 Baseline observations were recorded during the 2026-11-06 source and live-demo review.
 The live review used Edge at a desktop viewport of 1912 × 863; the colour sample was the
-Civic demo. These observations are baseline evidence, not final screenshots of this branch.
+Newsroom demo. These observations are baseline evidence, not final screenshots of this branch.
 
 | ID | Observed baseline | Consequence and scope |
 | --- | --- | --- |
 | E1 | The public loader reserves the same three hairline rows regardless of the page. | It does not describe the expected schedule or directory structure. Match the placeholder to the destination and measure the eventual layout shift separately. |
-| E2 | A secondary button uses a hairline boundary; the sampled Civic boundary is approximately 1.35:1, versus approximately 3.79:1 for the control-boundary token. | Use the control token for an identifiable outlined control. These sampled ratios do not establish compliance for other themes, backgrounds, states, or overrides. |
+| E2 | A secondary button uses a hairline boundary; the sampled Newsroom/light boundary is approximately 1.35:1, versus approximately 3.79:1 for the control-boundary token. | Use the control token for an identifiable outlined control. These sampled ratios do not establish compliance for other themes, backgrounds, states, or overrides. |
 | E3 | Public active-scale styling is not consistently guarded by reduced-motion preferences. | Guard the transform itself; making its transition instantaneous still leaves movement. |
 | E4 | `FeedbackModal` can be dismissed during submission and lacks a synchronous submission guard. | Prevent duplicate requests immediately; make close, Cancel, Escape, and backdrop behavior consistent while pending. |
 | E5 | Live `FeedbackModal` focus lands on a `SELECT` despite the intended `autoFocus` target. | Explicitly focus the intended element after native modality opens; verify the real browser behavior and focus return. |
 | E6 | The current Spectrum Button page was visually inspected. | Its hierarchy, states, and pending guidance inform the controls; adopting its visual shape wholesale is not required. |
+| E7 | Hosted browser checks exposed a native Tab boundary gap; the live demo also moves document focus to `BODY` after Tab from the last feedback button while the dialog remains open. | Share the admin's explicit boundary wrapping with public dialogs. Native modality still owns the inert background; test forward and reverse wrapping in the form, pending state, and receipt. |
+| E8 | The first hosted captures of the shaped loaders still read as large blank panels between faint rules. | Add still, token-tinted title and detail bars, schedule time markers, and directory portraits so the reserved structure is recognizable. The status label remains the meaningful content. |
+| E9 | In the hosted 390px console capture, eight expanded setup steps occupy roughly 400px above the task heading, leaving little team content in the first viewport. The selected step and its focus outline remain distinguishable in forced colors. | Coordinate compact mobile setup navigation with #746. The control and waiting-state improvements do not resolve this existing content-priority problem. |
 
 Source inspection and browser observations answer different questions. Source review can
 identify guards and semantics; only rendered checks establish clipping, contrast against the
 actual background, focus placement, layout stability, and the feel of a transition.
 
-## Changes in this pass — validation pending
+## Changes in this pass
 
-The following is the implementation scope on the working branch. Hosted results and final
-captures must be appended before these changes are described as verified or complete.
+The following is the implementation scope. Consult PR #752 for the current hosted results
+and screenshots; the required-evidence column also identifies the limits of each change.
 
 | Area | Change being made | Required evidence |
 | --- | --- | --- |
 | Public/admin loading | Immediate named activity; indicator after 1 second; explanatory states after 10 and 60 seconds; optional retry only where the operation is safe to repeat. | Fast response never flashes the indicator; slow work remains understandable; timers clear on completion/unmount; retry cannot duplicate a write. |
-| Public placeholders | Schedule and directory shapes, with representative states in the specimen. | Compare actual destination geometry at narrow and wide widths; record measured CLS separately under #615. |
+| Public placeholders | Still, token-tinted row, schedule, and directory shapes, with representative states in the specimen. | Compare actual destination geometry at narrow and wide widths; record measured CLS separately under #615. |
 | Public feedback modal | Explicit initial focus, synchronous submission protection, coordinated pending dismissal, stable action-label width, and predictable focus return. A 20-second request deadline preserves the draft and reports uncertain receipt. | Native browser keyboard path, rapid activation, delayed success/failure, and opener removal/fallback. |
 | Public/shared buttons | Stronger outlined boundaries, clearer action hierarchy, distinct state feedback, purposeful small transitions, and motion-safe press feedback. | Actual backgrounds and states across themes/modes; no layout jump or inaccessible busy state. |
 | Admin controls | Shared button treatment and editable text of at least 16px for coarse pointers. | Actual phone focus behavior, browser zoom availability, long labels, and form layout. This is not a complete #636 device audit. |
@@ -142,7 +146,7 @@ tables where comparison matters; use cards only when their structure helps the t
 
 ## Audit checklist and disposition
 
-**Current change** means included in this change but awaiting evidence. **Separate** means another
+**Current change** means included in this pull request; its verification record is linked below. **Separate** means another
 identified branch or issue owns the work. **Follow-up** means a remaining audit or lifecycle
 gap; it must not be marked complete merely because shared styling changed.
 
@@ -194,7 +198,18 @@ gap; it must not be marked complete merely because shared styling changed.
 | [#661](https://github.com/CenterCoopMedia/eventrunner/issues/661) | Full forced-colors audit. | Targeted button rules are only part of the required coverage. |
 | [#662](https://github.com/CenterCoopMedia/eventrunner/issues/662) | Contrast preference support. | Remains a separate rendered-state and token audit. |
 
-## Verification record to complete
+## Verification evidence and follow-up
+
+The branch includes unit coverage for loading stages and cleanup, request deadlines and
+late responses, modal focus and duplicate activation, and shared motion contracts. Hosted
+browser coverage exercises public dialogs and loading shapes at 1440, 390, and 320px;
+generated default-preset control contrast; reduced motion; targeted forced-colors focus;
+coarse-pointer admin text; and controlled console waiting. The generated-preset check does
+not substitute for runtime brand overrides or full-page contrast review.
+
+Use the tested revision, workflow and artifact links in PR #752 as the outcome record.
+The following checks describe the broader completion criteria, including device and
+performance work this shared-component pass does not establish:
 
 - Record the tested commit, hosted workflow links, and actual results; do not infer success from source inspection.
 - Capture public schedule/directory, specimen, feedback dialog, admin form, and console at desktop and narrow widths.
@@ -206,8 +221,9 @@ gap; it must not be marked complete merely because shared styling changed.
 - Confirm animations stop when work settles and reduced motion retains complete content and readable feedback.
 - Record remaining defects with the affected route/theme/device and evidence; do not close unrelated backlog by implication.
 
-At the time of this record, final screenshots, hosted test results, and performance measurements
-have not been entered. No passing test or final visual result is claimed here.
+Real-device behavior, assistive-technology output, full-route preference audits, and measured
+layout shift remain separate acceptance work. A passing shared-component check is not a
+claim of whole-application conformance.
 
 ## Primary references
 

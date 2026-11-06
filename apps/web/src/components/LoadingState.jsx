@@ -6,7 +6,7 @@ const SHAPES = new Set(['rows', 'schedule', 'directory']);
 
 /**
  * The same renderer powers real requests and the specimen’s explicit previews.
- * Placeholder rules reserve space without pretending that content has arrived.
+ * Still text and portrait shapes reserve space without inventing content.
  */
 export function LoadingStateView({
   label = 'Loading…',
@@ -42,8 +42,20 @@ export function LoadingStateView({
               key={index}
               className="loading-state__row border-t-hairline border-rule-hairline"
             >
-              {layout === 'schedule' ? <span className="loading-state__time" /> : null}
-              <span className="loading-state__space" />
+              {layout === 'schedule' ? (
+                <span className="loading-state__time">
+                  <span className="loading-state__bar loading-state__bar--time" />
+                  <span className="loading-state__bar loading-state__bar--time-detail" />
+                </span>
+              ) : null}
+              {layout === 'directory' ? <span className="loading-state__portrait" /> : null}
+              <span className="loading-state__content">
+                <span className="loading-state__bar loading-state__bar--title" />
+                <span className="loading-state__bar loading-state__bar--detail" />
+                {layout !== 'rows' ? (
+                  <span className="loading-state__bar loading-state__bar--detail loading-state__bar--short" />
+                ) : null}
+              </span>
             </div>
           ))}
         </div>

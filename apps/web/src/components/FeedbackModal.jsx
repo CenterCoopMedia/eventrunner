@@ -24,15 +24,11 @@
 // a control label is the one exemption the eyebrow ban names (§2.4), never
 // an eyebrow to "fix".
 //
-// A NATIVE <dialog>, OPENED WITH showModal(). This used to be a z-50 <div>
-// over the page, so Tab walked straight out of it and into the page behind
-// — including the fixed back-to-top control. `showModal()` is the platform's
-// own answer and it is four behaviours in one call: focus is trapped inside
-// the dialog, everything behind it is inert to the pointer and to assistive
-// technology, Escape fires `cancel`, and the top layer puts the dialog above
-// every stacking context without a z-index. None of that is reimplemented
-// here, because a hand-written trap is a list of focusable selectors that
-// goes stale the moment a control is added.
+// Native <dialog>, opened with showModal(), owns the inert background,
+// Escape cancellation and top-layer placement. Native Tab navigation can
+// still leave the document for browser controls at a boundary, so the shared
+// modal focus helper wraps the first and last available controls. The
+// browser handles ordinary focus traversal inside those boundaries.
 //
 // The component chooses the initial field and receipt focus, locks page
 // scrolling, and returns focus to the opener when React removes the dialog.
@@ -48,6 +44,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
 import { createSubmissionKey } from '../lib/submissionKey.js';
+import { wrapModalTab } from '../lib/modalFocus.js';
 import useLoadingStage from '../lib/useLoadingStage.js';
 import { focusFirstError, SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
@@ -106,9 +103,9 @@ export default function FeedbackModal({ onClose }) {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     mountedRef.current = true;
-    // `showModal` is the whole mechanism. Where it is missing the dialog
-    // still opens and the form still works; what is lost is the trap, and a
-    // visitor can still reach every control and close the dialog.
+    // Native modality owns the inert background. Where it is missing the
+    // dialog still opens and the form remains reachable, but that native
+    // isolation is unavailable.
     if (typeof dialog?.showModal === 'function') dialog.showModal();
     else if (dialog) dialog.setAttribute('open', '');
     // Native dialog focusing can choose the first select, even when React
@@ -202,7 +199,9 @@ export default function FeedbackModal({ onClose }) {
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
+      tabIndex={-1}
       className={`public-dialog motion-enter ${DIALOG_FRAME_CLASS}`}
+      onKeyDown={wrapModalTab}
       onCancel={(event) => {
         event.preventDefault();
         closeDialog();

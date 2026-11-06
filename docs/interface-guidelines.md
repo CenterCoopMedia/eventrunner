@@ -191,7 +191,7 @@ Only show **Try again** when the caller supplies a safe retry. A panel must not 
 
 Use an indeterminate ring when completion cannot be measured. Use a determinate progress control only for a real total or server-reported progress. Hide decorative artwork from assistive technology and keep the visible words. The existing console waiting character is allowed while work is pending, with a static reduced-motion state.
 
-The public loading component supports rows, schedule, and directory placeholders. These use still rules and layout space. They do not shimmer, pretend to be loaded content, or promise a measured layout-shift score. The specimen book exposes the loading shapes and stages for review.
+The public loading component supports rows, schedule, and directory placeholders. Still, token-tinted text bars, time markers, and portrait shapes make the expected structure recognizable. They do not shimmer, pretend to be loaded content, or promise a measured layout-shift score. The specimen book exposes the loading shapes and stages for review.
 
 ### Verification
 

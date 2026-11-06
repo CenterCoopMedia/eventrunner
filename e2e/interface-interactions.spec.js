@@ -1,6 +1,6 @@
 // Real public components with controlled responses; GitHub-hosted CI only.
 // No feedback leaves the browser: every submission is intercepted here.
-/* global document, getComputedStyle, window */
+/* global getComputedStyle, window */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
@@ -58,7 +58,8 @@ for (const width of [1440, 390, 320]) {
       const category = dialog.getByRole('combobox', { name: 'What is this about?' });
       const send = dialog.getByRole('button', { name: 'Send feedback', exact: true });
 
-      // The native dialog owns the keyboard loop in both directions.
+      // Native modality and shared boundary handling keep both directions
+      // inside the dialog, including browsers that otherwise focus the page.
       await send.focus();
       await page.keyboard.press('Tab');
       await expect(category).toBeFocused();
@@ -82,6 +83,10 @@ for (const width of [1440, 390, 320]) {
       await expect(email).toHaveAttribute('readonly', '');
       await expect(category).toBeDisabled();
       await expect(dialog.getByRole('status')).toContainText('Sending your feedback');
+      await page.keyboard.press('Tab');
+      await expect(message).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(sending).toBeFocused();
       // Pending controls remain keyboard reachable, but cannot repeat or
       // discard an unresolved submission.
       await page.keyboard.press('Enter');
@@ -90,6 +95,7 @@ for (const width of [1440, 390, 320]) {
       await page.keyboard.press('Enter');
       await expect(dialog).toBeVisible();
       await expect.poll(() => payloads.length).toBe(1);
+      await expect(dialog.locator('.loading-status__activity')).toBeVisible();
       await capture(page, `feedback-pending-${width}`);
 
       first.resolve();
@@ -105,6 +111,10 @@ for (const width of [1440, 390, 320]) {
       expect(payloads).toHaveLength(2);
       expect(payloads[1].submissionKey).toBe(payloads[0].submissionKey);
       await capture(page, `feedback-receipt-${width}`);
+      await page.keyboard.press('Shift+Tab');
+      await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(page.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
       await page.getByRole('button', { name: 'Close', exact: true }).click();
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await expect(opener).toBeFocused();
@@ -154,7 +164,9 @@ for (const width of [1440, 390, 320]) {
       await expect(placeholder).toHaveAttribute('data-loading-shape', shape);
       expect(await preview.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
       if (shape === 'directory') {
-        const columns = await placeholder.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+        // auto-fit exposes collapsed zero-width tracks in computed CSS.
+        // Count the occupied tracks, rather than mistaking those for columns.
+        const columns = await placeholder.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter((size) => Number.parseFloat(size) > 0).length);
         expect(columns).toBe(width === 1440 ? 3 : 1);
       }
       await preview.scrollIntoViewIfNeeded();

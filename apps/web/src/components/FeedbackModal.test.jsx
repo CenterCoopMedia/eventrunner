@@ -260,10 +260,10 @@ describe('FeedbackModal', () => {
 
   // THE DIALOG ITSELF. The modal used to be a <div> over the page, so Tab
   // walked out of it and into the page behind (issue 233). It is now a
-  // native <dialog> opened with showModal(), which is where the trap, the
-  // inert page and the top layer come from. jsdom has neither a top layer
-  // nor a focus model, so what is asserted here is that the component ASKS
-  // for those behaviours and that it returns focus itself.
+  // native <dialog>, whose showModal() owns the inert page and top
+  // layer. Explicit Tab boundaries keep keyboard focus in the document.
+  // jsdom can observe these explicit focus moves but cannot prove native
+  // traversal or modality; hosted browser tests cover those behaviors.
   it('opens as a modal dialog rather than as an overlay', () => {
     const opened = [];
     const proto = Object.getPrototypeOf(document.createElement('dialog'));
@@ -294,6 +294,62 @@ describe('FeedbackModal', () => {
     render(<FeedbackModal onClose={() => {}} />);
     expect(screen.getByLabelText('Message')).toHaveFocus();
     expect(screen.getByLabelText('What is this about?')).not.toHaveFocus();
+  });
+
+  it('wraps Tab from Send to the category and Shift+Tab back to Send', () => {
+    render(<FeedbackModal onClose={() => {}} />);
+    const category = screen.getByLabelText('What is this about?');
+    const submit = screen.getByRole('button', { name: 'Send feedback' });
+    submit.focus();
+    expect(fireEvent.keyDown(submit, { key: 'Tab' })).toBe(false);
+    expect(category).toHaveFocus();
+    expect(fireEvent.keyDown(category, { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(submit).toHaveFocus();
+  });
+
+  it('skips the disabled category while retaining pending actions in the keyboard loop', async () => {
+    let resolve;
+    submitFeedbackMock.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    render(<FeedbackModal onClose={() => {}} />);
+    const message = screen.getByLabelText('Message');
+    fireEvent.change(message, { target: { value: 'Please check the schedule link.' } });
+    const submit = screen.getByRole('button', { name: 'Send feedback' });
+    submit.focus();
+    fireEvent.click(submit);
+
+    expect(screen.getByLabelText('What is this about?')).toBeDisabled();
+    expect(submit).toHaveAttribute('aria-disabled', 'true');
+    expect(fireEvent.keyDown(submit, { key: 'Tab' })).toBe(false);
+    expect(message).toHaveFocus();
+    expect(message).toHaveAttribute('readonly');
+    expect(fireEvent.keyDown(message, { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(submit).toHaveFocus();
+
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(cancel).toBeEnabled();
+    expect(cancel).toHaveAttribute('aria-disabled', 'true');
+    cancel.focus();
+    // Cancel sits between the email field and Send: native traversal still
+    // owns this step, even while its activation is guarded.
+    expect(fireEvent.keyDown(cancel, { key: 'Tab' })).toBe(true);
+    await act(async () => { resolve({ ok: false, error: 'Please try again.' }); });
+  });
+
+  it('keeps both receipt boundaries on Close after announcing the heading', async () => {
+    submitFeedbackMock.mockResolvedValueOnce({ ok: true, id: 'f1' });
+    render(<FeedbackModal onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    const heading = await screen.findByRole('heading', { name: 'Thanks for letting us know' });
+    const close = screen.getByRole('button', { name: 'Close' });
+    expect(heading).toHaveFocus();
+    expect(fireEvent.keyDown(heading, { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(close).toHaveFocus();
+    for (const shiftKey of [false, true]) {
+      expect(fireEvent.keyDown(close, { key: 'Tab', shiftKey })).toBe(false);
+      expect(close).toHaveFocus();
+    }
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('locks page scrolling while open and restores the previous overflow on unmount', () => {
