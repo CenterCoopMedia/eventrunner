@@ -366,7 +366,10 @@ describe('Layout navigation (built from page documents)', () => {
     const sideNav = side.getByRole('navigation', { name: 'Main' });
     expect(sideNav.querySelector('details.site-nav-more')).toBeNull();
     expect(within(sideNav).getAllByRole('link').map((link) => link.textContent))
-      .toEqual([...MANY_PAGES.map((item) => item.label), 'Sign in']);
+      .toEqual(MANY_PAGES.map((item) => item.label));
+    const signIn = within(side.container.querySelector('.site-header-account-actions')).getByRole('link', {name:'Sign in'});
+    expect(signIn).toHaveAttribute('href', '/signin');
+    expect(side.container.querySelector('header')).toContainElement(signIn);
   });
 
   it('still gates a system page on its feature flag', () => {
