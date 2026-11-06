@@ -147,13 +147,17 @@ full. The client sees it as the plain status lines in §3.
 
 ### 7. Setup checklist in the event admin
 
-The admin page **Set up your event** (`/admin/setup`) shows the launch-readiness rows as a
+The admin page **Set up your event** (`/admin/setup`) shows six client-owned or shared tasks as a
 stepper: one step at a time at its own address (`/admin/setup/<step>`), the step list beside it,
-and Back and Next. Each step says who does it (the client, the hosting team, or both), its state, and a link to
-the screen for it. It reads `webMcpCheckEventReadiness`, which runs the `init-event.cjs --check`
-policy and reads the config fresh, not from the five-minute container cache. It also holds the
-operator's legal sign-off (`legal.reviewRequired: false`), which no admin screen wrote before.
-The page says "hosting team", not CCM, because the code is white-label. It is on the rail under
+and Back and Next. Each task says who does it (the client or both the client and the Event Runner
+team), its state, and a link to the screen for it. Host-only checks, including Google sign-in and
+unknown future checks, appear separately in read-only **Hosting status** as **Ready** or
+**Awaiting Event Runner setup**. They have no client action and do not count as numbered tasks or
+reduce client completion progress. Every client task and hosting check must be ready before the
+page says the site is ready to share. It reads `webMcpCheckEventReadiness`, which runs the
+`init-event.cjs --check` policy and reads the config fresh, not from the five-minute container cache.
+It also holds the operator's legal sign-off (`legal.reviewRequired: false`), which no admin screen
+wrote before. The page says "Event Runner team", not CCM, because the code is white-label. It is on the rail under
 Overview, and the first-visit tour waits until the reader leaves it. This page does not depend on the console; it also helps a client onboarded by hand.
 
 On a site the console builds, §6 meets the rows for the sender domain, ticketing and the

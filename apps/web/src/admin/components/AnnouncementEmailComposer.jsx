@@ -170,7 +170,7 @@ function SendDetail({ send, state, regionId }) {
     const failures = failureCounts(detail);
     body = (
       <>
-        <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+        <p className="text-admin-sm text-admin-ink">
           This preview uses a sample unsubscribe link. Open the email log to see each recipient’s message.
         </p>
         {send.recipientRowsLinked ? (
@@ -745,7 +745,7 @@ export default function AnnouncementEmailComposer() {
                   <h3 id="announcement-email-confirm" ref={confirmHeadingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
                     {`Send this email to ${recipients(count)}?`}
                   </h3>
-                  <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+                  <p className="text-admin-sm text-admin-ink">
                     Each recipient gets one copy. A sent email cannot be recalled.
                   </p>
                   <div className="flex flex-wrap gap-xs">

@@ -14,6 +14,8 @@ Open **Session pitches** to review private proposals. Share `/pitch` for public 
 
 **On a phone, the compact top bar names the event and current section.** Open **Menu** to use the grouped admin sections and account controls in a full-screen sheet. The groups open and close there too. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
 
+**Choose an account view at the foot of the rail.** If your account has more than one view, choose **Attendee**, **Speaker**, or **Admin**, as available, in **View**, then select **Open**. Changing the selection does not leave the page. A view changes where you work, not your permissions. The read-only demo has no view selector. Below your account details, **Take the tour**, **Report a problem**, and **View site** share one row. **Sign out** fills the row below them. Each icon shows its name on hover or keyboard focus.
+
 ## Find your way: The tour
 
 The first time you open the admin panel, a short tour opens above the page. It has one step for each group on the rail that your tier can open, and one step on the edit links on the public site. Move with **Next** and **Back**. End it at any step with **End tour** or the Escape key. The tour does not block the page: You can open a section it names while it stays on screen.
@@ -37,7 +39,7 @@ Staff access can end at a set time, for example for a demo account. Until that t
 
 ## Set up your event: The launch checklist
 
-Open **Set up your event**, under **Overview** on the rail. It is a stepper: one step at a time, with the list of every step beside it (on a phone, select **Show all 7 steps**). It opens on the first step that is not done. **Back** and **Next** move between steps, and each step has its own address, for example `/admin/setup/logos`. These are the steps that must be done before the site goes live:
+Open **Set up your event**, under **Overview** on the rail. It is a stepper: one client task at a time, with the list of tasks beside it (on a phone, select **Show all 6 steps**). It opens on the first step that is not done. **Back** and **Next** move between steps, and each step has its own address, for example `/admin/setup/logos`. The progress count includes only your tasks and tasks you share with the Event Runner team:
 
 | Step | Who does it | Where |
 | --- | --- | --- |
@@ -47,15 +49,16 @@ Open **Set up your event**, under **Overview** on the rail. It is a stepper: one
 | Approve the privacy policy and terms | You | The privacy policy in Content, then this page |
 | Set up your event email | You and the Event Runner team | The Event Runner team tells you if anything is needed from you |
 | Connect ticket sales | You | The Event Runner console. Ticketing shows the result |
-| Turn on Google sign-in | The Event Runner team | Nothing to do in the admin panel |
 
-Each step shows **Done** or **To do**. The server decides the state. It uses the same check that the Event Runner team runs. Select **Check again** after you finish a step.
+Each task shows **Done** or **To do**. The server decides the state. It uses the same check that the Event Runner team runs. Select **Check again** after you finish a task.
 
-**Approve the privacy policy and terms.** The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens the **Approve the privacy policy and terms** step, ticks **Our counsel reviewed and approved the privacy policy and the terms**, and selects **Mark the review complete**. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.
+**Hosting status** shows Google sign-in and any other hosting checks separately, as **Ready** or **Awaiting Event Runner setup**. The Event Runner team manages these checks. They are read-only, have no action for you, and do not count as numbered tasks.
+
+**Approve the privacy policy and terms.** The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens the **Approve the privacy policy and terms** step, ticks **Our counsel reviewed and approved the privacy policy and the terms**, and selects **Approve**. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.
 
 The first-visit tour of the admin panel does not open over this page. It opens on the next admin page you visit.
 
-When every step is done, your site is ready to share.
+Your site is ready to share only when every client task and hosting check is ready. If your tasks are done but a hosting check is pending, the page says **Awaiting Event Runner setup**. During a check, or when a check fails, the page does not announce that the site is ready to share. A failed refresh keeps the last results visible with a warning.
 
 ## Set the site up: Six steps
 
@@ -158,7 +161,7 @@ Every page document (About, Travel, Conduct, and anything else seeded or added) 
 
 **A built-in page has no heading field.** Schedule, Speakers, Sponsors, Attendees, Updates, and the home page write their own heading, so the editor states that where the field would be and offers nothing to set. Rename one of these in the navigation label and the browser tab follows the label too.
 
-**One item is not a page.** The navigation ends with the account control, which the site adds itself. It reads **Sign in** for a reader who is not signed in and **Dashboard** for one who is. You cannot remove it or reorder it, and it needs no page document. Multi-role accounts also get an **Account** menu with attendee, speaker, and admin views. The choice stays in the browser tab for the session; direct role links take precedence. **Manage event** on attendee and speaker dashboards opens the admin home. Single-role accounts get no switcher or extra admin link. The phone admin **Menu** sheet carries the same full-width view rows. These controls change navigation only; server access checks still decide every read and write.
+**Account controls are not pages.** The public header groups account actions at the right. Page links stay at the left when navigation is at the top. With side navigation, page links stay beside the page and account actions stay in the header. On a phone, **Menu** opens both groups. The account control reads **Sign in** for a reader who is not signed in and **Dashboard** for one who is. You cannot remove it or reorder it, and it needs no page document. Multi-role accounts also get an **Account** menu with attendee, speaker, and admin views. The choice stays in the browser tab for the session; direct role links take precedence. **Manage event** on attendee and speaker dashboards opens the admin home. Single-role accounts get no switcher or extra admin link. The phone admin **Menu** sheet carries the **View** selector and **Open** link described above. These controls change navigation only; server access checks still decide every read and write.
 
 **The footer lists the same pages.** The footer repeats the page list under the same rules, so a page you hide leaves both places at once and a page you rename is renamed in both. Under the page list, the footer shows the links in the home page's **Footer links** section, one list per group. Edit them in Content, under the home page. They appear in the footer of every page and not in the home page body. Below them the footer names the organization that operates the event and links its support address, both from the event configuration, and lists the event's social accounts if the configuration records any. Each account link is labelled with the service and the handle together, such as Mastodon @eventname, so two accounts on one service can be told apart; an account recorded with no handle is labelled with the service name alone. An event with no social accounts gets no social block, not an empty one. You add and edit the accounts under Settings → Event settings, in the **Social accounts** panel.
 
@@ -1113,7 +1116,11 @@ For an existing domain, select **Check now**, or wait for the hourly check. The 
 
 Operators only. One ruled table of every admin account with its tier word, and a form to grant access to a new address.
 
-**Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. The person signs in with that address the way every admin does, by Google or by the emailed code; there is no invitation to send.
+**Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. A new account grant sends one transactional email naming the event, role, event admin address and any staff end time. It tells the person to use the exact granted email address and request an emailed sign-in code. Google sign-in is not required. The admin address is a regular sign-in page, not a one-time invitation.
+
+**Email outcome.** Access stays saved even if the email setup or send fails. The result states access and email outcomes separately. Provider acceptance does not confirm delivery. An uncertain result means the provider may have accepted the email, or an earlier attempt already claimed it; the site does not automatically send another copy. Check **Email log** before sending again. A no-op grant, ordinary tier change, end-time change or removal sends no instructions.
+
+**Send sign-in instructions again.** An active account's row has **Send sign-in instructions**, including accounts granted access before this email feature existed. Confirm to send the current role and sign-in instructions without changing access. Ended, unreadable and removed grants cannot receive active-access instructions. Retrying after a lost response checks the same send attempt and cannot send a second copy. A new confirmed send is deliberate and may duplicate an earlier email, so check **Email log** first. Existing accounts receive no bulk or retroactive email.
 
 **Change a tier or remove access.** Each row carries two quiet actions: **Change to staff** or **Change to operator**, and **Remove access**. Each one opens a confirmation under the grant form, above the table, that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.
 
@@ -1128,6 +1135,8 @@ Operators only. One ruled table of every admin account with its tier word, and a
 **At least one operator stays.** The server refuses a change that would leave the deployment with no operator: Demoting or removing the last operator, your own grant included. Grant a second operator first. The refusal is stated in place, in the server's words.
 
 **What is recorded.** Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. When an end time is set, moved, or removed, the row also holds the old and the new end time. When the scheduled job removes an ended account, it writes one row for that account, with "system" as the actor and the end time. A change that changes nothing writes no row. Only operators can read the access lists, the end times, and the admin log.
+
+Each automatic instructions email and explicit resend also records its outcome in the admin log, including a safe failure reason when setup fails before the email provider is contacted. Messages that reach the email core appear in **Email log** with their rendered bodies and provider result.
 
 **When it takes effect.** At once. The database rules, the server, and the admin rail all read the access lists live: A granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.
 

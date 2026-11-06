@@ -673,7 +673,7 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
       </div>
 
       {stress ? (
-        <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+        <p className="text-admin-sm text-admin-ink-secondary">
           A made-up event name that wraps three times, and one day packed with{' '}
           {STRESS_SESSION_COUNT} sessions. Nothing here is saved or published — it
           is a harder page than any client will send, shown so you meet it now.

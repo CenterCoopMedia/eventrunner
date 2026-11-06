@@ -707,7 +707,7 @@ export default function AdminBranding() {
                   error={fieldErrors.get('theme.preset')}
                 />
                 {copy ? (
-                  <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+                  <p className="text-admin-sm text-admin-ink-secondary">
                     {copy.summary}
                     <span className="mt-3xs block text-admin-ink-data">
                       Best for: {copy.bestFor}
@@ -842,7 +842,7 @@ export default function AdminBranding() {
                 >
                   Typography
                 </h3>
-                <p className="mb-sm mt-3xs max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+                <p className="mb-sm mt-3xs text-admin-sm text-admin-ink-secondary">
                   The style names a face for every role. The heading face has
                   curated alternates that stay inside the style; naming a role
                   outright leaves the curated set behind.
@@ -968,7 +968,7 @@ export default function AdminBranding() {
                 >
                   Advanced colour settings
                 </h3>
-                <p className="mb-sm mt-3xs max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+                <p className="mb-sm mt-3xs text-admin-sm text-admin-ink-secondary">
                   Set any colour by hand, per mode. A value here wins over the
                   brand colour and over the style in that mode only; a blank
                   field keeps the worked-out value. Every pair is measured as

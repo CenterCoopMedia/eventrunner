@@ -12,8 +12,11 @@
 .admin-action-feedback > svg { flex: 0 0 1.1rem; inline-size: 1.1rem; block-size: 1.1rem; margin-block-start: .15em; }
 .admin-action-feedback--ok { color: rgb(var(--admin-state-ok-rgb)); }
 .admin-action-feedback--error { color: rgb(var(--admin-state-error-rgb)); }
-.admin-editor-action-feedback { flex-basis: 100%; max-inline-size: 65ch; }
-.admin-job-line__actions:has(.admin-editor-action-feedback) { max-inline-size: 100%; }
+.admin-editor-action-feedback { width: 100%; }
+.admin-job-line__heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm) var(--space-md); }
+@media (min-width: 640px) {
+  .admin-job-line__heading--editor { display: grid; grid-template-columns: minmax(0, 1fr) fit-content(60%); align-items: start; }
+}
 .admin-row-result { padding: 0 var(--space-md) var(--space-sm); scroll-margin-block: var(--space-xl); }
 .admin-row-result:empty { display: none; }
 .admin-record-edit { position: relative; inline-size: var(--admin-control-height); padding-inline: 0; flex-shrink: 0; }

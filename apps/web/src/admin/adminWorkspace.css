@@ -253,6 +253,7 @@
 
 /* Issues #477 and #695: navigation and layout changes remain immediate.
    Compact, named utility icons leave the destination names room to breathe. */
+.admin-mobile-docket:not([open]) > .admin-mobile-docket__content,
 .admin-mobile-docket__content[hidden], .admin-docket-group[hidden] { display: none; }
 .admin-docket-group-toggle {
   display: flex; align-items: center; gap: var(--space-xs); width: 100%;

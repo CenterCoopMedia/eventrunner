@@ -54,6 +54,7 @@ import {
 } from '../../lib/pageTemplates.js';
 import { summarizePublish } from '../publishResult.js';
 import {
+  ActionLabel,
   CheckboxField,
   DestructiveConfirm,
   Notice,
@@ -526,13 +527,14 @@ export default function AdminPageEditor({ mode }) {
         )}
         identifiers={page.path || null}
         description="Save a draft to keep your changes. Publish to show them on the site."
+        feedback={status || error ? <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
           <>
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to pages
             </Link>
             <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
-              {busy === 'draft' ? 'Saving…' : 'Save draft'}
+              <ActionLabel busy={busy === 'draft'} pending="Saving…">Save draft</ActionLabel>
             </button>
             <button
               type="button"
@@ -541,9 +543,8 @@ export default function AdminPageEditor({ mode }) {
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
+              <ActionLabel busy={busy === 'publish'} pending="Publishing…">Save and publish</ActionLabel>
             </button>
-            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />
@@ -678,7 +679,7 @@ export default function AdminPageEditor({ mode }) {
             {layoutOpen ? 'Hide the individual settings' : 'Change the individual settings'}
           </button>
           <div id="admin-page-layout-advanced" hidden={!layoutOpen} className="mt-sm">
-            <p className="mb-sm max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+            <p className="mb-sm text-admin-sm text-admin-ink-secondary">
               The parts a template sets. Change one and the page stops following
               its template — the template above reads “Custom” from then on, and
               picking a template again sets all three back.

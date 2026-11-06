@@ -114,6 +114,16 @@ export const rowMetaClass = 'font-admin-data text-admin-xs text-admin-ink-data';
 /** One list row's inner padding, so every galley in the room keeps one rhythm. */
 export const rowClass = 'flex flex-wrap items-center justify-between gap-sm px-md py-sm';
 
+/** Reserve both labels' width while exposing only the current action name. */
+export function ActionLabel({ busy, pending, children }) {
+  return (
+    <span className="inline-grid">
+      <span className={`[grid-area:1/1] ${busy ? 'invisible' : ''}`} aria-hidden={busy || undefined}>{children}</span>
+      <span className={`[grid-area:1/1] ${busy ? '' : 'invisible'}`} aria-hidden={!busy || undefined}>{pending}</span>
+    </span>
+  );
+}
+
 /** A labelled text-ish input. `error` is the server's message, verbatim. */
 export function TextField({
   label,
@@ -577,7 +587,7 @@ export function DestructiveConfirm({
       <h2 ref={headingRef} id={headingId} tabIndex={-1} aria-describedby={consequenceId} className="text-admin-base font-bold text-admin-state-error">
         {title ?? trigger}
       </h2>
-      <p id={consequenceId} className="max-w-[65ch] text-admin-sm text-admin-ink">
+      <p id={consequenceId} className="text-admin-sm text-admin-ink">
         {consequence}
         {permanence ? ` ${permanence}` : ''}
       </p>
@@ -635,10 +645,10 @@ export function Panel({
             flush ? 'px-md pt-md ' : ''
           }admin-panel__heading mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-sm`}
         >
-          <div className="min-w-0">
+          <div className="min-w-0 flex-auto">
             <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2>
             {description ? (
-              <p className="mt-3xs max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+              <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
                 {description}
               </p>
             ) : null}

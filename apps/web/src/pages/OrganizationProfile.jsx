@@ -194,7 +194,7 @@ export default function OrganizationProfile() {
     : [];
 
   return (
-    <article className="mx-auto max-w-2xl">
+    <article className="w-full">
       {organization.logoPath ? (
         <div className="mb-lg max-w-xs">
           <AssetImage path={organization.logoPath} alt="" decorative className="max-h-24 w-auto object-contain" />

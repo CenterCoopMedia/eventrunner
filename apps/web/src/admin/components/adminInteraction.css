@@ -4,6 +4,15 @@
   width: var(--admin-control-height); height: var(--admin-control-height); padding: 0;
 }
 .admin-icon-control svg { flex: none; }
+.admin-rail-view-select { padding-inline: var(--space-2xs); }
+.admin-rail-utilities {
+  display: grid; grid-template-columns: repeat(3, minmax(var(--admin-control-height), 1fr));
+  gap: var(--space-xs);
+}
+.admin-rail-utilities > .admin-icon-control {
+  width: 100%;
+}
+.admin-rail-utilities > [data-admin-action='sign-out'] { grid-column: 1 / -1; }
 .admin-control-tooltip {
   position: fixed; z-index: 100; pointer-events: none;
   max-width: min(15rem, calc(100vw - 1rem)); padding: var(--space-2xs) var(--space-xs);

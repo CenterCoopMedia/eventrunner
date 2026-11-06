@@ -366,7 +366,10 @@ describe('Layout navigation (built from page documents)', () => {
     const sideNav = side.getByRole('navigation', { name: 'Main' });
     expect(sideNav.querySelector('details.site-nav-more')).toBeNull();
     expect(within(sideNav).getAllByRole('link').map((link) => link.textContent))
-      .toEqual([...MANY_PAGES.map((item) => item.label), 'Sign in']);
+      .toEqual(MANY_PAGES.map((item) => item.label));
+    const signIn = within(side.container.querySelector('.site-header-account-actions')).getByRole('link', {name:'Sign in'});
+    expect(signIn).toHaveAttribute('href', '/signin');
+    expect(side.container.querySelector('header')).toContainElement(signIn);
   });
 
   it('still gates a system page on its feature flag', () => {
@@ -416,14 +419,13 @@ describe('Layout navigation (built from page documents)', () => {
 });
 
 // THE ACCOUNT CONTROL (M7 issue 2, speaker routing in issue #210). One
-// control at the end of the navigation: sign in when nobody is signed in,
+// control in the header: sign in when nobody is signed in,
 // the attendee dashboard for an attendee, and the speaker dashboard for a
-// linked speaker. It inherits the nav's placement, landmark, and keyboard
-// path rather than making the shell place a second control.
+// linked speaker. It stays in the header when page navigation moves aside.
 describe('Layout account control', () => {
   const accountLink = (root) =>
     root.querySelector(
-      'nav[aria-label="Main"] a[href="/signin"], nav[aria-label="Main"] a[href="/dashboard"], nav[aria-label="Main"] a[href="/speaker/dashboard"]',
+      '.site-header-account-actions > li:last-child > a',
     );
 
   it('offers sign-in to a visitor who is not signed in', () => {
@@ -548,10 +550,34 @@ describe('Layout account control', () => {
     expect(links.at(-1)).toBe(accountLink(container));
   });
 
-  it('is reachable in both nav placements, as the same one control', () => {
+  it.each(['standard', 'masthead', 'compact', 'minimal'])('%s keeps account and registration actions at the header end for either nav placement', (header) => {
     for (const navPlacement of ['top', 'side']) {
-      const { container } = renderShell({}, { path: '/schedule', themeDoc: { navPlacement } });
-      expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/signin"]')).toHaveLength(1);
+      const { container, unmount } = renderShell({}, {
+        path: '/schedule', header, themeDoc: { navPlacement },
+        event: { ...FIXTURE_EVENT, registration: { externalUrl: 'https://register.example.org/tickets' } },
+      });
+      const actions = container.querySelector('.site-header-account-actions');
+      expect(container.querySelector('header')).toContainElement(actions);
+      expect(container.querySelectorAll('.site-header-account-actions')).toHaveLength(1);
+      const signIn = within(actions).getByRole('link', {name:'Sign in'});
+      expect(signIn).toHaveAttribute('href','/signin');
+      const nav = within(container).getByRole('navigation', {name:'Main'});
+      expect(within(nav).getByRole('link', {name:'Schedule'})).toHaveAttribute('href','/schedule');
+      const registration = container.querySelector('header a[href="https://register.example.org/tickets"]');
+      expect(registration).not.toBeNull();
+      expect(registration.closest('nav')).toBeNull();
+      if (navPlacement === 'side') {
+        expect(nav).not.toContainElement(actions);
+        const group = actions.parentElement;
+        expect(group).toHaveClass('site-header-actions', 'no-print');
+        expect(group).toContainElement(registration);
+        expect(actions.nextElementSibling).toBe(registration.parentElement);
+      } else {
+        expect(actions.previousElementSibling).toContainElement(within(nav).getByRole('link', {name:'Schedule'}));
+      }
+      fireEvent.click(signIn);
+      expect(signIn).toHaveAttribute('aria-current','page');
+      unmount();
     }
   });
 
@@ -1166,10 +1192,10 @@ describe('Layout variants (brief §6.1)', () => {
       { path: '/schedule', themeDoc: { navPlacement: 'side' } },
     );
 
-    // Same landmark, same items, same order — the rail is a placement, not
-    // a different navigation (§8.1).
+    // Page links keep their landmark and order. Account actions stay in
+    // the header for either placement (issue #747).
     const labels = (root) =>
-      [...root.querySelectorAll('nav[aria-label="Main"] a')].map((a) => a.textContent);
+      [...root.querySelectorAll('nav[aria-label="Main"] > ul:first-child a')].map((a) => a.textContent);
     expect(labels(side)).toEqual(labels(top));
     expect(side.querySelector('nav')).toHaveAttribute('aria-label', 'Main');
 
@@ -1409,7 +1435,7 @@ describe('deployed historical demo shell', () => {
       user: { uid: 'multi-role-demo' },
       profile: { registrationStatus: 'approved', speakerId: 'rae-okonkwo' },
     });
-    await waitFor(() => expect(container.querySelector('nav[aria-label="Main"] > ul > li:last-child > a'))
+    await waitFor(() => expect(container.querySelector('.site-header-account-actions > li:last-child > a'))
       .toHaveAttribute('href', '/speaker/dashboard'));
     if (historicalDemo) {
       // The menu is a lazy chunk. Load it first so a missing gate would
@@ -1451,12 +1477,15 @@ describe('Layout mobile navigation', () => {
     expect(indexCss).toMatch(/\.site-header-treatment \.site-header-menu\s*\{\s*display: none;/);
     expect(indexCss).toMatch(/@media screen\s*\{\s*\.site-header-treatment \.site-header-menu\[data-mobile-visible="true"\]\s*\{\s*display: inline-flex;/);
   });
-  it('uses one navigation landmark with a labeled disclosure, repeatable close, and Escape focus restoration', () => {
+  it.each(['top', 'side'])('keeps the %s navigation and account actions in one phone disclosure with repeatable close and focus restoration', (navPlacement) => {
     vi.stubGlobal('matchMedia', (query) => ({ matches: query === '(max-width: 639px)', addEventListener() {}, removeEventListener() {} }));
-    renderShell({});
+    const {container} = renderShell({}, {themeDoc:{navPlacement}});
     const menu = screen.getByRole('button', { name: 'Menu' });
     const nav = screen.getByRole('navigation', { name: 'Main' });
-    expect(menu).toHaveAttribute('aria-controls', nav.id);
+    const actions = container.querySelector('.site-header-account-actions');
+    const controlled = menu.getAttribute('aria-controls').split(' ').map(id => document.getElementById(id));
+    expect(controlled).toContain(nav);
+    expect(controlled.some(element => element?.contains(actions))).toBe(true);
     expect(menu).toHaveAttribute('aria-expanded', 'false');
     expect(nav).toHaveAttribute('data-mobile-open', 'false');
     for (let i = 0; i < 2; i += 1) {
@@ -1474,6 +1503,16 @@ describe('Layout mobile navigation', () => {
     expect(menu).toHaveFocus();
     expect(menu).toHaveAttribute('aria-expanded', 'false');
     expect(within(nav).getByRole('link', { name: 'Schedule' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(menu);
+    const signIn = within(actions).getByRole('link', {name:'Sign in'});
+    signIn.focus();
+    fireEvent.keyDown(signIn, {key:'Escape'});
+    expect(menu).toHaveFocus();
+    expect(menu).toHaveAttribute('aria-expanded','false');
+    fireEvent.click(menu);
+    fireEvent.click(signIn);
+    expect(menu).toHaveFocus();
+    expect(menu).toHaveAttribute('aria-expanded','false');
   });
 });
 

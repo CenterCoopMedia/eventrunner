@@ -21,6 +21,7 @@ import { useAdminSessions } from '../useAdminSessions.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import {
+  ActionLabel,
   DestructiveConfirm,
   Notice,
   Panel,
@@ -319,6 +320,7 @@ export default function AdminSessionEditor({ mode }) {
         )}
         identifiers={null}
         description="Edit session details for the public schedule."
+        feedback={status || error ? <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
           <>
             {mode === 'edit' ? (
@@ -342,7 +344,7 @@ export default function AdminSessionEditor({ mode }) {
               disabled={saving}
               aria-busy={action === 'draft' || undefined}
             >
-              {action === 'draft' ? 'Saving…' : 'Save'}
+              <ActionLabel busy={action === 'draft'} pending="Saving…">Save</ActionLabel>
             </button>
             <button
               type="button"
@@ -351,9 +353,8 @@ export default function AdminSessionEditor({ mode }) {
               aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {action === 'publish' ? 'Publishing…' : 'Publish'}
+              <ActionLabel busy={action === 'publish'} pending="Publishing…">Publish</ActionLabel>
             </button>
-            <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
         }
       />

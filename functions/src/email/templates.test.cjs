@@ -78,6 +78,7 @@ test.beforeEach(() => resetTemplateCacheForTest());
 test('listTemplateIds includes account, speaker, claim, and native ticket confirmations', () => {
   assert.deepEqual(listTemplateIds().sort(), [
     'account.welcome',
+    'admin.access_granted',
     // ADR 0008 §5: an organizer approved an attendee.
     'attendee.approved',
     'auth.otp',

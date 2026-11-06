@@ -267,18 +267,23 @@ export default function Layout() {
   const menuButtonRef = useRef(null);
   const navId = useId();
   const navRef = useRef(null);
+  const accountActionsId = useId();
+  const accountActionsRef = useRef(null);
   const compactHeader = useMediaQuery('(max-width: 639px)');
   const [settledCompactHeader, setSettledCompactHeader] = useState(compactHeader);
   useLayoutEffect(() => {
     const menu = menuButtonRef.current;
     const doc = menu?.ownerDocument;
     const activeElement = doc?.activeElement;
-    if (compactHeader && navRef.current?.contains(activeElement)) {
+    if (compactHeader && (navRef.current?.contains(activeElement) || accountActionsRef.current?.contains(activeElement))) {
       menu?.focus();
     } else if (!compactHeader && activeElement === menu) {
       // Both controls remain visible for this layout pass. Move focus
       // before the next render hides Menu; More uses its visible summary.
-      const candidates = [...(navRef.current?.querySelectorAll('a[href], summary, button:not([disabled])') ?? [])]
+      const candidates = [
+        ...(navRef.current?.querySelectorAll('a[href], summary, button:not([disabled])') ?? []),
+        ...(accountActionsRef.current?.querySelectorAll('a[href], summary, button:not([disabled])') ?? []),
+      ]
         .filter((element) => !element.closest('[hidden]'));
       const current = candidates.find((element) => element.getAttribute('aria-current') === 'page')
         ?? candidates[0];
@@ -293,6 +298,11 @@ export default function Layout() {
     event.stopPropagation();
     setMenuOpen(false);
     menuButtonRef.current?.focus();
+  };
+  const closeMenuOnLink = (event) => {
+    if (!event.target.closest('a') || !menuOpen) return;
+    menuButtonRef.current?.focus();
+    setMenuOpen(false);
   };
   const accountViews = useAccountViews();
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
@@ -386,17 +396,30 @@ export default function Layout() {
     ? { ...ACCOUNT_SIGNED_IN, to: accountViews.current?.to ?? '/dashboard' }
     : ACCOUNT_SIGNED_OUT;
 
-  // One nav, placed two ways. The list, its labels, its landmark, and its
-  // position in the document are identical either way — `side` only moves
-  // it to the leading edge at wide viewports, where there is room for a
-  // rail beside the page (brief §6.1).
-  //
-  // The landmark always renders now. It used to disappear when no page was
-  // navigable, so that a deployment with every page hidden did not ship an
-  // empty "Main" nav for a screen reader to land in; the account control is
-  // in the list unconditionally, so the list is never empty and that reader
-  // can still reach sign-in.
-  const nav = (
+  const accountActions = (
+    <ul
+      id={accountActionsId}
+      ref={accountActionsRef}
+      hidden={readOnlyDemo}
+      className="site-header-account-actions no-print"
+      data-mobile-hidden={compactHeader && settledCompactHeader && !menuOpen}
+      onKeyDown={closeMenuOnEscape}
+      onClick={closeMenuOnLink}
+    >
+      {!readOnlyDemo && accountViews.views.length > 1 ? (
+        <li><Suspense fallback={null}><AccountMenu account={accountViews} /></Suspense></li>
+      ) : null}
+      <li>
+        <NavLink to={account.to} end={account.end} className={accountClass}>
+          {account.label}
+        </NavLink>
+      </li>
+    </ul>
+  );
+
+  // Top navigation shares a row with the account group. A side placement
+  // keeps its page links beside the content and its account group in Header.
+  const nav = navPlacement !== 'side' || navItems.length ? (
     <nav
       aria-label="Main"
       id={navId}
@@ -404,11 +427,7 @@ export default function Layout() {
       data-mobile-open={menuOpen}
       data-mobile-hidden={compactHeader && settledCompactHeader && !menuOpen}
       onKeyDown={closeMenuOnEscape}
-      onClick={(event) => {
-        if (!event.target.closest('a') || !menuOpen) return;
-        menuButtonRef.current?.focus();
-        setMenuOpen(false);
-      }}
+      onClick={closeMenuOnLink}
       data-placement={navPlacement}
       className={
         navPlacement === 'side'
@@ -453,17 +472,10 @@ export default function Layout() {
             </details>
           </li>
         ) : null}
-        {!readOnlyDemo && accountViews.views.length > 1 ? (
-          <li><Suspense fallback={null}><AccountMenu account={accountViews} /></Suspense></li>
-        ) : null}
-        <li hidden={readOnlyDemo}>
-          <NavLink to={account.to} end={account.end} className={accountClass}>
-            {account.label}
-          </NavLink>
-        </li>
       </ul>
+      {navPlacement === 'side' ? null : accountActions}
     </nav>
-  );
+  ) : null;
 
   // Ordinary pages sit on a flat surface. The Atlas sheet — the faint
   // coordinate grid behind a section (brief §4.6) — is drawn on the SCHEDULE
@@ -515,7 +527,7 @@ export default function Layout() {
                 className={`site-header-menu no-print ${quietActionClass}`}
                 aria-expanded={menuOpen}
                 data-mobile-visible={compactHeader || settledCompactHeader}
-                aria-controls={navId}
+                aria-controls={navPlacement === 'side' ? `${navItems.length ? `${navId} ` : ''}${accountActionsId}` : navId}
                 onClick={() => setMenuOpen((open) => !open)}
                 onKeyDown={closeMenuOnEscape}
               >
@@ -526,6 +538,12 @@ export default function Layout() {
               </button>
             }
             variant={headerVariant}
+            actions={navPlacement === 'side' ? (
+              <div className="site-header-actions no-print">
+                {accountActions}
+                <RegistrationAction placement="header" />
+              </div>
+            ) : null}
             name={historicalDemo && markSrc && !markFailed ? '' : plate.name}
             dates={plate.dates}
             place={plate.edition}
@@ -555,11 +573,7 @@ export default function Layout() {
             }
           >
             {navPlacement === 'side' ? null : nav}
-            {/* The event's configured registration action (M7 issue 8).
-                It owns its own row and renders nothing at all when no
-                destination is configured, so mounting it is this one line
-                and no other control in the header has to move. */}
-            <RegistrationAction placement="header" />
+            {navPlacement === 'side' ? null : <RegistrationAction placement="header" />}
           </Header>
         </div>
       </header>

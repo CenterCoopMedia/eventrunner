@@ -36,7 +36,7 @@ export default function ComingSoon() {
   return (
     <div className="coming-soon flex min-h-screen flex-col bg-surface text-text-primary">
       <main id="main-content" className="flex flex-1 items-center px-md py-2xl">
-        <div className="mx-auto w-full max-w-2xl">
+        <div className="mx-auto w-full max-w-stage">
           {logo ? <img src={logo} alt={organizer || name} className="mb-xl h-12 w-auto max-w-[12rem] object-contain" /> : null}
           <p className="font-data text-caption font-semibold uppercase tracking-wide text-text-secondary">
             Coming soon
@@ -62,7 +62,7 @@ export default function ComingSoon() {
         </div>
       </main>
       <footer className="border-t-hairline border-t-rule-hairline px-md py-md">
-        <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center justify-between gap-sm font-data text-caption text-text-secondary">
+        <div className="mx-auto flex w-full max-w-stage flex-wrap items-center justify-between gap-sm font-data text-caption text-text-secondary">
           <span>{organizer ? `Presented by ${organizer}` : name}</span>
           <Link to="/admin" className="underline underline-offset-2">Organizer sign-in</Link>
         </div>

@@ -217,7 +217,7 @@ export default function AdminInvoicesList() {
             ))}
           </select>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-3xs sm:max-w-[24rem]">
+        <div className="flex min-w-0 flex-1 flex-col gap-3xs">
           <label htmlFor={searchId} className={fieldLabelClass}>
             Search
           </label>

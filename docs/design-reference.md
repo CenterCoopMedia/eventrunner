@@ -168,7 +168,7 @@ The frame and running text each have a width token. The frame defaults to `95%` 
 
 The stage retains its `--space-lg` inline gutter for the Atlas coordinate mark. At viewports of 1024px and wider, its content box uses at least 90 percent of the viewport. The specimen split uses one full-width track, and folios stay inside the stage at the end of the rule.
 
-**Engine.** Both widths are tokens: `--stage-max` and `--measure-text`, declared in the page contract over a tier 2 stage family. Their source is `design/tokens/primitives.json`; regenerate the committed CSS with `node scripts/generate-content.cjs --demo`. The `arrangement` variant maps onto them: `grid` uses the stage's columns and `list` uses the measure. Admin long-text fields fill their panel content box; short helper paragraphs, date fields and category controls retain their own limits.
+**Engine.** Both widths are tokens: `--stage-max` and `--measure-text`, declared in the page contract over a tier 2 stage family. Their source is `design/tokens/primitives.json`; regenerate the committed CSS with `node scripts/generate-content.cjs --demo`. The `arrangement` variant maps onto them: `grid` uses the stage's columns and `list` uses the measure. Admin introductions, panel descriptions, helper paragraphs, notices and confirmations fill their available content box. Narrative fields and public multi-step forms fill their workspace. Console management pages use a fluid frame with responsive gutters. Narrower sizes serve specific tasks: long-form agreement reading, focused identity flows, short-value controls, compact table columns, tooltips, email previews and modal shells; their contextual text fills the space inside them.
 
 ### Pages are chosen by task
 

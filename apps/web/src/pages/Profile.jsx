@@ -330,7 +330,7 @@ export default function Profile() {
   };
 
   return (
-    <article className="mx-auto max-w-2xl">
+    <article className="w-full">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">
         {needsProfileSetup ? 'Complete your profile' : 'Your profile'}
       </h1>
