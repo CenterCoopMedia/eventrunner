@@ -4,7 +4,7 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 
 **License:** [Apache-2.0](LICENSE). The code is free. The trademark is the exclusivity lever: nobody else can market hosting under this name.
 
-**Status:** Preparing for the first outside client, NC Local. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract; later decisions are in the [decision records](docs/adr/). Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2). Milestones 1 to 4 and the public-site parity milestone are complete. The registration and pitch steppers ([ADR 0008](docs/adr/0008-registration-and-pitch-steppers.md)) are built. The client console, where a client opens one signup link and gets a site with no keys, files or DNS ([ADR 0007](docs/adr/0007-client-console-self-serve-onboarding.md)), is in progress.
+**Status:** Preparing for the first outside client, NC Local. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract; later decisions are in the [decision records](docs/adr/). Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2). Milestones 1 to 4 and the public-site parity milestone are complete. The registration and pitch steppers ([ADR 0008](docs/adr/0008-registration-and-pitch-steppers.md)) are built. The client console is live at [console.eventrunner.org](https://console.eventrunner.org): a client opens one signup link, accepts the agreement, fills in setup, and the site builder makes their site with no keys, files or DNS ([ADR 0007](docs/adr/0007-client-console-self-serve-onboarding.md)). Sites are archived for seven days before they are deleted.
 
 Site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
 Documentation: [centercoopmedia.github.io/eventrunner/docs](https://centercoopmedia.github.io/eventrunner/docs/)
@@ -58,13 +58,14 @@ The reference implementation is the [2026 Collaborative Journalism Summit](https
 
 **Running the event**
 
-- An admin CMS on its own editorial desk, in the event's own colours, with a setup checklist for launch
+- An admin CMS on its own editorial desk, in the event's own colours, with a setup checklist for launch. Features start on and each has a switch on its own page
 - Transactional email through a provider adapter (Postmark is the reference)
 - Announcement email to registered attendees, approved attendees, or speakers, with a preview, a test send, a confirmation of the recipient count, a separate broadcast stream, and one-click unsubscribe
 - Scheduled reminders ([ADR 0006](docs/adr/0006-scheduled-reminders.md)) and live updates
 - Sponsor invoices with a PDF, email, and an optional card payment link
 - Import of speakers, sessions, organizations, and registrations from CSV files, and spreadsheet exports, including speaker logistics
 - An event data package for the handoff after the event
+- A "Report a problem" button in the admin and the console that sends the report to the hosting team
 
 What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, social feeds, and speaker chat stay out. Sponsor invoicing was cut in the triage and is back in scope ([ADR 0001 §4.2 amendment](docs/adr/0001-event-platform-v1.md#42-collections-not-carried-over), [#208](https://github.com/CenterCoopMedia/eventrunner/issues/208)). Airtable is in scope for session pitch intake only: a read-only refresh from one approved table into the private review queue ([ADR 0005](docs/adr/0005-airtable-pitch-intake.md)). Other Airtable sync stays out. Announcement email goes only to the event's attendees and speakers; it is not a marketing list tool.
 
