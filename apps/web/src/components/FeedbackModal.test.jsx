@@ -177,6 +177,22 @@ describe('FeedbackModal', () => {
     expect(cancel).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('status')).toHaveTextContent('Sending your feedback.');
 
+    // Native close requests can become noncancelable after an earlier
+    // Escape. Model the resulting close, rather than another canceled event.
+    dialog.showModal = vi.fn(() => dialog.setAttribute('open', ''));
+    act(() => {
+      dialog.dispatchEvent(new Event('cancel', { cancelable: false }));
+      dialog.removeAttribute('open');
+      dialog.dispatchEvent(new Event('close'));
+    });
+    expect(dialog.showModal).toHaveBeenCalledTimes(1);
+    expect(dialog).toHaveAttribute('open');
+    expect(message).toHaveFocus();
+    expect(message).toHaveValue('Please check the schedule link.');
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(submitFeedbackMock).toHaveBeenCalledTimes(1);
+
     await act(async () => { resolve({ ok: true, id: 'f1' }); });
     const receipt = screen.getByRole('heading', { name: 'Thanks for letting us know' });
     expect(receipt).toHaveFocus();

@@ -91,6 +91,10 @@ for (const width of [1440, 390, 320]) {
       // discard an unresolved submission.
       await page.keyboard.press('Enter');
       await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+      await expect(dialog).toBeVisible();
+      await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
+      await expect(message).toHaveValue('Please make the room directions easier to find on the schedule.');
       await dialog.getByRole('button', { name: 'Cancel', exact: true }).focus();
       await page.keyboard.press('Enter');
       await expect(dialog).toBeVisible();

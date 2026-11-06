@@ -206,6 +206,18 @@ export default function FeedbackModal({ onClose }) {
         event.preventDefault();
         closeDialog();
       }}
+      onClose={(event) => {
+        const dialog = event.currentTarget;
+        if (!mountedRef.current || dialog.open) return;
+        // A repeated native close request can bypass cancel prevention.
+        // Keep the pending result reachable until its deadline settles it.
+        if (submissionStateRef.current === 'pending') {
+          dialog.showModal();
+          formRef.current?.querySelector('textarea')?.focus({ preventScroll: true });
+        } else {
+          onClose();
+        }
+      }}
     >
       <div>
         {receipt ? (
