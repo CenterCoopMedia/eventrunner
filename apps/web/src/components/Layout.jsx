@@ -401,7 +401,7 @@ export default function Layout() {
       id={accountActionsId}
       ref={accountActionsRef}
       hidden={readOnlyDemo}
-      className="site-header-account-actions"
+      className="site-header-account-actions no-print"
       data-mobile-hidden={compactHeader && settledCompactHeader && !menuOpen}
       onKeyDown={closeMenuOnEscape}
       onClick={closeMenuOnLink}
