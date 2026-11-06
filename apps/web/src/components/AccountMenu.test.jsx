@@ -8,6 +8,8 @@ import AccountMenu from './AccountMenu.jsx';
 import AdminEntryLink from './AdminEntryLink.jsx';
 import RoleSwitcher from './RoleSwitcher.jsx';
 import { saveSessionView } from '../lib/accountViews.js';
+import { useUnsavedNavigation } from '../admin/useUnsavedNavigation.js';
+import { UnsavedChangesDialog } from '../admin/components/UnsavedChanges.jsx';
 
 const demo = vi.hoisted(() => ({ static: false, event: {} }));
 vi.mock('../lib/demoMode.js', () => ({ get IS_DEMO() { return demo.static; } }));
@@ -23,11 +25,17 @@ function Account({ compact = false, onNavigate }) {
     {compact ? <RoleSwitcher account={account} presentation="select" onNavigate={onNavigate} />
       : account.views.length > 1 ? <AccountMenu account={account}/> : null}<AdminEntryLink account={account}/><Link to="/schedule">Schedule</Link></>;
 }
-function renderAccount({registered=true, speaker=false, admin=false, path='/dashboard', uid=user.uid, compact=false, onNavigate} = {}) {
+function GuardedAccount({ blocked, onNavigate }) {
+  const guard = useUnsavedNavigation(true, {blocked});
+  return <><Account compact onNavigate={onNavigate}/>{guard.pending ? <UnsavedChangesDialog
+    onStay={guard.stay} onDiscard={guard.discard} canDiscard={guard.canDiscard} /> : null}</>;
+}
+function renderAccount({registered=true, speaker=false, admin=false, path='/dashboard', uid=user.uid, compact=false, onNavigate, unsaved=false, blocked=false} = {}) {
   return render(<MemoryRouter initialEntries={[path]}>
     <AuthContext.Provider value={{user:{...user,uid},loading:false,adminStatus:admin?'admin':'denied'}}>
       <ProfileContext.Provider value={{profile:{registrationStatus:registered?'approved':'pending',speakerId:speaker?'speaker-340':null},status:'ready'}}>
-        <Account compact={compact} onNavigate={onNavigate}/>
+        {unsaved ? <GuardedAccount blocked={blocked} onNavigate={onNavigate}/>
+          : <Account compact={compact} onNavigate={onNavigate}/>}
       </ProfileContext.Provider>
     </AuthContext.Provider>
   </MemoryRouter>);
@@ -101,23 +109,60 @@ describe('view selection', () => {
   it('offers every available view in the compact selector and navigates with the saved choice', async () => {
     const onNavigate = vi.fn();
     renderAccount({speaker:true,admin:true,path:'/admin',compact:true,onNavigate});
-    const select = screen.getByRole('combobox', {name:'View'});
-    await waitFor(() => expect(within(select).getByRole('option', {name:'Speaker'})).toBeInTheDocument());
-    expect(within(select).getAllByRole('option').map(option => option.textContent)).toEqual(['Attendee','Speaker','Admin']);
-    expect(select).toHaveValue('admin');
-    fireEvent.change(select, {target:{value:'speaker'}});
+    const select = () => screen.getByRole('combobox', {name:'View'});
+    await waitFor(() => expect(within(select()).getByRole('option', {name:'Speaker'})).toBeInTheDocument());
+    expect(within(select()).getAllByRole('option').map(option => option.textContent)).toEqual(['Attendee','Speaker','Admin']);
+    expect(select()).toHaveValue('admin');
+    fireEvent.change(select(), {target:{value:'speaker'}});
+    expect(screen.getByText('/admin')).toBeInTheDocument();
+    expect(screen.getByRole('link', {name:'Dashboard'})).toHaveAttribute('href','/admin');
+    expect(onNavigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('link', {name:'Open'}));
     expect(screen.getByText('/speaker/dashboard')).toBeInTheDocument();
-    expect(select).toHaveValue('speaker');
+    expect(select()).toHaveValue('speaker');
     expect(onNavigate).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('link', {name:'Schedule'}));
-    expect(select).toHaveValue('speaker');
+    expect(select()).toHaveValue('speaker');
     expect(screen.getByRole('link', {name:'Dashboard'})).toHaveAttribute('href','/speaker/dashboard');
-    fireEvent.change(select, {target:{value:'attendee'}});
+    fireEvent.change(select(), {target:{value:'attendee'}});
+    fireEvent.click(screen.getByRole('link', {name:'Open'}));
     expect(screen.getByText('/dashboard')).toBeInTheDocument();
-    expect(select).toHaveValue('attendee');
-    fireEvent.change(select, {target:{value:'admin'}});
+    expect(select()).toHaveValue('attendee');
+    fireEvent.change(select(), {target:{value:'admin'}});
+    fireEvent.click(screen.getByRole('link', {name:'Open'}));
     expect(screen.getByText('/admin')).toBeInTheDocument();
-    expect(select).toHaveValue('admin');
+    expect(select()).toHaveValue('admin');
+  });
+
+  it('keeps dirty edits until Open is confirmed, restores focus on Stay, and leaves only after discard', () => {
+    const onNavigate = vi.fn();
+    renderAccount({admin:true,path:'/admin/pages/edit',unsaved:true,onNavigate});
+    fireEvent.change(screen.getByRole('combobox', {name:'View'}), {target:{value:'attendee'}});
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    const open = screen.getByRole('link', {name:'Open'});
+    open.focus();
+    fireEvent.click(open);
+    expect(screen.getByRole('alertdialog', {name:'Unsaved changes'})).toBeInTheDocument();
+    expect(screen.getByText('/admin/pages/edit')).toBeInTheDocument();
+    expect(screen.getByRole('link', {name:'Dashboard'})).toHaveAttribute('href','/admin');
+    expect(onNavigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', {name:'Stay'}));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(open).toHaveFocus();
+    expect(screen.getByText('/admin/pages/edit')).toBeInTheDocument();
+    fireEvent.click(open);
+    fireEvent.click(screen.getByRole('button', {name:'Discard changes'}));
+    expect(screen.getByText('/dashboard')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', {name:'View'})).toHaveValue('attendee');
+  });
+
+  it('keeps Open from leaving while an editor save is running', () => {
+    renderAccount({admin:true,path:'/admin/pages/edit',unsaved:true,blocked:true});
+    fireEvent.change(screen.getByRole('combobox', {name:'View'}), {target:{value:'attendee'}});
+    fireEvent.click(screen.getByRole('link', {name:'Open'}));
+    expect(screen.getByRole('alertdialog', {name:'Unsaved changes'})).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name:'Discard changes'})).not.toBeInTheDocument();
+    expect(screen.getByText('/admin/pages/edit')).toBeInTheDocument();
   });
 
   it.each([

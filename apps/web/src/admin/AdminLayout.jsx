@@ -758,7 +758,7 @@ function AdminDesk() {
             {/* On a wide screen the account and its actions stay pinned to the
                 foot of the rail while the sections scroll above them. */}
             <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline bg-admin-rail-ground px-md py-sm lg:sticky lg:bottom-0 lg:z-10 lg:mt-auto lg:flex-col lg:items-stretch">
-              <RoleSwitcher account={accountViews} presentation="select" selectClass={`${railButtonClass} bg-admin-rail-ground`} labelClass="text-admin-xs" onNavigate={() => {
+              <RoleSwitcher account={accountViews} presentation="select" linkClass={railButtonClass} selectClass={`${railButtonClass} admin-rail-view-select bg-admin-rail-ground`} labelClass="text-admin-xs" onNavigate={() => {
                 if (!wide) mobileMenuRef.current?.focus();
                 setMobileDocketOpen(false);
               }} />

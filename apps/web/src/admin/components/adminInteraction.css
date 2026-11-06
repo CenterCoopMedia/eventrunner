@@ -4,6 +4,7 @@
   width: var(--admin-control-height); height: var(--admin-control-height); padding: 0;
 }
 .admin-icon-control svg { flex: none; }
+.admin-rail-view-select { padding-inline: var(--space-2xs); }
 .admin-rail-utilities {
   display: grid; grid-template-columns: repeat(3, minmax(var(--admin-control-height), 1fr));
   gap: var(--space-xs);
