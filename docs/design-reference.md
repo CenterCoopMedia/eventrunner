@@ -304,7 +304,7 @@ Keyboard-first, on the token system, in `apps/web/src/components/forms/`. Every 
 - **Dialog** — a native dialog opened as a modal, so focus is trapped, the page behind is inert, and Escape closes it. Focus returns to the control that opened it. The scrim is tinted ink, never a blur.
 - **External link** — any link that opens a new tab says so inside the link's own name.
 
-**The eyebrow ban is absolute.** Nothing sits directly above a heading — not a label, not a chip, not a small line of description, not a plain folio. It holds at every size, in every style. Two things are not eyebrows and must never be "fixed": Metadata inside the rule-bounded nameplate block, and a form `<label>` above its own input.
+**The eyebrow ban is absolute.** Nothing sits directly above a heading — not a label, not a chip, not a small line of description, not a plain folio. It holds at every size, in every style. Three things are not eyebrows and must never be "fixed": Metadata inside the rule-bounded nameplate block, a form `<label>` above its own input, and a meaningful image caption or credit inside the homepage hero's figure below 640px, where it stays with its image before the title.
 
 **Elevation is tint, not shadow.** Where a surface must sit above another, shift its tone.
 

@@ -62,10 +62,11 @@ Typography and rules do the visual work. Color decorates very little, and shadow
 
 **The eyebrow ban is absolute.** No text sits directly above a heading. Not an eyebrow label, not a chip, not a small line of description copy, and not a plain small-caps folio — a folio stacked above a headline is still an eyebrow, and a reviewer rejects it. The rule holds at every size, on every surface, in every preset. A folio lives beside a rule at a section boundary, in a margin, or in a running header. Where a label must sit near a title, put it below the title or beside it.
 
-Two things are **not** eyebrows and must never be "fixed" to satisfy this rule:
+Three things are **not** eyebrows and must never be "fixed" to satisfy this rule:
 
 - Metadata inside the rule-bounded nameplate block. The dates and the edition line are the nameplate device, wherever they sit inside it.
 - A form `<label>` above its own input. That is a control label.
+- A meaningful image caption or credit inside the homepage hero's figure below 640px. It stays with its image before the title.
 
 Cards, boxes, and chrome: A rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme's ink or accent.
 
@@ -305,7 +306,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 
 The list the design brief settles in §2.4, recorded here so a review has one place to look. This is holistic guidance, not a checklist to game: A reviewer may reject a pattern this list does not name, and may accept a listed pattern only where the brief grants an exception.
 
-- **Eyebrow furniture.** Nothing sits directly above a heading. See Editorial devices above for the full rule and its two non-exceptions.
+- **Eyebrow furniture.** Nothing sits directly above a heading. See Editorial devices above for the full rule and its three non-exceptions.
 - **Decorative gradients.** No gradient blobs, no purple-heavy gradients, no gradient as a background event.
 - **Glassmorphism.** No frosted panels, no blurred translucent overlays used as style.
 - **Zero-padded decorative numbers.** No `01` / `02` / `03` motifs.
@@ -345,6 +346,6 @@ The brief names exactly two exceptions, both narrow: A bento grid that passes al
 
 ### Event hero and demo preview
 
-The September 11 update in the binding design brief defines EventHero as the shared home and schedule hero. Home owns the h1 and all configured hero actions. Schedule uses a paragraph for the event identity before its own h1. Schedule uses the compact interior treatment at every width: It keeps the event name, dateline, meaningful image text, and caption, removes the repeated tagline, and shortens the art crop so the programme starts sooner. The component preserves safe image URLs, required alt text, focal points, and captions. From 640px up, the copy has its own column and the artwork fills the rest of the hero, so no live text sits on the picture. The column is never narrower than `--hero-copy-min-inline-size`, so the copy wins when a preset asks for a wide photograph. The title size is capped by `--hero-title-fit`, a share of the column's width, so a long word fits its line. A surface-color veil is allowed only over the leading edge of the artwork, to soften it; phone layouts place artwork below the copy. The hero is a coloured band, so its copy keeps the `--hero-inset-inline` inset from the band's edge at every width, with or without artwork. Dense rows such as session type badges keep their own tighter padding on purpose. Each preset owns its composition through component tokens.
+The September 11 update in the binding design brief defines EventHero as the shared home and schedule hero. Home owns the h1 and all configured hero actions. Schedule uses a paragraph for the event identity before its own h1. Schedule uses the compact interior treatment at every width: It keeps the event name, dateline, meaningful image text, and caption, removes the repeated tagline, and shortens the art crop so the programme starts sooner. The component preserves safe image URLs, required alt text, focal points, and captions. From 640px up, the copy has its own column and the artwork fills the rest of the hero, so no live text sits on the picture. The column is never narrower than `--hero-copy-min-inline-size`, so the copy wins when a preset asks for a wide photograph. The title size is capped by `--hero-title-fit`, a share of the column's width, so a long word fits its line. A surface-color veil is allowed only over the leading edge of the artwork, to soften it. Below 640px, Home places the artwork and caption before the title, details, and actions in both visual and reading order, in every style; compact Schedule keeps the copy before the artwork. The hero is a coloured band, so its copy keeps the `--hero-inset-inline` inset from the band's edge at every width, with or without artwork. Dense rows such as session type badges keep their own tighter padding on purpose. Each preset owns its composition through component tokens.
 
 Demo preview hides the disclosure and style controls until Exit preview or Escape. It preserves theme, mode, and route. Client builds have no preview controls. Uploaded client marks remain supported, with no fallback square for an absent mark.
