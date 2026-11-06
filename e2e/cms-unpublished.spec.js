@@ -137,7 +137,7 @@ test.describe.serial('unpublished changes', () => {
     const failedRow = runs.locator(`[data-run="${failedRef.id}"]`);
     await expect(failedRow).toContainText('Failed');
     await expect(failedRow).toContainText('0 of 1 published before it stopped.');
-    await expect(failedRow).toContainText('E2E: the second chunk commit failed.');
+    await expect(failedRow).toContainText('Some changes were not published.');
     await expect(failedRow.getByRole('button', { name: 'Resume publish' })).toBeVisible();
 
     // A later save and publish: a new Done run leads, and the failed run

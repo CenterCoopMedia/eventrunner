@@ -142,7 +142,7 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
 
     // What changed: the one field, the stored text before and after.
     const table = latest.getByRole('table', { name: `What changed in version ${live.revision}` });
-    const change = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'value', exact: true }) });
+    const change = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Content', exact: true }) });
     await expect(change).toHaveCount(1);
     await expect(change.getByRole('cell').nth(0)).toHaveText(oldSubtitle);
     await expect(change.getByRole('cell').nth(1)).toHaveText(newSubtitle);
