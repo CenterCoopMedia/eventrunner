@@ -29,7 +29,6 @@ import {
   Notice,
   SelectField,
   TextField,
-  rowMetaClass,
   rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -40,9 +39,11 @@ import {
   DEFAULT_COLLECTION,
   collectionChoice,
   formatPublishedAt,
-  recordNameOf,
   toMillis,
 } from '../versionHistory.js';
+
+import AdminIconControl from '../components/AdminIconControl.jsx';
+import { versionRecordName } from './versionDisplay.js';
 
 const SORTS = Object.freeze({ published: 'Most recently published', name: 'Name, A to Z' });
 
@@ -90,7 +91,7 @@ export default function AdminVersionRecords() {
         .filter((row) => row.current)
         .map((row) => ({
           id: row.id,
-          name: recordNameOf(collection, row.current),
+          name: versionRecordName(collection, row.current),
           state: row.state,
           live: row.live,
           publishedMs: toMillis(row.live?.publishedAt),
@@ -99,7 +100,7 @@ export default function AdminVersionRecords() {
   );
   const shown = useMemo(() => {
     const matching = needle
-      ? all.filter((row) => row.name.toLowerCase().includes(needle) || row.id.toLowerCase().includes(needle))
+      ? all.filter((row) => row.name.toLowerCase().includes(needle))
       : all;
     return [...matching].sort(sort === 'name' ? byName : byPublished);
   }, [all, needle, sort]);
@@ -128,17 +129,18 @@ export default function AdminVersionRecords() {
     body = (
       <AdminEmptyState
         title={`No ${choice.plural} yet`}
-        description="A record shows here once it is saved. A version is added each time it is published."
+        description="Save content to start its version history."
+        action={<Link to={choice.id === 'cmsContent' ? '/admin/content' : ({ cmsPages: '/admin/pages', cmsSchedule: '/admin/sessions', cmsOrganizations: '/admin/organizations', cmsUpdates: '/admin/updates', cmsTimeline: '/admin/timeline' })[choice.id]} className={secondaryButtonClass}>Manage {choice.plural}</Link>}
       />
     );
   } else if (shown.length === 0) {
     body = (
       <AdminEmptyState
         title={`No ${choice.plural} match “${query.trim()}”`}
-        description="The search looks at each record’s name and id."
+        description="Try another name or clear the search."
         action={
           <button type="button" className={secondaryButtonClass} onClick={clearSearch}>
-            Clear search
+            Show all
           </button>
         }
       />
@@ -170,7 +172,6 @@ export default function AdminVersionRecords() {
                   >
                     {row.name}
                   </Link>
-                  <span className={rowMetaClass}>{row.id}</span>
                 </div>
               ),
               // A hidden live version is on no public page, so the list says
@@ -205,7 +206,7 @@ export default function AdminVersionRecords() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Version history"
-        description="Every publish keeps a version. Pick a collection, then a record, to see what changed, when, and who published it. Saving a draft adds no version."
+        description="Choose an item to see its published versions and restore past content."
       />
 
       <form
@@ -217,7 +218,7 @@ export default function AdminVersionRecords() {
       >
         <div className="min-w-0 grow basis-48">
           <SelectField
-            label="Collection"
+            label="Content type"
             value={collection}
             onChange={(id) => writeParam('collection', id === DEFAULT_COLLECTION ? '' : id)}
             options={COLLECTION_CHOICES.map((option) => ({ value: option.id, label: option.label }))}
@@ -225,7 +226,7 @@ export default function AdminVersionRecords() {
         </div>
         <div className="min-w-0 grow basis-64">
           <TextField
-            label="Search by name or id"
+            label="Search by name"
             type="search"
             value={query}
             onChange={(q) => writeParam('q', q, { replace: true })}
@@ -234,9 +235,7 @@ export default function AdminVersionRecords() {
             maxLength={200}
           />
         </div>
-        <button type="button" className={secondaryButtonClass} onClick={clearSearch}>
-          Clear
-        </button>
+        <AdminIconControl icon="close" label="Clear search" className={secondaryButtonClass} onClick={clearSearch} />
         <div className="min-w-0 grow basis-48">
           <SelectField
             label="Order records by"

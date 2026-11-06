@@ -1,6 +1,6 @@
 // AssetImage: what a missing object says, and to whom.
 //
-// The admin sentence ("This file is missing from storage.") is written for
+// The admin sentence ("This image could not load. Try again.") is written for
 // somebody who owns the library and can fix it. On the public site the same
 // sentence reaches a visitor who cannot act on it, about a file they were
 // never meant to think about — a sponsor's logo, whose organization is
@@ -36,7 +36,7 @@ describe('AssetImage', () => {
 
   it('tells an operator when the object cannot be resolved', () => {
     const { container } = render(<AssetImage path={null} alt="A mark" />);
-    expect(container.textContent).toContain('This file is missing from storage.');
+    expect(container.textContent).toContain('This image could not load. Try again.');
   });
 
   it('reads the tier 2 role tokens, not the old compatibility names (issue 247)', () => {
@@ -50,7 +50,7 @@ describe('AssetImage', () => {
   it('tells an operator when the object is gone from the bucket', () => {
     const { container } = render(<AssetImage path="branding/gone.png" alt="A mark" />);
     fireEvent.error(container.querySelector('img'));
-    expect(container.textContent).toContain('This file is missing from storage.');
+    expect(container.textContent).toContain('This image could not load. Try again.');
   });
 
   it('says nothing at all for a decorative miss, and keeps the space', () => {
@@ -129,7 +129,7 @@ describe('AssetImage', () => {
       fireEvent.error(await sized(container));
       fireEvent.error(container.querySelector('img'));
       expect(container.querySelector('img')).toBeNull();
-      expect(container.textContent).toContain('This file is missing from storage.');
+      expect(container.textContent).toContain('This image could not load. Try again.');
     });
 
     it('tries the sizes again for a new path', async () => {

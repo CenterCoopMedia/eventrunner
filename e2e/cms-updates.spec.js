@@ -72,7 +72,7 @@ test.describe.serial('the updates editor', () => {
     await page.getByLabel('Title', { exact: true }).fill(title);
     await page.getByLabel('Text', { exact: true }).fill('The workshop list for next year is on the schedule page.');
     await page.getByLabel('Date', { exact: true }).fill(day);
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByRole('status').filter({ hasText: 'Draft saved. It is not live until you publish it.' })).toBeVisible();
     await expect(page).toHaveURL(/\/admin\/updates\/[A-Za-z0-9_-]{8,}$/);
@@ -117,7 +117,7 @@ test.describe.serial('the updates editor', () => {
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Backspace');
     expect(await date.evaluate((input) => input.validity.badInput)).toBe(true);
-    const save = page.getByRole('button', { name: 'Save draft' });
+    const save = page.getByRole('button', { name: 'Save', exact: true });
     await save.click();
     await expect(page.getByText('Enter the full date, or clear the field.')).toBeVisible();
     await expect(date).toHaveAttribute('aria-invalid', 'true');
@@ -149,11 +149,11 @@ test.describe.serial('the updates editor', () => {
   });
 
   test('the update appears on the public page after the editor publishes it', async () => {
-    const publish = page.getByRole('button', { name: 'Save and publish' });
+    const publish = page.getByRole('button', { name: 'Publish', exact: true });
     // A date a year ahead never disables the publish action.
     await expect(publish).toBeEnabled();
     await publish.click();
-    await expect(page.getByRole('status').filter({ hasText: 'Published. The public site picks it up live.' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Published.' })).toBeVisible();
     await expect(page.locator('header [data-record-state]')).toHaveText('Live');
 
     const live = await adminDb().collection('cmsUpdates').doc(updateId).get();

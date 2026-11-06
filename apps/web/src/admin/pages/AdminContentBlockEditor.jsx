@@ -25,15 +25,14 @@ import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { leadsToNoPublicPage, switchedOffSectionFor } from '../../lib/linkTargets.js';
 import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
+import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import {
   BLOCK_TYPE_IDS,
   FACT_HINTS,
-  QUOTE_HINTS,
   STAT_CONTRACT_HINTS,
   blockTypeFor,
-  blockTypeLabel,
 } from '../blockTypes.js';
 import { SPONSOR_PACKAGE_HINTS } from '../sponsorPackageHints.js';
 import {
@@ -66,6 +65,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
@@ -89,7 +89,7 @@ const RichTextEditor = lazy(() => import('../components/RichTextEditor.jsx'));
 const FIELD_HINTS = Object.freeze({
   stat: STAT_CONTRACT_HINTS,
   fact: FACT_HINTS,
-  quote: QUOTE_HINTS,
+  quote: { text: 'Use the speaker’s exact words, without quotation marks.', attribution: 'Who said it, and in what role.' },
   sponsor_package: SPONSOR_PACKAGE_HINTS,
 });
 
@@ -123,7 +123,7 @@ function linkTargetWarning(blockTypeId, fieldId, value, features, pageRows) {
   const url = typeof value === 'string' ? value.trim() : value;
   const gate = switchedOffSectionFor(url, features);
   if (gate) {
-    return `${featureLabel(gate)} is off in Features. The public site does not show this link until you turn it on.`;
+    return `${featureLabel(gate)} is off. This link is hidden until it is turned on.`;
   }
   // The public site reads the published pages, so this does too.
   const published = pageRows ? pageRows.map((row) => row.live).filter(Boolean) : null;
@@ -145,12 +145,12 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
   if (!blockTypeFor(blockTypeId)) {
     return (
       <p className="text-admin-sm text-admin-ink-secondary">
-        Choose a block type above to fill in its value.
+        Choose a content type to start writing.
       </p>
     );
   }
   return (
-    <div className="admin-content-fields grid gap-sm sm:grid-cols-2">
+    <div className="admin-content-fields grid items-end gap-sm sm:grid-cols-2">
       {fields.map((field) => {
         const name = editorialFieldLabel(blockTypeId, field.id);
         const label = field.required ? name : `${name} (optional)`;
@@ -385,7 +385,7 @@ export default function AdminContentBlockEditor({ mode }) {
       return (
         <Notice
           tone="caution"
-          message="We could not load this block and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+          message="This block could not load. Check your connection and try again."
         />
       );
     }
@@ -398,7 +398,7 @@ export default function AdminContentBlockEditor({ mode }) {
       return (
         <Notice
           tone="caution"
-          message="We could not load content. A new block waits until both revisions have loaded, so its order cannot tie a block that is still loading."
+          message="Content could not load. Check your connection and try again."
         />
       );
     }
@@ -408,7 +408,7 @@ export default function AdminContentBlockEditor({ mode }) {
     return (
       <AdminEmptyState
         title="No such section"
-        description="That section doesn’t exist on this page (any more)."
+        description="This section is no longer available. Choose another section."
         action={
           <Link to="../../.." relative="path" className={primaryButtonClass}>
             Back to content
@@ -421,7 +421,7 @@ export default function AdminContentBlockEditor({ mode }) {
     return (
       <AdminEmptyState
         title="No such block"
-        description="That content block has neither a published nor a draft revision."
+        description="This block is no longer available. Choose another block."
         action={
           <Link to=".." relative="path" className={primaryButtonClass}>
             Back to section
@@ -453,10 +453,15 @@ export default function AdminContentBlockEditor({ mode }) {
     setResumeQueueId(null);
     // Give immediate field feedback before the server repeats the same
     // required-field contract at the write boundary.
-    const validationErrors = validateRequiredContent(content);
+    const validationErrors = validateRequiredContent(content).map((item) => ({
+      ...item,
+      message: item.field === 'blockType' ? 'Choose a content type.'
+        : item.field === 'limit' ? 'Enter a whole number of 1 or more, or clear the field.'
+          : item.message,
+    }));
     if (validationErrors.length > 0) {
       setError({
-        message: 'Fill in the required fields for this block type before saving.',
+        message: 'Fill in the required fields before saving.',
         fieldErrors: validationErrors,
         clientValidation: true,
       });
@@ -527,7 +532,7 @@ export default function AdminContentBlockEditor({ mode }) {
     } catch (err) {
       if (!mountedRef.current) return;
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
-      setError(err);
+      setError(contentError(err, { fallback: stage === 'publish' ? 'Publishing did not finish. Your draft is saved. Try again.' : undefined, labels: Object.fromEntries(valueFieldsOf(content.blockType).map((field) => [field.id, editorialFieldLabel(content.blockType, field.id)])) }));
       if (err?.queueId) setResumeQueueId(err.queueId);
     } finally {
       if (mountedRef.current) setBusy(null);
@@ -537,8 +542,8 @@ export default function AdminContentBlockEditor({ mode }) {
   /** cmsPublish answers 200 even when it skipped what you asked for. */
   function reportPublish(response, requestedIds) {
     const verdict = summarizePublish(response, 'cmsContent', requestedIds, 'content blocks');
-    if (!verdict.ok) throw new Error(verdict.message);
-    setStatus(verdict.message);
+    if (!verdict.ok) throw Object.assign(new Error(verdict.message), { contentPublishResult: true });
+    setStatus('Published.');
   }
 
   async function resumePublish() {
@@ -551,7 +556,7 @@ export default function AdminContentBlockEditor({ mode }) {
       setResumeQueueId(null);
       reportPublish(response, [savedDocId]);
     } catch (err) {
-      setError(err);
+      setError(contentError(err, { labels: Object.fromEntries(valueFieldsOf(content.blockType).map((field) => [field.id, editorialFieldLabel(content.blockType, field.id)])) }));
       if (err?.queueId) setResumeQueueId(err.queueId);
     } finally {
       setBusy(null);
@@ -567,8 +572,8 @@ export default function AdminContentBlockEditor({ mode }) {
       showToast('Block deleted.');
       navigate('..', { relative: 'path' });
     } catch (err) {
-      setErrorTitle('The server refused the delete');
-      setError(err);
+      setErrorTitle('Could not delete. Try again.');
+      setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: Object.fromEntries(valueFieldsOf(content.blockType).map((field) => [field.id, editorialFieldLabel(content.blockType, field.id)])) }));
       setBusy(null);
     }
   }
@@ -578,43 +583,30 @@ export default function AdminContentBlockEditor({ mode }) {
     content.blockType && !registryOptions.includes(content.blockType)
       ? [content.blockType, ...registryOptions]
       : registryOptions
-  ).map((id) => ({ value: id, label: blockTypeLabel(id) }));
+  ).map((id) => ({ value: id, label: blockTypeFor(id)?.label ?? 'Content block' }));
 
   const settingsPanel = (
     <Panel
       key="settings"
-      title={isExisting ? 'Block settings' : 'Set up the block'}
-      description={isExisting ? 'Type and visibility for this block.' : 'Choose the block type, then write the content below.'}
+      title={isExisting ? 'Block settings' : 'Content type'}
       className="admin-content-settings"
     >
       {isExisting ? (
         <div className="admin-content-settings-summary">
           <p className="text-admin-sm text-admin-ink-secondary">
-            {blockTypeLabel(content.blockType)} · Order {content.order === '' ? 'not set' : content.order} · {content.visible ? 'Visible' : 'Hidden'}
+            {blockTypeFor(content.blockType)?.label ?? 'Content block'} · {content.visible ? 'Visible' : 'Hidden'}
           </p>
-          <button
-            type="button"
-            className={`${secondaryButtonClass} admin-content-settings-toggle`}
+          <AdminIconControl
+            label={settingsOpen ? 'Hide block settings' : 'Edit block settings'}
+            icon={settingsOpen ? 'close' : 'edit'}
             aria-expanded={settingsOpen}
             aria-controls="admin-content-block-settings"
             onClick={() => setSettingsOpen((open) => !open)}
-          >
-            {settingsOpen ? 'Hide block settings' : 'Edit block settings'}
-          </button>
+          />
         </div>
       ) : null}
       <div id="admin-content-block-settings" hidden={isExisting && !settingsOpen}>
-        <div className="mt-sm grid gap-sm sm:grid-cols-2">
-          {isExisting ? (
-            <TextField
-              label="Field id"
-              value={currentFieldId}
-              onChange={() => {}}
-              error={errorFor('field')}
-              readOnly
-              hint="This id stays the same when the text changes."
-            />
-          ) : null}
+        <div className="mt-sm grid items-end gap-sm sm:grid-cols-2">
           <SelectField
             label="Block type"
             value={content.blockType}
@@ -627,7 +619,6 @@ export default function AdminContentBlockEditor({ mode }) {
               label="Visible"
               checked={content.visible}
               onChange={(checked) => setContent((current) => ({ ...current, visible: checked }))}
-              hint="Hidden blocks stay out of the public site even once published."
             />
           </div>
         </div>
@@ -635,7 +626,7 @@ export default function AdminContentBlockEditor({ mode }) {
     </Panel>
   );
   const valuePanel = (
-    <Panel key="value" title="Content" description={blockTypeFor(content.blockType)?.description} className="admin-content-value">
+    <Panel key="value" title="Content" className="admin-content-value">
       <BlockValueFields
         blockTypeId={content.blockType}
         values={content.values}
@@ -660,31 +651,21 @@ export default function AdminContentBlockEditor({ mode }) {
       <AdminPageHeader
         title={mode === 'create'
           ? 'New content block'
-          : contentBlockTitle({ ...content.values, field: currentFieldId, blockType: content.blockType })}
+          : contentBlockTitle({ ...content.values, blockType: content.blockType })}
         state={(
           <>
             {existingRow ? <RecordState state={existingRow.state} /> : null}
             {unsaved ? <UnsavedEditBadge /> : null}
           </>
         )}
-        identifiers={`${page?.current?.label || pageId} · ${section?.label || sectionId}`}
-        description={
-          // JSX children, not a template literal: while the page listener is
-          // still loading, `page` is null and a template literal would print
-          // the literal word "undefined" — JSX quietly renders nothing for
-          // an undefined child instead, same as before the restyle.
-          <>
-            {section?.label || sectionId} · {page?.current?.label}. Saving writes a draft;
-            publishing copies it to the live revision the public site reads.
-          </>
-        }
+        identifiers={`${page?.current?.label || 'Untitled page'} · ${section?.label || 'Untitled section'}`}
         actions={
           <>
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to section
             </Link>
             <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
-              {busy === 'draft' ? 'Saving…' : 'Save draft'}
+              {busy === 'draft' ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
@@ -693,7 +674,7 @@ export default function AdminContentBlockEditor({ mode }) {
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {busy === 'publish' ? 'Publishing…' : 'Save and publish'}
+              {busy === 'publish' ? 'Publishing…' : 'Publish'}
             </button>
             <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
@@ -717,7 +698,7 @@ export default function AdminContentBlockEditor({ mode }) {
       {isExisting && isStarterContent({ ...content.values, blockType: content.blockType, seeded: existingRow?.current?.seeded }) ? (
         <Notice
           tone="caution"
-          message="This block still has starter text, so it is hidden on the public site. Replace every line that starts with [Replace], then publish, and the block appears."
+          message="Replace the starter text, then publish to show this block on the site."
         />
       ) : null}
       <div className="admin-content-editor-layout" data-creating={!isExisting}>
@@ -738,12 +719,13 @@ export default function AdminContentBlockEditor({ mode }) {
         {isExisting ? (
           <DestructiveConfirm
             trigger="Delete this block"
-            title={`Delete ${contentBlockTitle({ ...content.values, field: currentFieldId, blockType: content.blockType })}`}
+            triggerIcon="delete"
+            title={`Delete ${contentBlockTitle({ ...content.values, blockType: content.blockType })}`}
             confirmLabel="Delete this block"
             busyLabel="Deleting…"
             busy={busy === 'delete'}
             disabled={busy !== null}
-            consequence={`The live revision of ${currentFieldId} and its draft both go, and the section renders without it.`}
+            consequence="This block and its saved draft will be deleted."
             permanence="This cannot be undone."
             onConfirm={remove}
           />

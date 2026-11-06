@@ -23,6 +23,6 @@ describe('actionable overview figures', () => {
     show(true);
     expect(screen.getByRole('link', { name: /Review system errors/ })).toHaveAttribute('href', '/admin/system-errors');
     expect(screen.getAllByRole('article')).toHaveLength(5);
-    expect(screen.getByRole('article', { name: 'Tickets' })).toHaveTextContent('One ticket record, not one seat.');
+    expect(screen.getByRole('article', { name: 'Tickets' })).toHaveTextContent('0 tickets');
   });
 });

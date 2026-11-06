@@ -39,16 +39,22 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
 
+  function fileProblem(chosen) {
+    if (chosen && !accepted.includes(chosen.type)) return `This file type is not supported. Choose ${accepted.map(typeLabel).join(', ')}.`;
+    const problem = checkFile(chosen, { types: accepted, maxBytes: MEDIA_MAX_BYTES });
+    return problem && chosen ? `${problem} Choose a smaller file.` : problem;
+  }
+
   function chooseFile(event) {
     const chosen = event.target.files?.[0] ?? null;
     setFile(chosen);
-    setError(chosen ? checkFile(chosen, { types: accepted, maxBytes: MEDIA_MAX_BYTES }) : null);
+    setError(chosen ? fileProblem(chosen) : null);
   }
 
   async function submit(event) {
     event.preventDefault();
     if (pending.current) return;
-    const problem = checkFile(file, { types: accepted, maxBytes: MEDIA_MAX_BYTES });
+    const problem = fileProblem(file);
     if (problem) {
       setError(problem);
       return;
@@ -60,7 +66,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
       const asset = await upload({ file, folder, alt: alt.trim(), title: title.trim() });
       onUploaded(asset);
     } catch (err) {
-      setError(mediaErrorMessage(err));
+      setError(mediaErrorMessage(err, 'The file could not be uploaded. Try again.'));
     } finally {
       pending.current = false;
       setBusy(false);
@@ -70,7 +76,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
   return (
     <ModalShell
       title="Upload a file"
-      description={`${accepted.map(typeLabel).join(', ')} · up to ${formatBytes(MEDIA_MAX_BYTES)} · stored in ${folder}/`}
+      description={`${accepted.map(typeLabel).join(', ')} · Up to ${formatBytes(MEDIA_MAX_BYTES)}`}
       onClose={onClose}
       busy={busy}
       returnFocusRef={returnFocusRef}
@@ -98,7 +104,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
         </div>
 
         <TextAreaField
-          label="Alt text"
+          label="Image description"
           value={alt}
           onChange={setAlt}
           rows={2}

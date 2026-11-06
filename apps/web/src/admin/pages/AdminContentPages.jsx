@@ -25,17 +25,18 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import '../contentBrowser.css';
 
 function PageSections({ row }) {
   const sections = Array.isArray(row.current?.sections) ? row.current.sections : [];
   if (sections.length > 0) {
     return (
-      <ul className="admin-content-section-links" role="list" aria-label={`Sections in ${row.current?.label || row.id}`}>
+      <ul className="admin-content-section-links" role="list" aria-label={`Sections in ${row.current?.label || 'Untitled page'}`}>
         {sections.map((section) => (
           <li key={section.id}>
             <Link to={contentSectionPath(row.id, section.id)} className="admin-content-section-link">
-              {section.label || section.id}
+              {section.label || 'Untitled section'}
             </Link>
           </li>
         ))}
@@ -71,14 +72,13 @@ export default function AdminContentPages() {
     <div className="admin-content-browser flex flex-col gap-md">
       <AdminPageHeader
         title="Content"
-        description="Find a page or jump straight to a section."
         actions={<Link to="/admin/pages" className={linkButtonClass}>Manage page structure</Link>}
       />
 
       {error ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the page list; showing the last values we received and retrying."
+          message="The page list could not refresh. Check your connection."
         />
       ) : null}
 
@@ -87,7 +87,7 @@ export default function AdminContentPages() {
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title={ready ? 'No pages yet' : 'The page list is not available yet'}
-          description={ready ? 'Create a page in Pages before editing its content.' : 'We are waiting for the page list to reconnect.'}
+          description={ready ? 'Create your first page to add content.' : 'Check your connection to load the page list.'}
           action={ready ? <Link to="/admin/pages/new" className={secondaryButtonClass}>Create a page</Link> : null}
         />
       ) : (
@@ -106,13 +106,13 @@ export default function AdminContentPages() {
                     id={searchId}
                     type="search"
                     className={inputClass}
-                    placeholder="Page name, path, or section"
+                    placeholder="Page or section name"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     aria-describedby={resultId}
                   />
                 </div>
-                {query ? <button type="button" className={secondaryButtonClass} onClick={clearSearch}>Clear search</button> : null}
+                {query ? <AdminIconControl label="Clear search" icon="close" onClick={clearSearch} /> : null}
               </div>
             </div>
             <p id={resultId} role="status" aria-atomic="true" className="admin-content-browser__result">
@@ -123,7 +123,8 @@ export default function AdminContentPages() {
           {filtered.length === 0 ? (
             <AdminEmptyState
               title="No matching pages"
-              description={`No page name, path, or section matches “${query.trim()}”. Clear the search to see every page.`}
+              description={`No pages match “${query.trim()}”.`}
+              action={<AdminIconControl label="Clear search" icon="close" onClick={clearSearch} />}
             />
           ) : (
             <Panel flush className="admin-content-browser__panel">
@@ -143,9 +144,8 @@ export default function AdminContentPages() {
                     <tr key={row.id} role="row" data-page-state={row.state.id}>
                       <th scope="row" role="rowheader" className="admin-content-index__page">
                         <Link to={contentPagePath(row.id)} className={`${rowTitleLinkClass} admin-content-page-name`}>
-                          {row.current?.label || row.id}
+                          {row.current?.label || 'Untitled page'}
                         </Link>
-                        {row.current?.path ? <p className="admin-content-page-path">{row.current.path}</p> : null}
                       </th>
                       <td role="cell" className="admin-content-index__sections">
                         <span className="admin-content-index__mobile-label" aria-hidden="true">Sections</span>
@@ -161,7 +161,6 @@ export default function AdminContentPages() {
               </table>
             </Panel>
           )}
-          <p className="admin-content-browser__note">Page state is for the page’s structure. Open a section to review its content drafts.</p>
         </>
       )}
     </div>

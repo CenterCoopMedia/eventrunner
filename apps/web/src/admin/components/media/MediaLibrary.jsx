@@ -1,8 +1,8 @@
 // The browsable library: every indexed asset as a grid, with upload, search,
 // per-asset details, and delete-with-usage-warning. Admin-only (design brief
 // §5.2, admin story part 2 "the cut file") — a print shop's cabinet of
-// engravings, not a photo gallery. The thumbnail is evidence; the path and
-// size beside it, in the mono, are the point.
+// engravings, not a photo gallery. Tiles show file names, sizes, and image
+// descriptions beside each thumbnail.
 //
 // One component serves both jobs the issue names. On the Media tab it is a
 // browser: clicking a tile opens its detail modal. Inside ImagePicker it is
@@ -14,7 +14,7 @@
 // shows, but offers no upload, and its asset modal offers no save or
 // delete. The server refuses those writes anyway; the drawer says so in one
 // line rather than with buttons that fail.
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext.jsx';
 import { formatBytes } from '../../../lib/mediaSource.js';
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from '../adminChrome.jsx';
@@ -31,6 +31,7 @@ import { useMediaLibrary } from '../../../components/media/useMediaLibrary.js';
 import AssetModal from './AssetModal.jsx';
 import { BRANDING_NOTE } from './mediaErrors.js';
 import UploadModal from './UploadModal.jsx';
+import AdminIconControl from '../AdminIconControl.jsx';
 
 /** Case-insensitive match across the fields a person would search by. */
 function matches(asset, term) {
@@ -67,6 +68,7 @@ export default function MediaLibrary({
   const [detail, setDetail] = useState(null);
   const [notice, setNotice] = useState(null);
   const searchRef = useRef(null);
+  const searchId = useId();
 
   const visible = useMemo(() => assets.filter((asset) => matches(asset, term)), [assets, term]);
   const choosing = typeof onSelect === 'function';
@@ -79,12 +81,12 @@ export default function MediaLibrary({
               box is the same control as every other field in the room —
               a second copy of those class strings is a second answer to
               "what does a field look like here". */}
-          <label htmlFor="media-search" className={fieldLabelClass}>
+          <label htmlFor={searchId} className={fieldLabelClass}>
             Search the library
           </label>
           <input
             ref={searchRef}
-            id="media-search"
+            id={searchId}
             type="search"
             value={term}
             onChange={(event) => setTerm(event.target.value)}
@@ -95,8 +97,8 @@ export default function MediaLibrary({
         {brandingLocked ? (
           <p className="text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p>
         ) : (
-          <button type="button" className={primaryButtonClass} onClick={() => setUploading(true)}>
-            Upload a file
+          <button type="button" aria-label="Upload a file" className={primaryButtonClass} onClick={() => setUploading(true)}>
+            Upload
           </button>
         )}
       </div>
@@ -104,7 +106,7 @@ export default function MediaLibrary({
       {error ? (
         <Notice
           tone="caution"
-          message="The library could not be loaded just now. It will reappear when the connection recovers."
+          message="The library could not load. Check your connection and try again."
         />
       ) : null}
       {notice ? <Notice tone="ok" message={notice} /> : null}
@@ -120,8 +122,13 @@ export default function MediaLibrary({
               : brandingLocked
                 ? BRANDING_NOTE
                 : emptyHint ||
-                'Upload an image to start the library. Files are stored server-side; nothing is written from the browser.'
+                'Upload an image to add it to your event.'
           }
+          action={term ? (
+            <AdminIconControl label="Clear search" icon="remove" onClick={() => { setTerm(''); searchRef.current?.focus(); }} />
+          ) : brandingLocked ? null : (
+            <button type="button" aria-label="Upload a file" className={primaryButtonClass} onClick={() => setUploading(true)}>Upload</button>
+          )}
         />
       ) : null}
 
@@ -134,6 +141,7 @@ export default function MediaLibrary({
                 type="button"
                 className="admin-target block w-full text-left"
                 aria-pressed={choosing ? Boolean(isSelected) : undefined}
+                aria-haspopup={choosing ? undefined : 'dialog'}
                 onClick={() => (choosing ? onSelect(asset) : setDetail(asset))}
               >
                 <AssetImage
@@ -148,23 +156,23 @@ export default function MediaLibrary({
                     </span>
                     {isSelected ? <StatusBadge tone="info">Selected</StatusBadge> : null}
                   </span>
-                  <span className={`block truncate ${rowMetaClass}`}>{asset.path}</span>
+                  <span className={`block truncate ${rowMetaClass}`}>{asset.filename || asset.path?.split('/').pop()}</span>
                   <span className="block font-admin-data text-admin-xs text-admin-ink-secondary">
                     {formatBytes(asset.size)}
                   </span>
                   {asset.alt ? null : (
-                    <span className="block text-admin-xs text-admin-ink-secondary">no alt text</span>
+                    <span className="block text-admin-xs text-admin-ink-secondary">No image description</span>
                   )}
                 </span>
               </button>
               {choosing ? (
-                <button
-                  type="button"
-                  className="admin-target border-admin-rule-hairline border-t-admin-hairline px-sm py-xs text-left font-admin-ui text-admin-sm font-semibold text-admin-ink-link hover:bg-admin-ground-soft"
+                <AdminIconControl
+                  label={`File details for ${asset.title || asset.filename || 'image'}`}
+                  icon="more"
+                  aria-haspopup="dialog"
+                  className="self-end m-2xs"
                   onClick={() => setDetail(asset)}
-                >
-                  Details and delete
-                </button>
+                />
               ) : null}
             </li>
           );
@@ -209,9 +217,7 @@ export default function MediaLibrary({
       ) : null}
 
       {choosing && selectedPath ? (
-        <button type="button" className={secondaryButtonClass} onClick={() => onSelect(null)}>
-          Clear the selection
-        </button>
+        <AdminIconControl label="Clear selection" icon="remove" className={`${secondaryButtonClass} self-start`} onClick={() => onSelect(null)} />
       ) : null}
     </div>
   );

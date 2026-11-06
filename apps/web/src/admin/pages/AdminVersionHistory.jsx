@@ -8,9 +8,8 @@
 // diffs anything itself. It reads the record's live and draft documents too
 // (useAdminRecords), for its name, its state, and what a restore replaces.
 //
-// STORED VALUES ARE TEXT. Every value, path and account is a React text
-// node. Rich text shows its tags; nothing is parsed, and a stored URL is
-// never made a link, so a `javascript:` value cannot run here.
+// Stored content is shown as plain text with human labels. Internal fields
+// and identifiers stay in requests. Stored URLs never become links.
 //
 // RESTORE. A past version can become the record's draft again. The page
 // sends the version's fields through the record's normal save endpoint, so
@@ -41,6 +40,8 @@ import {
   unavailableButtonClass,
 } from '../components/formControls.jsx';
 import { summarizePublish } from '../publishResult.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
+import { versionAuthor, versionFieldLabel, versionRecordName, versionValue } from './versionDisplay.js';
 import { deadMatter } from '../recordState.js';
 import { useAdminRecords } from '../useAdminRecords.js';
 import {
@@ -48,10 +49,7 @@ import {
   formatClock,
   formatPublishedAt,
   pageIdForSection,
-  pathText,
-  recordNameOf,
   restoreRequestFor,
-  valueText,
 } from '../versionHistory.js';
 
 const PAGE_SIZE = 20;
@@ -65,8 +63,8 @@ const headClass =
 const cellClass = 'px-sm py-xs align-top wrap-anywhere';
 
 /** A stored value as text, its start only when it is long. */
-function ValueCell({ value, time, timeZone }) {
-  const text = valueText(value, { time, timeZone });
+function ValueCell({ value, time, timeZone, path }) {
+  const text = time ? formatPublishedAt(value, timeZone) ?? versionValue(value, { path }) : versionValue(value, { path });
   if (text.length <= SHOWN_CHARACTERS) return <span className="whitespace-pre-wrap">{text}</span>;
   return (
     <>
@@ -84,7 +82,8 @@ function ValueCell({ value, time, timeZone }) {
 /** The what-changed entry: a table that never scrolls sideways. */
 function ChangeTable({ entry, timeZone }) {
   const first = entry.previousRevision === null;
-  const changes = Array.isArray(entry.changes) ? entry.changes : [];
+  const allChanges = Array.isArray(entry.changes) ? entry.changes : [];
+  const changes = allChanges.filter((change) => versionFieldLabel(change.path));
   const more = Number.isFinite(entry.moreChanges) ? entry.moreChanges : 0;
   return (
     <div className="flex flex-col gap-xs">
@@ -98,7 +97,7 @@ function ChangeTable({ entry, timeZone }) {
           Change details are too large to show. This version can still be restored.
         </p>
       ) : changes.length === 0 ? (
-        <p className="text-admin-sm text-admin-ink">No field changed in this publish.</p>
+        <p className="text-admin-sm text-admin-ink">{allChanges.length ? 'Other content changed.' : 'No content changed in this publish.'}</p>
       ) : (
         <table className="w-full table-fixed border-collapse text-admin-sm">
           <caption className="sr-only">{`What changed in version ${entry.revision}`}</caption>
@@ -119,21 +118,22 @@ function ChangeTable({ entry, timeZone }) {
             {changes.map((change) => (
               <tr key={change.path} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
                 <th scope="row" className={`${cellClass} text-start font-admin-data font-normal text-admin-ink-data`}>
-                  {pathText(change.path)}
+                  {versionFieldLabel(change.path)}
                 </th>
                 {first ? null : (
                   <td className={`${cellClass} text-admin-ink`}>
-                    <ValueCell value={change.before} time={change.time} timeZone={timeZone} />
+                    <ValueCell value={change.before} time={change.time} timeZone={timeZone} path={change.path} />
                   </td>
                 )}
                 <td className={`${cellClass} text-admin-ink`}>
-                  <ValueCell value={change.after} time={change.time} timeZone={timeZone} />
+                  <ValueCell value={change.after} time={change.time} timeZone={timeZone} path={change.path} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
+      {changes.length > 0 && allChanges.length > changes.length ? <p className="text-admin-sm text-admin-ink-secondary">Other content changed.</p> : null}
       {more > 0 && !entry.changeValuesOmitted ? (
         <p className="text-admin-sm text-admin-ink-secondary">
           {`${plural(more, 'more change is', 'more changes are')} not listed.`}
@@ -161,7 +161,7 @@ function RestoreConfirm({ entry, removed, busy, disabled, error, onConfirm, onCa
       </p>
       {error ? (
         <div ref={errorRef} tabIndex={-1}>
-          <Notice tone="error" message={error.message} />
+          <Notice tone="error" message="This version could not be restored. Try again or edit the current draft." />
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-xs">
@@ -394,13 +394,13 @@ export default function AdminVersionHistory() {
       if (!isCurrent()) return;
       const verdict = summarizePublish(response, choice.id, [docId], choice.plural);
       if (verdict.ok) {
-        setNotice({ docPath, kind: 'published', message: verdict.message });
+        setNotice({ docPath, kind: 'published', message: 'Published.' });
         load('refresh');
       } else {
         setNotice((current) => ({ ...current, publishError: verdict.message }));
       }
-    } catch (err) {
-      if (isCurrent()) setNotice((current) => ({ ...current, publishError: err.message }));
+    } catch {
+      if (isCurrent()) setNotice((current) => ({ ...current, publishError: 'The restored version could not be published. Try again.' }));
     } finally {
       if (isCurrent()) {
         mutationRef.current = null;
@@ -420,7 +420,7 @@ export default function AdminVersionHistory() {
     return (
       <div className="flex flex-col gap-md">
         <AdminEmptyState
-          title="No such collection"
+          title="Version history is unavailable"
           description="Version history covers content blocks, pages, sessions, organizations, updates, and the timeline."
           action={
             <Link to="/admin/versions" className={secondaryButtonClass}>
@@ -442,7 +442,7 @@ export default function AdminVersionHistory() {
   if (error && !denied) {
     if (error.status === 401) {
       errorNotice = (
-        <Notice tone="error" message={error.message.replace(/\s*Sign in again\.?\s*$/i, '')}>
+        <Notice tone="error" message="Your session has expired.">
           {' '}
           <Link to="/signin" className="font-semibold underline underline-offset-2">
             Sign in again
@@ -456,7 +456,7 @@ export default function AdminVersionHistory() {
     } else {
       errorNotice = (
         <div className="flex flex-col items-start gap-xs">
-          <Notice tone="error" message={error.message} />
+          <Notice tone="error" message="Version history is temporarily unavailable. Try again." />
           <button
             type="button"
             className={secondaryButtonClass}
@@ -562,7 +562,7 @@ export default function AdminVersionHistory() {
                     {entry.publishedBy ? (
                       <>
                         {' by '}
-                        <span className="font-admin-data text-admin-ink-data">{entry.publishedBy}</span>
+                        <span className="font-admin-data text-admin-ink-data">{versionAuthor(entry.publishedBy)}</span>
                       </>
                     ) : (
                       '. Account not recorded'
@@ -595,7 +595,7 @@ export default function AdminVersionHistory() {
                     />
                     {restoreError?.revision === entry.revision ? (
                       <div ref={dirtyErrorRef} tabIndex={-1}>
-                        <Notice tone="error" message={restoreError.error.message} />
+                        <Notice tone="error" message="This version could not be restored. Try again or edit the current draft." />
                       </div>
                     ) : null}
                   </div>
@@ -642,21 +642,20 @@ export default function AdminVersionHistory() {
   return (
     <div className="flex flex-col gap-md">
       <AdminPageHeader
-        title={recordNameOf(choice.id, row?.current ?? { id: docId })}
+        title={versionRecordName(choice.id, row?.current ?? entries[0]?.fields)}
         state={recordState}
-        identifiers={`${choice.id}/${docId}`}
         description="Newest first. A version is added each time this record is published."
         actions={
           <>
             {backLink}
-            <button
-              type="button"
+            <AdminIconControl
+              icon="refresh"
+              label="Refresh"
+              busy={pending === 'refresh'}
               className={secondaryButtonClass}
               aria-busy={pending === 'refresh' ? 'true' : undefined}
               onClick={refresh}
-            >
-              {pending === 'refresh' ? 'Refreshing…' : 'Refresh'}
-            </button>
+            />
           </>
         }
       />

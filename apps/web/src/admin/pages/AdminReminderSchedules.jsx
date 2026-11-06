@@ -32,6 +32,9 @@ import {
 import { describeTimeZone } from '../../lib/eventDateTime.js';
 import EventDateTimeField from '../components/EventDateTimeField.jsx';
 import AttendeeReminderSchedule from '../components/AttendeeReminderSchedule.jsx';
+import AdminIconControl from '../components/AdminIconControl.jsx';
+import ReminderScheduleSwitch from '../components/ReminderScheduleSwitch.jsx';
+import { communicationsError } from '../components/communicationsErrors.js';
 import {
   CheckboxField,
   FieldError,
@@ -92,8 +95,8 @@ function SampleMessage({ sample, timeZone }) {
         />
       ) : null}
       <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version</summary>
-        <pre data-testid={`schedule-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview</summary>
+        <pre data-testid={`schedule-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {sample.text}
         </pre>
       </details>
@@ -162,7 +165,7 @@ function SpeakerSchedule({ call }) {
       setForm(formFrom(next));
       setLoadError(null);
     } catch (err) {
-      setLoadError(err.message);
+      setLoadError(communicationsError(err, 'The schedule could not be loaded. Try again.'));
     } finally {
       setLoading(false);
     }
@@ -207,14 +210,14 @@ function SpeakerSchedule({ call }) {
         // The change is stored; only the read after it failed. Say so, and
         // read the schedule again.
         setPreview(null);
-        show('caution', next.refreshError);
+        show('caution', 'The change is saved, but the schedule could not be loaded. Refresh the page.');
         await load();
         return;
       }
       onDone(next);
     } catch (err) {
       if (kind === 'preview' && revision !== formRevision.current) return;
-      show('error', err.message);
+      show('error', communicationsError(err, 'The schedule could not be updated. Check the settings and preview again.'));
     } finally {
       busyRef.current = false;
       setBusy(null);
@@ -284,16 +287,17 @@ function SpeakerSchedule({ call }) {
   return (
     <Panel
       title="Speakers"
-      description="Remind accepted speakers who still owe items before a due date. Only speakers who owe a chosen item get one. A speaker gets at most one reminder in 24 hours, from the schedule or from staff."
+      description="Remind speakers about missing items before the due date. Each speaker can receive one reminder every 24 hours."
       actions={<StatusBadge tone={STATE_TONES[data.state]}>{STATE_LABELS[data.state]}</StatusBadge>}
     >
       <div className="flex flex-col gap-md">
+        <ReminderScheduleSwitch label="Scheduled speaker reminders" checked={data.state !== 'off'} disabled={Boolean(busy)} onChange={(enabled) => { if (!enabled) turnOff(); else if (preview && !dirty) approve(); else runPreview(); }} />
         <p className="text-admin-base font-semibold text-admin-ink" data-testid="schedule-state">
           {stateWords(data.state)}
-          {data.state !== 'off' && data.approval?.at ? ` Approved ${eventTime(data.approval.at, timeZone)} by ${data.approval.by ?? 'an admin'}.` : ''}
+          {data.state !== 'off' && data.approval?.at ? ` Approved ${eventTime(data.approval.at, timeZone)}.` : ''}
         </p>
         {data.paused ? (
-          <Notice tone="caution" message={`Paused: ${data.paused.message}`} />
+          <Notice tone="caution" message="Reminders are paused because the message or settings changed. Preview and approve them to resume." />
         ) : null}
         {data.state === 'on' && !data.wording.matchesApproval ? (
           <Notice tone="caution" message="The reminder wording is not the wording you approved. The next run sends nothing and pauses the schedule. Preview, then approve again." />
@@ -307,7 +311,7 @@ function SpeakerSchedule({ call }) {
           <fieldset aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
             <legend className="text-admin-base font-semibold text-admin-ink">Days before the due date</legend>
             <p id={`${offsetsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
-              One reminder for each number. The default is 14, 7 and 2 days.
+              Choose how many days before the due date to send each reminder.
             </p>
             {form.offsets.map((value, index) => (
               <div key={index} className="flex flex-wrap items-end gap-xs">
@@ -321,13 +325,7 @@ function SpeakerSchedule({ call }) {
                   onChange={(next) => update({ offsets: form.offsets.map((old, i) => (i === index ? next : old)) })}
                 />
                 {form.offsets.length > 1 ? (
-                  <button
-                    type="button"
-                    className={linkButtonClass}
-                    onClick={() => update({ offsets: form.offsets.filter((_, i) => i !== index) })}
-                  >
-                    Remove reminder {index + 1}
-                  </button>
+                  <AdminIconControl className={linkButtonClass} onClick={() => update({ offsets: form.offsets.filter((_, i) => i !== index) })} label={`Remove reminder ${index + 1}`} icon="remove" />
                 ) : null}
               </div>
             ))}
@@ -347,7 +345,7 @@ function SpeakerSchedule({ call }) {
             timeZone={timeZone}
             onChange={(value) => update({ dueAt: value })}
             onProblemChange={setDueProblem}
-            hint="The date and time the items are due. Approving needs a due date."
+            hint="Set the deadline for missing items."
             summaryPrefix="Due"
             emptySummary="No due date is set."
             clearable
@@ -384,16 +382,11 @@ function SpeakerSchedule({ call }) {
           </fieldset>
           <div className="flex flex-wrap items-center gap-xs">
             <button type="submit" className={primaryButtonClass} disabled={Boolean(busy)} aria-busy={busy === 'save'}>
-              {busy === 'save' ? 'Saving…' : 'Save settings'}
+              {busy === 'save' ? 'Saving…' : 'Save'}
             </button>
             <button type="button" className={secondaryButtonClass} onClick={runPreview} disabled={Boolean(busy)} aria-busy={busy === 'preview'}>
-              {busy === 'preview' ? 'Preparing the preview…' : 'Preview'}
+              {busy === 'preview' ? 'Preparing…' : 'Preview'}
             </button>
-            {data.state !== 'off' ? (
-              <button type="button" className={secondaryButtonClass} onClick={turnOff} disabled={Boolean(busy)} aria-busy={busy === 'disable'}>
-                {busy === 'disable' ? 'Turning off…' : 'Turn off'}
-              </button>
-            ) : null}
           </div>
         </form>
 
@@ -410,7 +403,7 @@ function SpeakerSchedule({ call }) {
           <section aria-labelledby="schedule-preview-heading" className="flex flex-col gap-sm">
             <h3 id="schedule-preview-heading" className="text-admin-base font-bold text-admin-ink">Preview</h3>
             {preview.usedFallback ? (
-              <Notice tone="caution" message="The saved reminder wording failed its check, so these messages use the shipped wording. Approving approves the shipped wording." />
+              <Notice tone="caution" message="The saved message could not be used. Review the default message below before turning reminders on." />
             ) : null}
             {preview.samples.map((sample) => (
               <SampleMessage key={sample.windowKey} sample={sample} timeZone={timeZone} />
@@ -435,7 +428,7 @@ export default function AdminReminderSchedules() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Scheduled reminders"
-        description="Reminders that go out on their own, once an hour when one is due, with the wording you approved. Every schedule is off until you preview it and approve it."
+        description="Send automatic reminders before a deadline or the event. Review each message before turning its schedule on."
         actions={<Link to="/admin/speakers/reminders/send" className={linkButtonClass}>Speaker reminders</Link>}
       />
       <SpeakerSchedule call={call} />

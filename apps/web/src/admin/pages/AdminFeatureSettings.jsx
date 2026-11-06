@@ -19,7 +19,9 @@ import {
   primaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
+import { contentError } from '../contentError.js';
 import { FEATURE_CHOICES } from '../featureChoices.js';
+import '../components/featureSwitch.css';
 
 
 const FEATURE_GROUPS = [
@@ -40,7 +42,7 @@ const FEATURE_GROUPS = [
   },
   {
     title: 'Feedback and browser tools',
-    description: 'Requests from visitors and read-only tools for supported browsers.',
+    description: 'Feedback, change requests, and connected tools.',
     keys: ['feedbackInbox', 'changeRequests', 'webmcpPublic', 'webmcpAdmin'],
   },
 ];
@@ -63,8 +65,8 @@ const VISIBLE_GROUPS = featureGroupsFor(KNOWN_FEATURE_KEYS);
 function FeatureChoice({ featureKey, checked, onChange, error }) {
   const id = useId();
   const choice = FEATURE_CHOICES[featureKey] ?? {
-    label: featureKey.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (letter) => letter.toUpperCase()),
-    hint: 'Enable this feature for the event.',
+    label: 'Additional feature',
+    hint: 'Make this feature available on your event site.',
   };
   const titleId = `${id}-title`;
   const descriptionId = `${id}-description`;
@@ -76,7 +78,8 @@ function FeatureChoice({ featureKey, checked, onChange, error }) {
           id={id}
           name={featureKey}
           type="checkbox"
-          className="mt-3xs h-5 w-5 shrink-0 rounded-admin-small border-admin-rule-control bg-admin-ground-input accent-admin-action"
+          role="switch"
+          className="admin-feature-switch mt-3xs"
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
           aria-labelledby={titleId}
@@ -87,10 +90,10 @@ function FeatureChoice({ featureKey, checked, onChange, error }) {
           <span className="admin-feature-card__heading">
             <span id={titleId} className="admin-feature-card__title">{choice.label}</span>
             <StatusBadge className="admin-feature-card__state" tone={checked ? 'ok' : 'neutral'} aria-hidden="true">
-              {checked ? 'Enabled' : 'Disabled'}
+              {checked ? 'On' : 'Off'}
             </StatusBadge>
           </span>
-          <span id={descriptionId} className="admin-feature-card__description">{choice.hint}</span>
+          <span id={descriptionId} className="admin-feature-card__description">{featureKey === 'webmcpPublic' ? 'Let connected tools read public event information.' : featureKey === 'webmcpAdmin' ? 'Let connected tools check event setup after an admin signs in.' : choice.hint}</span>
         </span>
       </label>
       <FieldError id={errorId} message={error} />
@@ -148,10 +151,10 @@ export default function AdminFeatureSettings() {
     setStatus('');
     try {
       await call('updateFeatures', { features: form });
-      setStatus('Saved. The site picks the change up live.');
-      showToast('Feature flags saved.', { announce: false });
+      setStatus('Features saved.');
+      showToast('Features saved.', { announce: false });
     } catch (err) {
-      setError(err);
+      setError(contentError(err, { labels: Object.fromEntries(KNOWN_FEATURE_KEYS.map((key) => [`features.${key}`, FEATURE_CHOICES[key]?.label ?? 'this feature'])), fallback: 'Features could not be saved. Try again.' }));
     } finally {
       setSaving(false);
     }
@@ -161,10 +164,10 @@ export default function AdminFeatureSettings() {
     <form className="flex flex-col gap-md" onSubmit={submit}>
       <AdminPageHeader
         title="Features"
-        description="What the site offers. Turning a feature off hides its route as well as its navigation."
+        description="Choose what visitors can use on your event site."
         actions={
           <button type="submit" className={primaryButtonClass} disabled={saving} aria-busy={saving || undefined}>
-            {saving ? 'Saving…' : 'Save features'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         }
       />
@@ -173,7 +176,7 @@ export default function AdminFeatureSettings() {
       {status ? <SaveStatus message={status} /> : null}
 
       <p className="text-admin-sm text-admin-ink-secondary">
-        {KNOWN_FEATURE_KEYS.filter((key) => form[key]).length} of {KNOWN_FEATURE_KEYS.length} features enabled.
+        {KNOWN_FEATURE_KEYS.filter((key) => form[key]).length} of {KNOWN_FEATURE_KEYS.length} features on.
         {' '}Changes take effect after you save.
       </p>
 
@@ -186,7 +189,7 @@ export default function AdminFeatureSettings() {
             className="admin-feature-group"
             actions={
               <StatusBadge>
-                {group.keys.filter((key) => form[key]).length} of {group.keys.length} enabled
+                {group.keys.filter((key) => form[key]).length} of {group.keys.length} on
               </StatusBadge>
             }
           >

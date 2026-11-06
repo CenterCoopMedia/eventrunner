@@ -21,17 +21,18 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
+import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { toEditablePage, toPagePayload } from '../pageDoc.js';
 import { orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import {
   Notice,
   Panel,
   fieldHintClass,
-  linkButtonClass,
   primaryButtonClass,
   rowClass,
   rowMetaClass,
@@ -82,13 +83,13 @@ function pageVisibility(row, features) {
   }
   const gate = live.visible === true ? pageFeatureGate(live) : null;
   if (gate && features?.[gate] !== true) {
-    return { word, reason: `${featureLabel(gate)} is off in Features. The public site hides this page.` };
+    return { word, reason: `${featureLabel(gate)} is off. This page is hidden.` };
   }
   return { word, reason: null };
 }
 
 function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
-  const label = row.current?.label || row.id;
+  const label = row.current?.label || 'Untitled page';
   const visibility = pageVisibility(row, features);
   const drag = useRowDrag(`page:${index}`, disabled);
   const drop = bindReorderDrop('page:', index, moveRow);
@@ -122,12 +123,12 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
             </Link>
             <RecordState state={row.state} />
             {row.current?.systemPage ? (
-              <StatusBadge tone="neutral">System page</StatusBadge>
+              <StatusBadge tone="neutral">Built-in page</StatusBadge>
             ) : null}
             <StatusBadge tone="neutral">{visibility.word}</StatusBadge>
           </div>
           <p className={`mt-3xs truncate ${rowMetaClass}`} data-reorder-block="">
-            {row.current?.path} · {sections.length} section
+            {sections.length} section
             {sections.length === 1 ? '' : 's'}
           </p>
           {visibility.reason ? (
@@ -145,9 +146,7 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
             onMove={moveRow}
             disabled={disabled}
           />
-          <Link to={row.id} className={linkButtonClass} data-reorder-block="">
-            Edit this page
-          </Link>
+          <AdminIconControl as={Link} to={row.id} label={`Edit ${label}`} icon="edit" data-reorder-block="" />
         </div>
       </div>
     </li>
@@ -187,7 +186,7 @@ export default function AdminPagesList() {
 
   function moveRow(from, to) {
     if (savingOrder || publishing !== null) return false;
-    const label = ordered[from]?.current?.label || ordered[from]?.id || 'Page';
+    const label = ordered[from]?.current?.label || 'Page';
     const count = ordered.length;
     const moved = draft.move(from, to);
     if (moved) setSpoken(`${label} moved to position ${to + 1} of ${count}`);
@@ -210,7 +209,7 @@ export default function AdminPagesList() {
         const page = toEditablePage({ ...row.current, id: row.id, order });
         await call('cmsSavePage', { page: toPagePayload(page) });
       },
-      (row) => row.current?.label || row.id,
+      (row) => row.current?.label || 'Untitled page',
     );
     const verdict = orderSaveMessage(failed);
     setNotice(verdict);
@@ -233,8 +232,8 @@ export default function AdminPagesList() {
       });
       reportPublish(response, ids);
     } catch (err) {
-      showToast(err.message, { tone: 'error' });
-      setNotice({ tone: 'error', message: err.message });
+      showToast(contentError(err, { fallback: 'Publishing did not finish. Try again.' }).message, { tone: 'error' });
+      setNotice({ tone: 'error', message: contentError(err, { fallback: 'Publishing did not finish. Try again.' }).message });
       // A part-way failure names the queue row a retry must resume from,
       // so committed chunks are not published a second time.
       if (err?.queueId) setResume({ queueId: err.queueId, ids });
@@ -246,11 +245,12 @@ export default function AdminPagesList() {
   /** cmsPublish answers 200 even when it skipped what you asked for. */
   function reportPublish(response, requestedIds) {
     const verdict = summarizePublish(response, 'cmsPages', requestedIds);
-    setNotice({ tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
+    const message = verdict.ok ? 'Published.' : verdict.message;
+    setNotice({ tone: verdict.ok ? 'ok' : 'error', message });
     if (verdict.ok) {
       setResolvedIds((current) => new Set([...current, ...requestedIds]));
     }
-    showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
+    showToast(message, verdict.ok ? undefined : { tone: 'error' });
   }
 
   /** Resume a part-way publish; { queueId } skips the committed chunks. */
@@ -263,8 +263,8 @@ export default function AdminPagesList() {
       setResume(null);
       reportPublish(response, ids);
     } catch (err) {
-      showToast(err.message, { tone: 'error' });
-      setNotice({ tone: 'error', message: err.message });
+      showToast(contentError(err, { fallback: 'Publishing did not finish. Try again.' }).message, { tone: 'error' });
+      setNotice({ tone: 'error', message: contentError(err, { fallback: 'Publishing did not finish. Try again.' }).message });
       if (err?.queueId) setResume({ queueId: err.queueId, ids });
     } finally {
       setPublishing(null);
@@ -277,7 +277,6 @@ export default function AdminPagesList() {
     <div ref={frameRef} className="flex flex-col gap-md">
       <AdminPageHeader
         title="Pages"
-        description="Every page on the site, and whether its latest edit is live yet."
         identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
         actions={
           <>
@@ -321,7 +320,7 @@ export default function AdminPagesList() {
       {error ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the page list; showing the last values we received and retrying."
+          message="The page list could not refresh. Check your connection."
         />
       ) : null}
 
@@ -330,7 +329,7 @@ export default function AdminPagesList() {
       ) : ordered.length === 0 ? (
         <AdminEmptyState
           title="No pages yet"
-          description="Create the first page — a title, a path, and the sections its content lives in."
+          description="Create your first page."
           action={
             <Link to="new" className={primaryButtonClass}>
               Create a page

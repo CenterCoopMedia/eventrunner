@@ -120,8 +120,8 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/versions?collection=cmsContent');
     await expect(page.getByRole('heading', { level: 1, name: 'Version history' })).toBeVisible();
-    await expect(page.getByRole('combobox', { name: 'Collection' })).toHaveValue('cmsContent');
-    await page.getByRole('searchbox', { name: 'Search by name or id' }).fill('hero__subtitle');
+    await expect(page.getByRole('combobox', { name: 'Content type' })).toHaveValue('cmsContent');
+    await page.getByRole('searchbox', { name: 'Search by name' }).fill(newSubtitle);
     const records = page.getByRole('region', { name: 'Records' });
     await expect(records.getByRole('link')).toHaveCount(1);
     await records.getByRole('link').click();
@@ -142,7 +142,7 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
 
     // What changed: the one field, the stored text before and after.
     const table = latest.getByRole('table', { name: `What changed in version ${live.revision}` });
-    const change = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'value', exact: true }) });
+    const change = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Content', exact: true }) });
     await expect(change).toHaveCount(1);
     await expect(change.getByRole('cell').nth(0)).toHaveText(oldSubtitle);
     await expect(change.getByRole('cell').nth(1)).toHaveText(newSubtitle);
@@ -156,7 +156,7 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
 
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/versions/cmsContent/hero__subtitle');
-    await expect(page.getByRole('heading', { level: 1, name: 'hero › subtitle' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: newSubtitle })).toBeVisible();
     const versions = page.getByRole('list', { name: 'Versions' });
     const older = versions.getByRole('listitem').filter({
       has: page.getByRole('heading', { level: 2, name: `Version ${oldRevision}` }),
@@ -179,7 +179,7 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
       await expect(subtitle).toHaveText(newSubtitle);
 
       await page.getByRole('button', { name: 'Publish now' }).click();
-      await expect(page.getByText('Published. The public site picks it up live.')).toBeVisible();
+      await expect(page.getByText('Published.', { exact: true })).toBeVisible();
 
       await publicPage.reload();
       await expect(liveContent).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
@@ -225,7 +225,7 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
     await page.getByRole('button', { name: 'Bold' }).click();
     await expect(editor.locator('strong')).toHaveText(answer);
 
-    await page.getByRole('button', { name: 'Save draft' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Draft saved. It is not public until you publish.')).toBeVisible();
     const draft = (await adminDb().collection('cmsContent_drafts').doc(docId).get()).data();
     expect(draft.answer).toBe(`<p><strong>${answer}</strong></p>`);
@@ -253,10 +253,10 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
         expect(await response.finished()).toBeNull();
         expect(response.ok()).toBe(true);
       });
-      await page.getByRole('button', { name: 'Save and publish' }).click();
+      await page.getByRole('button', { name: 'Publish', exact: true }).click();
       await Promise.all([updateFinished, publishFinished]);
       await expect(page.locator('#admin-content').getByRole('status').filter({
-        hasText: 'Published. The public site picks it up live.',
+        hasText: 'Published.',
       })).toBeVisible();
 
       await publicPage.reload();

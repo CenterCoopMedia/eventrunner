@@ -11,10 +11,10 @@
 export const BRANDING_REFUSAL = 'branding: operator access required';
 
 /** The one-line note the read-only drawer and modal carry. */
-export const BRANDING_NOTE = 'An operator manages branding files.';
+export const BRANDING_NOTE = 'Ask your site manager to change branding files.';
 
 /** The refusal, as a sentence. */
-export const BRANDING_REFUSED = 'Only an operator can change branding files.';
+export const BRANDING_REFUSED = 'Only your site manager can change branding files.';
 
 /**
  * The sentence an endpoint's error is shown as.
@@ -22,9 +22,13 @@ export const BRANDING_REFUSED = 'Only an operator can change branding files.';
  * @param {unknown} err
  * @returns {string}
  */
-export function mediaErrorMessage(err) {
-  const message = typeof err?.message === 'string' && err.message ? err.message : 'The request failed.';
-  return message === BRANDING_REFUSAL ? BRANDING_REFUSED : message;
+export function mediaErrorMessage(err, fallback = 'The file could not be updated. Try again.') {
+  if (err?.message === BRANDING_REFUSAL) return BRANDING_REFUSED;
+  if (err?.code === 'unauthenticated' || err?.status === 401) return 'Your session has expired. Sign in again.';
+  if (err?.code === 'forbidden' || err?.status === 403) return 'You cannot change this file. Ask your site manager for help.';
+  if (err?.code === 'asset-in-use') return 'This file is in use. Review where it is used before deleting it.';
+  if (err?.code === 'not-found' || err?.status === 404) return 'This file is no longer available. Choose another file.';
+  return fallback;
 }
 
 /** @param {{ folder?: string, path?: string } | null | undefined} asset @returns {boolean} */

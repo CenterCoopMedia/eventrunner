@@ -9,7 +9,7 @@ async function openPrimaryPicker(page) {
   await signIn(page, ADMIN_EMAIL);
   await page.goto('/admin/branding');
   await page.getByRole('button', { name: 'Identity', exact: true }).click();
-  const primary = page.getByLabel('Primary logo');
+  const primary = page.getByRole('textbox', { name: 'Primary logo' });
   await primary.locator('..').getByRole('button', { name: 'Choose or upload…' }).click();
   await expect(page.getByRole('dialog', { name: /Choose an image/ })).toBeVisible();
 }
@@ -56,7 +56,7 @@ test('the media close control keeps its hit area at phone widths', async ({ page
   await expectCloseFits(page, 320);
   // Focusing the panel dismisses the close button's keyboard tooltip.
   await dialog.focus();
-  const opener = page.getByLabel('Primary logo').locator('..').getByRole('button', { name: 'Choose or upload…' });
+  const opener = page.getByRole('textbox', { name: 'Primary logo' }).locator('..').getByRole('button', { name: 'Choose or upload…' });
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(opener).toBeFocused();
@@ -76,7 +76,7 @@ test('Tab follows a media deletion consequence instead of returning to the dialo
     await page.goto('/admin/media');
     await page.getByRole('button', { name: /Keyboard proof image/ }).click();
     const dialog = page.getByRole('dialog', { name: 'Keyboard proof image' });
-    await expect(dialog.getByText(/Deleting it is safe/)).toBeVisible();
+    await expect(dialog.getByText('This file is not used in your event.')).toBeVisible();
     await dialog.getByRole('button', { name: 'Delete this file', exact: true }).click();
     const consequence = dialog.getByRole('heading', { name: 'Delete this file', exact: true });
     await expect(consequence).toBeFocused();
@@ -84,7 +84,7 @@ test('Tab follows a media deletion consequence instead of returning to the dialo
     await expect(dialog.getByRole('button', { name: 'Delete this file', exact: true })).toBeFocused();
     await consequence.focus();
     await page.keyboard.press('Shift+Tab');
-    await expect(dialog.getByRole('button', { name: 'Done', exact: true })).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await consequence.focus();
     await page.keyboard.press('Escape');
     await expect(dialog.getByRole('button', { name: 'Delete this file', exact: true })).toBeFocused();

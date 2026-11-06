@@ -133,9 +133,9 @@ describe('the updates list', () => {
   it('offers the first update when there is none', async () => {
     await renderAt('/admin/updates');
     expect(await screen.findByRole('heading', { name: 'No updates yet' })).toBeInTheDocument();
-    expect(screen.getByText('Write the first update. It stays a draft until you publish it.')).toBeInTheDocument();
+    expect(screen.getByText('Write your first update.')).toBeInTheDocument();
     // One term: every control says "update", so the description does too.
-    expect(screen.getByText("Every update on the site's Updates page, and whether each one is live. Short notices for the dashboard card are under Live updates.")).toBeInTheDocument();
+    expect(screen.getByText("News and announcements for the Updates page.")).toBeInTheDocument();
     for (const link of screen.getAllByRole('link', { name: 'Write an update' })) {
       expect(link).toHaveAttribute('href', '/admin/updates/new/update');
     }
@@ -157,10 +157,10 @@ describe('the updates list', () => {
     const [, ...bodyRows] = within(table).getAllByRole('row');
     const cells = bodyRows.map((tr) => within(tr).getAllByRole('cell').map((td) => td.textContent));
     expect(cells).toEqual([
-      ['New wordingedited', 'Live with unpublished changes', 'September 20, 2026', 'None', 'Pinned'],
+      ['New wording', 'Live with unpublished changes', 'September 20, 2026', 'None', 'Pinned'],
       // 02:30 UTC on 1 October is 30 September on the event's clock.
-      ['Doors open at ninepublished', 'Live', 'September 30, 2026', 'None', 'By date'],
-      ['Not out yetfresh', 'DraftHidden', 'Undated', 'None', 'By date'],
+      ['Doors open at nine', 'Live', 'September 30, 2026', 'None', 'By date'],
+      ['Not out yet', 'DraftHidden', 'Undated', 'None', 'By date'],
     ]);
     // Each title opens its editor.
     expect(screen.getByRole('link', { name: 'New wording' })).toHaveAttribute('href', '/admin/updates/edited');
@@ -190,7 +190,7 @@ describe('the updates list', () => {
 
     await waitFor(() => expect(callsTo('cmsPublish')).toHaveLength(1));
     expect(bodyOf(callsTo('cmsPublish')[0])).toEqual({ collection: 'cmsUpdates', docIds: ['edited', 'fresh'] });
-    expect(await screen.findByText('Published. The public site picks it up live.', { selector: 'p[role="status"]' })).toBeInTheDocument();
+    expect(await screen.findByText('Published.', { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 
   // Codex review on #281 found this in the organizations list, which this
@@ -211,7 +211,7 @@ describe('the updates list', () => {
     pushUpdates([PUBLISHED, EDITED_LIVE], [{ ...PUBLISHED, title: 'Doors open at ten', status: 'dirty' }, EDITED_DRAFT, NEVER_PUBLISHED]);
     fetch.mockResolvedValueOnce(response({ results: { cmsUpdates: { published: ['edited', 'fresh'], skipped: [] } } }));
     fireEvent.click(resume);
-    expect(await screen.findByText('Published. The public site picks it up live.', { selector: 'p[role="status"]' })).toBeInTheDocument();
+    expect(await screen.findByText('Published.', { selector: 'p[role="status"]' })).toBeInTheDocument();
     expect(bodyOf(callsTo('cmsPublish')[1])).toEqual({ queueId: 'queue-9' });
   });
 
@@ -237,11 +237,11 @@ describe('the update editor', () => {
     expect(screen.queryByRole('heading', { name: 'Post' })).toBeNull();
 
     fetch.mockResolvedValueOnce(response({ error: { code: 'internal', message: 'The update could not be saved.' } }, 500));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    expect(await screen.findByText('The update could not be saved.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    expect(await screen.findByText('The change could not be saved. Try again.')).toBeInTheDocument();
 
     fetch.mockResolvedValueOnce(response({ id: 'x', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(2));
     const [first, second] = callsTo('cmsSaveUpdate').map(bodyOf);
     expect(first.id).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
@@ -279,7 +279,7 @@ describe('the update editor', () => {
       if (String(url).endsWith('/cmsSaveUpdate')) return response({ id, status: 'dirty' });
       return response({ results: { cmsUpdates: { published: docIds, skipped: [] } } });
     });
-    const publish = screen.getByRole('button', { name: 'Save and publish' });
+    const publish = screen.getByRole('button', { name: 'Publish', exact: true });
     // A future date never holds the publish action back.
     expect(publish).toBeEnabled();
     fireEvent.click(publish);
@@ -290,7 +290,7 @@ describe('the update editor', () => {
     const saved = bodyOf(fetch.mock.calls[0]);
     expect(saved.update.publishAt).toBe('2027-10-15T16:00:00.000Z');
     expect(bodyOf(fetch.mock.calls[1])).toEqual({ collection: 'cmsUpdates', docIds: [saved.id] });
-    expect(await screen.findByText('Published. The public site picks it up live.', { selector: 'p[role="status"]' })).toBeInTheDocument();
+    expect(await screen.findByText('Published.', { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 
   it('keeps the draft and says so when the publish after a save fails, and the retry writes the same draft', async () => {
@@ -301,7 +301,7 @@ describe('the update editor', () => {
     fetch
       .mockImplementationOnce(async (_url, init) => response({ id: JSON.parse(init.body).id, status: 'dirty' }))
       .mockResolvedValueOnce(response({ error: { code: 'internal', message: 'Publish failed.' } }, 500));
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish', exact: true }));
     expect(await screen.findByText('The draft is saved, and it is not published')).toBeInTheDocument();
     const id = bodyOf(callsTo('cmsSaveUpdate')[0]).id;
     await waitFor(() => expect(currentPath).toBe(`/admin/updates/${id}`));
@@ -311,7 +311,7 @@ describe('the update editor', () => {
       if (String(url).endsWith('/cmsSaveUpdate')) return response({ id: body.id, status: 'dirty' });
       return response({ results: { cmsUpdates: { published: body.docIds, skipped: [] } } });
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish', exact: true }));
     await waitFor(() => expect(callsTo('cmsPublish')).toHaveLength(2));
     expect(callsTo('cmsSaveUpdate').map(bodyOf).map((body) => body.id)).toEqual([id, id]);
   });
@@ -320,7 +320,7 @@ describe('the update editor', () => {
     await renderAt('/admin/updates/new/update');
     await screen.findByRole('heading', { level: 1, name: 'New update' });
     expect(screen.getByLabelText('Date')).toHaveAccessibleDescription(
-      'The date readers see, on the event\'s clock. Leave it empty for an undated update. It does not delay publishing. The update goes live when you publish it.',
+      'The date shown to readers. A future date does not delay publishing.',
     );
   });
 
@@ -329,7 +329,7 @@ describe('the update editor', () => {
     await screen.findByRole('heading', { level: 1, name: 'New update' });
     // Nothing is marked before the first attempt.
     expect(screen.queryByText('Enter a title.')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     expect(await screen.findByText('Enter a title.')).toBeInTheDocument();
     expect(screen.getByText('Enter the text of the update.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Title')).toHaveFocus());
@@ -351,13 +351,13 @@ describe('the update editor', () => {
     Object.defineProperty(date, 'validity', { configurable: true, get: () => ({ badInput: true, valid: false }) });
     fireEvent.input(date, { target: { value: '' } });
 
-    const save = screen.getByRole('button', { name: 'Save draft' });
+    const save = screen.getByRole('button', { name: 'Save', exact: true });
     fireEvent.click(save);
     expect(await screen.findByText('Enter the full date, or clear the field.')).toBeInTheDocument();
     expect(date).toHaveAttribute('aria-invalid', 'true');
     await waitFor(() => expect(date).toHaveFocus());
     expect(save).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Save and publish' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Publish', exact: true })).toBeEnabled();
     expect(fetch).not.toHaveBeenCalled();
 
     Object.defineProperty(date, 'validity', { configurable: true, get: () => ({ badInput: false, valid: true }) });
@@ -378,7 +378,7 @@ describe('the update editor', () => {
       configurable: true,
       get: () => ({ badInput: true, valid: false }),
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish', exact: true }));
     expect(await screen.findByText('Enter the full date, or clear the field.')).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -390,7 +390,7 @@ describe('the update editor', () => {
     // A browser's implicit submission presses the form's first submit
     // button; jsdom does not implement it, so the test reads the structure
     // and submits the form the way the browser would.
-    expect(title.form.querySelector('[type="submit"]')).toBe(screen.getByRole('button', { name: 'Save draft' }));
+    expect(title.form.querySelector('[type="submit"]')).toBe(screen.getByRole('button', { name: 'Save', exact: true }));
     fireEvent.change(title, { target: { value: 'By keyboard' } });
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Body.' } });
     fetch.mockImplementation(async (_url, init) => response({ id: JSON.parse(init.body).id, status: 'dirty' }));
@@ -423,7 +423,7 @@ describe('the update editor', () => {
     expect(screen.getByLabelText('Feature this update at the head of the list')).toBeChecked();
 
     fetch.mockResolvedValueOnce(response({ id: 'edited', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
     expect(bodyOf(callsTo('cmsSaveUpdate')[0]).update).toMatchObject({
       title: 'New wording',
@@ -441,7 +441,7 @@ describe('the update editor', () => {
     act(() => adminErrors.get('cmsUpdates_drafts')(new Error('unavailable')));
 
     expect(screen.getByText(
-      'We could not load this update and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again.',
+      'This update could not load. Check your connection and try again.',
     )).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'No such update' })).toBeNull();
@@ -481,13 +481,14 @@ describe('the update editor', () => {
       publishedBy: 'seed',
     };
     pushUpdates([seeded], []);
-    expect(await screen.findByText('This update also has a picture and 3 content blocks. Saving here keeps them as they are.')).toBeInTheDocument();
+    await screen.findByRole('heading', { level: 1, name: 'Seeded post' });
+    expect(screen.queryByRole('heading', { name: 'Picture and blocks' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Pin this update to the top of the list')).toBeChecked();
     // The preview reads the draft on the public page, in a new tab.
     expect(screen.getByRole('link', { name: `Preview draft (${NEW_TAB_NOTE})` })).toHaveAttribute('href', '/updates/seeded?preview=1');
 
     fetch.mockResolvedValueOnce(response({ id: 'seeded', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
     expect(bodyOf(callsTo('cmsSaveUpdate')[0])).toEqual({
       id: 'seeded',
@@ -524,7 +525,7 @@ describe('the update editor', () => {
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: '  Room change  ' } });
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'The clinic moves to Room B.' } });
     fetch.mockImplementation(async (_url, init) => response({ id: JSON.parse(init.body).id, status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
     const id = bodyOf(callsTo('cmsSaveUpdate')[0]).id;
     await waitFor(() => expect(currentPath).toBe(`/admin/updates/${id}`));
@@ -546,25 +547,25 @@ describe('the update editor', () => {
 
     pushUpdates([], []);
     expect(await screen.findByRole('heading', { name: 'No such update' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save', exact: true })).toBeNull();
   });
 
   it('closes the form when a loaded update is deleted, so a save cannot write it back', async () => {
     await renderAt('/admin/updates/published');
     pushUpdates([PUBLISHED], [PUBLISHED_CLEAN]);
     await screen.findByRole('heading', { level: 1, name: PUBLISHED.title });
-    expect(screen.getByRole('button', { name: 'Save draft' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save', exact: true })).toBeInTheDocument();
 
     pushUpdates([], []);
     expect(await screen.findByRole('heading', { name: 'No such update' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save', exact: true })).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it('says an unknown update does not exist', async () => {
     await renderAt('/admin/updates/ghost');
     expect(await screen.findByRole('heading', { name: 'No such update' })).toBeInTheDocument();
-    expect(screen.getByText('That update does not exist. It may have been deleted.')).toBeInTheDocument();
+    expect(screen.getByText('This update is no longer available. Choose another update.')).toBeInTheDocument();
   });
 
   it('says so on the editor too while updates are off, and draws no preview link', async () => {
@@ -601,7 +602,7 @@ describe('the category and the featured flag (issue 191)', () => {
     const category = screen.getByLabelText('Category');
     expect(category).toHaveValue('Travel');
     expect(category).toHaveAttribute('maxlength', '24');
-    expect(category).toHaveAccessibleDescription('One or two words shown as a tag beside the title. Leave it empty for none.');
+    expect(category).toHaveAccessibleDescription('An optional topic, such as Travel or Program.');
     // The categories in use are offered as suggestions.
     const list = document.getElementById(category.getAttribute('list'));
     expect([...list.querySelectorAll('option')].map((option) => option.value)).toEqual(['Program', 'Travel']);
@@ -611,13 +612,13 @@ describe('the category and the featured flag (issue 191)', () => {
     fireEvent.change(category, { target: { value: ' Travel and arrival notes ' } });
     fireEvent.click(featured);
     fetch.mockResolvedValueOnce(response({ id: 'tagged', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
     expect(bodyOf(callsTo('cmsSaveUpdate')[0]).update).toMatchObject({ category: 'Travel and arrival notes', featured: false });
 
     fireEvent.change(category, { target: { value: '' } });
     fetch.mockResolvedValueOnce(response({ id: 'tagged', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(2));
     expect(bodyOf(callsTo('cmsSaveUpdate')[1]).update).toMatchObject({ category: null });
   });
@@ -628,7 +629,7 @@ describe('the category and the featured flag (issue 191)', () => {
     await screen.findByRole('heading', { level: 1, name: 'Arrival notes' });
     // maxLength stops typing; a value set another way is still checked.
     fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'x'.repeat(25) } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     expect(await screen.findByText('Use 24 characters or fewer.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Category')).toHaveFocus());
     expect(fetch).not.toHaveBeenCalled();
@@ -641,10 +642,10 @@ describe('the category and the featured flag (issue 191)', () => {
     fetch.mockResolvedValueOnce(response({
       error: { code: 'invalid-argument', message: 'Invalid update: category: must be null or 1 to 24 characters on one line' },
     }, 400));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('This was not saved');
     expect(screen.getByLabelText('Category')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Category')).toHaveAccessibleDescription(/Category: must be null or 1 to 24 characters on one line/);
+    expect(screen.getByLabelText('Category')).toHaveAccessibleDescription(/Check category and try again/);
   });
 });

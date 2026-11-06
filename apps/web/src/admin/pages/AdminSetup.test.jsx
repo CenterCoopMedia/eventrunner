@@ -182,12 +182,12 @@ describe('the setup stepper', () => {
     const legal = await openStep('Approve the privacy policy and terms');
 
     // The box must be ticked first; the press without it saves nothing.
-    fireEvent.click(within(legal).getByRole('button', { name: 'Mark the review complete' }));
+    fireEvent.click(within(legal).getByRole('button', { name: 'Approve' }));
     expect(within(legal).getByText('Tick the box to confirm the review first.')).toBeInTheDocument();
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness']);
 
     fireEvent.click(within(legal).getByRole('checkbox'));
-    fireEvent.click(within(legal).getByRole('button', { name: 'Mark the review complete' }));
+    fireEvent.click(within(legal).getByRole('button', { name: 'Approve' }));
 
     await screen.findByText('1 of 7 steps done');
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness', 'updateEventConfig', 'webMcpCheckEventReadiness']);
@@ -204,9 +204,9 @@ describe('the setup stepper', () => {
     await renderSetup('/admin/setup/legal');
     const legal = await openStep('Approve the privacy policy and terms');
     fireEvent.click(within(legal).getByRole('checkbox'));
-    fireEvent.click(within(legal).getByRole('button', { name: 'Mark the review complete' }));
+    fireEvent.click(within(legal).getByRole('button', { name: 'Approve' }));
 
-    expect(await within(legal).findByRole('alert')).toHaveTextContent('Operator access required.');
+    expect(await within(legal).findByRole('alert')).toHaveTextContent('The legal review could not be approved. Try again.');
     expect(within(legal).getByText('To do')).toBeInTheDocument();
   });
 
@@ -237,7 +237,7 @@ describe('the setup stepper', () => {
   it('states a failed first check with the server words and no steps', async () => {
     fetch.mockResolvedValueOnce(errorResponse(503, 'unavailable', 'The diagnostic is temporarily unavailable.'));
     await renderSetup();
-    expect(await screen.findByRole('alert')).toHaveTextContent('The diagnostic is temporarily unavailable.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The setup could not be checked. Try again.');
     expect(screen.queryByRole('list', { name: 'Setup steps' })).toBeNull();
   });
 
@@ -248,7 +248,7 @@ describe('the setup stepper', () => {
     await renderSetup();
     await screen.findByText('1 of 7 steps done');
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
-    await waitFor(() => expect(screen.getByText(/We could not check again/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/The setup could not be checked/)).toBeInTheDocument());
     expect(stepList()).toBeInTheDocument();
   });
 });

@@ -76,8 +76,8 @@ export default function AdminOverview() {
       const next = await call('getEventStats', {});
       setStats(next);
       setError(null);
-    } catch (err) {
-      setError(err);
+    } catch {
+      setError(new Error('The event figures could not be loaded. Refresh to try again.'));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -95,7 +95,7 @@ export default function AdminOverview() {
       <AdminPageHeader
         title="Overview"
         identifiers={readAt ? `Read at ${readAt}` : null}
-        description={`${eventConfig.shortName || eventConfig.name || 'Your event'} at a glance. Check progress and go straight to the work that needs you.`}
+        description={`${eventConfig.shortName || eventConfig.name || 'Your event'} at a glance. Check attendance, tickets, and event progress.`}
         actions={
           <>
             <AdminIconControl
@@ -107,7 +107,7 @@ export default function AdminOverview() {
               label={busy ? 'Refreshing…' : 'Refresh figures'}
               icon="refresh"
             />
-            <Link to="/admin/unpublished" className={primaryButtonClass}>Review unpublished changes</Link>
+            <Link to="/admin/unpublished" className={primaryButtonClass}>Review changes</Link>
           </>
         }
       />
@@ -117,7 +117,7 @@ export default function AdminOverview() {
       {stats && error ? (
         <Notice
           tone="caution"
-          message={`We could not refresh the figures. These are the figures read at ${readAt}.`}
+          message={`The figures could not be refreshed. Showing the figures from ${readAt}; refresh to try again.`}
         />
       ) : null}
       {stats && !error ? <p role="status" className="sr-only">Figures read at {readAt}.</p> : null}

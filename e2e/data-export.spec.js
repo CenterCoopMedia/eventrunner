@@ -152,7 +152,7 @@ test.describe.serial('event data export', () => {
     expect(row[rows[0].indexOf('Speakers')]).toBe(`Export Speaker ${stamp}`);
     expect(text).not.toContain('SECRET');
     expect(text).not.toContain(inviteHash);
-    await expect(page.getByRole('status').filter({ hasText: 'Exported' })).toContainText('The export is in the admin log.');
+    await expect(page.getByRole('status').filter({ hasText: 'Exported' })).toContainText(/^Exported \d+ sessions to sessions-/);
 
     const logs = await adminDb().collection('admin_logs').where('action', '==', 'exportEventData').get();
     expect(logs.docs.map((doc) => doc.data())).toContainEqual(expect.objectContaining({
@@ -200,7 +200,7 @@ test.describe.serial('event data export', () => {
     }
     expect(files.get('README.md').toString('utf8')).toContain('## Personal data and retention');
 
-    await expect(page.getByRole('status').filter({ hasText: 'Downloaded' })).toContainText('The download is in the admin log.');
+    await expect(page.getByRole('status').filter({ hasText: 'Downloaded' })).toContainText('This file contains personal data; share it only with people who need it.');
     const logs = await adminDb().collection('admin_logs').where('action', '==', 'downloadEventPackage').get();
     expect(logs.size).toBe(before + 1);
     await context.close();

@@ -37,6 +37,7 @@ import {
   toMillis,
 } from '../pendingChanges.js';
 import { useAdminPages } from '../useAdminPages.js';
+import { versionAuthor, versionRecordName } from './versionDisplay.js';
 import { useComingSoon } from '../../lib/launchSource.js';
 import {
   Notice,
@@ -61,19 +62,19 @@ const MAX_COLLECTION_IDS = 2000;
 const RECENT_RUNS = 10;
 const FAILED_RUNS = 20;
 
-export const COUNT_ERROR = 'We could not count the unpublished changes. We will try again.';
+export const COUNT_ERROR = 'The changes could not be counted. Check your connection and try again.';
 const STALE_LIST =
-  'The list could not be refreshed. Until it is, the buttons on each table wait. Publish all reads the current list. It will try again.';
+  'This list is out of date. Check your connection, or use Publish all for the latest changes.';
 const PART_WAY =
-  'The publish stopped part-way. Its run is marked Failed under Recent publishes. Resume it there.';
+  'Some changes were not published. Resume the failed publish under Recent publishes.';
 const STILL_RUNNING =
-  'That run is still publishing. Wait for it to finish. A run with no progress for 90 minutes is marked Failed and can then be resumed.';
+  'These changes are still publishing. Wait for the publish to finish, then try again.';
 
-/** What a refused or failed call says: our words for the two we can explain, the server's for the rest. */
+/** Give a recovery action without exposing server diagnostics. */
 function errorText(err) {
   if (err?.queueId) return PART_WAY;
   if (err?.status === 409) return STILL_RUNNING;
-  return err?.message || 'Something went wrong. Try again.';
+  return 'The changes could not be published. Try again.';
 }
 
 /** The galley head the ticketing tables draw, copied: sticky in its own box. */
@@ -131,7 +132,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice
       </div>
       {tooMany ? (
         <p id={whyId} className="px-md pb-sm text-admin-sm text-admin-ink-secondary">
-          Use Publish all. One collection publish takes at most 2,000 changes.
+          Use Publish all to publish more than 2,000 changes at once.
         </p>
       ) : null}
       {/* A scrolling box has to take a tab stop to be scrolled by keyboard;
@@ -168,7 +169,6 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice
                         <RecordName row={row} />
                       </span>
                     )}
-                    <p className={`mt-3xs break-all ${rowMetaClass}`}>{row.id}</p>
                   </td>
                   <td className={cell}>
                     <div className="flex flex-wrap items-center gap-2xs">
@@ -180,7 +180,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice
                     <span>{formatPublishedAt(row.savedAt, timeZone) ?? '—'}</span>
                   </td>
                   <td className={`${cell} break-all font-admin-data text-admin-ink-data`}>
-                    <span>{row.savedBy ?? '—'}</span>
+                    <span>{row.savedBy ? versionAuthor(row.savedBy) : '—'}</span>
                   </td>
                 </tr>
               );
@@ -211,18 +211,13 @@ function RunRow({ row, timeZone, busyKey, controlProps, notice, resultRef }) {
         {summary.sentence ? <span className="text-admin-sm text-admin-ink">{summary.sentence}</span> : null}
       </div>
       <p className={`break-all ${rowMetaClass}`}>
-        {[typeof row.requestedBy === 'string' ? row.requestedBy : null, when].filter(Boolean).join(' · ')}
+        {[typeof row.requestedBy === 'string' ? versionAuthor(row.requestedBy) : null, when].filter(Boolean).join(' · ')}
       </p>
       {failed ? (
         <div className="flex flex-col items-start gap-2xs">
-          {typeof row.error === 'string' && row.error ? (
-            <p className="text-admin-sm text-admin-ink">{row.error}</p>
-          ) : null}
-          {typeof row.note === 'string' && row.note ? (
-            <p className="text-admin-sm text-admin-ink">{row.note}</p>
-          ) : null}
+          <p className="text-admin-sm text-admin-ink">Some changes were not published. Resume to finish publishing them.</p>
           <p className="text-admin-sm text-admin-ink-secondary">
-            Resume publishes the current saved version of each record this run did not reach.
+            Resume publishes the latest saved changes that are still waiting.
           </p>
           <button type="button" {...controlProps(key, secondaryButtonClass)}>
             {busyKey === key ? 'Resuming…' : 'Resume publish'}
@@ -318,7 +313,17 @@ export default function AdminUnpublishedChanges() {
   });
 
   const resultKey = notice?.key ?? busyKey;
-  const groups = groupPending(docsByCollection).filter((group) => group.rows.length > 0 || resultKey === `collection:${group.choice.id}`);
+  const groups = groupPending(docsByCollection).map((group) => {
+    const docs = new Map((docsByCollection[group.choice.id] ?? []).map((doc) => [doc.id, doc]));
+    return {
+      ...group,
+      rows: group.rows.map((row) => ({
+        ...row,
+        name: versionRecordName(group.choice.id, docs.get(row.id)),
+        fullName: versionRecordName(group.choice.id, docs.get(row.id), { full: true }),
+      })),
+    };
+  }).filter((group) => group.rows.length > 0 || resultKey === `collection:${group.choice.id}`);
   const localResult = resultKey?.startsWith('collection:') || runs.runs.some((run) => resultKey === `resume:${run.id}`);
 
   async function publish(event, key, body, read) {
@@ -338,8 +343,9 @@ export default function AdminUnpublishedChanges() {
       busyRef.current = false;
       setBusyKey(null);
     }
-    setNotice({ key, tone: result.ok ? 'ok' : 'error', message: result.message });
-    showToast(result.message, result.ok ? { announce: false } : { tone: 'error', announce: false });
+    const message = result.ok && key !== 'open' ? 'Published.' : result.message;
+    setNotice({ key, tone: result.ok ? 'ok' : 'error', message });
+    showToast(message, result.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
   function onPress(key) {
@@ -422,10 +428,10 @@ export default function AdminUnpublishedChanges() {
           {total === 0 ? (
             <AdminEmptyState
               title="Nothing is waiting to be published"
-              description="Saved changes to pages, content blocks, sessions, organizations, updates, and timeline entries appear here. Speaker edits are reviewed on each speaker’s page."
+              description="Edit your pages to add content or change what visitors see."
               action={
                 <Link to="/admin/pages" className={secondaryButtonClass}>
-                  Open the pages list
+                  Edit pages
                 </Link>
               }
             />
@@ -451,10 +457,10 @@ export default function AdminUnpublishedChanges() {
 
       <Panel
         title="Recent publishes"
-        description="The last 10 publish runs, and the 20 newest runs still marked Failed, newest first. Running: Still publishing. Done: Finished. Failed: Stopped part-way. A run with no progress for 90 minutes is marked Failed."
+        description="Review recent publishes and resume any that stopped before they finished."
       >
         {runs.error ? (
-          <Notice tone="caution" message="The publish runs could not be refreshed. The list will try again." />
+          <Notice tone="caution" message="Recent publishes could not be refreshed. Check your connection and try again." />
         ) : null}
         {!runs.ready ? (
           runs.error ? null : <AdminLoadingState label="Loading recent publishes…" />

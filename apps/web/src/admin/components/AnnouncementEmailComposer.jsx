@@ -46,6 +46,8 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { zoneLabel } from '../../lib/eventTime.js';
 import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from './AdminIconControl.jsx';
+import { communicationsError } from './communicationsErrors.js';
 import { buildPreviewDoc } from '../emailPreview.js';
 import {
   Notice,
@@ -100,7 +102,7 @@ export function countsSentence(send) {
   const parts = [`Sent to ${plural(counts.sent ?? 0, 'recipient', 'recipients')} of ${plural(total, 'address', 'addresses')}.`];
   if (counts.failed) parts.push(`${plural(counts.failed, 'message', 'messages')} failed.`);
   if (counts.uncertain) parts.push(`${plural(counts.uncertain, 'message has', 'messages have')} an unknown result.`);
-  if (counts.skipped) parts.push(`${plural(counts.skipped, 'recipient was', 'recipients were')} already handled by an earlier call.`);
+  if (counts.skipped) parts.push(`${plural(counts.skipped, 'recipient was', 'recipients were')} already handled.`);
   if (counts.suppressed) parts.push(`${plural(counts.suppressed, 'address', 'addresses')} unsubscribed during the send.`);
   if (send.status === 'sending') parts.push(`${plural(Math.max(0, total - processed), 'address is', 'addresses are')} still to send.`);
   if (send.status === 'stopped') parts.push(`${plural(Math.max(0, total - processed), 'address was', 'addresses were')} not sent.`);
@@ -134,14 +136,14 @@ function PreviewFrame({ html, text }) {
             title="Email preview"
             className="block h-[28rem] w-full rounded-admin border-admin-hairline border-admin-rule-hairline [color-scheme:light]"
           />
-          <p className="text-admin-xs text-admin-ink-secondary">Links and remote images are turned off in this preview.</p>
+          <p className="text-admin-xs text-admin-ink-secondary">Links are inactive and images are hidden.</p>
         </>
       ) : (
-        <p className="text-admin-sm text-admin-ink">The HTML version cannot be shown safely, so the plain text version is shown.</p>
+        <p className="text-admin-sm text-admin-ink">The formatted preview is unavailable. The text preview is shown below.</p>
       )}
       <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version</summary>
-        <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview</summary>
+        <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {text}
         </pre>
       </details>
@@ -162,14 +164,14 @@ function SendDetail({ send, state, regionId }) {
   if (!state || state.status === 'loading') {
     body = <AdminLoadingState label="Loading the send…" />;
   } else if (state.status === 'error') {
-    body = <Notice tone="error" message={state.error.message} />;
+    body = <Notice tone="error" message={communicationsError(state.error, 'This email could not be loaded. Close the details and try again.')} />;
   } else {
     const detail = state.send;
     const failures = failureCounts(detail);
     body = (
       <>
         <p className="max-w-[65ch] text-admin-sm text-admin-ink">
-          This is the message as the send started it, with a test unsubscribe link in place of each recipient&apos;s own link. It is not a copy of what each person received.
+          This preview uses a sample unsubscribe link. Open the email log to see each recipient’s message.
         </p>
         {send.recipientRowsLinked ? (
           <p className="text-admin-sm">
@@ -182,7 +184,7 @@ function SendDetail({ send, state, regionId }) {
           </p>
         ) : (
           <p className="text-admin-sm text-admin-ink">
-            This send is older than the email log filter for one send. Its messages are in the email log under the source Announcement.
+            Find these messages in the email log with the Announcement filter.
           </p>
         )}
         <dl className="grid grid-cols-[max-content_1fr] gap-x-sm gap-y-3xs text-admin-sm">
@@ -206,7 +208,7 @@ function SendDetail({ send, state, regionId }) {
               {detail.failures.map((failure, index) => (
                 <li key={`${failure.email}-${index}`} className="break-words">
                   <span className="font-admin-data text-admin-ink-data">{failure.email}</span>
-                  {`: ${failure.error}`}
+                  {': Delivery failed. Check the email address before trying again.'}
                 </li>
               ))}
             </ul>
@@ -223,15 +225,15 @@ function SendDetail({ send, state, regionId }) {
 }
 
 function SendHistory({
-  sends, timeZone, onReuse, onRetry, onContinue, continuingId, openId, details, onToggle, rowRefs,
+  sends, timeZone, onReuse, onRetry, onContinue, continuingId, openId, details, onToggle, rowRefs, onCompose,
 }) {
   if (sends.length === 0) {
-    return <p className="text-admin-sm text-admin-ink-secondary">No announcement email has been sent yet.</p>;
+    return <div className="flex flex-col items-start gap-xs"><p className="text-admin-sm text-admin-ink-secondary">Write an announcement to keep attendees informed.</p><button type="button" className={secondaryButtonClass} onClick={onCompose}>Write announcement</button></div>;
   }
   return (
     <ul className="flex flex-col">
       {sends.map((send) => {
-        const word = STATUS_WORDS[send.status] ?? { label: send.status, tone: 'neutral' };
+        const word = STATUS_WORDS[send.status] ?? { label: 'Status unavailable', tone: 'neutral' };
         const when = formatWhen(send.createdAt, timeZone);
         const open = openId === send.id;
         const regionId = `announcement-send-${send.id}`;
@@ -250,29 +252,20 @@ function SendHistory({
               {send.audienceLabel}
               {when ? ` · ${when}` : ''}
               {send.scheduled ? ' · Scheduled attendee reminder' : ''}
-              {send.createdBy ? ` · ${send.createdBy}` : ''}
             </p>
             <p className="text-admin-sm text-admin-ink">{countsSentence(send)}</p>
             {send.scheduled && send.status === 'sending' ? (
               <p className="text-admin-sm text-admin-ink-secondary">
-                The schedule sends the rest in its next hourly run. It does not send in quiet hours or after this reminder day.
+                Remaining reminders are scheduled for daytime hours.
               </p>
             ) : null}
             {send.auditGaps > 0 ? (
               <p className="text-admin-sm text-admin-state-caution">
-                {`The email log could not record ${plural(send.auditGaps, 'message', 'messages')} of this send. The counts come from the email provider, and nobody gets a second copy.`}
+                {`Details are unavailable for ${plural(send.auditGaps, 'message', 'messages')}. The delivery counts are shown above.`}
               </p>
             ) : null}
             <div className="flex flex-wrap gap-xs">
-              <button
-                type="button"
-                className={linkButtonClass}
-                aria-expanded={open ? 'true' : 'false'}
-                aria-controls={open ? regionId : undefined}
-                onClick={() => onToggle(send)}
-              >
-                {open ? 'Hide details' : 'Show details'}
-              </button>
+              <AdminIconControl className={linkButtonClass} aria-expanded={open} aria-controls={open ? regionId : undefined} onClick={() => onToggle(send)} label={open ? 'Hide details' : 'Show details'} icon={open ? 'collapse' : 'expand'} />
               <button type="button" className={linkButtonClass} onClick={() => onReuse(send)}>
                 Use this message
               </button>
@@ -394,7 +387,7 @@ export default function AnnouncementEmailComposer() {
       });
       if (more[0]) setFocusSendId(more[0].id);
     } catch (err) {
-      showToast(err.message, { tone: 'error' });
+      showToast(communicationsError(err, 'The action could not be completed. Try again.'), { tone: 'error' });
     } finally {
       setLoadingOlder(false);
     }
@@ -597,13 +590,13 @@ export default function AnnouncementEmailComposer() {
       if (response.removed) {
         // With Postmark unsubscribe handling, Postmark keeps its own opt-out.
         message = providerManaged
-          ? 'This site no longer leaves the address out. Reactivate it on the broadcast stream in Postmark too.'
+          ? 'This address is restored here. Ask the event administrator to restore delivery with the email provider too.'
           : 'This address gets announcement email again.';
       }
       showToast(message);
       if (response.removed) setRestoreEmail('');
     } catch (err) {
-      showToast(err.message, { tone: 'error' });
+      showToast(communicationsError(err, 'The action could not be completed. Try again.'), { tone: 'error' });
     } finally {
       setRestoring(false);
     }
@@ -621,14 +614,14 @@ export default function AnnouncementEmailComposer() {
         <Panel
           title="Write your email"
           className="admin-email-workspace__writer"
-          description="Write to registered people, then preview the message and recipient count before sending."
+          description="Write your message, then review it before sending."
         >
           {history === null && !historyError ? <AdminLoadingState label="Loading the email settings…" /> : null}
-          {historyError ? <Notice tone="error" message={historyError.message} /> : null}
-          {channel && !channel.canSend ? <Notice tone="caution" message={channel.blocker} /> : null}
+          {historyError ? <Notice tone="error" message={communicationsError(historyError, 'Email settings could not be loaded. Refresh the page to try again.')} /> : null}
+          {channel && !channel.canSend ? <Notice tone="caution" message="Email is not available. Ask an event administrator to check the email settings." /> : null}
           {history ? (
             <form className="mt-sm flex flex-col gap-sm" onSubmit={runPreview} noValidate>
-              <ServerErrorSummary error={error} errorRef={errorRef} title="This email was not sent" />
+              <ServerErrorSummary error={error ? { message: communicationsError(error, 'The email could not be prepared or sent. Check the message and preview it again.') } : null} errorRef={errorRef} title="This email was not sent" />
               {retry ? (
                 <div className="flex flex-col gap-2xs">
                   <Notice
@@ -660,7 +653,6 @@ export default function AnnouncementEmailComposer() {
               </div>
               <TextAreaField
                 label="Email message"
-                hint="Plain text. A blank line starts a new paragraph."
                 value={draft.message}
                 rows={8}
                 maxLength={10000}
@@ -684,7 +676,7 @@ export default function AnnouncementEmailComposer() {
               </div>
               <div className="flex flex-wrap gap-xs">
                 <button type="submit" className={primaryButtonClass} aria-busy={busy === 'preview' ? 'true' : undefined}>
-                  {busy === 'preview' ? 'Building the preview…' : 'Preview email'}
+                  {busy === 'preview' ? 'Preparing…' : 'Preview'}
                 </button>
               </div>
             </form>
@@ -723,7 +715,7 @@ export default function AnnouncementEmailComposer() {
               ) : null}
               <p className="text-admin-sm text-admin-ink-secondary">{preview.unsubscribeNote}</p>
               <PreviewFrame html={preview.html} text={preview.text} />
-              {preview.canSend ? null : <Notice tone="caution" message={preview.blocker} />}
+              {preview.canSend ? null : <Notice tone="caution" message="This email cannot be sent yet. Check the audience and ask an event administrator to check email settings." />}
               {preview.canSend && !confirming ? (
                 <div className="flex flex-wrap gap-xs">
                   <button
@@ -741,7 +733,7 @@ export default function AnnouncementEmailComposer() {
                     aria-disabled={busy ? 'true' : undefined}
                     onClick={sendTest}
                   >
-                    {busy === 'test' ? 'Sending the test…' : 'Send a test to me'}
+                    {busy === 'test' ? 'Sending…' : 'Send test'}
                   </button>
                 </div>
               ) : null}
@@ -788,13 +780,9 @@ export default function AnnouncementEmailComposer() {
                 <path d="M40 4H12a8 8 0 0 0-8 8v56a8 8 0 0 0 8 8h40a8 8 0 0 0 8-8V24L40 4Z" />
                 <path d="M40 4v20h20M16 38h32M16 50h32M16 62h24" />
               </svg>
-              <h3 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Your preview will appear here</h3>
-              <p className="text-admin-sm text-admin-ink-secondary">Check the message and recipient count before sending.</p>
-              <ol className="admin-email-workspace__steps" aria-label="Email sending steps">
-                <li>Preview</li>
-                <li>Send a test</li>
-                <li>Confirm recipients</li>
-              </ol>
+              <h3 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Review your email</h3>
+              <p className="text-admin-sm text-admin-ink-secondary">Write a message, then preview it before sending.</p>
+              <button type="button" className={secondaryButtonClass} onClick={() => subjectRef.current?.querySelector('input')?.focus()}>Write email</button>
             </div>
           )}
         </Panel>
@@ -831,7 +819,7 @@ export default function AnnouncementEmailComposer() {
 
       <Panel
         title="Email send history"
-        description="Announcement emails, newest first. The history keeps each send for 90 days, as the email log does."
+        description="Announcement emails from the past 90 days, newest first."
       >
         {history ? (
           <SendHistory
@@ -845,6 +833,7 @@ export default function AnnouncementEmailComposer() {
             details={details}
             onToggle={toggleDetail}
             rowRefs={rowRefs}
+            onCompose={() => subjectRef.current?.querySelector('input')?.focus()}
           />
         ) : null}
         {history?.nextCursor ? (
@@ -863,7 +852,7 @@ export default function AnnouncementEmailComposer() {
           <TextField
             label="Restore an unsubscribed address"
             hint={providerManaged
-              ? 'Use this only when the person asks to get announcement email again. Postmark keeps its own list of addresses that unsubscribed: reactivate the address on the broadcast stream in Postmark too.'
+              ? 'Restore only when the person asks to receive announcements again. Ask the event administrator to restore delivery with the email provider too.'
               : 'Use this only when the person asks to get announcement email again.'}
             type="email"
             autoComplete="off"

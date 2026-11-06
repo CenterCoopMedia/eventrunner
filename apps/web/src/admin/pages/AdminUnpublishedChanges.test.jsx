@@ -213,8 +213,8 @@ describe('the Unpublished changes page', () => {
     act(() => drafts.get('cmsTimeline').onNext([]));
     expect(screen.queryByLabelText('Loading unpublished changes…')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Nothing is waiting to be published' })).toBeInTheDocument();
-    expect(screen.getByText(/Speaker edits are reviewed on each speaker’s page\./)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open the pages list' })).toHaveAttribute('href', '/admin/pages');
+    expect(screen.getByText(/Edit your pages to add content or change what visitors see/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Edit pages' })).toHaveAttribute('href', '/admin/pages');
     expect(screen.queryByRole('button', { name: /^Publish all/ })).toBeNull();
     pushRuns();
     expect(screen.getByText('No publish has run yet.')).toBeInTheDocument();
@@ -234,11 +234,11 @@ describe('the Unpublished changes page', () => {
     expect(figure()).toHaveTextContent('1 unpublished change: 1 content block.');
     const table = screen.getByRole('table', { name: 'Content blocks with unpublished changes, newest first' });
     const [row] = within(table).getAllByRole('row').slice(1);
-    expect(within(row).getByRole('link', { name: 'hero › subtitle' })).toHaveAttribute(
+    expect(within(row).getByRole('link', { name: 'x' })).toHaveAttribute(
       'href',
       '/admin/content/home/hero/subtitle',
     );
-    expect(row).toHaveTextContent('hero__subtitle');
+    expect(row).not.toHaveTextContent('hero__subtitle');
     expect(row).toHaveTextContent('Live with unpublished changes');
     expect(row).toHaveTextContent('admin@example.org');
     // The proof ground is on every cell of the row (a pseudo-element layer
@@ -268,7 +268,7 @@ describe('the Unpublished changes page', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/cmsPublish$/);
     expect(bodyOf(0)).toEqual({ collection: 'cmsContent', docIds: ['hero__subtitle'] });
-    const notice = await within(main()).findByText('Published. The public site picks it up live.');
+    const notice = await within(main()).findByText('Published.');
     expect(notice).toHaveAttribute('role', 'status');
     // The control is still here until the listener says the draft is clean.
     expect(document.activeElement).toBe(button);
@@ -296,7 +296,7 @@ describe('the Unpublished changes page', () => {
     await act(async () => {
       answer(ok({ queueId: 'q6', status: 'done', results: { cmsPages: { published: ['home'], skipped: [] } } }));
     });
-    const notice = await within(main()).findByText('Published. The public site picks it up live.');
+    const notice = await within(main()).findByText('Published.');
     await waitFor(() => expect(document.activeElement).toBe(notice.parentElement));
   });
 
@@ -329,9 +329,9 @@ describe('the Unpublished changes page', () => {
     fireEvent.click(button);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0)).toEqual({ all: true });
-    expect(await within(main()).findByText('Published 3 changes. The public site picks them up live.')).toBeInTheDocument();
+    expect(await within(main()).findByText('Published.')).toBeInTheDocument();
     pushDrafts();
-    expect(document.activeElement).toBe(within(main()).getByText('Published 3 changes. The public site picks them up live.').parentElement);
+    expect(document.activeElement).toBe(within(main()).getByText('Published.').parentElement);
   });
 
   it('(c) keeps a failed run listed as Failed with its error and one Resume, however many finished runs follow it', async () => {
@@ -349,15 +349,15 @@ describe('the Unpublished changes page', () => {
     };
     pushRuns([failed], [failed]);
     expect(screen.getByRole('heading', { name: 'Recent publishes' }).closest('section')).toHaveTextContent(
-      'The last 10 publish runs, and the 20 newest runs still marked Failed, newest first.',
+      'Review recent publishes and resume any that stopped before they finished.',
     );
     const list = screen.getByRole('list', { name: 'Publish runs' });
     let row = list.querySelector('[data-run="q-failed"]');
     expect(within(row).getByText('Failed')).toBeInTheDocument();
     expect(row).toHaveTextContent('1 of 3 published before it stopped.');
-    expect(row).toHaveTextContent('Publish stranded: no progress for 90 minutes.');
-    expect(row).toHaveTextContent('Checked by hand.');
-    expect(row).toHaveTextContent('Resume publishes the current saved version of each record this run did not reach.');
+    expect(row).toHaveTextContent('Some changes were not published. Resume to finish publishing them.');
+    expect(row).not.toHaveTextContent('Checked by hand.');
+    expect(row).toHaveTextContent('Resume publishes the latest saved changes that are still waiting.');
     expect(row).toHaveTextContent('staff@example.org');
     expect(within(list).getAllByRole('button')).toHaveLength(1);
 
@@ -386,7 +386,7 @@ describe('the Unpublished changes page', () => {
     fireEvent.click(within(row).getByRole('button', { name: 'Resume publish' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0)).toEqual({ queueId: 'q-failed' });
-    expect(await within(main()).findByText('Published 3 changes. The public site picks them up live.')).toBeInTheDocument();
+    expect(await within(main()).findByText('Published.')).toBeInTheDocument();
   });
 
   it('(d) derives the page count from its rows and closes their listeners on other pages', async () => {
@@ -472,7 +472,7 @@ describe('the Unpublished changes page', () => {
     }));
     fireEvent.click(screen.getByRole('button', { name: 'Publish 1 session' }));
     const partWay = await within(main()).findByText(
-      'The publish stopped part-way. Its run is marked Failed under Recent publishes. Resume it there.',
+      'Some changes were not published. Resume the failed publish under Recent publishes.',
     );
     expect(partWay).toHaveAttribute('role', 'alert');
 
@@ -481,7 +481,7 @@ describe('the Unpublished changes page', () => {
     }));
     fireEvent.click(within(main()).getByRole('button', { name: 'Publish all (1)' }));
     expect(await within(main()).findByText(
-      'That run is still publishing. Wait for it to finish. A run with no progress for 90 minutes is marked Failed and can then be resumed.',
+      'These changes are still publishing. Wait for the publish to finish, then try again.',
     )).toBeInTheDocument();
     expect(within(main()).queryByText(/cmsUpdatePublishStatus/)).toBeNull();
 
@@ -489,7 +489,7 @@ describe('the Unpublished changes page', () => {
       error: { code: 'invalid-argument', message: 'cmsSchedule/child names parent opening, which is not published.' },
     }));
     fireEvent.click(screen.getByRole('button', { name: 'Publish 1 session' }));
-    expect(await within(main()).findByText('cmsSchedule/child names parent opening, which is not published.')).toBeInTheDocument();
+    expect(await within(main()).findByText('The changes could not be published. Try again.')).toBeInTheDocument();
   });
 
   it('reads an answer that skipped a change as a problem, naming it', async () => {
@@ -509,16 +509,16 @@ describe('the Unpublished changes page', () => {
   it('keeps the rows and says so when the list cannot be refreshed; says so plainly before it has any', async () => {
     await renderAt('/admin/unpublished');
     act(() => drafts.get('cmsPages').onError(new Error('offline')));
-    expect(within(main()).getByText('We could not count the unpublished changes. We will try again.')).toHaveAttribute('role', 'alert');
+    expect(within(main()).getByText('The changes could not be counted. Check your connection and try again.')).toHaveAttribute('role', 'alert');
     pushDrafts({ cmsPages: [{ id: 'home', label: 'Home', status: 'dirty' }] });
-    expect(within(main()).queryByText('We could not count the unpublished changes. We will try again.')).toBeNull();
+    expect(within(main()).queryByText('The changes could not be counted. Check your connection and try again.')).toBeNull();
     act(() => drafts.get('cmsPages').onError(new Error('offline again')));
     expect(within(main()).getByText(
-      'The list could not be refreshed. Until it is, the buttons on each table wait. Publish all reads the current list. It will try again.',
+      'This list is out of date. Check your connection, or use Publish all for the latest changes.',
     )).toHaveAttribute('role', 'status');
     expect(screen.getByRole('table', { name: /^Pages with unpublished changes/ })).toBeInTheDocument();
     act(() => runs.recent.onError(new Error('offline')));
-    expect(within(main()).getByText('The publish runs could not be refreshed. The list will try again.')).toBeInTheDocument();
+    expect(within(main()).getByText('Recent publishes could not be refreshed. Check your connection and try again.')).toBeInTheDocument();
   });
 
   it('holds the collection buttons while the list is stale, and keeps Publish all, which reads the current list', async () => {
@@ -531,7 +531,7 @@ describe('the Unpublished changes page', () => {
     expect(stale).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(stale);
     expect(within(main()).getByText(
-      'The list could not be refreshed. Until it is, the buttons on each table wait. Publish all reads the current list. It will try again.',
+      'This list is out of date. Check your connection, or use Publish all for the latest changes.',
     )).toHaveAttribute('role', 'status');
     const all = screen.getByRole('button', { name: 'Publish all (1)' });
     expect(all).not.toHaveAttribute('aria-disabled');
@@ -553,7 +553,7 @@ describe('the Unpublished changes page', () => {
     const button = within(panel).getByRole('button', { name: 'Publish 2001 sessions' });
     expect(button).toHaveAttribute('aria-disabled', 'true');
     expect(button.className).toContain(unavailableButtonClass);
-    expect(button).toHaveAccessibleDescription('Use Publish all. One collection publish takes at most 2,000 changes.');
+    expect(button).toHaveAccessibleDescription('Use Publish all to publish more than 2,000 changes at once.');
     button.focus();
     expect(document.activeElement).toBe(button);
     fireEvent.click(button);

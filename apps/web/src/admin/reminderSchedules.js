@@ -24,11 +24,11 @@ export function eventTime(iso, timeZone) {
   if (!iso) return '';
   const instant = new Date(iso);
   if (Number.isNaN(instant.getTime())) return '';
-  if (!timeZone) return instant.toISOString();
+  if (!timeZone) return new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'short' }).format(instant);
   try {
-    return `${describeEventDateTime(instant, timeZone)}, ${timeZone}`;
+    return describeEventDateTime(instant, timeZone);
   } catch {
-    return instant.toISOString();
+    return new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'short' }).format(instant);
   }
 }
 
@@ -77,10 +77,10 @@ export function lastRunWords(lastRun, timeZone) {
       what = 'the wording was not the approved wording, so it sent nothing and paused the schedule';
       break;
     case 'failed':
-      what = `it stopped: ${lastRun.error?.message ?? 'a server error'}`;
+      what = 'it stopped before completing; preview the reminders and try again';
       break;
     default:
-      what = lastRun.outcome ?? 'unknown';
+      what = 'the result is unavailable';
   }
   return `Last run ${when}: ${what}.`;
 }
@@ -185,10 +185,10 @@ export function attendeeLastRunWords(lastRun, timeZone) {
         : 'the wording was not the approved wording, so it sent nothing and paused the schedule';
       break;
     case 'failed':
-      what = `it stopped: ${String(lastRun.error?.message ?? 'a server error').replace(/\.$/, '')}`;
+      what = 'it stopped before completing; preview the reminders and try again';
       break;
     default:
-      what = lastRun.outcome ?? 'unknown';
+      what = 'the result is unavailable';
   }
   return `Last run ${when}: ${what}.`;
 }

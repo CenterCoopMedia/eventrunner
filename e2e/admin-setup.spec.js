@@ -44,7 +44,7 @@ test.describe.serial('the setup checklist', () => {
     // The step list beside the step marks this one as the current step.
     await expect(page.getByRole('list', { name: 'Setup steps' }).getByRole('link', { name: /Approve the privacy policy and terms/ })).toHaveAttribute('aria-current', 'step');
     await legal.getByRole('checkbox').check();
-    await legal.getByRole('button', { name: 'Mark the review complete' }).click();
+    await legal.getByRole('button', { name: 'Approve', exact: true }).click();
 
     await expect(legal.getByText('Done', { exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(`${doneBefore + 1} of ${items.length} steps done`)).toBeVisible();

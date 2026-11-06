@@ -4,8 +4,8 @@ import { secondaryButtonClass } from '../formControls.jsx';
 
 export const ASSET_SLOT_STATUS = Object.freeze({
   loading: 'Loading this file.',
-  unavailable: 'This path cannot be shown.',
-  missing: 'This file is missing from storage. Choose or upload a replacement, or try again.',
+  unavailable: 'This image cannot be shown. Choose another file.',
+  missing: 'This file is missing. Choose or upload a replacement, or try again.',
   denied: 'You do not have permission to view this file. Try again, or choose another file.',
   failed: 'This file could not be loaded. Try again, or choose another file.',
 });

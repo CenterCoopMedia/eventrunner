@@ -112,11 +112,11 @@ describe('AnnouncementEmailComposer', () => {
     await renderLoaded();
     expect(screen.getByRole('heading', { name: 'Write your email' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Review before sending' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Your preview will appear here' })).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Email sending steps' })).toHaveTextContent('PreviewSend a testConfirm recipients');
+    expect(screen.getByRole('heading', { name: 'Review your email' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Write email' })).toBeInTheDocument();
     expect(screen.queryByTitle('Email preview')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Send to/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Send a test to me' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send test' })).not.toBeInTheDocument();
     expect(call.mock.calls.filter(([name]) => name === 'previewAnnouncementEmail')).toHaveLength(0);
   });
 
@@ -129,9 +129,9 @@ describe('AnnouncementEmailComposer', () => {
     expect(screen.getByText('Speaker check-in moved')).toBeInTheDocument();
     expect(screen.getByText('Sent', { selector: 'span' })).toBeInTheDocument();
     expect(screen.getByText('Sent to 2 recipients of 3 addresses. 1 message failed.')).toBeInTheDocument();
-    expect(screen.getByText(/Speakers · Oct 1, 2026, 2:00 PM UTC · staff@example.org/)).toBeInTheDocument();
+    expect(screen.getByText(/Speakers · Oct 1, 2026, 2:00 PM UTC/)).toBeInTheDocument();
     expect(screen.queryByText('gone@example.org')).toBeNull();
-    expect(screen.getByText(/keeps each send for 90 days/)).toBeInTheDocument();
+    expect(screen.getByText(/Announcement emails from the past 90 days/)).toBeInTheDocument();
   });
 
   it('opens the frozen content of a send and failures on request, with a link to its recipient rows', async () => {
@@ -144,10 +144,10 @@ describe('AnnouncementEmailComposer', () => {
     expect(call).toHaveBeenCalledWith('getAnnouncementSend', { id: 'send-old' });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const region = screen.getByRole('region', { name: 'Speaker check-in moved: details' });
-    expect(within(region).getByText(/the message as the send started it/i)).toBeInTheDocument();
+    expect(within(region).getByText(/This preview uses a sample unsubscribe link/i)).toBeInTheDocument();
     expect(within(region).getByTitle('Email preview')).toHaveAttribute('sandbox', '');
     expect(within(region).getByText('gone@example.org')).toBeInTheDocument();
-    expect(within(region).getByText(/406: Inactive recipient/)).toBeInTheDocument();
+    expect(within(region).getByText(/Delivery failed\. Check the email address before trying again\./)).toBeInTheDocument();
     expect(within(region).getByRole('link', { name: 'Open the recipient messages in the email log' }))
       .toHaveAttribute('href', '/admin/email-log?send=send-old');
 
@@ -165,13 +165,13 @@ describe('AnnouncementEmailComposer', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Show details' })); });
     const region = screen.getByRole('region', { name: 'Speaker check-in moved: details' });
     expect(within(region).queryByRole('link', { name: /email log/ })).toBeNull();
-    expect(within(region).getByText('This send is older than the email log filter for one send. Its messages are in the email log under the source Announcement.')).toBeInTheDocument();
+    expect(within(region).getByText('Find these messages in the email log with the Announcement filter.')).toBeInTheDocument();
   });
 
   it('says when the email log could not record part of a send', async () => {
     respond({ listAnnouncementSends: listResponse([{ ...SENT, auditGaps: 2 }]) });
     await renderLoaded();
-    expect(screen.getByText('The email log could not record 2 messages of this send. The counts come from the email provider, and nobody gets a second copy.')).toBeInTheDocument();
+    expect(screen.getByText('Details are unavailable for 2 messages. The delivery counts are shown above.')).toBeInTheDocument();
   });
 
   it('pages the history: Show older sends adds the next page and moves focus to it', async () => {
@@ -205,7 +205,7 @@ describe('AnnouncementEmailComposer', () => {
     });
     await renderLoaded();
     fillDraft();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
 
     const heading = await screen.findByRole('heading', { name: 'Preview' });
     await waitFor(() => expect(heading).toHaveFocus());
@@ -249,7 +249,7 @@ describe('AnnouncementEmailComposer', () => {
     respond({ listAnnouncementSends: listResponse([]), previewAnnouncementEmail: PREVIEW });
     await renderLoaded();
     fillDraft();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     await screen.findByRole('heading', { name: 'Preview' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Send to 42 recipients' }));
@@ -270,9 +270,9 @@ describe('AnnouncementEmailComposer', () => {
     });
     await renderLoaded();
     fillDraft();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     await screen.findByRole('heading', { name: 'Preview' });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Send a test to me' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Send test' })); });
     expect(call).toHaveBeenCalledWith('sendAnnouncementTest', { draft: { subject: 'Doors open at nine', message: 'Doors open at nine.' } });
     expect(showToast).toHaveBeenCalledWith('Test email sent to staff@example.org.');
   });
@@ -284,12 +284,12 @@ describe('AnnouncementEmailComposer', () => {
       previewAnnouncementEmail: { ...PREVIEW, canSend: false, blocker, receipt: null },
     });
     await renderLoaded();
-    expect(screen.getByText(blocker)).toBeInTheDocument();
+    expect(screen.getByText('Email is not available. Ask an event administrator to check the email settings.')).toBeInTheDocument();
     fillDraft();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     await screen.findByRole('heading', { name: 'Preview' });
     expect(screen.queryByRole('button', { name: /Send to/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Send a test to me' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send test' })).not.toBeInTheDocument();
   });
 
   it('shows a stale-preview refusal, focuses it, and drops the preview', async () => {
@@ -303,7 +303,7 @@ describe('AnnouncementEmailComposer', () => {
     });
     await renderLoaded();
     fillDraft();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     await screen.findByRole('heading', { name: 'Preview' });
     fireEvent.click(screen.getByRole('button', { name: 'Send to 42 recipients' }));
     const confirm = await screen.findByRole('heading', { name: 'Send this email to 42 recipients?' });
@@ -311,7 +311,7 @@ describe('AnnouncementEmailComposer', () => {
       fireEvent.click(within(confirm.closest('section')).getByRole('button', { name: 'Send to 42 recipients' }));
     });
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Preview the email again.');
+    expect(alert).toHaveTextContent('Preview the email again before sending.');
     await waitFor(() => expect(alert).toHaveFocus());
     expect(screen.queryByRole('heading', { name: 'Preview' })).not.toBeInTheDocument();
   });
@@ -356,7 +356,7 @@ describe('AnnouncementEmailComposer', () => {
     expect(screen.getByLabelText('Subject')).toHaveFocus();
     expect(screen.getByText('This email goes only to the 2 addresses that failed in "Speaker check-in moved".')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     await screen.findByRole('heading', { name: 'Preview' });
     expect(call).toHaveBeenCalledWith('previewAnnouncementEmail', {
       draft: { subject: 'Speaker check-in moved', message: 'Check in at the side door.', linkUrl: 'https://example.org/map', linkLabel: 'Open the map' },
@@ -387,7 +387,7 @@ describe('AnnouncementEmailComposer', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry 1 failed address' })); });
     fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'registered' } });
     expect(screen.queryByText(/This email goes only to/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     await screen.findByRole('heading', { name: 'Preview' });
     expect(call.mock.calls.find(([name]) => name === 'previewAnnouncementEmail')[1]).not.toHaveProperty('retryOf');
   });
@@ -430,7 +430,7 @@ describe('AnnouncementEmailComposer', () => {
     const rows = screen.getAllByRole('listitem').filter((row) => within(row).queryByText(/Your event is/));
     expect(rows).toHaveLength(2);
     expect(within(rows[0]).getByText(/Scheduled attendee reminder/)).toBeInTheDocument();
-    expect(within(rows[0]).getByText(/The schedule sends the rest in its next hourly run\./)).toBeInTheDocument();
+    expect(within(rows[0]).getByText(/Remaining reminders are scheduled for daytime hours\./)).toBeInTheDocument();
     expect(within(rows[0]).queryByRole('button', { name: 'Continue sending' })).toBeNull();
     expect(within(rows[1]).getByText('Stopped')).toBeInTheDocument();
     expect(within(rows[1]).getByText(/200 addresses were not sent\./)).toBeInTheDocument();
@@ -451,17 +451,17 @@ describe('AnnouncementEmailComposer', () => {
       removeEmailSuppression: { removed: true },
     });
     await renderLoaded();
-    expect(screen.getByText(/Postmark keeps its own list of addresses that unsubscribed/)).toBeInTheDocument();
+    expect(screen.getByText(/Ask the event administrator to restore delivery with the email provider too/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Restore an unsubscribed address/), { target: { value: 'back@example.org' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Restore address' })); });
-    expect(showToast).toHaveBeenCalledWith('This site no longer leaves the address out. Reactivate it on the broadcast stream in Postmark too.');
+    expect(showToast).toHaveBeenCalledWith('This address is restored here. Ask the event administrator to restore delivery with the email provider too.');
   });
 
   it('states every count it has and nothing it does not', () => {
     expect(countsSentence({ status: 'sent', total: 1, processed: 1, counts: { sent: 1 } }))
       .toBe('Sent to 1 recipient of 1 address.');
     expect(countsSentence({ status: 'sent', total: 5, processed: 5, counts: { sent: 1, uncertain: 1, skipped: 2, suppressed: 1 } }))
-      .toBe('Sent to 1 recipient of 5 addresses. 1 message has an unknown result. 2 recipients were already handled by an earlier call. 1 address unsubscribed during the send.');
+      .toBe('Sent to 1 recipient of 5 addresses. 1 message has an unknown result. 2 recipients were already handled. 1 address unsubscribed during the send.');
   });
 });
 
@@ -532,7 +532,7 @@ describe('AnnouncementEmailComposer saved messages', () => {
     await renderLoaded();
     fillDraft();
     fireEvent.change(screen.getByLabelText('Name for this message'), { target: { value: 'Doors note' } });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save as a new message' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save new message' })); });
     expect(actionsOf('save')[0][1]).toEqual({
       action: 'save',
       name: 'Doors note',
@@ -555,7 +555,7 @@ describe('AnnouncementEmailComposer saved messages', () => {
     expect(screen.getByLabelText('Button link (optional)')).toHaveValue('https://example.org/schedule');
     expect(screen.getByLabelText('Audience')).toHaveValue('speakers');
     await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveFocus());
-    expect(screen.getByText('Loaded from "Weekly note". Changes here do not change the saved message until you update it.')).toBeInTheDocument();
+    expect(screen.getByText('Using “Weekly note”. Save changes to update the saved message.')).toBeInTheDocument();
   });
 
   it('asks before it replaces a draft with edits; cancel keeps the draft, replace drops the preview', async () => {
@@ -563,7 +563,7 @@ describe('AnnouncementEmailComposer saved messages', () => {
     await renderLoaded();
     await within(savedPanel()).findByText('This week');
     fillDraft();
-    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     await screen.findByRole('heading', { name: 'Preview' });
 
     const load = within(savedRow('This week')).getByRole('button', { name: 'Load' });
@@ -606,7 +606,7 @@ describe('AnnouncementEmailComposer saved messages', () => {
     await within(savedPanel()).findByText('This week');
     await act(async () => { fireEvent.click(within(savedRow('This week')).getByRole('button', { name: 'Load' })); });
     fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'This week, changed' } });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Update "Weekly note"' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save changes' })); });
     expect(actionsOf('save')[0][1]).toMatchObject({ action: 'save', id: 'msg-aaaa-1111', name: 'Weekly note' });
     expect(actionsOf('save')[0][1].draft.subject).toBe('This week, changed');
 
@@ -647,8 +647,8 @@ describe('AnnouncementEmailComposer saved messages', () => {
     });
     await renderLoaded();
     fillDraft();
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save as a new message' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save new message' })); });
     const alert = within(savedPanel()).getByRole('alert');
-    expect(alert).toHaveTextContent('must contain text');
+    expect(alert).toHaveTextContent('The message could not be saved. Check the message and try again.');
   });
 });

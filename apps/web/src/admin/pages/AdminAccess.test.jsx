@@ -118,7 +118,7 @@ describe('a change to the signed-in account', () => {
 describe('AdminAccess', () => {
   it('lists every account in a ruled table with a tier word, and marks the signed-in operator', async () => {
     await renderPage();
-    const table = screen.getByRole('table', { name: 'Admin accounts and their tier' });
+    const table = screen.getByRole('table', { name: 'Admin accounts and their roles' });
     expect(table).toBeInTheDocument();
     expect(callMock).toHaveBeenCalledWith('listAdminAccess', {});
 
@@ -135,9 +135,9 @@ describe('AdminAccess', () => {
 
   it('names each tier’s sections in the rail’s own words, Event included, and never “deployment settings”', async () => {
     const { container } = await renderPage();
-    expect(container.textContent).toContain(`Staff run ${TIER_SCOPE.staff}.`);
+    expect(container.textContent).toContain(`Staff can manage ${TIER_SCOPE.staff}.`);
     expect(TIER_SCOPE.staff).toContain('Event');
-    expect(container.textContent).toContain(`including ${TIER_SCOPE.operatorOnly}.`);
+    expect(container.textContent).toContain(`Operators can manage ${TIER_SCOPE.operatorOnly}.`);
     expect(container.textContent).not.toMatch(/deployment settings/);
   });
 
@@ -196,7 +196,7 @@ describe('AdminAccess', () => {
     // The confirmation records the first grant, even if the operator starts
     // another draft before confirming it.
     fireEvent.change(email, { target: { value: 'next@example.org' } });
-    const tier = screen.getByLabelText('Tier');
+    const tier = screen.getByLabelText('Role');
     fireEvent.change(tier, { target: { value: 'operator' } });
     let finish;
     callMock.mockImplementation((name) => name === 'setAdminAccess'
@@ -230,7 +230,7 @@ describe('AdminAccess', () => {
   it('changes a tier through a confirmation that repeats the consequence, then hands focus back to the row’s control', async () => {
     await renderPage();
     const trigger = rowFor('desk@example.org').querySelector('button');
-    expect(trigger).toHaveTextContent('Change to operator');
+    expect(trigger).toHaveAccessibleName('Change desk@example.org to operator');
     trigger.focus();
     fireEvent.click(trigger);
 
@@ -283,7 +283,7 @@ describe('AdminAccess', () => {
   });
 
   it('shows the server’s refusal verbatim, in place, focuses it, and keeps the surface open for another try', async () => {
-    const message = 'At least one operator must keep access. Grant another account operator access first.';
+    const message = 'At least one operator must keep access.';
     await renderPage({ set: serverError(409, 'last-operator', message) });
     fireEvent.click(rowFor('ops@example.org').querySelectorAll('button')[1]);
     const surface = screen.getByRole('region', { name: 'Remove access for ops@example.org' });
@@ -343,7 +343,7 @@ describe('AdminAccess', () => {
     // One retry action, and it loads the list.
     serve();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByRole('table', { name: 'Admin accounts and their tier' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Admin accounts and their roles' })).toBeInTheDocument();
     expect(screen.getByText('3 accounts, 2 operators')).toBeInTheDocument();
   });
 
@@ -369,14 +369,14 @@ describe('AdminAccess', () => {
     expect(busy).toBe(retry);
     expect(busy).toHaveAttribute('aria-busy', 'true');
     expect(document.activeElement).toBe(retry);
-    expect(screen.getByRole('alert').textContent).toContain('down 1');
+    expect(screen.getByRole('alert').textContent).toContain('The access list could not be loaded. Try again.');
     // Second failure: the block stays, the button is back, focus never left.
     await act(async () => {
       failRetry(serverError(500, 'internal', 'down 2'));
     });
     expect(screen.getByRole('button', { name: 'Try again' })).toBe(retry);
     expect(retry).not.toHaveAttribute('aria-busy');
-    expect(screen.getByRole('alert').textContent).toContain('down 2');
+    expect(screen.getByRole('alert').textContent).toContain('The access list could not be loaded. Try again.');
     expect(document.activeElement).toBe(retry);
     expect(screen.queryByRole('table')).toBeNull();
   });
@@ -398,7 +398,7 @@ describe('AdminAccess', () => {
     const retry = screen.getByRole('button', { name: 'Try again' });
     retry.focus();
     fireEvent.click(retry);
-    const table = await screen.findByRole('table', { name: 'Admin accounts and their tier' });
+    const table = await screen.findByRole('table', { name: 'Admin accounts and their roles' });
     // The surface is still open; the keyboard went to what was asked for.
     expect(screen.getByRole('region', { name: 'Set staff access for new@example.org' })).toBeInTheDocument();
     await waitFor(() => expect(document.activeElement).not.toBe(surface));
@@ -414,7 +414,7 @@ describe('AdminAccess', () => {
     const surface = screen.getByRole('region', { name: 'Change desk@example.org to operator' });
     fireEvent.click(within(surface).getByRole('button', { name: 'Change to operator' }));
     expect(await screen.findByText(/could not refresh the access list/)).toBeInTheDocument();
-    expect(screen.getByRole('table', { name: 'Admin accounts and their tier' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Admin accounts and their roles' })).toBeInTheDocument();
   });
 
   it('describes every change and every result in one vocabulary', () => {
@@ -477,7 +477,7 @@ describe('staff access with an end time', () => {
     await renderPage({ list: TEMP_LIST });
     expect(rowFor('demo@example.org').textContent).toContain(`Access ends ${formatEndTime(ENDS)}`);
     expect(rowFor('ended@example.org').textContent).toContain('Ended');
-    expect(rowFor('ended@example.org').textContent).toContain(`Access ended ${formatEndTime('2026-10-01T12:00:00.000Z')}. No access now. The account leaves this list within a minute.`);
+    expect(rowFor('ended@example.org').textContent).toContain(`Access ended ${formatEndTime('2026-10-01T12:00:00.000Z')}. No access now.`);
     expect(rowFor('bad@example.org').textContent).toContain('The end time cannot be read. No access now.');
     expect(rowFor('bad@example.org').textContent).toContain('No access');
     expect(rowFor('demo@example.org').textContent).not.toContain('Ended');
@@ -488,9 +488,9 @@ describe('staff access with an end time', () => {
   it('offers an end time for staff only, and sends it as an ISO instant after a confirmation that names it', async () => {
     await renderPage();
     expect(screen.getByLabelText('Access ends (optional)')).toHaveAttribute('type', 'datetime-local');
-    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'operator' } });
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'operator' } });
     expect(screen.queryByLabelText('Access ends (optional)')).toBeNull();
-    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'staff' } });
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'staff' } });
 
     const ends = new Date(Date.now() + 3 * 24 * 3_600_000);
     ends.setSeconds(0, 0);
@@ -502,7 +502,7 @@ describe('staff access with an end time', () => {
     // The scope, the end, and that the end does not make the account read-only.
     expect(surface.textContent).toContain(`run ${TIER_SCOPE.staff}`);
     expect(surface.textContent).toContain(`Access ends ${formatEndTime(ends.toISOString())}.`);
-    expect(surface.textContent).toContain('Until then, staff can edit and publish content. An end time does not make the account read-only.');
+    expect(surface.textContent).toContain('Until then, staff can edit and publish content. ');
 
     fireEvent.click(within(surface).getByRole('button', { name: 'Grant staff access' }));
     await waitFor(() => {

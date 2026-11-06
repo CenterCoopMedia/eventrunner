@@ -26,7 +26,7 @@
 // Restyled onto the fixed admin identity (docs/plans/2026-08-27-admin-
 // identity-story.md): the job line via AdminPageHeader, the galley for the
 // row list (hairline rows, mono data, no zebra, no row cards), and every
-// rejection — the row-level "not resolved" notices — rendered verbatim on
+// rejection uses a short recovery message on
 // the alarm ground via `Notice tone="error"`, the same query pattern
 // `ServerErrorSummary` uses. The soft list-load failure stays a caution
 // notice, not an alarm: it is not a rejection, it is a stale, non-blocking
@@ -38,56 +38,28 @@ import { Notice, Panel, secondaryButtonClass } from '../components/formControls.
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
-  StatusBadge,
 } from '../components/adminChrome.jsx';
 import OperationIcon from '../components/OperationIcon.jsx';
 
 const PAGE_SIZE = 100;
-// Long enough to show real signal (a stack's first line, a validation
-// message) without a screenful of raw text; anything past this gets the
-// <details> expansion below.
-const MESSAGE_PREVIEW_LEN = 140;
-
 function formatWhen(ms) {
-  if (!Number.isFinite(ms)) return '—';
+  if (!Number.isFinite(ms)) return 'Time not recorded';
   return new Date(ms).toLocaleString();
 }
 
-function KindLabel({ kind }) {
-  return (
-    <code className="rounded-admin-small bg-admin-ground-soft px-2xs py-3xs font-admin-data text-admin-xs text-admin-ink-data">
-      {kind}
-    </code>
-  );
-}
-
-/**
- * The row's message (or joined `errors`), truncated with a keyboard-
- * accessible expansion for anything long enough to need one. `<details>` is
- * used rather than a custom toggle button: it is natively focusable and
- * Enter/Space-activatable with no extra ARIA wiring, unlike a plain `<p>`
- * with a "show more" link.
- *
- * The message is set in the data face: it is exactly the kind of text an
- * operator copies, pastes, and compares character by character to dedupe a
- * fault against a known one.
- */
-function MessageText({ text }) {
-  if (!text) {
-    return <p className="mt-3xs font-admin-data text-admin-sm text-admin-ink-data">(no message)</p>;
-  }
-  if (text.length <= MESSAGE_PREVIEW_LEN) {
-    return <p className="mt-3xs font-admin-data text-admin-sm text-admin-ink-data">{text}</p>;
-  }
-  return (
-    <details className="mt-3xs font-admin-data text-admin-sm text-admin-ink-data">
-      <summary className="admin-target inline cursor-pointer underline underline-offset-4">
-        {text.slice(0, MESSAGE_PREVIEW_LEN)}…{' '}
-        <span className="text-admin-ink-secondary">(show full message)</span>
-      </summary>
-      <p className="mt-2xs whitespace-pre-wrap break-words">{text}</p>
-    </details>
-  );
+function errorDetails(kind) {
+  if (kind === 'template-override-invalid') return {
+    title: 'Email wording needs attention',
+    message: 'Sign-in emails are using the default wording. Ask the Event Runner team to check your saved wording.',
+  };
+  if (kind === 'client-error') return {
+    title: 'A visitor had a problem',
+    message: 'A visitor could not complete an action on the site. Ask the Event Runner team to check it.',
+  };
+  return {
+    title: 'Site error',
+    message: 'An action on the site failed. Ask the Event Runner team to check it.',
+  };
 }
 
 export default function AdminSystemErrors() {
@@ -163,8 +135,8 @@ export default function AdminSystemErrors() {
       setNextCursor(response?.nextCursor ?? null);
       setError(null);
       setFocusRow(more.find((row) => !row.resolved)?.id ?? '');
-    } catch (err) {
-      setMoreError(err.message);
+    } catch {
+      setMoreError('The next page could not be loaded. Try again.');
     } finally {
       readBusyRef.current = false;
       setLoadingMore(false);
@@ -197,8 +169,8 @@ export default function AdminSystemErrors() {
         const refreshed = await load();
         setResolvedMessage(refreshed ? 'Error resolved. The list has been checked again.' : 'Error resolved. Refresh to check the list again.');
       }
-    } catch (err) {
-      setRowNotices((current) => ({ ...current, [row.id]: err.message }));
+    } catch {
+      setRowNotices((current) => ({ ...current, [row.id]: 'This error could not be marked as resolved. Refresh and try again.' }));
     } finally {
       resolveBusyRef.current = false;
       setResolvingId(null);
@@ -211,7 +183,7 @@ export default function AdminSystemErrors() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="System errors"
-        description="Unresolved server-side faults (telemetry/systemErrors.cjs). Resolving a row here is not permanent — the server reopens it automatically if the same fault happens again."
+        description="Review site problems with the Event Runner team, then mark them as resolved. A problem appears again if it returns."
         actions={
           rows === null && error ? <button
             ref={refreshRef}
@@ -249,7 +221,8 @@ export default function AdminSystemErrors() {
       ) : rows === null ? null : visibleRows.length === 0 && !nextCursor ? (
         <AdminEmptyState
           title="No unresolved errors"
-          description="No unresolved errors were returned by the last check. Refresh to check for new errors."
+          description="Check again for new site problems."
+          action={<AdminIconControl icon="refresh" label="Check for new errors" onClick={load} />}
         />
       ) : (
         <>
@@ -267,20 +240,9 @@ export default function AdminSystemErrors() {
                     <div className="flex flex-wrap items-center justify-between gap-sm">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-x-sm gap-y-3xs">
-                          <KindLabel kind={row.kind} />
-                          {/* alertedAt is stamped when a notify attempt is
-                              CLAIMED (systemErrors.cjs's claimAlert), before the
-                              notifier runs — a 'none' sink, a failed send, or a
-                              deduped delivery all still stamp it. "attempted" is
-                              the honest word; the row does not record whether
-                              the notification was actually delivered. */}
-                          {row.alertedAt ? (
-                            <StatusBadge tone="info">Alert attempted</StatusBadge>
-                          ) : (
-                            <StatusBadge tone="neutral">No alert attempted</StatusBadge>
-                          )}
+                          <h2 className="text-admin-base font-semibold text-admin-ink">{errorDetails(row.kind).title}</h2>
                         </div>
-                        <MessageText text={row.message || (row.errors ?? []).join('; ') || null} />
+                        <p className="mt-3xs text-admin-sm text-admin-ink-secondary">{errorDetails(row.kind).message}</p>
                         <p className="mt-3xs font-admin-data text-admin-xs text-admin-ink-secondary">
                           Last seen {formatWhen(row.lastSeenAt ?? row.createdAt)}
                         </p>
@@ -306,7 +268,7 @@ export default function AdminSystemErrors() {
           </Panel>
           {nextCursor ? (
             <div className="flex flex-col gap-xs">
-              {moreError ? <Notice tone="error" message={`The next page could not be loaded. ${moreError}`} /> : null}
+              {moreError ? <Notice tone="error" message={moreError} /> : null}
               <button
                 type="button"
                 className={secondaryButtonClass}

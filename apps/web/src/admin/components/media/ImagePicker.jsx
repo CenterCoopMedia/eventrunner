@@ -27,6 +27,7 @@ import { assetUrl, brandingSrc } from '../../../lib/mediaSource.js';
 import AssetSlotStatus, { ASSET_SLOT_STATUS, assetFailureKind } from './AssetSlotStatus.jsx';
 import ModalShell from './ModalShell.jsx';
 import MediaLibrary from './MediaLibrary.jsx';
+import AdminIconControl from '../AdminIconControl.jsx';
 
 // Branding slots and the page preview must ask the same origin. The preview
 // uses brandingSrc: a flat seeded path is a bundle file, and only a library
@@ -165,16 +166,14 @@ export default function ImagePicker({
                 .filter(Boolean)
                 .join(' ') || undefined
             }
-            placeholder={`${folder}/…`}
+            placeholder="Choose an image"
           />
           <div className="mt-2xs flex flex-wrap gap-2xs">
             <button type="button" className={secondaryButtonClass} onClick={() => setBrowsing(true)}>
               Choose or upload…
             </button>
             {value ? (
-              <button type="button" className={secondaryButtonClass} onClick={() => onChange('')}>
-                Clear
-              </button>
+              <AdminIconControl label={`Remove ${label.toLowerCase()}`} icon="remove" className={secondaryButtonClass} onClick={() => onChange('')} />
             ) : null}
           </div>
         </div>
@@ -193,7 +192,7 @@ export default function ImagePicker({
 
       {browsing ? (
         <ModalShell
-          title={`Choose an image — ${label}`}
+          title="Choose an image"
           description="Pick a file from the library, or upload a new one."
           onClose={() => setBrowsing(false)}
         >

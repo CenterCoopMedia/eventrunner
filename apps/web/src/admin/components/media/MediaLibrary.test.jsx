@@ -84,7 +84,7 @@ describe('MediaLibrary', () => {
 
   it('flags an asset with no alt text', async () => {
     render(<MediaLibrary folder="branding" />);
-    expect(await screen.findByText(/no alt text/)).toBeInTheDocument();
+    expect(await screen.findByText('No image description')).toBeInTheDocument();
   });
 
   it('filters on search', async () => {
@@ -106,7 +106,7 @@ describe('MediaLibrary', () => {
 
     const file = new File(['x'], 'new.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('File'), { target: { files: [file] } });
-    fireEvent.change(screen.getByLabelText('Alt text'), {
+    fireEvent.change(screen.getByLabelText('Image description'), {
       target: { value: 'A new picture' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
@@ -129,7 +129,7 @@ describe('MediaLibrary', () => {
     fireEvent.change(screen.getByLabelText('File'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/application\/pdf/);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose PNG, JPEG, WEBP, GIF.');
     expect(call).not.toHaveBeenCalledWith('mediaUpload', expect.anything());
   });
 });
@@ -146,15 +146,18 @@ describe('the delete-with-usage-warning flow', () => {
     render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
 
-    expect(await screen.findByText('cmsPages/home')).toBeInTheDocument();
-    expect(screen.getByText(/Used by 1 document/)).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Open page 1' })).toBeInTheDocument();
+    expect(screen.queryByText('cmsPages/home')).not.toBeInTheDocument();
+    expect(screen.queryByText('sections.0.image')).not.toBeInTheDocument();
+    expect(screen.queryByText(HERO.path)).not.toBeInTheDocument();
+    expect(screen.getByText(/Used in 1 place/)).toBeInTheDocument();
 
     // The plain "Delete this file" button is not offered for an asset in use.
     expect(screen.queryByRole('button', { name: 'Delete this file' })).not.toBeInTheDocument();
     // Moment 3: the first press states the cost — how many live documents
     // lose their file — and sends nothing.
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file anyway' }));
-    expect(screen.getByText(/render a missing file/)).toBeInTheDocument();
+    expect(screen.getByText(/will show a missing image/)).toBeInTheDocument();
     expect(call).not.toHaveBeenCalledWith('mediaDelete', expect.anything());
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file anyway' }));
     await waitFor(() =>
@@ -172,7 +175,7 @@ describe('the delete-with-usage-warning flow', () => {
     });
     render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
-    expect(await screen.findByText(/Deleting it is safe/)).toBeInTheDocument();
+    expect(await screen.findByText('This file is not used in your event.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     await waitFor(() =>
@@ -192,11 +195,11 @@ describe('the delete-with-usage-warning flow', () => {
     });
     render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
-    await screen.findByText(/Deleting it is safe/);
+    await screen.findByText('This file is not used in your event.');
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
 
-    expect(await screen.findByText('cmsContent/home-hero')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Open content block 1' })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Delete this file anyway' }),
     ).toBeInTheDocument();
@@ -205,10 +208,10 @@ describe('the delete-with-usage-warning flow', () => {
   it('saves alt text through mediaUpdateMetadata', async () => {
     render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
-    fireEvent.change(await screen.findByLabelText('Alt text'), {
+    fireEvent.change(await screen.findByLabelText('Image description'), {
       target: { value: 'A wide shot' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save description' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() =>
       expect(call).toHaveBeenCalledWith('mediaUpdateMetadata', {
         assetId: HERO.id,
@@ -226,11 +229,14 @@ describe('nested dialogs', () => {
     // picker the person was only stepping out of.
     render(<ImagePicker label="Primary logo" folder="branding" value="" onChange={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Choose or upload…' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Details and delete' }));
+    const edit = await screen.findByRole('button', { name: 'File details for Logo' });
+    edit.focus();
+    fireEvent.click(edit);
 
     expect(screen.getAllByRole('dialog')).toHaveLength(2);
     fireEvent(screen.getAllByRole('dialog').at(-1), new Event('cancel', { cancelable: true }));
     await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
+    expect(screen.getByRole('button', { name: 'File details for Logo' })).toHaveFocus();
     // The one still open is the picker's library, not the detail modal.
     expect(screen.getByRole('dialog')).toHaveAccessibleName(/Choose an image/);
 
@@ -241,7 +247,7 @@ describe('nested dialogs', () => {
   it('restores page scrolling only when the last dialog closes', async () => {
     render(<ImagePicker label="Primary logo" folder="branding" value="" onChange={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Choose or upload…' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Details and delete' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'File details for Logo' }));
     fireEvent(screen.getAllByRole('dialog').at(-1), new Event('cancel', { cancelable: true }));
     await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
     expect(document.body.style.overflow).toBe('hidden');
@@ -261,7 +267,7 @@ describe('ImagePicker', () => {
     const onChange = vi.fn();
     render(<ImagePicker label="Primary logo" folder="branding" value="" onChange={onChange} />);
     fireEvent.click(screen.getByRole('button', { name: 'Choose or upload…' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Logo/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Logo/ }));
     expect(onChange).toHaveBeenCalledWith(LOGO.path);
   });
 
@@ -279,7 +285,7 @@ describe('ImagePicker', () => {
     render(
       <ImagePicker label="Mark" folder="branding" value="branding/mark.svg" onChange={onChange} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove mark' }));
     expect(onChange).toHaveBeenCalledWith('');
   });
 
@@ -349,7 +355,7 @@ describe('ImagePicker', () => {
     expect(await screen.findByText('Loading this file.')).toBeInTheDocument();
     fireEvent.error(img);
     const status = await screen.findByText(
-      'This file is missing from storage. Choose or upload a replacement, or try again.',
+      'This file is missing. Choose or upload a replacement, or try again.',
     );
     const frame = img.closest('.asset-slot-frame');
     expect(frame).not.toContain(status);
@@ -372,7 +378,7 @@ describe('ImagePicker', () => {
     expect(busy).toHaveFocus();
     fireEvent.error(document.querySelector('img'));
     await screen.findByText(
-      'This file is missing from storage. Choose or upload a replacement, or try again.',
+      'This file is missing. Choose or upload a replacement, or try again.',
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     vi.unstubAllGlobals();
@@ -409,7 +415,7 @@ describe('ImagePicker', () => {
     render(
       <ImagePicker label="Primary logo" folder="branding" value="https://evil.example/x.png" onChange={vi.fn()} />,
     );
-    expect(await screen.findByText('This path cannot be shown.')).toBeInTheDocument();
+    expect(await screen.findByText('This image cannot be shown. Choose another file.')).toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();
     expect(screen.getByRole('button', { name: 'Choose or upload…' })).toBeInTheDocument();
   });
@@ -431,19 +437,19 @@ describe('the Branding drawer for staff', () => {
     render(<MediaLibrary folder="branding" />);
     expect(await screen.findByText('Logo')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Upload a file' })).toBeNull();
-    expect(screen.getByText('An operator manages branding files.')).toBeInTheDocument();
+    expect(screen.getByText('Ask your site manager to change branding files.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Logo/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Logo/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save description' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete this file' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete this file anyway' })).toBeNull();
-    expect(screen.getByLabelText('Alt text')).toHaveAttribute('readonly');
-    expect(screen.getByLabelText('Title')).toHaveAttribute('readonly');
-    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Image description')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
     // The note is in the dialog too, where the missing controls would have been.
-    expect(screen.getAllByText('An operator manages branding files.').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('Ask your site manager to change branding files.').length).toBeGreaterThan(1);
   });
 
   it('keeps the Page images drawer fully editable for staff', async () => {
@@ -451,10 +457,10 @@ describe('the Branding drawer for staff', () => {
     render(<MediaLibrary folder="cms-images" />);
     expect(await screen.findByText('Hero')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload a file' })).toBeInTheDocument();
-    expect(screen.queryByText('An operator manages branding files.')).toBeNull();
+    expect(screen.queryByText('Ask your site manager to change branding files.')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Hero/ }));
-    expect(await screen.findByRole('button', { name: 'Save description' })).toBeInTheDocument();
-    expect(await screen.findByText(/Deleting it is safe/)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(await screen.findByText('This file is not used in your event.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete this file' })).toBeInTheDocument();
   });
 
@@ -463,10 +469,10 @@ describe('the Branding drawer for staff', () => {
     render(<MediaLibrary folder="branding" />);
     expect(await screen.findByText('Logo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload a file' })).toBeInTheDocument();
-    expect(screen.queryByText('An operator manages branding files.')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /Logo/ }));
-    expect(await screen.findByRole('button', { name: 'Save description' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Alt text')).not.toHaveAttribute('readonly');
+    expect(screen.queryByText('Ask your site manager to change branding files.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Logo/ }));
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Image description')).not.toHaveAttribute('readonly');
   });
 
   it('a page image a theme slot or the social card uses is read-only for staff once the scan says so', async () => {
@@ -479,10 +485,10 @@ describe('the Branding drawer for staff', () => {
     });
     render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
-    expect(await screen.findByText('config/theme')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save description' })).toBeNull();
+    expect(await screen.findByRole('link', { name: 'Open branding 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete this file anyway' })).toBeNull();
-    expect(screen.getByText('An operator manages branding files.')).toBeInTheDocument();
+    expect(screen.getByText('Ask your site manager to change branding files.')).toBeInTheDocument();
   });
 
   it("maps the server's branding refusal to a plain sentence on save, delete and upload", async () => {
@@ -493,15 +499,15 @@ describe('the Branding drawer for staff', () => {
     });
     const { unmount } = render(<MediaLibrary folder="cms-images" />);
     fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
-    await screen.findByText(/Deleting it is safe/);
-    fireEvent.click(screen.getByRole('button', { name: 'Save description' }));
-    expect(await screen.findByText('Only an operator can change branding files.')).toBeInTheDocument();
+    await screen.findByText('This file is not used in your event.');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Only your site manager can change branding files.')).toBeInTheDocument();
     expect(screen.queryByText('branding: operator access required')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('mediaDelete', expect.anything()));
-    expect(await screen.findByText('Only an operator can change branding files.')).toBeInTheDocument();
+    expect(await screen.findByText('Only your site manager can change branding files.')).toBeInTheDocument();
     unmount();
 
     render(<MediaLibrary folder="cms-images" />);
@@ -509,6 +515,6 @@ describe('the Branding drawer for staff', () => {
     const file = new File(['x'], 'new.png', { type: 'image/png' });
     fireEvent.change(screen.getByLabelText('File'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
-    expect(await screen.findByText('Only an operator can change branding files.')).toBeInTheDocument();
+    expect(await screen.findByText('Only your site manager can change branding files.')).toBeInTheDocument();
   });
 });

@@ -23,6 +23,9 @@ import {
   readOffsetInputs,
 } from '../reminderSchedules.js';
 import { describeTimeZone } from '../../lib/eventDateTime.js';
+import AdminIconControl from './AdminIconControl.jsx';
+import ReminderScheduleSwitch from './ReminderScheduleSwitch.jsx';
+import { communicationsError } from './communicationsErrors.js';
 import {
   FieldError,
   Notice,
@@ -42,15 +45,15 @@ function formFrom(data) {
   return {
     offsets: data.settings.offsetsDays.map(String),
     sendTime: data.settings.sendTime,
-    subject: data.settings.draft.subject,
-    message: data.settings.draft.message,
+    subject: data.settings.draft.subject.replaceAll('{{days_until}}', '[Days until event]'),
+    message: data.settings.draft.message.replaceAll('{{days_until}}', '[Days until event]'),
   };
 }
 
 function sameForm(form, data) {
   const offsets = readOffsetInputs(form.offsets).days;
   const { settings } = data;
-  return JSON.stringify([offsets, form.sendTime, form.subject.trim(), form.message.trim()])
+  return JSON.stringify([offsets, form.sendTime, form.subject.trim().replaceAll('[Days until event]', '{{days_until}}'), form.message.trim().replaceAll('[Days until event]', '{{days_until}}')])
     === JSON.stringify([settings.offsetsDays, settings.sendTime, settings.draft.subject, settings.draft.message]);
 }
 
@@ -83,8 +86,8 @@ function SampleMessage({ sample, timeZone }) {
         />
       ) : null}
       <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version</summary>
-        <pre data-testid={`attendee-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview</summary>
+        <pre data-testid={`attendee-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {sample.text}
         </pre>
       </details>
@@ -108,17 +111,17 @@ function NextRun({ data, headingId }) {
 }
 
 function Facts({ facts }) {
-  if (!facts.ok) return <Notice tone="caution" message={`The reminder cannot be prepared: ${facts.problem}`} />;
+  if (!facts.ok) return <Notice tone="caution" message="The reminder could not be prepared. Check the event date and venue in Event settings." />;
   return (
     <section aria-label="What every attendee reminder states" className="flex flex-col gap-2xs">
       <p className="text-admin-sm text-admin-ink-secondary">
-        The site adds these after your message, from Event settings. A change to any of them pauses the schedule.
+        Each reminder includes the event details and ticket link shown below.
       </p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-sm gap-y-3xs text-admin-sm">
         <dt className="font-semibold text-admin-ink">Starts</dt>
         <dd className="text-admin-ink">{facts.when}</dd>
         <dt className="font-semibold text-admin-ink">Where</dt>
-        <dd className="text-admin-ink">{facts.where || 'No venue is set. The reminder leaves the place out.'}</dd>
+        <dd className="text-admin-ink">{facts.where || 'No venue set.'}</dd>
         <dt className="font-semibold text-admin-ink">Ticket link</dt>
         <dd className="wrap-anywhere font-admin-data text-admin-ink-data">{facts.ticketUrl}</dd>
       </dl>
@@ -157,7 +160,7 @@ export default function AttendeeReminderSchedule({ call }) {
       setForm(formFrom(next));
       setLoadError(null);
     } catch (err) {
-      setLoadError(err.message);
+      setLoadError(communicationsError(err, 'The schedule could not be loaded. Try again.'));
     } finally {
       setLoading(false);
     }
@@ -211,14 +214,14 @@ export default function AttendeeReminderSchedule({ call }) {
       if (next?.refreshError) {
         // The change is stored; only the read after it failed.
         setPreview(null);
-        show('caution', next.refreshError);
+        show('caution', 'The change is saved, but the schedule could not be loaded. Refresh the page.');
         await load();
         return;
       }
       onDone(next);
     } catch (err) {
       if (kind === 'preview' && revision !== formRevision.current) return;
-      show('error', err.message);
+      show('error', communicationsError(err, 'The schedule could not be updated. Check the settings and preview again.'));
     } finally {
       busyRef.current = false;
       setBusy(null);
@@ -228,10 +231,11 @@ export default function AttendeeReminderSchedule({ call }) {
   function save(event) {
     event.preventDefault();
     const offsets = readOffsetInputs(form.offsets, data.limits);
-    const problems = draftProblems({ subject: form.subject, message: form.message }, data.limits);
+    const problems = draftProblems({ subject: form.subject.replaceAll('[Days until event]', '{{days_until}}'), message: form.message.replaceAll('[Days until event]', '{{days_until}}') }, data.limits);
     setOffsetsProblem(offsets.problem);
-    setWordingProblems(problems);
-    const first = offsets.problem ?? problems.subject ?? problems.message;
+    const readable = Object.fromEntries(Object.entries(problems).map(([key, problem]) => [key, problem?.includes('{{') ? 'Use [Days until event] for the time left, then save again.' : problem]));
+    setWordingProblems(readable);
+    const first = offsets.problem ?? readable.subject ?? readable.message;
     if (first) {
       show('error', first);
       return;
@@ -240,7 +244,7 @@ export default function AttendeeReminderSchedule({ call }) {
       action: 'save',
       offsetsDays: offsets.days,
       sendTime: form.sendTime,
-      draft: { subject: form.subject.trim(), message: form.message.trim() },
+      draft: { subject: form.subject.trim().replaceAll('[Days until event]', '{{days_until}}'), message: form.message.trim().replaceAll('[Days until event]', '{{days_until}}') },
     }, (next) => {
       apply(next);
       setPreview(null);
@@ -296,15 +300,16 @@ export default function AttendeeReminderSchedule({ call }) {
   return (
     <Panel
       title="Attendees"
-      description="Email registered attendees before the event starts: the days left, the start time, the place and their ticket link. It goes as an announcement, with an unsubscribe link, and never to an address that unsubscribed."
+      description="Remind attendees before the event, with the date, venue and their ticket link."
       actions={<StatusBadge tone={STATE_TONES[data.state]}>{STATE_LABELS[data.state]}</StatusBadge>}
     >
       <div className="flex flex-col gap-md">
+        <ReminderScheduleSwitch label="Scheduled attendee reminders" checked={data.state !== 'off'} disabled={Boolean(busy)} onChange={(enabled) => { if (!enabled) turnOff(); else if (preview && !dirty && preview.canSend) approve(); else runPreview(); }} />
         <p className="text-admin-base font-semibold text-admin-ink" data-testid="attendee-schedule-state">
           {attendeeStateWords(data.state)}
-          {data.state !== 'off' && data.approval?.at ? ` Approved ${eventTime(data.approval.at, timeZone)} by ${data.approval.by ?? 'an admin'}.` : ''}
+          {data.state !== 'off' && data.approval?.at ? ` Approved ${eventTime(data.approval.at, timeZone)}.` : ''}
         </p>
-        {data.paused ? <Notice tone="caution" message={`Paused: ${data.paused.message}`} /> : null}
+        {data.paused ? <Notice tone="caution" message="Reminders are paused because the message or event details changed. Preview and approve them to resume." /> : null}
         {data.state === 'on' && !data.wording.matchesApproval ? (
           <Notice tone="caution" message="The attendee reminder wording is not the wording you approved. The next run sends nothing and pauses the schedule. Preview, then approve again." />
         ) : null}
@@ -312,7 +317,7 @@ export default function AttendeeReminderSchedule({ call }) {
           <Notice tone="caution" message="The event start, the venue or the ticket link is not what you approved. The next run sends nothing and pauses the schedule. Preview, then approve again." />
         ) : null}
         {!data.channel.canSend ? (
-          <Notice tone="caution" message={`Announcement email cannot be sent now: ${data.channel.blocker}`} />
+          <Notice tone="caution" message="Email is not available. Ask an event administrator to check email settings." />
         ) : null}
         {data.eventEnded ? <Notice tone="info" message="The event has ended. Scheduled reminders do not send." /> : null}
 
@@ -325,7 +330,7 @@ export default function AttendeeReminderSchedule({ call }) {
           <fieldset aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
             <legend className="text-admin-base font-semibold text-admin-ink">Days before the event</legend>
             <p id={`${offsetsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
-              One reminder for each number, counted back from the start of the first event day. The default is 7 and 1 days.
+              Choose how many days before the event to send each reminder.
             </p>
             {form.offsets.map((value, index) => (
               <div key={index} className="flex flex-wrap items-end gap-xs">
@@ -339,13 +344,7 @@ export default function AttendeeReminderSchedule({ call }) {
                   onChange={(next) => update({ offsets: form.offsets.map((old, i) => (i === index ? next : old)) })}
                 />
                 {form.offsets.length > 1 ? (
-                  <button
-                    type="button"
-                    className={linkButtonClass}
-                    onClick={() => update({ offsets: form.offsets.filter((_, i) => i !== index) })}
-                  >
-                    Remove attendee reminder {index + 1}
-                  </button>
+                  <AdminIconControl className={linkButtonClass} onClick={() => update({ offsets: form.offsets.filter((_, i) => i !== index) })} label={`Remove attendee reminder ${index + 1}`} icon="remove" />
                 ) : null}
               </div>
             ))}
@@ -373,7 +372,7 @@ export default function AttendeeReminderSchedule({ call }) {
             onChange={(value) => update({ subject: value })}
             maxLength={data.limits.maxSubjectLength}
             error={wordingProblems.subject}
-            hint={`Plain text. ${data.placeholder} becomes the days left, for example “7 days” or “1 day”.`}
+            hint="[Days until event] adds the time left, such as “7 days” or “1 day”."
           />
           <TextAreaField
             label="Attendee reminder message"
@@ -382,21 +381,16 @@ export default function AttendeeReminderSchedule({ call }) {
             onChange={(value) => update({ message: value })}
             maxLength={data.limits.maxMessageLength}
             error={wordingProblems.message}
-            hint={`Plain text. A blank line starts a new paragraph. ${data.placeholder} is the only placeholder. The site adds the start, the place and the ticket link after your message.`}
+            hint="Use [Days until event] to add the time left."
           />
 
           <div className="flex flex-wrap items-center gap-xs">
             <button type="submit" className={primaryButtonClass} disabled={Boolean(busy)} aria-busy={busy === 'save'}>
-              {busy === 'save' ? 'Saving…' : 'Save attendee settings'}
+              {busy === 'save' ? 'Saving…' : 'Save'}
             </button>
             <button type="button" className={secondaryButtonClass} onClick={runPreview} disabled={Boolean(busy)} aria-busy={busy === 'preview'}>
-              {busy === 'preview' ? 'Preparing the preview…' : 'Preview attendee reminders'}
+              {busy === 'preview' ? 'Preparing…' : 'Preview attendee reminders'}
             </button>
-            {data.state !== 'off' ? (
-              <button type="button" className={secondaryButtonClass} onClick={turnOff} disabled={Boolean(busy)} aria-busy={busy === 'disable'}>
-                {busy === 'disable' ? 'Turning off…' : 'Turn off attendee reminders'}
-              </button>
-            ) : null}
           </div>
           </fieldset>
         </form>
@@ -433,7 +427,7 @@ export default function AttendeeReminderSchedule({ call }) {
                 </button>
               </div>
             ) : (
-              <Notice tone="caution" message={`These reminders cannot be approved yet: ${preview.blocker}`} />
+              <Notice tone="caution" message="These reminders cannot be sent yet. Check the event details and ask an event administrator to check email settings." />
             )}
           </section>
         ) : null}

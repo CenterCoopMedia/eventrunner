@@ -20,6 +20,7 @@ import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { publishDateLabel, toPublishDate } from '../../lib/updateDates.js';
 import { useAdminApi } from '../adminApi.js';
+import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminUpdates } from '../useAdminUpdates.js';
 import {
@@ -32,7 +33,6 @@ import {
 import {
   Notice,
   primaryButtonClass,
-  rowMetaClass,
   rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -73,14 +73,15 @@ export default function AdminUpdatesList() {
   /** cmsPublish answers 200 even when it skipped what you asked for. */
   function reportPublish(response, requestedIds) {
     const verdict = summarizePublish(response, 'cmsUpdates', requestedIds, 'updates');
-    setNotice({ tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
+    const message = verdict.ok ? 'Published.' : verdict.message;
+    setNotice({ tone: verdict.ok ? 'ok' : 'error', message });
     if (verdict.ok) setResolvedIds((current) => new Set([...current, ...requestedIds]));
-    showToast(verdict.message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
+    showToast(message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
   function reportFailure(err, ids) {
-    setNotice({ tone: 'error', message: err.message });
-    showToast(err.message, { tone: 'error', announce: false });
+    setNotice({ tone: 'error', message: contentError(err, { fallback: 'Publishing did not finish. Try again.' }).message });
+    showToast(contentError(err, { fallback: 'Publishing did not finish. Try again.' }).message, { tone: 'error', announce: false });
     // A part-way failure names the queue row a retry must resume from, so
     // committed chunks are not published a second time.
     if (err?.queueId) setResume({ queueId: err.queueId, ids });
@@ -125,7 +126,7 @@ export default function AdminUpdatesList() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Updates"
-        description="Every update on the site's Updates page, and whether each one is live. Short notices for the dashboard card are under Live updates."
+        description="News and announcements for the Updates page."
         identifiers={loading ? null : `${rows.length} update${rows.length === 1 ? '' : 's'}`}
         actions={
           <>
@@ -163,7 +164,7 @@ export default function AdminUpdatesList() {
       {error ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the update list. Showing the last values we received and retrying."
+          message="The update list could not refresh. Check your connection."
         />
       ) : null}
 
@@ -172,7 +173,7 @@ export default function AdminUpdatesList() {
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title="No updates yet"
-          description="Write the first update. It stays a draft until you publish it."
+          description="Write your first update."
           action={writeLink}
         />
       ) : (
@@ -211,9 +212,8 @@ export default function AdminUpdatesList() {
                     <td className={cell}>
                       <div>
                         <Link to={`${UPDATES_ROOT}/${encodeURIComponent(row.id)}`} className={rowTitleLinkClass}>
-                          {update.title || row.id}
+                          {update.title || 'Untitled update'}
                         </Link>
-                        <p className={`mt-3xs break-words ${rowMetaClass}`}>{row.id}</p>
                       </div>
                     </td>
                     <td className={cell}>

@@ -182,7 +182,7 @@ describe('page list', () => {
     expect(within(await row('Recap')).queryByText('Visible')).toBeNull();
     const attendees = await row('Attendees');
     expect(within(attendees).getByText('Hidden')).toBeInTheDocument();
-    expect(within(attendees).getByText(/Attendee directory is off in Features/)).toBeInTheDocument();
+    expect(within(attendees).getByText(/Attendee directory is off/)).toBeInTheDocument();
   });
 
   // The word is about the public site, so it reads the published revision.
@@ -251,7 +251,7 @@ describe('page list', () => {
     ];
     await renderAt('/admin/pages');
     fireEvent.click(await screen.findByRole('button', { name: 'Move Scholarships up' }));
-    fireEvent.click(screen.getAllByRole('link', { name: 'Edit this page' })[0]);
+    fireEvent.click(screen.getByRole('link', { name: 'Edit Scholarships' }));
     expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Stay' }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -268,7 +268,7 @@ describe('page list', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'Scholarships' })).toBeInTheDocument();
-      expect(screen.getByRole('status')).toHaveTextContent(/lost the connection/i);
+      expect(screen.getByRole('status')).toHaveTextContent(/could not refresh/i);
     });
   });
 
@@ -1101,7 +1101,7 @@ describe('publish results and recovery', () => {
     fireEvent.click(resume);
 
     expect(await screen.findByText(
-      'Published. The public site picks it up live.',
+      'Published.',
       { selector: 'p[role="status"]' },
     )).toBeInTheDocument();
     expect(bodyOf(1)).toEqual({ queueId: 'queue-list' });

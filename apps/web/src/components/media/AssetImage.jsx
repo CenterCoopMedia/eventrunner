@@ -5,14 +5,9 @@
 // than a resolve failure now that URLs are built rather than fetched
 // (lib/mediaSource.js).
 //
-// WHAT A MISS SAYS DEPENDS ON WHO IS READING IT. "This file is missing from
-// storage." is a sentence written for an operator: it names a thing they
-// own, in a library they can open, and asking them to fix it is the whole
-// point of saying it. On the public site the same sentence is addressed to
-// a visitor who cannot act on it, about an asset they were never meant to
-// think about — a sponsor's logo, say, where the organization's own name is
-// already printed directly under the mark. There the miss is not news; it
-// is the site telling a reader about its own broken plumbing.
+// A failed image shows a short message to people who can replace it.
+// Decorative images stay silent. Their nearby text supplies the context,
+// so a missing sponsor logo does not add a technical message for visitors.
 //
 // `decorative` is the caller's statement that this image carries no
 // information of its own (it is the `alt=""` case, and the two go together).
@@ -73,7 +68,7 @@ export default function AssetImage({ path, alt = '', className = '', decorative 
       <span
         className={`flex items-center justify-center bg-surface-alt p-2 text-center text-xs text-text-secondary ${className}`}
       >
-        This file is missing from storage.
+        This image could not load. Try again.
       </span>
     );
   }

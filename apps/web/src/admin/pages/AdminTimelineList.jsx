@@ -14,6 +14,7 @@ import { Link } from 'react-router';
 import { useContent } from '../../contexts/ContentContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminTimeline } from '../useAdminTimeline.js';
 import {
@@ -53,13 +54,14 @@ export default function AdminTimelineList() {
 
   function reportPublish(response, ids) {
     const verdict = summarizePublish(response, COLLECTION, ids, 'timeline entries');
-    setNotice({ tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
-    showToast(verdict.message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
+    const message = verdict.ok ? 'Published.' : verdict.message;
+    setNotice({ tone: verdict.ok ? 'ok' : 'error', message });
+    showToast(message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
   function reportFailure(err, ids) {
-    setNotice({ tone: 'error', message: err.message });
-    showToast(err.message, { tone: 'error', announce: false });
+    setNotice({ tone: 'error', message: contentError(err, { fallback: 'Publishing did not finish. Try again.' }).message });
+    showToast(contentError(err, { fallback: 'Publishing did not finish. Try again.' }).message, { tone: 'error', announce: false });
     if (err?.queueId) setResume({ queueId: err.queueId, ids });
   }
 
@@ -103,7 +105,7 @@ export default function AdminTimelineList() {
       <AdminPageHeader
         title="Timeline"
         identifiers={`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}`}
-        description="Past editions of the event. The home page's History section lists them, oldest first."
+        description="Past editions of the event, oldest first."
         actions={
           <>
             {resume ? (
@@ -138,24 +140,17 @@ export default function AdminTimelineList() {
       {hasHistorySection ? null : (
         <Notice
           tone="caution"
-          message={
-            <>
-              The home page has no section with the id{' '}
-              {/* A value the operator types into the page editor, so it is
-                  set in the data face. */}
-              <code className="rounded-admin-small bg-admin-ground-soft px-2xs py-3xs font-admin-data text-admin-xs text-admin-ink-data">
-                history
-              </code>
-              , so published entries do not appear on the site. Add one to the home page under Pages.
-            </>
-          }
+          message={<>
+            Add a History section to the home page to show these entries.{' '}
+            <Link to="/admin/pages/home" className="underline">Edit home page</Link>
+          </>}
         />
       )}
 
       {error ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the timeline; showing the last values we received and retrying."
+          message="The timeline could not refresh. Check your connection."
         />
       ) : null}
 
@@ -164,7 +159,7 @@ export default function AdminTimelineList() {
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title="No timeline entries yet"
-          description="Add the first entry. It stays a draft until you publish it."
+          description="Add your first past event."
           action={addLink}
         />
       ) : (
@@ -180,10 +175,10 @@ export default function AdminTimelineList() {
                   <div className={rowClass}>
                     <div className="min-w-0">
                       <Link to={encodeURIComponent(row.id)} className={rowTitleLinkClass}>
-                        {text(entry.title) ?? row.id}
+                        {text(entry.title) ?? 'Untitled entry'}
                       </Link>
                       <p className={`mt-3xs ${rowMetaClass}`}>
-                        {[Number.isInteger(entry.year) ? String(entry.year) : 'No year', row.id].join(' · ')}
+                        {Number.isInteger(entry.year) ? String(entry.year) : 'No year'}
                       </p>
                     </div>
                     <span className="flex flex-wrap items-center gap-2xs">

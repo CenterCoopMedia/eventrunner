@@ -63,7 +63,8 @@ test.describe.serial('Scheduled reminders', () => {
     const dueField = page.getByRole('group', { name: 'Due date', exact: true });
     await dueField.getByLabel('Date', { exact: true }).fill(due);
     await dueField.getByLabel('Time', { exact: true }).fill('17:00');
-    await page.getByRole('button', { name: 'Save settings' }).click();
+    const speakers = page.locator('section.admin-panel').filter({ has: page.getByRole('heading', { level: 2, name: 'Speakers' }) });
+    await speakers.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Settings saved.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Result' })).toBeFocused();
 
@@ -78,7 +79,7 @@ test.describe.serial('Scheduled reminders', () => {
     await expect(page.getByTestId('schedule-state')).toContainText('Scheduled speaker reminders are on.');
     await expect(page.getByText('Approved. Scheduled speaker reminders are on.')).toBeVisible();
     await expect(page.getByTestId('next-run')).toContainText('Next: the 14-day reminder,');
-    await expect(page.getByTestId('next-run')).toContainText('America/New_York');
+    await expect(page.getByTestId('next-run')).toContainText('Eastern');
     await expect(page.getByText(/It would reach \d+ speakers?:/)).toContainText(speakerName);
     await expect(page.getByTestId('last-run')).toHaveText('The schedule has not run yet.');
 
@@ -95,7 +96,7 @@ test.describe.serial('Scheduled reminders', () => {
     await openAdminGroups(page);
     await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Scheduled reminders' }).click();
     await expect(page.getByTestId('schedule-state')).toContainText('Scheduled speaker reminders are paused.');
-    await expect(page.getByText('Paused: The reminder wording changed after it was approved. Preview the wording, then approve it again.')).toBeVisible();
+    await expect(page.getByText('Reminders are paused because the message or settings changed. Preview and approve them to resume.')).toBeVisible();
   });
 
   test('staff preview and approve attendee reminders, read the next run, and see the pause after a wording edit', async ({ page }) => {
@@ -122,15 +123,15 @@ test.describe.serial('Scheduled reminders', () => {
     await expect(panel.getByText('Approved. Scheduled attendee reminders are on.')).toBeVisible();
     await expect(panel.getByRole('heading', { name: 'Result' })).toBeFocused();
     await expect(page.getByTestId('attendee-next-run')).toContainText('Next: the 7-day reminder,');
-    await expect(page.getByTestId('attendee-next-run')).toContainText('America/New_York');
+    await expect(page.getByTestId('attendee-next-run')).toContainText('Eastern');
     await expect(panel.getByText(/^It would reach \d+ attendees?\./)).toBeVisible();
     await expect(page.getByTestId('attendee-last-run')).toHaveText('The schedule has not run yet.');
 
     // New wording while on pauses the schedule.
     await panel.getByLabel('Attendee reminder subject').fill('See you in {{days_until}}');
-    await panel.getByRole('button', { name: 'Save attendee settings' }).click();
+    await panel.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(panel.getByText('Attendee settings saved. The schedule is paused until you preview and approve it again.')).toBeVisible();
     await expect(page.getByTestId('attendee-schedule-state')).toContainText('Scheduled attendee reminders are paused.');
-    await expect(panel.getByText('Paused: The attendee reminder wording changed after it was approved. Preview the reminders, then approve them again.')).toBeVisible();
+    await expect(panel.getByText('Reminders are paused because the message or event details changed. Preview and approve them to resume.')).toBeVisible();
   });
 });

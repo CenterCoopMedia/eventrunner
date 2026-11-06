@@ -17,7 +17,7 @@
 // says so once instead of offering controls that fail. `operator` is the
 // caller's tier; it defaults closed.
 import { useEffect, useRef, useState } from 'react';
-import { formatBytes } from '../../../lib/mediaSource.js';
+import { formatBytes, typeLabel } from '../../../lib/mediaSource.js';
 import {
   DestructiveConfirm,
   Notice,
@@ -37,6 +37,22 @@ import {
 } from './mediaErrors.js';
 import ModalShell from './ModalShell.jsx';
 
+function usageLocation(reference) {
+  const [stored, id] = (reference.docPath ?? '').split('/');
+  const collection = stored?.replace(/_drafts$/, '');
+  const locations = {
+    cmsPages: ['Page', `/admin/pages/${encodeURIComponent(id ?? '')}`],
+    cmsContent: ['Content block', '/admin/content'],
+    cmsSchedule: ['Session', `/admin/sessions/${encodeURIComponent(id ?? '')}`],
+    cmsOrganizations: ['Organization', `/admin/organizations/${encodeURIComponent(id ?? '')}`],
+    cmsUpdates: ['Update', `/admin/updates/${encodeURIComponent(id ?? '')}`],
+    cmsTimeline: ['Timeline entry', `/admin/timeline/${encodeURIComponent(id ?? '')}`],
+    speakers: ['Speaker', `/admin/speakers/${encodeURIComponent(id ?? '')}`],
+  };
+  if (collection === 'config') return id === 'theme' ? ['Branding', '/admin/branding'] : ['Event settings', '/admin/settings'];
+  return locations[collection] ?? ['Event content', '/admin/content'];
+}
+
 function UsageList({ references, error, onRetry }) {
   if (error) {
     return (
@@ -52,24 +68,24 @@ function UsageList({ references, error, onRetry }) {
   if (references.length === 0) {
     return (
       <p className="text-admin-sm text-admin-ink-secondary">
-        Nothing references this file. Deleting it is safe.
+        This file is not used in your event.
       </p>
     );
   }
   return (
     <div className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-proof px-md py-sm">
       <p className="text-admin-base font-bold text-admin-state-caution">
-        Used by {references.length} {references.length === 1 ? 'document' : 'documents'}
+        Used in {references.length} {references.length === 1 ? 'place' : 'places'}
       </p>
       <ul className="mt-2xs list-disc ps-5 text-admin-sm text-admin-ink">
-        {references.map((reference) => (
-          <li key={`${reference.docPath}:${reference.field}`}>
-            <code className="font-admin-data text-admin-ink-data">{reference.docPath}</code>
-            {reference.field ? (
-              <span className="text-admin-ink-secondary"> · {reference.field}</span>
-            ) : null}
-          </li>
-        ))}
+        {references.map((reference, index) => {
+          const [label, href] = usageLocation(reference);
+          return (
+            <li key={`${reference.docPath}:${reference.field}`}>
+              <a href={href} className="admin-target text-admin-ink-link underline underline-offset-2" aria-label={`Open ${label.toLowerCase()} ${index + 1}`}>{label}</a>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -129,7 +145,7 @@ export default function AssetModal({
       await updateMetadata({ assetId: asset.id, alt: alt.trim(), title: title.trim() });
       setStatus('Description saved.');
     } catch (err) {
-      setSaveError(mediaErrorMessage(err));
+      setSaveError(mediaErrorMessage(err, 'The description could not be saved. Try again.'));
     } finally {
       pending.current = false;
       setAction('');
@@ -153,7 +169,7 @@ export default function AssetModal({
         setReferences(err.usage ?? references ?? []);
         setConfirming(true);
       }
-      setDeleteError(mediaErrorMessage(err));
+      setDeleteError(mediaErrorMessage(err, 'The file could not be deleted. Try again.'));
     } finally {
       pending.current = false;
       setAction('');
@@ -169,35 +185,29 @@ export default function AssetModal({
           className="max-h-64 w-full rounded-admin border-admin-hairline border-admin-rule-hairline object-contain"
         />
         <dl className="text-admin-sm text-admin-ink">
-          <dt className="font-semibold">Path</dt>
-          <dd className={`mb-2xs break-all ${rowMetaClass}`}>{asset.path}</dd>
+          <dt className="font-semibold">File name</dt>
+          <dd className={`mb-2xs break-all ${rowMetaClass}`}>{asset.filename || asset.path?.split('/').pop()}</dd>
           <dt className="font-semibold">Type and size</dt>
           <dd className={`mb-2xs ${rowMetaClass}`}>
-            {asset.contentType} · {formatBytes(asset.size)}
+            {typeLabel(asset.contentType)} · {formatBytes(asset.size)}
           </dd>
-          <dt className="font-semibold">Uploaded by</dt>
-          <dd className={rowMetaClass}>{asset.uploadedBy ?? 'unknown'}</dd>
         </dl>
       </div>
 
-      <form className="mt-md flex flex-col gap-sm" onSubmit={save}>
-        <TextAreaField label="Alt text" value={alt} onChange={(value) => { setAlt(value); setStatus(''); }} rows={2} readOnly={locked} disabled={busy} />
-        <TextField label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} readOnly={locked} disabled={busy} />
-        {status ? <SaveStatus message={status} /> : null}
-        {saveError ? <Notice tone="error" message={saveError} /> : null}
-        {locked ? <p className="text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p> : null}
-        <div className="flex flex-wrap gap-xs">
-          {locked ? null : (
+      {locked ? <p className="mt-md text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p> : (
+        <form className="mt-md flex flex-col gap-sm" onSubmit={save}>
+          <TextAreaField label="Image description" hint="Describe what the image shows for people who cannot see it." value={alt} onChange={(value) => { setAlt(value); setStatus(''); }} rows={2} disabled={busy} />
+          <TextField label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} disabled={busy} />
+          {status ? <SaveStatus message={status} /> : null}
+          {saveError ? <Notice tone="error" message={saveError} /> : null}
+          <div className="flex flex-wrap gap-xs">
             <button type="submit" className={primaryButtonClass} disabled={busy}>
               {action === 'save' ? <span className="admin-busy-mark" aria-hidden="true" /> : null}
-              {action === 'save' ? 'Saving…' : 'Save description'}
+              {action === 'save' ? 'Saving…' : 'Save'}
             </button>
-          )}
-          <button type="button" className={secondaryButtonClass} onClick={onClose} disabled={busy}>
-            Done
-          </button>
-        </div>
-      </form>
+          </div>
+        </form>
+      )}
 
       <section className="mt-md border-admin-rule-hairline border-t-admin-hairline pt-sm">
         <h3 className="text-admin-lg font-bold text-admin-ink">Where this is used</h3>
@@ -213,28 +223,30 @@ export default function AssetModal({
           {locked ? null : confirming || (references?.length ?? 0) > 0 ? (
             <DestructiveConfirm
               trigger="Delete this file anyway"
+              triggerIcon="delete"
               title="Delete a file that is in use"
               confirmLabel="Delete this file anyway"
               busyLabel="Deleting…"
               busy={busy}
               disabled={busy || references === null || usageError}
-              consequence={`The object is removed from storage, and the ${
+              consequence={`This file is deleted, and the ${
                 references?.length ?? 0
-              } document${
+              } place${
                 (references?.length ?? 0) === 1 ? '' : 's'
-              } listed above render a missing file until you point them at another one.`}
+              } listed above will show a missing image until you choose a replacement.`}
               permanence="This cannot be undone."
               onConfirm={() => destroy(true)}
             />
           ) : (
             <DestructiveConfirm
               trigger="Delete this file"
+              triggerIcon="delete"
               title="Delete this file"
               confirmLabel="Delete this file"
               busyLabel="Deleting…"
               busy={busy}
               disabled={busy || references === null || usageError}
-              consequence="The object is removed from storage. Its library row goes with it."
+              consequence="This file is deleted from your event and the media library."
               permanence="This cannot be undone."
               onConfirm={() => destroy(false)}
             />

@@ -67,7 +67,6 @@ import {
   SelectField,
   TextField,
   dangerButtonClass,
-  linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -77,6 +76,7 @@ import AdminPageHeader, {
   StatusBadge,
 } from '../components/adminChrome.jsx';
 import { EMAIL_ADDRESS_RE as EMAIL_RE } from 'shared/email';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 
 /** The tier word and its badge tone. The word is always rendered; the tone agrees with it. */
 const TIER_WORDS = Object.freeze({
@@ -180,7 +180,7 @@ export function describeChange({ email, tier, previousTier, expiresAt = null, pr
   const ends = tier === 'staff' && expiresAt ? formatEndTime(expiresAt) : null;
   // Said whenever a grant will end: when, and what it does not mean.
   const endSentence = ends
-    ? ` Access ends ${ends}. Until then, staff can edit and publish content. An end time does not make the account read-only.`
+    ? ` Access ends ${ends}. Until then, staff can edit and publish content.`
     : '';
   if (tier === 'staff' && previousTier === 'staff') {
     return ends
@@ -259,7 +259,7 @@ function EndTimeLine({ account }) {
   const text = account.expiryState === 'active'
     ? `Access ends ${formatEndTime(account.expiresAt)}.`
     : account.expiryState === 'expired'
-      ? `Access ended ${formatEndTime(account.expiresAt)}. No access now. The account leaves this list within a minute.`
+      ? `Access ended ${formatEndTime(account.expiresAt)}. No access now.`
       : 'The end time cannot be read. No access now.';
   return <p className="mt-3xs text-admin-xs text-admin-ink-secondary">{text}</p>;
 }
@@ -544,9 +544,10 @@ export default function AdminAccess() {
       await Promise.all([load(), isSelf && nextTier !== standing ? refreshAdminStatus() : undefined]);
       close();
     } catch (err) {
-      // Verbatim and in place: the server's sentence names the rule.
-      setChangeError(err.message);
-      showToast(err.message, { tone: 'error', announce: false });
+      // Keep the actionable access rule, without exposing server diagnostics.
+      const message = /at least one operator/i.test(err?.message ?? '') ? 'At least one operator must keep access.' : 'Access could not be changed. Try again.';
+      setChangeError(message);
+      showToast(message, { tone: 'error', announce: false });
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -564,12 +565,12 @@ export default function AdminAccess() {
             ? `${accounts.length} account${accounts.length === 1 ? '' : 's'}, ${operatorCount} operator${operatorCount === 1 ? '' : 's'}`
             : undefined
         }
-        description={`Who can sign in to the admin panel, and at which tier. Operators open every section, including ${TIER_SCOPE.operatorOnly}. Staff run ${TIER_SCOPE.staff}. Staff access can end at a set time. Every change here asks you to confirm it first and is recorded in the admin log.`}
+        description={`Choose who can manage your event. Operators can manage ${TIER_SCOPE.operatorOnly}. Staff can manage ${TIER_SCOPE.staff}.`}
       />
 
       <Panel
         title="Grant access"
-        description={`Enter an address and pick a tier. The person signs in with that address the way every admin does: Google, or the emailed code. For staff, you can set a time when access ends, at most ${MAX_STAFF_ACCESS_DAYS} days from now. Leave it empty for access with no end time. The time is in your time zone.`}
+        description={`Add a team member by email. Staff access can end within ${MAX_STAFF_ACCESS_DAYS} days; leave the end time empty for ongoing access. Times use your time zone.`}
       >
         <form ref={formRef} onSubmit={submitGrant} className="flex flex-col gap-sm" noValidate>
           <fieldset disabled={busy} className="flex min-w-0 flex-wrap items-end gap-sm">
@@ -585,7 +586,7 @@ export default function AdminAccess() {
             </div>
             <div className="w-full max-w-xs sm:w-auto">
               <SelectField
-                label="Tier"
+                label="Role"
                 value={form.tier}
                 onChange={(value) => {
                   setEndsError(null);
@@ -632,7 +633,7 @@ export default function AdminAccess() {
         <div className="flex flex-col gap-xs">
           <Notice
             tone="error"
-            message={`The access list could not be loaded${loadError?.message ? `: ${loadError.message}` : '.'}`}
+            message="The access list could not be loaded. Try again."
           />
           <div>
             {/* The same control through the retry: busy, not gone, so the
@@ -665,18 +666,18 @@ export default function AdminAccess() {
           ) : (
             <Panel flush>
               <table ref={listRef} tabIndex={-1} className="w-full border-collapse text-admin-sm">
-                <caption className="sr-only">Admin accounts and their tier</caption>
+                <caption className="sr-only">Admin accounts and their roles</caption>
                 <thead>
                   <tr>
                     <GalleyHead>Account</GalleyHead>
-                    <GalleyHead>Tier</GalleyHead>
+                    <GalleyHead>Role</GalleyHead>
                     <GalleyHead align="end">Actions</GalleyHead>
                   </tr>
                 </thead>
                 <tbody>
                   {accounts.map((account) => {
                     const isSelf = account.email === callerEmail;
-                    const word = TIER_WORDS[account.tier] ?? { label: account.tier, tone: 'neutral' };
+                    const word = TIER_WORDS[account.tier] ?? { label: 'Team member', tone: 'neutral' };
                     const otherTier = account.tier === 'operator' ? 'staff' : 'operator';
                     return (
                       <tr
@@ -702,9 +703,9 @@ export default function AdminAccess() {
                         </td>
                         <td className="px-md py-sm text-end align-top">
                           <div className="flex flex-wrap items-center justify-end gap-xs">
-                            <button
-                              type="button"
-                              className={linkButtonClass}
+                            <AdminIconControl
+                              icon="edit"
+                              label={`Change ${account.email} to ${TIER_WORDS[otherTier].label.toLowerCase()}`}
                               disabled={busy}
                               onClick={(event) => open(
                                 {
@@ -715,20 +716,17 @@ export default function AdminAccess() {
                                 },
                                 event.currentTarget,
                               )}
-                            >
-                              Change to {TIER_WORDS[otherTier].label.toLowerCase()}
-                            </button>
-                            <button
-                              type="button"
-                              className={`${linkButtonClass} text-admin-state-error`}
+                            />
+                            <AdminIconControl
+                              icon="remove"
+                              label={`Remove access for ${account.email}`}
+                              className="text-admin-state-error"
                               disabled={busy}
                               onClick={(event) => open(
                                 { email: account.email, tier: 'none', previousTier: account.tier },
                                 event.currentTarget,
                               )}
-                            >
-                              Remove access
-                            </button>
+                            />
                           </div>
                         </td>
                       </tr>

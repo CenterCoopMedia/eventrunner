@@ -71,7 +71,7 @@ describe('AdminDataExport', () => {
     expect(screen.queryByRole('button', { name: 'Export admissions' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Event data package' })).toBeNull();
     expect(screen.getByText('An operator exports ticket orders, admissions, and the event data package.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Go to the Attendees page' })).toHaveAttribute('href', '/admin/attendees');
+    expect(screen.getByRole('link', { name: 'Attendees' })).toHaveAttribute('href', '/admin/attendees');
   });
 
   it('exports one spreadsheet, saves the file, and states the count and the audit in place', async () => {
@@ -88,7 +88,7 @@ describe('AdminDataExport', () => {
     expect(callMock).toHaveBeenCalledWith('exportEventData', { dataset: 'sessions' });
     expect(saveTextFileMock).toHaveBeenCalledWith('sessions-2026-10-01.csv', '\uFEFF"Session ID"\r\n');
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Exported 12 sessions to sessions-2026-10-01.csv. The export is in the admin log.',
+      'Exported 12 sessions to sessions-2026-10-01.csv.',
     );
   });
 
@@ -98,7 +98,7 @@ describe('AdminDataExport', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Export ticket orders' }));
     await settle();
-    expect(screen.getByRole('alert')).toHaveTextContent('dataset: only an operator can export orders.');
+    expect(screen.getByRole('alert')).toHaveTextContent('The spreadsheet could not be downloaded. Try again.');
     expect(saveTextFileMock).not.toHaveBeenCalled();
   });
 
@@ -114,8 +114,8 @@ describe('AdminDataExport', () => {
     expect(screen.getByRole('checkbox', { name: 'Include staff notes on session pitches' })).not.toBeChecked();
     expect(screen.queryByText(/An operator exports/)).toBeNull();
     // The server builds every package file from live records (eventPackage.cjs datasetFile).
-    expect(screen.getByText(/It holds live records only: no drafts\. A hidden record is in it and marked hidden\./)).toBeInTheDocument();
-    expect(screen.getByText(/drafts included, with its state/)).toBeInTheDocument();
+    expect(screen.getByText(/Download published records, including hidden records/)).toBeInTheDocument();
+    expect(screen.getByText(/current records and drafts, with their status/)).toBeInTheDocument();
   });
 
   it('downloads the package with the parts and the staff-note choice the operator made', async () => {
@@ -135,7 +135,7 @@ describe('AdminDataExport', () => {
     expect(args.includeStaffNotes).toBe(true);
     await expect(args.getIdToken()).resolves.toBe('id-token');
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Downloaded event-data-package-2026-10-01.zip. The download is in the admin log.',
+      'Downloaded event-data-package-2026-10-01.zip.',
     );
   });
 
@@ -159,6 +159,6 @@ describe('AdminDataExport', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Download event data package' }));
     await settle();
-    expect(screen.getByRole('alert')).toHaveTextContent(/too large to package here/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/too large for one download/);
   });
 });

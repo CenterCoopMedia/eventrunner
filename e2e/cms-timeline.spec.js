@@ -110,7 +110,7 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
       await expect(page.getByRole('heading', { level: 1, name: 'New entry' })).toBeVisible();
       await page.getByLabel('Year', { exact: true }).fill('2023');
       await page.getByLabel('Title', { exact: true }).fill(title);
-      await page.getByRole('button', { name: 'Save draft' }).click();
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
       await page.waitForURL((url) => /^\/admin\/timeline\/[0-9a-f-]{36}$/.test(url.pathname));
       entryId = new URL(page.url()).pathname.split('/').at(-1);
       await expect(page.locator('header [data-record-state]')).toHaveText('Draft');
@@ -121,8 +121,8 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
       await expect(home.getByRole('region', { name: 'History', exact: true })).toHaveCount(0);
 
       // Published from the editor.
-      await page.getByRole('button', { name: 'Save and publish' }).click();
-      await expect(page.getByText('Published. The public site picks it up live.').first()).toBeVisible();
+      await page.getByRole('button', { name: 'Publish', exact: true }).click();
+      await expect(page.getByText('Published.', { exact: true }).first()).toBeVisible();
       await expect(page.locator('header [data-record-state]')).toHaveText('Live');
 
       // The open page picks it up with no reload: 2023 is the oldest, so it

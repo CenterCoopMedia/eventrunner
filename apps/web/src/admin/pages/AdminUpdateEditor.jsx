@@ -13,22 +13,22 @@
 //
 // The picture and the content blocks an update may carry are not edited
 // here. They go back to the server unchanged on every save
-// (admin/updatesDoc.js toUpdatePayload), and a panel says so.
+// (admin/updatesDoc.js toUpdatePayload).
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { UPDATE_CATEGORY_MAX, validUpdateCategory } from 'shared/update';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminUpdates } from '../useAdminUpdates.js';
 import {
   UPDATES_ROOT,
   blankUpdateForm,
   categoriesIn,
-  extrasOf,
   toUpdateForm,
   toUpdatePayload,
 } from '../updatesDoc.js';
@@ -88,16 +88,6 @@ export function validateUpdateForm(form, { dateIncomplete = false } = {}) {
     );
   }
   return errors;
-}
-
-/** "This update also has a picture and 3 content blocks. …" or null. */
-export function extrasSentence({ picture, blocks }) {
-  if (!picture && blocks === 0) return null;
-  const parts = [];
-  if (picture) parts.push('a picture');
-  if (blocks > 0) parts.push(`${blocks} content block${blocks === 1 ? '' : 's'}`);
-  const one = (picture ? 1 : 0) + blocks === 1;
-  return `This update also has ${parts.join(' and ')}. Saving here keeps ${one ? 'it as it is' : 'them as they are'}.`;
 }
 
 export default function AdminUpdateEditor({ mode }) {
@@ -206,8 +196,8 @@ export default function AdminUpdateEditor({ mode }) {
         stage = 'publish';
         const response = await call('cmsPublish', { collection: 'cmsUpdates', docIds: [id] });
         const verdict = summarizePublish(response, 'cmsUpdates', [id], 'updates');
-        if (!verdict.ok) throw new Error(verdict.message);
-        message = verdict.message;
+        if (!verdict.ok) throw Object.assign(new Error(verdict.message), { contentPublishResult: true });
+        message = 'Published.';
       }
       setStatus(message);
       if (mode === 'create') {
@@ -221,7 +211,7 @@ export default function AdminUpdateEditor({ mode }) {
           navigate(`${UPDATES_ROOT}/${encodeURIComponent(id)}`, { replace: true });
         }
       }
-      setError(err);
+      setError(contentError(err, { fallback: stage === 'publish' ? 'Publishing did not finish. Your draft is saved. Try again.' : undefined, labels: { title: 'Title', body: 'Text', publishAt: 'Date', category: 'Category' } }));
     } finally {
       setAction(null);
     }
@@ -236,8 +226,8 @@ export default function AdminUpdateEditor({ mode }) {
       showToast('Update deleted.');
       navigate(UPDATES_ROOT);
     } catch (err) {
-      setErrorTitle('The server refused the delete');
-      setError(err);
+      setErrorTitle('Could not delete. Try again.');
+      setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: { title: 'Title', body: 'Text', publishAt: 'Date', category: 'Category' } }));
     } finally {
       setAction(null);
     }
@@ -251,7 +241,8 @@ export default function AdminUpdateEditor({ mode }) {
     return (
       <AdminEmptyState
         title="No such update"
-        description="That update does not exist. It may have been deleted."
+        description="This update is no longer available. Choose another update."
+        action={<Link to={UPDATES_ROOT} className={secondaryButtonClass}>Back to updates</Link>}
       />
     );
   }
@@ -261,7 +252,8 @@ export default function AdminUpdateEditor({ mode }) {
       return (
         <AdminEmptyState
           title="No such update"
-          description="That update does not exist. It may have been deleted."
+          description="This update is no longer available. Choose another update."
+          action={<Link to={UPDATES_ROOT} className={secondaryButtonClass}>Back to updates</Link>}
         />
       );
     }
@@ -272,14 +264,12 @@ export default function AdminUpdateEditor({ mode }) {
       return (
         <Notice
           tone="caution"
-          message="We could not load this update and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+          message="This update could not load. Check your connection and try again."
         />
       );
     }
     return <AdminLoadingState label="Loading update…" />;
   }
-
-  const extras = extrasSentence(extrasOf(row));
 
   return (
     <form
@@ -292,10 +282,8 @@ export default function AdminUpdateEditor({ mode }) {
       }}
     >
       <AdminPageHeader
-        title={mode === 'create' ? 'New update' : form.title.trim() || updateId}
+        title={mode === 'create' ? 'New update' : form.title.trim() || 'Untitled update'}
         state={mode === 'edit' ? <RecordState state={row?.state} /> : null}
-        identifiers={mode === 'edit' ? updateId : null}
-        description="Save builds a draft. Preview reads that draft, and publish sends it to the Updates page."
         actions={
           <>
             {mode === 'edit' && features?.updates ? (
@@ -315,7 +303,7 @@ export default function AdminUpdateEditor({ mode }) {
               disabled={saving}
               aria-busy={action === 'draft' || undefined}
             >
-              {action === 'draft' ? 'Saving…' : 'Save draft'}
+              {action === 'draft' ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
@@ -324,7 +312,7 @@ export default function AdminUpdateEditor({ mode }) {
               aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {action === 'publish' ? 'Publishing…' : 'Save and publish'}
+              {action === 'publish' ? 'Publishing…' : 'Publish'}
             </button>
             <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} />
           </>
@@ -347,7 +335,6 @@ export default function AdminUpdateEditor({ mode }) {
           <TextAreaField
             label="Text"
             rows={8}
-            hint="Plain text. The update's own page keeps line breaks. The Updates page shows the opening lines."
             value={form.body}
             onChange={(value) => set({ body: value })}
             error={errorFor('body')}
@@ -356,7 +343,7 @@ export default function AdminUpdateEditor({ mode }) {
           <TextField
             label="Date"
             type="date"
-            hint="The date readers see, on the event's clock. Leave it empty for an undated update. It does not delay publishing. The update goes live when you publish it."
+            hint="The date shown to readers. A future date does not delay publishing."
             name="date"
             value={form.date}
             onChange={(value) => set({ date: value })}
@@ -368,7 +355,7 @@ export default function AdminUpdateEditor({ mode }) {
           />
           <TextField
             label="Category"
-            hint="One or two words shown as a tag beside the title. Leave it empty for none."
+            hint="An optional topic, such as Travel or Program."
             value={form.category}
             onChange={(value) => set({ category: value })}
             error={errorFor('category')}
@@ -395,7 +382,7 @@ export default function AdminUpdateEditor({ mode }) {
           />
           <CheckboxField
             label="Feature this update at the head of the list"
-            hint="If more than one update is featured, the one that comes first leads and the others stay in place."
+            hint="The first featured update appears above the list."
             checked={form.featured}
             onChange={(value) => set({ featured: value })}
           />
@@ -407,12 +394,6 @@ export default function AdminUpdateEditor({ mode }) {
         </div>
       </Panel>
 
-      {extras ? (
-        <Panel title="Picture and blocks">
-          <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">{extras}</p>
-        </Panel>
-      ) : null}
-
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={secondaryButtonClass} onClick={() => navigate(UPDATES_ROOT)}>
           Cancel
@@ -421,7 +402,8 @@ export default function AdminUpdateEditor({ mode }) {
           <DestructiveConfirm
             className="ms-auto"
             trigger="Delete this update"
-            title={`Delete ${form.title.trim() || updateId}`}
+            triggerIcon="delete"
+            title={`Delete ${form.title.trim() || 'Untitled update'}`}
             confirmLabel="Delete this update"
             busyLabel="Deleting…"
             busy={action === 'delete'}

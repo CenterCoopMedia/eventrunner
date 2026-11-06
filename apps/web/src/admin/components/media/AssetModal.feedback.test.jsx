@@ -23,7 +23,7 @@ describe('media action feedback', () => {
     expect(screen.queryByText('Checking usage…')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete this file' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Retry usage check' }));
-    await screen.findByText(/Deleting it is safe/);
+    await screen.findByText('This file is not used in your event.');
     expect(screen.getByRole('button', { name: 'Delete this file' })).toBeEnabled();
     expect(scanUsage).toHaveBeenCalledTimes(2);
     expect(remove).not.toHaveBeenCalled();
@@ -34,16 +34,18 @@ describe('media action feedback', () => {
     const remove = vi.fn(() => request.promise);
     const onClose = vi.fn();
     render(<AssetModal asset={asset} operator onClose={onClose} scanUsage={vi.fn().mockResolvedValue({ [asset.path]: [] })} updateMetadata={vi.fn()} remove={remove} />);
-    await screen.findByText(/Deleting it is safe/);
+    await screen.findByText('This file is not used in your event.');
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
     expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save description' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
     expect(onClose).not.toHaveBeenCalled();
-    await act(async () => request.reject(new Error('The connection was interrupted.')));
+    await act(async () => request.reject(new Error('storage/internal: cmsPages/home')));
     const failure = await screen.findByRole('alert');
+    expect(failure).toHaveTextContent('The file could not be deleted. Try again.');
+    expect(failure).not.toHaveTextContent('storage/internal');
     expect(failure.closest('section')).toHaveTextContent('Where this is used');
     expect(screen.getByRole('button', { name: 'Delete this file' })).toBeEnabled();
     expect(remove).toHaveBeenCalledOnce();
@@ -53,15 +55,15 @@ describe('media action feedback', () => {
     const request = deferred();
     const updateMetadata = vi.fn(() => request.promise);
     render(<AssetModal asset={asset} operator onClose={vi.fn()} scanUsage={vi.fn().mockResolvedValue({ [asset.path]: [] })} updateMetadata={updateMetadata} remove={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'A bright meeting room' } });
-    const form = screen.getByRole('button', { name: 'Save description' }).closest('form');
+    fireEvent.change(screen.getByLabelText('Image description'), { target: { value: 'A bright meeting room' } });
+    const form = screen.getByRole('button', { name: 'Save' }).closest('form');
     fireEvent.submit(form);
     fireEvent.submit(form);
-    expect(screen.getByLabelText('Alt text')).toBeDisabled();
+    expect(screen.getByLabelText('Image description')).toBeDisabled();
     expect(updateMetadata).toHaveBeenCalledOnce();
     await act(async () => request.resolve({}));
     expect(await screen.findByText('Description saved.')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Another description' } });
+    fireEvent.change(screen.getByLabelText('Image description'), { target: { value: 'Another description' } });
     expect(screen.queryByText('Description saved.')).not.toBeInTheDocument();
   });
 
@@ -76,7 +78,7 @@ describe('media action feedback', () => {
     fireEvent.submit(form);
     fireEvent.submit(form);
     expect(upload).toHaveBeenCalledOnce();
-    for (const label of ['File', 'Alt text', 'Title (optional)']) expect(screen.getByLabelText(label)).toBeDisabled();
+    for (const label of ['File', 'Image description', 'Title (optional)']) expect(screen.getByLabelText(label)).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
@@ -84,6 +86,7 @@ describe('media action feedback', () => {
     await act(async () => request.reject(new Error('Upload interrupted')));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled());
     expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('The file could not be uploaded. Try again.');
     expect(screen.getByLabelText('File')).toBeEnabled();
     expect(onUploaded).not.toHaveBeenCalled();
   });
