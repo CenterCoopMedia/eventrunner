@@ -190,7 +190,7 @@ describe('speaker editor', () => {
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
       .toEqual(['Name', 'Profile', 'Contact and status', 'Logistics']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
-      'First name', 'Last name', 'URL slug', 'Pronouns', 'Job title', 'Organization',
+      'First name', 'Last name', 'Pronouns', 'Job title', 'Organization',
       'Bio', 'Replace photo', 'None',
       'Default avatar 01', 'Default avatar 02', 'Default avatar 03',
       'Default avatar 04', 'Default avatar 05', 'Default avatar 06',
@@ -206,7 +206,7 @@ describe('speaker editor', () => {
     expect(screen.getByRole('radio', { name: 'None' }).closest('label')).toHaveClass('text-admin-ink');
     const account = within(layout).getByRole('heading', { name: 'Linked attendee account' })
       .closest('.admin-object-row');
-    expect(account).toHaveTextContent('cannot be edited here');
+    expect(account).toHaveTextContent('This speaker has an attendee account.');
     expect(account.querySelector('input, select, textarea, button, a')).toBeNull();
     expect(form).not.toHaveTextContent('linked-attendee');
     expect(fetch).not.toHaveBeenCalled();
@@ -219,9 +219,9 @@ describe('speaker editor', () => {
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Rae' } });
     fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Okonkwo' } });
     fireEvent.change(screen.getByLabelText('Job title'), { target: { value: 'Editor' } });
-    expect(screen.getByLabelText('URL slug')).toHaveValue('');
+    expect(screen.getByLabelText('Page link')).toHaveValue('');
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -242,9 +242,9 @@ describe('speaker editor', () => {
     await renderAt('/admin/speakers/new');
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Rae' } });
     fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Okonkwo' } });
-    fireEvent.change(screen.getByLabelText('URL slug'), { target: { value: 'rae-okonkwo-2' } });
+    fireEvent.change(screen.getByLabelText('Page link'), { target: { value: 'rae-okonkwo-2' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).speaker.slug).toBe('rae-okonkwo-2');
@@ -256,7 +256,7 @@ describe('speaker editor', () => {
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'A' } });
     fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'B' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).speaker.email).toBeNull();
@@ -273,7 +273,7 @@ describe('speaker editor', () => {
 
     fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Updated bio.' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -299,7 +299,7 @@ describe('speaker editor', () => {
 
     fireEvent.change(screen.getByLabelText('Pronouns'), { target: { value: 'they/them' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).speaker.pronouns).toBe('they/them');
@@ -315,7 +315,7 @@ describe('speaker editor', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Default avatar 01' }));
     expect(screen.getByAltText('Your chosen default avatar')).toBeInTheDocument();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -333,7 +333,7 @@ describe('speaker editor', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(screen.getByText('Upload a photo')).toBeInTheDocument();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -347,19 +347,19 @@ describe('speaker editor', () => {
     );
     await renderAt('/admin/speakers/rae-okonkwo');
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
 
     // Each segment appears twice on purpose: once in the summary, once
     // against the input it names (aria-describedby).
     await waitFor(() =>
-      expect(screen.getAllByText('First name: must be a non-empty string').length).toBeGreaterThan(0),
+      expect(screen.getAllByText('First name: Enter a value.').length).toBeGreaterThan(0),
     );
     expect(screen.getByLabelText('First name')).toHaveAttribute('aria-invalid', 'true');
     expect(
-      screen.getAllByText('Slug: must be lowercase letters, digits, and single hyphens').length,
+      screen.getAllByText('Page link: must be lowercase letters, digits, and single hyphens').length,
     ).toBeGreaterThan(0);
-    expect(screen.getByLabelText('URL slug')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByLabelText('Page link')).toBeNull();
   });
 
   it('deletes through the atomic unlink endpoint', async () => {
@@ -432,11 +432,10 @@ describe('speaker editor', () => {
     speakerDocs = [RAE];
     fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
     await renderAt('/admin/speakers/rae-okonkwo');
-    expect(screen.getByLabelText('URL slug')).toHaveValue('rae-okonkwo');
-    expect(screen.getByLabelText('URL slug')).toHaveAttribute('readonly');
+    expect(screen.queryByLabelText('Page link')).toBeNull();
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Raeanne' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).speaker.slug).toBe('rae-okonkwo');
@@ -462,7 +461,7 @@ describe('speaker editor', () => {
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Rae' } });
     fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Okonkwo' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     });
     // Only the edit form offers the delete.
     expect(await screen.findByRole('button', { name: 'Delete this speaker' })).toBeInTheDocument();
@@ -473,7 +472,7 @@ describe('speaker editor', () => {
     speakerDocs = [{ ...RAE, uid: 'u1' }];
     await renderAt('/admin/speakers/rae-okonkwo');
     expect(screen.queryByLabelText(/uid/i)).toBeNull();
-    expect(screen.getByText(/managed by the invitation flow/)).toBeInTheDocument();
+    expect(screen.getByText(/This speaker has an attendee account/)).toBeInTheDocument();
   });
 
   it('offers only the admin-settable statuses', async () => {
@@ -495,7 +494,7 @@ describe('speaker editor', () => {
 
     fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Updated bio.' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -510,7 +509,7 @@ describe('speaker editor', () => {
 
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'removed' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -526,11 +525,11 @@ describe('speaker editor', () => {
       // No control at all — a select showing `draft` would be a lie about
       // what the record holds and an offer the server would reject.
       expect(screen.queryByLabelText('Status')).toBeNull();
-      expect(screen.getByText(/Managed by the invitation flow/)).toBeInTheDocument();
+      expect(screen.getByText(/Invitation sent|Accepted, awaiting approval/)).toBeInTheDocument();
 
       fireEvent.change(screen.getByLabelText('Bio'), { target: { value: 'Edited.' } });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
       });
 
       await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -544,7 +543,7 @@ describe('speaker editor', () => {
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'A' } });
     fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'B' } });
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     });
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).speaker.status).toBe('draft');
@@ -742,7 +741,7 @@ describe('pending-edit review (issue #22 review finding P1-1)', () => {
     await renderAt('/admin/speakers');
 
     expect(screen.getByText('Changes pending review')).toBeInTheDocument();
-    expect(screen.getByText(/bio, organization/)).toBeInTheDocument();
+    expect(screen.getByText(/2 profile changes/)).toBeInTheDocument();
   });
 
   it('offers no pending-edit affordance when there is nothing queued', async () => {

@@ -39,7 +39,7 @@ beforeEach(() => {
 async function reopenSales() {
   render(<StripeTicketingWorkspace call={call} />);
   await screen.findByRole('heading', { name: 'Stripe sales' });
-  fireEvent.click(screen.getByRole('button', { name: 'Review reopening sales' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reopen sales' }));
   const dialog = screen.getByRole('dialog', { name: 'Reopen new ticket sales?' });
   fireEvent.change(within(dialog).getByLabelText(/Reason for changing sales/), { target: { value: 'Launch approved.' } });
   fireEvent.click(within(dialog).getByRole('button', { name: 'Reopen new sales' }));
@@ -49,12 +49,12 @@ async function reopenSales() {
 describe('catalog editor after a sales change', () => {
   it('follows the new saved catalog without a warning when the editor holds no edits', async () => {
     await reopenSales();
-    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Pause new sales' })).not.toBeChecked());
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Ticket sales' })).toBeChecked());
     expect(screen.queryByText(CHANGED)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Discard unsaved edits and reload catalog' })).not.toBeInTheDocument();
     // The flipped checkbox is explained in a status line.
     expect(screen.getByText(REBASED)).toHaveAttribute('role', 'status');
-    const submit = screen.getByRole('button', { name: 'Save catalog' });
+    const submit = screen.getByRole('button', { name: 'Save' });
     expect(submit).toHaveAttribute('aria-disabled', 'false');
     // A save from the rebased editor keeps sales open and names the new revision.
     fireEvent.click(submit);
@@ -67,14 +67,14 @@ describe('catalog editor after a sales change', () => {
     render(<StripeTicketingWorkspace call={call} />);
     await screen.findByRole('heading', { name: 'Stripe sales' });
     fireEvent.change(screen.getByLabelText('Ticket name'), { target: { value: 'Unsaved early bird' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Review reopening sales' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen sales' }));
     const dialog = screen.getByRole('dialog', { name: 'Reopen new ticket sales?' });
     fireEvent.change(within(dialog).getByLabelText(/Reason for changing sales/), { target: { value: 'Launch approved.' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reopen new sales' }));
     expect(await screen.findByText(CHANGED)).toBeInTheDocument();
     expect(screen.getByLabelText('Ticket name')).toHaveValue('Unsaved early bird');
     expect(screen.queryByText(REBASED)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save catalog' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('treats an edit typed back to the saved value as no edit', async () => {
@@ -82,12 +82,12 @@ describe('catalog editor after a sales change', () => {
     await screen.findByRole('heading', { name: 'Stripe sales' });
     fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '30' } });
     fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '25' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Review reopening sales' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen sales' }));
     const dialog = screen.getByRole('dialog', { name: 'Reopen new ticket sales?' });
     fireEvent.change(within(dialog).getByLabelText(/Reason for changing sales/), { target: { value: 'Launch approved.' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reopen new sales' }));
     await screen.findByText('New sales enabled');
-    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Pause new sales' })).not.toBeChecked());
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Ticket sales' })).toBeChecked());
     expect(screen.queryByText(CHANGED)).not.toBeInTheDocument();
   });
 });

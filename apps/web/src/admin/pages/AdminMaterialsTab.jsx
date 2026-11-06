@@ -1,3 +1,6 @@
+import { plannerError, plannerMessage } from '../plannerErrors.js';
+import '../plannerFields.css';
+import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
 // Session materials (issue #23, spec §4.4; bulk download and coverage,
 // issue #189). `session_materials` is fully server-only, even for an admin's
 // direct read, so every operation here goes through Cloud Functions
@@ -158,7 +161,7 @@ function AddLinkForm({ sessionId, onAdded }) {
       showToast('Material added.');
       onAdded();
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setSaving(false);
     }
@@ -167,12 +170,12 @@ function AddLinkForm({ sessionId, onAdded }) {
   return (
     <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit}>
       <ServerErrorSummary error={error} />
-      <TextField label="Link URL" value={url} onChange={setUrl} type="url" required />
+      <TextField label="Link" value={url} onChange={setUrl} type="url" required />
       <TextField
-        label="Display label"
+        label="Link text"
         value={label}
         onChange={setLabel}
-        hint="Leave blank to use the default label. A blank or URL-shaped label is stored as “External link” — it is never shown as the raw URL."
+        hint="Optional. Leave empty to show “External link”."
       />
       <div>
         <button
@@ -227,6 +230,7 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const downloadingRef = useRef(false);
   const errorId = useId();
   const isFile = material.type === 'file';
@@ -234,26 +238,30 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
   const filename = material.filename || 'Untitled';
 
   async function review(reviewStatus) {
+    setActionError(null);
     setBusy(true);
     try {
       await call('setMaterialReviewStatus', { materialId: material.id, reviewStatus });
       showToast(`Marked ${REVIEW_LABEL[reviewStatus].toLowerCase()}.`);
       onChanged();
     } catch (err) {
-      showToast(err.message || 'Could not update the review status.', { tone: 'error' });
+      setActionError(plannerMessage(err.message || 'The review status was not updated. Try again.'));
+      showToast(plannerMessage(err.message || 'Could not update the review status.'), { tone: 'error' });
     } finally {
       setBusy(false);
     }
   }
 
   async function remove() {
+    setActionError(null);
     setBusy(true);
     try {
       await call('deleteSessionMaterial', { materialId: material.id });
       showToast('Material deleted.');
       onChanged();
     } catch (err) {
-      showToast(err.message || 'Could not delete the material.', { tone: 'error' });
+      setActionError(plannerMessage(err.message || 'The material was not deleted. Try again.'));
+      showToast(plannerMessage(err.message || 'Could not delete the material.'), { tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -267,14 +275,13 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
     try {
       await downloadSessionMaterialFile({ user, materialId: material.id, filename });
     } catch (err) {
-      setDownloadError(err.message || 'The file did not download. Try again.');
+      setDownloadError(plannerMessage(err.message || 'The file did not download. Try again.'));
     } finally {
       downloadingRef.current = false;
       setDownloading(false);
     }
   }
 
-  const address = isFile ? material.storagePath : isLink ? material.url : null;
 
   return (
     <tr
@@ -298,14 +305,13 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
       <td className={CELL_CLASS}>
         <p className="break-words text-admin-base font-bold text-admin-ink">{filename}</p>
         <p className="text-admin-xs text-admin-ink-secondary">{isFile ? 'File' : 'Link'}</p>
-        {address ? <p className={`break-all ${rowMetaClass}`}>{address}</p> : null}
       </td>
       <td className={`${CELL_CLASS} break-words text-admin-ink`}>
-        {sessionTitle ?? <span className={`break-all ${rowMetaClass}`}>{material.sessionId ?? 'No session'}</span>}
+        {sessionTitle ?? 'Session unavailable'}
       </td>
       <td className={CELL_CLASS}>
         <StatusBadge tone={REVIEW_TONE[material.reviewStatus] ?? 'neutral'}>
-          {REVIEW_LABEL[material.reviewStatus] ?? material.reviewStatus ?? 'Unknown'}
+          {REVIEW_LABEL[material.reviewStatus] ?? 'Unknown'}
         </StatusBadge>
       </td>
       <td className={`${CELL_CLASS} whitespace-nowrap font-admin-data text-admin-xs text-admin-ink-data`}>
@@ -345,6 +351,7 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
           ) : null}
           <DestructiveConfirm
             trigger="Delete"
+            triggerIcon="delete"
             title={`Delete ${filename}`}
             confirmLabel="Delete this material"
             busy={busy}
@@ -355,6 +362,7 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
           />
         </div>
         <FieldError id={errorId} role="alert" message={downloadError} />
+        <FieldError role="alert" message={actionError} />
       </td>
     </tr>
   );
@@ -440,7 +448,7 @@ function CoveragePanel({ materials, truncated, readAt, sessions, sessionsState, 
                       {speaker.name}
                     </Link>
                   ) : (
-                    <span className={`break-all ${rowMetaClass}`}>{speaker.id}</span>
+                    <span className={`break-all ${rowMetaClass}`}>{'Speaker unavailable'}</span>
                   )}
                   <p className="text-admin-sm text-admin-ink-secondary">
                     Sessions: {speaker.sessions.map((session) => session.title).join(', ')}.
@@ -659,7 +667,7 @@ export default function AdminMaterialsTab() {
       });
       setArchiveResult({ tone: 'ok', message: `Downloaded an archive of ${fileCount(ids.length)}.` });
     } catch (err) {
-      setArchiveResult({ tone: 'error', message: err.message });
+      setArchiveResult({ tone: 'error', message: plannerMessage(err.message) });
     } finally {
       archiveBusyRef.current = false;
       setArchiveBusy(false);
@@ -741,15 +749,7 @@ export default function AdminMaterialsTab() {
             <p role="status" className="text-admin-sm font-semibold text-admin-ink">
               {selectionSentence(selectedIds.length)}
             </p>
-            <button
-              type="button"
-              className={secondaryButtonClass}
-              onClick={downloadArchive}
-              aria-busy={archiveBusy ? 'true' : undefined}
-              aria-disabled={archiveBusy ? 'true' : undefined}
-            >
-              {archiveBusy ? 'Preparing archive…' : 'Download as archive'}
-            </button>
+            <AdminIconControl label={archiveBusy ? 'Preparing archive…' : 'Download as archive'} icon="download" className={secondaryButtonClass} onClick={downloadArchive} busy={archiveBusy} aria-busy={archiveBusy ? 'true' : undefined} aria-disabled={archiveBusy ? 'true' : undefined} />
             <button type="button" className={linkButtonClass} onClick={() => changeSelection(new Set())}>
               Clear selection
             </button>
@@ -819,9 +819,10 @@ export default function AdminMaterialsTab() {
         title="Materials"
         description="Every session’s files and links. Download files one at a time or together as one archive, and see which sessions have nothing yet."
       />
+      <PlannerFeatureControls choices={[{ key: 'sessionMaterials', label: 'Session materials' }]} />
 
       <Panel title="Show">
-        <div className="grid gap-sm sm:grid-cols-2">
+        <div className="planner-fields grid gap-sm sm:grid-cols-2">
           <div ref={sessionFieldRef}>
             <SelectField
               label="Session"

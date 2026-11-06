@@ -1,3 +1,4 @@
+import { plannerError } from '../plannerErrors.js';
 // The record of an issued invoice (issue #209), and what staff can do with
 // it: email it as a PDF (part 4, InvoiceEmailForm), make a Stripe card
 // payment link (part 5, InvoiceCardPayment), mark it paid, duplicate it into
@@ -12,8 +13,10 @@
 // The forms sit inside the editor's <form>, so their controls are plain
 // buttons. A press with a field the rules refuse moves focus to that field
 // and sends nothing, like every admin form.
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
+  formatMoney,
   INVOICE_LIMITS,
   PAYMENT_METHODS,
   PAYMENT_METHOD_WORDS,
@@ -94,7 +97,7 @@ function MarkPaidForm({ timeZone, busy, onSubmit, onCancel }) {
     try {
       await onSubmit(verdict.value);
     } catch (err) {
-      setServerError(err);
+      setServerError(plannerError(err));
       setErrors(fieldErrorsOf(err));
     }
   }
@@ -108,7 +111,7 @@ function MarkPaidForm({ timeZone, busy, onSubmit, onCancel }) {
         <TextField
           label="Date paid"
           type="date"
-          hint={`The date it arrived, on the event's clock${timeZone ? ` (${timeZone})` : ''}.`}
+          hint="The date the payment arrived."
           value={payment.paidOn}
           onChange={(value) => set({ paidOn: value })}
           error={errors.get('paidOn')}
@@ -178,7 +181,7 @@ function ReasonForm({ title, explanation, label, hint, maxLength, validate, conf
     try {
       await onSubmit(verdict.value);
     } catch (err) {
-      setServerError(err);
+      setServerError(plannerError(err));
     }
   }
 
@@ -306,17 +309,32 @@ export default function InvoiceRecord({
           <Row term="Email">{issuer.email}</Row>
           <Row term="Tax ID">{issuer.taxId}</Row>
           <Row term="How to pay">{issuer.paymentInstructions}</Row>
+          <Row term="Bill to">{invoice.billTo?.name}</Row>
+          <Row term="Billing contact">{invoice.billTo?.contactName}</Row>
+          <Row term="Billing email">{invoice.billTo?.email}</Row>
+          <Row term="Billing address">{invoice.billTo?.address}</Row>
+          <Row term="Reference">{invoice.reference}</Row>
+          <Row term="Notes">{invoice.notes}</Row>
           {invoice.payment ? (
             <>
               <Row term="Paid on"><span className="font-admin-data tabular-nums">{invoice.payment.paidOn}</span></Row>
               <Row term="Method">{paymentMethodText(invoice.payment) || 'Other'}</Row>
-              <Row term="Stripe payment">
-                {invoice.payment.stripe?.paymentIntentId ? <span className="font-admin-data">{invoice.payment.stripe.paymentIntentId}</span> : null}
-              </Row>
               <Row term="Payment note">{invoice.payment.note}</Row>
             </>
           ) : null}
           {invoice.voided ? <Row term="Void reason">{invoice.voided.reason}</Row> : null}
+        </dl>
+        <div role="region" aria-label="Invoice lines" tabIndex={0} className="overflow-auto">
+          <table className="w-full text-start text-admin-sm">
+            <caption className="sr-only">Invoice lines</caption>
+            <thead><tr>{['Description', 'Quantity', 'Unit price', 'Amount'].map((label) => <th key={label} scope="col" className="px-sm py-xs text-start">{label}</th>)}</tr></thead>
+            <tbody>{(invoice.lines ?? []).map((line, index) => <tr key={index} className="border-b-admin-hairline border-admin-rule-hairline"><td className="px-sm py-xs">{line.description}</td><td className="px-sm py-xs">{line.quantity}</td><td className="px-sm py-xs">{formatMoney(line.unitAmount, invoice.currency)}</td><td className="px-sm py-xs">{formatMoney(line.amount, invoice.currency)}</td></tr>)}</tbody>
+          </table>
+        </div>
+        <dl className="grid max-w-[40rem] grid-cols-[1fr_auto] gap-x-md gap-y-xs text-admin-base">
+          <Row term="Subtotal">{formatMoney(invoice.totals?.subtotal ?? 0, invoice.currency)}</Row>
+          {(invoice.adjustments ?? []).map((row, index) => <Row key={index} term={row.label || (row.kind === 'discount' ? 'Discount' : 'Tax')}>{row.kind === 'discount' ? '−' : ''}{formatMoney(row.amount, invoice.currency)}</Row>)}
+          <Row term="Total">{formatMoney(invoice.totals?.total ?? 0, invoice.currency)}</Row>
         </dl>
         <PaymentHistory history={invoice.paymentHistory} />
         <PayByCard invoice={invoice} cardPayments={cardPayments} timeZone={timeZone} busy={busy} onCreatePayLink={onCreatePayLink} />
@@ -338,15 +356,7 @@ export default function InvoiceRecord({
               Mark paid
             </button>
           ) : null}
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            disabled={busy !== null}
-            aria-busy={busy === 'duplicate' || undefined}
-            onClick={onDuplicate}
-          >
-            {busy === 'duplicate' ? 'Copying…' : 'Duplicate as a new draft'}
-          </button>
+          <AdminIconControl label="Duplicate as a new draft" icon="copy" className={secondaryButtonClass} disabled={busy !== null} busy={busy === 'duplicate'} aria-busy={busy === 'duplicate' || undefined} onClick={onDuplicate} />
           {status === 'paid' && canReopen && open !== 'reopen' ? (
             <button type="button" className={secondaryButtonClass} disabled={busy !== null} onClick={() => setOpen('reopen')}>
               Reopen this invoice

@@ -1,3 +1,4 @@
+import '../plannerFields.css';
 // A staff edit of a pitch (ADR 0008, admin review): the proposal fields
 // the pitch stepper collects, corrected in place. The check is the server's
 // (editSessionPitch runs shared/pitchForm checkPitch); the form shows the
@@ -11,7 +12,8 @@ import { AUDIENCE_LEVELS, MAX_CO_PRESENTERS, readPitchFormOptions, readPresenter
 import {
   Notice, SelectField, TextAreaField, TextField, primaryButtonClass, secondaryButtonClass,
 } from './formControls.jsx';
-import { AddItemButton, RemoveItemButton } from './listItemControls.jsx';
+import AdminIconControl from './AdminIconControl.jsx';
+import { AddItemButton } from './listItemControls.jsx';
 
 const withStored = (list, value) => (value === null || value === undefined || value === '' || list.includes(value) ? list : [...list, value]);
 const orEmpty = (value) => (value === null || value === undefined ? '' : value);
@@ -93,7 +95,7 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
         <TextField label="Title" required maxLength={160} value={form.title} onChange={edit('title')} />
         <TextField label="One-line summary" maxLength={300} value={form.summary} onChange={edit('summary')} />
         <TextAreaField label="Description" required maxLength={5000} rows={6} value={form.description} onChange={edit('description')} />
-        <div className="grid gap-sm md:grid-cols-2">
+        <div className="planner-fields grid gap-sm md:grid-cols-2">
           {formats.length ? (
             <SelectField label="Format" value={form.format} onChange={edit('format')} options={choices(formats, 'No format')} />
           ) : (
@@ -105,8 +107,8 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
         </div>
         <fieldset className="flex flex-col gap-sm border-admin-hairline border-admin-rule-hairline p-sm">
           <legend className="px-3xs text-admin-base font-semibold">Lead presenter</legend>
-          <p className="text-admin-sm text-admin-ink-secondary">Email: {lead?.email || 'Not recorded'}. The lead’s email is the submitter’s and cannot change.</p>
-          <div className="grid gap-sm md:grid-cols-3">
+          <p className="text-admin-sm text-admin-ink-secondary">Email: {lead?.email || 'Not recorded'}. </p>
+          <div className="planner-fields grid gap-sm md:grid-cols-3">
             <TextField label="Lead presenter name" required maxLength={120} value={form.leadName} onChange={edit('leadName')} />
             <TextField label="Lead presenter role" maxLength={120} value={form.leadRole} onChange={edit('leadRole')} />
             <TextField label="Organization" maxLength={200} value={form.organization} onChange={edit('organization')} />
@@ -115,12 +117,12 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
         <fieldset className="flex flex-col gap-sm">
           <legend className="text-admin-base font-semibold">Co-presenters ({form.presenters.length} of {maxCo})</legend>
           {form.presenters.map((row, index) => (
-            <div key={row.key} className="grid items-end gap-sm border-admin-hairline border-admin-rule-hairline p-sm md:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+            <div key={row.key} className="planner-fields grid items-end gap-sm border-admin-hairline border-admin-rule-hairline p-sm md:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
               <TextField label={`Co-presenter ${index + 1} name`} required maxLength={120} value={row.name} onChange={(name) => editRow(row.key, { name })} />
               <TextField label={`Co-presenter ${index + 1} email`} required type="email" maxLength={254} value={row.email} onChange={(email) => editRow(row.key, { email })} />
               <TextField label={`Co-presenter ${index + 1} organization`} maxLength={200} value={row.organization} onChange={(organization) => editRow(row.key, { organization })} />
               <TextField label={`Co-presenter ${index + 1} role`} maxLength={120} value={row.role} onChange={(role) => editRow(row.key, { role })} />
-              <RemoveItemButton name={`Remove co-presenter ${index + 1}`} onClick={() => setForm((current) => ({ ...current, presenters: current.presenters.filter((other) => other.key !== row.key) }))} />
+              <AdminIconControl icon="remove" className={secondaryButtonClass} label={`Remove co-presenter ${index + 1}`} onClick={() => setForm((current) => ({ ...current, presenters: current.presenters.filter((other) => other.key !== row.key) }))} />
             </div>
           ))}
           <div>
@@ -132,7 +134,7 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
             </AddItemButton>
           </div>
         </fieldset>
-        <div className="grid gap-sm md:grid-cols-2">
+        <div className="planner-fields grid gap-sm md:grid-cols-2">
           <TextAreaField label="Access needs" maxLength={2000} rows={3} value={form.accessNeeds} onChange={edit('accessNeeds')} />
           <TextAreaField label="Notes to the organizers" maxLength={2000} rows={3} value={form.notes} onChange={edit('notes')} />
         </div>
@@ -140,7 +142,7 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
       {error ? <Notice tone="error" message={error.message} /> : null}
       <div className="flex flex-wrap gap-xs">
         <button type="submit" className={primaryButtonClass} aria-busy={busy || undefined} aria-disabled={busy || undefined}>
-          {busy ? 'Saving…' : 'Save changes'}
+          {busy ? 'Saving…' : 'Save'}
         </button>
         <button type="button" className={secondaryButtonClass} onClick={onCancel} disabled={busy}>Cancel</button>
       </div>

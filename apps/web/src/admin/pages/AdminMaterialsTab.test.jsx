@@ -142,7 +142,7 @@ describe('AdminMaterialsTab: the list', () => {
     // The row says what it is and where it lives, and which session holds it.
     const slides = within(rowOf('Slides.pdf'));
     expect(slides.getByText('File')).toBeInTheDocument();
-    expect(slides.getByText('session-materials/s1/Slides.pdf')).toBeInTheDocument();
+    expect(slides.queryByText('session-materials/s1/Slides.pdf')).toBeNull();
     expect(slides.getByText('[Fixture] Opening keynote')).toBeInTheDocument();
     expect(slides.getByText('Pending review')).toBeInTheDocument();
   });
@@ -163,10 +163,10 @@ describe('AdminMaterialsTab: the list', () => {
 
   it('narrows the rows by session and by review state, and offers the add-link form for one session', async () => {
     await renderLoaded();
-    expect(screen.queryByLabelText('Link URL')).toBeNull();
+    expect(screen.queryByLabelText('Link')).toBeNull();
     fireEvent.change(screen.getByLabelText('Session'), { target: { value: 's2' } });
     expect(rowNames()).toEqual(['Bad', 'Handout.pdf']);
-    expect(screen.getByLabelText('Link URL')).toBeInTheDocument();
+    expect(screen.getByLabelText('Link')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Session'), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText('Review'), { target: { value: 'approved' } });
@@ -363,7 +363,7 @@ describe('AdminMaterialsTab: selection and the archive', () => {
     await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
     expect(button).toHaveAttribute('aria-disabled', 'true');
     expect(button).not.toHaveAttribute('disabled');
-    expect(button).toHaveTextContent('Preparing archive…');
+    expect(button).toHaveAccessibleName('Preparing archive…');
     expect(document.activeElement).toBe(button);
     // A press while busy sends nothing more.
     fireEvent.click(button);
@@ -379,7 +379,7 @@ describe('AdminMaterialsTab: selection and the archive', () => {
     expect(status).toHaveAttribute('role', 'status');
     expect(saved).toEqual(['session-materials.zip']);
     expect(button).not.toHaveAttribute('aria-busy');
-    expect(button).toHaveTextContent('Download as archive');
+    expect(button).toHaveAccessibleName('Download as archive');
     expect(document.activeElement).toBe(button);
   });
 
@@ -614,7 +614,7 @@ describe('AdminMaterialsTab: row actions', () => {
       materials: [...MATERIALS, link('m-new', 's4', 'External link', 'https://x.org', 'pending')],
       truncated: false,
     });
-    fireEvent.change(screen.getByLabelText('Link URL'), { target: { value: 'https://x.org' } });
+    fireEvent.change(screen.getByLabelText('Link'), { target: { value: 'https://x.org' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
 
     expect(await screen.findByText('External link', { selector: 'td p' })).toBeInTheDocument();
@@ -644,7 +644,7 @@ describe('AdminMaterialsTab: row actions', () => {
     handlers.addSessionMaterialLink = () => ok({ id: 'b1', material: { filename: 'External link' } });
     handlers.listAllSessionMaterials = () => ok({ materials: [file('b1', 's2', 'Newer list.pdf', 'pending')], truncated: false });
     fireEvent.change(screen.getByLabelText('Session'), { target: { value: 's2' } });
-    fireEvent.change(screen.getByLabelText('Link URL'), { target: { value: 'https://x.org' } });
+    fireEvent.change(screen.getByLabelText('Link'), { target: { value: 'https://x.org' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
     fireEvent.change(screen.getByLabelText('Session'), { target: { value: '' } });
     expect(await screen.findByText('Newer list.pdf')).toBeInTheDocument();

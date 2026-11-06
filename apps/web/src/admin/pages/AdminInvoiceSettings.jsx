@@ -1,3 +1,4 @@
+import { plannerError } from '../plannerErrors.js';
 // Invoice settings (issue #208): the issuer block, payment instructions and
 // number prefix every issued invoice copies.
 //
@@ -120,11 +121,23 @@ export default function AdminInvoiceSettings() {
       setStatus(message, formOf(result.settings));
       showToast(message, { announce: false });
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setSaving(false);
     }
   }
+
+  if (!canEdit) return <div className="flex flex-col gap-md">
+    <AdminPageHeader title="Invoice settings" description="Billing details for new invoices." actions={<Link to={INVOICES_ROOT} className={secondaryButtonClass}>Back to invoices</Link>} />
+    <Notice message="An operator can update billing and bank details." />
+    <Panel title="Billing details"><dl className="grid gap-x-md gap-y-xs sm:grid-cols-[12rem_1fr]">
+      {[
+        ['Next invoice number', data.nextNumber], ['Currency', data.invoiceCurrency?.toUpperCase()],
+        ['From', form.issuerName], ['Address', form.issuerAddress], ['Email', form.issuerEmail],
+        ['Tax number', form.taxId], ['Payment instructions', form.paymentInstructions],
+      ].map(([label, value]) => <div key={label} className="contents"><dt className="font-semibold">{label}</dt><dd className="whitespace-pre-line break-words">{value || 'Not set'}</dd></div>)}
+    </dl></Panel>
+  </div>;
 
   return (
     <form
@@ -139,7 +152,7 @@ export default function AdminInvoiceSettings() {
       <AdminPageHeader
         title="Invoice settings"
         identifiers={`Next number ${data.nextNumber}`}
-        description="What every issued invoice copies: who it is from, how to pay, and how it is numbered. An issued invoice keeps the settings it was issued with."
+        description="Set the billing details and payment instructions for new invoices."
         actions={
           <>
             <Link to={INVOICES_ROOT} className={secondaryButtonClass}>
@@ -147,7 +160,7 @@ export default function AdminInvoiceSettings() {
             </Link>
             {canEdit ? (
               <button type="submit" className={primaryButtonClass} disabled={saving} aria-busy={saving || undefined}>
-                {saving ? 'Saving…' : 'Save settings'}
+                {saving ? 'Saving…' : 'Save'}
               </button>
             ) : null}
           </>

@@ -135,11 +135,13 @@ test.describe.serial('Speaker reminders', () => {
     await expect(row).toContainText(`Materials (${sessionTitle})`);
 
     await page.goto(`/admin/sessions/${encodeURIComponent(sessionId)}`);
-    const mark = page.getByLabel('This session needs no slides or other materials');
+    const request = page.getByRole('switch', { name: 'Request speaker materials' });
     await expect(page.getByLabel('Public title')).toHaveValue(sessionTitle);
-    await expect(mark).not.toBeChecked();
-    await mark.check();
-    await page.getByRole('button', { name: 'Save and publish' }).click();
+    await expect(request).toBeChecked();
+    await request.focus();
+    await page.keyboard.press('Space');
+    await expect(request).not.toBeChecked();
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
     await expect.poll(async () => (await adminDb().collection('cmsSchedule').doc(sessionId).get()).data()?.materialsNotNeeded)
       .toBe(true);
 

@@ -1,3 +1,5 @@
+import { plannerMessage } from '../plannerErrors.js';
+import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
 // Feedback review tab (issue #28, spec §9 "Feedback inbox") — every
 // submission from the public feedback modal, newest first, with a
 // mark-reviewed/archived action. Reads `feedback` directly (firestore.rules:
@@ -36,7 +38,7 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_FILTERS = [
-  { value: 'open', label: 'Open (new + reviewed)' },
+  { value: 'open', label: 'Open' },
   { value: 'all', label: 'All' },
   ...STATUS_OPTIONS,
 ];
@@ -151,8 +153,8 @@ export default function AdminFeedback() {
       setStatusResult({ id, neighbours, message });
       showToast(message, { announce: false });
     } catch (err) {
-      setStatusError({ id, message: err.message });
-      showToast(err.message, { tone: 'error', announce: false });
+      setStatusError({ id, message: plannerMessage(err.message) });
+      showToast(plannerMessage(err.message), { tone: 'error', announce: false });
     } finally {
       writeRef.current = false;
       setUpdating(null);
@@ -189,11 +191,12 @@ export default function AdminFeedback() {
           </label>
         }
       />
+      <PlannerFeatureControls choices={[{ key: 'feedbackInbox', label: 'Collect feedback' }]} />
 
       {listError ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the feedback list; showing the last values we received and retrying."
+          message="The feedback list did not refresh. Reconnecting…"
         />
       ) : null}
 
@@ -204,7 +207,7 @@ export default function AdminFeedback() {
       {rows === null ? (
         <AdminLoadingState label="Loading feedback…" />
       ) : ordered.length === 0 ? (
-        <AdminEmptyState title="Nothing here" description="No feedback matches this filter." />
+        <AdminEmptyState title="No feedback here" description="Show all feedback to check other messages." action={<button type="button" className={secondaryButtonClass} onClick={() => setFilter('all')}>Show all feedback</button>} />
       ) : (
         <Panel flush>
           <ul>
@@ -227,7 +230,7 @@ export default function AdminFeedback() {
                         {STATUS_LABELS[row.status] ?? STATUS_LABELS.new}
                       </StatusBadge>
                       <span className="font-admin-data text-admin-xs text-admin-ink-secondary">
-                        {row.category ?? 'feedback'}
+                        {{ bug: 'Bug report', feature: 'Suggestion', general: 'Feedback', feedback: 'Feedback' }[row.category] ?? 'Feedback'}
                       </span>
                       <span className="font-admin-data text-admin-xs text-admin-ink-secondary">
                         {toDate(row.createdAt)?.toLocaleString() ?? ''}

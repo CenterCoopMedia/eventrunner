@@ -1,3 +1,4 @@
+import '../plannerFields.css';
 // One custom registration question in the operator's editor (ADR 0008 §4).
 // Choices are added one at a time; the shared check refuses a repeat or a
 // list shorter than two.
@@ -33,12 +34,12 @@ export default function RegistrationQuestionEditor({ question, index, count, err
       <div className="flex flex-wrap items-center justify-between gap-xs">
         <h3 className="font-admin-ui text-admin-base font-semibold text-admin-ink">{index + 1}. {name}</h3>
         <div className="flex flex-wrap gap-2xs" role="group" aria-label={`Arrange ${name}`}>
-          <button type="button" className={ghostButtonClass} onClick={() => onMove(-1)} disabled={index === 0} aria-label={`Move ${name} up`}>Move up</button>
-          <button type="button" className={ghostButtonClass} onClick={() => onMove(1)} disabled={index === count - 1} aria-label={`Move ${name} down`}>Move down</button>
+          <AdminIconControl label={`Move ${name} up`} icon="up" className={ghostButtonClass} onClick={() => onMove(-1)} disabled={index === 0} />
+          <AdminIconControl label={`Move ${name} down`} icon="down" className={ghostButtonClass} onClick={() => onMove(1)} disabled={index === count - 1} />
           <AdminIconControl className={ghostButtonClass} onClick={onRemove} label={`Remove ${name}`} icon="remove" />
         </div>
       </div>
-      <div className="grid gap-sm sm:grid-cols-2">
+      <div className="planner-fields grid gap-sm sm:grid-cols-2">
         <TextField label="Question" value={question.label} onChange={(label) => onChange({ label })} maxLength={LIMITS.label} required error={errorFor(`${at}.label`)} />
         <SelectField
           label="Answer type"

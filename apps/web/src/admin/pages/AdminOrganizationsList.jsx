@@ -1,3 +1,5 @@
+import { plannerMessage } from '../plannerErrors.js';
+import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
 // The organizations list (issue #192): every organization the sponsors page
 // can draw, live and draft, in the order it draws them.
 //
@@ -23,7 +25,6 @@ import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import {
   Notice,
   primaryButtonClass,
-  rowMetaClass,
   rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -78,7 +79,7 @@ export default function AdminOrganizationsList() {
   }, [leaveGuard.pending]);
 
   function moveRow(from, to) {
-    const label = text(ordered[from]?.current?.name) ?? ordered[from]?.id ?? 'Organization';
+    const label = text(ordered[from]?.current?.name) ?? 'Unnamed organization';
     const count = ordered.length;
     const moved = draft.move(from, to);
     if (moved) setSpoken(`${label} moved to position ${to + 1} of ${count}`);
@@ -104,7 +105,7 @@ export default function AdminOrganizationsList() {
           fields: { order },
         });
       },
-      (row) => text(row.current?.name) ?? row.id,
+      (row) => text(row.current?.name) ?? 'Unnamed organization',
     );
     const verdict = orderSaveMessage(failed);
     setNotice(verdict);
@@ -121,8 +122,8 @@ export default function AdminOrganizationsList() {
   }
 
   function reportFailure(err, ids) {
-    setNotice({ tone: 'error', message: err.message });
-    showToast(err.message, { tone: 'error', announce: false });
+    setNotice({ tone: 'error', message: plannerMessage(err.message) });
+    showToast(plannerMessage(err.message), { tone: 'error', announce: false });
     if (err?.queueId) setResume({ queueId: err.queueId, ids });
   }
 
@@ -164,7 +165,7 @@ export default function AdminOrganizationsList() {
       <AdminPageHeader
         title="Organizations"
         identifiers={`${rows.length} organization${rows.length === 1 ? '' : 's'}`}
-        description="The sponsors page draws these in this order. Organizations with the same tier form one group."
+        description="Manage sponsors and partners in the order they appear on the site."
         actions={
           <>
             <OrderDraftButtons
@@ -173,6 +174,7 @@ export default function AdminOrganizationsList() {
               onSave={saveOrder}
               onCancel={cancelOrder}
             />
+      <PlannerFeatureControls choices={[{ key: 'sponsors', label: 'Sponsor list' }]} />
             {resume && !draft.dirty ? (
               <button
                 type="button"
@@ -206,7 +208,7 @@ export default function AdminOrganizationsList() {
       {error ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the organization list; showing the last values we received and retrying."
+          message="The organization list did not refresh. Reconnecting…"
         />
       ) : null}
 
@@ -241,7 +243,7 @@ export default function AdminOrganizationsList() {
               {ordered.map((row, index) => {
                 const organization = row.current ?? {};
                 const tier = text(organization.tier);
-                const label = text(organization.name) ?? row.id;
+                const label = text(organization.name) ?? 'Unnamed organization';
                 return (
                   <tr
                     key={row.id}
@@ -252,7 +254,6 @@ export default function AdminOrganizationsList() {
                       <Link to={encodeURIComponent(row.id)} className={rowTitleLinkClass}>
                         {label}
                       </Link>
-                      <p className={`mt-3xs ${rowMetaClass}`}>/sponsors/{row.id}</p>
                     </td>
                     <td className={`px-sm py-xs align-top ${tier ? 'text-admin-ink' : 'text-admin-ink-secondary'}`}>
                       {tier ?? 'None'}

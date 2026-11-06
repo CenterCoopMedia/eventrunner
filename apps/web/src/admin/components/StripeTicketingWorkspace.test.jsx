@@ -42,21 +42,21 @@ describe('organizer order management', () => {
     call.mockResolvedValue({ ...DETAIL, tickets: [{ ...TICKET, claimedByUid: 'holder' }] });
     render(<StripeOrderDetail call={call} orderId="order-1" isOperator timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Correct attendee' }));
-    expect(screen.getByLabelText('Corrected attendee email')).toHaveAttribute('readonly');
-    expect(screen.getByText(/claimed ticket cannot change email/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Corrected attendee email')).toBeNull();
+    expect(screen.getByText('Email: attendee@example.test')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Transfer ticket/ })).not.toBeInTheDocument();
   });
   it('locks the email on an already checked-in unclaimed ticket', async () => {
     call.mockResolvedValue({ ...DETAIL, tickets: [{ ...TICKET, checkedInAt: '2026-01-02T10:00:00Z' }] });
     render(<StripeOrderDetail call={call} orderId="order-1" isOperator timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Correct attendee' }));
-    expect(screen.getByLabelText('Corrected attendee email')).toHaveAttribute('readonly');
-    expect(screen.getByText(/checked-in ticket cannot change email/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Corrected attendee email')).toBeNull();
+    expect(screen.getByText('Email: attendee@example.test')).toBeInTheDocument();
   });
   it('surfaces reconciliation exceptions and dispute ownership without changing admission', async () => {
     call.mockResolvedValue({ ...DETAIL, order: { ...ORDER, reconciliationException: { code: 'payment-disputed', message: 'A dispute needs an organizer decision.' }, disputes: [{ id: 'dp_synthetic', status: 'needs_response', amount: 2500, currency: 'usd' }] } });
     render(<StripeOrderDetail call={call} orderId="order-1" isOperator timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
-    expect(await screen.findByText('A dispute needs an organizer decision.')).toBeInTheDocument();
+    expect(await screen.findByText('This payment needs review. Check it in Stripe before changing admission.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Payment disputes' })).toBeInTheDocument();
     expect(screen.getByText(/A dispute does not automatically change admission/)).toBeInTheDocument();
     expect(call).toHaveBeenCalledTimes(1);
@@ -104,8 +104,8 @@ describe('complimentary tickets and online check-in', () => {
     render(<StripeCheckInPanel call={call} isOperator timezone="UTC" onChanged={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Ticket code for check-in'), { target: { value: TICKET.externalId } });
     fireEvent.click(screen.getByRole('button', { name: 'Check in attendee' }));
-    expect(await screen.findByText(/This scan did not create another check-in/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Review check-in correction' }));
+    expect(await screen.findByText(/This attendee is already checked in/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Undo check-in' }));
     expect(call).toHaveBeenCalledTimes(1);
     fireEvent.change(screen.getByLabelText('Reason for check-in correction'), { target: { value: 'Test scan before attendee arrival.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Undo recorded check-in' }));
@@ -117,7 +117,7 @@ describe('complimentary tickets and online check-in', () => {
     fireEvent.change(screen.getByLabelText('Ticket code for check-in'), { target: { value: TICKET.externalId } });
     fireEvent.click(screen.getByRole('button', { name: 'Check in attendee' }));
     await screen.findByText('Checked in. Admit this attendee.');
-    expect(screen.queryByRole('button', { name: 'Review check-in correction' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Undo check-in' })).not.toBeInTheDocument();
   });
 });
 
@@ -125,7 +125,7 @@ describe('catalog precision and cursor isolation', () => {
   it('refuses a price with excessive precision instead of silently rounding money', () => {
     render(<StripeCatalogPanel call={call} data={{ catalog: CATALOG, mode: 'test' }} isOperator timezone="UTC" onSaved={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '12.345' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save catalog' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByLabelText('Price (USD)')).toHaveAttribute('aria-invalid', 'true');
     expect(call).not.toHaveBeenCalled();
   });
@@ -135,18 +135,18 @@ describe('catalog precision and cursor isolation', () => {
     fireEvent.change(screen.getByLabelText('Ticket name'), { target: { value: 'Local unsaved change' } });
     rerender(<StripeCatalogPanel {...props} data={{ catalog: { ...CATALOG, revision: 2, salesPaused: false } }} />);
     expect(screen.getByLabelText('Ticket name')).toHaveValue('Local unsaved change');
-    fireEvent.click(screen.getByRole('button', { name: 'Save catalog' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(call).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Discard unsaved edits and reload catalog' })).toBeInTheDocument();
   });
   it('uses the submitted filters for the next page even if a search field has unsaved text', async () => {
     call.mockResolvedValue({ orders: [ORDER], nextCursor: 'cursor-page-2' });
     render(<StripeTicketList call={call} kind="orders" catalog={CATALOG} timezone="UTC" refreshToken={0} onOpenOrder={vi.fn()} />);
-    await screen.findByText('order-1');
+    await screen.findByText('purchaser@example.test');
     fireEvent.change(screen.getByLabelText('Find a purchaser or order'), { target: { value: 'purchaser@example.test' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Search orders' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     await waitFor(() => expect(call).toHaveBeenCalledTimes(2));
-    await screen.findByText('order-1');
+    await screen.findByText('purchaser@example.test');
     fireEvent.change(screen.getByLabelText('Find a purchaser or order'), { target: { value: 'different@example.test' } });
     call.mockResolvedValueOnce({ orders: [{ ...ORDER, id: 'order-2', orderId: 'order-2' }], nextCursor: null });
     fireEvent.click(screen.getByRole('button', { name: 'Load more orders' }));
@@ -155,13 +155,13 @@ describe('catalog precision and cursor isolation', () => {
   it('ignores a stale search response after a newer filter was submitted', async () => {
     let resolveFirst;
     call.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
-    call.mockResolvedValue({ orders: [{ ...ORDER, orderId: 'new-order', id: 'new-order' }], nextCursor: null });
+    call.mockResolvedValue({ orders: [{ ...ORDER, orderId: 'new-order', id: 'new-order', purchaserEmail: 'new@example.test' }], nextCursor: null });
     render(<StripeTicketList call={call} kind="orders" catalog={CATALOG} timezone="UTC" refreshToken={0} onOpenOrder={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Find a purchaser or order'), { target: { value: 'new@example.test' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Search orders' }));
-    await screen.findByText('new-order');
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    await screen.findByText('new@example.test');
     await act(async () => resolveFirst({ orders: [ORDER], nextCursor: 'old-cursor' }));
-    expect(screen.queryByText('order-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('purchaser@example.test')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Load more orders' })).not.toBeInTheDocument();
   });
 });

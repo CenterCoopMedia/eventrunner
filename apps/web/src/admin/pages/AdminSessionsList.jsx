@@ -1,3 +1,5 @@
+import { plannerMessage } from '../plannerErrors.js';
+import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -42,8 +44,8 @@ export default function AdminSessionsList() {
   }
 
   function reportFailure(err, ids) {
-    setNotice({ tone: 'error', message: err.message });
-    showToast(err.message, { tone: 'error', announce: false });
+    setNotice({ tone: 'error', message: plannerMessage(err.message) });
+    showToast(plannerMessage(err.message), { tone: 'error', announce: false });
     if (err?.queueId) setResume({ queueId: err.queueId, ids });
   }
 
@@ -86,7 +88,7 @@ export default function AdminSessionsList() {
       <AdminPageHeader
         title="Sessions"
         identifiers={`${rows.length} session${rows.length === 1 ? '' : 's'}`}
-        description="The programme in event-day order. Child sessions stay directly below their parent."
+        description="Sessions in schedule order, grouped by day."
         actions={
           <>
             {resume ? (
@@ -115,13 +117,14 @@ export default function AdminSessionsList() {
           </>
         }
       />
+      <PlannerFeatureControls choices={[{ key: 'schedule', label: 'Public schedule' }, { key: 'sessionBookmarks', label: 'Save sessions' }]} />
 
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
       {error ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the session register; showing the last values we received and retrying."
+          message="The session list did not refresh. Reconnecting…"
         />
       ) : null}
 
@@ -130,7 +133,7 @@ export default function AdminSessionsList() {
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title="No sessions yet"
-          description="Create the first session, then save its draft before publishing it."
+          description="Add a session to start your program."
           action={
             <Link to="new/session" className={primaryButtonClass}>
               Create a session
@@ -156,7 +159,7 @@ export default function AdminSessionsList() {
                       <div className={`${rowClass} ${session.parentId ? 'ms-md' : ''}`}>
                         <div className="min-w-0">
                           <Link to={encodeURIComponent(row.id)} className={rowTitleLinkClass}>
-                            {session.title || row.id}
+                            {session.title || 'Untitled session'}
                           </Link>
                           <p className={`mt-3xs ${rowMetaClass}`}>
                             {[`${session.startTime || 'Time unset'}${session.endTime ? `–${session.endTime}` : ''}`,

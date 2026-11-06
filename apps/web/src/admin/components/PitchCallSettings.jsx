@@ -1,13 +1,15 @@
+import { plannerError } from '../plannerErrors.js';
 // The call for sessions: open or closed, its deadline, and where people
 // pitch. Operator-only. Moved unchanged from the pitch page so the queue
 // holds the queue alone (ADR 0008, admin review).
+import PlannerSwitch from './PlannerSwitch.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
 import { readPitchFormUrl } from 'shared/pitch';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import EventDateTimeField from './EventDateTimeField.jsx';
 import { Radio } from '../../components/forms/Choice.jsx';
 import { sameCallSettings } from '../pitchCallSettings.js';
-import { Panel, Notice, SaveStatus, TextField, SelectField, CheckboxField,
+import { Panel, Notice, SaveStatus, TextField, SelectField,
   ServerErrorSummary, fieldHintClass, fieldLabelClass, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
 
 // A stored null deadline is "Open until I close it" (issue #476). A
@@ -78,26 +80,26 @@ export default function PitchCallSettings({ settings, call, timeZone }) {
     }
     setFormUrlError(''); setError(null); setResult(''); setBusy(true);
     try { await call('updatePitchCall', { enabled, closesAt: effectiveClosesAt, externalFormUrl }); setSavedElsewhere(false); setResult('Call settings saved.'); }
-    catch (err) { setError(err); }
+    catch (err) { setError(plannerError(err)); }
     finally { setBusy(false); }
   }
-  return <Panel title="Call settings" description="Only operators can open or close intake.">
+  return <Panel title="Call settings" description="Choose when and where people can submit proposals.">
     <form ref={formRef} onSubmit={save} className="space-y-sm">
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {savedElsewhere ? <><Notice tone="caution" message="The saved call settings changed. Your unsaved edits are still here. Saving replaces the saved settings." /><button type="button" className={secondaryButtonClass} onClick={() => load(baseline)} disabled={busy}>Load saved settings</button></> : null}
       <fieldset disabled={busy} className="space-y-sm">
-        <CheckboxField label="Accept session pitches" checked={enabled} onChange={setEnabled} />
+        <PlannerSwitch label="Accept session pitches" checked={enabled} onChange={setEnabled} />
         <fieldset className="flex min-w-0 flex-col gap-3xs">
           <legend className={`${fieldLabelClass} mb-3xs`}>When intake closes</legend>
           <Radio tone="admin" name={`${deadlineModeId}-mode`} value="date" checked={deadlineMode === 'date'} onChange={() => setDeadlineMode('date')} label="At a set date and time" />
           <Radio tone="admin" name={`${deadlineModeId}-mode`} value="open" checked={deadlineMode === 'open'} onChange={() => setDeadlineMode('open')} label="Open until I close it" aria-describedby={deadlineMode === 'open' ? `${deadlineModeId}-open-hint` : undefined} />
-          {deadlineMode === 'open' ? <p id={`${deadlineModeId}-open-hint`} className={`${fieldHintClass} text-pretty`}>Intake stays open until an operator clears “Accept session pitches” and saves. The public page shows no deadline.</p> : null}
+          {deadlineMode === 'open' ? <p id={`${deadlineModeId}-open-hint`} className={`${fieldHintClass} text-pretty`}>Turn off “Accept session pitches” to close the call.</p> : null}
         </fieldset>
         {deadlineMode === 'date' ? <EventDateTimeField label="Deadline" value={closesAt} timeZone={timeZone} onChange={(value) => setClosesAt(value || '')} onProblemChange={setDeadlineProblem} required showError={showDeadlineError} summaryPrefix="Intake closes" emptySummary="No deadline is set. Enter one, or choose “Open until I close it”." hint="Intake closes at this date and time." /> : null}
         <SelectField label="Where people pitch" value={intake} onChange={setIntake} options={intakeOptions} hint="With an external form, the site links to it. Pitches reach this queue through a refresh from Airtable or a CSV import." />
         {intake === 'external' ? <TextField name="externalFormUrl" label="External form address" type="url" value={formUrl} onChange={(v) => { setFormUrl(v); setFormUrlError(''); }} required maxLength={2048} error={formUrlError} hint="Use the form’s public https:// share link." /> : null}
       </fieldset>
-      <button className={primaryButtonClass} aria-disabled={busy} aria-busy={busy}>{busy ? 'Saving…' : 'Save call settings'}</button>
+      <button aria-label="Save call settings" className={primaryButtonClass} aria-disabled={busy} aria-busy={busy}>{busy ? 'Saving…' : 'Save'}</button>
       {result ? <SaveStatus message={result} /> : null}
     </form>
   </Panel>;

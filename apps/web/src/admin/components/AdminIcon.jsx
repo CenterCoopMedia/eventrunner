@@ -1,6 +1,9 @@
 /** Familiar utility actions use the same 20px stroke and a full control target. */
 export default function AdminIcon({ name, className = '' }) {
   const paths = {
+    copy: <><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V3H3v13h5" /></>,
+    up: <path d="m5 14 7-7 7 7" />,
+    down: <path d="m5 10 7 7 7-7" />,
     close: <path d="m6 6 12 12M18 6 6 18" />,
     menu: <path d="M4 6h16M4 12h16M4 18h16" />,
     collapse: <path d="m14 6-6 6 6 6" />,

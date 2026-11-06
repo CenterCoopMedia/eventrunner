@@ -1,3 +1,4 @@
+import { plannerError } from '../plannerErrors.js';
 // Invoices (issues #208, #209): every invoice, newest first, with a status filter
 // and a search. The rows come from invoiceAdmin, never from Firestore: the
 // invoice collections deny every client read (firestore.rules), because an
@@ -101,7 +102,7 @@ export default function AdminInvoicesList() {
       .catch((err) => {
         if (current()) {
           setRows([]);
-          setError(err);
+          setError(plannerError(err));
         }
       });
   }, [load]);
@@ -131,7 +132,7 @@ export default function AdminInvoicesList() {
       setNextCursor(result.nextCursor ?? null);
       setScans((count) => count + 1);
     } catch (err) {
-      if (current()) setError(err);
+      if (current()) setError(plannerError(err));
     } finally {
       if (current()) setLoadingMore(false);
     }
@@ -162,7 +163,7 @@ export default function AdminInvoicesList() {
       status: (
         <span className="inline-flex flex-wrap items-center gap-3xs">
           <StatusBadge tone={INVOICE_STATUS_TONES[invoice.status] ?? 'neutral'} data-invoice-status={invoice.status}>
-            {INVOICE_STATUS_WORDS[invoice.status] ?? invoice.status}
+            {INVOICE_STATUS_WORDS[invoice.status] ?? 'Unknown'}
           </StatusBadge>
           {/* A card payment waits for an operator's review (#519). */}
           {invoice.needsReview ? <StatusBadge tone="error" data-invoice-review="">Needs review</StatusBadge> : null}
@@ -177,7 +178,7 @@ export default function AdminInvoicesList() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Invoices"
-        description="Bills for sponsors and partners. Write a draft, issue it, download its PDF, and record the payment. A draft has no number. The number is given when the invoice is issued."
+        description="Create and send invoices to sponsors and partners, then track payments."
         actions={
           <>
             <Link to={INVOICE_SETTINGS_PATH} className={secondaryButtonClass}>
@@ -279,7 +280,7 @@ export default function AdminInvoicesList() {
         ) : error ? null : (
           <AdminEmptyState
             title="No invoices yet"
-            description="Write the first draft. You can pick an organization, and its sponsor package fills the first line."
+            description="Create an invoice for a sponsor or partner."
             action={
               <Link to={`${INVOICES_ROOT}/new/invoice`} className={primaryButtonClass}>
                 New invoice

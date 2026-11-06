@@ -42,7 +42,7 @@ test('a ticket holder saves registration answers, and staff see them on the Atte
     await expect(summary.getByText(/told you about access needs/)).toBeVisible();
     await expect(summary.getByText('A step-free route to the stage.')).toHaveCount(0);
     await page.getByLabel('Search').fill(`Ada Answers ${stamp}`);
-    await page.getByRole('button', { name: 'Edit record' }).first().click();
+    await page.getByRole('button', { name: 'Edit attendee record' }).first().click();
     const record = page.getByRole('region', { name: 'Registration answers' });
     await expect(record.getByText('A step-free route to the stage.')).toBeVisible();
     await expect(record.getByText('Vegan; Other: Low sodium')).toBeVisible();

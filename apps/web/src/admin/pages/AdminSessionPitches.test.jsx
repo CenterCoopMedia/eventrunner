@@ -296,10 +296,10 @@ describe('AdminSessionPitches queue', () => {
     collections.session_pitches = QUEUE;
     renderAt('/admin/pitches');
     fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'rejected' } });
-    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2.');
+    expect(screen.getByText('Showing 1 of 2.')).toHaveAttribute('role', 'status');
     fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'all' } });
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bo' } });
-    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2.');
+    expect(screen.getByText('Showing 1 of 2.')).toHaveAttribute('role', 'status');
     expect(screen.getByRole('link', { name: 'Newest pitch' })).toBeInTheDocument();
   });
 
@@ -339,24 +339,24 @@ describe('AdminSessionPitch decisions, notes and edits', () => {
   it('edits the proposal and sends the corrected fields with the revision it read', async () => {
     openPitch({ ...PITCH, status: 'new', presenters: [{ name: 'Ada', email: PITCH.email, organization: null, role: null, lead: true }] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit pitch' }));
-    expect(screen.getByText(/The lead’s email is the submitter’s and cannot change/)).toBeInTheDocument();
+    expect(screen.getByText(/Email:/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Reporting together, revised' } });
     call.mockResolvedValueOnce({ id: PITCH.id, revision: 3, changed: ['title'] });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Changes saved. The submitted copy is kept. No email was sent.')).toBeInTheDocument();
     const [name, body] = call.mock.calls.at(-1);
     expect(name).toBe('editSessionPitch');
     expect(body).toMatchObject({ id: PITCH.id, expectedRevision: 2, pitch: { title: 'Reporting together, revised', leadName: 'Ada', description: 'A workshop.', presenters: [] } });
-    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
   });
 
   it('keeps the edit open with the server reason when the edit is refused', async () => {
     openPitch({ ...PITCH, status: 'new' });
     fireEvent.click(screen.getByRole('button', { name: 'Edit pitch' }));
     call.mockRejectedValueOnce(new Error('leadName: Enter your name.'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('leadName: Enter your name.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 
   it('stops every control when the live pitch moves on, and offers the current version', () => {

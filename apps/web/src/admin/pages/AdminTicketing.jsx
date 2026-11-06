@@ -1,3 +1,5 @@
+import { plannerMessage } from '../plannerErrors.js';
+import '../plannerFields.css';
 // Ticketing tab (issue #31): provider status, CSV import with column
 // mapping + dry-run preview, and a searchable ticket list.
 //
@@ -44,8 +46,8 @@ const StripeTicketingWorkspace = lazy(() => import('../components/StripeTicketin
 
 const MAPPING_FIELDS = [
   { id: 'email', label: 'Email address', required: true },
-  { id: 'id', label: 'Order / ticket ID', required: true },
-  { id: 'orderId', label: 'Order ID (if different from the ticket ID above)', required: false },
+  { id: 'id', label: 'Ticket reference', required: true },
+  { id: 'orderId', label: 'Order reference (if different)', required: false },
   { id: 'name', label: 'Full name', required: false },
   { id: 'firstName', label: 'First name (if separate from full name)', required: false },
   { id: 'lastName', label: 'Last name (if separate from full name)', required: false },
@@ -96,8 +98,8 @@ function GalleyHead({ children, align = 'start' }) {
 function StatusCard({ status, error, onRefresh, busy }) {
   return (
     <Panel
-      title="Provider status"
-      description="Current provider connection and reconciliation activity."
+      title="Ticket updates"
+      description="Connection and recent ticket updates."
       actions={
         <AdminIconControl className={secondaryButtonClass} onClick={onRefresh} disabled={busy}
           busy={busy} label={busy ? 'Checking…' : 'Refresh'} icon="refresh" />
@@ -114,23 +116,23 @@ function StatusCard({ status, error, onRefresh, busy }) {
             <dd className="font-admin-data text-admin-ink-data">{PROVIDER_LABELS[status.provider] || 'Other'}</dd>
           </div>
           <div>
-            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Webhook support</dt>
+            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Automatic updates</dt>
             <dd className="text-admin-ink-secondary">
-              {status.webhookSupported ? 'Supported' : 'Not applicable for this provider'}
+              {status.webhookSupported ? 'Available' : 'Tickets are imported from a file'}
             </dd>
           </div>
           {status.webhookSupported ? (
             <div>
-              <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Webhook registration</dt>
+              <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Connection</dt>
               <dd className="text-admin-ink-secondary">
                 {status.webhookRegisteredAt ? (
                   <span className="font-admin-data text-admin-ink-data">
                     {localDateTime(status.webhookRegisteredAt) ? `Connected on ${localDateTime(status.webhookRegisteredAt)}` : 'Connected'}
                   </span>
                 ) : status.provider === 'stripe' ? (
-                  'Verify the configured endpoint and recent deliveries in Stripe Dashboard.'
+                  'Check ticket updates in your Stripe dashboard.'
                 ) : (
-                  'Not connected. Ask Joe to connect ticket updates.'
+                  'Not connected. Contact support to connect ticket updates.'
                 )}
               </dd>
             </div>
@@ -140,7 +142,7 @@ function StatusCard({ status, error, onRefresh, busy }) {
             <dd className="font-admin-data text-admin-ink-data">{localDateTime(status.lastDeliveryAt) ?? 'None'}</dd>
           </div>
           <div>
-            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Update queue</dt>
+            <dt className="font-admin-ui text-admin-base font-semibold text-admin-ink">Updates</dt>
             <dd className="font-admin-data text-admin-ink-data">
               Updates waiting: {status.queue.pending}{status.queue.pendingCapped ? '+' : ''}.
               {' '}Updates that failed: {status.queue.exhausted}{status.queue.exhaustedCapped ? '+' : ''}.
@@ -153,9 +155,9 @@ function StatusCard({ status, error, onRefresh, busy }) {
 }
 
 function MappingForm({ headers, mapping, onChange }) {
-  const options = [{ value: '', label: '— not in this file —' }, ...headers.map((h) => ({ value: h, label: h }))];
+  const options = [{ value: '', label: 'Not in this file' }, ...headers.map((h) => ({ value: h, label: MAPPING_FIELDS.find((field) => field.id === h)?.label || h }))];
   return (
-    <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
+    <div className="planner-fields grid grid-cols-1 gap-sm sm:grid-cols-2">
       {MAPPING_FIELDS.map((field) => (
         <SelectField
           key={field.id}
@@ -186,7 +188,7 @@ function PreviewTable({ preview }) {
             <tr>
               <GalleyHead align="end">Row</GalleyHead>
               <GalleyHead>Result</GalleyHead>
-              <GalleyHead>Ticket ID</GalleyHead>
+
               <GalleyHead>Email</GalleyHead>
               <GalleyHead>Reason</GalleyHead>
             </tr>
@@ -200,7 +202,7 @@ function PreviewTable({ preview }) {
                     {VERDICT_LABELS[row.verdict] ?? row.verdict}
                   </StatusBadge>
                 </td>
-                <td className="px-sm py-xs font-admin-data text-admin-ink-data">{row.externalId ?? '—'}</td>
+
                 <td className="px-sm py-xs font-admin-data text-admin-ink-data">{row.email ?? '—'}</td>
                 <td className="px-sm py-xs text-admin-ink-secondary">{(row.reasons ?? []).join('; ') || '—'}</td>
               </tr>
@@ -262,7 +264,7 @@ function ImportPanel({ call, onImported }) {
       const result = await call('ticketingImportCsv', { mapping, rows: parsed.rows, dryRun: true });
       setPreview(result);
     } catch (err) {
-      setNotice({ kind: 'error', message: err?.message ?? 'The preview could not be built.' });
+      setNotice({ kind: 'error', message: plannerMessage(err?.message ?? 'The preview could not be built.') });
     } finally {
       setBusy(false);
     }
@@ -281,7 +283,7 @@ function ImportPanel({ call, onImported }) {
       setParsed(null);
       onImported();
     } catch (err) {
-      setNotice({ kind: 'error', message: err?.message ?? 'The import did not finish. Nothing changed. Try again.' });
+      setNotice({ kind: 'error', message: plannerMessage(err?.message ?? 'The import did not finish. Nothing changed. Try again.') });
     } finally {
       setBusy(false);
     }
@@ -290,7 +292,7 @@ function ImportPanel({ call, onImported }) {
   return (
     <Panel
       title="Import tickets from a CSV"
-      description="Upload a file, map its columns onto email + order/ticket id (required), preview what would happen, then commit."
+      description="Choose a CSV file and match its columns, then review the tickets before importing."
     >
       <div className="flex flex-col gap-md">
         <div className="flex flex-col gap-3xs">
@@ -361,7 +363,7 @@ function TicketList({ call, refreshToken }) {
         setTickets((prev) => (append ? [...(prev ?? []), ...result.tickets] : result.tickets));
         setCursor(result.nextCursor);
       } catch (err) {
-        setError(err?.message ?? 'The ticket list could not be loaded.');
+        setError(plannerMessage(err?.message ?? 'The ticket list could not be loaded.'));
       } finally {
         setLoading(false);
       }
@@ -375,7 +377,7 @@ function TicketList({ call, refreshToken }) {
   }, [refreshToken]);
 
   return (
-    <Panel title="Tickets" description="Exact-match search over the imported and synced ticket set.">
+    <Panel title="Tickets" description="Find tickets by email address and status.">
       <form
         className="mb-md flex flex-wrap items-end gap-sm"
         onSubmit={(event) => {
@@ -471,7 +473,7 @@ export default function AdminTicketing() {
     try {
       setStatus(await call('getTicketingStatus', {}));
     } catch (err) {
-      setStatusError(err?.message ?? 'The ticketing status could not be loaded.');
+      setStatusError(plannerMessage(err?.message ?? 'The ticketing status could not be loaded.'));
     } finally {
       setStatusBusy(false);
     }
