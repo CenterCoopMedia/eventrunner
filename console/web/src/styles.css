@@ -365,6 +365,33 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
   }
 }
 
+/* Badger stands outside the widest page when there is enough left margin.
+   This copy stays still until a pointer hovers over it. */
+.margin-badger { display: none; }
+.margin-badger .wait-buddy, .margin-badger .wait-buddy * { animation: none; }
+@media (min-width: 84rem) {
+  .margin-badger {
+    display: block;
+    position: fixed;
+    top: 7rem;
+    right: calc(50% + 24rem);
+    width: 4rem;
+    height: 4.5rem;
+  }
+  .margin-badger .wait-buddy { width: 4rem; height: 4.5rem; transform-box: fill-box; transform-origin: 50% 70%; }
+  body:has(.setup) .margin-badger { right: calc(50% + 33rem); }
+  body:has(.console-workspace) .margin-badger { right: calc(50% + 37rem); }
+}
+@media (min-width: 84rem) and (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .margin-badger:hover .wait-buddy { animation: margin-badger-wiggle 500ms ease-in-out; }
+  @keyframes margin-badger-wiggle {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-5deg); }
+    50% { transform: rotate(4deg); }
+    75% { transform: rotate(-2deg); }
+  }
+}
+
 /* Organization and application workspaces share the console's palette,
    with more room for the directory and a secondary progress column. */
 .page:has(.console-workspace), body:has(.console-workspace) .masthead-inner {
@@ -429,9 +456,8 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 .application-address { display: grid; gap: 0.25rem; margin: 0 0 var(--space-lg); }
 .application-address > span { color: rgb(var(--ink-muted)); font-size: 0.875rem; }
 .application-address strong { font-weight: 600; }
-.application-actions { display: grid; justify-items: start; gap: var(--space-sm); margin-top: var(--space-lg); }
+.application-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-top: var(--space-lg); }
 .application-actions p { margin: 0; }
-.application-actions a:not(.button) { display: inline-flex; align-items: center; min-height: 44px; }
 .application-progress { border-top: 1px solid rgb(var(--rule)); padding-top: var(--space-lg); }
 .application-progress h2 { margin: 0 0 var(--space-lg); font-size: 1.0625rem; }
 .application-progress .stages { margin: 0; gap: var(--space-xs); }

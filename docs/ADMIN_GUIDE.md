@@ -97,6 +97,8 @@ Work down the controls in this order.
 
 The square icon also sets the app icon. A phone or a desktop browser shows the app icon when a visitor installs the site. To use your own app icon, upload a square PNG to the square icon slot, from 512 to 4096 pixels on a side. Any other value gives the neutral placeholder icon: An SVG, JPEG, or WebP file, an image that is not square, or a path that is not an uploaded file. The app icon changes at the next deploy. If the site publisher is on for your deployment, it also changes at the next content publish. Publishing the theme alone does not change it. When the placeholder is used, the deploy log names the reason. If the site publisher is on, its log after a content publish names the reason too. [`DEPLOY_RUNBOOK.md`](DEPLOY_RUNBOOK.md) §9 describes the site publisher.
 
+**Homepage hero image.** The picture at the top of your home page. In **Identity**, choose an image and add the required alt text. **Save image draft** saves it without making it public. **Save and publish image** saves and publishes it. **Publish the theme** applies theme changes right away; it does not publish this picture. You can also edit and publish the same picture in **Content → Home → Hero**.
+
 **Main brand colour.** One colour, as a hex value. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. Leave it blank to keep the site style's own colour.
 
 **Five more choices sit under Advanced.** Each site style also answers **Long read opening** (a drop cap, a standfirst, or plain, for the first paragraph of a page on the Long read template), **Quote device** (how a quoted sentence is set), **Directory style** (how the speaker shelf and the attendee index are set), **Section boundary** (whether a section heading carries its folio, and where), and **Table rules** (hairline rows, a ruled head, or the full grid). Every style comes with the answer that suits it, and each choice retunes values the style already declares.
@@ -228,6 +230,8 @@ A sponsor or partner can keep its own profile current. You give one account acce
 ## Content (Pages → Content editor)
 
 Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All eleven block types are editable here.
+
+**Home hero image.** Open **Home → Hero**. If there is no image block, the **Hero image** slot lets you choose an image and add the required alt text. Save the image draft, or save and publish it. The image then appears in the block list for normal editing. Hero holds at most four blocks. If all four places are in use, remove a block before adding the picture. **Settings → Branding → Identity → Homepage hero image** edits the same image.
 
 **A fact is a term and a description.** The **fact** block carries three parts: The term ("Where", "Who", "Format"), the fact itself (the hall's name, the audience), and one optional line under it (the address, a way to get there). It asks for no source and no finding, because a venue counts nothing. A run of facts renders as one ruled list of term and description pairs. Use it for anything that is true and is not a number.
 

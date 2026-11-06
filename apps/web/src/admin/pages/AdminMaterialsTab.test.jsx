@@ -566,7 +566,7 @@ describe('AdminMaterialsTab: page states', () => {
     await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
     expect(button).toHaveAttribute('aria-disabled', 'true');
     expect(button).not.toHaveAttribute('disabled');
-    expect(button).toHaveTextContent('Refreshing…');
+    expect(button).toHaveAccessibleName('Refreshing…');
     fireEvent.click(button);
     expect(callsTo('listAllSessionMaterials')).toHaveLength(2);
 
@@ -574,7 +574,7 @@ describe('AdminMaterialsTab: page states', () => {
       finish(ok({ materials: MATERIALS, truncated: false }));
     });
     expect(button).not.toHaveAttribute('aria-busy');
-    expect(button).toHaveTextContent('Refresh');
+    expect(button).toHaveAccessibleName('Refresh');
     expect(document.activeElement).toBe(button);
   });
 

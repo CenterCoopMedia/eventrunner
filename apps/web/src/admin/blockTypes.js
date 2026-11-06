@@ -187,11 +187,3 @@ export function blockTypeLabel(id) {
   return blockTypeFor(id)?.label ?? String(id);
 }
 
-/** One-line summary of the fields a block of this type carries. */
-export function blockTypeFieldSummary(id) {
-  const type = blockTypeFor(id);
-  if (!type) return '';
-  return type.fields
-    .map((f) => `${f.id} (${f.type}${f.required ? '' : ', optional'})`)
-    .join(' · ');
-}
