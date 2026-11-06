@@ -1398,6 +1398,131 @@
           </table>
           </div>
           <p>Stopping a build also leaves any <code>Deploy &lt;name&gt;</code> run it started going, so cancel that too. A retry won&#39;t redeploy a code fix on its own, because an earlier successful deploy of the same kind still counts. Run the deploy yourself and wait for it, then retry. For a failure before the full deploy, use <code>gh workflow run deploy.yml --ref main -f client=&lt;name&gt; -f provision=true -f bootstrap=true</code>. For a failure after it, use the plain redeploy in the table.</p>
+          <h3 id="126-deleting-a-console-built-site">12.6 Deleting a console-built site<a class="heading-anchor" href="#126-deleting-a-console-built-site" aria-label="Link to this section">#</a></h3>
+          <p>Run <strong>Decommission client</strong> in GitHub Actions on <code>main</code>, with the console
+          application id and mode <code>archive</code>, <code>restore</code>, <code>cancel-restore</code>, <code>purge-now</code>, or
+          <code>verify</code>. For <code>purge-now</code>, enter the application&#39;s exact site name in
+          <code>confirm_site</code>, for example <code>nclocal</code>. The script checks the name against the
+          application; an empty or different name stops the run.
+          It uses the builder&#39;s <code>provisioning</code> Environment, identity, App, and secrets.
+          It refuses forks and shares the builder&#39;s concurrency group per application.
+          Stop separate <code>Deploy &lt;name&gt;</code> runs first. Remove the name from
+          <code>AUTO_DEPLOY_ENVIRONMENTS</code> if it was added there.</p>
+          <ul>
+          <li><strong>Archive:</strong> Disables Firebase Hosting and saves the serving version and
+          previous application status. It keeps the project, data, buckets, DNS,
+          secrets, and connections. <code>purgeAfter</code> is exactly 168 hours after
+          <code>archivedAt</code>. Background services and charges continue. Allowed states are
+          <code>ready</code>, <code>launched</code>, <code>draft</code>, or a failed build. Failed builds in this console
+          usually have status <code>approved</code> or <code>building</code> with a failed build record.</li>
+          <li><strong>Restore:</strong> Start before <code>purgeAfter</code>. It releases the saved Hosting version
+          and restores the previous status. Retry a failed restore with the same
+          command; a restore started in time can finish after the deadline and blocks
+          scheduled purge until it finishes or is canceled. A draft without a deployed
+          version needs no deploy.</li>
+          <li><strong>Cancel restore:</strong> Clears <code>archive.restoring</code> on an archived application.
+          Use it if a restore cannot finish. It keeps the archive deadline and saved
+          version. It does not change Hosting; a failed restore can have released the
+          site before it lost its response. Check Hosting or proceed with purge.</li>
+          <li><strong>Purge:</strong> The daily schedule runs expired archives at 09:23 UTC. Each job
+          checks the deadline again after waiting for its concurrency group.
+          <code>purge-now</code> requires the site-name confirmation, skips the recovery window,
+          and clears a stuck restore claim. It can delete an application that is not
+          archived, subject to the existing active-build and connection-change guards.
+          Once purge starts, restore is refused.</li>
+          </ul>
+          <p>Purge removes resources in this order: Ticket webhooks; Postmark webhooks,
+          server and sender domain; console connection secrets; every Storage object
+          version and bucket; the default Firestore database; the Hosting custom domain;
+          site DNS records; the GitHub deployment Environment; the Google Cloud project;
+          then the console records. Environment variables and secrets go with the
+          Environment. Firebase apps, sign-in, deploy identities, identity pools, IAM
+          bindings, and client secrets go with the project. The shared billing account
+          and the client&#39;s ticket account remain. Google reports <code>DELETE_REQUESTED</code> and
+          completes its own deletion and retention process later.</p>
+          <p>An unbuilt application with no owned project or saved resource identities
+          removes only console data and connection secrets. Mail, DNS, and GitHub
+          Environment steps are skipped and reported. A matching resource name alone
+          does not prove ownership. Postmark discovery can use names only after the
+          project passes its application-label and folder checks. Saved Postmark IDs
+          and DNS records remain usable if the project is gone. The builder records
+          <code>resources.githubEnvironment</code> after its Environment ownership check or creation
+          claim; the Environment&#39;s owner variable is also checked before deletion.
+          The final console cleanup removes the application, build, signup links,
+          private connections, and OAuth state rows. It keeps an infrastructure-only
+          <code>console_deleted_sites/{applicationId}</code> tombstone with timestamps and completed
+          steps. Legal acceptance records and organization memberships keep their
+          existing retention rules. Built names stay reserved because Google never
+          reuses a project id; draft names are released.</p>
+          <p>Each step reads and checks its result. Retry a failed purge with the same id.
+          The script does not turn off Firestore delete protection or Storage retention.
+          <code>verify</code> prints a read-only JSON report for an application or tombstone. Purge
+          runs it at the end and fails for resources still present or reads it cannot
+          complete. When the project is <code>DELETE_REQUESTED</code> or absent, Hosting, buckets,
+          Firestore, the custom domain, and client secrets report
+          <code>pending-project-deletion</code>. Verification does not require child API reads that
+          can return 400 or 403 after project deletion. A completed project delete or its
+          tombstone checkpoint also permits 400 or 403 from the project read itself;
+          the report records <code>pending-project-deletion</code>. Denied reads without project
+          deletion evidence remain <code>unknown</code>. A completed <code>ticket-webhooks</code> tombstone
+          step is the deletion receipt; verification does not read its deleted account
+          token. An incomplete ticket step still needs the token. A successful purge
+          sets the tombstone&#39;s <code>verifiedAt</code>; this confirms the recorded cleanup and
+          project deletion request, not Google&#39;s final physical destruction.</p>
+          <p>DNS deletion touches only saved <code>resources.dnsRecords</code> entries. Type, name,
+          and content must match; when an entry has an ID, that ID must also match.
+          Other records at the same address remain. The builder saves record IDs after
+          each write and saves <code>{type, name, content}</code> before the call so a lost response
+          can be recovered. It keeps this inventory in
+          <code>console_builds.resources.dnsRecords</code>. For old builds, Hosting and Postmark
+          identify verification names to inspect, but cannot prove who created a
+          record. Unproven records stop purge before provider deletion. Confirm the
+          builder&#39;s original records, add only those exact entries to the private build&#39;s
+          <code>resources.dnsRecords</code>, and set <code>resources.dnsInventoryComplete</code> to <code>true</code> after
+          that review. Never add unrelated records.</p>
+          <p>Operators can also use the CLI with the workflow&#39;s credentials:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/decommission-client.cjs --application &lt;id&gt; --archive
+          node scripts/decommission-client.cjs --application &lt;id&gt; --restore
+          node scripts/decommission-client.cjs --application &lt;id&gt; --cancel-restore
+          node scripts/decommission-client.cjs --application &lt;id&gt; --purge
+          node scripts/decommission-client.cjs --application &lt;id&gt; --purge --now --confirm-site &lt;site-name&gt;
+          node scripts/decommission-client.cjs --application &lt;id&gt; --verify
+          node scripts/decommission-client.cjs --purge-due
+          </code></pre>
+          <p><strong>IAM:</strong> Section 12.1 makes the provisioner Owner of each project it creates.
+          With those grants still present, no extra Google IAM role is needed. Folder
+          <code>projectCreator</code> alone does not permit deletion. If Owner was removed, supply
+          these permissions on the client projects:</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Work</th><th>Required permissions or role</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Read and delete the project</td><td><code>resourcemanager.projects.get</code>, <code>resourcemanager.projects.delete</code>; <code>roles/resourcemanager.projectDeleter</code> supplies delete</td></tr>
+          <tr><td>Read and remove buckets and object versions</td><td><code>roles/storage.admin</code></td></tr>
+          <tr><td>Read and delete the default database</td><td><code>datastore.databases.get</code>, <code>datastore.databases.delete</code>; <code>roles/datastore.owner</code> supplies both</td></tr>
+          <tr><td>Disable/restore Hosting and delete custom domains</td><td><code>roles/firebasehosting.admin</code></td></tr>
+          <tr><td>Read the deployed ticket token and list client secrets</td><td><code>roles/secretmanager.secretAccessor</code>, <code>roles/secretmanager.viewer</code></td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>The existing console <code>roles/datastore.user</code> and conditional
+          <code>roles/secretmanager.admin</code> grants cover console records and <code>connection-</code>
+          secrets. Cloudflare DNS Edit, the Postmark account token, and the provisioner
+          App permissions in section 12.1 already cover their deletion calls.</p>
+          <p><strong>Required setup change:</strong> The WIF condition in section 12.1 permits only
+          <code>provision-client.yml</code>. Allow both workflows, keeping all other restrictions:</p>
+          <pre data-scroll-region data-scroll-label="Code example (text)"><code class="language-text">assertion.repository_owner_id == &#39;&lt;owner-id&gt;&#39; &amp;&amp;
+          assertion.repository_id == &#39;&lt;repository-id&gt;&#39; &amp;&amp;
+          assertion.ref == &#39;refs/heads/main&#39; &amp;&amp;
+          assertion.environment == &#39;provisioning&#39; &amp;&amp;
+          (assertion.workflow_ref == &#39;&lt;owner&gt;/&lt;repo&gt;/.github/workflows/provision-client.yml@refs/heads/main&#39; ||
+           assertion.workflow_ref == &#39;&lt;owner&gt;/&lt;repo&gt;/.github/workflows/decommission-client.yml@refs/heads/main&#39;)
+          </code></pre>
+          <p>Fake-service tests cover the deletion contract. A live rehearsal is still
+          needed to confirm provider deletion behavior and readback after Google marks
+          a project for deletion.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>docs/DEPLOY_RUNBOOK.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">

@@ -277,6 +277,13 @@ const computeAccount = (ctx) => `${ctx.projectNumber}-compute@developer.gservice
 const summary = (notes) => (notes.length > 0 ? notes.join('; ') : 'already right');
 const functionUrl = (ctx, name) => `https://${ctx.region}-${ctx.projectId}.cloudfunctions.net/${name}`;
 
+// Keep resource identities for deletion, including DNS proof after a provider
+// stops returning its pending verification records. Never store credentials.
+async function rememberResources(ctx, patch) {
+  ctx.resources = { ...ctx.resources, ...patch };
+  await ctx.recordRef.update({ resources: ctx.resources });
+}
+
 /** Store a value in the client project and let the running functions read it. */
 async function putClientSecret(ctx, id, value) {
   const secrets = ctx.clientSecrets;
@@ -301,14 +308,26 @@ async function dnsRecord(ctx, { type, name, content }) {
   const query = new URLSearchParams({ type, name: host, per_page: '100' });
   const listed = await call(ctx, `dns: read ${type} ${host}`, `${base}?${query}`, { headers });
   const records = listed.result || [];
-  if (records.some((record) => record.content.replace(/\.$/, '').replaceAll('"', '') === value)) return false;
-  const json = { type, name: host, content: value, ttl: 300, proxied: false };
-  // A name holds one CNAME, and other types can hold several values.
-  if (type === 'CNAME' && records[0]) {
-    await call(ctx, `dns: replace ${type} ${host}`, `${base}/${records[0].id}`, { method: 'PUT', headers, json });
-  } else {
-    await call(ctx, `dns: add ${type} ${host}`, base, { method: 'POST', headers, json });
+  const owned = ctx.resources?.dnsRecords || [];
+  const matches = (record) => record.type === type && record.name === host && record.content === value;
+  const existing = records.find((record) => record.type === type && record.name === host && record.content.replace(/\.$/, '').replaceAll('"', '') === value);
+  if (existing) {
+    // An existing value is ours only if a previous call saved its intent.
+    if (existing.id && owned.some((record) => matches(record) && !record.id)) {
+      await rememberResources(ctx, { dnsRecords: owned.map((record) => matches(record) && !record.id ? { ...record, id: existing.id } : record) });
+    }
+    return false;
   }
+  const json = { type, name: host, content: value, ttl: 300, proxied: false };
+  if (!owned.some(matches)) {
+    // Save the intent before the call: a lost response must remain removable.
+    await rememberResources(ctx, { dnsRecords: [...owned, { type, name: host, content: value }] });
+  }
+  // A name holds one CNAME, and other types can hold several values.
+  const replace = type === 'CNAME' && records[0];
+  const result = await call(ctx, `dns: ${replace ? 'replace' : 'add'} ${type} ${host}`, replace ? `${base}/${replace.id}` : base, { method: replace ? 'PUT' : 'POST', headers, json });
+  const id = result.result?.id || replace?.id;
+  if (id) await rememberResources(ctx, { dnsRecords: ctx.resources.dnsRecords.map((record) => matches(record) ? { ...record, id } : record) });
   return true;
 }
 
@@ -399,6 +418,7 @@ async function stepFirebase(ctx) {
     notes.push('created the Hosting site');
   }
   ctx.site = site.name.split('/').pop();
+  await rememberResources(ctx, { site: ctx.site, buckets: [ctx.bucket] });
 
   const webApps = `${FIREBASE}/projects/${projectId}/webApps`;
   let app = (await google(ctx, 'read the web apps', webApps)).apps?.[0];
@@ -638,6 +658,7 @@ async function stepEmail(ctx) {
     server = await postmarkAccount(ctx, 'create the mail server', '/servers', { method: 'POST', json: { Name: environment } });
     notes.push('created the mail server');
   }
+  await rememberResources(ctx, { postmarkServerId: server.ID });
   const serverToken = server.ApiTokens?.[0];
   if (!serverToken) throw new Error('the mail server answer held no token');
   if (await putClientSecret(ctx, 'EMAIL_PROVIDER_API_KEY', serverToken)) notes.push('stored the mail token');
@@ -671,6 +692,7 @@ async function stepEmail(ctx) {
     })).ID;
     notes.push('added the sender domain');
   }
+  await rememberResources(ctx, { postmarkDomainId: id });
   for (let poll = 0; poll < POSTMARK_POLLS; poll += 1) {
     const detail = await postmarkAccount(ctx, 'read the sender domain', `/domains/${id}`);
     if (detail.DKIMVerified && detail.ReturnPathDomainVerified) return summary(notes);
@@ -919,6 +941,7 @@ async function stepEnvironment(ctx) {
     throw new Error(`the Environment ${environment} was not made for this request`);
   }
   if (!existing) await ctx.recordRef.set({ environmentClaim: environment }, { merge: true });
+  await rememberResources(ctx, { githubEnvironment: environment });
   if (existing?.deployment_branch_policy?.custom_branch_policies !== true) {
     await call(ctx, 'create the Environment', base, {
       method: 'PUT',
@@ -1230,6 +1253,7 @@ async function provision({ appId, testMode = false, deps }) {
     ticketsKey: previous.exists ? previous.data().ticketsKey || null : null,
     ticketsChangedAt: previous.exists ? previous.data().ticketsChangedAt || null : null,
     stripeEndpointId: previous.exists ? previous.data().stripeEndpointId || null : null,
+    resources: previous.exists ? previous.data().resources || {} : {},
   };
   // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
   // closed after this sees a live run and is refused.
@@ -1251,6 +1275,7 @@ async function provision({ appId, testMode = false, deps }) {
       ticketsChangedAt: ctx.ticketsChangedAt,
       stripeEndpointId: ctx.stripeEndpointId,
       environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
+      resources: ctx.resources,
     });
     tx.update(ref, { buildStart: { state: 'started', at } });
     return true;
@@ -1267,6 +1292,11 @@ async function provision({ appId, testMode = false, deps }) {
     ctx.projectId = ctx.settings.projectId;
     ctx.region = ctx.settings.region;
     ctx.domain = siteAddress(ctx.name);
+    await rememberResources(ctx, {
+      projectId: ctx.projectId, region: ctx.region, domain: ctx.domain,
+      environment: ctx.settings.environment, gcpFolder: ctx.settings.gcpFolder,
+      dnsInventoryComplete: ctx.resources.dnsInventoryComplete ?? !previous.exists,
+    });
     ctx.clientSecrets = deps.clientSecrets(ctx.projectId);
     // The acceptance email already said we are building, so this move sends none.
     await moveStatus(ctx, 'approved', 'building');
