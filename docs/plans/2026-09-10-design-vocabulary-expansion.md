@@ -195,7 +195,7 @@ The brief's §2.4 list stands. This record adds the mechanical checks that a wav
 
 - No `transition: all`, no `animate-pulse`, no infinite keyframe, no hover rule outside the hover query, no duration outside the token set (the motion test).
 - No `rounded-full` on any element but the ring of a focus outline (the tag test, widened).
-- No text node directly above a heading (the eyebrow test, widened to the new devices).
+- No decorative eyebrow text node directly above a heading, following the caption, nameplate and form-label cases in brief §2.4 (the eyebrow test, widened to the new devices).
 - No zero-padded sequence number rendered by any device (the schedule number test, widened).
 - No decorative gradient: a gradient whose colour stops differ is rejected; a single-colour or transparent-stop gradient that draws a rule, a frame, a grid, or a texture is a device mechanic and passes. No `backdrop-filter`. No `box-shadow` anywhere; the Zine stamp is a flat layer, not a shadow (a stylesheet scan).
 - Every colour token in both mode blocks (the dark-mode test, extended to every new token).

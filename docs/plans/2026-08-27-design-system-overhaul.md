@@ -144,10 +144,11 @@ Two rules from §2.4 bind this section directly:
 - **The eyebrow ban is absolute.** No text sits directly above a heading. This holds for a folio in
   plain small-caps text. It holds at every size, on every surface, in every preset. A folio lives
   beside a rule at a section boundary, in a margin, or in a running header. Where a label must sit
-  near a title, put it below the title or beside it. Two things are not eyebrows: Metadata inside
+  near a title, put it below the title or beside it. Three things are not eyebrows: Metadata inside
   the rule-bounded nameplate block, which is part of the nameplate device wherever it sits inside
   it; and a form `<label>` above its own input, which is a control label and must never be
-  "corrected".
+  "corrected"; and a meaningful image caption or credit inside the homepage hero's figure below
+  640px, where it stays with its image before the title.
 - **The Zine stamp is the only box behind a box.** See §2.4.
 
 Use print devices with intent. Each device below has one job. Use a device where its job applies.
@@ -275,10 +276,11 @@ Reject these patterns:
   a heading is still an eyebrow, and a reviewer rejects it. The rule holds at every size, on every
   surface, and in every preset. A folio lives beside a rule at a section boundary, in a margin, or
   in a running header. Where a label must sit near a title, put it below the title or beside it.
-  Two things are not eyebrows. Metadata inside the rule-bounded nameplate block is part of the
+  Three things are not eyebrows. Metadata inside the rule-bounded nameplate block is part of the
   nameplate device, wherever it sits inside that block: The dates and the edition line above the
   event name are the nameplate, not an eyebrow. A form `<label>` above its own input is a control
-  label. Never "fix" a form label to satisfy this rule.
+  label. Never "fix" a form label to satisfy this rule. A meaningful image caption or credit
+  inside the homepage hero's figure below 640px stays with its image before the title.
 - **Decorative gradients.** No gradient blobs. No purple-heavy gradients. No gradient as a
   background event.
 - **Glassmorphism.** No frosted panels. No blurred translucent overlays used as style.
@@ -1261,6 +1263,6 @@ The approved Harborlight mockups supersede the earlier home lead and full-size m
 
 Each style has its own artwork and composition: newsroom editorial collage, civic architecture, broadsheet engraving, field-guide natural history, zine print collage, and Atlas waterfront transit in day and night versions. Atlas carries a yellow route through the hero and restrained stops along the schedule. Real client logos remain supported; an absent logo does not gain a decorative square.
 
-A surface-color opacity veil is permitted only within the illustrated EventHero to keep live text readable over artwork. It is not permitted as decoration elsewhere. Below 640px, Home places the image and its caption before the event title, details, and actions in both visual and reading order, in every style. A meaningful caption or credit stays inside the image's figure on phones, including before the Home h1; this is the narrow image-caption exception to the eyebrow ban. Schedule keeps its compact copy before the image. Safe image URLs, required alt text, focal points, captions, live text, editor-authored actions, keyboard access, and one h1 per page remain required. Theme variations use declared component tokens.
+A surface-color opacity veil is permitted only within the illustrated EventHero to keep live text readable over artwork. It is not permitted as decoration elsewhere. Below 640px, Home places the image and its caption before the event title, details, and actions in both visual and reading order, in every style. A meaningful caption or credit stays inside the image's figure on phones, including before the Home h1, as specified in the eyebrow rule above. Schedule keeps its compact copy before the image. Safe image URLs, required alt text, focal points, captions, live text, editor-authored actions, keyboard access, and one h1 per page remain required. Theme variations use declared component tokens.
 
 The static demo has a full-screen preview control. It hides demo controls while exploring, has an always-available exit, supports Escape, and preserves the selected style and route. A client build includes no demo controls. Fictional content keeps its clear demo disclosure outside preview without repeated bracketed prefixes in every label.

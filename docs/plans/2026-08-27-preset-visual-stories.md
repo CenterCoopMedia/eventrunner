@@ -33,11 +33,12 @@ Four rules apply to every page below, so they are stated once here:
 - **Nothing sits above a title.** No eyebrow-position text anywhere, in any preset, at any size. A
   plain small-caps folio stacked above a headline is still an eyebrow and is still rejected. This
   rule has no exceptions. A folio lives beside a rule at a section boundary, in a margin, or in a
-  running header. If a label needs to be near a title, put it below the title or beside it. Two
+  running header. If a label needs to be near a title, put it below the title or beside it. Three
   things are not eyebrows. Metadata inside the rule-bounded nameplate block is part of the nameplate
   device, wherever it sits inside it: The dates and the edition line are the nameplate. A form
-  `<label>` above its own input is a control label, and a builder must never "fix" it. Brief §2.4
-  carries the full rule.
+  `<label>` above its own input is a control label, and a builder must never "fix" it. A meaningful
+  image caption or credit inside the homepage hero's figure below 640px stays with its image before
+  the title. Brief §2.4 carries the full rule.
 - **Dark mode is a place, not a filter.** Each story names what dark mode *is* in its world. The
   palette is authored, never inverted (§3.3).
 
@@ -857,7 +858,7 @@ glance.
 | §9 settled type | All three pairings are recorded in brief §9: Zine (Karrik, with Bagnard and Avara bundled as alternates), Field Guide (Besley, Vollkorn, IBM Plex Mono), Atlas (Overpass, Libre Franklin, Overpass Mono). Nothing in §9 is open. |
 | §3.2 font roles | Every story assigns all four roles. A preset may point `data` and `mono` at one family; Zine, Field Guide, and Atlas do, and Broadsheet runs its agate serif in both. |
 | §2.4 Zine stamp | The stamp is built against the six tests in brief §2.4, "Exception two". No other story uses an offset layer. |
-| §2.4 eyebrows | No story places text above a title. Folios appear only beside a rule at a section boundary, in a margin, or in a running header. Nameplate metadata sits inside the rule-bounded nameplate block. |
+| §2.4 eyebrows | No story places decorative eyebrow text above a title. Folios appear only beside a rule at a section boundary, in a margin, or in a running header. Nameplate metadata sits inside the rule-bounded nameplate block; meaningful phone homepage hero captions stay inside their image figure before the title. |
 | CJS2026 findings | Tonal grounds, near-black ink, and tint-based elevation apply to all six. The stamp layer and the marginalia are Zine only, with a restrained pencil line in Field Guide. The other four decline both in one stated line. |
 | Schedule data model | All six assign a role to nested parent/child sessions, lettered tracks, and the print view. |
 | §3.4 / §5.2 options | Every option in part 6 remaps existing tokens only. No option adds a property name, a class, or a component type. The pickers sit in the theme editor beside the preset picker; raw per-token override stays the advanced path. |
