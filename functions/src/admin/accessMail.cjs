@@ -55,7 +55,10 @@ async function sendAccessInstructions({ db, getConfig, sendEmail, email, onceKey
       template, override, config, now: () => new Date(now()),
       tokenValues: {
         access_email: email, access_role: account.tier, admin_url: url,
-        access_ends: account.expiresAtMs === null ? '' : new Date(account.expiresAtMs).toISOString(),
+        access_ends: account.expiresAtMs === null ? '' : new Intl.DateTimeFormat('en-US', {
+          timeZone: config?.event?.timezone || 'UTC', year: 'numeric', month: 'short', day: 'numeric',
+          hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+        }).format(new Date(account.expiresAtMs)),
       },
     });
     if (rendered.usedFallback) log.warn('Admin access instructions used shipped wording', { reason: 'invalid-template-override' });

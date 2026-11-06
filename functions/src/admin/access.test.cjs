@@ -50,7 +50,8 @@ const req = (token, body = {}, method = 'POST') => ({
 /** A db seeded with one bootstrap document, and a getConfig that mirrors it. */
 function world(bootstrap = { adminEmails: [OPS, SECOND_OPS], staffEmails: [STAFF], createdAt: 'seeded' }) {
   const event = {
-    name: 'Community Summit', sender: { email: 'events@example.org', name: 'Summit team' },
+    name: 'Community Summit', timezone: 'America/New_York',
+    sender: { email: 'events@example.org', name: 'Summit team' },
     legal: { postalAddressHtml: 'Summit team<br>1 Main Street', supportEmail: 'help@example.org' },
   };
   const db = makeFakeDb({ 'config/bootstrap': bootstrap, 'config/event': event });
@@ -848,7 +849,7 @@ test('new grant sends once with the configured admin link, exact address, role, 
   assert.equal(mail.Tag, 'admin.access_granted');
   assert.match(mail.HtmlBody, /href="https:\/\/summit.example.org\/admin"/);
   for (const body of [mail.HtmlBody, mail.TextBody]) {
-    for (const value of ['Community Summit', email, 'staff', expiresAt, 'Request an emailed sign-in code', '1 Main Street']) {
+    for (const value of ['Community Summit', email, 'staff', 'Sep 23, 2026, 6:01 AM EDT', 'Request an emailed sign-in code', '1 Main Street']) {
       assert.ok(body.includes(value), value);
     }
     assert.doesNotMatch(body, /Google|one-time invitation/);
