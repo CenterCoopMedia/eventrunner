@@ -24,6 +24,24 @@ export default function EventHero({
   // the full width at any size, so the slot is stated as the viewport.
   const art = useSizedImageSources(src);
   const caption = typeof image?.caption === 'string' ? image.caption.trim() : '';
+  const figure = src ? <figure className="event-hero__figure">
+    <div className="event-hero__media">
+      <img className="event-hero__art" src={art.src} srcSet={art.srcSet} sizes={art.srcSet ? '100vw' : undefined} onError={art.onError} alt={alt} style={{ objectPosition: focalPosition(image), ...(art.pending ? { visibility: 'hidden' } : null) }} fetchpriority="high" />
+      {image.demoTransitSign ? (
+        <div className="event-hero__sign" aria-hidden="true">
+          <WayfindingIcon name="transit" /><span>→</span>
+        </div>
+      ) : null}
+      <svg className="event-hero__route" viewBox="0 0 1200 110" preserveAspectRatio="none" fill="none" aria-hidden="true">
+        <path d="M-10 82H675C722 82 720 30 767 30H1210" />
+        <circle cx="185" cy="82" r="9" /><circle cx="545" cy="82" r="9" /><circle cx="1040" cy="30" r="9" />
+      </svg>
+      <svg className="event-hero__press" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+        <circle cx="50" cy="50" r="35" /><path d="M50 4V22M50 78V96M4 50H22M78 50H96M35 50H65M50 35V65" />
+      </svg>
+    </div>
+    {caption ? <figcaption className="event-hero__caption">{caption}</figcaption> : null}
+  </figure> : null;
   return (
     <div
       className={[
@@ -33,6 +51,8 @@ export default function EventHero({
       ].filter(Boolean).join(' ')}
     >
       {src ? <div className="event-hero__veil" aria-hidden="true" /> : null}
+      {/* Phone reading order follows the artwork on Home; Schedule keeps its compact lead. */}
+      {compact ? null : figure}
       <div className="event-hero__copy">
         {name ? <Name id={nameId} className="event-hero__title font-heading">{name}</Name> : null}
         {dates || place ? (
@@ -45,24 +65,7 @@ export default function EventHero({
         {typeof tagline === 'string' && tagline.trim() ? <p className="event-hero__tagline font-body">{tagline}</p> : null}
         {children}
       </div>
-      {src ? <figure className="event-hero__figure">
-        <div className="event-hero__media">
-          <img className="event-hero__art" src={art.src} srcSet={art.srcSet} sizes={art.srcSet ? '100vw' : undefined} onError={art.onError} alt={alt} style={{ objectPosition: focalPosition(image), ...(art.pending ? { visibility: 'hidden' } : null) }} fetchpriority="high" />
-      {src && image.demoTransitSign ? (
-        <div className="event-hero__sign" aria-hidden="true">
-          <WayfindingIcon name="transit" /><span>→</span>
-        </div>
-      ) : null}
-      <svg className="event-hero__route" viewBox="0 0 1200 110" preserveAspectRatio="none" fill="none" aria-hidden="true">
-        <path d="M-10 82H675C722 82 720 30 767 30H1210" />
-        <circle cx="185" cy="82" r="9" /><circle cx="545" cy="82" r="9" /><circle cx="1040" cy="30" r="9" />
-      </svg>
-      <svg className="event-hero__press" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-        <circle cx="50" cy="50" r="35" /><path d="M50 4V22M50 78V96M4 50H22M78 50H96M35 50H65M50 35V65" />
-      </svg>
-        </div>
-        {caption ? <figcaption className="event-hero__caption">{caption}</figcaption> : null}
-      </figure> : null}
+      {compact ? figure : null}
     </div>
   );
 }
