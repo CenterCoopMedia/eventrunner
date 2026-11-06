@@ -37,7 +37,7 @@ Staff access can end at a set time, for example for a demo account. Until that t
 
 ## Set up your event: The launch checklist
 
-Open **Set up your event**, under **Overview** on the rail. It is a stepper: one step at a time, with the list of every step beside it (on a phone, select **Show all 7 steps**). It opens on the first step that is not done. **Back** and **Next** move between steps, and each step has its own address, for example `/admin/setup/logos`. These are the steps that must be done before the site goes live:
+Open **Set up your event**, under **Overview** on the rail. It is a stepper: one client task at a time, with the list of tasks beside it (on a phone, select **Show all 6 steps**). It opens on the first step that is not done. **Back** and **Next** move between steps, and each step has its own address, for example `/admin/setup/logos`. The progress count includes only your tasks and tasks you share with the Event Runner team:
 
 | Step | Who does it | Where |
 | --- | --- | --- |
@@ -47,15 +47,16 @@ Open **Set up your event**, under **Overview** on the rail. It is a stepper: one
 | Approve the privacy policy and terms | You | The privacy policy in Content, then this page |
 | Set up your event email | You and the Event Runner team | The Event Runner team tells you if anything is needed from you |
 | Connect ticket sales | You | The Event Runner console. Ticketing shows the result |
-| Turn on Google sign-in | The Event Runner team | Nothing to do in the admin panel |
 
-Each step shows **Done** or **To do**. The server decides the state. It uses the same check that the Event Runner team runs. Select **Check again** after you finish a step.
+Each task shows **Done** or **To do**. The server decides the state. It uses the same check that the Event Runner team runs. Select **Check again** after you finish a task.
 
-**Approve the privacy policy and terms.** The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens the **Approve the privacy policy and terms** step, ticks **Our counsel reviewed and approved the privacy policy and the terms**, and selects **Mark the review complete**. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.
+**Hosting status** shows Google sign-in and any other hosting checks separately, as **Ready** or **Awaiting Event Runner setup**. The Event Runner team manages these checks. They are read-only, have no action for you, and do not count as numbered tasks.
+
+**Approve the privacy policy and terms.** The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens the **Approve the privacy policy and terms** step, ticks **Our counsel reviewed and approved the privacy policy and the terms**, and selects **Approve**. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.
 
 The first-visit tour of the admin panel does not open over this page. It opens on the next admin page you visit.
 
-When every step is done, your site is ready to share.
+Your site is ready to share only when every client task and hosting check is ready. If your tasks are done but a hosting check is pending, the page says **Awaiting Event Runner setup**. During a check, or when a check fails, the page does not announce that the site is ready to share. A failed refresh keeps the last results visible with a warning.
 
 ## Set the site up: Six steps
 
