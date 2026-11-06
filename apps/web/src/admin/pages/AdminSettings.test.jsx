@@ -278,12 +278,13 @@ describe('event settings', () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
 
-    // The sender is the operator's: readable, not editable, and said so.
-    for (const label of ['Sender email', 'Sender name', 'Reply-to']) {
+    // Staff can read the sender details. The from address is text for every role.
+    for (const label of ['Sender name', 'Reply-to']) {
       expect(screen.getByLabelText(label)).toHaveAttribute('readonly');
     }
-    expect(screen.getByLabelText('Sender email')).toHaveValue('summit@example.org');
-    expect(screen.getByText('The From address every transactional email uses. You can read it here. An operator changes it.')).toBeInTheDocument();
+    expect(screen.getByText('summit@example.org')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Sender email' })).toBeNull();
+    expect(screen.getByText('To send from a different address, contact us.')).toBeInTheDocument();
 
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.change(screen.getByLabelText('Event name'), {
@@ -301,16 +302,19 @@ describe('event settings', () => {
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
   }, 20000);
 
-  it('lets an operator edit the sender, and sends it', async () => {
+  it('shows the from address as text and lets an operator edit only the sender name and reply-to', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', LIVE_EVENT);
-    expect(screen.getByLabelText('Sender email')).not.toHaveAttribute('readonly');
-    expect(screen.queryByText(/You can read it here/)).toBeNull();
+    expect(screen.getByText('summit@example.org')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Sender email' })).toBeNull();
+    expect(screen.getByText('To send from a different address, contact us.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Sender name')).not.toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Reply-to')).not.toHaveAttribute('readonly');
     fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
     fireEvent.change(screen.getByLabelText('Sender name'), { target: { value: 'The Summit desk' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0).event.sender).toEqual({ email: 'summit@example.org', name: 'The Summit desk', replyTo: null });
+    expect(bodyOf(0).event.sender).toEqual({ name: 'The Summit desk', replyTo: null });
   }, 20000);
 
   // The event's concurrent tracks (design brief §4.6): a letter and a name,
@@ -795,16 +799,16 @@ describe('event settings', () => {
       errorResponse(
         400,
         'bad-request',
-        'timezone: must be a valid IANA timezone (got "Mars/Olympus"); sender.email: must be an email address',
+        'timezone: must be a valid IANA timezone (got "Mars/Olympus"); sender.replyTo: must be null or an email address',
       ),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Timezone: must be a valid IANA timezone (got "Mars/Olympus")');
-    expect(alert).toHaveTextContent('Email: must be an email address');
+    expect(alert).toHaveTextContent('Reply to: must be null or an email address');
     expect(screen.getByRole('combobox', { name: 'Time zone' })).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Sender email')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Reply-to')).toHaveAttribute('aria-invalid', 'true');
   });
 
   // THE REGISTRATION ACTION (M7 issue 8). Two fields drive one control the
@@ -1398,4 +1402,50 @@ describe('milestones and the registration goal', () => {
     expect(payload).not.toHaveProperty('sender');
     expect(await screen.findByText(/picks the change up live/i)).toBeInTheDocument();
   }, 20000);
+});
+
+
+describe('feature switches on the pages that use them', () => {
+  it.each([
+    ['/admin/badges', 'badges', 'Attendee badges'],
+    ['/admin/badges', 'customBadges', 'Custom badges'],
+    ['/admin/live-updates', 'liveUpdates', 'Live updates'],
+    ['/admin/change-requests', 'changeRequests', 'Change requests'],
+    ['/admin/updates', 'updates', 'Written updates'],
+    ['/admin/updates/new/update', 'updates', 'Written updates'],
+  ])('saves %s through the Features endpoint in both directions', async (path, key, label) => {
+    await renderAt(path);
+    const toggle = await screen.findByRole('switch', { name: label });
+    expect(toggle).toBeDisabled();
+    await pushConfig('features', { schedule: true, speakers: false, [key]: false });
+    expect(toggle).toBeEnabled();
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
+    fireEvent.click(toggle);
+    await screen.findByText(`${label} setting saved.`);
+    expect(String(fetch.mock.calls[0][0])).toMatch(/\/updateFeatures$/);
+    expect(bodyOf(0).features).toEqual(Object.fromEntries(KNOWN_FEATURE_KEYS.map((feature) => [feature, feature === 'schedule' || feature === key])));
+    expect(toggle).not.toBeChecked();
+    await pushConfig('features', { ...bodyOf(0).features });
+    expect(toggle).toBeChecked();
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
+    fireEvent.click(toggle);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).features[key]).toBe(false);
+    expect(bodyOf(1).features.schedule).toBe(true);
+  });
+
+  it.each([
+    ['/admin/badges', 'Attendee badges'],
+    ['/admin/live-updates', 'Live updates'],
+    ['/admin/change-requests', 'Change requests'],
+    ['/admin/updates', 'Written updates'],
+    ['/admin/updates/new/update', 'Written updates'],
+  ])('shows a read-only feature state to staff on %s', async (path, label) => {
+    operatorProbeShouldSucceed = false;
+    await renderAt(path);
+    await pushConfig('features', {});
+    expect(screen.queryByRole('switch', { name: label })).toBeNull();
+    expect(screen.getByText(`${label}: Off. Only an operator can change this setting.`)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });

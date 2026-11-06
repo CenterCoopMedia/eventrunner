@@ -140,7 +140,8 @@ function demoEvent() {
   const built = buildConfigDocs({ answers: DEMO_ANSWERS, tierA: DEMO_TIER_A, now: () => Date.parse(DEMO_SEEDED_AT) });
   if (!built.ok) throw new Error(`demo fixture no longer validates: ${built.errors.join('; ')}`);
   const config = built.docs;
-  Object.assign(config.features, { updates: true, attendeeDirectory: false, icsExport: false });
+  // Keep this past-event demo’s existing choices separate from new-site defaults.
+  Object.assign(config.features, { updates: true, attendeeDirectory: false, icsExport: false, badges: false, customBadges: false, liveUpdates: false, changeRequests: false });
   Object.assign(config.theme.logos, { primary: 'branding/nclocal-logo.png', mark: 'branding/nclocal-logo.png', footer: 'branding/nclocal-logo.png', ogDefault: 'branding/nclocal-og.png', favicon: 'branding/nclocal-favicon.svg' });
   Object.assign(config.event, { historicalDemo: true, announcedAt: '2026-01-01T12:00:00', archivedAt: '2026-03-28T00:00:00' });
   config.event.seo.defaultOgImagePath = 'branding/nclocal-og.png';
@@ -153,7 +154,6 @@ function demoEvent() {
     ...page, label: labels[page.id] ?? page.label, visible: true, seeded: true,
     sections: page.sections.filter((section) => !['stats', 'history', 'sponsor_packages'].includes(section.id)).map((section) => {
       if (section.id === 'sponsors') return { ...section, label: 'Historical partners' };
-      if (section.id === 'recap_media') return { ...section, allowedBlocks: [...section.allowedBlocks, 'image'] };
       return section;
     }),
   }));

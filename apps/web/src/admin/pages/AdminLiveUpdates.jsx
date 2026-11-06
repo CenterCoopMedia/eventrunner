@@ -11,7 +11,6 @@
 // to admins only: the list names it, and saving it again gives it one.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
-import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
 import {
@@ -26,6 +25,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import FeatureSwitch from '../components/FeatureSwitch.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -57,7 +57,6 @@ function audienceBadge(audience) {
 }
 
 export default function AdminLiveUpdates() {
-  const { features } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
 
@@ -190,12 +189,7 @@ export default function AdminLiveUpdates() {
         identifiers={rows ? `${ordered.length} update${ordered.length === 1 ? '' : 's'}` : null}
       />
 
-      {features?.liveUpdates ? null : (
-        <Notice
-          tone="caution"
-          message="The live updates feature is currently off, so this feed is not shown to visitors. Turn it on under Features."
-        />
-      )}
+      <FeatureSwitch featureKeys={['liveUpdates']} />
 
       {withoutAudience > 0 ? (
         <Notice

@@ -704,3 +704,24 @@ test('cmsDeletePage rejects a malformed id before touching the db', async () => 
   await createDeletePageHandler(deps())(adminReq({ id: '../config' }), res);
   assert.equal(res.statusCode, 400);
 });
+
+
+test('validatePageDoc accepts empty allowedBlocks on custom sections', () => {
+  const page = validPage();
+  page.sections[0].allowedBlocks = [];
+  assert.deepEqual(validatePageDoc(page), { ok: true, errors: [] });
+});
+
+test('validatePageDoc retains built-in block restrictions in data and default blocks', () => {
+  const page = validPage({ id: 'home', path: '/', systemPage: true });
+  page.sections[0].id = 'hero';
+  page.sections[0].allowedBlocks = ['text', 'cta', 'image'];
+  assert.equal(validatePageDoc(page).ok, true);
+  page.sections[0].allowedBlocks = [];
+  assert.equal(validatePageDoc(page).ok, false);
+  page.sections[0].allowedBlocks = ['richtext'];
+  assert.ok(validatePageDoc(page).errors.some((error) => error.startsWith('sections[0].allowedBlocks[0]:')));
+  page.sections[0].allowedBlocks = ['text', 'cta', 'image'];
+  page.sections[0].defaultBlocks[0].blockType = 'richtext';
+  assert.ok(validatePageDoc(page).errors.some((error) => error.startsWith('sections[0].defaultBlocks[0].blockType:')));
+});

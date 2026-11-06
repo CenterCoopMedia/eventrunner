@@ -19,6 +19,8 @@ vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
 const showToastMock = vi.fn();
 vi.mock('../../contexts/ToastContext.jsx', () => ({ useToast: () => ({ showToast: showToastMock }) }));
 
+vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ isOperator: false }) }));
+
 let features = { liveUpdates: true };
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ features }) }));
 
@@ -83,7 +85,7 @@ describe('AdminLiveUpdates', () => {
     features = { liveUpdates: false };
     render(<AdminLiveUpdates />);
     pushRows([]);
-    expect(screen.getByText(/currently off/)).toBeInTheDocument();
+    expect(screen.getByText('Live updates: Off. Only an operator can change this setting.')).toBeInTheDocument();
     features = { liveUpdates: true };
   });
 

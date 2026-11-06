@@ -160,6 +160,7 @@ function makeDeps(seed = {}) {
   // address the tests use.
   const db = fakeDb({
     'config/bootstrap': { adminEmails: [ADMIN_EMAIL], staffEmails: ['staff@example.org'] },
+    'config/event': validEvent(),
     ...seed,
   });
   return {
@@ -432,7 +433,7 @@ test('client-supplied updatedAt/updatedBy are stripped, not trusted', async () =
   assert.deepEqual(written.updatedAt, new Date(NOW));
 });
 
-test('a sender email change clears the verification record', async () => {
+test('a sender email change is refused and keeps the verification record', async () => {
   const deps = makeDeps({
     'config/event': {
       ...validEvent(),
@@ -449,13 +450,15 @@ test('a sender email change clears the verification record', async () => {
   });
   const res = makeRes();
   await createUpdateEventConfigHandler(deps)(makeReq({ event: validEvent() }), res);
-  assert.equal(res.statusCode, 200);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.message, 'To send from a different address, contact us.');
   const written = deps.db.docs.get('config/event');
-  assert.equal(written.sender.email, 'summit@example.org', 'editable sender fields still replace');
-  assert.equal(written.sender.domainVerified, false);
-  assert.equal(written.sender.domainVerifiedAt, null);
-  assert.equal(written.sender.domainVerifiedBy, null);
-  assert.equal(written.sender.domainVerifiedDomain, null);
+  assert.equal(written.sender.email, 'old@x.org');
+  assert.equal(written.sender.domainVerified, true);
+  assert.equal(written.sender.domainVerifiedAt, '2026-02-02T00:00');
+  assert.equal(written.sender.domainVerifiedBy, 'provider-check');
+  assert.equal(written.sender.domainVerifiedDomain, 'x.org');
+  assert.equal(deps.db.writes.length, 0);
 });
 
 test('a case-only sender email change keeps the verification record', async () => {
@@ -598,7 +601,7 @@ test('the shared validator runs on the MERGED result, not the partial payload', 
 });
 
 test('a partial payload onto an empty store is rejected — the merged doc must be complete', async () => {
-  const deps = makeDeps();
+  const deps = makeDeps({ 'config/event': undefined });
   const res = makeRes();
   await createUpdateEventConfigHandler(deps)(makeReq({ event: { name: 'Only a name' } }), res);
   assert.equal(res.statusCode, 400);
@@ -692,7 +695,7 @@ test('an unknown legal or social field is refused by name, and nothing is writte
   assert.equal(deps.db.writes.length, 0);
 });
 
-test('a first event write defaults the verification pair, never omits it', async () => {
+test('a save of a provisioned event defaults a missing verification pair', async () => {
   const deps = makeDeps();
   const res = makeRes();
   await createUpdateBadgesHandler(deps)(makeReq({ badges: validBadges() }), makeRes());
@@ -867,20 +870,60 @@ test('a staff event save that CHANGES sender is refused by name, and nothing is 
     res,
   );
   assert.equal(res.statusCode, 403);
-  assert.equal(res.body.error.message, 'sender: operator access required');
+  assert.equal(res.body.error.message, 'To send from a different address, contact us.');
   assert.equal(deps.db.docs.get('config/event').tagline, undefined);
   assert.equal(deps.db.writes.length, 0);
 });
 
-test('an operator may still write sender on config/event', async () => {
+test('an operator may still change the sender name and reply-to', async () => {
   const deps = tieredDeps({ 'config/event': validEvent() });
   const res = makeRes();
   await createUpdateEventConfigHandler(deps)(
-    makeReq({ event: { sender: { email: 'ops@example.org', name: 'Ops' } } }, { token: 'admin-token' }),
+    makeReq({ event: { sender: { name: 'Ops', replyTo: 'ops@example.org' } } }, { token: 'admin-token' }),
     res,
   );
   assert.equal(res.statusCode, 200);
-  assert.equal(deps.db.docs.get('config/event').sender.email, 'ops@example.org');
+  assert.equal(deps.db.docs.get('config/event').sender.email, 'summit@example.org');
+  assert.equal(deps.db.docs.get('config/event').sender.name, 'Ops');
+  assert.equal(deps.db.docs.get('config/event').sender.replyTo, 'ops@example.org');
+});
+
+test('no admin role may change or clear the from address or mailing address', async () => {
+  const stored = validEvent({ legal: { postalAddressHtml: '<p>1 Example Street</p>' } });
+  for (const token of ['admin-token', 'staff-token']) {
+    for (const [event, message] of [
+      [{ sender: { email: 'other@example.org' } }, 'To send from a different address, contact us.'],
+      [{ sender: { email: null } }, 'To send from a different address, contact us.'],
+      [{ sender: { email: '' } }, 'To send from a different address, contact us.'],
+      [{ sender: null }, 'To send from a different address, contact us.'],
+      [{ legal: { postalAddressHtml: '2 Other Street' } }, 'To change your mailing address, contact us.'],
+      [{ legal: { postalAddressHtml: null } }, 'To change your mailing address, contact us.'],
+      [{ legal: { postalAddressHtml: '' } }, 'To change your mailing address, contact us.'],
+      [{ legal: null }, 'To change your mailing address, contact us.'],
+    ]) {
+      const deps = tieredDeps({ 'config/event': stored });
+      const res = makeRes();
+      await createUpdateEventConfigHandler(deps)(makeReq({ event: { ...event, tagline: 'Must not save' } }, { token }), res);
+      assert.equal(res.statusCode, 403);
+      assert.equal(res.body.error.message, message);
+      assert.deepEqual(deps.db.docs.get('config/event'), stored);
+      assert.equal(deps.db.writes.length, 0);
+    }
+  }
+});
+
+test('both roles may carry an unchanged mailing address and edit other legal fields', async () => {
+  const stored = validEvent({ legal: { postalAddressHtml: '<p>1 Example Street</p>', supportEmail: 'old@example.org' } });
+  for (const token of ['admin-token', 'staff-token']) {
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: { legal: {
+      postalAddressHtml: stored.legal.postalAddressHtml, supportEmail: 'help@example.org',
+    } } }, { token }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(deps.db.docs.get('config/event').legal.postalAddressHtml, stored.legal.postalAddressHtml);
+    assert.equal(deps.db.docs.get('config/event').legal.supportEmail, 'help@example.org');
+  }
 });
 
 /** The whole editable slice the Event form sends (AdminEventSettings toPayload), for `stored`. */

@@ -218,9 +218,9 @@ describe('the updates list', () => {
   it('says so while updates are off, since the site does not show them', async () => {
     await renderAt('/admin/updates');
     pushConfig('features', { updates: false });
-    expect(screen.getByText(/Updates are off for this event, so the site does not show them\. An operator can turn them on under Features\./)).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Written updates' })).not.toBeChecked();
     pushConfig('features', { updates: true });
-    expect(screen.queryByText(/Updates are off for this event/)).toBeNull();
+    expect(screen.getByRole('switch', { name: 'Written updates' })).toBeChecked();
   });
 });
 
@@ -572,7 +572,7 @@ describe('the update editor', () => {
     pushUpdates([PUBLISHED], [PUBLISHED_CLEAN]);
     pushConfig('features', { updates: false });
     await screen.findByRole('heading', { level: 1, name: PUBLISHED.title });
-    expect(screen.getByText(/Updates are off for this event/)).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Written updates' })).not.toBeChecked();
     expect(screen.queryByRole('link', { name: /Preview draft/ })).toBeNull();
   });
 });

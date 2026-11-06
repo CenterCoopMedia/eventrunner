@@ -7,6 +7,7 @@
 // down to the accepted key set before it goes back over the wire — otherwise
 // every edit of a seeded page would fail with "seeded: unknown field".
 import { lockEditorialId } from './editorialId.js';
+import { builtInSectionBlockTypes } from 'shared/page';
 import { recordStateOf } from './recordState.js';
 import { DEFAULT_SECTION_SLOT, slotOf, statedPageLayout } from '../lib/pageLayout.js';
 import { templateOf } from '../lib/pageTemplates.js';
@@ -99,7 +100,7 @@ export function toEditablePage(doc) {
             id: s.id ?? '',
             label: s.label ?? '',
             description: typeof s.description === 'string' ? s.description : '',
-            allowedBlocks: Array.isArray(s.allowedBlocks) ? [...s.allowedBlocks] : [],
+            allowedBlocks: [...(builtInSectionBlockTypes(base, s) ?? [])],
             maxBlocks: Number.isInteger(s.maxBlocks) ? s.maxBlocks : 1,
             reorderable: s.reorderable !== false,
             slot: slotOf(s),
@@ -124,13 +125,13 @@ export function blankPage() {
   return toEditablePage({ id: '', label: '', path: '', order: 0, visible: true });
 }
 
-/** A blank section, pre-allowing the plainest two block types. */
+/** A blank section accepts every block type. */
 export function blankSection() {
   return {
     id: '',
     label: '',
     description: '',
-    allowedBlocks: ['text', 'richtext'],
+    allowedBlocks: [],
     maxBlocks: 6,
     reorderable: true,
     slot: DEFAULT_SECTION_SLOT,
@@ -179,7 +180,7 @@ export function toPagePayload(page) {
         id: section.id ?? '',
         label: section.label ?? '',
         description: section.description ? section.description : null,
-        allowedBlocks: [...(section.allowedBlocks ?? [])],
+        allowedBlocks: [...(builtInSectionBlockTypes(page, section) ?? [])],
         maxBlocks: Number.isInteger(maxBlocks) ? maxBlocks : section.maxBlocks,
         reorderable: Boolean(section.reorderable),
         slot: slotOf(section),

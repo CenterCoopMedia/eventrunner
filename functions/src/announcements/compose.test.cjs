@@ -72,6 +72,23 @@ test('the console channel needs a public site URL for the link', async () => {
   assert.equal(missing.code, 'site-url-missing');
 });
 
+test('every announcement channel refuses an empty or placeholder mailing address before provider calls', async () => {
+  for (const postalAddressHtml of [undefined, null, '', ' \n ', '<p><br></p>', '<p>&nbsp;</p>',
+    '[Replace] Operator postal address for the email footer.', '<p>[Replace this address]</p>']) {
+    for (const name of ['console', 'postmark']) {
+      const provider = { name, sendBatch() { assert.fail('must not send'); }, getMessageStream() { assert.fail('must not call the provider'); } };
+      const verdict = await resolveChannel({ provider, config: {
+        ...CONFIG, event: { legal: { postalAddressHtml } },
+      } });
+      assert.deepEqual(verdict, {
+        ok: false,
+        code: 'mailing-address-missing',
+        message: 'Add your mailing address before sending announcements. Contact us to set it.',
+      });
+    }
+  }
+});
+
 test('a Postmark stream read that throws is refused as unavailable', async () => {
   const provider = { name: 'postmark', sendBatch() {}, async getMessageStream() { throw new Error('offline'); } };
   const verdict = await resolveChannel({ provider, config: { ...CONFIG, providers: { email: { announcementStream: 'news' } } } });

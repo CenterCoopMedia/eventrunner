@@ -13,6 +13,7 @@
     "sender": { "email": "hello@example.test", "name": "E2E Test Summit" },
     "legal": {
       "operatorName": "Example Operator",
+      "postalAddressHtml": "Example Operator<br>1 Example Street, Example City",
       "supportEmail": "help@example.test"
     }
   },

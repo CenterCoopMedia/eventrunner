@@ -303,7 +303,7 @@ describe('admin route gating', () => {
     expect(await screen.findByText('No one has sent a change request yet.')).toBeInTheDocument();
     // The flag is off in the build-time snapshot: no form, and the notice.
     expect(screen.queryByRole('button', { name: 'Send request' })).toBeNull();
-    expect(screen.getByText('Change requests are off. An operator can turn them on under Features.')).toBeInTheDocument();
+    expect(screen.getByText('Change requests: Off. Only an operator can change this setting.')).toBeInTheDocument();
   });
 
   it('opens the organizations list and editor for a staff admin: organizations are content', async () => {

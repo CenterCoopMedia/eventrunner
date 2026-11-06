@@ -13,7 +13,6 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useSavedMessage } from '../useSavedMessage.js';
 import {
-  Notice,
   Panel,
   SaveStatus,
   ServerErrorSummary,
@@ -22,6 +21,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import FeatureSwitch from '../components/FeatureSwitch.jsx';
 import AdminPageHeader from '../components/adminChrome.jsx';
 
 function toForm(badges) {
@@ -51,7 +51,7 @@ function toPayload(categories) {
 }
 
 export default function AdminBadgeSettings() {
-  const { badges, features, sources } = useEventConfig();
+  const { badges, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
 
@@ -123,12 +123,7 @@ export default function AdminBadgeSettings() {
         }
       />
 
-      {features?.badges ? null : (
-        <Notice
-          tone="caution"
-          message="The badges feature is currently off, so this set is not shown to attendees. Turn it on under Features."
-        />
-      )}
+      <FeatureSwitch featureKeys={['badges', 'customBadges']} />
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}

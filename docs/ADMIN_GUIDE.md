@@ -29,7 +29,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, closing a flagged card payment, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
 | Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, make a card payment link, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
-Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
+Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Operators can change the sender name, reply-to address, and social sharing image. Staff can read those values. No admin can change the from address or the mailing address in the email footer. Our team manages those settings on request.
 
 An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.
 
@@ -229,7 +229,7 @@ A sponsor or partner can keep its own profile current. You give one account acce
 
 ## Content (Pages → Content editor)
 
-Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All eleven block types are editable here.
+Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections and default blocks — is set in the page editor above; this tree of screens is for the block *content*. Every block type is available in a custom section. Home’s Hero, Key facts, Sponsors, and Footer links sections offer only the types their built-in layouts can show. These rules apply automatically; editors do not select an allowed-types list.
 
 **Home hero image.** Open **Home → Hero**. If there is no image block, the **Hero image** slot lets you choose an image and add the required alt text. Save the image draft, or save and publish it. The image then appears in the block list for normal editing. Hero holds at most four blocks. If all four places are in use, remove a block before adding the picture. **Settings → Branding → Identity → Homepage hero image** edits the same image.
 
@@ -867,7 +867,7 @@ Sent messages are closed to every browser, admins included. The page reads them 
 
 Requests for a change to the site, from signed-in visitors and from staff. Both kinds arrive in one list, newest first. Staff and operators can open it.
 
-- **The feature is off by default.** An operator turns on `changeRequests` in Settings → Features. While it is off, the footer has no **Request a change** button, this page has no form, and the server refuses every request. The list, the status changes, and **Remove** still work, so you can clear the list after the feature is off.
+- **Change requests are on for new sites.** An operator can switch them on or off at the top of the Change requests page. Existing sites keep their saved setting. While it is off, the footer has no **Request a change** button, this page has no form, and the server refuses every request. The list, the status changes, and **Remove** still work, so you can clear the list after the feature is off.
 - **Only a signed-in visitor can send one.** The footer shows **Request a change** only to a visitor who is signed in, and the server refuses a request from an address that is not verified. The request is stored with the sender's sign-in address. One account can send 5 requests in 15 minutes. The server refuses more, and the refusal says how many minutes to wait.
 - **Send one yourself** from the **Request a change** panel at the top of the page. It goes through the same server checks and the same limit.
 - **Show** picks the requests the list shows: **Open** (new and in progress, the default), **All**, **New**, **In progress**, **Done**, or **Declined**. The choice stays in the page address.
@@ -955,7 +955,11 @@ The page sends a package of up to 9 MB built from at most 50,000 stored document
 
 ## Settings → Event settings
 
-The event's own identity fields: Name, dates, time zone, venue, sender address, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
+The event's own identity fields: Name, dates, time zone, venue, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. Saving keeps values that the form does not edit.
+
+**From address.** The address is shown as read-only text for all admins, including operators. To send from a different address, contact us. Operators can still edit the sender name and reply-to address. Staff can read those values.
+
+**Mailing address.** Our team sets the mailing address in the email footer during setup. Admins cannot change it here. Announcements cannot be sent until it is set: "Add your mailing address before sending announcements. Contact us to set it." Receipts and sign-in codes are not blocked by this check.
 
 **The time zone is chosen from a list.** Type part of a city, a region, the zone's usual name, or an offset into **Time zone**, such as `Chicago`, `Eastern Time`, or `UTC+05:30`. Each match shows the city, the zone's name, and its offset today. Use the arrow keys and Enter, or select one. Escape, or leaving the field without a choice, keeps the saved zone. The saved zone is marked **Current**. The site still stores the IANA name, such as `America/Chicago`, and the field states it under the search. A line under the field gives the UTC offset on your event days. If the clocks change during the event, it names both offsets and the day the second one starts.
 
@@ -1087,26 +1091,23 @@ The questions are stored in `config/registration_form`, which anyone can read, b
 
 Feature flags, wired to a **whole-document replace** — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form's key list comes from the same shared schema the server validates against.
 
-`changeRequests` turns on the change request form in the footer and on the Change requests page. It is off by default. See [Change requests](#change-requests).
+New sites start with attendee badges, custom badges, live updates, and change requests on. These features need no provider setup. Explicit setup choices and stored settings on existing sites stay unchanged. Written updates keep their existing default.
+
+Operators can also switch a feature on or off where they use it: Badges, Live updates, Change requests, and the Written updates list and editor. Each switch saves immediately. Staff see the current state but cannot change it. See [Change requests](#change-requests).
 
 ## Settings → Badges
 
 The badge catalog: Categories, each with a max-picks cap and its list of badges, which attendees self-select from on their profile. Also a whole-document replace: editing one badge sends the complete set of categories back and preserves the configured custom-badge block list.
 
-**Custom badges.** The separate feature is off by default. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; `config/badges.customBadgeBlockList` adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.
+**Custom badges.** This feature is on for new sites. An operator can switch it on or off on the Badges page. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; `config/badges.customBadgeBlockList` adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.
 
 **Remove a custom badge.** In Attendees, select the removal action beside the badge and confirm. The result stays on the page and an `admin_logs` entry records the action. Turning the feature off removes custom badges from the public projection; attendees can still edit their other profile fields.
 
 ## Settings → Web address
 
-Your site already works at its own address. A custom web address, such as `summit.example.org`, is optional. Operators only.
+Operators can see the site's current web address and the status of an existing custom domain. Want to use your own domain? Contact us and we'll set it up. Admins cannot add or remove domains, including through the admin API.
 
-1. Type the domain under **Your domain** and select **Add this address**. Use the plain domain, with no `https://` and no path.
-2. The page shows the records to change. Where you manage your domain (the company you bought it from, or your IT team), add each record marked **Add** and remove each record marked **Remove**: an old record for the same name stops the new address from working. Changes there can take a few hours to reach everyone.
-3. Select **Check now**, or wait: the site checks every hour. While the records are not in place, the state is **Waiting for the records**.
-4. When the domain works, the state is **Ready to switch**: sign-in already accepts the domain. Ask the hosting team to switch the site to it. After the switch the state is **In use**.
-
-**Remove this address** stops the site from answering at that domain. You can add it again later. A custom sender domain for email is a separate step that the hosting team runs.
+For an existing domain, select **Check now**, or wait for the hourly check. The status shows **Waiting for the records**, **Ready to switch**, or **In use**. Our team manages setup and the switch to the new address. Email sender setup is a separate step that our team manages.
 
 ## Settings → Access
 

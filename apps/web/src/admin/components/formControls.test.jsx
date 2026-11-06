@@ -1,6 +1,9 @@
 // The copy bench and the destructive moment
 // (docs/plans/2026-08-27-admin-identity-story.md, part 2 and moment 3).
 import { useState } from 'react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
@@ -11,6 +14,8 @@ import {
   Panel,
   ServerErrorSummary,
   TextField,
+  SelectField,
+  CheckboxField,
   dangerButtonClass,
   primaryButtonClass,
 } from './formControls.jsx';
@@ -247,5 +252,33 @@ describe('AddOneListField and a click that leaves the input', () => {
     fireEvent.change(input, { target: { value: '2025' } });
     fireEvent.blur(input);
     expect(screen.getByText('2025')).toBeTruthy();
+  });
+});
+
+
+describe('shared field grid rows', () => {
+  it('shares separate label, hint, control, and feedback rows in field grids', () => {
+    const { container } = render(
+      <div className="grid gap-sm sm:grid-cols-2">
+        <TextField label="Name" value="" onChange={() => {}} error="Enter a name" />
+        <SelectField label="Position" value="main" onChange={() => {}} hint="Choose where this section appears." options={[{ value: 'main', label: 'After the main content' }]} />
+        <CheckboxField label="Reorderable" checked onChange={() => {}} />
+      </div>,
+    );
+    const fields = container.querySelectorAll('.admin-field');
+    expect(fields).toHaveLength(2);
+    expect(fields[0].querySelector('.admin-field__hint')).toBeNull();
+    expect([...fields[1].children].map((element) => element.className.split(' ').find((name) => name.startsWith('admin-field__')))).toEqual(['admin-field__label', 'admin-field__hint', 'admin-field__control']);
+    expect(fields[0].querySelector('.admin-field__feedback')).toHaveTextContent('Enter a name');
+    expect(screen.getByLabelText('Reorderable').closest('.admin-field-toggle')).toBeInTheDocument();
+    const css = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'adminWorkspace.css'), 'utf8');
+    expect(css).toContain(':has(> .admin-field)');
+    expect(css).toContain(':has(> .admin-field) > *');
+    expect(css).toContain('grid-row: span 4; grid-template-rows: subgrid;');
+    expect(css).toMatch(/\.admin-field__label \{ grid-row: 1;/);
+    expect(css).toMatch(/\.admin-field__hint \{ grid-row: 2;/);
+    expect(css).toMatch(/\.admin-field__control \{ grid-row: 3;/);
+    expect(css).toMatch(/\.admin-field__feedback \{ grid-row: 4;/);
+    expect(css).toMatch(/> \.admin-field-toggle > \*,[\s\S]*?grid-row: 3; align-self: start;/);
   });
 });

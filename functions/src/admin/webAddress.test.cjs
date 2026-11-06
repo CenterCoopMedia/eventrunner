@@ -1,7 +1,6 @@
 'use strict';
 
-// The custom web address (ADR 0007 §8, P9a): the operator types a domain,
-// the page shows the records to add, and checks run until the domain is live.
+// The team sets up domains. Admins can read status and check connections.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
@@ -16,6 +15,8 @@ const RECORDS = [
   { action: 'add', type: 'TXT', host: 'summit.example.org', value: 'hosting-site=example-event' },
   { action: 'remove', type: 'A', host: 'summit.example.org', value: '10.0.0.1' },
 ];
+
+const CONNECTED = { 'web_address/current': { domain: 'summit.example.org', state: 'records', records: RECORDS, lastCheckedAt: null } };
 
 function fakeHosting(state = {}) {
   const calls = [];
@@ -54,7 +55,7 @@ test('normalizeDomain takes a plain domain and refuses what cannot be one', () =
   }
 });
 
-test('only an operator sees or changes the web address', async () => {
+test('only an operator reads web address status', async () => {
   const { call } = setup();
   assert.equal((await call({ action: 'status' }, 'staff')).statusCode, 403);
   const status = await call({ action: 'status' });
@@ -62,33 +63,26 @@ test('only an operator sees or changes the web address', async () => {
   assert.deepEqual(status.body, { domain: null, state: 'none', records: [], currentAddress: 'https://example-event.eventrunner.org', lastCheckedAt: null });
 });
 
-test('adding a domain asks hosting for it and shows the records to add', async () => {
-  const { call, db, hosting } = setup();
-  const res = await call({ action: 'add', domain: 'Summit.Example.org' });
-  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
-  assert.equal(res.body.domain, 'summit.example.org');
-  assert.equal(res.body.state, 'records');
-  assert.deepEqual(res.body.records, RECORDS);
-  assert.deepEqual(hosting.calls, [['add', 'summit.example.org']]);
-  const stored = db.read('web_address', 'current');
-  assert.equal(stored.requestedBy, 'operator@example.org');
-  assert.ok(db.ids('admin_logs').some((id) => db.read('admin_logs', id).action === 'webAddress.add'));
-  // One custom address at a time.
-  const second = await call({ action: 'add', domain: 'other.example.org' });
-  assert.equal(second.statusCode, 409);
-});
-
-test('a bad domain is refused before hosting is asked', async () => {
-  const { call, hosting } = setup();
-  const res = await call({ action: 'add', domain: 'https://summit.example.org' });
-  assert.equal(res.statusCode, 400);
-  assert.match(res.body.error.message, /domain/);
-  assert.deepEqual(hosting.calls, []);
+test('all admin roles are refused add and remove calls without service calls or writes', async () => {
+  for (const seed of [{}, CONNECTED]) {
+    for (const user of ['operator', 'staff']) {
+      for (const action of ['add', 'remove']) {
+        const { call, hosting, identity, db } = setup({ seed });
+        const before = db.read('web_address', 'current');
+        const res = await call({ action, domain: 'summit.example.org' }, user);
+        assert.equal(res.statusCode, 403);
+        assert.equal(res.body.error.message, 'To add or remove a custom domain, contact us.');
+        assert.deepEqual(hosting.calls, []);
+        assert.deepEqual(identity.calls, []);
+        assert.deepEqual(db.read('web_address', 'current'), before);
+        assert.deepEqual(db.ids('admin_logs'), []);
+      }
+    }
+  }
 });
 
 test('a check that finds the domain live adds it to sign-in and asks for the switch', async () => {
-  const { call, hosting, identity, db } = setup();
-  await call({ action: 'add', domain: 'summit.example.org' });
+  const { call, hosting, identity, db } = setup({ seed: CONNECTED });
   const waiting = await call({ action: 'check' });
   assert.equal(waiting.body.state, 'records');
   assert.equal(waiting.body.lastCheckedAt, NOW.toISOString());
@@ -102,36 +96,25 @@ test('a check that finds the domain live adds it to sign-in and asks for the swi
 });
 
 test('the address is done once the site runs on it', async () => {
-  const { call } = setup({ hosting: fakeHosting({ live: true }), env: { EVENT_PUBLIC_URL: 'https://summit.example.org' } });
-  await call({ action: 'add', domain: 'summit.example.org' });
+  const { call } = setup({ hosting: fakeHosting({ live: true }), env: { EVENT_PUBLIC_URL: 'https://summit.example.org' }, seed: CONNECTED });
   const res = await call({ action: 'check' });
   assert.equal(res.body.state, 'done');
 });
 
-test('removing the address asks hosting to drop it and clears the record', async () => {
-  const { call, hosting, db } = setup();
-  await call({ action: 'add', domain: 'summit.example.org' });
-  const res = await call({ action: 'remove' });
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.state, 'none');
-  assert.deepEqual(hosting.calls.at(-1), ['remove', 'summit.example.org']);
-  assert.equal(db.read('web_address', 'current'), undefined);
-});
-
 test('a hosting failure is a plain retry message and keeps the stored state', async () => {
   const hosting = fakeHosting();
-  hosting.addDomain = async () => { throw new Error('PERMISSION_DENIED firebasehosting'); };
-  const { call, db } = setup({ hosting });
-  const res = await call({ action: 'add', domain: 'summit.example.org' });
+  hosting.readDomain = async () => { throw new Error('PERMISSION_DENIED firebasehosting'); };
+  const { call, db } = setup({ hosting, seed: CONNECTED });
+  const res = await call({ action: 'check' });
   assert.equal(res.statusCode, 503);
   assert.doesNotMatch(res.body.error.message, /PERMISSION|firebase/i);
-  assert.equal(db.read('web_address', 'current'), undefined);
+  assert.deepEqual(db.read('web_address', 'current'), CONNECTED['web_address/current']);
 });
 
 test('the scheduled check runs only while a domain waits', async () => {
-  const { db, hosting, identity, call, env } = setup();
+  const { db, hosting, identity, env } = setup();
   assert.deepEqual(await runWebAddressCheck({ db, hosting, identity, env, now: () => NOW }), { checked: false });
-  await call({ action: 'add', domain: 'summit.example.org' });
+  await db.collection('web_address').doc('current').set(CONNECTED['web_address/current']);
   hosting.state.live = true;
   const result = await runWebAddressCheck({ db, hosting, identity, env, now: () => NOW });
   assert.equal(result.checked, true);
@@ -210,8 +193,8 @@ test('adding a domain Hosting already has reuses it, and a removed one is restor
 });
 
 test('the scheduled check changes nothing on a read-only historical demo', async () => {
-  const { db, hosting, identity, call, env } = setup();
-  await call({ action: 'add', domain: 'summit.example.org' });
+  const { db, hosting, identity, env } = setup();
+  await db.collection('web_address').doc('current').set(CONNECTED['web_address/current']);
   await db.collection('config').doc('event').set({ historicalDemo: true });
   hosting.state.live = true;
   const result = await runWebAddressCheck({ db, hosting, identity, env, now: () => NOW });
@@ -221,14 +204,13 @@ test('the scheduled check changes nothing on a read-only historical demo', async
 });
 
 test('a check still running when the address is removed does not bring it back', async () => {
-  const { db, hosting, identity, call, env } = setup();
-  await call({ action: 'add', domain: 'summit.example.org' });
+  const { db, hosting, identity, env } = setup();
+  await db.collection('web_address').doc('current').set(CONNECTED['web_address/current']);
   let release;
   hosting.readDomain = async () => { await new Promise((resolve) => { release = resolve; }); return { live: false, records: RECORDS }; };
   const check = runWebAddressCheck({ db, hosting, identity, env, now: () => NOW });
   await new Promise((resolve) => setImmediate(resolve));
-  hosting.removeDomain = async () => {};
-  await call({ action: 'remove' });
+  await db.collection('web_address').doc('current').delete();
   release();
   await check;
   assert.equal(db.read('web_address', 'current'), undefined);

@@ -29,10 +29,6 @@ export const UPDATES_ROOT = '/admin/updates';
 // same reason.
 export const NEW_UPDATE_PATH = `${UPDATES_ROOT}/new/update`;
 
-/** Said on the list and the editor while config/features.updates is off. */
-export const UPDATES_OFF_MESSAGE =
-  'Updates are off for this event, so the site does not show them. An operator can turn them on under Features.';
-
 /**
  * The parts of `instant` on the event's clock, or on the reader's when no
  * zone is given or the runtime does not know it (the fallback the public

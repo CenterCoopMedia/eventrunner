@@ -293,16 +293,16 @@ test('cmsCreateContent refuses a missing page, a removed section, and a disallow
     [{ section: 'hero', field: 'missing-page', fields: { blockType: 'text', value: 'x' } }, /^pageId:/],
     [{ pageId: 'test-page', section: 'removed', field: 'x', fields: { blockType: 'text', value: 'x' } }, /^section:/],
     [{
-      pageId: 'text-page',
-      section: 'body',
+      pageId: 'home',
+      section: 'sponsors',
       field: 'image',
       fields: { blockType: 'image', url: 'https://example.org/image.jpg', alt: 'Example' },
     }, /^allowedBlocks:/],
   ]) {
     const db = makeFakeDb({
-      'cmsPages/text-page': {
-        id: 'text-page',
-        sections: [{ id: 'body', allowedBlocks: ['text'], maxBlocks: 2 }],
+      'cmsPages/home': {
+        id: 'home', systemPage: true,
+        sections: [{ id: 'sponsors', allowedBlocks: ['text'], maxBlocks: 2 }],
       },
     });
     const res = fakeRes();
@@ -313,15 +313,16 @@ test('cmsCreateContent refuses a missing page, a removed section, and a disallow
   }
 });
 
-test('cmsCreateContent uses the current page draft for section rules', async () => {
+test('cmsCreateContent uses the current page draft block limit', async () => {
   const db = makeFakeDb({
-    'cmsPages/test-page': {
-      id: 'test-page',
-      sections: [{ id: 'hero', allowedBlocks: ['image'], maxBlocks: 2 }],
+    'cmsPages/home': {
+      id: 'home', systemPage: true,
+      sections: [{ id: 'sponsors', allowedBlocks: ['text'], maxBlocks: 2 }],
     },
-    'cmsPages_drafts/test-page': {
-      id: 'test-page',
-      sections: [{ id: 'hero', allowedBlocks: ['text'], maxBlocks: 1 }],
+    'cmsContent/sponsors__lede': { section: 'sponsors', field: 'lede', blockType: 'text', value: 'Existing sponsor line', visible: true },
+    'cmsPages_drafts/home': {
+      id: 'home', systemPage: true,
+      sections: [{ id: 'sponsors', allowedBlocks: ['text'], maxBlocks: 1 }],
       status: 'dirty',
     },
   });
@@ -329,17 +330,17 @@ test('cmsCreateContent uses the current page draft for section rules', async () 
   await createCmsCreateContentHandler(deps(db))(
     req({
       body: {
-        pageId: 'test-page',
-        section: 'hero',
-        field: 'image',
-        fields: { blockType: 'image', url: 'https://example.org/image.jpg', alt: 'Example' },
+        pageId: 'home',
+        section: 'sponsors',
+        field: 'extra',
+        fields: { blockType: 'text', value: 'Another sponsor line' },
       },
       rawBody: true,
     }),
     res,
   );
   assert.equal(res.statusCode, 400);
-  assert.match(res.body.error.message, /^allowedBlocks:/);
+  assert.match(res.body.error.message, /^maxBlocks:/);
 });
 
 test('cmsCreateContent serializes concurrent creates at maxBlocks', async () => {
@@ -1784,4 +1785,34 @@ test('a timeline entry created, edited and published is live with its three fiel
   assert.equal(live.description, null);
   assert.equal(live.visible, true);
   assert.equal(db.read('cmsTimeline_drafts', 'edition-2024').status, 'clean');
+});
+
+
+test('cmsCreateContent accepts a block for a custom section with empty allowedBlocks', async () => {
+  const db = makeFakeDb({ 'cmsPages/custom': { id: 'custom', sections: [{ id: 'body', allowedBlocks: [], maxBlocks: 2 }] } });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(req({ body: { pageId: 'custom', section: 'body', field: 'image', fields: { blockType: 'image', url: 'https://example.org/image.jpg', alt: 'Example' } }, rawBody: true }), res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsContent_drafts', 'body__image').blockType, 'image');
+});
+
+test('cmsCreateContent keeps built-in restrictions even when stored allowedBlocks is empty', async () => {
+  const db = makeFakeDb({ 'cmsPages/home': { id: 'home', systemPage: true, sections: [{ id: 'hero', allowedBlocks: [], maxBlocks: 4 }] } });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(req({ body: { pageId: 'home', section: 'hero', field: 'body', fields: { blockType: 'richtext', value: '<p>Body</p>' } }, rawBody: true }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^allowedBlocks:/);
+});
+
+
+test('cmsUpdateContent rejects a type change the built-in renderer cannot show', async () => {
+  const db = makeFakeDb({
+    'cmsPages/home': { id: 'home', systemPage: true, sections: [{ id: 'hero', allowedBlocks: ['text', 'cta', 'image'], maxBlocks: 4 }] },
+    'cmsContent/hero__title': { section: 'hero', field: 'title', blockType: 'text', value: 'Title', visible: true },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(req({ body: { section: 'hero', field: 'title', fields: { blockType: 'richtext', value: '<p>Title</p>' } } }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^blockType:/);
+  assert.equal(db.ids('cmsContent_drafts').length, 0);
 });

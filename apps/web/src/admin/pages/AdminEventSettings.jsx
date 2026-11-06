@@ -10,6 +10,8 @@
 //   • sender.domainVerified, domainVerifiedAt, and domainVerifiedDomain belong
 //     to the sender-domain job. The badge uses the same check as launch
 //     readiness. The form shows that state read-only and never sends it.
+//   • sender.email is set during setup. Every role sees it as text, and
+//     the form never sends it. Only operators edit the name and reply-to.
 //   • Current values come from EventConfigContext, whose onSnapshot listener
 //     also delivers the saved result back — no reload, nothing optimistic.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -86,7 +88,6 @@ function toForm(eventConfig) {
       ...normalizeVenueReferences(venue),
     },
     sender: {
-      email: sender.email ?? '',
       name: sender.name ?? '',
       replyTo: sender.replyTo ?? '',
     },
@@ -187,7 +188,6 @@ function toPayload(form, { includeSender = true } = {}) {
     ...(includeSender
       ? {
         sender: {
-          email: form.sender.email,
           name: orNull(form.sender.name),
           replyTo: orNull(form.sender.replyTo),
         },
@@ -653,21 +653,14 @@ export default function AdminEventSettings() {
           <div className="admin-settings-grid">
             <Panel className="admin-settings-card"
               title="Sender"
-              description={
-                canEditSender
-                  ? 'The From address every transactional email uses.'
-                  : 'The From address every transactional email uses. You can read it here. An operator changes it.'
-              }
+              description="The sender details used for your event emails."
             >
               <div className="admin-settings-fields">
-                <TextField
-                  label="Sender email"
-                  type="email"
-                  value={form.sender.email}
-                  onChange={(value) => setGroup('sender', { email: value })}
-                  error={errorFor('sender.email')}
-                  readOnly={!canEditSender}
-                />
+                <div>
+                  <p className="text-admin-sm font-semibold text-admin-ink">From address</p>
+                  <p className="break-all text-admin-base text-admin-ink">{eventConfig?.sender?.email || 'Not set'}</p>
+                  <p className="text-admin-sm text-admin-ink-secondary">To send from a different address, contact us.</p>
+                </div>
                 <TextField
                   label="Sender name"
                   value={form.sender.name}
@@ -688,7 +681,7 @@ export default function AdminEventSettings() {
                   <StatusBadge tone={verified ? 'ok' : 'caution'}>
                     {verified ? 'verified' : 'not verified'}
                   </StatusBadge>
-                  . Verification is set by the sender-domain job, not from here.
+                  . Our team manages email setup.
                 </p>
               </div>
             </Panel>
