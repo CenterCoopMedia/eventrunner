@@ -48,9 +48,24 @@ export function rememberReturn(path) {
  * clear it, so a second render gets the same answer. Layout clears it
  * once the reader is signed in and has left the sign-in pages.
  */
-export function peekReturn() {
-  const path = readStored(RETURN_KEY);
-  return typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') ? path : '/';
+export function peekReturn(href) {
+  return localPath(readStored(RETURN_KEY)) || localPath(nextFrom(href)) || '/';
+}
+
+function localPath(path) {
+  return typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') ? path : null;
+}
+
+/**
+ * The return path an emailed sign-in link carries. Another tab, or another
+ * browser, can finish the sign-in after the saved path is gone.
+ */
+function nextFrom(href) {
+  try {
+    return href ? new URL(href).searchParams.get('next') : null;
+  } catch {
+    return null;
+  }
 }
 
 export function forgetReturn() {
@@ -94,8 +109,9 @@ export function AuthProvider({ children }) {
     },
     async sendEmailLink(rawEmail) {
       const email = String(rawEmail).trim().toLowerCase();
+      const next = localPath(readStored(RETURN_KEY));
       await sendSignInLinkToEmail(auth, email, {
-        url: `${window.location.origin}/signin/finish`,
+        url: `${window.location.origin}/signin/finish${next && next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`,
         handleCodeInApp: true,
       });
       store(EMAIL_KEY, email);
