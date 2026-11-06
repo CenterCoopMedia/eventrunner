@@ -111,7 +111,9 @@ function setup(options = {}) {
           return answer({ releases: state.release ? [state.release, ...(state.oldReleases || [])].slice(0, Number(url.searchParams.get('pageSize') || 100)) : [] });
         }
         if (p.endsWith(`/customDomains/${DOMAIN}`)) {
-          if (method === 'DELETE') { state.customDomain = false; return done(); }
+          // Hosting soft-deletes: the domain stays readable with a deleteTime.
+          if (method === 'DELETE') { state.customDomain = 'deleted'; return done(); }
+          if (state.customDomain === 'deleted') return answer({ deleteTime: '2026-11-06T00:00:00Z', purgeTime: '2026-12-06T00:00:00Z' });
           return state.customDomain ? answer({ requiredDnsUpdates: { desired: [] } }) : answer({}, 404);
         }
       }

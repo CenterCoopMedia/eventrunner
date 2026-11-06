@@ -566,12 +566,19 @@ async function database(ctx) {
   if (await google(ctx, 'verify deleted database', base, { allow: [404] })) throw new Error('database: database remains');
 }
 
+// Hosting keeps a deleted custom domain for 30 days with a deleteTime, and
+// project deletion removes it. Only a domain without one is still live.
+async function liveDomain(ctx, label, url) {
+  const domain = await google(ctx, label, url, { allow: [404] });
+  return domain && !domain.deleteTime ? domain : null;
+}
+
 async function customDomain(ctx) {
   if (!ctx.resources.site) return;
   const url = `${siteUrl(ctx)}/customDomains/${encode(ctx.resources.domain)}`;
-  if (!await google(ctx, 'custom domain', url, { allow: [404] })) return;
+  if (!await liveDomain(ctx, 'custom domain', url)) return;
   await finish(ctx, 'delete custom domain', HOSTING, await google(ctx, 'delete custom domain', url, { method: 'DELETE' }));
-  if (await google(ctx, 'verify custom domain', url, { allow: [404] })) throw new Error('custom-domain: domain remains');
+  if (await liveDomain(ctx, 'verify custom domain', url)) throw new Error('custom-domain: domain remains');
 }
 
 async function dnsRecords(ctx) {
@@ -713,7 +720,7 @@ async function inspect(ctx) {
       const release = await latestRelease(ctx);
       return { state: release && release.type !== 'SITE_DISABLE' ? 'present' : 'absent', serving: Boolean(release && release.type !== 'SITE_DISABLE') };
     });
-    await projectCheck('custom-domain', async () => ({ state: r.site && await google(ctx, 'verify custom domain', `${siteUrl(ctx)}/customDomains/${encode(r.domain)}`, { allow: [404] }) ? 'present' : 'absent' }));
+    await projectCheck('custom-domain', async () => ({ state: r.site && await liveDomain(ctx, 'verify custom domain', `${siteUrl(ctx)}/customDomains/${encode(r.domain)}`) ? 'present' : 'absent' }));
     // Project secrets disappear with Google's project deletion. This reports
     // their lifecycle rather than claiming immediate physical destruction.
     await projectCheck('client-secrets', async () => {
