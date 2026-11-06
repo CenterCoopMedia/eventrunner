@@ -258,7 +258,7 @@ describe('order confirmation resend outcomes', () => {
     clickResend();
     await screen.findByText(/1 message failed or could not be confirmed/);
     rerender(<StripeOrderDetail {...props} orderId="order-2" />);
-    await screen.findByRole('heading', { name: 'order-2' });
+    await screen.findByRole('heading', { name: 'purchaser@example.test' });
     clickResend();
     await screen.findByText('1 confirmation message sent. Stripe’s payment receipt is separate.');
     expect(resend.mock.calls[0][0].orderId).toBe('order-1');
@@ -277,5 +277,17 @@ describe('promo code on an order', () => {
     view.unmount();
     await setup([]);
     expect(screen.queryByText('Promo code')).not.toBeInTheDocument();
+  });
+});
+
+describe('StripeOrderDetail: audit trail', () => {
+  it('names each entry by the action the server stores', async () => {
+    const audit = ['tickets-cancelled', 'refund-allocated', 'checked-in', 'unknown-thing'].map((action, index) => (
+      { id: `audit-${index}`, action: `ticketing.${action}`, at: '2026-01-02T12:00:00Z', actorUid: 'staff', reason: null, ticketIds: [] }
+    ));
+    const call = vi.fn(async () => ({ ...DETAIL, audit }));
+    render(<StripeOrderDetail call={call} orderId="order-1" isOperator timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
+    expect(await screen.findByText('Tickets cancelled')).toBeInTheDocument();
+    for (const label of ['Refund recorded', 'Attendee checked in', 'Order updated']) expect(screen.getByText(label)).toBeInTheDocument();
   });
 });

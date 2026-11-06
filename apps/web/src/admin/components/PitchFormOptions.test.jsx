@@ -63,7 +63,7 @@ describe('PitchFormOptions', () => {
     addItem('Lengths in minutes', 'an hour');
     addItem('Formats', 'panel');
     fireEvent.click(screen.getByRole('button', { name: 'Save pitch form options' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/lengths: each length is a whole number/));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/Lengths in minutes: Each length is a whole number/));
     expect(screen.getByRole('alert')).toHaveTextContent(/"panel" is listed twice/);
     expect(call).not.toHaveBeenCalled();
   });

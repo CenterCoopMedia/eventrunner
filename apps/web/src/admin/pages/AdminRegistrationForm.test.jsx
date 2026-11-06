@@ -48,7 +48,7 @@ describe('AdminRegistrationForm', () => {
     expect(preview().getByLabelText('Organization (required)')).toBeInTheDocument();
     expect(preview().getByRole('group', { name: 'T-shirt size' })).toBeInTheDocument();
     expect(preview().queryByLabelText(/Job title/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save registration form' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
   it('shows a change in the preview at once, before it is saved', async () => {
@@ -66,10 +66,10 @@ describe('AdminRegistrationForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add a question' }));
     fireEvent.change(screen.getByLabelText('Answer type'), { target: { value: 'one_choice' } });
     addChoice('Only one');
-    fireEvent.click(screen.getByRole('button', { name: 'Save registration form' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     // In the summary, and on the field it names.
-    expect((await screen.findAllByText(/custom\.0\.label: required/)).length).toBe(2);
-    expect(screen.getAllByText(/custom\.0\.choices: add at least two choices/).length).toBe(2);
+    expect((await screen.findAllByText(/Question 1: Enter a question\./)).length).toBe(2);
+    expect(screen.getAllByText(/Question 1: Add at least two choices/).length).toBe(2);
     expect(callMock).not.toHaveBeenCalled();
   });
 
@@ -79,14 +79,14 @@ describe('AdminRegistrationForm', () => {
     addChoice('S');
     addChoice(' M ');
     addChoice('L');
-    fireEvent.click(screen.getByRole('button', { name: 'Save registration form' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(callMock).toHaveBeenCalledTimes(1));
     const [name, body] = callMock.mock.calls[0];
     expect(name).toBe('updateRegistrationForm');
     expect(body.expectedRevision).toBe(2);
     expect(body.form.custom[0]).toEqual({ id: 'q_shirt', kind: 'one_choice', label: 'T-shirt size', help: '', choices: ['S', 'M', 'L'], required: false });
     expect(body.form.standard.organization).toEqual({ enabled: true, required: true });
-    expect(await screen.findByText('Registration form saved. New registrations use it now.')).toBeInTheDocument();
+    expect(await screen.findByText('Registration form saved.')).toBeInTheDocument();
   });
 
   it('stops a save when someone else saved first, and keeps the edits until the current version is loaded', async () => {
@@ -94,7 +94,7 @@ describe('AdminRegistrationForm', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ask: Job title' }));
     await act(async () => { pushForm({ ...SAVED, revision: 3 }); });
     expect(screen.getByText(/Someone saved the registration form after you opened it/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save registration form' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Ask: Job title' })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Load the current version' }));
     expect(screen.queryByText(/Someone saved the registration form after you opened it/)).toBeNull();
@@ -115,7 +115,7 @@ describe('AdminRegistrationForm', () => {
     callMock.mockResolvedValue({ revision: 3 });
     await renderPage();
     fireEvent.change(screen.getByLabelText('Answer type'), { target: { value: 'short_text' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save registration form' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(callMock).toHaveBeenCalledTimes(1));
     const [question] = callMock.mock.calls[0][1].form.custom;
     expect(question.kind).toBe('short_text');

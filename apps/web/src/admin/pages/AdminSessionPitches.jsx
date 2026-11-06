@@ -1,3 +1,4 @@
+import '../plannerFields.css';
 // /admin/pitches: the session pitch queue (ADR 0008, admin review). It
 // holds the queue alone, in the rail's list idiom: the title band with the
 // count and the page actions, then one ruled row per pitch with its title,
@@ -6,6 +7,11 @@
 // The pitch itself is /admin/pitches/:pitchId; the call, the form choices
 // and the emails are /admin/pitches/settings; CSV and Airtable imports are
 // /admin/pitches/import. Export writes the rows the filter shows.
+import PitchCallSettings from '../components/PitchCallSettings.jsx';
+import { subscribePitchCall } from '../../lib/pitchSource.js';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import { useAdminApi } from '../adminApi.js';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { readPresenters } from 'shared/pitchForm';
@@ -35,6 +41,10 @@ function detailOf(row) {
 
 export default function AdminSessionPitches() {
   const { isOperator } = useAuth();
+  const { eventConfig } = useEventConfig();
+  const call = useAdminApi();
+  const [settings, setSettings] = useState(null);
+  useEffect(() => subscribePitchCall(setSettings, () => {}), []);
   const [rows, setRows] = useState(null);
   const [listError, setListError] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -53,30 +63,29 @@ export default function AdminSessionPitches() {
       <AdminPageHeader
         title="Session pitches"
         identifiers={rows ? `${total} pitch${total === 1 ? '' : 'es'}` : null}
-        description="Private proposals from the call for sessions. Open a pitch to read it, decide, edit it, or turn it into drafts. Deciding sends no email and publishes nothing."
+        description="Review proposals and choose sessions for your program. Decisions do not send email."
         actions={
           <>
             {isOperator ? <Link to="settings" className={secondaryButtonClass}>Call settings</Link> : null}
             <Link to="import" className={secondaryButtonClass}>Import pitches</Link>
-            <button type="button" className={secondaryButtonClass} disabled={!rows || Boolean(listError)} onClick={() => saveTextFile('session-pitches.csv', pitchQueueCsv(shown))}>
-              Export the shown pitches
-            </button>
+            <AdminIconControl label="Download pitches" icon="download" className={secondaryButtonClass} disabled={!rows || Boolean(listError)} onClick={() => saveTextFile('session-pitches.csv', pitchQueueCsv(shown))} />
           </>
         }
       />
+      {isOperator && settings ? <PitchCallSettings settings={settings} call={call} timeZone={eventConfig?.timezone} /> : null}
       <p className="text-admin-sm text-admin-ink-secondary">
         <Link to="/pitch" className={rowTitleLinkClass}>Open the public pitch form</Link>. The export holds contact details: keep the file private. Private notes are left out.
       </p>
-      <div className="grid gap-sm sm:grid-cols-2 sm:items-end">
+      <div className="planner-fields grid gap-sm sm:grid-cols-2 sm:items-end">
         <SelectField label="Decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...PITCH_STATUS_OPTIONS]} />
-        <TextField label="Search" value={search} onChange={setSearch} hint="Title, email, organization or presenter." />
+        <TextField label="Search" value={search} onChange={setSearch} type="search" placeholder="Title, email, organization or presenter" />
       </div>
       {listError ? <Notice tone="caution" message="The list did not refresh. Trying again…" /> : null}
       {rows === null ? <AdminLoadingState label="Loading session pitches…" /> : (
         <>
           <p role="status" className="text-admin-sm text-admin-ink-secondary">Showing {shown.length} of {total}.</p>
           {shown.length === 0 ? (
-            <AdminEmptyState title={total ? 'No pitches in this view' : 'No pitches yet'} description={total ? 'Try another decision or search.' : 'Pitches from the public form, a CSV import or Airtable appear here.'} />
+            <AdminEmptyState title={total ? 'No pitches in this view' : 'No pitches yet'} description={total ? 'Try another decision or search.' : 'Import proposals to start your review.'} action={total ? <button type="button" className={secondaryButtonClass} onClick={() => { setFilter('all'); setSearch(''); }}>Clear filters</button> : <Link to="import" className={secondaryButtonClass}>Import pitches</Link>} />
           ) : (
             <Panel flush>
               <ul aria-label="Session pitches">

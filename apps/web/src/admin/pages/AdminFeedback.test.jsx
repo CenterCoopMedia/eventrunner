@@ -1,3 +1,4 @@
+vi.mock('../components/PlannerFeatureControls.jsx', () => ({ default: () => null }));
 // AdminFeedback — the review tab (issue #28). Mocks adminApi and
 // adminSource directly, same convention as AdminLiveUpdates.test.jsx.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -129,7 +130,7 @@ describe('AdminFeedback', () => {
   it('shows an empty state when nothing matches the filter', () => {
     render(<AdminFeedback />);
     pushRows([]);
-    expect(screen.getByText('Nothing here')).toBeInTheDocument();
+    expect(screen.getByText('No feedback here')).toBeInTheDocument();
   });
 
   it('serializes row writes and moves focus beside the archived row after the listener updates', async () => {
@@ -175,7 +176,7 @@ describe('AdminFeedback', () => {
     pushRows([{ ...row, status: 'archived' }]);
     expect(screen.getByLabelText('Show')).toHaveFocus();
     expect(screen.getByRole('status')).toHaveTextContent('Feedback archived.');
-    expect(screen.getByText('Nothing here')).toBeInTheDocument();
+    expect(screen.getByText('No feedback here')).toBeInTheDocument();
   });
 
   it('never offers "Mark reviewed" on an archived row (Codex P2: it would silently unarchive)', () => {

@@ -1,3 +1,6 @@
+import { plannerError } from '../plannerErrors.js';
+import '../plannerFields.css';
+import PlannerSwitch from '../components/PlannerSwitch.jsx';
 // The organization editor (issue #192): create or edit one cmsOrganizations
 // record through the generic content endpoints, and publish it through
 // cmsPublish like every other editor.
@@ -17,7 +20,7 @@
 // publish that fails after a create is retried as an update rather than
 // meeting the "address in use" refusal about its own record.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { summarizePublish } from '../publishResult.js';
@@ -35,7 +38,6 @@ import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
-  CheckboxField,
   DestructiveConfirm,
   Notice,
   Panel,
@@ -208,7 +210,7 @@ export default function AdminOrganizationEditor({ mode }) {
       }
     } catch (err) {
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setAction(null);
     }
@@ -223,8 +225,8 @@ export default function AdminOrganizationEditor({ mode }) {
       showToast('Organization deleted.');
       navigate(ORGANIZATIONS_LIST);
     } catch (err) {
-      setErrorTitle('The server refused the delete');
-      setError(err);
+      setErrorTitle('The organization was not deleted');
+      setError(plannerError(err));
     } finally {
       setAction(null);
     }
@@ -238,7 +240,7 @@ export default function AdminOrganizationEditor({ mode }) {
       return (
         <Notice
           tone="caution"
-          message="We could not load this organization and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+          message="The organization did not load. Reconnecting…"
         />
       );
     }
@@ -248,13 +250,13 @@ export default function AdminOrganizationEditor({ mode }) {
     return (
       <AdminEmptyState
         title="No such organization"
-        description="That organization does not exist. It may have been deleted."
+        description="That organization may have been deleted. Open the list to choose another."
+        action={<Link to={ORGANIZATIONS_LIST} className={secondaryButtonClass}>Back to organizations</Link>}
       />
     );
   }
 
   const tiers = tiersInUse(rows);
-  const address = creating ? form.slug : docId;
 
   // A representative's edit (issue #334) may not land on a field the form
   // holds unsaved text for: the next save would put the typed text back.
@@ -280,10 +282,10 @@ export default function AdminOrganizationEditor({ mode }) {
         onSubmit={(event) => { event.preventDefault(); save(); }}
       >
         <AdminPageHeader
-          title={creating ? 'New organization' : form.name || docId}
+          title={creating ? 'New organization' : form.name || 'Unnamed organization'}
           state={!creating && row ? <RecordState state={row.state} /> : null}
-          identifiers={address ? `/sponsors/${address}` : null}
-          description="Save builds a draft. Preview reads that draft, and publish sends it to the sponsors page. Everything here is public once published."
+          identifiers={null}
+          description="Edit the details attendees see on the sponsors page."
           actions={
             <>
               {!creating ? (
@@ -303,7 +305,7 @@ export default function AdminOrganizationEditor({ mode }) {
                 disabled={saving}
                 aria-busy={action === 'draft' || undefined}
               >
-                {action === 'draft' ? 'Saving…' : 'Save draft'}
+                {action === 'draft' ? 'Saving…' : 'Save'}
               </button>
               <button
                 type="button"
@@ -312,7 +314,7 @@ export default function AdminOrganizationEditor({ mode }) {
                 aria-busy={action === 'publish' || undefined}
                 onClick={() => save({ publish: true })}
               >
-                {action === 'publish' ? 'Publishing…' : 'Save and publish'}
+                {action === 'publish' ? 'Publishing…' : 'Publish'}
               </button>
               <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} />
           </>
@@ -343,7 +345,7 @@ export default function AdminOrganizationEditor({ mode }) {
               {creating ? (
                 <TextField
                   label="Page address"
-                  hint="The end of this organization’s page address. Lowercase letters, digits, and hyphens. It cannot change after the first save."
+                  hint="Choose the end of the page link. This is fixed after the first save."
                   value={form.slug}
                   onChange={(value) => {
                     setSlugTouched(true);
@@ -376,11 +378,11 @@ export default function AdminOrganizationEditor({ mode }) {
 
           <div className="admin-editor-stack">
             <Panel title="Placement" description="Set the group and visibility here. The sponsors list sets the order.">
-              <div className="admin-editor-fields grid gap-sm sm:grid-cols-2">
+              <div className="admin-editor-fields planner-fields grid gap-sm sm:grid-cols-2">
                 <div>
                   <TextField
                     label="Tier"
-                    hint="Organizations with the same tier text form one group. Gold and gold are two groups."
+                    hint="Choose an existing tier to group sponsors together."
                     value={form.tier}
                     onChange={(value) => set('tier', value)}
                     error={errorFor('tier')}
@@ -393,8 +395,8 @@ export default function AdminOrganizationEditor({ mode }) {
                   ) : null}
                 </div>
                 <div className="sm:col-span-2">
-                  <CheckboxField
-                    label="Show this organization when it is published"
+                  <PlannerSwitch
+                    label="Show on the sponsors page"
                     checked={form.visible}
                     onChange={(value) => set('visible', value)}
                   />
@@ -405,7 +407,7 @@ export default function AdminOrganizationEditor({ mode }) {
             <Panel title="Logo" description="The organization’s mark on its page and the sponsor wall.">
               <ImagePicker
                 label="Logo"
-                hint="Choose the logo from the media library, or upload it there. The sponsors page shows it whole."
+                hint="Choose or upload a logo."
                 folder="cms-images"
                 value={form.logoPath}
                 onChange={(value) => set('logoPath', value)}
@@ -423,7 +425,8 @@ export default function AdminOrganizationEditor({ mode }) {
             <DestructiveConfirm
               className="ms-auto"
               trigger="Delete this organization"
-              title={`Delete ${form.name || docId}`}
+              triggerIcon="delete"
+              title={`Delete ${form.name || 'Unnamed organization'}`}
               confirmLabel="Delete this organization"
               busyLabel="Deleting…"
               busy={action === 'delete'}

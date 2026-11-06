@@ -120,10 +120,10 @@ test.describe.serial('attendee export and administration', () => {
   test('a staff organizer records past attendance; it reaches the account, never the directory', async () => {
     await page.goto('/admin/attendees');
     await page.getByLabel('Search').fill(name);
-    const toggle = page.getByRole('button', { name: 'Edit record' });
+    const toggle = page.getByRole('button', { name: 'Edit attendee record' });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('button', { name: 'Close attendee record' })).toHaveAttribute('aria-expanded', 'true');
 
     const panel = page.getByRole('region', { name: `Record for ${name}` });
     for (const edition of ['2024', ' 2025 ']) {
@@ -152,7 +152,7 @@ test.describe.serial('attendee export and administration', () => {
 
     await page.goto('/admin/attendees');
     await page.getByLabel('Search').fill(name);
-    const button = page.getByRole('button', { name: 'Export 1 attendee', exact: true });
+    const button = page.getByRole('button', { name: 'Download 1 attendee', exact: true });
     await expect(button).toBeEnabled();
 
     const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
@@ -177,7 +177,7 @@ test.describe.serial('attendee export and administration', () => {
     for (const secret of ['PRIVATE', uid]) expect(text).not.toContain(secret);
 
     await expect(page.getByRole('status').filter({ hasText: 'Exported 1 attendee to' }))
-      .toHaveText(`Exported 1 attendee to ${download.suggestedFilename()}. The export is in the admin log.`);
+      .toHaveText(`Exported 1 attendee to ${download.suggestedFilename()}.`);
 
     // The server wrote the audit row before it sent the file.
     const logs = await adminDb().collection('admin_logs').where('action', '==', 'exportAttendees').get();
@@ -217,7 +217,7 @@ test.describe.serial('attendee export and administration', () => {
     // The staff organizer deletes the account from its record.
     await page.goto('/admin/attendees');
     await page.getByLabel('Search').fill(name);
-    await page.getByRole('button', { name: 'Edit record' }).click();
+    await page.getByRole('button', { name: 'Edit attendee record' }).click();
     const panel = page.getByRole('region', { name: `Record for ${name}` });
     await panel.getByRole('button', { name: 'Delete account' }).click();
     await expect(panel.getByRole('heading', { name: `Delete the account for ${name}` })).toBeVisible();

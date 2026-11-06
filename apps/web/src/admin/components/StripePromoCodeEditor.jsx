@@ -1,6 +1,8 @@
+import '../plannerFields.css';
 // One promo code's form (ADR 0004 amendment 2026-11-04). It checks the
 // fields with the shared validator before sending; the server checks again
 // and owns the use count, which this form never sends.
+import PlannerSwitch from './PlannerSwitch.jsx';
 import { useState } from 'react';
 import { validatePromoCode } from 'shared/promoCodes';
 import { Checkbox } from '../../components/forms/Choice.jsx';
@@ -69,12 +71,9 @@ export default function StripePromoCodeEditor({ promo, creating, catalog, timezo
   const valueLabel = draft.kind === 'percent' ? 'Percent off' : `Amount off each ticket (${currency.toUpperCase()})`;
   return (
     <form className="space-y-md" onSubmit={submit} noValidate aria-label={creating ? 'New promo code' : `Edit ${draft.code}`}>
-      <div className="grid gap-md sm:grid-cols-2">
-        <TextField
-          label="Code" value={draft.code} onChange={(value) => change('code', value)} error={errors.code}
-          readOnly={!creating} maxLength={32} autoCapitalize="characters"
-          hint={creating ? 'Attendees type this at checkout. Case does not matter.' : 'A code’s name cannot change. Make a new code instead.'}
-        />
+      <div className="planner-fields grid gap-md sm:grid-cols-2">
+        {creating ? <TextField label="Code" value={draft.code} onChange={(value) => change('code', value)} error={errors.code}
+          maxLength={32} autoCapitalize="characters" hint="Attendees enter this at checkout." /> : <p className="text-admin-base font-semibold">{draft.code}</p>}
         <SelectField
           label="Discount" value={draft.kind} onChange={(value) => change('kind', value)} error={errors.kind}
           options={[{ value: 'percent', label: 'Percent off each ticket' }, { value: 'amount', label: 'Amount off each ticket' }]}
@@ -94,9 +93,9 @@ export default function StripePromoCodeEditor({ promo, creating, catalog, timezo
         ))}
         <FieldError message={errors.ticketTypeIds} />
       </fieldset>
-      <Checkbox tone="admin" label="Code is active" checked={draft.active} onChange={(event) => change('active', event.target.checked)} />
+      <PlannerSwitch label="Code is active" checked={draft.active} onChange={(value) => change('active', value)} />
       <div className="flex flex-wrap gap-sm">
-        <button type="submit" className={primaryButtonClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Saving promo code…' : 'Save promo code'}</button>
+        <button type="submit" className={primaryButtonClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Saving promo code…' : 'Save'}</button>
         <button type="button" className={secondaryButtonClass} onClick={onCancel}>Cancel</button>
       </div>
     </form>

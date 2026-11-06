@@ -135,7 +135,7 @@ describe('AdminSessionPitches deadline', () => {
     fireEvent.change(timeField(), { target: { value: '22:00' } });
     fireEvent.click(saveButton());
     // The button keeps focus while the save runs: it says it is busy instead of going disabled.
-    const busyButton = screen.getByRole('button', { name: 'Saving…' });
+    const busyButton = screen.getByRole('button', { name: 'Save call settings' });
     expect(busyButton).not.toBeDisabled();
     expect(busyButton).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(busyButton);
@@ -177,7 +177,7 @@ describe('AdminSessionPitches deadline', () => {
     expect(screen.getByRole('radio', { name: 'Open until I close it' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'At a set date and time' })).not.toBeChecked();
     expect(screen.queryByLabelText('Deadline Date')).toBeNull();
-    expect(screen.getByText('Intake stays open until an operator clears “Accept session pitches” and saves. The public page shows no deadline.')).toBeInTheDocument();
+    expect(screen.getByText('Turn off “Accept session pitches” to close the call.')).toBeInTheDocument();
   });
 
   it('saves "Open until I close it" as a null deadline without asking for a date', async () => {

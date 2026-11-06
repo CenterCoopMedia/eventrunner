@@ -13,7 +13,7 @@
 // the site with no saves, and nothing else: a draft with no saves is not a
 // session nobody chose.
 
-const byTitle = (row) => String(row.current?.title || row.id);
+const byTitle = (row) => String(row.current?.title || 'Untitled session');
 
 /**
  * The saved sessions, most saved first, and the count of sessions on the

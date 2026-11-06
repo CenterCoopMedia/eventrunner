@@ -1,3 +1,4 @@
+import { plannerError } from '../plannerErrors.js';
 // Email an issued or paid invoice (issue #208, part 4).
 //
 // The PDF goes to the billing email on the invoice. Staff may add one copy
@@ -154,7 +155,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
       setConfirmError('');
     } catch (err) {
       if (version !== inputVersion.current) return;
-      setServerError(err);
+      setServerError(plannerError(err));
       setErrors(fieldErrorsOf(err));
     } finally {
       setPreviewing(false);
@@ -178,7 +179,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
         confirmResend: Boolean(preview.recentSend) && confirm,
       });
     } catch (err) {
-      setServerError(err);
+      setServerError(plannerError(err));
       setErrors(fieldErrorsOf(err));
       // A refusal that names a changed preview or a recent send needs a new
       // preview; the old receipt and send id are not used again.
@@ -218,7 +219,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
       />
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={secondaryButtonClass} disabled={busy || previewing} aria-busy={previewing || undefined} onClick={showPreview}>
-          {previewing ? 'Preparing preview…' : 'Preview email'}
+          {previewing ? 'Preparing preview…' : 'Preview'}
         </button>
         {!preview ? (
           <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>
@@ -255,7 +256,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
           <div className="flex flex-wrap items-center gap-xs">
             {preview.canSend ? (
               <button type="button" className={primaryButtonClass} disabled={busy} aria-busy={busy || undefined} onClick={send}>
-                {busy ? 'Sending…' : `Send to ${preview.preview.to}`}
+                {busy ? 'Sending…' : 'Send'}
               </button>
             ) : null}
             <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>

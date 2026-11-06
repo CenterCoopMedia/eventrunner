@@ -52,10 +52,10 @@ test('an operator connects Airtable, refreshes, and sees a changed record marked
   await page.getByText('Refresh pitches from Airtable', { exact: true }).click();
   await expect(page.getByText('No refresh has run yet.')).toBeVisible();
   await page.getByText('Connection settings', { exact: true }).click();
-  await page.getByLabel('Base ID').fill(BASE);
-  await page.getByLabel('Table ID or name').fill(TABLE);
+  await page.getByLabel('Airtable base link').fill(`https://airtable.com/${BASE}`);
+  await page.getByLabel('Table name').fill(TABLE);
   await page.getByLabel('Automatic refresh').selectOption('60');
-  await page.getByRole('button', { name: 'Save Airtable settings' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Airtable settings saved. Refresh to check the connection.')).toBeVisible();
 
   // Keyboard path: the refresh control takes focus and Enter runs it.

@@ -1,3 +1,4 @@
+import { plannerMessage } from '../plannerErrors.js';
 // Attendee registration tab (issue #32, spec §3.4) — the surface where an
 // organizer approves a scholarship attendee, a volunteer, or a press pass,
 // and revokes access when someone should no longer have it.
@@ -45,6 +46,8 @@
 // goes back to that row's panel (refusedBeforeDelete). Every other failure
 // — delete-incomplete, a gateway timeout, a dropped connection — may have
 // come after the directory commit, and the retry resumes it.
+import { Link } from 'react-router';
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -202,7 +205,7 @@ export default function AdminAttendees() {
             : 'Registration updated.',
       );
     } catch (err) {
-      showToast(err.message, { tone: 'error' });
+      showToast(plannerMessage(err.message), { tone: 'error' });
     } finally {
       setBusyUid(null);
     }
@@ -221,10 +224,10 @@ export default function AdminAttendees() {
       saveTextFile(result.filename, result.csv);
       setExportResult({
         tone: 'ok',
-        message: `Exported ${attendeeCount(result.rowCount)} to ${result.filename}. The export is in the admin log.`,
+        message: `Exported ${attendeeCount(result.rowCount)} to ${result.filename}.`,
       });
     } catch (err) {
-      setExportResult({ tone: 'error', message: err.message });
+      setExportResult({ tone: 'error', message: plannerMessage(err.message) });
     } finally {
       exportingRef.current = false;
       setExporting(false);
@@ -297,8 +300,8 @@ export default function AdminAttendees() {
       setBadgeRemovalResult({ uid, tone: 'ok', message: `“${badge}” was removed.` });
       showToast('Custom badge removed.');
     } catch (err) {
-      setBadgeRemovalResult({ uid, tone: 'error', message: err.message });
-      showToast(err.message, { tone: 'error' });
+      setBadgeRemovalResult({ uid, tone: 'error', message: plannerMessage(err.message) });
+      showToast(plannerMessage(err.message), { tone: 'error' });
     } finally {
       setRemovingBadges((current) => current.filter((key) => key !== pendingKey));
     }
@@ -309,18 +312,18 @@ export default function AdminAttendees() {
       <AdminPageHeader
         title="Attendees"
         identifiers={rows ? `${shown.length} of ${rows.length} account${rows.length === 1 ? '' : 's'}` : undefined}
-        description="Registration status for every account. An approval you make here is recorded as an organizer decision and survives a ticket refund; a revocation is never undone by a later ticket sync. An export holds names, email addresses, profile details and registration answers, including diet and access needs, and every export is recorded."
+        description="Manage attendance and access. Organizer approvals stay in place after refunds. Downloads include private registration answers; keep these files secure."
         actions={
           rows === null ? null : (
-            <button
-              type="button"
+            <AdminIconControl
+              label={`Download ${attendeeCount(shown.length)}`}
+              icon="download"
+              busy={exporting}
               className={secondaryButtonClass}
               onClick={exportShown}
               disabled={exporting || shown.length === 0}
               aria-busy={exporting ? 'true' : undefined}
-            >
-              {exporting ? 'Exporting…' : `Export ${attendeeCount(shown.length)}`}
-            </button>
+            />
           )
         }
       />
@@ -380,7 +383,7 @@ export default function AdminAttendees() {
       {rows === null ? (
         <AdminLoadingState label="Loading attendees…" />
       ) : shown.length === 0 ? (
-        <AdminEmptyState title="No attendees" description="No account matches this search." />
+        <AdminEmptyState title={rows.length ? "No matching attendees" : "No attendees yet"} description={rows.length ? "Clear the filters to see all attendees." : "Import a registration list to add attendees."} action={rows.length ? <button type="button" className={secondaryButtonClass} onClick={() => { setFilter('all'); setSearch(''); }}>Clear filters</button> : <Link to="/admin/import" className={secondaryButtonClass}>Import attendees</Link>} />
       ) : (
         <Panel flush>
           <ul>
@@ -421,6 +424,7 @@ export default function AdminAttendees() {
                                 <StatusBadge>{badge}</StatusBadge>
                                 <DestructiveConfirm
                                   trigger={`Remove “${badge}”`}
+                                  triggerIcon="remove"
                                   title={`Remove “${badge}”`}
                                   confirmLabel={`Remove “${badge}”`}
                                   busyLabel="Removing…"

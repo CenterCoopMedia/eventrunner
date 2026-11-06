@@ -213,7 +213,7 @@ describe('the invoice editor', () => {
     fireEvent.change(screen.getByLabelText('Tax row 1 amount'), { target: { value: '12.50' } });
     expect(total).toHaveTextContent('Total: $10,012.50');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(invoiceCalls().some((body) => body.action === 'saveDraft')).toBe(true));
     const sent = invoiceCalls().find((body) => body.action === 'saveDraft');
     expect(sent.invoiceId).toMatch(/^inv_[a-z0-9]{16,40}$/);
@@ -234,7 +234,7 @@ describe('the invoice editor', () => {
     fireEvent.change(screen.getByLabelText('Line 1 description'), { target: { value: 'Booth' } });
     fireEvent.change(screen.getByLabelText('Line 1 unit price'), { target: { value: '12.345' } });
     expect(screen.getByTestId('invoice-total')).toHaveTextContent('1 row is not counted');
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     const price = screen.getByLabelText('Line 1 unit price');
     await waitFor(() => expect(price).toHaveFocus());
     expect(price).toHaveAttribute('aria-invalid', 'true');
@@ -262,7 +262,7 @@ describe('the invoice editor', () => {
     expect(screen.getByLabelText('Discount row 1 amount')).toHaveValue('500.00');
     expect(screen.getByTestId('invoice-total')).toHaveTextContent('Total: $4,500.00');
     fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Thank you.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The invoice changed since you opened it.');
     expect(invoiceCalls().find((body) => body.action === 'saveDraft').expectedRevision).toBe(3);
     expect(screen.getByRole('button', { name: 'Reload the saved invoice' })).toBeInTheDocument();
@@ -278,7 +278,7 @@ describe('the invoice editor', () => {
     await renderAt('/admin/invoices/new/invoice');
     await screen.findByRole('heading', { level: 1, name: 'New invoice' }, { timeout: 5000 });
     fireEvent.change(screen.getByLabelText('Name to bill'), { target: { value: 'Example Press' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The invoice changed since you opened it.');
     fireEvent.click(screen.getByRole('button', { name: 'Reload the saved invoice' }));
     await waitFor(() => expect(currentPath).toBe(`/admin/invoices/${savedId}`));
@@ -292,8 +292,9 @@ describe('the invoice editor', () => {
     await renderAt(`/admin/invoices/${STORED.id}`);
     expect(await screen.findByRole('heading', { level: 1, name: 'INV-0001' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('This invoice is issued. Its details cannot change.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
-    expect(screen.getByLabelText('Name to bill')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByLabelText('Name to bill')).toBeNull();
+    expect(screen.getByText(STORED.billTo.name)).toBeInTheDocument();
   });
 });
 
@@ -305,7 +306,7 @@ describe('invoice settings', () => {
     await renderAt('/admin/invoices/settings');
     const instructions = await screen.findByLabelText('Payment instructions');
     fireEvent.change(instructions, { target: { value: 'Pay by bank transfer.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(invoiceCalls().some((body) => body.action === 'saveSettings')).toBe(true));
     expect(instructions).toBeDisabled();
     await act(async () => finish());
@@ -327,10 +328,10 @@ describe('invoice settings', () => {
   it('shows staff the settings read-only', async () => {
     await renderAt('/admin/invoices/settings');
     expect(await screen.findByRole('heading', { level: 1, name: 'Invoice settings' }, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByText(/Only an operator can change these settings/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save settings' })).toBeNull();
-    expect(screen.getByLabelText('Payment instructions')).toHaveAttribute('readonly');
-    expect(screen.getByText('Next number INV-0001')).toBeInTheDocument();
+    expect(screen.getByText(/An operator can update billing and bank details/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByText('INV-0001')).toBeInTheDocument();
   });
 
   it('lets an operator save, with the revision it read', async () => {
@@ -340,7 +341,7 @@ describe('invoice settings', () => {
     await screen.findByRole('heading', { level: 1, name: 'Invoice settings' }, { timeout: 5000 });
     fireEvent.change(screen.getByLabelText('Number prefix'), { target: { value: 'sponsor' } });
     fireEvent.change(screen.getByLabelText('Payment instructions'), { target: { value: 'Account 000000.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(invoiceCalls().some((body) => body.action === 'saveSettings')).toBe(true));
     const sent = invoiceCalls().find((body) => body.action === 'saveSettings');
     expect(sent.expectedRevision).toBe(0);
@@ -371,9 +372,10 @@ describe('issuing an invoice', () => {
     await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({ action: 'issue', invoiceId: STORED.id, expectedRevision: 3 }));
     expect(await screen.findByRole('heading', { level: 1, name: 'INV-0004' })).toBeInTheDocument();
     expect((await screen.findAllByText('Issued as INV-0004. Its details are now locked.'))[0]).toHaveAttribute('role', 'status');
-    expect(screen.getByLabelText('Name to bill')).toBeDisabled();
+    expect(screen.queryByLabelText('Name to bill')).toBeNull();
+    expect(screen.getByText(STORED.billTo.name)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
   });
 
   it('asks for a save first when the form has changes, and sends nothing', async () => {
@@ -382,7 +384,7 @@ describe('issuing an invoice', () => {
     await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
     fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Changed.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
-    expect(await screen.findByText('Save the draft first. Issue uses the saved draft, not the form.')).toBeInTheDocument();
+    expect(await screen.findByText('Save your changes before issuing this invoice.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Issue this invoice' })).toBeNull();
     expect(invoiceCalls().some((body) => body.action === 'issue')).toBe(false);
   });
@@ -395,7 +397,7 @@ describe('issuing an invoice', () => {
     const confirm = await screen.findByRole('button', { name: 'Issue this invoice' });
     fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Changed after.' } });
     fireEvent.click(confirm);
-    expect(await screen.findByText('Save the draft first. Issue uses the saved draft, not the form.')).toBeInTheDocument();
+    expect(await screen.findByText('Save your changes before issuing this invoice.')).toBeInTheDocument();
     expect(invoiceCalls().some((body) => body.action === 'issue')).toBe(false);
   });
 
@@ -585,7 +587,7 @@ describe('emailing an invoice', () => {
     await waitFor(() => expect(within(form).getByLabelText('Copy to', { exact: false })).toHaveFocus());
     fireEvent.change(within(form).getByLabelText('Copy to', { exact: false }), { target: { value: 'Finance@Example.org' } });
     fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Thanks again.' } });
-    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({
       action: 'previewSend', invoiceId: ISSUED.id, cc: 'finance@example.org', note: 'Thanks again.',
     }));
@@ -594,7 +596,7 @@ describe('emailing an invoice', () => {
     expect(within(preview).getByText('INV-0004.pdf')).toBeInTheDocument();
     expect(within(preview).getByText(/Thanks again\./)).toBeInTheDocument();
 
-    fireEvent.click(within(form).getByRole('button', { name: 'Send to billing@example.org' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(invoiceCalls().at(-1)).toMatchObject({
       action: 'send', invoiceId: ISSUED.id, receipt: RECEIPT, cc: 'finance@example.org', note: 'Thanks again.', confirmResend: false,
     }));
@@ -612,11 +614,11 @@ describe('emailing an invoice', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
-    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await within(form).findByRole('region', { name: 'Email preview' });
     fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Changed.' } });
     expect(within(form).queryByRole('region', { name: 'Email preview' })).toBeNull();
-    expect(within(form).queryByRole('button', { name: 'Send to billing@example.org' })).toBeNull();
+    expect(within(form).queryByRole('button', { name: 'Send' })).toBeNull();
   });
 
   it('drops a preview answer that arrives after the note changed, so Send cannot use old input', async () => {
@@ -629,12 +631,12 @@ describe('emailing an invoice', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
     fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'First.' } });
-    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await waitFor(() => expect(typeof release).toBe('function'));
     fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Second.' } });
     await act(async () => { release(); });
     expect(within(form).queryByRole('region', { name: 'Email preview' })).toBeNull();
-    expect(within(form).queryByRole('button', { name: 'Send to billing@example.org' })).toBeNull();
+    expect(within(form).queryByRole('button', { name: 'Send' })).toBeNull();
     expect(invoiceCalls().some((body) => body.action === 'send')).toBe(false);
   });
 
@@ -646,15 +648,15 @@ describe('emailing an invoice', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
-    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await within(form).findByRole('region', { name: 'Email preview' });
     expect(within(form).getByText(/was emailed to billing@example\.org less than 15 minutes ago/)).toBeInTheDocument();
     const again = within(form).getByLabelText('Send it again anyway');
-    fireEvent.click(within(form).getByRole('button', { name: 'Send to billing@example.org' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(again).toHaveFocus());
     expect(invoiceCalls().some((body) => body.action === 'send')).toBe(false);
     fireEvent.click(again);
-    fireEvent.click(within(form).getByRole('button', { name: 'Send to billing@example.org' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(invoiceCalls().at(-1)).toMatchObject({ action: 'send', confirmResend: true }));
   });
 
@@ -667,7 +669,7 @@ describe('emailing an invoice', () => {
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
     const cc = within(form).getByLabelText('Copy to', { exact: false });
     fireEvent.change(cc, { target: { value: 'not an address' } });
-    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await waitFor(() => expect(cc).toHaveFocus());
     expect(cc).toHaveAttribute('aria-invalid', 'true');
     expect(invoiceCalls().some((body) => body.action === 'previewSend')).toBe(false);
@@ -680,9 +682,9 @@ describe('emailing an invoice', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
-    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     expect(await within(form).findByText(/cannot send attachments/)).toBeInTheDocument();
-    expect(within(form).queryByRole('button', { name: 'Send to billing@example.org' })).toBeNull();
+    expect(within(form).queryByRole('button', { name: 'Send' })).toBeNull();
   });
 
   it('offers no email for a void invoice', async () => {
@@ -711,7 +713,7 @@ describe('paying an invoice by card (issue 519)', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     const card = screen.getByRole('region', { name: 'Pay by card' });
     expect(within(card).getByText(/Card payment links need Stripe\./)).toBeInTheDocument();
-    expect(within(card).queryByRole('button', { name: 'Make a card payment link' })).toBeNull();
+    expect(within(card).queryByRole('button', { name: 'Create payment link' })).toBeNull();
   });
 
   it('makes a link from the invoice alone and shows it with when it ends', async () => {
@@ -721,13 +723,13 @@ describe('paying an invoice by card (issue 519)', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     const card = screen.getByRole('region', { name: 'Pay by card' });
     expect(within(card).getByText(/Stripe test mode/)).toBeInTheDocument();
-    fireEvent.click(within(card).getByRole('button', { name: 'Make a card payment link' }));
+    fireEvent.click(within(card).getByRole('button', { name: 'Create payment link' }));
     await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({ action: 'createPayLink', invoiceId: ISSUED.id }));
     const link = await within(card).findByRole('link', { name: /Open the card payment link/ });
     expect(link.getAttribute('href') === PAY_URL).toBe(true);
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(within(card).getByText(/Works until/)).toBeInTheDocument();
-    expect(within(card).queryByRole('button', { name: 'Make a card payment link' })).toBeNull();
+    expect(within(card).queryByRole('button', { name: 'Create payment link' })).toBeNull();
     expect(screen.getAllByText('Made a card payment link for INV-0004.').length).toBeGreaterThan(0);
   });
 
@@ -737,7 +739,7 @@ describe('paying an invoice by card (issue 519)', () => {
     await renderAt(`/admin/invoices/${ISSUED.id}`);
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     const card = screen.getByRole('region', { name: 'Pay by card' });
-    fireEvent.click(within(card).getByRole('button', { name: 'Make a card payment link' }));
+    fireEvent.click(within(card).getByRole('button', { name: 'Create payment link' }));
     expect(await within(card).findByText('Stripe did not answer. Try again.')).toBeInTheDocument();
   });
 
@@ -751,8 +753,8 @@ describe('paying an invoice by card (issue 519)', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     const record = screen.getByRole('region', { name: 'Invoice record' });
     expect(within(record).getByText('Card (Stripe)')).toBeInTheDocument();
-    expect(within(record).getByText('pi_test_0001')).toBeInTheDocument();
-    expect(within(record).queryByRole('button', { name: 'Make a card payment link' })).toBeNull();
+    expect(within(record).queryByText('pi_test_0001')).toBeNull();
+    expect(within(record).queryByRole('button', { name: 'Create payment link' })).toBeNull();
   });
 
   it('flags a card payment for review, and an operator closes it with a note', async () => {
@@ -770,7 +772,7 @@ describe('paying an invoice by card (issue 519)', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     const panel = screen.getByRole('region', { name: 'A card payment needs review' });
     expect(within(panel).getByText(/Stripe took \$4,500\.00 for this invoice after it was voided\./)).toBeInTheDocument();
-    expect(within(panel).getByText(/pi_test_0001/)).toBeInTheDocument();
+    expect(within(panel).queryByText(/pi_test_0001/)).toBeNull();
     fireEvent.click(within(panel).getByRole('button', { name: 'Mark reviewed' }));
     const note = await within(panel).findByLabelText('Review note', { exact: false });
     await waitFor(() => expect(note).toHaveFocus());
@@ -807,7 +809,7 @@ describe('paying an invoice by card (issue 519)', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     const card = screen.getByRole('region', { name: 'Pay by card' });
     expect(within(card).getByRole('link', { name: /Open the card payment link/ })).toBeInTheDocument();
-    expect(await within(card).findByRole('button', { name: 'Make a card payment link' }, { timeout: 4000 })).toBeInTheDocument();
+    expect(await within(card).findByRole('button', { name: 'Create payment link' }, { timeout: 4000 })).toBeInTheDocument();
     expect(within(card).queryByRole('link', { name: /Open the card payment link/ })).toBeNull();
   });
 

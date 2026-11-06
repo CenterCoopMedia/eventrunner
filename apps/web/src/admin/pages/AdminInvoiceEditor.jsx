@@ -1,3 +1,4 @@
+import { plannerError } from '../plannerErrors.js';
 // Invoice editor (issue #208): write and save one invoice draft.
 //
 // Save sends the draft to invoiceAdmin, which checks it with the same
@@ -14,11 +15,12 @@
 // totals and copies the issuer block, after a confirmation that names the
 // next number. Issue sends the revision the form was filled from, so it
 // issues the saved draft and never the unsaved form: with changes on the
-// form, the page asks for a save first. After issue the fields sit in a
-// disabled fieldset, and InvoiceRecord shows the frozen record with Email
+// form, the page asks for a save first. After issue InvoiceRecord shows the
+// frozen billing details, lines, totals and the actions: Email
 // invoice (an issued or paid one), Mark paid, Duplicate and, for an
 // operator, Void and Reopen (a paid invoice). Download PDF is in the header
 // of every issued invoice.
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -272,7 +274,7 @@ export default function AdminInvoiceEditor({ mode }) {
       }
     } catch (err) {
       if (err?.code === 'conflict') setErrorTitle('The invoice was not saved');
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -292,7 +294,7 @@ export default function AdminInvoiceEditor({ mode }) {
       // The draft now opens at its own address, as an edit.
       if (mode === 'create') navigate(`${INVOICES_ROOT}/${encodeURIComponent(invoiceId)}`, { replace: true });
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     }
   }
 
@@ -352,7 +354,7 @@ export default function AdminInvoiceEditor({ mode }) {
     } catch (err) {
       setIssueConfirm(null);
       setErrorTitle('The invoice was not issued');
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -480,7 +482,7 @@ export default function AdminInvoiceEditor({ mode }) {
       navigate(`${INVOICES_ROOT}/${encodeURIComponent(newInvoiceId)}`);
     } catch (err) {
       setErrorTitle('The invoice was not copied');
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -495,7 +497,7 @@ export default function AdminInvoiceEditor({ mode }) {
       setStatus(`Downloaded ${invoice.number}.pdf.`);
     } catch (err) {
       setErrorTitle('The PDF was not downloaded');
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -512,7 +514,7 @@ export default function AdminInvoiceEditor({ mode }) {
       navigate(INVOICES_ROOT);
     } catch (err) {
       setErrorTitle('The draft was not deleted');
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -563,19 +565,11 @@ export default function AdminInvoiceEditor({ mode }) {
             {unsaved ? <UnsavedEditBadge /> : null}
           </>
         }
-        identifiers={mode === 'edit' ? `${invoiceId} · ${currency?.toUpperCase()}` : currency?.toUpperCase()}
-        description="Save keeps a draft. The server checks every line and computes the totals again."
+        identifiers={currency?.toUpperCase()}
+        description="Prepare an invoice for a sponsor or partner."
         actions={
           locked ? (
-            <button
-              type="button"
-              className={secondaryButtonClass}
-              disabled={busy !== null}
-              aria-busy={busy === 'pdf' || undefined}
-              onClick={downloadPdf}
-            >
-              {busy === 'pdf' ? 'Downloading…' : 'Download PDF'}
-            </button>
+            <AdminIconControl label="Download PDF" icon="download" busy={busy === 'pdf'} className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'pdf' || undefined} onClick={downloadPdf} />
           ) : (
             <>
               {mode === 'edit' ? (
@@ -589,7 +583,7 @@ export default function AdminInvoiceEditor({ mode }) {
                 disabled={busy !== null}
                 aria-busy={busy === 'save' || undefined}
               >
-                {busy === 'save' ? 'Saving…' : 'Save draft'}
+                {busy === 'save' ? 'Saving…' : 'Save'}
               </button>
             </>
           )
@@ -656,7 +650,7 @@ export default function AdminInvoiceEditor({ mode }) {
         />
       ) : null}
 
-      <fieldset disabled={locked} className="flex min-w-0 flex-col gap-md">
+      {!locked ? <fieldset disabled={busy !== null} className="flex min-w-0 flex-col gap-md">
         <legend className="sr-only">Invoice details</legend>
         <Panel title="Bill to" description="Who pays this invoice. Choose an organization to fill the name and its sponsor package.">
           <div className="flex flex-col gap-sm">
@@ -669,7 +663,7 @@ export default function AdminInvoiceEditor({ mode }) {
                 { value: '', label: 'No organization' },
                 ...organizations.rows.map((row) => ({
                   value: row.id,
-                  label: row.current?.tier ? `${row.current?.name || row.id} (${row.current.tier})` : row.current?.name || row.id,
+                  label: row.current?.tier ? `${row.current?.name || 'Unnamed organization'} (${row.current.tier})` : row.current?.name || 'Unnamed organization',
                 })),
               ]}
               className="sm:max-w-[28rem]"
@@ -769,13 +763,7 @@ export default function AdminInvoiceEditor({ mode }) {
                       {preview?.lineAmounts[index] == null ? 'Not counted yet' : money(preview.lineAmounts[index])}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className={`${linkButtonClass} self-end`}
-                    onClick={() => removeLine(index)}
-                  >
-                    Remove {lineName(index).toLowerCase()}
-                  </button>
+                  <AdminIconControl label={`Remove ${lineName(index).toLowerCase()}`} icon="remove" className={linkButtonClass} onClick={() => removeLine(index)} />
                 </div>
               </fieldset>
             ))}
@@ -831,13 +819,7 @@ export default function AdminInvoiceEditor({ mode }) {
                     aria-label={`${adjustmentName(row, index)} amount`}
                     className="w-40 font-admin-data tabular-nums"
                   />
-                  <button
-                    type="button"
-                    className={`${linkButtonClass} self-end`}
-                    onClick={() => removeAdjustment(index)}
-                  >
-                    Remove {adjustmentName(row, index).toLowerCase()}
-                  </button>
+                  <AdminIconControl label={`Remove ${adjustmentName(row, index).toLowerCase()}`} icon="remove" className={linkButtonClass} onClick={() => removeAdjustment(index)} />
                 </div>
               </fieldset>
             ))}
@@ -863,7 +845,7 @@ export default function AdminInvoiceEditor({ mode }) {
           </div>
         </Panel>
 
-        <Panel title="Totals" description="A preview. The server computes the same figures when you save.">
+        <Panel title="Totals" description="Review the total before issuing the invoice.">
           {preview ? (
             <div className="flex flex-col gap-xs">
               <dl className="grid max-w-[28rem] grid-cols-[1fr_auto] gap-x-md gap-y-3xs text-admin-base">
@@ -906,7 +888,7 @@ export default function AdminInvoiceEditor({ mode }) {
             <TextField
               label="Due date"
               type="date"
-              hint={`Optional. A date on the event's clock${timeZone ? ` (${timeZone})` : ''}.`}
+              hint="Optional. When payment is due."
               value={form.dueDate}
               onChange={(value) => set({ dueDate: value })}
               error={errorFor('dueDate')}
@@ -923,7 +905,7 @@ export default function AdminInvoiceEditor({ mode }) {
             />
           </div>
         </Panel>
-      </fieldset>
+      </fieldset> : null}
 
       <div className="flex flex-wrap items-center gap-xs">
         <Link to={INVOICES_ROOT} className={secondaryButtonClass}>
@@ -933,6 +915,7 @@ export default function AdminInvoiceEditor({ mode }) {
           <DestructiveConfirm
             className="ms-auto"
             trigger="Delete this draft"
+            triggerIcon="delete"
             confirmLabel="Delete this draft"
             busyLabel="Deleting…"
             busy={busy === 'delete'}
@@ -978,7 +961,7 @@ function IssueConfirm({ confirm, busy, onIssue, onCancel }) {
       <h2 id={headingId} className="text-admin-base font-bold text-admin-ink">Issue this invoice?</h2>
       {confirm.unsaved ? (
         <>
-          <p className="max-w-[65ch] text-admin-sm text-admin-ink">Save the draft first. Issue uses the saved draft, not the form.</p>
+          <p className="max-w-[65ch] text-admin-sm text-admin-ink">Save your changes before issuing this invoice.</p>
           <div>
             <button type="button" className={secondaryButtonClass} onClick={onCancel}>Keep editing</button>
           </div>

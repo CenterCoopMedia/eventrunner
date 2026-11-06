@@ -1,3 +1,5 @@
+import { plannerError } from '../plannerErrors.js';
+import '../plannerFields.css';
 // Speaker create/edit form (issue #20), wired to createSpeaker /
 // updateSpeaker / deleteSpeaker.
 //
@@ -50,14 +52,14 @@ import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 
 const STATUS_OPTIONS = [
-  { value: 'draft', label: 'Draft — hidden from the public site' },
-  { value: 'approved', label: 'Live — visible in the public directory' },
-  { value: 'removed', label: 'Removed — hidden everywhere, record kept' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Published' },
+  { value: 'removed', label: 'Removed' },
 ];
 
 const PIPELINE_STATUS_LABELS = {
-  invited: 'Invite sent — waiting for this speaker to accept',
-  accepted: 'Accepted — waiting for approval',
+  invited: 'Invitation sent',
+  accepted: 'Accepted, awaiting approval',
 };
 
 /**
@@ -250,7 +252,7 @@ export default function AdminSpeakerEditor({ mode }) {
         setStatus('Saved. The public directory updates within moments.');
       }
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setAction(null);
     }
@@ -268,12 +270,12 @@ export default function AdminSpeakerEditor({ mode }) {
           ? 'Speaker marked removed and hidden everywhere.'
           : `Speaker deleted and unlinked from ${
             response.unlinkedSessions.length + response.unlinkedDrafts.length
-          } session document(s).`,
+          } sessions.`,
       );
       navigate(SPEAKERS_LIST);
     } catch (err) {
-      setError(err);
-      setErrorTitle('The server refused the delete');
+      setError(plannerError(err));
+      setErrorTitle('The speaker was not deleted');
       // The server refused a full unlink and named the soft delete as the
       // way through; nothing was changed.
       if (err?.code === 'too-many-references') setDeleteBlocked(true);
@@ -287,7 +289,8 @@ export default function AdminSpeakerEditor({ mode }) {
     return (
       <AdminEmptyState
         title="No such speaker"
-        description="That speaker record does not exist. It may have been deleted."
+        description="That speaker may have been deleted. Open the list to choose another."
+        action={<Link to={SPEAKERS_LIST} className={secondaryButtonClass}>Back to speakers</Link>}
       />
     );
   }
@@ -307,11 +310,11 @@ export default function AdminSpeakerEditor({ mode }) {
           </>
         )}
         identifiers={null}
-        description="This is the one record for this person. Sessions point at it by id, and the public directory shows a published copy of the safe fields."
+        description="Manage this speaker’s profile and contact details."
         actions={
           <>
             <button type="submit" className={primaryButtonClass} disabled={saving || photoBusy} aria-busy={action === 'draft' || undefined}>
-              {action === 'draft' ? 'Saving…' : mode === 'create' ? 'Create speaker' : 'Save speaker'}
+              {action === 'draft' ? 'Saving…' : mode === 'create' ? 'Create' : 'Save'}
             </button>
             <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
@@ -350,9 +353,9 @@ export default function AdminSpeakerEditor({ mode }) {
               required
             />
           </div>
-          <div className="mt-sm">
+          {mode === 'create' ? <div className="mt-sm">
             <TextField
-              label="URL slug"
+              label="Page link"
               hint={
                 mode === 'edit'
                   ? 'This address stays the same when the name changes.'
@@ -360,10 +363,9 @@ export default function AdminSpeakerEditor({ mode }) {
               }
               value={form.slug}
               onChange={mode === 'edit' ? () => {} : (value) => set({ slug: value })}
-              readOnly={mode === 'edit'}
               error={errorFor('slug')}
             />
-          </div>
+          </div> : null}
         </Panel>
 
         <Panel
@@ -381,7 +383,7 @@ export default function AdminSpeakerEditor({ mode }) {
               error={errorFor('pronouns')}
             />
           </div>
-          <div className="grid gap-sm sm:grid-cols-2">
+          <div className="planner-fields grid gap-sm sm:grid-cols-2">
             <TextField
               label="Job title"
               value={form.jobTitle}
@@ -411,7 +413,7 @@ export default function AdminSpeakerEditor({ mode }) {
                   value={form.headshotPath}
                   onChange={(path) => set({ headshotPath: path })}
                   label="Headshot"
-                  saveNote="Save speaker to keep this photo. A live speaker shows it on the public directory."
+                  saveNote="Save to use this photo."
                   appearance="admin"
                   onBusyChange={setPhotoBusy}
                 />
@@ -456,9 +458,6 @@ export default function AdminSpeakerEditor({ mode }) {
                 <p className="text-admin-sm text-admin-ink-secondary">
                   {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
                 </p>
-                <p className="text-admin-sm text-admin-ink-secondary">
-                  Managed by the invitation flow. Saving this form leaves it unchanged.
-                </p>
               </div>
             )}
           </div>
@@ -473,8 +472,7 @@ export default function AdminSpeakerEditor({ mode }) {
               <div className="admin-object-row__body">
                 <h3 className="admin-object-row__title">Linked attendee account</h3>
                 <p className="admin-object-row__description">
-                  This speaker is linked to an attendee account. The link is managed
-                  by the invitation flow and cannot be edited here.
+                  This speaker has an attendee account.
                 </p>
               </div>
             </div>
@@ -493,6 +491,7 @@ export default function AdminSpeakerEditor({ mode }) {
           <DestructiveConfirm
             className="ms-auto"
             trigger="Delete this speaker"
+            triggerIcon="delete"
             title={`Delete ${form.firstName} ${form.lastName}`.trim()}
             confirmLabel="Delete this speaker"
             busyLabel="Deleting…"
@@ -506,7 +505,7 @@ export default function AdminSpeakerEditor({ mode }) {
       </div>
 
       {deleteBlocked ? (
-        <Panel title="Delete could not remove every reference">
+        <Panel title="This speaker could not be deleted">
           <p className="max-w-[65ch] text-admin-base text-admin-ink">
             Nothing was changed. Marking the speaker removed hides them from the
             public directory and every public surface, and leaves the sessions

@@ -1,3 +1,7 @@
+import { plannerMessage } from '../plannerErrors.js';
+import '../plannerFields.css';
+import AdminIconControl from './AdminIconControl.jsx';
+import PlannerSwitch from './PlannerSwitch.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Checkbox } from '../../components/forms/Choice.jsx';
 import { currencyDigits, formatTicketMoney } from '../../lib/ticketingCommerce.js';
@@ -93,7 +97,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
       onSaved(result);
     } catch (err) {
       setRecoveryRequired(true);
-      setNotice({ tone: 'error', message: err.message });
+      setNotice({ tone: 'error', message: plannerMessage(err.message) });
     } finally { busyRef.current = false; setBusy(false); setReloading(false); }
   }
 
@@ -127,7 +131,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
       loadSaved(result.catalog);
       setNotice({ tone: 'ok', message: 'Catalog saved. Existing orders keep the prices they were issued with.' });
       onSaved(result);
-    } catch (err) { setRecoveryRequired(true); setNotice({ tone: 'error', message: err.message }); }
+    } catch (err) { setRecoveryRequired(true); setNotice({ tone: 'error', message: plannerMessage(err.message) }); }
     finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -136,8 +140,8 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
     <Panel title="Ticket catalog" description="One currency, full-event admission, and prices that include every amount the attendee will pay. Early-bird types share the event’s total capacity.">
       <form className="space-y-md" onSubmit={save} noValidate>
         {recoveryRequired || revisionChanged ? <div className="space-y-sm"><Notice tone="caution" message={recoveryRequired ? 'The save could not be confirmed. Your unsaved edits are still here. Reload the saved catalog to check the current version before saving again.' : 'The saved catalog has changed. Your unsaved edits are still here; reload to use the current saved version.'} /><button type="button" className={secondaryButtonClass} aria-busy={reloading} aria-disabled={busy} onClick={reloadCatalog}>{reloading ? 'Reloading saved catalog…' : 'Discard unsaved edits and reload catalog'}</button></div> : null}
-        <div className="grid gap-md sm:grid-cols-2">
-          {data.catalog ? <TextField label="Currency" value={draft.currency.toUpperCase()} readOnly hint="Currency is fixed after the first catalog is saved." /> : <SelectField label="Currency" value={draft.currency.toLowerCase()} onChange={(value) => changed('currency', value)} options={['usd', 'cad', 'eur', 'gbp', 'aud', 'nzd'].map((currency) => ({ value: currency, label: currency.toUpperCase() }))} />}
+        <div className="planner-fields grid gap-md sm:grid-cols-2">
+          {data.catalog ? <p className="text-admin-base text-admin-ink"><span className="font-semibold">Currency</span> {draft.currency.toUpperCase()}</p> : <SelectField label="Currency" value={draft.currency.toLowerCase()} onChange={(value) => changed('currency', value)} options={['usd', 'cad', 'eur', 'gbp', 'aud', 'nzd'].map((currency) => ({ value: currency, label: currency.toUpperCase() }))} />}
           <TextField label="Event capacity" type="number" inputMode="numeric" min="1" max="1000000" step="1" value={draft.capacity} onChange={(value) => changed('capacity', quantity(value))} />
           <TextField label="Maximum tickets per order" type="number" inputMode="numeric" min="1" max="20" step="1" value={draft.maxPerOrder} onChange={(value) => changed('maxPerOrder', quantity(value))} />
           <SelectField label="Tax treatment" value={draft.taxTreatment} onChange={(value) => changed('taxTreatment', value)} options={[{ value: 'inclusive', label: 'Tax included in ticket prices' }, { value: 'not_collected', label: 'No tax collected for this event' }]} />
@@ -148,35 +152,35 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
         <TextAreaField label="Refund policy" value={draft.refundPolicy} onChange={(value) => changed('refundPolicy', value)} rows={4} maxLength={2000} hint="Attendees must see and accept these terms before proceeding to payment." />
         <Checkbox tone="admin" label="Commercial terms are approved for this event" checked={draft.commercialTermsConfirmed} onChange={(event) => changed('commercialTermsConfirmed', event.target.checked)} />
         <p className="text-admin-sm text-admin-ink-secondary">Confirm the organizer’s merchant account, currency, taxes, refund/support responsibilities, and fee allocation before opening sales.</p>
-        <Checkbox tone="admin" label="Publish the catalog" checked={draft.published} onChange={(event) => changed('published', event.target.checked)} />
-        <Checkbox tone="admin" label="Pause new sales" checked={draft.salesPaused} onChange={(event) => changed('salesPaused', event.target.checked)} />
+        <PlannerSwitch label="Publish tickets" checked={draft.published} onChange={(value) => changed('published', value)} />
+        <PlannerSwitch label="Ticket sales" checked={!draft.salesPaused} onChange={(value) => changed('salesPaused', !value)} />
         <div className="space-y-md">
           <h3 className="text-admin-lg font-bold">Ticket types</h3>
           {draft.ticketTypes.map((type, index) => <fieldset key={type.id} className="min-w-0 space-y-sm rounded-admin-panel border-admin-hairline border-admin-rule-hairline p-md">
             <legend className="px-xs text-admin-base font-bold">{type.name || `Ticket type ${index + 1}`}</legend>
-            <div className="grid gap-md sm:grid-cols-2">
+            <div className="planner-fields grid gap-md sm:grid-cols-2">
               <TextField label="Ticket name" value={type.name} maxLength={120} onChange={(value) => updateType(index, 'name', value)} />
               <TextField label={`Price (${draft.currency.toUpperCase()})`} type="text" inputMode="decimal" value={priceInputs[type.id] ?? '0'} error={priceErrors[type.id]} hint={`0 for free admission. Current preview: ${formatTicketMoney(Math.round(Number(priceInputs[type.id]) * (10 ** currencyDigits(draft.currency))), draft.currency)}`} onChange={(value) => setPriceInputs((previous) => ({ ...previous, [type.id]: value }))} />
               <TextField label="Ticket-type capacity" type="number" inputMode="numeric" min="1" max="1000000" step="1" value={type.capacity} onChange={(value) => updateType(index, 'capacity', quantity(value))} />
-              <SelectField label="Availability" value={type.visibility} onChange={(value) => updateType(index, 'visibility', value)} options={[{ value: 'public', label: 'Public ticket selection' }, { value: 'hidden', label: 'Hidden — staff-issued only' }]} />
+              <SelectField label="Availability" value={type.visibility} onChange={(value) => updateType(index, 'visibility', value)} options={[{ value: 'public', label: 'Public ticket selection' }, { value: 'hidden', label: 'Staff only' }]} />
               <TextField label="Minimum per order" type="number" inputMode="numeric" min="1" max="20" step="1" value={type.minPerOrder} onChange={(value) => updateType(index, 'minPerOrder', quantity(value))} />
               <TextField label="Maximum per order" type="number" inputMode="numeric" min="1" max="20" step="1" value={type.maxPerOrder} onChange={(value) => updateType(index, 'maxPerOrder', quantity(value))} />
               <EventDateTimeField key={`salesStartAt-${loads}`} label="Ticket sales start" value={type.salesStartAt} timeZone={timezone} clearable showError={showTimeErrors} summaryPrefix="Sales start" emptySummary="Uses the event’s start restriction." onProblemChange={timeProblem(`${type.id}.salesStartAt`)} onChange={(value) => updateType(index, 'salesStartAt', value)} />
               <EventDateTimeField key={`salesEndAt-${loads}`} label="Ticket sales end" value={type.salesEndAt} timeZone={timezone} clearable showError={showTimeErrors} summaryPrefix="Sales end" emptySummary="Uses the event’s end restriction." onProblemChange={timeProblem(`${type.id}.salesEndAt`)} onChange={(value) => updateType(index, 'salesEndAt', value)} />
             </div>
             <TextAreaField label="Ticket description" value={type.description} maxLength={1000} onChange={(value) => updateType(index, 'description', value)} />
-            <Checkbox tone="admin" label="Ticket type is active" checked={type.active} onChange={(event) => updateType(index, 'active', event.target.checked)} />
-            {!data.catalog?.ticketTypes?.some((saved) => saved.id === type.id) ? <button type="button" className={dangerButtonClass} onClick={() => changed('ticketTypes', draft.ticketTypes.filter((_, current) => current !== index))}>Remove unsaved ticket type</button> : <p className="text-admin-sm text-admin-ink-secondary">To retire this type, make it inactive. Historical orders retain its identity and price.</p>}
+            <PlannerSwitch label="Ticket type is active" checked={type.active} onChange={(value) => updateType(index, 'active', value)} />
+            {!data.catalog?.ticketTypes?.some((saved) => saved.id === type.id) ? <AdminIconControl label={`Remove ${type.name || 'ticket type'}`} icon="remove" className={dangerButtonClass} onClick={() => changed('ticketTypes', draft.ticketTypes.filter((_, current) => current !== index))} /> : <p className="text-admin-sm text-admin-ink-secondary">To retire this type, make it inactive. Historical orders retain its identity and price.</p>}
           </fieldset>)}
           <button type="button" className={secondaryButtonClass} aria-disabled={draft.ticketTypes.length >= 20} onClick={() => {
             if (draft.ticketTypes.length >= 20) return;
             const id = `type-${crypto.randomUUID()}`;
             changed('ticketTypes', [...draft.ticketTypes, { id, name: '', description: '', unitAmount: 0, capacity: draft.capacity, active: false, visibility: 'hidden', minPerOrder: 1, maxPerOrder: draft.maxPerOrder, salesStartAt: null, salesEndAt: null }]);
             setPriceInputs((previous) => ({ ...previous, [id]: '0' }));
-          }}>{draft.ticketTypes.length >= 20 ? 'Limit reached — 20 ticket types' : 'Add ticket type'}</button>
+          }}>{draft.ticketTypes.length >= 20 ? '20 ticket types maximum' : 'Add ticket type'}</button>
         </div>
         {notice ? <div ref={errorRef} tabIndex={-1}><Notice tone={notice.tone} message={notice.message} /></div> : null}
-        <button type="submit" className={primaryButtonClass} aria-busy={busy && !reloading} aria-disabled={busy || recoveryRequired || revisionChanged}>{busy && !reloading ? 'Saving catalog…' : 'Save catalog'}</button>
+        <button type="submit" className={primaryButtonClass} aria-busy={busy && !reloading} aria-disabled={busy || recoveryRequired || revisionChanged}>{busy && !reloading ? 'Saving catalog…' : 'Save'}</button>
       </form>
     </Panel>
   );

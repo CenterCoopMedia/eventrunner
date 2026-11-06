@@ -1,6 +1,9 @@
+import { plannerError } from '../plannerErrors.js';
+import '../plannerFields.css';
+import PlannerSwitch from '../components/PlannerSwitch.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { isSafeUrl } from 'shared/urlSafety';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -18,7 +21,6 @@ import { useAdminSessions } from '../useAdminSessions.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import {
-  CheckboxField,
   DestructiveConfirm,
   Notice,
   Panel,
@@ -176,21 +178,21 @@ export default function AdminSessionEditor({ mode }) {
     // alone as if it were a real day's name — keeps the control honest and
     // gives the operator the one thing they need to fix it.
     ...(form.dayId && !configuredDays.some((day) => day.id === form.dayId)
-      ? [{ value: form.dayId, label: `${form.dayId} (not on a configured day)` }]
+      ? [{ value: form.dayId, label: 'Choose a different event day' }]
       : []),
   ];
   const trackOptions = [
     { value: '', label: 'No track' },
     ...(eventConfig.tracks ?? []).map((track) => ({
       value: track.letter,
-      label: `${track.letter} — ${track.name}`,
+      label: track.name || `Track ${track.letter}`,
     })),
   ];
   const placeOptions = [
     { value: '', label: 'No recorded place' },
     ...(eventConfig.venue?.places ?? []).map((place) => ({
       value: place.id,
-      label: `${place.name} (${place.id})`,
+      label: place.name,
     })),
   ];
   const parentOptions = [
@@ -201,7 +203,7 @@ export default function AdminSessionEditor({ mode }) {
         && candidate.current.dayId === form.dayId
         && !candidate.current.parentId,
       )
-      .map((candidate) => ({ value: candidate.id, label: candidate.current.title || candidate.id })),
+      .map((candidate) => ({ value: candidate.id, label: candidate.current.title || 'Untitled session' })),
   ];
 
   async function save({ publish = false } = {}) {
@@ -257,7 +259,7 @@ export default function AdminSessionEditor({ mode }) {
       }
     } catch (err) {
       if (stage === 'publish') setErrorTitle('The draft is saved, and it is not published');
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setAction(null);
     }
@@ -272,8 +274,8 @@ export default function AdminSessionEditor({ mode }) {
       showToast('Session deleted.');
       navigate(SESSIONS_LIST);
     } catch (err) {
-      setErrorTitle('The server refused the delete');
-      setError(err);
+      setErrorTitle('The session was not deleted');
+      setError(plannerError(err));
     } finally {
       setAction(null);
     }
@@ -283,7 +285,8 @@ export default function AdminSessionEditor({ mode }) {
     return (
       <AdminEmptyState
         title="No such session"
-        description="That session does not exist. It may have been deleted."
+        description="That session may have been deleted. Open the list to choose another."
+        action={<Link to={SESSIONS_LIST} className={secondaryButtonClass}>Back to sessions</Link>}
       />
     );
   }
@@ -293,7 +296,7 @@ export default function AdminSessionEditor({ mode }) {
       return (
         <Notice
           tone="caution"
-          message="We could not load this session and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+          message="The session did not load. Reconnecting…"
         />
       );
     }
@@ -315,7 +318,7 @@ export default function AdminSessionEditor({ mode }) {
           </>
         )}
         identifiers={null}
-        description="Save builds a draft. Preview reads that draft, and publish sends it to the public schedule."
+        description="Edit session details for the public schedule."
         actions={
           <>
             {mode === 'edit' ? (
@@ -339,7 +342,7 @@ export default function AdminSessionEditor({ mode }) {
               disabled={saving}
               aria-busy={action === 'draft' || undefined}
             >
-              {action === 'draft' ? 'Saving…' : 'Save draft'}
+              {action === 'draft' ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
@@ -348,7 +351,7 @@ export default function AdminSessionEditor({ mode }) {
               aria-busy={action === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
-              {action === 'publish' ? 'Publishing…' : 'Save and publish'}
+              {action === 'publish' ? 'Publishing…' : 'Publish'}
             </button>
             <EditorActionFeedback unsaved={unsaved} status={status} error={error} errorTitle={errorTitle} />
           </>
@@ -390,7 +393,7 @@ export default function AdminSessionEditor({ mode }) {
             <TextField
               label="Recording link"
               type="url"
-              hint="Where attendees can watch this session afterwards. Leave it empty until the recording is public. The public pages show the link only when it is filled in."
+              hint="Add the public recording when it is ready to watch."
               value={form.recordingUrl}
               onChange={(value) => set({ recordingUrl: value })}
               error={errorFor('recordingUrl')}
@@ -403,7 +406,7 @@ export default function AdminSessionEditor({ mode }) {
             title="Time and structure"
             description="Place this session in the event day and programme."
           >
-            <div className="admin-editor-fields grid gap-sm sm:grid-cols-2">
+            <div className="admin-editor-fields planner-fields grid gap-sm sm:grid-cols-2">
               <SelectField
                 label="Event day"
                 value={form.dayId}
@@ -413,7 +416,7 @@ export default function AdminSessionEditor({ mode }) {
               />
               <SelectField
                 label="Parent session"
-                hint="Only same-day top-level sessions can be parents."
+                hint="Choose the session this belongs to."
                 value={form.parentId}
                 onChange={(value) => set({ parentId: value })}
                 options={parentOptions}
@@ -435,7 +438,7 @@ export default function AdminSessionEditor({ mode }) {
               />
               <SelectField
                 label="Track"
-                hint="A child can leave this unset to inherit its parent’s track."
+                hint="Leave empty to use the parent session’s track."
                 value={form.track}
                 onChange={(value) => set({ track: value })}
                 options={trackOptions}
@@ -444,10 +447,10 @@ export default function AdminSessionEditor({ mode }) {
             </div>
           </Panel>
 
-          <Panel title="Location" description="Choose the recorded place and the wording attendees read.">
+          <Panel title="Location" description="Choose a room and the location attendees see.">
             <div className="flex flex-col gap-sm">
               <SelectField
-                label="Recorded place"
+                label="Room"
                 value={form.placeId}
                 onChange={(value) => set({ placeId: value })}
                 options={placeOptions}
@@ -455,8 +458,8 @@ export default function AdminSessionEditor({ mode }) {
               />
               <div>
                 <TextField
-                  label="Public location text"
-                  hint="This is the wording attendees read. It does not change the recorded place."
+                  label="Location label"
+                  hint="For example: Main hall, second floor."
                   value={form.location}
                   onChange={(value) => set({ location: value })}
                   error={errorFor('location')}
@@ -469,17 +472,17 @@ export default function AdminSessionEditor({ mode }) {
             title="Speaker materials"
             description="Most sessions need slides or other materials from their speakers."
           >
-            <CheckboxField
-              label="This session needs no slides or other materials"
-              hint="Speakers on this session are not asked for materials. The session does not count as missing materials. Speakers can still send materials if they want to."
-              checked={form.materialsNotNeeded}
-              onChange={(value) => set({ materialsNotNeeded: value })}
+            <PlannerSwitch
+              label="Request speaker materials"
+              hint="Turn off for sessions that do not need slides or other files."
+              checked={!form.materialsNotNeeded}
+              onChange={(value) => set({ materialsNotNeeded: !value })}
             />
           </Panel>
 
           <Panel title="Publishing" description="Visibility takes effect when this draft is published.">
-            <CheckboxField
-              label="Show this session when it is published"
+            <PlannerSwitch
+              label="Show on the schedule"
               checked={form.visible}
               onChange={(value) => set({ visible: value })}
             />
@@ -495,7 +498,8 @@ export default function AdminSessionEditor({ mode }) {
           <DestructiveConfirm
             className="ms-auto"
             trigger="Delete this session"
-            title={`Delete ${form.title || sessionId}`}
+            triggerIcon="delete"
+            title={`Delete ${form.title || 'this session'}`}
             confirmLabel="Delete this session"
             busyLabel="Deleting…"
             busy={action === 'delete'}

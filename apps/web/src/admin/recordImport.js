@@ -20,11 +20,11 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
     previewNote: 'New speakers are saved as drafts. A change to a published speaker waits for review on the Speakers page. Nothing is published and no email is sent.',
     doneNote: 'New speakers are drafts. Invite or approve them on the Speakers page. A change to a published speaker waits there for review.',
     fields: [
-      { id: 'externalId', label: 'External ID', required: true, header: 'external_id', example: 'SPK-001' },
+      { id: 'externalId', label: 'Reference', required: true, header: 'external_id', example: 'SPK-001' },
       { id: 'firstName', label: 'First name', header: 'first_name', example: 'Ada' },
       { id: 'lastName', label: 'Last name', header: 'last_name', example: 'Lovelace' },
-      { id: 'name', label: 'Full name (if there are no separate name columns)', header: 'name', example: '', template: false },
-      { id: 'slug', label: 'Page address (slug)', header: 'slug', example: '' },
+      { id: 'name', label: 'Full name', header: 'name', example: '', template: false },
+      { id: 'slug', label: 'Page link', header: 'slug', example: '' },
       { id: 'email', label: 'Email address', header: 'email', example: 'ada@example.com' },
       { id: 'organization', label: 'Organization', header: 'organization', example: 'Example Newsroom' },
       { id: 'jobTitle', label: 'Job title', header: 'job_title', example: 'Data editor' },
@@ -39,19 +39,19 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
     previewNote: 'New sessions are saved as hidden drafts. Changed sessions get a new draft. Nothing is published and no email is sent.',
     doneNote: 'The new and changed sessions are drafts. Publish them from the Sessions page.',
     fields: [
-      { id: 'externalId', label: 'External ID', required: true, header: 'external_id', example: 'SES-001' },
+      { id: 'externalId', label: 'Reference', required: true, header: 'external_id', example: 'SES-001' },
       { id: 'title', label: 'Title', required: true, header: 'title', example: 'Opening keynote' },
       { id: 'description', label: 'Description', header: 'description', example: 'The year in local news.' },
-      { id: 'day', label: 'Day (ID, date or label)', header: 'day', example: 'day-1' },
+      { id: 'day', label: 'Event day', header: 'day', example: 'Day one' },
       { id: 'startTime', label: 'Start time', header: 'start_time', example: '09:00' },
       { id: 'endTime', label: 'End time', header: 'end_time', example: '09:45' },
-      { id: 'track', label: 'Track (letter or name)', header: 'track', example: '' },
-      { id: 'place', label: 'Place (ID or name)', header: 'place', example: '' },
+      { id: 'track', label: 'Track', header: 'track', example: '' },
+      { id: 'place', label: 'Room', header: 'place', example: '' },
       { id: 'location', label: 'Public location text', header: 'location', example: '' },
       { id: 'recordingUrl', label: 'Recording link', header: 'recording_url', example: '' },
       { id: 'materialsNotNeeded', label: 'Needs no slides or other materials (yes or no)', header: 'materials_not_needed', example: 'no' },
-      { id: 'speakers', label: 'Speakers (external IDs or slugs, separated by ;)', header: 'speakers', example: 'SPK-001' },
-      { id: 'slug', label: 'Session ID (new sessions only)', header: 'session_id', example: '' },
+      { id: 'speakers', label: 'Speaker references (separate with a semicolon)', header: 'speakers', example: 'SPK-001' },
+      { id: 'slug', label: 'Page link (new sessions only)', header: 'session_id', example: '' },
     ],
   },
   {
@@ -62,7 +62,7 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
     previewNote: 'New organizations are saved as hidden drafts. Changed organizations get a new draft. Nothing is published and no email is sent.',
     doneNote: 'The new and changed organizations are drafts. Publish them from the Organizations page.',
     fields: [
-      { id: 'externalId', label: 'External ID', required: true, header: 'external_id', example: 'ORG-001' },
+      { id: 'externalId', label: 'Reference', required: true, header: 'external_id', example: 'ORG-001' },
       { id: 'name', label: 'Name', required: true, header: 'name', example: 'Example Foundation' },
       { id: 'slug', label: 'Page address (new organizations only)', header: 'slug', example: '' },
       { id: 'tier', label: 'Tier', header: 'tier', example: 'Presenting' },
@@ -81,7 +81,7 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
     previewNote: 'Each new row makes a valid ticket. Answers wait with the ticket until the attendee claims it, then belong to their account. No email is sent.',
     doneNote: 'The tickets are on the Attendees page. Each attendee claims theirs by signing in with the same email.',
     fields: [
-      { id: 'externalId', label: 'Ticket ID', required: true, header: 'ticket_id', example: 'REG-001' },
+      { id: 'externalId', label: 'Ticket reference', required: true, header: 'ticket_id', example: 'REG-001' },
       { id: 'email', label: 'Email address', required: true, header: 'email', example: 'ada@example.com' },
       { id: 'firstName', label: 'First name', header: 'first_name', example: 'Ada' },
       { id: 'lastName', label: 'Last name', header: 'last_name', example: 'Lovelace' },
@@ -166,7 +166,7 @@ export function guessMapping(headers, type) {
  */
 export function missingMapping(mapping, type) {
   for (const field of type.fields) {
-    if (field.required && !mapping[field.id]) return `Map a column to ${field.label}.`;
+    if (field.required && !mapping[field.id]) return `Choose the column for ${field.label.toLowerCase()}.`;
   }
   if (type.id === 'speakers' && !mapping.name && !(mapping.firstName && mapping.lastName)) {
     return 'Map the first and last name columns, or a full name column.';

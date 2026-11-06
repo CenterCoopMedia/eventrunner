@@ -1,3 +1,4 @@
+import { plannerMessage } from '../plannerErrors.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatTicketMoney, formatTicketTime, ticketStatusLabel } from '../../lib/ticketingCommerce.js';
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from './adminChrome.jsx';
@@ -40,7 +41,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
       if (run !== runRef.current || !activeRef.current) return;
       setRows((previous) => appendCursor ? [...(previous || []), ...(result[kind] || [])] : result[kind] || []);
       setCursor(result.nextCursor || null);
-    } catch (err) { if (run === runRef.current && activeRef.current) setError(err.message); }
+    } catch (err) { if (run === runRef.current && activeRef.current) setError(plannerMessage(err.message)); }
     finally { if (run === runRef.current && activeRef.current) { busyRef.current = false; setBusy(false); } }
   }, [call, kind]);
 
@@ -48,7 +49,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
   const setFilter = (key, value) => setFilters((previous) => ({ ...previous, [key]: value }));
   const options = (values) => [{ value: '', label: 'Any' }, ...values.map((value) => ({ value, label: ticketStatusLabel(value) }))];
 
-  return <Panel title={label} description={isOrders ? 'Search purchaser email or order reference. Financial amounts retain the original purchase record.' : 'Search attendee email or ticket code. Each row represents one seat.'}>
+  return <Panel title={label} description={isOrders ? 'Find orders by purchaser email.' : 'Search attendee email or ticket code. Each row represents one seat.'}>
     <form className="mb-md grid items-end gap-sm sm:grid-cols-2 lg:grid-cols-3" onSubmit={(event) => { event.preventDefault(); setSubmitted({ ...filters }); }}>
       <TextField label={isOrders ? 'Find a purchaser or order' : 'Find an attendee or ticket'} type="search" value={filters.search} onChange={(value) => setFilter('search', value.trimStart())} />
       {isOrders ? <>
@@ -60,16 +61,16 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
         <SelectField label="Claim state" value={filters.claimState} onChange={(value) => setFilter('claimState', value)} options={[{ value: '', label: 'Any' }, { value: 'claimed', label: 'Claimed' }, { value: 'unclaimed', label: 'Unclaimed' }]} />
         <SelectField label="Check-in state" value={filters.checkInState} onChange={(value) => setFilter('checkInState', value)} options={[{ value: '', label: 'Any' }, { value: 'checked_in', label: 'Checked in' }, { value: 'not_checked_in', label: 'Not checked in' }]} />
       </>}
-      <button type="submit" className={secondaryButtonClass} aria-busy={busy}>{isOrders ? 'Search orders' : 'Search admission tickets'}</button>
+      <button type="submit" className={secondaryButtonClass} aria-busy={busy}>{isOrders ? 'Search' : 'Search'}</button>
     </form>
     {error ? <Notice tone="error" message={error} /> : null}
     {rows === null && !error ? <AdminLoadingState label={`Loading ${label.toLowerCase()}…`} /> : rows?.length === 0 ? <AdminEmptyState title={`No ${label.toLowerCase()} found`} description="Adjust the filters to find another record." /> : rows?.length ? <>
       <p role="status" className="mb-xs text-admin-sm text-admin-ink-secondary">Showing {rows.length} {isOrders ? 'orders' : 'tickets'}{cursor ? '; more are available' : ''}.</p>
       <TicketingTable label={label}>
-        <thead><tr>{(isOrders ? ['Order reference', 'Purchaser', 'Payment', 'Refund', 'Total', 'Created'] : ['Ticket code', 'Attendee', 'Email', 'Type', 'Admission', 'Claim', 'Check-in', 'Order']).map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
+        <thead><tr>{(isOrders ? ['Order', 'Purchaser', 'Payment', 'Refund', 'Total', 'Created'] : ['Ticket code', 'Attendee', 'Email', 'Type', 'Admission', 'Claim', 'Check-in', 'Order']).map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
         <tbody>{rows.map((row) => <tr key={row.orderId && isOrders ? row.orderId : row.externalId || row.id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
           {isOrders ? <>
-            <td className={dataCellClass}><button type="button" className={linkButtonClass} onClick={() => onOpenOrder(row.orderId || row.id)}>{row.orderId || row.id}</button></td>
+            <td className={dataCellClass}><button type="button" className={linkButtonClass} onClick={() => onOpenOrder(row.orderId || row.id)}>View order</button></td>
             <td className={dataCellClass}>{row.purchaserEmail || row.purchaser?.email || 'Not available'}</td>
             <td className={cellClass}><StatusBadge>{ticketStatusLabel(row.paymentStatus)}</StatusBadge></td>
             <td className={cellClass}>{ticketStatusLabel(row.refundStatus || 'none')}</td>
@@ -83,7 +84,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
             <td className={cellClass}><StatusBadge tone={row.status === 'valid' ? 'ok' : 'caution'}>{ticketStatusLabel(row.status)}</StatusBadge></td>
             <td className={cellClass}>{row.claimedByUid ? 'Claimed' : 'Unclaimed'}</td>
             <td className={cellClass}>{row.checkedInAt ? 'Checked in' : 'Not checked in'}</td>
-            <td className={cellClass}><button type="button" className={linkButtonClass} onClick={() => onOpenOrder(row.orderId)}>Inspect order</button></td>
+            <td className={cellClass}><button type="button" className={linkButtonClass} onClick={() => onOpenOrder(row.orderId)}>View order</button></td>
           </>}
         </tr>)}</tbody>
       </TicketingTable>

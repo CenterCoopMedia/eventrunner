@@ -50,7 +50,7 @@ test.describe.serial('import records: upload -> preview -> import, organizations
     await expect(page.getByRole('heading', { level: 1, name: 'Import records' })).toBeVisible();
     await page.getByLabel('Record type').selectOption('organizations');
     await uploadCsv(page);
-    await expect(page.getByLabel('External ID (required)')).toHaveValue('external_id');
+    await expect(page.getByLabel('Reference (required)')).toHaveValue('external_id');
     await expect(page.getByLabel('Website')).toHaveValue('website');
 
     await page.getByRole('button', { name: 'Preview import' }).click();

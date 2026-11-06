@@ -61,8 +61,8 @@ describe('record import vocabulary', () => {
   });
 
   it('names the first missing required mapping, and the speaker name rule', () => {
-    expect(missingMapping({}, importTypeById('sessions'))).toBe('Map a column to External ID.');
-    expect(missingMapping({ externalId: 'ID' }, importTypeById('sessions'))).toBe('Map a column to Title.');
+    expect(missingMapping({}, importTypeById('sessions'))).toBe('Choose the column for reference.');
+    expect(missingMapping({ externalId: 'ID' }, importTypeById('sessions'))).toBe('Choose the column for title.');
     expect(missingMapping({ externalId: 'ID', firstName: 'F' }, importTypeById('speakers')))
       .toBe('Map the first and last name columns, or a full name column.');
     expect(missingMapping({ externalId: 'ID', name: 'N' }, importTypeById('speakers'))).toBeNull();

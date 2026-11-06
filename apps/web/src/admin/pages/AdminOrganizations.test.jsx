@@ -169,7 +169,7 @@ describe('the organizations list', () => {
       'Beacon Fund', 'Tide Media Collective', 'Hidden Press', 'New Grant',
     ]);
     expect(within(table).getByRole('columnheader', { name: 'Order' })).toHaveAttribute('aria-sort', 'ascending');
-    expect(within(rows[0]).getByText('/sponsors/beacon-fund')).toBeInTheDocument();
+    expect(within(rows[0]).queryByText('/sponsors/beacon-fund')).toBeNull();
     expect(within(rows[0]).getByText('Live')).toBeInTheDocument();
     expect(within(rows[1]).getByText('Live with unpublished changes')).toBeInTheDocument();
     expect(within(rows[2]).getByText('Hidden')).toBeInTheDocument();
@@ -321,13 +321,13 @@ describe('the organization editor', () => {
       .toEqual(['Public details', 'Placement', 'Logo']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
       'Name', 'Page address', 'Description', 'Website', 'Tier',
-      'Show this organization when it is published', 'Logo',
+      'Show on the sponsors page', 'Logo',
     ]);
     const logo = within(layout).getByRole('heading', { name: 'Logo' }).closest('section');
     expect(within(logo).getByLabelText('Logo')).toBeInTheDocument();
     expect(within(logo).getByRole('button', { name: 'Choose or upload…' })).toBeEnabled();
-    expect(within(form).getByRole('button', { name: 'Save draft' })).toBeEnabled();
-    expect(within(form).getByRole('button', { name: 'Save and publish' })).toBeEnabled();
+    expect(within(form).getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(within(form).getByRole('button', { name: 'Publish' })).toBeEnabled();
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -339,7 +339,7 @@ describe('the organization editor', () => {
     await fillNewOrganization();
     expect(screen.getByLabelText(/^Page address/)).toHaveValue('example-fund');
     fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'https://example.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsCreateContent');
@@ -367,7 +367,7 @@ describe('the organization editor', () => {
       .mockResolvedValueOnce(response({ docId: 'example-fund', status: 'dirty' }))
       .mockResolvedValueOnce(published(['example-fund']));
     await fillNewOrganization();
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(endpointOf(0)).toBe('cmsCreateContent');
@@ -384,14 +384,14 @@ describe('the organization editor', () => {
       .mockResolvedValueOnce(response({ docId: 'example-fund', status: 'dirty' }))
       .mockResolvedValueOnce(published(['example-fund']));
     await fillNewOrganization();
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     expect(await screen.findByText('Publish failed.')).toBeInTheDocument();
     // The page already stands at the record's own address.
     await waitFor(() => expect(currentPath).toBe('/admin/organizations/example-fund'));
     // The form is still here, with what was typed, while the listener catches up.
     expect(screen.getByLabelText('Name')).toHaveValue('Example Fund');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
     expect(fetch.mock.calls.map((_, index) => endpointOf(index))).toEqual([
       'cmsCreateContent', 'cmsPublish', 'cmsUpdateContent', 'cmsPublish',
@@ -403,7 +403,7 @@ describe('the organization editor', () => {
     await openNewOrganization();
     fetch.mockResolvedValueOnce(refusal(400, 'name: must be text'));
     await fillNewOrganization();
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     const summary = await screen.findByRole('alert');
     expect(summary).toHaveTextContent('Name: must be text');
@@ -417,14 +417,14 @@ describe('the organization editor', () => {
     await openNewOrganization();
     fetch.mockResolvedValueOnce(refusal(409, 'slug: another organization already uses "example-fund"', 'already-exists'));
     await fillNewOrganization();
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
 
     const summary = await screen.findByRole('alert');
-    expect(summary).toHaveTextContent('Slug: another organization already uses "example-fund"');
+    expect(summary).toHaveTextContent('Page link: another organization already uses "example-fund"');
     const address = screen.getByLabelText(/^Page address/);
     expect(address).toHaveAttribute('aria-invalid', 'true');
     expect(address).toHaveAccessibleDescription(
-      expect.stringContaining('Slug: another organization already uses "example-fund"'),
+      expect.stringContaining('Page link: another organization already uses "example-fund"'),
     );
     // Refused at the save: nothing was published.
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -437,7 +437,7 @@ describe('the organization editor', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Tide Media' } });
     const address = screen.getByLabelText(/^Page address/);
     expect(address).toHaveValue('tide-media');
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await settle();
     expect(fetch).not.toHaveBeenCalled();
     await waitFor(() => expect(document.activeElement).toBe(address));
@@ -448,7 +448,7 @@ describe('the organization editor', () => {
     await openNewOrganization();
     // A blank form shows no errors until the operator acts.
     expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await settle();
     expect(fetch).not.toHaveBeenCalled();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Name')));
@@ -462,12 +462,12 @@ describe('the organization editor', () => {
     pushOrganizations(LIVE, DRAFTS);
     expect(await screen.findByDisplayValue('Tide Media Collective')).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Page address/)).toBeNull();
-    expect(screen.getByText('/sponsors/tide-media')).toBeInTheDocument();
+    expect(screen.queryByText('/sponsors/tide-media')).toBeNull();
     expect(screen.getByRole('link', { name: /Preview draft/ })).toHaveAttribute('href', '/sponsors/tide-media?preview=1');
 
     fetch.mockResolvedValueOnce(response({ docId: 'tide-media', status: 'dirty' }));
-    fireEvent.click(screen.getByLabelText('Show this organization when it is published'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByLabelText('Show on the sponsors page'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsUpdateContent');
     expect(bodyOf(0)).toMatchObject({
@@ -492,7 +492,7 @@ describe('the organization editor', () => {
     expect(await screen.findByDisplayValue('Tide Media Collective')).toBeInTheDocument();
 
     fetch.mockResolvedValueOnce(response({ docId: 'tide-media', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).fields.name).toBe('Tide Media Collective');
   });
@@ -503,7 +503,7 @@ describe('the organization editor', () => {
     await waitFor(() => expect(adminErrors.has('cmsOrganizations_drafts')).toBe(true));
     act(() => adminSubscriptions.get('cmsOrganizations')(LIVE));
     act(() => adminErrors.get('cmsOrganizations_drafts')(new Error('permission-denied')));
-    expect(await screen.findByText(/could not load this organization and its saved draft/)).toBeInTheDocument();
+    expect(await screen.findByText(/The organization did not load/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Name')).toBeNull();
     // The retried listener reports, and the form opens on the draft.
     act(() => adminSubscriptions.get('cmsOrganizations_drafts')(DRAFTS));
@@ -675,7 +675,7 @@ describe('organization representatives', () => {
     fireEvent.click(within(reps).getByRole('button', { name: 'Add representative' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0)).toEqual({ action: 'grant', organizationId: 'tide-media', email: 'cy@example.org' });
-    expect(await within(reps).findByText('Representative added. They edit at /profile/organization.')).toBeInTheDocument();
+    expect(await within(reps).findByText('Representative added. They can edit this organization from their profile.')).toBeInTheDocument();
 
     fireEvent.click(within(reps).getByRole('button', { name: 'Remove ada@example.org' }));
     const moment = screen.getByRole('region', { name: 'Remove ada@example.org' });

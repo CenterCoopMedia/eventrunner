@@ -53,7 +53,7 @@ function Harness({ account = row(), onDeleted = () => {}, onDeleteFailed = () =>
 
 function openPanel(props) {
   render(<Harness {...props} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Edit record' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit attendee record' }));
 }
 
 const flush = () => act(async () => { await Promise.resolve(); });
@@ -65,7 +65,7 @@ describe('AttendeeRecordPanel', () => {
 
   it('opens and closes from the row face, and says so with aria-expanded', () => {
     render(<Harness />);
-    const toggle = screen.getByRole('button', { name: 'Edit record' });
+    const toggle = screen.getByRole('button', { name: 'Edit attendee record' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveAttribute('aria-controls', recordPanelId('uid-ada'));
     expect(screen.queryByLabelText('Past attendance')).toBeNull();
@@ -86,7 +86,7 @@ describe('AttendeeRecordPanel', () => {
     expect(within(list).getByText('2024')).toBeInTheDocument();
     expect(within(list).getByText('2025')).toBeInTheDocument();
     expect(screen.getByText(
-      'Add each past event this person attended, such as 2024. Only staff can change this list.',
+      'Add past events this person attended, such as 2024.',
     )).toBeInTheDocument();
   });
 
@@ -170,7 +170,7 @@ describe('AttendeeRecordPanel', () => {
       const error = new AdminApiError(shape);
       callMock.mockRejectedValueOnce(error);
       const { unmount } = render(<Harness onDeleteFailed={onDeleteFailed} onDeleteStart={onDeleteStart} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Edit record' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Edit attendee record' }));
 
       fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
       fireEvent.click(screen.getByRole('button', { name: 'Delete this account' }));

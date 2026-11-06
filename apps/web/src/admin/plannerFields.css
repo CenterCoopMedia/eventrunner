@@ -1,0 +1,23 @@
+/* Only the registration, ticket, program, people and billing forms opt in. */
+.planner-fields { row-gap: var(--space-3xs); }
+.planner-fields > * { grid-row: span 4; }
+.planner-fields > div:has(> :is(input, select, textarea)) {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 4;
+  align-content: start;
+}
+.planner-fields > div > label { grid-row: 1; }
+.planner-fields > div > :is(input, select, textarea) { grid-row: 2; }
+.planner-fields > div > [id$="-hint"] { grid-row: 3; }
+.planner-fields > div > [id$="-error"] { grid-row: 4; }
+.planner-fields > :is(button, .admin-icon-control) { grid-row: span 4; align-self: center; }
+
+.planner-fields > div:has(> div > input) {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 5;
+}
+.planner-fields > div > div:has(> input) { grid-row: 2; }
+.planner-fields > div > ul { grid-row: 4; }
+.planner-fields > div:has(> div > input) > [id$="-error"] { grid-row: 5; }

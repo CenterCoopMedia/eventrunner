@@ -1,3 +1,4 @@
+import { plannerMessage } from '../plannerErrors.js';
 import { useRef, useState } from 'react';
 import { formatTicketTime } from '../../lib/ticketingCommerce.js';
 import { Notice, Panel, primaryButtonClass, secondaryButtonClass, TextAreaField, TextField } from './formControls.jsx';
@@ -5,7 +6,7 @@ import TicketingConfirmation from './TicketingConfirmation.jsx';
 
 const RESULT_MESSAGES = {
   checked_in: 'Checked in. Admit this attendee.',
-  already_checked_in: 'Already checked in. This scan did not create another check-in.',
+  already_checked_in: 'This attendee is already checked in.',
   invalid: 'Do not admit. This ticket is invalid, cancelled, refunded, or unavailable.',
   corrected: 'Check-in corrected. The ticket can be checked in again if it remains valid.',
 };
@@ -32,10 +33,10 @@ export default function StripeCheckInPanel({ call, isOperator, timezone, onChang
       setReason('');
       onChanged();
       if (action === 'checkIn') formRef.current?.querySelector('input')?.select();
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(plannerMessage(err.message)); }
     finally { busyRef.current = false; setBusy(false); }
   }
-  return <Panel title="Online check-in" description="Scan or type the opaque ticket code. The server checks current admission and prevents duplicate check-ins.">
+  return <Panel title="Online check-in" description="Scan or enter a ticket code to check in an attendee.">
     <form ref={formRef} className="space-y-sm" onSubmit={(event) => { event.preventDefault(); check(); }}>
       <TextField label="Ticket code for check-in" value={ticketId} autoComplete="off" autoCapitalize="none" spellCheck={false} error={error && !correction && !ticketId.trim() ? error : undefined} onChange={(value) => { setTicketId(value); setResult(null); }} />
       <button type="submit" className={primaryButtonClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Checking ticket…' : 'Check in attendee'}</button>
@@ -47,7 +48,7 @@ export default function StripeCheckInPanel({ call, isOperator, timezone, onChang
         <p className="wrap-anywhere text-admin-base font-bold">{result.ticket.firstName} {result.ticket.lastName} · {result.ticket.ticketClass}</p>
         <p className="wrap-anywhere font-admin-data text-admin-sm">{result.ticket.externalId || result.ticket.id}</p>
         {result.ticket.checkedInAt ? <p className="font-admin-data text-admin-sm">Checked in {formatTicketTime(result.ticket.checkedInAt, timezone)}.</p> : null}
-        {isOperator && result.ticket.checkedInAt ? <button type="button" className={secondaryButtonClass} onClick={() => { setCorrection({ ...result.ticket }); setReason(''); setError(''); }}>Review check-in correction</button> : null}
+        {isOperator && result.ticket.checkedInAt ? <button type="button" className={secondaryButtonClass} onClick={() => { setCorrection({ ...result.ticket }); setReason(''); setError(''); }}>Undo check-in</button> : null}
       </div> : null}
     </div> : null}
     {correction ? <TicketingConfirmation title="Undo this check-in?" confirmLabel="Undo recorded check-in" destructive busy={busy} error={error} onClose={() => setCorrection(null)} onConfirm={() => check('undo')}>

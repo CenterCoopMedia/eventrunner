@@ -163,19 +163,20 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByRole('heading', { name: 'Stripe sales', exact: true })).toBeVisible();
     const endTour = page.getByRole('button', { name: 'End tour', exact: true });
     if (await endTour.isVisible()) await endTour.click();
-    await page.getByText('Configure ticket catalog').click();
-    await expect(page.getByRole('checkbox', { name: 'Pause new sales' })).toBeChecked();
-    await page.getByRole('button', { name: 'Review reopening sales' }).click();
+    await page.getByText('Ticket settings', { exact: true }).click();
+    const sales = page.getByRole('switch', { name: 'Ticket sales' });
+    await expect(sales).not.toBeChecked();
+    await page.getByRole('button', { name: 'Reopen sales', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Reopen new ticket sales?' });
     await dialog.getByLabel('Reason for changing sales').fill('Launch approved.');
     await dialog.getByRole('button', { name: 'Reopen new sales' }).click();
     await expect(page.getByText('New sales enabled')).toBeVisible();
-    await expect(page.getByRole('checkbox', { name: 'Pause new sales' })).not.toBeChecked();
+    await expect(sales).toBeChecked();
     await expect(page.getByText(/The saved catalog has changed/)).toHaveCount(0);
     await expect(page.getByRole('status').filter({ hasText: 'The editor now shows the current saved catalog.' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Discard unsaved edits and reload catalog' })).toHaveCount(0);
     await screenshot(page, 'stripe-catalog-after-reopen', page.locator('form').filter({ hasText: 'Ticket types' }));
-    await page.getByRole('button', { name: 'Save catalog' }).click();
+    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Catalog saved. Existing orders keep the prices they were issued with.')).toBeVisible();
     expect(writes).toHaveLength(1);
     expect(writes[0].expectedRevision).toBe(CATALOG.revision + 1);
@@ -229,7 +230,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await page.getByLabel('Code', { exact: true }).fill('early');
     await page.getByLabel('Percent off').fill('20');
     await page.getByLabel('Use limit (tickets)').fill('50');
-    await page.getByRole('button', { name: 'Save promo code' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Promo code saved.')).toBeVisible();
     await expect(page.getByRole('listitem', { name: 'EARLY' })).toContainText('20% off each ticket');
     for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }]]) {
@@ -297,7 +298,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByRole('heading', { name: 'Stripe sales', exact: true })).toBeVisible();
     const endTour = page.getByRole('button', { name: 'End tour', exact: true });
     if (await endTour.isVisible()) await endTour.click();
-    await page.getByRole('button', { name: ORDER.orderId, exact: true }).click();
+    await page.getByRole('region', { name: 'Orders', exact: true }).getByRole('button', { name: 'View order', exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'Order details', exact: true })).toBeVisible();
     for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }], ['narrow', { width: 320, height: 800 }]]) {
       await page.setViewportSize(viewport);
