@@ -60,7 +60,7 @@ describe('Console status and settings recovery', () => {
       } });
     statusPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, disconnect' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
     const result = await screen.findByText('You disconnected your Stripe account.');
     expect(screen.getAllByText('You disconnected your Stripe account.')).toHaveLength(1);
     expect(result.closest('.application-details')).toBeInTheDocument();
@@ -75,12 +75,12 @@ describe('Console status and settings recovery', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Save settings' }));
     expect(screen.getByLabelText('Region')).toBeDisabled();
     expect(screen.getByLabelText('Billing account')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Saving settings…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled();
     await act(async () => save.resolve({ settings: SETTINGS }));
-    const result = await screen.findByText('The settings are saved. New builds use them.');
+    const result = await screen.findByText('Settings saved. New sites will use them.');
     expect(result.closest('form')).toContainElement(screen.getByRole('button', { name: 'Save settings' }));
     fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'us-east1' } });
-    expect(screen.queryByText('The settings are saved. New builds use them.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Settings saved. New sites will use them.')).not.toBeInTheDocument();
   });
 
   it('focuses a refused settings field after it becomes editable again', async () => {

@@ -45,22 +45,22 @@ describe('Team', () => {
     const members = within(screen.getByRole('list', { name: 'Members' })).getAllByRole('listitem');
     expect(members[0]).toHaveTextContent('ana@example.org (you)');
     expect(members[1]).toHaveTextContent('ben@example.org');
-    const invites = within(screen.getByRole('list', { name: 'Invites waiting for an answer' })).getAllByRole('listitem');
+    const invites = within(screen.getByRole('list', { name: 'Pending invites' })).getAllByRole('listitem');
     expect(invites[0]).toHaveTextContent('dee@example.org');
     expect(invites[0]).toHaveTextContent('Link expires 10 November 2026');
   });
 
-  it('recommends two Owners, and says how many are missing', async () => {
+  it('recommends a second owner for team access', async () => {
     page();
     const note = await screen.findByRole('note');
-    expect(note).toHaveTextContent('We recommend two Owners.');
-    expect(note).toHaveTextContent('You can add 1 more Owner at any time.');
+    expect(note).toHaveTextContent('Add a second owner');
+    expect(note).toHaveTextContent('Invite another owner so the team can still sign in if someone loses access to their email.');
   });
 
   it('says when the team has two Owners', async () => {
     serve(team({ ownersNeeded: 0 }));
     page();
-    expect(await screen.findByRole('note')).toHaveTextContent('Your team has two Owners.');
+    expect(await screen.findByRole('note')).toHaveTextContent('Your team has at least two owners.');
   });
 
   it('lets an Owner invite a teammate as an Owner', async () => {
@@ -110,18 +110,18 @@ describe('Team', () => {
     expect(screen.getByRole('button', { name: 'Remove ben@example.org' })).toHaveFocus();
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove ben@example.org' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     expect(await screen.findByText('ben@example.org was removed from the team.')).toBeInTheDocument();
     expect(callApi).toHaveBeenCalledWith('removeMember', { orgId: 'o1', uid: 'ben' });
   });
 
-  it('shows why the last Owner cannot step down', async () => {
-    serve(team(), {
-      changeMemberRole: () => { throw new Error('An organization needs at least one Owner. Make another member an Owner first.'); },
-    });
+  it('keeps the only owner visible without controls that cannot be used', async () => {
     page();
-    fireEvent.change(await screen.findByLabelText('Role for ana@example.org'), { target: { value: 'editor' } });
-    expect(await screen.findByRole('alert')).toHaveTextContent('needs at least one Owner');
+    expect(await screen.findByText('Add another owner to change this role or remove this member.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Role for ana@example.org')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove ana@example.org' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Role for ben@example.org')).toBeInTheDocument();
+    expect(callApi).not.toHaveBeenCalledWith('changeMemberRole', expect.anything());
   });
 
   it('gives an Editor the list only', async () => {
@@ -140,10 +140,13 @@ describe('Team', () => {
     expect(screen.queryByRole('button', { name: 'Send invite' })).not.toBeInTheDocument();
   });
 
-  it('shows the server message when the team cannot load', async () => {
+  it('shows a load error with an action to try again', async () => {
     callApi.mockRejectedValue(new Error('We could not find that organization.'));
     page();
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not find that organization.');
+    serve(team());
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh team' }));
+    expect(await screen.findByText('Local News Lab')).toBeInTheDocument();
   });
 
   it('keeps the invite role choice keyboard reachable as one radio group', async () => {

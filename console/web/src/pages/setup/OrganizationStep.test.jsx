@@ -16,7 +16,7 @@ describe('Your organization step', () => {
     expect(screen.getByLabelText('Website (optional)')).toHaveAttribute('type', 'url');
     const address = screen.getByLabelText('Mailing address');
     expect(address.tagName).toBe('TEXTAREA');
-    expect(address).toHaveAccessibleDescription(/Every email your site sends shows this address/);
+    expect(address).toHaveAccessibleDescription(/This address appears at the bottom of your event emails/);
   });
 
   it('saves the whole step', async () => {

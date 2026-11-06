@@ -3,6 +3,8 @@ import { useAuth } from '../../auth.jsx';
 import TeamSections from '../TeamSections.jsx';
 import { useTeam } from '../useTeam.js';
 import LoadingState from '../../LoadingState.jsx';
+import ActionFeedback from '../../ActionFeedback.jsx';
+import IconControl from '../../IconControl.jsx';
 
 /** Step 4: the same team tools as the Team page. Invites go out at once. */
 export default function TeamStep({ orgId, onOwnersNeeded }) {
@@ -15,11 +17,13 @@ export default function TeamStep({ orgId, onOwnersNeeded }) {
   }, [ownersNeeded, onOwnersNeeded]);
 
   if (!team.data) {
-    return team.error ? <p className="message error" role="alert">{team.error}</p> : <LoadingState>Loading the team.</LoadingState>;
+    return team.error ? (
+      <ActionFeedback kind="error"><p>{team.error}</p><IconControl icon="refresh" label="Reload team" onClick={team.refresh} disabled={team.refreshing} /></ActionFeedback>
+    ) : <LoadingState>Loading the team.</LoadingState>;
   }
   return (
     <div>
-      <p className="lead">Invite the people who run the event with you. An invite is an email with a link.</p>
+      <p className="lead">Invite the people who run the event with you.</p>
       <TeamSections team={team} myUid={user?.uid} />
     </div>
   );

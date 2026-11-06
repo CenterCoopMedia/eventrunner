@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 import { signInErrorMessage, peekReturn, useAuth } from '../auth.jsx';
 import { isEmail } from '../text.js';
+import IconControl from '../IconControl.jsx';
 
 /** The sign-in methods set up in this console's project. Left out, both show; set empty, only the emailed link does. */
 function signInProviders() {
@@ -15,20 +16,21 @@ export default function SignIn() {
   const [fieldError, setFieldError] = useState('');
   const [error, setError] = useState('');
   const [sentTo, setSentTo] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
   const fieldRef = useRef(null);
 
   if (auth.user) return <Navigate to={peekReturn()} replace />;
 
-  async function run(method) {
+  async function run(method, action = 'provider') {
+    if (busy) return;
     setError('');
-    setBusy(true);
+    setBusy(action);
     try {
       await method();
     } catch (err) {
       setError(signInErrorMessage(err));
     } finally {
-      setBusy(false);
+      setBusy('');
     }
   }
 
@@ -43,13 +45,13 @@ export default function SignIn() {
     await run(async () => {
       await auth.sendEmailLink(email);
       setSentTo(email.trim().toLowerCase());
-    });
+    }, 'email');
   }
 
   return (
     <section className="panel narrow" aria-labelledby="signin-title">
       <h1 id="signin-title" tabIndex={-1}>Sign in to Event Runner</h1>
-      <p className="lead">Sign in to set up your event site. If you are new, signing in makes your account.</p>
+      <p className="lead">Set up and manage your event sites.</p>
 
       {error ? <p className="message error" role="alert">{error}</p> : null}
 
@@ -68,11 +70,17 @@ export default function SignIn() {
         </div>
       ) : null}
 
-      <h2 className="divider">{providers.length > 0 ? 'Or get a sign-in link by email' : 'Get a sign-in link by email'}</h2>
+      <h2 className="divider">{providers.length > 0 ? 'Or use email' : 'Use email'}</h2>
       {sentTo ? (
-        <p className="message success" role="status">
-          We sent a sign-in link to {sentTo}. Open the link on this device to sign in.
-        </p>
+        <div className="stack">
+          <p className="message success" role="status">
+            We sent a sign-in link to {sentTo}. Open the link to sign in.
+          </p>
+          <IconControl icon="edit" label="Use another email address" onClick={() => {
+            setSentTo('');
+            setTimeout(() => fieldRef.current?.focus(), 0);
+          }} />
+        </div>
       ) : (
         <form noValidate onSubmit={onEmailSubmit} className="stack">
           <div className="field">
@@ -84,13 +92,14 @@ export default function SignIn() {
               inputMode="email"
               autoComplete="email"
               value={email}
+              disabled={Boolean(busy)}
               onChange={(e) => setEmail(e.target.value)}
               aria-invalid={fieldError ? 'true' : undefined}
               aria-describedby={fieldError ? 'signin-email-error' : undefined}
             />
             {fieldError ? <p id="signin-email-error" className="field-error">{fieldError}</p> : null}
           </div>
-          <button type="submit" className="button primary" disabled={busy}>Email me a link</button>
+          <button type="submit" className="button primary" disabled={Boolean(busy)}>{busy === 'email' ? 'Sending…' : 'Send link'}</button>
         </form>
       )}
     </section>

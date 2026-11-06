@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import IconControl from './IconControl.jsx';
 import './actionFeedback.css';
 
 /** An action's result stays beside its controls, including after a failed refresh. */
@@ -31,9 +32,7 @@ export function ActionResult({ result, onRefresh, refreshing = false, refreshLab
       {result.refreshError ? (
         <>
           <p>{result.refreshError}</p>
-          {onRefresh ? <button type="button" className="button" title={refreshLabel} disabled={refreshing} onClick={onRefresh}>
-            <span aria-hidden="true">↻ </span>{refreshing ? 'Refreshing…' : refreshLabel}
-          </button> : null}
+          {onRefresh ? <IconControl icon="refresh" label={refreshLabel} disabled={refreshing} aria-busy={refreshing} onClick={onRefresh} /> : null}
         </>
       ) : null}
     </ActionFeedback>
