@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { EMAIL_KEY } from '../auth.jsx';
+import { EMAIL_KEY, RETURN_KEY } from '../auth.jsx';
 import { fakeAuth, renderPage } from '../test/renderPage.jsx';
 import SignInFinish from './SignInFinish.jsx';
 
@@ -41,6 +41,15 @@ describe('SignInFinish', () => {
   it('sends a signed-in reader on', () => {
     renderPage(<SignInFinish />, { path: '/signin/finish', routes: { '/': 'Home page' } });
     expect(screen.getByText('Home page')).toBeInTheDocument();
+  });
+
+  it('returns to the signup link from the link itself when another tab already cleared the saved path', () => {
+    window.localStorage.removeItem(RETURN_KEY);
+    window.history.replaceState(null, '', '/signin/finish?next=%2Fstart%2Fabc&oobCode=1');
+    const auth = linkAuth({ user: { uid: 'u1', email: 'sam@example.org', emailVerified: true } });
+    renderPage(<SignInFinish />, { path: '/signin/finish', auth, routes: { '/start/abc': 'Start page', '/': 'Home page' } });
+    expect(screen.getByText('Start page')).toBeInTheDocument();
+    window.history.replaceState(null, '', '/');
   });
 
   it('uses the link even when an unconfirmed session is already open in this browser', async () => {

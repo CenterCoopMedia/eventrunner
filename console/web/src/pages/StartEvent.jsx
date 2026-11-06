@@ -78,7 +78,7 @@ export default function StartEvent() {
   if (!token) {
     return (
       <Panel>
-        <p className="message error" role="alert">This signup link is not complete. Open the link again, with all of its characters.</p>
+        <p className="message error" role="alert">You are signed in. Open the signup link in your email again to continue.</p>
       </Panel>
     );
   }
