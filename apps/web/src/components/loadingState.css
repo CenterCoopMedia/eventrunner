@@ -71,20 +71,32 @@
   align-items: center;
   min-inline-size: 0;
   min-block-size: 4rem;
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+.loading-state__lead {
+  display: none;
+}
+
+.loading-state__content,
+.loading-state__details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-inline-size: 0;
 }
 
 .loading-state__content {
-  display: flex;
-  flex-direction: column;
   flex: 1;
-  gap: var(--space-xs);
-  min-inline-size: 0;
   padding-block: var(--space-sm);
 }
 
-/* Unequal, still bars suggest text hierarchy without looking like progress. */
-.loading-state__bar,
-.loading-state__portrait {
+/* Purely decorative bars live in CSS; every layout shares the same markup. */
+.loading-state__content::before,
+.loading-state__details::before,
+.loading-state__details::after,
+.loading-state__lead::before,
+.loading-state__lead::after {
   display: block;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -92,19 +104,26 @@
   background: var(--loading-placeholder-fill);
 }
 
-.loading-state__bar--title {
+.loading-state__content::before {
+  content: '';
   inline-size: min(62%, 28rem);
   block-size: 0.875rem;
   background: var(--loading-placeholder-emphasis);
 }
 
-.loading-state__bar--detail {
+.loading-state__details::before,
+.loading-state__details::after {
+  content: '';
   inline-size: min(78%, 34rem);
   block-size: 0.5rem;
 }
 
-.loading-state__bar--short {
+.loading-state__details::after {
   inline-size: min(42%, 18rem);
+}
+
+.loading-state__placeholder[data-loading-shape='rows'] .loading-state__details::after {
+  content: none;
 }
 
 .loading-state__placeholder[data-loading-shape='schedule'] .loading-state__row {
@@ -117,7 +136,7 @@
   padding-inline-start: var(--space-md);
 }
 
-.loading-state__time {
+.loading-state__placeholder[data-loading-shape='schedule'] .loading-state__lead {
   display: flex;
   flex-direction: column;
   flex: 0 0 clamp(2.75rem, 12%, 5rem);
@@ -129,13 +148,18 @@
   border-inline-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
-.loading-state__bar--time {
+.loading-state__placeholder[data-loading-shape='schedule'] .loading-state__lead::before,
+.loading-state__placeholder[data-loading-shape='schedule'] .loading-state__lead::after {
+  content: '';
+}
+
+.loading-state__lead::before {
   inline-size: min(100%, 3rem);
   block-size: 0.625rem;
   background: var(--loading-placeholder-emphasis);
 }
 
-.loading-state__bar--time-detail {
+.loading-state__lead::after {
   inline-size: min(70%, 2rem);
   block-size: 0.5rem;
 }
@@ -155,9 +179,13 @@
   border-block-end: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
-.loading-state__portrait {
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__lead {
+  display: block;
+  box-sizing: border-box;
+  flex-shrink: 0;
   inline-size: 4rem;
   block-size: 4rem;
+  border-radius: min(var(--radius-base), 0.25rem);
   background: var(--loading-placeholder-emphasis);
 }
 
@@ -167,15 +195,16 @@
   padding: 0;
 }
 
-.loading-state__placeholder[data-loading-shape='directory'] .loading-state__bar--title {
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__content::before {
   inline-size: min(62%, 14rem);
 }
 
-.loading-state__placeholder[data-loading-shape='directory'] .loading-state__bar--detail {
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__details::before,
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__details::after {
   inline-size: min(85%, 18rem);
 }
 
-.loading-state__placeholder[data-loading-shape='directory'] .loading-state__bar--short {
+.loading-state__placeholder[data-loading-shape='directory'] .loading-state__details::after {
   inline-size: min(52%, 12rem);
 }
 
@@ -195,13 +224,17 @@
     color: CanvasText;
   }
 
-  .loading-state__row,
-  .loading-state__time {
+  .loading-state__placeholder[data-loading-shape] .loading-state__row,
+  .loading-state__placeholder[data-loading-shape] .loading-state__lead {
     border-color: CanvasText;
   }
 
-  .loading-state__bar,
-  .loading-state__portrait {
+  .loading-state__content::before,
+  .loading-state__details::before,
+  .loading-state__details::after,
+  .loading-state__lead::before,
+  .loading-state__lead::after,
+  .loading-state__placeholder[data-loading-shape='directory'] .loading-state__lead {
     border: var(--rule-hairline-width) solid GrayText;
     background: Canvas;
   }

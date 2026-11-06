@@ -38,23 +38,10 @@ export function LoadingStateView({
           data-loading-shape={layout}
         >
           {Array.from({ length: rowCount }, (_, index) => (
-            <div
-              key={index}
-              className="loading-state__row border-t-hairline border-rule-hairline"
-            >
-              {layout === 'schedule' ? (
-                <span className="loading-state__time">
-                  <span className="loading-state__bar loading-state__bar--time" />
-                  <span className="loading-state__bar loading-state__bar--time-detail" />
-                </span>
-              ) : null}
-              {layout === 'directory' ? <span className="loading-state__portrait" /> : null}
+            <div key={index} className="loading-state__row">
+              <span className="loading-state__lead" />
               <span className="loading-state__content">
-                <span className="loading-state__bar loading-state__bar--title" />
-                <span className="loading-state__bar loading-state__bar--detail" />
-                {layout !== 'rows' ? (
-                  <span className="loading-state__bar loading-state__bar--detail loading-state__bar--short" />
-                ) : null}
+                <span className="loading-state__details" />
               </span>
             </div>
           ))}

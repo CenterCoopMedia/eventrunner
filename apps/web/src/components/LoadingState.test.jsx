@@ -83,19 +83,14 @@ describe('LoadingState', () => {
     expect(container.querySelector('.loading-status__activity')).toBeNull();
   });
 
-  it.each(['rows', 'schedule', 'directory'])('previews the %s content hierarchy without exposing placeholder content', (shape) => {
+  it.each(['rows', 'schedule', 'directory'])('keeps %s placeholders decorative and reserves the requested rows', (shape) => {
     const { container } = render(<LoadingState shape={shape} rows={3} />);
     const reserved = container.querySelector('.loading-state__placeholder');
     expect(reserved).toHaveAttribute('data-loading-shape', shape);
     expect(reserved).toHaveAttribute('aria-hidden', 'true');
     expect(reserved.querySelectorAll('.loading-state__row')).toHaveLength(3);
-    expect(reserved.querySelectorAll('.loading-state__time')).toHaveLength(shape === 'schedule' ? 3 : 0);
-    expect(reserved.querySelectorAll('.loading-state__bar--time')).toHaveLength(shape === 'schedule' ? 3 : 0);
-    expect(reserved.querySelectorAll('.loading-state__bar--time-detail')).toHaveLength(shape === 'schedule' ? 3 : 0);
-    expect(reserved.querySelectorAll('.loading-state__portrait')).toHaveLength(shape === 'directory' ? 3 : 0);
-    expect(reserved.querySelectorAll('.loading-state__bar--title')).toHaveLength(3);
-    expect(reserved.querySelectorAll('.loading-state__bar--detail')).toHaveLength(shape === 'rows' ? 3 : 6);
     expect(reserved.textContent).toBe('');
+    expect(reserved.querySelector('a, button, input, [tabindex]')).toBeNull();
     expect(screen.getByRole('status')).not.toContainElement(reserved);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
