@@ -43,8 +43,8 @@ export default function SignInFinish() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLink, address]);
 
-  if (auth.user && auth.user.emailVerified) return <Navigate to={peekReturn()} replace />;
-  if (!isLink) return <Navigate to={auth.user ? peekReturn() : '/signin'} replace />;
+  if (auth.user && auth.user.emailVerified) return <Navigate to={peekReturn(href)} replace />;
+  if (!isLink) return <Navigate to={auth.user ? peekReturn(href) : '/signin'} replace />;
 
   function onSubmit(event) {
     event.preventDefault();
