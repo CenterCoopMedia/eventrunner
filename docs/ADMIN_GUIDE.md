@@ -1114,7 +1114,11 @@ For an existing domain, select **Check now**, or wait for the hourly check. The 
 
 Operators only. One ruled table of every admin account with its tier word, and a form to grant access to a new address.
 
-**Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. The person signs in with that address the way every admin does, by Google or by the emailed code; there is no invitation to send.
+**Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. A new account grant sends one transactional email naming the event, role, event admin address and any staff end time. It tells the person to use the exact granted email address and request an emailed sign-in code. Google sign-in is not required. The admin address is a regular sign-in page, not a one-time invitation.
+
+**Email outcome.** Access stays saved even if the email setup or send fails. The result states access and email outcomes separately. Provider acceptance does not confirm delivery. An uncertain result means the provider may have accepted the email, or an earlier attempt already claimed it; the site does not automatically send another copy. Check **Email log** before sending again. A no-op grant, ordinary tier change, end-time change or removal sends no instructions.
+
+**Send sign-in instructions again.** An active account's row has **Send sign-in instructions**, including accounts granted access before this email feature existed. Confirm to send the current role and sign-in instructions without changing access. Ended, unreadable and removed grants cannot receive active-access instructions. Retrying after a lost response checks the same send attempt and cannot send a second copy. A new confirmed send is deliberate and may duplicate an earlier email, so check **Email log** first. Existing accounts receive no bulk or retroactive email.
 
 **Change a tier or remove access.** Each row carries two quiet actions: **Change to staff** or **Change to operator**, and **Remove access**. Each one opens a confirmation under the grant form, above the table, that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.
 

@@ -167,7 +167,15 @@ function isTemporary(account) {
  *           previousTier: 'operator'|'staff'|null|undefined,
  *           expiresAt?: string|null, previousTemporary?: boolean }} change
  */
-export function describeChange({ email, tier, previousTier, expiresAt = null, previousTemporary = false }) {
+export function describeChange({ email, tier, previousTier, expiresAt = null, previousTemporary = false, action }) {
+  if (action === 'resend') {
+    return {
+      title: `Send sign-in instructions to ${email}`,
+      consequence: `Email ${email} the event admin address, their current role and instructions to request an emailed sign-in code. Access stays the same. Check the Email log before sending again: an earlier email may already have been accepted.`,
+      confirmLabel: 'Send sign-in instructions',
+      destructive: false,
+    };
+  }
   if (tier === 'none') {
     return {
       title: `Remove access for ${email}`,
@@ -250,6 +258,17 @@ export function describeResult({ email, tier, previousTier, expiresAt = null }) 
   return `${email} is now ${TIER_WORDS[tier].label.toLowerCase()}${until}.`;
 }
 
+function emailNotice(outcome, saved = false) {
+  const prefix = saved ? 'Access saved. ' : '';
+  if (outcome?.status === 'accepted') {
+    return { tone: 'ok', message: `${prefix}The email provider accepted the sign-in instructions. This does not confirm delivery.` };
+  }
+  if (outcome?.status === 'failed') {
+    return { tone: 'caution', message: `${prefix}Sign-in instructions could not be sent. Check the email setup and Email log before choosing Send sign-in instructions again.` };
+  }
+  return { tone: 'caution', message: `${prefix}Email acceptance is uncertain. This attempt will not send another copy. Check the Email log before choosing a new send.` };
+}
+
 /**
  * The words under the tier badge for a staff grant with an end time. The
  * server decided the state by its own clock.
@@ -285,7 +304,7 @@ function ChangeConfirm({ change, busy, error, onConfirm, onCancel, surfaceRef, e
       <h2 id={headingId} className={`text-admin-base font-bold ${headingInk}`}>
         {words.title}
       </h2>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">{words.consequence}</p>
+      <p className="text-admin-sm text-admin-ink">{words.consequence}</p>
       {error ? (
         <div ref={errorRef} tabIndex={-1}>
           <Notice tone="error" message={error} />
@@ -299,7 +318,7 @@ function ChangeConfirm({ change, busy, error, onConfirm, onCancel, surfaceRef, e
           aria-busy={busy || undefined}
           onClick={onConfirm}
         >
-          {busy ? 'Saving…' : words.confirmLabel}
+          {busy ? (change.action === 'resend' ? 'Sending…' : 'Saving…') : words.confirmLabel}
         </button>
         <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>
           Cancel
@@ -421,7 +440,7 @@ export default function AdminAccess() {
     setResult(null);
     setChangeError(null);
     triggerRef.current = trigger ?? null;
-    setPending(change);
+    setPending(change.action === 'resend' ? { ...change, sendId: crypto.randomUUID() } : change);
   }
 
   function close() {
@@ -498,6 +517,15 @@ export default function AdminAccess() {
     setChangeError(null);
     const { email, tier, previousTier, expiresAt = null } = pending;
     try {
+      if (pending.action === 'resend') {
+        const response = await call('resendAdminAccessInstructions', { email, sendId: pending.sendId });
+        const notice = emailNotice(response?.emailResult);
+        setResult(notice);
+        showToast(notice.message, { tone: notice.tone === 'ok' ? undefined : 'error', announce: false });
+        await load();
+        close();
+        return;
+      }
       // An end time is sent only when there is one, so a permanent grant
       // asks exactly what it asked before #331.
       const response = await call('setAdminAccess', expiresAt ? { email, tier, expiresAt } : { email, tier });
@@ -522,8 +550,10 @@ export default function AdminAccess() {
         });
       // The line on the page is the record and it announces; the bar
       // repeats it silently.
-      setResult({ tone: 'ok', message: sentence });
-      showToast(sentence, { announce: false });
+      const mail = response?.emailResult ? emailNotice(response.emailResult, true) : null;
+      const message = mail ? `${sentence} ${mail.message}` : sentence;
+      setResult({ tone: mail?.tone ?? 'ok', message });
+      showToast(message, { announce: false });
       if (standing === null && tier !== 'none' && pending.grantForm) {
         const submitted = pending.grantForm;
         setForm((current) => (
@@ -545,7 +575,13 @@ export default function AdminAccess() {
       close();
     } catch (err) {
       // Keep the actionable access rule, without exposing server diagnostics.
-      const message = /at least one operator/i.test(err?.message ?? '') ? 'At least one operator must keep access.' : 'Access could not be changed. Try again.';
+      const message = pending.action === 'resend'
+        ? err?.code === 'inactive-access'
+          ? 'This account no longer has active access. No instructions were sent.'
+          : 'Email acceptance could not be confirmed. Try again checks this attempt without sending a second copy.'
+        : /at least one operator/i.test(err?.message ?? '')
+          ? 'At least one operator must keep access.'
+          : 'The response could not be confirmed. Access may already be saved. Refresh the list before trying again.';
       setChangeError(message);
       showToast(message, { tone: 'error', announce: false });
     } finally {
@@ -727,6 +763,17 @@ export default function AdminAccess() {
                                 event.currentTarget,
                               )}
                             />
+                            {!isTemporary(account) || account.expiryState === 'active' ? (
+                              <button
+                                type="button"
+                                className={secondaryButtonClass}
+                                aria-label={`Send sign-in instructions to ${account.email}`}
+                                disabled={busy}
+                                onClick={(event) => open({ email: account.email, action: 'resend' }, event.currentTarget)}
+                              >
+                                Send sign-in instructions
+                              </button>
+                            ) : null}
                           </div>
                         </td>
                       </tr>

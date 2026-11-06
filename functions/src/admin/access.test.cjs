@@ -7,8 +7,10 @@ const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const {
   createListAdminAccessHandler,
   createSetAdminAccessHandler,
+  createResendAdminAccessInstructionsHandler,
   internals: { accountsOf, applyAccessChange, readEmail, ACCESS_TIERS },
 } = require('./access.cjs');
+const { createEmailCore, internals: { claimIdForOnceKey } } = require('../email/send.cjs');
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const T0 = new Date('2026-09-23T10:00:00.000Z');
@@ -47,17 +49,31 @@ const req = (token, body = {}, method = 'POST') => ({
 
 /** A db seeded with one bootstrap document, and a getConfig that mirrors it. */
 function world(bootstrap = { adminEmails: [OPS, SECOND_OPS], staffEmails: [STAFF], createdAt: 'seeded' }) {
-  const db = makeFakeDb({ 'config/bootstrap': bootstrap });
+  const event = {
+    name: 'Community Summit', sender: { email: 'events@example.org', name: 'Summit team' },
+    legal: { postalAddressHtml: 'Summit team<br>1 Main Street', supportEmail: 'help@example.org' },
+  };
+  const db = makeFakeDb({ 'config/bootstrap': bootstrap, 'config/event': event });
   const refreshes = [];
+  const messages = [];
   const deps = {
     db,
     auth,
-    getConfig: async () => ({ bootstrap: db.read('config', 'bootstrap') }),
+    getConfig: async () => ({
+      bootstrap: db.read('config', 'bootstrap'), event,
+      tierA: { publicUrl: 'https://summit.example.org/' },
+      providers: { email: { messageStream: 'transactional', announcementStream: 'announcements' } },
+    }),
     refreshConfig: async () => { refreshes.push(db.read('config', 'bootstrap')); },
     now: () => T0.getTime(),
     log: QUIET,
   };
-  return { db, deps, refreshes };
+  const provider = { async send(message) {
+    messages.push(JSON.parse(JSON.stringify(message)));
+    return { status: 'sent', providerMessageId: 'mail-1' };
+  } };
+  deps.sendEmail = createEmailCore({ db, provider, getConfig: deps.getConfig, log: QUIET }).send;
+  return { db, deps, refreshes, messages, provider };
 }
 
 const bootstrapOf = (db) => db.read('config', 'bootstrap');
@@ -129,6 +145,7 @@ test('setAdminAccess: grants staff to a new address, lowercased, records it, and
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, {
     ok: true, email: 'new.desk@example.org', tier: 'staff', previousTier: null, changed: true,
+    emailResult: { status: 'accepted', providerMessageId: 'mail-1' },
   });
   assert.deepEqual(bootstrapOf(db).staffEmails, [STAFF, 'new.desk@example.org']);
   assert.deepEqual(bootstrapOf(db).adminEmails, [OPS, SECOND_OPS]);
@@ -390,6 +407,7 @@ test('setAdminAccess: grants staff access with an end time, stores it, answers i
   assert.deepEqual(res.body, {
     ok: true, email: DEMO, tier: 'staff', previousTier: null, changed: true,
     expiresAt: iso(ends), previousExpiresAt: null,
+    emailResult: { status: 'accepted', providerMessageId: 'mail-1' },
   });
   const stored = bootstrapOf(db);
   assert.deepEqual(stored.staffEmails, [STAFF, DEMO]);
@@ -445,7 +463,10 @@ test('setAdminAccess: exactly 90 days is allowed, and null or an absent end time
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   res = await grant(deps, { email: 'perm@example.org', tier: 'staff', expiresAt: null });
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.body, { ok: true, email: 'perm@example.org', tier: 'staff', previousTier: null, changed: true });
+  assert.deepEqual(res.body, {
+    ok: true, email: 'perm@example.org', tier: 'staff', previousTier: null, changed: true,
+    emailResult: { status: 'accepted', providerMessageId: 'mail-1' },
+  });
   assert.deepEqual(bootstrapOf(db).staffExpiry, { [DEMO]: limit });
 });
 
@@ -787,4 +808,204 @@ test('setAdminAccess: an impossible date is refused before anything is written',
   assert.equal(res.statusCode, 400);
   assert.match(res.body.error.message, /does not exist/);
   assert.equal(db.writes.length, 0);
+});
+
+// Access instructions exercise the real render -> core -> serialized provider
+// boundary and core-owned sent_emails/claims, without sending any live email.
+const resend = async (deps, email = STAFF, sendId = 'resend_attempt_1', token = 'ops') => {
+  const res = makeRes();
+  await createResendAdminAccessInstructionsHandler(deps)(req(token, { email, sendId }), res);
+  return res;
+};
+
+test('new grant sends once with the configured admin link, exact address, role, expiry and standard footer, all logged', async () => {
+  const { db, deps } = world();
+  const payloads = [];
+  const { createPostmarkProvider } = require('../email/providers/postmark.cjs');
+  const provider = createPostmarkProvider({
+    env: { EMAIL_PROVIDER_API_KEY: 'test-only-placeholder' },
+    fetchImpl: async (url, init) => {
+      assert.equal(url, 'https://api.postmarkapp.com/email');
+      assert.equal(init.method, 'POST');
+      payloads.push(JSON.parse(init.body));
+      return { status: 200, json: async () => ({ MessageID: 'mail-1', ErrorCode: 0 }) };
+    },
+  });
+  deps.sendEmail = createEmailCore({ db, provider, getConfig: deps.getConfig, log: QUIET }).send;
+  const email = 'new.desk@example.org';
+  const expiresAt = new Date(T0.getTime() + 60_000).toISOString();
+  const first = await grant(deps, { email: ' New.Desk@Example.ORG ', tier: 'staff', expiresAt });
+  assert.equal(first.body.emailResult.status, 'accepted');
+  assert.equal(payloads.length, 1);
+  const mail = payloads[0];
+  assert.equal(mail.To, email);
+  assert.equal(mail.MessageStream, 'transactional');
+  assert.equal(mail.From, 'Summit team <events@example.org>');
+  assert.equal(mail.Tag, 'admin.access_granted');
+  assert.match(mail.HtmlBody, /href="https:\/\/summit.example.org\/admin"/);
+  for (const body of [mail.HtmlBody, mail.TextBody]) {
+    for (const value of ['Community Summit', email, 'staff', expiresAt, 'Request an emailed sign-in code', '1 Main Street']) {
+      assert.ok(body.includes(value), value);
+    }
+    assert.doesNotMatch(body, /Google|one-time invitation/);
+    assert.equal(body.match(/1 Main Street/g).length, 1, 'footer occurs once');
+  }
+  assert.match(mail.HtmlBody, /<table role="presentation"/);
+  const [logged] = db.ids('sent_emails').map((id) => db.read('sent_emails', id));
+  assert.equal(logged.html, mail.HtmlBody);
+  assert.equal(logged.text, mail.TextBody);
+  assert.equal(logged.subject, mail.Subject);
+  assert.equal(logged.to, email);
+  assert.equal(logged.source, 'admin-access');
+  assert.equal(logged.templateId, mail.Tag);
+  assert.equal(logged.providerMessageId, 'mail-1');
+  assert.equal(logged.status, 'sent');
+  const replay = await grant(deps, { email, tier: 'staff', expiresAt });
+  assert.equal(replay.body.changed, false);
+  assert.equal(replay.body.emailResult, undefined);
+  assert.equal(payloads.length, 1);
+  assert.equal(db.ids('email_claims').length, 1);
+});
+
+test('no-op, normalization, ordinary role change, removal and refused changes never send instructions', async () => {
+  const { db, deps, messages } = world();
+  await grant(deps, { email: STAFF, tier: 'staff' });
+  await grant(deps, { email: STAFF, tier: 'operator' });
+  await grant(deps, { email: STAFF, tier: 'none' });
+  await grant(deps, { email: 'bad-address', tier: 'staff' });
+  const forbidden = makeRes();
+  await createSetAdminAccessHandler(deps)(req('stranger', { email: 'new@example.org', tier: 'staff' }), forbidden);
+  assert.equal(forbidden.statusCode, 403);
+  assert.equal(messages.length, 0);
+  const normalized = world({ adminEmails: [OPS], staffEmails: [' Desk@Example.ORG '] });
+  await grant(normalized.deps, { email: STAFF, tier: 'staff' });
+  assert.equal(normalized.messages.length, 0);
+  const last = await grant(normalized.deps, { email: OPS, tier: 'none' });
+  assert.equal(last.statusCode, 409);
+  assert.equal(normalized.messages.length, 0);
+  assert.equal(db.ids('email_claims').length, 0);
+});
+
+test('access save and audit survive provider refusal, ambiguous throw and missing provider setup', async () => {
+  for (const failure of ['refused', 'ambiguous', 'setup']) {
+    const { db, deps, provider } = world();
+    let calls = 0;
+    provider.send = async () => {
+      calls += 1;
+      if (failure === 'ambiguous') throw new Error('connection closed after submission');
+      return { status: 'failed', providerStatus: 422, error: 'refused' };
+    };
+    if (failure === 'setup') { delete deps.sendEmail; deps.env = { EVENT_EMAIL_PROVIDER: 'invalid-provider' }; }
+    const response = await grant(deps, { email: 'new@example.org', tier: 'operator' });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.changed, true);
+    assert.equal(response.body.emailResult.status, failure === 'ambiguous' ? 'uncertain' : 'failed');
+    assert.ok(bootstrapOf(db).adminEmails.includes('new@example.org'));
+    assert.equal(adminLogs(db)[0].action, 'setAdminAccess');
+    assert.equal(calls, failure === 'setup' ? 0 : 1, 'ambiguous exceptions are not retried');
+    if (failure !== 'setup') {
+      const logged = db.read('sent_emails', db.ids('sent_emails')[0]);
+      assert.equal(logged.status, 'failed');
+      assert.equal(logged.retries, 0);
+      assert.match(logged.text, /Use this exact email address: new@example.org/);
+    }
+    await grant(deps, { email: 'new@example.org', tier: 'operator' });
+    assert.equal(calls, failure === 'setup' ? 0 : 1, 'lost grant response is not another invitation');
+  }
+});
+
+test('operator resend supports existing active grants, reads current role and replays one logical send without duplication', async () => {
+  const { db, deps, messages } = world();
+  const first = await resend(deps);
+  assert.equal(first.body.emailResult.status, 'accepted');
+  const replay = await resend(deps);
+  assert.equal(replay.body.emailResult.status, 'uncertain', 'a claim is not acceptance evidence');
+  assert.equal(messages.length, 1);
+  assert.equal(db.ids('sent_emails').length, 1);
+  await grant(deps, { email: STAFF, tier: 'operator' });
+  await resend(deps, STAFF, 'resend_attempt_2');
+  assert.equal(messages.length, 2);
+  assert.match(messages[1].text, /You have operator access/);
+  assert.equal(adminLogs(db).filter((row) => row.action === 'resendAdminAccessInstructions').length, 3);
+});
+
+test('an interrupted resend claim and an ambiguous provider throw stay uncertain and never automatically send again', async () => {
+  const { db, deps, provider } = world();
+  let calls = 0;
+  provider.send = async () => { calls += 1; throw new Error('connection lost'); };
+  assert.equal((await resend(deps)).body.emailResult.status, 'uncertain');
+  assert.equal((await resend(deps)).body.emailResult.status, 'uncertain');
+  assert.equal(calls, 1);
+  const addressKey = require('node:crypto').createHash('sha256').update(STAFF).digest('hex');
+  const onceKey = `admin-access:resend:ops-1:${addressKey}:interrupted_1`;
+  await db.collection('email_claims').doc(claimIdForOnceKey(onceKey)).create({ onceKey });
+  assert.equal((await resend(deps, STAFF, 'interrupted_1')).body.emailResult.status, 'uncertain');
+  assert.equal(calls, 1);
+});
+
+test('resend refuses unauthorized callers, invalid input, inactive grants and read-only demos without provider sends or claims', async () => {
+  const { db, deps, messages } = world();
+  for (const [token, status] of [['staff', 403], ['stranger', 403], [null, 401]]) {
+    assert.equal((await resend(deps, STAFF, 'resend_attempt_1', token)).statusCode, status);
+  }
+  for (const [email, sendId] of [['bad', 'valid_send_id'], [STAFF, '../bad']]) {
+    assert.equal((await resend(deps, email, sendId)).statusCode, 400);
+  }
+  const get = makeRes();
+  await createResendAdminAccessInstructionsHandler(deps)(req('ops', {}, 'GET'), get);
+  assert.equal(get.statusCode, 405);
+  for (const staffExpiry of [{ [STAFF]: new Date(T0.getTime()) }, { [STAFF]: null }, 'invalid']) {
+    await db.collection('config').doc('bootstrap').set({ adminEmails: [OPS], staffEmails: [STAFF], staffExpiry });
+    assert.equal((await resend(deps)).statusCode, 409);
+  }
+  await db.collection('config').doc('bootstrap').set({ adminEmails: [OPS], staffEmails: [] });
+  assert.equal((await resend(deps)).statusCode, 409);
+  await db.collection('config').doc('event').set({ historicalDemo: true });
+  assert.equal((await resend(deps, OPS)).statusCode, 403);
+  assert.equal(messages.length, 0);
+  assert.equal(db.ids('email_claims').length, 0);
+  assert.equal(db.ids('sent_emails').length, 0);
+});
+
+test('mail checks the stream, current access and expiry again after preparation; refusals leave the grant saved', async () => {
+  for (const failure of ['stream', 'expired', 'removed', 'demo', 'config']) {
+    const { db, deps, messages } = world();
+    const original = deps.getConfig;
+    deps.getConfig = async () => {
+      if (failure === 'config') throw new Error('config outage');
+      const config = await original();
+      if (failure === 'stream') config.providers.email.messageStream = 'announcements';
+      if (failure === 'expired') {
+        await db.collection('config').doc('bootstrap').set({ ...bootstrapOf(db), staffExpiry: { 'new@example.org': T0 } });
+      }
+      if (failure === 'removed') {
+        await db.collection('config').doc('bootstrap').set({ ...bootstrapOf(db), staffEmails: [STAFF] });
+      }
+      return config;
+    };
+    if (failure === 'demo') await db.collection('config').doc('event').set({ historicalDemo: true });
+    const response = await grant(deps, { email: 'new@example.org', tier: 'staff' });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.changed, true);
+    assert.equal(response.body.emailResult.status, 'failed');
+    if (failure !== 'removed') assert.ok(bootstrapOf(db).staffEmails.includes('new@example.org'));
+    assert.equal(messages.length, 0);
+    assert.equal(db.ids('email_claims').length, 0);
+  }
+});
+
+test('only sending access endpoints bind provider secrets', () => {
+  const previous = process.env.EVENT_EMAIL_PROVIDER;
+  process.env.EVENT_EMAIL_PROVIDER = 'postmark';
+  try {
+    const { handlers } = require('./access.cjs');
+    const secretsOf = (fn) => (Object.getOwnPropertyDescriptor(fn, '__endpoint')?.value?.secretEnvironmentVariables ?? []).map((s) => s.key);
+    assert.deepEqual(secretsOf(handlers.listAdminAccess), []);
+    assert.deepEqual(secretsOf(handlers.endExpiredStaffAccess), []);
+    assert.ok(secretsOf(handlers.setAdminAccess).length > 0);
+    assert.ok(secretsOf(handlers.resendAdminAccessInstructions).length > 0);
+  } finally {
+    if (previous === undefined) delete process.env.EVENT_EMAIL_PROVIDER;
+    else process.env.EVENT_EMAIL_PROVIDER = previous;
+  }
 });

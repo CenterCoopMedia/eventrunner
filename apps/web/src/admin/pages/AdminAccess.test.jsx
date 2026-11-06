@@ -682,3 +682,68 @@ describe('nextEndReloadDelay', () => {
     expect(nextEndReloadDelay([row(-1000)], now)).toBe(30_000);
   });
 });
+
+describe('access sign-in instructions', () => {
+  it.each([
+    ['accepted', 'The email provider accepted the sign-in instructions. This does not confirm delivery.'],
+    ['failed', 'Sign-in instructions could not be sent.'],
+    ['uncertain', 'Email acceptance is uncertain.'],
+  ])('keeps the saved grant distinct from the %s email result', async (status, words) => {
+    await renderPage({ set: { ok: true, changed: true, previousTier: null, tier: 'staff', emailResult: { status } } });
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'new@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Grant staff access to new@example.org' })).getByRole('button', { name: 'Grant staff access' }));
+    const notice = await screen.findByText((text) => text.startsWith('Staff access granted to new@example.org. Access saved.'));
+    expect(notice.textContent).toContain(words);
+    expect(screen.getByLabelText('Email address')).toHaveValue('');
+    expect(setCalls()).toHaveLength(1);
+    expect(callMock.mock.calls.filter(([name]) => name === 'resendAdminAccessInstructions')).toHaveLength(0);
+  });
+
+  it('resends only after confirmation, keeps one id across a lost response and rapid retry, and restores focus', async () => {
+    await renderPage();
+    const trigger = within(rowFor('desk@example.org')).getByRole('button', { name: 'Send sign-in instructions to desk@example.org' });
+    fireEvent.click(trigger);
+    const surface = screen.getByRole('region', { name: 'Send sign-in instructions to desk@example.org' });
+    expect(document.activeElement).toBe(surface);
+    expect(surface.textContent).toContain('Check the Email log before sending again');
+    const resendCalls = () => callMock.mock.calls.filter(([name]) => name === 'resendAdminAccessInstructions');
+    expect(resendCalls()).toHaveLength(0);
+    let rejectFirst;
+    const first = new Promise((resolve, reject) => { rejectFirst = reject; });
+    callMock.mockImplementation((name) => {
+      if (name === 'listAdminAccess') return Promise.resolve(LIST);
+      return resendCalls().length === 1 ? first : Promise.resolve({ ok: true, emailResult: { status: 'uncertain' } });
+    });
+    const confirm = within(surface).getByRole('button', { name: 'Send sign-in instructions' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(resendCalls()).toHaveLength(1);
+    expect(confirm).toBeDisabled();
+    await act(async () => rejectFirst(new Error('response lost')));
+    expect(await screen.findByText('Email acceptance could not be confirmed. Try again checks this attempt without sending a second copy.')).toBeInTheDocument();
+    fireEvent.click(within(surface).getByRole('button', { name: 'Send sign-in instructions' }));
+    await waitFor(() => expect(resendCalls()).toHaveLength(2));
+    expect(resendCalls()[0][1]).toEqual(resendCalls()[1][1]);
+    expect(resendCalls()[0][1]).toEqual({ email: 'desk@example.org', sendId: expect.stringMatching(/^[A-Za-z0-9_-]{8,64}$/) });
+    expect(await screen.findByText(/Email acceptance is uncertain\. This attempt will not send another copy/)).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+    expect(setCalls()).toHaveLength(0);
+  });
+
+  it('offers resend for active existing accounts, hides it for ended/invalid grants, and states a server-side removal', async () => {
+    const list = { ...LIST, accounts: [
+      ...LIST.accounts,
+      { email: 'ended@example.org', tier: 'staff', expiryState: 'expired', expiresAt: '2026-01-01T00:00:00Z' },
+      { email: 'invalid@example.org', tier: 'staff', expiryState: 'invalid', expiresAt: null },
+    ] };
+    await renderPage({ list, set: serverError(409, 'inactive-access', 'removed meanwhile') });
+    for (const email of ['ended@example.org', 'invalid@example.org']) {
+      expect(within(rowFor(email)).queryByRole('button', { name: `Send sign-in instructions to ${email}` })).toBeNull();
+    }
+    fireEvent.click(within(rowFor('desk@example.org')).getByRole('button', { name: 'Send sign-in instructions to desk@example.org' }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Send sign-in instructions to desk@example.org' })).getByRole('button', { name: 'Send sign-in instructions' }));
+    expect(await screen.findByText('This account no longer has active access. No instructions were sent.')).toBeInTheDocument();
+    expect(setCalls()).toHaveLength(0);
+  });
+});
