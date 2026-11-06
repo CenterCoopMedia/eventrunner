@@ -38,7 +38,6 @@ import { useAdminPages } from '../useAdminPages.js';
 import {
   BLOCK_TYPES,
   BLOCK_TYPE_IDS,
-  blockTypeFieldSummary,
   blockTypeLabel,
 } from '../blockTypes.js';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
@@ -901,7 +900,6 @@ export default function AdminPageEditor({ mode }) {
                           key={blockTypeId}
                           label={`${BLOCK_TYPES[blockTypeId].label} — section ${sectionIndex + 1}`}
                           checked={section.allowedBlocks.includes(blockTypeId)}
-                          hint={blockTypeFieldSummary(blockTypeId)}
                           onChange={(checked) =>
                             updateSection(sectionIndex, {
                               allowedBlocks: checked
@@ -950,16 +948,10 @@ export default function AdminPageEditor({ mode }) {
                               className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-sm"
                               {...bindReorderDrop(`block:${sectionIndex}:`, blockIndex, (from, to) => moveBlocks(sectionIndex, from, to))}
                             >
-                              <div className="grid gap-xs sm:grid-cols-2">
-                                {block.field ? (
-                                  <TextField
-                                    label={`Block ${blockIndex + 1} field — section ${sectionIndex + 1}`}
-                                    value={block.field}
-                                    onChange={() => {}}
-                                    error={errorFor(`${bat}.field`)}
-                                    readOnly
-                                  />
-                                ) : null}
+                              {/* The block's field key is the page's internal name for it and
+                                  never changes, so it is not shown. Type and description sit
+                                  on one row with no hints, so their boxes line up. */}
+                              <div className="grid items-start gap-xs sm:grid-cols-[minmax(10rem,14rem)_1fr]">
                                 <SelectField
                                   label={`Block ${blockIndex + 1} type — section ${sectionIndex + 1}`}
                                   value={block.blockType}
@@ -967,19 +959,16 @@ export default function AdminPageEditor({ mode }) {
                                   onChange={(value) =>
                                     updateBlock(sectionIndex, blockIndex, { blockType: value })
                                   }
-                                  error={errorFor(`${bat}.blockType`)}
-                                  hint={blockTypeFieldSummary(block.blockType)}
+                                  error={errorFor(`${bat}.blockType`) || errorFor(`${bat}.field`)}
                                 />
-                                <div className="sm:col-span-2">
-                                  <TextField
-                                    label={`Block ${blockIndex + 1} description — section ${sectionIndex + 1}`}
-                                    value={block.description}
-                                    onChange={(value) =>
-                                      updateBlock(sectionIndex, blockIndex, { description: value })
-                                    }
-                                    error={errorFor(`${bat}.description`)}
-                                  />
-                                </div>
+                                <TextField
+                                  label={`Block ${blockIndex + 1} description — section ${sectionIndex + 1}`}
+                                  value={block.description}
+                                  onChange={(value) =>
+                                    updateBlock(sectionIndex, blockIndex, { description: value })
+                                  }
+                                  error={errorFor(`${bat}.description`)}
+                                />
                               </div>
                               <div className="mt-xs flex flex-wrap gap-2xs">
                                 <ReorderControls

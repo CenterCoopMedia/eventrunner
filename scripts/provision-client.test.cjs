@@ -242,12 +242,13 @@ function fakeCloud(options = {}) {
       return answer({ result: state.dns.filter((r) => r.type === type && r.name === name) });
     }
     if (method === 'POST') {
-      state.dns.push({ id: `r${state.dns.length}`, ...body });
-      return answer({ result: {} });
+      const record = { id: `r${state.dns.length}`, ...body };
+      state.dns.push(record);
+      return answer({ result: record });
     }
     const record = state.dns.find((r) => url.pathname.endsWith(`/${r.id}`));
     Object.assign(record, body);
-    return answer({ result: {} });
+    return answer({ result: record });
   }
 
   function postmarkRoute(url, method, body, headers) {
@@ -272,7 +273,7 @@ function fakeCloud(options = {}) {
     if (headers['X-Postmark-Account-Token'] !== ENV.POSTMARK_ACCOUNT_TOKEN) return answer({ Message: 'bad account token' }, 401);
     if (p === '/servers') {
       if (method === 'POST') {
-        const server = { Name: body.Name, ApiTokens: ['server-token'] };
+        const server = { ID: 3, Name: body.Name, ApiTokens: ['server-token'] };
         state.servers.push(server);
         return answer(server);
       }
@@ -1070,4 +1071,45 @@ test('a run stops when the request closed after its first read', async () => {
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 2);
   assert.equal(fake.db.read('console_builds/a1'), undefined, 'no run was recorded');
   assert.equal(fake.db.read('applications/a1').status, 'declined');
+});
+
+test('the private resource inventory retains deletion identities and DNS proof across retries', async () => {
+  const fake = setup({ initCode: 1 });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  const resources = fake.db.read('console_builds/a1').resources;
+  assert.equal(resources.projectId, PROJECT);
+  assert.equal(resources.site, PROJECT);
+  assert.deepEqual(resources.buckets, [`${PROJECT}.firebasestorage.app`]);
+  assert.equal(resources.postmarkServerId, 3);
+  assert.equal(resources.postmarkDomainId, 5);
+  assert.equal(resources.githubEnvironment, 'nclocal');
+  assert.equal(resources.dnsInventoryComplete, true);
+  assert.ok(resources.dnsRecords.some((r) => r.name === `_acme-challenge.${DOMAIN}` && r.content === 'cert-proof'));
+  assert.ok(resources.dnsRecords.some((r) => r.name === `pm._domainkey.${DOMAIN}` && r.content === 'k=rsa; p=key'));
+  assert.ok(resources.dnsRecords.some((r) => r.name === `pm-bounces.${DOMAIN}`));
+  assert.ok(resources.dnsRecords.every((r) => r.id && fake.state.dns.some((record) => record.id === r.id && record.type === r.type && record.name === r.name && record.content === r.content)));
+  assert.ok(!JSON.stringify(resources).includes('server-token'));
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.deepEqual(fake.db.read('console_builds/a1').resources, resources, 'completed verification no longer exposes its original proof, so the inventory must persist');
+});
+
+test('a DNS write with a lost response retains its intent and records its id on retry', async () => {
+  const fake = setup({ initCode: 1 });
+  const fetch = fake.deps.fetch;
+  let loseResponse = true;
+  fake.deps.fetch = async (url, init) => {
+    const response = await fetch(url, init);
+    if (loseResponse && new URL(url).host === 'api.cloudflare.com' && init.method === 'POST') {
+      loseResponse = false;
+      throw new Error('lost response');
+    }
+    return response;
+  };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  const intent = fake.db.read('console_builds/a1').resources.dnsRecords[0];
+  assert.equal(intent.id, undefined);
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1, 'the retry reaches the later seed failure');
+  const saved = fake.db.read('console_builds/a1').resources.dnsRecords.find((r) => r.type === intent.type && r.name === intent.name && r.content === intent.content);
+  assert.equal(saved.id, fake.state.dns.find((r) => r.type === intent.type && r.name === intent.name && r.content === intent.content).id);
+  assert.equal(fake.db.read('console_builds/a1').failedStep, 'seed');
 });

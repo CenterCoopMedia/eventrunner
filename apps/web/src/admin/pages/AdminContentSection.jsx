@@ -18,6 +18,7 @@ import { byStoredOrder, orderSaveMessage, ordersToWrite, saveOrderWrites, useDra
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
+import HomeHeroImageEditor from '../components/HomeHeroImageEditor.jsx';
 import {
   DestructiveConfirm,
   Notice,
@@ -267,6 +268,15 @@ export default function AdminContentSection() {
         <Notice
           tone="caution"
           message="We lost the connection to the content list; showing the last values we received and retrying."
+        />
+      ) : null}
+
+      {pageId === 'home' && sectionId === 'hero' && !serverBlocks.some((row) => row.current?.blockType === 'image') ? (
+        <HomeHeroImageEditor
+          page={page}
+          rows={contentRows}
+          ready={pagesReady && contentReady}
+          disabled={savingOrder || busy !== null || draft.dirty}
         />
       ) : null}
 

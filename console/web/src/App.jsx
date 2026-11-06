@@ -21,11 +21,20 @@ import ReportProblem from './ReportProblem.jsx';
 import WaitingBuddy from './WaitingBuddy.jsx';
 
 const MARK = (
-  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="mark">
-    <rect x="2.5" y="2" width="3" height="20" />
-    <rect x="5.5" y="2" width="16" height="3" />
-    <rect x="5.5" y="11" width="9.5" height="2" />
-    <rect x="5.5" y="19.5" width="13" height="2.5" />
+  <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false" className="mark">
+    <g transform="scale(0.4)" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 44h7 M8 50h4" fill="none" stroke="rgb(var(--accent))" strokeWidth="3.5" />
+      <g transform="matrix(1 0 -0.16 1 8 0)">
+        <path d="M28 6 40 23 50 6" fill="none" stroke="rgb(var(--accent))" strokeWidth="3.5" />
+        <path d="m31 59-7 10-7-3-1 2 M43 59l9 12 5-2 M54 42l8-8" fill="none" stroke="currentColor" strokeWidth="2.8" />
+        <rect x="23" y="23" width="32" height="36" rx="5" fill="rgb(var(--surface))" stroke="currentColor" strokeWidth="2.5" />
+        <path d="M24.25 28a3.75 3.75 0 0 1 3.75-3.75h22A3.75 3.75 0 0 1 53.75 28v4.75h-29.5Z" fill="rgb(var(--accent))" />
+        <rect x="35" y="18" width="8" height="7" rx="1.5" fill="currentColor" />
+        <circle cx="33" cy="43" r="2.2" fill="currentColor" />
+        <circle cx="45" cy="43" r="2.2" fill="currentColor" />
+        <path d="M34 50q5 4 10 0" fill="none" stroke="currentColor" strokeWidth="2.5" />
+      </g>
+    </g>
   </svg>
 );
 

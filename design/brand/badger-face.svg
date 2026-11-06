@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Event Runner" color="var(--badger-ink, rgb(238 238 236))">
+  <!-- Face-only source for icons. Larger eyes and a 2-unit outline stay distinct at 16px. -->
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4.5" width="18" height="18" rx="4" fill="var(--badger-surface, rgb(25 26 28))" stroke="currentColor" stroke-width="2"/>
+    <path d="M4 8.5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3V10H4Z" fill="var(--badger-accent, rgb(128 178 238))"/>
+    <rect x="9" y="1" width="6" height="5.5" rx="1.2" fill="currentColor"/>
+    <circle cx="8.5" cy="13.75" r="1.65" fill="currentColor"/>
+    <circle cx="15.5" cy="13.75" r="1.65" fill="currentColor"/>
+    <path d="M8.5 18.25q3.5 3 7 0" fill="none" stroke="currentColor" stroke-width="2"/>
+  </g>
+</svg>

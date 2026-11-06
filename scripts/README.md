@@ -449,6 +449,27 @@ clear the second failure. After a change to `mark.svg`, do these steps in order:
 2. Run `node scripts/dev/build-app-icons.mjs`.
 3. Commit both PNGs with the change.
 
+### `dev/build-social-cards.mjs`
+
+Renders the Event Runner Badger identity from `design/brand/` SVG sources.
+It writes the three 1200 by 630 share cards, the console and docs SVG and
+32px PNG favicons, both 180px Apple touch icons, and the console 192px and
+512px app icons. The card template keeps each surface's existing text.
+All icons use `design/brand/badger-face.svg`; the app icons have an opaque
+accent ground and keep the face inside the maskable safe circle.
+
+```sh
+node scripts/dev/build-social-cards.mjs
+node scripts/dev/build-social-cards.mjs --check
+```
+
+The script spawns system Chrome headless and embeds the fonts from
+`docs/fonts/`. Run it in a local terminal outside the agent sandbox.
+Set `CHROME` to its executable, or use the standard macOS
+Google Chrome path, `google-chrome`, or `chromium` on `PATH`. No browser
+package is required. `--check` renders in a temporary directory and compares
+bytes without writing repository files. See [the brand file list](../design/brand/README.md).
+
 ## Planned
 
 `grant-admin`, `register-ticketing-webhook`, `export-attendees`, `generate-favicons`. Credentials go

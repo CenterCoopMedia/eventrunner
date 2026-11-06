@@ -47,9 +47,12 @@ vi.mock('../../lib/contentSource.js', () => ({
   subscribeSpeakersPublic: () => () => {},
 }));
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
+let adminSources = {};
+const adminSubscriptions = new Map();
 vi.mock('../adminSource.js', () => ({
-  subscribeAdminCollection: (_name, onNext) => {
-    onNext([]);
+  subscribeAdminCollection: (name, onNext) => {
+    adminSubscriptions.set(name, onNext);
+    onNext(adminSources[name] ?? []);
     return () => {};
   },
 }));
@@ -208,12 +211,115 @@ beforeEach(() => {
   // the page, so the account has already ended it.
   markTourDone('admin-1');
   configSubscriptions.clear();
+  adminSources = {};
+  adminSubscriptions.clear();
   document.getElementById(PREVIEW_STYLE_ID)?.remove();
   for (const attribute of ['theme', 'mode', 'motifSet', 'texture']) {
     delete document.documentElement.dataset[attribute];
   }
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+describe('the Homepage hero image field', () => {
+  const home = {
+    id: 'home', label: 'Home', path: '/',
+    sections: [{ id: 'hero', allowedBlocks: ['text', 'cta', 'image'], maxBlocks: 4 }],
+  };
+  const photo = {
+    id: 'hero__photo', section: 'hero', field: 'photo', blockType: 'image',
+    url: 'cms-images/live.jpg', alt: 'The live picture', order: 3,
+    caption: 'Keep the caption', focalX: 20, focalY: 40, visible: false,
+  };
+  beforeEach(() => {
+    adminSources.cmsPages = [home];
+  });
+
+  it('shows the current draft image and requires alt text', async () => {
+    adminSources.cmsContent = [photo];
+    adminSources.cmsContent_drafts = [{ ...photo, url: 'cms-images/draft.jpg', alt: 'The draft picture' }];
+    await renderBranding();
+    expect(screen.getByLabelText('Homepage hero image')).toHaveValue('cms-images/draft.jpg');
+    expect(screen.getByLabelText('Homepage hero image')).toHaveAttribute('placeholder', 'cms-images/…');
+    expect(screen.getByText(/The picture at the top of your home page\./)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(screen.getByLabelText('Alt text')).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByLabelText('Alt text')).toHaveAttribute('aria-invalid', 'true');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('creates the content draft and uses update on a second save before listener readback', async () => {
+    fetch.mockResolvedValue(okResponse({ docId: 'hero__image', status: 'dirty' }));
+    await renderBranding();
+    fireEvent.change(screen.getByLabelText('Homepage hero image'), { target: { value: 'cms-images/new.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'People at the event' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. Publish to show it on your site.');
+    expect(String(fetch.mock.calls[0][0])).toMatch(/\/cmsCreateContent$/);
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      pageId: 'home', section: 'hero', field: 'image', visible: true,
+      fields: { blockType: 'image', url: 'cms-images/new.jpg', alt: 'People at the event', order: 0 },
+    });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Guests at the event' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. Publish to show it on your site.');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(String(fetch.mock.calls[1][0])).toMatch(/\/cmsUpdateContent$/);
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({
+      section: 'hero', field: 'image', fields: { url: 'cms-images/new.jpg', alt: 'Guests at the event' },
+    });
+  });
+
+  it('updates the first image in content order and publishes only that content document', async () => {
+    // A full section still permits updates. The second image is first in
+    // the listener array, but the renderer uses stored content order.
+    adminSources.cmsContent = [
+      { ...photo, id: 'hero__second', field: 'second', order: 4 }, photo,
+      ...['title', 'subtitle'].map((field, order) => ({ id: `hero__${field}`, section: 'hero', field, blockType: 'text', order })),
+    ];
+    fetch.mockResolvedValueOnce(okResponse({ docId: photo.id }))
+      .mockResolvedValueOnce(okResponse({ results: { cmsContent: { published: [photo.id], skipped: [] } } }));
+    await renderBranding();
+    fireEvent.change(screen.getByLabelText('Homepage hero image'), { target: { value: 'cms-images/new.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Guests in the hall' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await screen.findByText('Published. The public site picks it up live.');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(String(fetch.mock.calls[0][0])).toMatch(/\/cmsUpdateContent$/);
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      section: 'hero', field: 'photo', fields: { url: 'cms-images/new.jpg', alt: 'Guests in the hall' },
+    });
+    expect(String(fetch.mock.calls[1][0])).toMatch(/\/cmsPublish$/);
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ collection: 'cmsContent', docIds: [photo.id] });
+  });
+
+  it('does not report success when publication skips the image', async () => {
+    adminSources.cmsContent = [photo];
+    fetch.mockResolvedValueOnce(okResponse({ docId: photo.id }))
+      .mockResolvedValueOnce(okResponse({ results: { cmsContent: { published: [], skipped: [{ docId: photo.id, reason: 'conflict' }] } } }));
+    await renderBranding();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await screen.findByText(/The image draft is saved, but it was not published\./);
+    expect(screen.queryByText('Published. The public site picks it up live.')).not.toBeInTheDocument();
+  });
+
+  it('reads an image added in Content after Branding loads', async () => {
+    await renderBranding();
+    act(() => adminSubscriptions.get('cmsContent_drafts')([photo]));
+    expect(screen.getByLabelText('Homepage hero image')).toHaveValue(photo.url);
+    expect(screen.getByLabelText('Alt text')).toHaveValue(photo.alt);
+  });
+
+  it('explains the four-item limit when no image can be added', async () => {
+    adminSources.cmsContent = ['title', 'subtitle', 'extra', 'another'].map((field) => ({
+      id: `hero__${field}`, section: 'hero', field, blockType: 'text', value: field,
+    }));
+    await renderBranding();
+    expect(screen.getByLabelText('Homepage hero image')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(screen.getByText('The top of your home page is full (4 items). Remove one to add a picture.')).toBeInTheDocument();
+  });
 });
 
 describe('the proof', () => {
@@ -412,7 +518,7 @@ describe('the staff workflow', () => {
       .toEqual(['Identity', 'Page style', 'Workspace', 'Advanced']);
     const proof = previewIframe();
     expect(screen.getByRole('button', { name: 'Identity', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    expect(panelTitles()).toEqual(['Logo and icon', 'Main brand colour', 'Page preview']);
+    expect(panelTitles()).toEqual(['Logo and icon', 'Homepage hero image', 'Main brand colour', 'Page preview']);
 
     fireEvent.change(screen.getByLabelText('Primary logo'), { target: { value: 'branding/draft.svg' } });
     fireEvent.click(screen.getByRole('button', { name: 'Page style', exact: true }));
@@ -776,7 +882,7 @@ describe('publishing the theme', () => {
     expect(screen.getByLabelText('Favicon').closest('[hidden]')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'More image slots' }));
     expect(screen.getByLabelText('Favicon').closest('[hidden]')).toBeNull();
-    expect(screen.getAllByRole('button', { name: 'Choose or upload…' }).length).toBe(5);
+    expect(screen.getAllByRole('button', { name: 'Choose or upload…' }).length).toBe(6);
   });
 
   // The square icon also becomes the app icon when it is a square PNG. The
