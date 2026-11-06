@@ -1,7 +1,8 @@
 // Event hero geometry in every site style, mode and width (#345, #478).
 //
-// The hero sets its copy beside a photograph from 640px up and above it on
-// phones. Two defects reached the public page because no check measured
+// The hero sets its copy beside a photograph from 640px up. On phones,
+// Home puts the photograph first (#753); compact Schedule keeps copy first.
+// Two defects reached the public page because no check measured
 // what a reader sees: the copy column ran onto the photograph (#345), and
 // the copy started at the hero's coloured left edge with no inner inset
 // (#478). This spec measures the rendered glyph boxes on Home and the
@@ -11,14 +12,14 @@
 // It drives the real public Home page against the seeded emulators. The
 // demo build is not used: its Newsroom style is the NC Local historical
 // composition, and the shared Newsroom hero is the one #345 is about.
-/* global document, NodeFilter */
+/* global document, Node, NodeFilter */
 import { test, expect } from '@playwright/test';
 import { adminDb } from './helpers.mjs';
 
 const THEMES = ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'];
 const MODES = ['light', 'dark'];
 const WIDTHS = [320, 360, 375, 640, 768, 1024, 1280, 1440, 1920];
-// The phone layout stacks the photograph under the copy below this width.
+// Below this width Home stacks artwork first and compact Schedule copy first.
 const SIDE_BY_SIDE_MIN = 640;
 // The smallest inner inset the copy may have from the hero's edge.
 const MIN_INSET = 12;
@@ -34,6 +35,7 @@ async function measureHero(page) {
     const hero = document.querySelector('.event-hero');
     const copy = hero.querySelector('.event-hero__copy');
     const art = hero.querySelector('.event-hero__art');
+    const figure = hero.querySelector('.event-hero__figure');
     const boxes = [];
     const brokenWords = [];
     const range = document.createRange();
@@ -63,11 +65,15 @@ async function measureHero(page) {
     const heroRect = hero.getBoundingClientRect();
     const copyRect = copy.getBoundingClientRect();
     const artRect = art ? art.getBoundingClientRect() : null;
+    const figureRect = figure ? figure.getBoundingClientRect() : null;
     return {
       illustrated: hero.classList.contains('event-hero--illustrated'),
+      compact: hero.classList.contains('event-hero--compact'),
+      artBeforeCopy: art ? Boolean(art.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING) : false,
       hero: { left: heroRect.left, right: heroRect.right },
-      copy: { right: copyRect.right },
+      copy: { right: copyRect.right, top: copyRect.top },
       art: artRect ? { left: artRect.left, top: artRect.top } : null,
+      figure: figureRect ? { bottom: figureRect.bottom } : null,
       boxes,
       controls,
       brokenWords,
@@ -122,8 +128,15 @@ function heroFaults(width, metrics, copy) {
     if (Math.abs(metrics.copy.right - metrics.art.left) > 1) {
       faults.push(`the copy column ends ${round(metrics.art.left - metrics.copy.right)}px before the photograph`);
     }
-  } else if (metrics.illustrated && metrics.art.top < textBottom) {
-    faults.push(`the phone photograph starts ${round(textBottom - metrics.art.top)}px above the end of the copy`);
+  } else if (metrics.illustrated) {
+    if (metrics.artBeforeCopy === metrics.compact) {
+      faults.push('the phone artwork reading order disagrees with the page treatment');
+    }
+    if (metrics.compact && metrics.art.top < textBottom) {
+      faults.push(`the phone photograph starts ${round(textBottom - metrics.art.top)}px above the end of the copy`);
+    } else if (!metrics.compact && metrics.figure.bottom > metrics.copy.top + 0.5) {
+      faults.push(`the phone artwork ends ${round(metrics.figure.bottom - metrics.copy.top)}px below the start of the copy`);
+    }
   }
   return faults;
 }
