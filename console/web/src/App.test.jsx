@@ -51,9 +51,9 @@ describe('AppRoutes', () => {
 
   it('asks a reader with an unconfirmed email to confirm it by an emailed link', async () => {
     const auth = renderApp('/', fakeAuth({ user: { uid: 'm', email: 'mo@example.org', emailVerified: false } }));
-    expect(screen.getByText(/We could not confirm your email address/)).toBeInTheDocument();
+    expect(screen.getByText(/Send a sign-in link to/)).toBeInTheDocument();
     expect(callApi).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Email me a link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send link' }));
     await waitFor(() => expect(auth.sendEmailLink).toHaveBeenCalledWith('mo@example.org'));
     expect(await screen.findByRole('status')).toHaveTextContent('We sent a sign-in link to mo@example.org.');
   });
@@ -78,7 +78,7 @@ describe('AppRoutes', () => {
         <MemoryRouter initialEntries={['/start/l1#token=abc']}><AppRoutes /></MemoryRouter>
       </AuthContext.Provider>,
     );
-    expect(screen.getByText(/We could not confirm your email address/)).toBeInTheDocument();
+    expect(screen.getByText(/Send a sign-in link to/)).toBeInTheDocument();
     expect(window.localStorage.getItem(RETURN_KEY)).toBe('/start/l1#token=abc');
     first.unmount();
 
@@ -147,6 +147,6 @@ describe('AppRoutes', () => {
     renderApp('/organizations/o1/applications/a1/agreement');
     expect(await screen.findByRole('heading', { level: 1, name: 'Agreement' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { level: 2, name: 'Test agreement' })).toBeInTheDocument();
-    expect(screen.queryByText('Nobody has accepted the agreement on this request yet.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Open your request to read and accept the agreement.')).not.toBeInTheDocument();
   });
 });

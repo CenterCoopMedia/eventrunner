@@ -29,7 +29,7 @@ export default function TeamInviteForm({ onInvite, outcome, disabled, onRefresh,
   return (
     <section aria-labelledby="invite-title" className="section">
       <h2 id="invite-title">Invite a teammate</h2>
-      <p className="muted">We email a link. It works once and expires in 7 days.</p>
+      <p className="muted">Invites expire after 7 days.</p>
       <form noValidate onSubmit={onSubmit} className="stack">
         <div className="field">
           <label htmlFor="invite-email">Email address</label>
@@ -40,14 +40,14 @@ export default function TeamInviteForm({ onInvite, outcome, disabled, onRefresh,
             inputMode="email"
             autoComplete="off"
             value={email}
-            disabled={busy}
+            disabled={busy || disabled}
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={fieldError ? 'true' : undefined}
             aria-describedby={fieldError ? 'invite-email-error' : undefined}
           />
           {fieldError ? <p id="invite-email-error" className="field-error">{fieldError}</p> : null}
         </div>
-        <fieldset className="choices" disabled={busy}>
+        <fieldset className="choices" disabled={busy || disabled}>
           <legend>Role</legend>
           {['editor', 'owner'].map((value) => (
             <label key={value} className="choice">

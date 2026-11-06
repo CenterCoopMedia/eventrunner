@@ -21,6 +21,7 @@ export default function AcceptInvite() {
   const [busy, setBusy] = useState(false);
 
   async function accept() {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -58,7 +59,7 @@ export default function AcceptInvite() {
   return (
     <section className="panel narrow" aria-labelledby="invite-title">
       <h1 id="invite-title" tabIndex={-1}>Join the team</h1>
-      <p>You are signed in as {auth.user?.email}. The invite must be for this address.</p>
+      <p>You are signed in as {auth.user?.email}. Use the email address that received the invite.</p>
       {error ? (
         <div className="stack">
           <p className="message error" role="alert">{error.message}</p>
@@ -67,7 +68,7 @@ export default function AcceptInvite() {
           ) : null}
         </div>
       ) : null}
-      <button type="button" className="button primary" disabled={busy} onClick={accept}>Accept invite</button>
+      <button type="button" className="button primary" disabled={busy} onClick={accept}>{busy ? 'Joining…' : 'Join team'}</button>
     </section>
   );
 }

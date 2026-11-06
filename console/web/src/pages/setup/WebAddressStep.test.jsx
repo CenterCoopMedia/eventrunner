@@ -22,7 +22,7 @@ describe('Your web address step', () => {
   it('says at once that a free name is available', async () => {
     renderSetup('web-address');
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'nclocal' } });
-    expect(await screen.findByText('nclocal.eventrunner.org is available. We keep it for you while you finish.')).toBeInTheDocument();
+    expect(await screen.findByText('nclocal.eventrunner.org is available.')).toBeInTheDocument();
     expect(callsTo('checkWebAddress').at(-1)).toEqual({ name: 'nclocal', appId: 'a1' });
   });
 

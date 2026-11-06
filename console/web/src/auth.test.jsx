@@ -4,7 +4,7 @@ import {
   GoogleAuthProvider, OAuthProvider, isSignInWithEmailLink, onIdTokenChanged,
   sendSignInLinkToEmail, signInWithEmailLink, signInWithPopup, signOut,
 } from 'firebase/auth';
-import { AuthProvider, EMAIL_KEY, signInErrorMessage, useAuth } from './auth.jsx';
+import { AuthProvider, EMAIL_KEY, RETURN_KEY, peekReturn, signInErrorMessage, useAuth } from './auth.jsx';
 
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: vi.fn(function GoogleAuthProvider() { this.providerId = 'google.com'; }),
@@ -67,6 +67,25 @@ describe('AuthProvider', () => {
       handleCodeInApp: true,
     });
     expect(window.localStorage.getItem(EMAIL_KEY)).toBe('sam@example.org');
+  });
+
+  it('carries the saved return path in the email link, without the link token', async () => {
+    window.localStorage.setItem(RETURN_KEY, '/start/abc#token=t1');
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await act(() => api.sendEmailLink('sam@example.org'));
+    expect(sendSignInLinkToEmail.mock.calls.at(-1)[2].url)
+      .toBe(`${window.location.origin}/signin/finish?next=%2Fstart%2Fabc`);
+    window.localStorage.removeItem(RETURN_KEY);
+  });
+
+  it('reads the return path from the link once the saved one is gone, and only a path in this app', () => {
+    window.localStorage.removeItem(RETURN_KEY);
+    expect(peekReturn('https://x/signin/finish?next=%2Fstart%2Fabc%23token%3Dt1&oobCode=1')).toBe('/start/abc#token=t1');
+    expect(peekReturn('https://x/signin/finish?next=%2F%2Fevil.example&oobCode=1')).toBe('/');
+    expect(peekReturn('https://x/signin/finish?next=https%3A%2F%2Fevil.example')).toBe('/');
+    window.localStorage.setItem(RETURN_KEY, '/invite/i1#token=t2');
+    expect(peekReturn('https://x/signin/finish?next=%2Fstart%2Fabc')).toBe('/invite/i1#token=t2');
+    window.localStorage.removeItem(RETURN_KEY);
   });
 
   it('finishes an email link sign-in and forgets the address', async () => {

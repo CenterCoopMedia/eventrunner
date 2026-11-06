@@ -42,7 +42,7 @@ describe('ReviewQueue', () => {
     const nav = await screen.findByRole('navigation', { name: 'Filter by status' });
     expect(within(nav).getByRole('link', { name: 'Approved' })).toHaveAttribute('aria-current', 'page');
     fireEvent.click(within(nav).getByRole('link', { name: 'Declined' }));
-    expect(await screen.findByText('No request has this status.')).toBeInTheDocument();
+    expect(await screen.findByText('No requests here. Choose another status or create a signup link.')).toBeInTheDocument();
     expect(callApi).toHaveBeenLastCalledWith('listApplicationsForReview', { status: 'declined' });
     expect(within(nav).getByRole('link', { name: 'Declined' })).toHaveAttribute('aria-current', 'page');
   });

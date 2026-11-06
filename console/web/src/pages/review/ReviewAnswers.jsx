@@ -27,10 +27,10 @@ function Days({ days }) {
 
 /** The frozen answers, in the order of the guided setup, in plain words. */
 export default function ReviewAnswers({ answers }) {
-  if (!answers) return <p>The client has not accepted the agreement yet, so there are no frozen answers.</p>;
+  if (!answers) return <p>Event details will appear when the client accepts the agreement.</p>;
   const { organization = {}, event = {}, webAddress = {}, tickets = {}, email = {} } = answers;
   const host = webAddress.name ? `${webAddress.name}.eventrunner.org` : '';
-  const sender = event.name && host ? `${email.senderName || event.name} <hello@${host}>` : '';
+  const sender = email.senderName && host ? `${email.senderName} <hello@${host}>` : 'Not added';
   return (
     <>
       <h3>Organization</h3>
@@ -44,7 +44,7 @@ export default function ReviewAnswers({ answers }) {
         <Row term="Name">{event.name}</Row>
         <Row term="Short name">{event.shortName}</Row>
         <Row term="One-line description">{event.tagline}</Row>
-        <Row term="Time zone">{event.timezone}</Row>
+        <Row term="Time zone">{event.timezone?.replaceAll('_', ' ').split('/').reverse().join(', ')}</Row>
         <Row term="Dates"><Days days={event.days} /></Row>
         <Row term="Venue">{event.venue?.name}</Row>
         <Row term="Venue address">{event.venue?.address}</Row>
@@ -59,7 +59,7 @@ export default function ReviewAnswers({ answers }) {
       </dl>
       <h3>Email</h3>
       <dl className="answers">
-        <Row term="Sender name">{email.senderName}</Row>
+        <Row term="Sender name">{email.senderName || 'Not added'}</Row>
         <Row term="Replies go to">{email.replyTo}</Row>
         <Row term="Sender preview">{sender}</Row>
       </dl>

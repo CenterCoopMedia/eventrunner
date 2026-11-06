@@ -22,6 +22,7 @@ export default function SignInFinish() {
   const fieldRef = useRef(null);
 
   async function finish(address) {
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
@@ -42,8 +43,8 @@ export default function SignInFinish() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLink, address]);
 
-  if (auth.user && auth.user.emailVerified) return <Navigate to={peekReturn()} replace />;
-  if (!isLink) return <Navigate to={auth.user ? peekReturn() : '/signin'} replace />;
+  if (auth.user && auth.user.emailVerified) return <Navigate to={peekReturn(href)} replace />;
+  if (!isLink) return <Navigate to={auth.user ? peekReturn(href) : '/signin'} replace />;
 
   function onSubmit(event) {
     event.preventDefault();
@@ -65,10 +66,10 @@ export default function SignInFinish() {
           <p><Link to="/signin">Get a new sign-in link</Link></p>
         </>
       ) : null}
-      {address && !error ? <LoadingState long>Signing you in. This takes a moment.</LoadingState> : null}
+      {address && !error ? <LoadingState long>Signing you in.</LoadingState> : null}
       {!address ? (
         <form noValidate onSubmit={onSubmit} className="stack">
-          <p>You opened the link in a different browser. Enter the email address the link was sent to. If you started from a signup link, open that link again here once you are signed in.</p>
+          <p>Enter the email address used for this sign-in link. If you have a signup link, open it again after signing in.</p>
           <div className="field">
             <label htmlFor="finish-email">Email address</label>
             <input
@@ -78,13 +79,14 @@ export default function SignInFinish() {
               inputMode="email"
               autoComplete="email"
               value={email}
+              disabled={busy}
               onChange={(e) => setEmail(e.target.value)}
               aria-invalid={fieldError ? 'true' : undefined}
               aria-describedby={fieldError ? 'finish-email-error' : undefined}
             />
             {fieldError ? <p id="finish-email-error" className="field-error">{fieldError}</p> : null}
           </div>
-          <button type="submit" className="button primary" disabled={busy}>Sign in</button>
+          <button type="submit" className="button primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
         </form>
       ) : null}
     </section>

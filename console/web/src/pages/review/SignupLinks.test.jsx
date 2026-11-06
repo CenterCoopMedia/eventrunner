@@ -28,7 +28,7 @@ const page = () => renderPage(<SignupLinks />, { path: '/review/links', route: '
 
 function create(name = 'New Org') {
   fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: name } });
-  fireEvent.click(screen.getByRole('button', { name: 'Create the link' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Create link' }));
 }
 
 beforeEach(() => serve());
@@ -40,9 +40,9 @@ describe('SignupLinks', () => {
     expect(callApi).toHaveBeenCalledWith('listSignupLinks', {});
     expect(items[0]).toHaveTextContent('Open Org');
     expect(items[0]).toHaveTextContent('Open');
-    expect(within(items[0]).getByRole('button', { name: 'Revoke' })).toBeInTheDocument();
+    expect(within(items[0]).getByRole('button', { name: /^Revoke link for / })).toBeInTheDocument();
     expect(items[1]).toHaveTextContent('Used by ana@example.org');
-    expect(within(items[1]).queryByRole('button', { name: 'Revoke' })).not.toBeInTheDocument();
+    expect(within(items[1]).queryByRole('button', { name: /^Revoke link for / })).not.toBeInTheDocument();
     expect(within(items[1]).getByRole('link', { name: 'Open the request' })).toHaveAttribute('href', '/review/a2');
   });
 
@@ -54,10 +54,10 @@ describe('SignupLinks', () => {
     await screen.findByRole('list', { name: 'Links' });
     create();
     const field = await screen.findByLabelText('Signup link');
-    expect(field).toHaveValue(URL_ONE);
+    expect(field).toHaveTextContent(URL_ONE);
     expect(callApi).toHaveBeenCalledWith('createSignupLink', { organizationName: 'New Org' });
-    expect(screen.getByText(/We will not show it again/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(screen.getByText(/Save this link before leaving/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy signup link' }));
     expect(await screen.findByText('Copied.')).toBeInTheDocument();
     expect(writeText).toHaveBeenCalledWith(URL_ONE);
     unmount();
@@ -73,8 +73,8 @@ describe('SignupLinks', () => {
     page();
     await screen.findByRole('list', { name: 'Links' });
     create();
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy' }));
-    expect(await screen.findByText(/Select it and copy it yourself/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy signup link' }));
+    expect(await screen.findByText(/Select the link and copy it/)).toBeInTheDocument();
   });
 
   it('checks the name first', async () => {
@@ -91,8 +91,9 @@ describe('SignupLinks', () => {
     page();
     await screen.findByRole('list', { name: 'Links' });
     create();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Missing: region.');
-    expect(screen.getByRole('link', { name: 'Open the console settings' })).toHaveAttribute('href', '/review/settings');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign-ups are closed.');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Missing: region.');
+    expect(screen.getByRole('link', { name: 'Save hosting settings and an agreement' })).toHaveAttribute('href', '/review/settings');
     expect(screen.queryByLabelText('Signup link')).not.toBeInTheDocument();
   });
 
@@ -103,15 +104,15 @@ describe('SignupLinks', () => {
       revokeSignupLink: () => { links = [{ ...OPEN, status: 'revoked' }]; return {}; },
     });
     page();
-    fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Revoke link for / }));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(callApi).not.toHaveBeenCalledWith('revokeSignupLink', expect.anything());
+    fireEvent.click(screen.getByRole('button', { name: /^Revoke link for / }));
     fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, revoke' }));
     expect(await screen.findByText('You revoked the link for Open Org.')).toBeInTheDocument();
     expect(callApi).toHaveBeenCalledWith('revokeSignupLink', { linkId: 'l1' });
     expect(await screen.findByText('Revoked')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Revoke' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Revoke link for / })).not.toBeInTheDocument();
   });
 
   it('takes a revoked new link off the page', async () => {
@@ -126,8 +127,8 @@ describe('SignupLinks', () => {
     create();
     await screen.findByLabelText('Signup link');
     const item = within(await screen.findByRole('list', { name: 'Links' })).getByText('New Org').closest('li');
+    fireEvent.click(within(item).getByRole('button', { name: /^Revoke link for / }));
     fireEvent.click(within(item).getByRole('button', { name: 'Revoke' }));
-    fireEvent.click(within(item).getByRole('button', { name: 'Yes, revoke' }));
     await screen.findByText('You revoked the link for New Org.');
     expect(screen.queryByLabelText('Signup link')).not.toBeInTheDocument();
   });
