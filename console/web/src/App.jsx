@@ -1,3 +1,4 @@
+import PageHeading from './PageHeading.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, forgetReturn, rememberReturn, signInErrorMessage, useAuth } from './auth.jsx';
@@ -18,7 +19,6 @@ import ReviewQueue from './pages/review/ReviewQueue.jsx';
 import SignupLinks from './pages/review/SignupLinks.jsx';
 import LoadingState from './LoadingState.jsx';
 import ReportProblem from './ReportProblem.jsx';
-import WaitingBuddy from './WaitingBuddy.jsx';
 
 const MARK = (
   <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false" className="mark">
@@ -78,9 +78,6 @@ function Layout() {
           ) : null}
         </div>
       </header>
-      <div className="margin-badger" aria-hidden="true">
-        <WaitingBuddy />
-      </div>
       <main id="main" tabIndex={-1} className="page">
         <Outlet />
         {helpEmail ? <p className="muted section">{helpName ? `Need a hand? Email ${helpName} at ` : 'Need the hosting team? Email '}<a href={`mailto:${helpEmail}`}>{helpEmail}</a>.</p> : null}
@@ -110,7 +107,7 @@ function ConfirmEmail({ user }) {
   }
   return (
     <section className="panel narrow" aria-labelledby="confirm-title">
-      <h1 id="confirm-title" tabIndex={-1}>Confirm your email address</h1>
+      <PageHeading id="confirm-title" tabIndex={-1}>Confirm your email address</PageHeading>
       <p>Send a sign-in link to {user.email}, then open it to continue.</p>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       {sent ? (
@@ -136,7 +133,7 @@ function RequireAuth() {
 function NotFound() {
   return (
     <section className="panel" aria-labelledby="missing-title">
-      <h1 id="missing-title" tabIndex={-1}>Page not found</h1>
+      <PageHeading id="missing-title" tabIndex={-1}>Page not found</PageHeading>
       <p><Link to="/">Go to your organizations</Link></p>
     </section>
   );

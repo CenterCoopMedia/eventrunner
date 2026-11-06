@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { EMAIL_KEY, peekReturn, readStored, signInErrorMessage, useAuth } from '../auth.jsx';
@@ -59,7 +60,7 @@ export default function SignInFinish() {
 
   return (
     <section className="panel narrow" aria-labelledby="finish-title">
-      <h1 id="finish-title" tabIndex={-1}>{address ? 'Signing you in' : 'Confirm your email address'}</h1>
+      <PageHeading id="finish-title" tabIndex={-1}>{address ? 'Signing you in' : 'Confirm your email address'}</PageHeading>
       {error ? (
         <>
           <p className="message error" role="alert">{error}</p>

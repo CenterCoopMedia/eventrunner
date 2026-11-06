@@ -1,3 +1,4 @@
+import PageHeading from '../../PageHeading.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { callApi } from '../../api.js';
@@ -163,7 +164,7 @@ export default function SignupLinks() {
     <section aria-labelledby="links-title">
       <p className="folio">Hosting team</p>
       <div className="directory-heading">
-        <h1 id="links-title" tabIndex={-1}>Signup links</h1>
+        <PageHeading id="links-title" tabIndex={-1}>Signup links</PageHeading>
         <IconControl icon="refresh" label="Refresh links" disabled={busy || Boolean(pending) || loading} onClick={load} />
       </div>
       <p>Create a signup link after the client's invoice is paid. Each link can be used once within 30 days. Anyone with the link can use it.</p>

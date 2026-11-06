@@ -4,6 +4,13 @@ Badger is the name badge in `console/web/src/WaitingBuddy.jsx`. These SVGs
 redraw the selected concepts with geometric shapes and paths. The concept
 PNGs are references; no final asset contains their pixels.
 
+Console page titles use `console/web/src/PageHeading.jsx`: a semantic `h1`
+with a still Badger beside wrapping title text, inside the page flow. The
+decorative drawing is hidden from assistive technology and fits a 48px box,
+or 36px on phones. Heading ids, focus targets and adjacent actions belong to
+their existing routes. Loading and build feedback use `WaitingBuddy` separately,
+with their existing motion preferences. The masthead keeps the running mark.
+
 | File | Use and source |
 | --- | --- |
 | `badger-mark.svg` | Running mark for dark ground, from `concepts/logo-d.png`. Includes the V lanyard, clip, band, face, raised arm, two legs, and two speed bars. |

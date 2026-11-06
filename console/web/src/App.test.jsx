@@ -22,11 +22,15 @@ function renderApp(path, auth = fakeAuth()) {
 }
 
 describe('AppRoutes', () => {
-  it('includes a screen-reader-hidden Badger for the wide page margin', () => {
+  it('keeps a decorative Badger inside the semantic page title and main region', () => {
     renderApp('/nowhere');
-    const badger = document.querySelector('.margin-badger');
+    const heading = screen.getByRole('heading', { level: 1, name: 'Page not found' });
+    expect(heading).toHaveAttribute('id', 'missing-title');
+    expect(heading).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('main')).toContainElement(heading);
+    const badger = heading.querySelector('.page-heading__mascot');
     expect(badger).toHaveAttribute('aria-hidden', 'true');
-    expect(badger?.querySelector('.wait-buddy')).toBeInTheDocument();
+    expect(badger?.querySelector('svg')).toHaveAttribute('focusable', 'false');
   });
 
   it('starts every page with a skip link to the main content', async () => {

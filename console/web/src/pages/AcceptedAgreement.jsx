@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { callApi } from '../api.js';
@@ -17,7 +18,7 @@ export default function AcceptedAgreement() {
 
   return (
     <section className="stack">
-      <h1 tabIndex={-1}>Your agreement</h1>
+      <PageHeading tabIndex={-1}>Your agreement</PageHeading>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       {!data && !error ? <LoadingState>Loading the agreement.</LoadingState> : null}
       {data?.accepted ? <p className="muted">{data.accepted.name}{data.accepted.title ? `, ${data.accepted.title},` : ''} accepted this version for {data.accepted.legalName || 'your organization'}.</p> : null}

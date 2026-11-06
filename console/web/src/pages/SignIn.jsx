@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useRef, useState } from 'react';
 import { Navigate } from 'react-router';
 import { signInErrorMessage, peekReturn, useAuth } from '../auth.jsx';
@@ -50,7 +51,7 @@ export default function SignIn() {
 
   return (
     <section className="panel narrow" aria-labelledby="signin-title">
-      <h1 id="signin-title" tabIndex={-1}>Sign in to Event Runner</h1>
+      <PageHeading id="signin-title" tabIndex={-1}>Sign in to Event Runner</PageHeading>
       <p className="lead">Set up and manage your event sites.</p>
 
       {error ? <p className="message error" role="alert">{error}</p> : null}

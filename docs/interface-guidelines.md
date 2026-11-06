@@ -17,6 +17,13 @@ The owner approved relaxing the earlier limits on animation and color. Use both 
 
 The [research and implementation record](plans/2026-11-06-interface-experience.md) maps the current improvements and remaining checks to primary sources and existing issues.
 
+Client console page titles use the shared `PageHeading`: one semantic `h1`
+with its existing id and focus target, a still decorative Badger, and wrapping
+text. Keep the drawing in the heading's flow, hidden from assistive technology,
+within 48px on desktop and 36px on phones. Keep adjacent close/refresh controls
+in their owning heading group. Waiting indicators retain their separate motion
+behavior; the masthead brand keeps its own mark.
+
 ## Vocabulary: The words staff see
 
 Staff meet this system through words, not through token names. One term per flow (Writing, below), and the staff term is the one that ships in every operator-facing surface: Admin labels and hints, `docs/ADMIN_GUIDE.md`, the handbook, and any message a person reads.

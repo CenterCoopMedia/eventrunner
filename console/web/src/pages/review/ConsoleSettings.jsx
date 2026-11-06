@@ -1,3 +1,4 @@
+import PageHeading from '../../PageHeading.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { callApi } from '../../api.js';
@@ -84,7 +85,7 @@ export default function ConsoleSettings() {
   return (
     <section aria-labelledby="settings-title">
       <p className="folio">Hosting team</p>
-      <h1 id="settings-title" tabIndex={-1}>Console settings</h1>
+      <PageHeading id="settings-title" tabIndex={-1}>Console settings</PageHeading>
       {!agreement || !FIELDS.every((field) => saved?.[field]) ? (
         <aside className="note" role="note">
           <p className="note-title">Sign-ups are closed</p>

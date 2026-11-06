@@ -1,3 +1,4 @@
+import PageHeading from '../../PageHeading.jsx';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
@@ -33,7 +34,7 @@ export default function ReviewQueue() {
     <section aria-labelledby="queue-title">
       <p className="folio">Hosting team</p>
       <div className="directory-heading">
-        <h1 id="queue-title" tabIndex={-1}>Review requests</h1>
+        <PageHeading id="queue-title" tabIndex={-1}>Review requests</PageHeading>
         <IconControl icon="refresh" label="Refresh requests" disabled={!data && !error} onClick={() => setRefreshKey((value) => value + 1)} />
       </div>
       {notice ? <p className="message success" role="status">{notice}</p> : null}

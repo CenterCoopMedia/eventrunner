@@ -1,10 +1,11 @@
+import PageHeading from '../../PageHeading.jsx';
 import { Link } from 'react-router';
 
 /** What a reader who is not on the hosting team sees on a review page. */
 export default function HostingOnly() {
   return (
     <section className="panel" aria-labelledby="hosting-only-title">
-      <h1 id="hosting-only-title" tabIndex={-1}>This page is for the hosting team</h1>
+      <PageHeading id="hosting-only-title" tabIndex={-1}>This page is for the hosting team</PageHeading>
       <p><Link to="/">Go to your organizations</Link></p>
     </section>
   );

@@ -439,28 +439,20 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
   .icon-control-tooltip { background: Canvas; color: CanvasText; border-color: CanvasText; }
 }
 
-/* Badger stands outside the widest page when there is enough left margin.
-   This copy stays still until a pointer hovers over it. */
-.margin-badger { display: none; }
-.margin-badger .wait-buddy, .margin-badger .wait-buddy * { animation: none; }
-@media (min-width: 84rem) {
-  .margin-badger {
-    display: block;
-    position: fixed;
-    top: 7rem;
-    right: 97.5%;
-    width: min(4rem, 2.5vw);
-  }
-  .margin-badger .wait-buddy { width: 100%; height: auto; transform-box: fill-box; transform-origin: 50% 70%; }
+.page-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
 }
-@media (min-width: 84rem) and (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .margin-badger:hover .wait-buddy { animation: margin-badger-wiggle 500ms ease-in-out; }
-  @keyframes margin-badger-wiggle {
-    0%, 100% { transform: rotate(0); }
-    25% { transform: rotate(-5deg); }
-    50% { transform: rotate(4deg); }
-    75% { transform: rotate(-2deg); }
-  }
+.page-heading__mascot { display: block; line-height: 0; }
+.page-heading .wait-buddy { width: 48px; height: 48px; }
+.page-heading .wait-buddy, .page-heading .wait-buddy * { animation: none; }
+.page-heading .wb-confetti { opacity: 1; }
+.page-heading__text { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 40rem) {
+  .page-heading .wait-buddy { width: 36px; height: 36px; }
 }
 
 /* Organization and application workspaces share the console's palette,

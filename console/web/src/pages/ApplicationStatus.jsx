@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
@@ -265,7 +266,7 @@ export default function ApplicationStatus() {
       <div className={`application-layout${closed ? ' application-closed' : ''}`}>
         <div className="application-summary">
           <header className="workspace-heading">
-            <h1 id="status-title" tabIndex={-1}>{title}</h1>
+            <PageHeading id="status-title" tabIndex={-1}>{title}</PageHeading>
             <p className="lead application-state">{app.build?.failed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status]}</p>
           </header>
           {/* The address shows once the site answers there, so nobody opens it to a hosting error page mid-build. */}

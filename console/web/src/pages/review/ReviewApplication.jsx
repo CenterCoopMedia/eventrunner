@@ -1,3 +1,4 @@
+import PageHeading from '../../PageHeading.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { callApi } from '../../api.js';
@@ -230,7 +231,7 @@ export default function ReviewApplication() {
     <section aria-labelledby="review-title">
       <p className="folio">{organization.name}</p>
       <div className="directory-heading">
-        <h1 id="review-title" tabIndex={-1}>{app.answers?.event?.name || 'Request'}</h1>
+        <PageHeading id="review-title" tabIndex={-1}>{app.answers?.event?.name || 'Request'}</PageHeading>
         <IconControl icon="refresh" label="Refresh request" disabled={Boolean(working) || refreshing} onClick={refresh} />
       </div>
       <p><span className="tag">{STATUS_LABELS[app.status] || 'In progress'}</span></p>

@@ -1,3 +1,4 @@
+import PageHeading from '../PageHeading.jsx';
 import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
@@ -36,7 +37,7 @@ export default function AcceptInvite() {
   if (!token) {
     return (
       <section className="panel narrow" aria-labelledby="invite-title">
-        <h1 id="invite-title" tabIndex={-1}>Join the team</h1>
+        <PageHeading id="invite-title" tabIndex={-1}>Join the team</PageHeading>
         <p className="message error" role="alert">
           This invite link is not complete. Open the link in the invite email again.
         </p>
@@ -47,7 +48,7 @@ export default function AcceptInvite() {
   if (joined) {
     return (
       <section className="panel narrow" aria-labelledby="invite-title">
-        <h1 id="invite-title" tabIndex={-1}>Join the team</h1>
+        <PageHeading id="invite-title" tabIndex={-1}>Join the team</PageHeading>
         <p className="message success" role="status">
           You joined {joined.organization.name} as {withArticle(joined.role)}.
         </p>
@@ -58,7 +59,7 @@ export default function AcceptInvite() {
 
   return (
     <section className="panel narrow" aria-labelledby="invite-title">
-      <h1 id="invite-title" tabIndex={-1}>Join the team</h1>
+      <PageHeading id="invite-title" tabIndex={-1}>Join the team</PageHeading>
       <p>You are signed in as {auth.user?.email}. Use the email address that received the invite.</p>
       {error ? (
         <div className="stack">

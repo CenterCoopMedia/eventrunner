@@ -1,3 +1,4 @@
+import PageHeading from '../../PageHeading.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
@@ -218,7 +219,7 @@ export default function Setup() {
       <section className="step-body" aria-labelledby="step-title">
         <p className="muted">Step {index + 1} of {STEPS.length}</p>
         <div className="step-heading">
-          <h1 id="step-title" tabIndex={-1}>{step.title}</h1>
+          <PageHeading id="step-title" tabIndex={-1}>{step.title}</PageHeading>
           <IconControl icon="close" label="Close setup" to={statusPath(orgId, appId)} aria-disabled={navigating || undefined}
             onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId), { leaving: true }); }} />
         </div>
