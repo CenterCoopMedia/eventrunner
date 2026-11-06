@@ -641,7 +641,8 @@ function AdminDesk() {
         className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto"
         data-collapsed={railHidden ? 'true' : undefined}
       >
-        <div className="admin-rail__job flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline px-sm lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
+        {/* The event name and the rail toggle stay pinned to the top of the rail. */}
+        <div className="admin-rail__job flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline bg-admin-rail-ground px-sm lg:sticky lg:top-0 lg:z-10 lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
           {markSrc && !markFailed ? (
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-admin-small bg-admin-ground-raised p-3xs lg:h-9 lg:w-9">
               <img
@@ -754,7 +755,9 @@ function AdminDesk() {
               })}
             </nav>
 
-            <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline px-md py-sm lg:flex-col lg:items-stretch">
+            {/* On a wide screen the account and its actions stay pinned to the
+                foot of the rail while the sections scroll above them. */}
+            <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline bg-admin-rail-ground px-md py-sm lg:sticky lg:bottom-0 lg:z-10 lg:mt-auto lg:flex-col lg:items-stretch">
               <RoleSwitcher account={accountViews} linkClass={railButtonClass} labelClass="text-admin-xs" onNavigate={() => {
                 if (!wide) mobileMenuRef.current?.focus();
                 setMobileDocketOpen(false);

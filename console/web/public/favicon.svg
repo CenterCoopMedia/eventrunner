@@ -1,21 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Event Runner console">
-  <!-- The console variant of docs/favicon.svg: the same four-stroke mark,
-       reversed out of a tile in the house accent, so a console tab is easy
-       to tell from a docs tab or an event site tab. Colors are the light
-       and dark brand tokens of the civic site style (design/tokens). -->
-  <style>
-    .tile { fill: rgb(26 82 150) }
-    .mark { fill: rgb(250 250 249) }
-    @media (prefers-color-scheme: dark) {
-      .tile { fill: rgb(128 178 238) }
-      .mark { fill: rgb(25 26 28) }
-    }
-  </style>
-  <rect class="tile" width="24" height="24" rx="4"/>
-  <g class="mark" transform="translate(3.6 3.6) scale(0.7)">
-    <rect x="2.5" y="2" width="3" height="20"/>
-    <rect x="5.5" y="2" width="16" height="3"/>
-    <rect x="5.5" y="11" width="9.5" height="2"/>
-    <rect x="5.5" y="19.5" width="13" height="2.5"/>
+  <!-- Derived from design/brand/badger-face.svg by build-social-cards.mjs. -->
+  <style>:root { --tile: rgb(26 82 150); --badger-ink: rgb(250 250 249); --badger-surface: rgb(26 82 150); --badger-accent: rgb(128 178 238); color: var(--badger-ink); } @media (prefers-color-scheme: dark) { :root { --tile: rgb(128 178 238); --badger-ink: rgb(25 26 28); --badger-surface: rgb(250 250 249); --badger-accent: rgb(26 82 150); } }</style>
+  <rect width="24" height="24" rx="4" fill="var(--tile)"/>
+  <g transform="translate(3 3) scale(0.75)">
+<!-- Face-only source for icons. Larger eyes and a 2-unit outline stay distinct at 16px. -->
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4.5" width="18" height="18" rx="4" fill="var(--badger-surface, rgb(25 26 28))" stroke="currentColor" stroke-width="2"/>
+    <path d="M4 8.5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3V10H4Z" fill="var(--badger-accent, rgb(128 178 238))"/>
+    <rect x="9" y="1" width="6" height="5.5" rx="1.2" fill="currentColor"/>
+    <circle cx="8.5" cy="13.75" r="1.65" fill="currentColor"/>
+    <circle cx="15.5" cy="13.75" r="1.65" fill="currentColor"/>
+    <path d="M8.5 18.25q3.5 3 7 0" fill="none" stroke="currentColor" stroke-width="2"/>
+  </g>
   </g>
 </svg>
