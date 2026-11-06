@@ -1,3 +1,4 @@
+import AdminIconControl from './AdminIconControl.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Radio } from '../../components/forms/Choice.jsx';
 import {
@@ -159,7 +160,7 @@ export default function EventDateTimeField({
           />
         </div>
         {clearable && (fields.date || fields.time) ? (
-          <button type="button" className={secondaryButtonClass} onClick={() => edit({ date: '', time: '' })} aria-label={`Clear ${label.toLowerCase()}`}>Clear</button>
+          <AdminIconControl label={`Clear ${label.toLowerCase()}`} icon="remove" className={secondaryButtonClass} onClick={() => edit({ date: '', time: '' })} />
         ) : null}
       </div>
       <p id={zoneId} className={fieldHintClass}>{timeZone === zoneProp

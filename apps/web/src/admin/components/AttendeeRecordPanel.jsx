@@ -1,3 +1,4 @@
+import { plannerError } from '../plannerErrors.js';
 // One attendee's organizer record (issue #185), opened from a row on the
 // Attendees page: the fields an organizer owns and the attendee cannot
 // change, and the account delete.
@@ -15,6 +16,7 @@
 // the page decides where it shows: a refusal made before anything was
 // deleted comes back here as `deleteError`; everything else, including a
 // failure the server never shaped, stays on the page with a retry.
+import AdminIconControl from './AdminIconControl.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { useAdminApi } from '../adminApi.js';
 import {
@@ -31,7 +33,7 @@ import { AttendeeAnswers } from './RegistrationAnswers.jsx';
 
 /** The name a person reads for a row: display name, then address, then id. */
 export function attendeeName(row) {
-  return row?.displayName || row?.email || row?.id || '';
+  return row?.displayName || row?.email || 'Unnamed attendee';
 }
 
 /** A DOM id for the panel of one account. */
@@ -82,15 +84,14 @@ export function refusedBeforeDelete(error) {
  */
 export function AttendeeRecordToggle({ open, uid, onToggle }) {
   return (
-    <button
-      type="button"
+    <AdminIconControl
+      label={open ? "Close attendee record" : "Edit attendee record"}
+      icon={open ? "close" : "edit"}
       className={linkButtonClass}
       aria-expanded={open ? 'true' : 'false'}
       aria-controls={recordPanelId(uid)}
       onClick={onToggle}
-    >
-      Edit record
-    </button>
+    />
   );
 }
 
@@ -141,7 +142,7 @@ export default function AttendeeRecordPanel({
       setLines(toLines(Array.isArray(result?.pastAttendance) ? result.pastAttendance : pastAttendance));
       setStatus('Past attendance saved.');
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setSaving(false);
     }
@@ -172,7 +173,7 @@ export default function AttendeeRecordPanel({
         <AddOneListField
           label="Past attendance"
           itemName="edition"
-          hint="Add each past event this person attended, such as 2024. Only staff can change this list."
+          hint="Add past events this person attended, such as 2024."
           items={toList(lines)}
           onChange={(items) => setLines(items.join('\n'))}
           error={fieldError}
@@ -195,6 +196,7 @@ export default function AttendeeRecordPanel({
         <div>
           <DestructiveConfirm
             trigger="Delete account"
+            triggerIcon="delete"
             title={`Delete the account for ${name}`}
             confirmLabel="Delete this account"
             busyLabel="Deleting…"

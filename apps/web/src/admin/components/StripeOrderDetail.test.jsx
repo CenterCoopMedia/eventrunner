@@ -258,7 +258,7 @@ describe('order confirmation resend outcomes', () => {
     clickResend();
     await screen.findByText(/1 message failed or could not be confirmed/);
     rerender(<StripeOrderDetail {...props} orderId="order-2" />);
-    await screen.findByRole('heading', { name: 'order-2' });
+    await screen.findByRole('heading', { name: 'purchaser@example.test' });
     clickResend();
     await screen.findByText('1 confirmation message sent. Stripe’s payment receipt is separate.');
     expect(resend.mock.calls[0][0].orderId).toBe('order-1');

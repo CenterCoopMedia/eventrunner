@@ -62,7 +62,7 @@ describe('promo codes panel', () => {
     expect(screen.queryByLabelText('Volunteer')).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Full event pass'));
     fireEvent.change(screen.getByLabelText('Use limit (tickets)'), { target: { value: '25' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save promo code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('Promo code saved.');
     const save = call.mock.calls.find(([, body]) => body.action === 'savePromoCode')[1];
     expect(save).toEqual({
@@ -80,7 +80,7 @@ describe('promo codes panel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'New promo code' }));
     fireEvent.change(screen.getByLabelText('Code'), { target: { value: 'no' } });
     fireEvent.change(screen.getByLabelText('Percent off'), { target: { value: '120' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save promo code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Enter a whole percent from 1 to 100.')).toBeInTheDocument();
     expect(screen.getByText(/Use 3 to 32 letters/)).toBeInTheDocument();
     expect(call.mock.calls.some(([, body]) => body.action === 'savePromoCode')).toBe(false);
@@ -90,9 +90,9 @@ describe('promo codes panel', () => {
     const { call } = setup();
     const early = await screen.findByRole('listitem', { name: 'EARLY' });
     fireEvent.click(within(early).getByRole('button', { name: 'Edit EARLY' }));
-    expect(screen.getByLabelText('Code')).toHaveAttribute('readonly');
+    expect(screen.queryByLabelText('Code')).toBeNull();
     fireEvent.change(screen.getByLabelText('Percent off'), { target: { value: '25' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save promo code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('Promo code saved.');
     const save = call.mock.calls.find(([, body]) => body.action === 'savePromoCode')[1];
     expect(save.create).toBe(false);

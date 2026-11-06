@@ -109,12 +109,12 @@ describe('admin Sessions workspace', () => {
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
       'Public title', 'Public description', 'Recording link',
       'Event day', 'Parent session', 'Start time', 'End time', 'Track',
-      'Recorded place', 'Public location text', 'This session needs no slides or other materials',
-      'Show this session when it is published',
+      'Room', 'Location label', 'Request speaker materials',
+      'Show on the schedule',
     ]);
     const location = within(layout).getByRole('heading', { name: 'Location' }).closest('section');
-    expect(within(location).getByLabelText('Recorded place')).toBeInTheDocument();
-    expect(within(location).getByLabelText('Public location text')).toBeInTheDocument();
+    expect(within(location).getByLabelText('Room')).toBeInTheDocument();
+    expect(within(location).getByLabelText('Location label')).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -139,11 +139,11 @@ describe('admin Sessions workspace', () => {
     ]);
     expect(await screen.findByLabelText('Public title')).toHaveValue('Panel');
     expect(screen.getByLabelText('Parent session')).toHaveValue('opening');
-    expect(screen.getByLabelText('Recorded place')).toHaveValue('hall');
-    expect(screen.getByLabelText('Show this session when it is published')).not.toBeChecked();
-    expect(screen.getByLabelText('This session needs no slides or other materials')).toBeChecked();
+    expect(screen.getByLabelText('Room')).toHaveValue('hall');
+    expect(screen.getByLabelText('Show on the schedule')).not.toBeChecked();
+    expect(screen.getByLabelText('Request speaker materials')).not.toBeChecked();
     fetch.mockResolvedValueOnce(response({ docId: 'panel', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0)).toEqual({
       collection: 'cmsSchedule', docId: 'panel', fields: saved, visible: false,
@@ -170,7 +170,7 @@ describe('admin Sessions workspace', () => {
     expect(await screen.findByLabelText('Public title')).toHaveValue('Unpublished title');
 
     fetch.mockResolvedValueOnce(response({ docId: 'keynote', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).fields).toMatchObject({
       title: 'Unpublished title',
@@ -187,7 +187,7 @@ describe('admin Sessions workspace', () => {
     }]));
     act(() => adminErrors.get('cmsSchedule_drafts')(new Error('permission denied')));
 
-    expect(await screen.findByText(/could not load this session and its saved draft/i)).toBeInTheDocument();
+    expect(await screen.findByText(/The session did not load/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('Public title')).toBeNull();
   });
 
@@ -205,7 +205,7 @@ describe('admin Sessions workspace', () => {
 
     expect(await screen.findByRole('heading', { name: 'No such session' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Public title')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -236,7 +236,7 @@ describe('admin Sessions workspace', () => {
     fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
     fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
     fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/cmsCreateContent$/);
@@ -260,13 +260,13 @@ describe('admin Sessions workspace', () => {
     fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
     fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
     fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('The draft service is down.')).toBeInTheDocument();
     expect(bodyOf(0).docId).toBe('opening-session');
 
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Welcome remarks' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(bodyOf(1).docId).toBe('opening-session');
     expect(bodyOf(1).fields.title).toBe('Welcome remarks');
@@ -280,7 +280,7 @@ describe('admin Sessions workspace', () => {
     }
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }))
       .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: { message: 'Publishing is unavailable.' } }) });
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The draft is saved, and it is not published');
     expect(alert).toHaveTextContent('Publishing is unavailable.');
@@ -288,7 +288,7 @@ describe('admin Sessions workspace', () => {
     expect(within(screen.getByLabelText('Parent session')).queryByRole('option', { name: 'Opening session' })).not.toBeInTheDocument();
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Welcome remarks' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
     expect(String(fetch.mock.calls[2][0])).toMatch(/\/cmsUpdateContent$/);
     expect(bodyOf(2)).toMatchObject({ docId: 'opening-session', fields: { title: 'Welcome remarks' } });
@@ -302,13 +302,13 @@ describe('admin Sessions workspace', () => {
     fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
     fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
     fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
-    const mark = screen.getByLabelText('This session needs no slides or other materials');
-    expect(mark).not.toBeChecked();
-    expect(screen.getByText(/Speakers on this session are not asked for materials/)).toBeInTheDocument();
+    const mark = screen.getByLabelText('Request speaker materials');
+    expect(mark).toBeChecked();
+    expect(screen.getByText(/Turn off for sessions that do not need slides or other files/)).toBeInTheDocument();
 
     fireEvent.click(mark);
     fetch.mockResolvedValueOnce(response({ docId: 'fireside-chat', status: 'dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).fields.materialsNotNeeded).toBe(true);
   });
@@ -335,14 +335,14 @@ describe('admin Sessions workspace', () => {
         `accepted ${bad}`,
       ).toBeInTheDocument();
       expect(field).toHaveAttribute('aria-invalid', 'true');
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
       expect(fetch).not.toHaveBeenCalled();
     }
 
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(field, { target: { value: 'https://video.example.org/watch?v=abc' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).fields.recordingUrl).toBe('https://video.example.org/watch?v=abc');
@@ -355,11 +355,11 @@ describe('admin Sessions workspace', () => {
     await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });
 
-    for (const name of ['Save draft', 'Save and publish']) {
+    for (const name of ['Save', 'Publish']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     expect(fetch).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(document.activeElement).toHaveAttribute('aria-invalid', 'true');
@@ -451,7 +451,7 @@ describe('admin Sessions workspace', () => {
       .mockResolvedValueOnce(response({
         results: { cmsSchedule: { published: ['parent', 'child'], skipped: [] } },
       }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(String(fetch.mock.calls[1][0])).toMatch(/\/cmsPublish$/);
@@ -482,7 +482,7 @@ describe('admin Sessions workspace', () => {
       .mockResolvedValueOnce(response({
         results: { cmsSchedule: { published: ['new-parent', 'child'], skipped: [] } },
       }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(bodyOf(1).docIds).toEqual(['new-parent', 'child']);
@@ -502,7 +502,7 @@ describe('admin Sessions workspace', () => {
     ]);
     const select = await screen.findByLabelText('Event day');
     expect(select).toHaveValue('day-9');
-    expect(screen.getByRole('option', { name: 'day-9 (not on a configured day)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Choose a different event day' })).toBeInTheDocument();
   });
 
   it('says that the preview opens a new tab, inside the link name (issue 236)', async () => {

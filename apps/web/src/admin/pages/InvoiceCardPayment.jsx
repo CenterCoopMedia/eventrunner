@@ -1,3 +1,4 @@
+import { plannerError } from '../plannerErrors.js';
 // Card payment through a Stripe pay link (issue #519), in the invoice record.
 //
 // PayByCard: on an issued invoice, staff make a Stripe link for the invoice
@@ -27,7 +28,7 @@ import {
 } from '../components/formControls.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 
-const NO_STRIPE = 'Card payment links need Stripe. This site does not take card payments through Stripe.';
+const NO_STRIPE = 'Card payments are not connected. Contact support to connect Stripe.';
 
 /** Why a link closed, in words. */
 const CLOSED_WORDS = Object.freeze({
@@ -138,7 +139,7 @@ export function PayByCard({ invoice, cardPayments, timeZone, busy, onCreatePayLi
       await onCreatePayLink();
       setFocusLink(true);
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     }
   }
 
@@ -186,7 +187,7 @@ export function PayByCard({ invoice, cardPayments, timeZone, busy, onCreatePayLi
               aria-busy={busy === 'paylink' || undefined}
               onClick={create}
             >
-              {busy === 'paylink' ? 'Making the link…' : 'Make a card payment link'}
+              {busy === 'paylink' ? 'Making the link…' : 'Create payment link'}
             </button>
           </div>
         </div>
@@ -240,7 +241,7 @@ function ReviewForm({ busy, onSubmit, onCancel }) {
     try {
       await onSubmit(verdict.value);
     } catch (err) {
-      setServerError(err);
+      setServerError(plannerError(err));
     }
   }
 
@@ -305,7 +306,7 @@ export function PaymentReviews({ invoice, canResolve, busy, onResolve }) {
                 It was recorded here and not applied to the invoice. Check it in the Stripe Dashboard, then refund it or record it another way.
               </p>
               {entry.paymentIntentId ? (
-                <p className="font-admin-data">{`Stripe payment ${entry.paymentIntentId}, received ${localTime(entry.at)}.`}</p>
+                <p className="font-admin-data">{`Received ${localTime(entry.at)}.`}</p>
               ) : null}
               {canResolve ? (
                 open === entry.reviewId ? (

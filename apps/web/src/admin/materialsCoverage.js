@@ -7,8 +7,8 @@
 // mapping the store already keeps (speakers/references.cjs), and a draft
 // that adds a speaker has not happened yet. A draft-only session has no
 // live document, so it cannot hold a material (materials/store.cjs checks
-// the live document) and is left out. A speaker id with no record still
-// counts and is shown as the id. A speaker is named when none of the
+// the live document) and is left out. A speaker with no record still
+// counts and is shown without an internal identifier. A speaker is named when none of the
 // considered sessions they are on has a counted material. A session staff
 // marked as needing no materials (`materialsNotNeeded`, shared/
 // speakerReadiness sessionNeedsMaterials) is not considered at all.
@@ -37,7 +37,7 @@ export function liveSessions(rows, days = [], timeZone) {
     .filter((row) => row?.live)
     .map((row) => {
       const dayId = row.live.dayId;
-      const title = typeof row.live.title === 'string' && row.live.title.trim() ? row.live.title : row.id;
+      const title = typeof row.live.title === 'string' && row.live.title.trim() ? row.live.title : 'Untitled session';
       return {
         id: row.id,
         title,
@@ -85,7 +85,7 @@ export function materialsCoverage({ sessions, speakers, materials }) {
       covered: covered.has(session.id),
       speakers: ids.map((id) => {
         const record = speakerById.get(id);
-        return { id, name: record?.displayName || id, known: Boolean(record) };
+        return { id, name: record?.displayName || 'Unnamed speaker', known: Boolean(record) };
       }),
     });
   }

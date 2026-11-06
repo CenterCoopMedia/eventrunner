@@ -1,3 +1,5 @@
+import { plannerError } from '../plannerErrors.js';
+import '../plannerFields.css';
 // Organization representatives in the organization editor (issue #334).
 //
 //   Edit waiting for review  what a representative sent, beside the text
@@ -33,7 +35,6 @@ export const REPRESENTATIVE_FIELD_LABELS = Object.freeze({
   url: 'Website',
 });
 
-const SIGN_IN_PATH = '/profile/organization';
 
 function dateOf(value) {
   const date = value instanceof Date ? value : typeof value?.toDate === 'function' ? value.toDate() : null;
@@ -74,7 +75,7 @@ function EditReview({ organizationId, request, current, isUnsaved, onApplied, on
       ));
       onResult({ tone: 'ok', message: 'Edit applied to the draft. Publish to show it on the site.' });
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -87,7 +88,7 @@ function EditReview({ organizationId, request, current, isUnsaved, onApplied, on
       await call(ENDPOINT, { action: 'discard', organizationId });
       onResult({ tone: 'ok', message: 'Edit discarded. The organization did not change.' });
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -101,7 +102,7 @@ function EditReview({ organizationId, request, current, isUnsaved, onApplied, on
       >
         <dl className="flex flex-col gap-sm">
           {fields.map((field) => (
-            <div key={field} className="grid gap-2xs border-b-admin-hairline border-admin-rule-hairline pb-sm last:border-b-0 sm:grid-cols-[8rem_1fr_1fr]">
+            <div key={field} className="planner-fields grid gap-2xs border-b-admin-hairline border-admin-rule-hairline pb-sm last:border-b-0 sm:grid-cols-[8rem_1fr_1fr]">
               <dt className="text-admin-sm font-semibold text-admin-ink">{REPRESENTATIVE_FIELD_LABELS[field]}</dt>
               <dd className="text-admin-sm">
                 <span className="block text-admin-xs text-admin-ink-secondary">In the draft now</span>
@@ -186,13 +187,13 @@ function RepresentativeList({ organizationId, grants, request, onResult }) {
         tone: 'ok',
         message: result?.changed === false
           ? 'This account already represents this organization.'
-          : `Representative added. They edit at ${SIGN_IN_PATH}.`,
+          : 'Representative added. They can edit this organization from their profile.',
         where: 'representatives',
       });
     } catch (err) {
       const segment = err?.fieldErrors?.find((entry) => entry.field === 'email');
       if (segment) setFieldError(segment.message);
-      else setError(err);
+      else setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -205,7 +206,7 @@ function RepresentativeList({ organizationId, grants, request, onResult }) {
       await call(ENDPOINT, { action: 'revoke', uid: grant.uid ?? grant.id });
       onResult({ tone: 'ok', message: `${grant.email ?? 'The account'} can no longer edit this organization.`, where: 'representatives' });
     } catch (err) {
-      setError(err);
+      setError(plannerError(err));
     } finally {
       setBusy(null);
     }
@@ -220,9 +221,10 @@ function RepresentativeList({ organizationId, grants, request, onResult }) {
         <ul className="flex flex-col">
           {grants.map((grant) => (
             <li key={grant.id} className="flex flex-wrap items-center justify-between gap-xs border-b-admin-hairline border-admin-rule-hairline py-xs last:border-b-0">
-              <span className="wrap-anywhere font-admin-data text-admin-sm text-admin-ink">{grant.email ?? grant.id}</span>
+              <span className="wrap-anywhere font-admin-data text-admin-sm text-admin-ink">{grant.email ?? 'Unnamed representative'}</span>
               <DestructiveConfirm
-                trigger={`Remove ${grant.email ?? grant.id}`}
+                trigger={`Remove ${grant.email ?? 'Unnamed representative'}`}
+                triggerIcon="remove"
                 confirmLabel="Remove access"
                 busyLabel="Removing…"
                 busy={busy === grant.id}
@@ -276,7 +278,7 @@ export default function OrganizationRepresentatives({
       {listenerError ? (
         <Notice
           tone="caution"
-          message="We lost the connection to the representatives and their edits; showing the last values we received and retrying."
+          message="The representative list did not refresh. Reconnecting…"
         />
       ) : null}
       {result && result.where !== 'representatives' ? <Notice tone={result.tone} message={result.message} /> : null}
@@ -293,7 +295,7 @@ export default function OrganizationRepresentatives({
       <div role="region" aria-label="Representatives">
         <Panel
           title="Representatives"
-          description={`A representative edits the description, the about text, and the website at ${SIGN_IN_PATH}. Each edit waits here for your review. The name, logo, tier, order, and visibility stay with staff.`}
+          description="Representatives can suggest changes to the organization’s description and website. You review each change before publishing."
         >
           {result && result.where === 'representatives' ? (
             <div className="mb-sm"><Notice tone={result.tone} message={result.message} /></div>

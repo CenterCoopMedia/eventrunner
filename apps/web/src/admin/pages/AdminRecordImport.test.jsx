@@ -72,7 +72,7 @@ describe('AdminRecordImport', () => {
   it('downloads the template for the chosen record type', () => {
     renderPage();
     fireEvent.change(screen.getByLabelText('Record type'), { target: { value: 'sessions' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Download the session template' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download session template' }));
     expect(saveMock).toHaveBeenCalledTimes(1);
     const [name, text] = saveMock.mock.calls[0];
     expect(name).toBe('sessions-import-template.csv');
@@ -84,7 +84,7 @@ describe('AdminRecordImport', () => {
     renderPage();
     await chooseFile(SPEAKER_CSV);
     expect(await screen.findByText('speakers.csv · 2 rows')).toBeInTheDocument();
-    expect(screen.getByLabelText('External ID (required)')).toHaveValue('external_id');
+    expect(screen.getByLabelText('Reference (required)')).toHaveValue('external_id');
     expect(screen.getByLabelText('First name')).toHaveValue('first_name');
     expect(screen.getByLabelText('Bio')).toHaveValue('');
 
@@ -130,7 +130,7 @@ describe('AdminRecordImport', () => {
     renderPage();
     await chooseFile('code,full\nx,Ada Lovelace\n');
     fireEvent.click(screen.getByRole('button', { name: 'Preview import' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Map a column to External ID.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose the column for reference.');
     expect(callMock).not.toHaveBeenCalled();
   });
 
@@ -228,7 +228,7 @@ describe('AdminRecordImport', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview import' }));
     const preview = await screen.findByRole('region', { name: /Preview: speakers/ });
     expect(within(preview).getByText('Matches existing')).toBeInTheDocument();
-    expect(within(preview).getByText(/Matches the existing speaker "ada-lovelace"/)).toBeInTheDocument();
+    expect(within(preview).getByText(/Matches an existing speaker/)).toBeInTheDocument();
     expect(screen.getByText(/A change to a published speaker waits for review on the Speakers page\./)).toBeInTheDocument();
   });
 

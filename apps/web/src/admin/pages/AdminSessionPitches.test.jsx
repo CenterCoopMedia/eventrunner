@@ -21,6 +21,7 @@ vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ isOperator:
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: { days: [] } }) }));
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => call }));
 
+import { displayTemplate } from '../components/EmailTemplateField.jsx';
 import { PITCH_NOTICE_DEFAULTS } from 'shared/pitch';
 import AdminSessionPitches from './AdminSessionPitches.jsx';
 import AdminSessionPitch from './AdminSessionPitch.jsx';
@@ -123,17 +124,17 @@ function openPitch(row) {
 }
 
 describe('AdminSessionPitches email settings', () => {
-  it('saves the receipt mode and edited wording, and restores the shipped wording', async () => {
+  it('saves the receipt mode and edited wording, and restores the default message', async () => {
     collections.session_pitch_settings = [{ id: 'notices', revision: 3, receiptMode: 'automatic', templates: { 'pitch.declined': { subject: 'Custom decline', wording: 'Custom words.' } } }];
     call.mockResolvedValueOnce({ revision: 4 });
     pitchCall = { enabled: true, closesAt: CLOSES_AT, externalFormUrl: null };
     renderAt('/admin/pitches/settings');
     expect(screen.getByLabelText('Decline email subject')).toHaveValue('Custom decline');
-    expect(screen.getByLabelText('Receipt subject')).toHaveValue(PITCH_NOTICE_DEFAULTS['pitch.receipt'].subject);
+    expect(screen.getByLabelText('Receipt subject')).toHaveValue(displayTemplate(PITCH_NOTICE_DEFAULTS['pitch.receipt'].subject));
     fireEvent.change(screen.getByLabelText('Receipts'), { target: { value: 'manual' } });
     fireEvent.change(screen.getByLabelText('Receipt wording'), { target: { value: 'Thanks for “{{pitch_title}}”.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Use the shipped decline email wording' }));
-    expect(screen.getByLabelText('Decline email wording')).toHaveValue(PITCH_NOTICE_DEFAULTS['pitch.declined'].wording);
+    fireEvent.click(screen.getByRole('button', { name: 'Use default decline email message' }));
+    expect(screen.getByLabelText('Decline email wording')).toHaveValue(displayTemplate(PITCH_NOTICE_DEFAULTS['pitch.declined'].wording));
     fireEvent.click(screen.getByRole('button', { name: 'Save email settings' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('savePitchNoticeSettings', {
       expectedRevision: 3,
@@ -160,7 +161,7 @@ describe('AdminSessionPitches email settings conflict', () => {
     expect(screen.getByRole('button', { name: 'Save email settings' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Load current settings' }));
     expect(screen.getByLabelText('Receipts')).toHaveValue('manual');
-    expect(screen.getByLabelText('Receipt wording')).toHaveValue(PITCH_NOTICE_DEFAULTS['pitch.receipt'].wording);
+    expect(screen.getByLabelText('Receipt wording')).toHaveValue(displayTemplate(PITCH_NOTICE_DEFAULTS['pitch.receipt'].wording));
     call.mockResolvedValueOnce({ revision: 3 });
     fireEvent.click(screen.getByRole('button', { name: 'Save email settings' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('savePitchNoticeSettings', expect.objectContaining({ expectedRevision: 2, receiptMode: 'manual' })));
@@ -183,7 +184,7 @@ describe('AdminSessionPitches decision email', () => {
     expect(call).toHaveBeenLastCalledWith('sendSessionPitchNotice', {
       id: 'pitch-1', kind: 'decision', expectedStatus: 'accepted', expectedRevision: 2, feedback: 'Plan for 45 minutes.', preview: true,
     });
-    const send = screen.getByRole('button', { name: 'Send the acceptance email' });
+    const send = screen.getByRole('button', { name: 'Send' });
     expect(send).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: `I reviewed this email. Send it to ${PITCH.email}.` }));
     expect(send).toBeEnabled();
@@ -205,7 +206,7 @@ describe('AdminSessionPitches decision email', () => {
     await screen.findByRole('region', { name: 'Preview of the acceptance email' });
     fireEvent.change(screen.getByLabelText('Note to the submitter (optional)'), { target: { value: 'Changed.' } });
     expect(screen.queryByRole('region', { name: 'Preview of the acceptance email' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Send the acceptance email' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
   });
 
   it('shows each delivery state in words and offers a retry only for an email that was not sent', () => {
@@ -239,7 +240,7 @@ describe('AdminSessionPitches decision email', () => {
     call.mockResolvedValueOnce({ preview: { to: PITCH.email, addressVerified: true, templateId: 'pitch.receipt', subject: 'Got it', text: 'Hello.', settingsRevision: 0, mayHaveBeenSent: true, otherDecisionSent: null } });
     fireEvent.click(screen.getByRole('button', { name: 'Preview the receipt' }));
     fireEvent.click(await screen.findByRole('checkbox', { name: `I reviewed this email. Send it to ${PITCH.email}.` }));
-    const send = screen.getByRole('button', { name: 'Send the receipt' });
+    const send = screen.getByRole('button', { name: 'Send' });
     expect(send).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'I checked the Email log. The earlier email was not delivered.' }));
     expect(send).toBeEnabled();
@@ -296,10 +297,10 @@ describe('AdminSessionPitches queue', () => {
     collections.session_pitches = QUEUE;
     renderAt('/admin/pitches');
     fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'rejected' } });
-    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2.');
+    expect(screen.getByText('Showing 1 of 2.')).toHaveAttribute('role', 'status');
     fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'all' } });
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bo' } });
-    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2.');
+    expect(screen.getByText('Showing 1 of 2.')).toHaveAttribute('role', 'status');
     expect(screen.getByRole('link', { name: 'Newest pitch' })).toBeInTheDocument();
   });
 
@@ -339,24 +340,24 @@ describe('AdminSessionPitch decisions, notes and edits', () => {
   it('edits the proposal and sends the corrected fields with the revision it read', async () => {
     openPitch({ ...PITCH, status: 'new', presenters: [{ name: 'Ada', email: PITCH.email, organization: null, role: null, lead: true }] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit pitch' }));
-    expect(screen.getByText(/The lead’s email is the submitter’s and cannot change/)).toBeInTheDocument();
+    expect(screen.getByText(/Email:/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Reporting together, revised' } });
     call.mockResolvedValueOnce({ id: PITCH.id, revision: 3, changed: ['title'] });
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Changes saved. The submitted copy is kept. No email was sent.')).toBeInTheDocument();
     const [name, body] = call.mock.calls.at(-1);
     expect(name).toBe('editSessionPitch');
     expect(body).toMatchObject({ id: PITCH.id, expectedRevision: 2, pitch: { title: 'Reporting together, revised', leadName: 'Ada', description: 'A workshop.', presenters: [] } });
-    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
   });
 
   it('keeps the edit open with the server reason when the edit is refused', async () => {
     openPitch({ ...PITCH, status: 'new' });
     fireEvent.click(screen.getByRole('button', { name: 'Edit pitch' }));
     call.mockRejectedValueOnce(new Error('leadName: Enter your name.'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('leadName: Enter your name.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 
   it('stops every control when the live pitch moves on, and offers the current version', () => {

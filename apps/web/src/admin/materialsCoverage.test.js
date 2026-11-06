@@ -99,11 +99,11 @@ describe('materialsCoverage', () => {
     expect(names(result.uncoveredSpeakers)).not.toContain('cy');
   });
 
-  it('counts an unknown speaker id and shows it as the id', () => {
+  it('counts an unknown speaker without exposing its id', () => {
     const result = coverage([session('s1', ['ghost-id'])], []);
     expect(result.consideredCount).toBe(1);
     expect(result.uncoveredSpeakers).toEqual([
-      { id: 'ghost-id', name: 'ghost-id', known: false, sessions: [{ id: 's1', title: 'Title s1' }] },
+      { id: 'ghost-id', name: 'Unnamed speaker', known: false, sessions: [{ id: 's1', title: 'Title s1' }] },
     ]);
   });
 

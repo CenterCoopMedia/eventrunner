@@ -1,3 +1,5 @@
+import { plannerMessage } from '../plannerErrors.js';
+import AdminIconControl from './AdminIconControl.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
 import ExternalLink from '../../components/ExternalLink.jsx';
 import { Checkbox } from '../../components/forms/Choice.jsx';
@@ -61,7 +63,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   useEffect(() => {
     let active = true;
     setError('');
-    call('ticketingCommerceAdmin', { action: 'order', orderId }).then((result) => { if (active) setData(result); }).catch((err) => { if (active) setError(err.message); });
+    call('ticketingCommerceAdmin', { action: 'order', orderId }).then((result) => { if (active) setData(result); }).catch((err) => { if (active) setError(plannerMessage(err.message)); });
     return () => { active = false; };
   }, [call, orderId, refresh]);
   const order = data?.order;
@@ -98,7 +100,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         resend.unconfirmed = true;
         setNotice({ tone: 'caution', message: 'Delivery is unconfirmed. Retrying keeps this request. Review the email log before another send.' });
       }
-      setError(err.message);
+      setError(plannerMessage(err.message));
     }
     finally { busyRef.current = false; setBusy(false); }
   }
@@ -122,11 +124,11 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       }
       if (eligibleIds.length !== selected.length) setNotice({ tone: 'caution', message: 'Checked-in or unavailable tickets were removed from the selection. An operator must cancel checked-in tickets.' });
       setConfirm('cancel');
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(plannerMessage(err.message)); }
     finally { busyRef.current = false; setBusy(false); }
   }
   function performConfirmed() {
-    if (!reason.trim()) { setError('Enter a reason for the audit trail.'); return; }
+    if (!reason.trim()) { setError('Enter a reason for this change.'); return; }
     if (confirm === 'cancel') {
       if (!selected.length || selectedTickets.length !== selected.length || (!isOperator && selectedTickets.some((ticket) => ticket.checkedInAt))) {
         setConfirm(null);
@@ -144,9 +146,9 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
     }
   }
 
-  const selectedSummary = <ul className="space-y-xs">{selectedTickets.map((ticket) => <li key={ticket.externalId || ticket.id} className="wrap-anywhere"><span className="font-semibold">{ticket.firstName} {ticket.lastName}</span> — <span className="font-admin-data">{ticket.externalId || ticket.id}</span>{ticket.checkedInAt ? ' — already checked in' : ''}</li>)}</ul>;
-  return <Panel title="Order details" actions={<button type="button" className={secondaryButtonClass} onClick={onClose}>Close order details</button>}>
-    <h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{orderId}</h3>
+  const selectedSummary = <ul className="space-y-xs">{selectedTickets.map((ticket) => <li key={ticket.externalId || ticket.id} className="wrap-anywhere"><span className="font-semibold">{ticket.firstName} {ticket.lastName}</span> — <span className="font-admin-data">{ticket.email || 'No email'}</span>{ticket.checkedInAt ? ' — already checked in' : ''}</li>)}</ul>;
+  return <Panel title="Order details" actions={<AdminIconControl label="Close order details" icon="close" className={secondaryButtonClass} onClick={onClose} />}>
+    <h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{order?.purchaserEmail || order?.purchaser?.email || 'Order'}</h3>
     {!order && !error ? <AdminLoadingState label="Loading order details…" /> : null}
     {error && !confirm ? <Notice tone="error" message={error} /> : null}
     {notice && confirm !== 'cancel' ? <Notice tone={notice.tone} message={notice.message} /> : null}
@@ -160,9 +162,9 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         <div><dt className="text-admin-base font-semibold">Refunded amount</dt><dd className="font-admin-data text-admin-sm">{formatTicketMoney(order.refundedAmount || 0, order.currency)}</dd></div>
         <div><dt className="text-admin-base font-semibold">Created</dt><dd className="font-admin-data text-admin-sm">{formatTicketTime(order.createdAt, timezone)}</dd></div>
       </dl>
-      {order.reconciliationException ? <Notice tone="caution" message={typeof order.reconciliationException === 'string' ? order.reconciliationException : order.reconciliationException.message || 'Reconciliation needs operator attention.'} /> : null}
+      {order.reconciliationException ? <Notice tone="caution" message="This payment needs review. Check it in Stripe before changing admission." /> : null}
       <div className="flex flex-wrap gap-sm">
-        <button type="button" className={secondaryButtonClass} aria-busy={busy} aria-disabled={busy} onClick={() => run({ action: 'reconcile', orderId }, 'Latest payment and ticket state requested from Stripe.')}>Resync this order</button>
+        <AdminIconControl label="Refresh order" icon="refresh" className={secondaryButtonClass} aria-busy={busy} disabled={busy} onClick={() => run({ action: 'reconcile', orderId }, 'Order updated.')} />
         <button type="button" className={secondaryButtonClass} aria-busy={busy} aria-disabled={busy} onClick={() => {
           if (busyRef.current) return;
           if (!resendRef.current || resendRef.current.orderId !== orderId) {
@@ -181,31 +183,31 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
           <button type="button" className={dangerButtonClass} aria-busy={busy} aria-disabled={!selected.length || busy} onClick={reviewCancellation}>Review ticket cancellation</button>
         </div>
         {!isOperator && tickets.some((ticket) => ticket.checkedInAt) ? <p id={cancellationHelpId} className="text-admin-sm text-admin-ink-secondary">An operator must cancel a checked-in ticket.</p> : null}
-        {tickets.length ? <TicketingTable label="Individual tickets on this order"><thead><tr>{['Select', 'Ticket code', 'Attendee', 'Email', 'Admission', 'Claim', 'Check-in', 'Correction'].map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
+        {tickets.length ? <TicketingTable label="Individual tickets on this order"><thead><tr>{['Select', 'Attendee', 'Email', 'Admission', 'Claim', 'Check-in', 'Correction'].map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
           <tbody>{tickets.map((ticket) => {
             const id = ticket.externalId || ticket.id;
             const requiresOperator = !isOperator && Boolean(ticket.checkedInAt);
             return <tr key={id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
-              <td className={cellClass}><Checkbox tone="admin" label={<span className="sr-only">Select {ticket.firstName} {ticket.lastName}, {id}</span>} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selected.includes(id)} onChange={(event) => {
+              <td className={cellClass}><Checkbox tone="admin" label={<span className="sr-only">Select {ticket.firstName} {ticket.lastName}</span>} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selected.includes(id)} onChange={(event) => {
                 if (busyRef.current || requiresOperator) return;
                 setSelected((previous) => event.target.checked ? [...previous, id] : previous.filter((selectedId) => selectedId !== id));
               }} /></td>
-              <td className={dataCellClass}>{id}</td>
+
               <td className={cellClass}>{ticket.firstName} {ticket.lastName}</td>
               <td className={dataCellClass}>{ticket.email}</td>
               <td className={cellClass}><StatusBadge tone={ticket.status === 'valid' ? 'ok' : 'caution'}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
               <td className={cellClass}>{ticket.claimedByUid ? 'Claimed' : 'Unclaimed'}</td>
               <td className={cellClass}>{ticket.checkedInAt ? 'Checked in' : 'Not checked in'}</td>
-              <td className={cellClass}><button type="button" className={linkButtonClass} onClick={() => { setEdit({ ticketId: id, firstName: ticket.firstName || '', lastName: ticket.lastName || '', email: ticket.email || '', claimed: Boolean(ticket.claimedByUid), checkedIn: Boolean(ticket.checkedInAt) }); setReason(''); setError(''); setConfirm('edit'); }}>Correct attendee</button></td>
+              <td className={cellClass}><AdminIconControl label="Correct attendee" icon="edit" className={linkButtonClass} onClick={() => { setEdit({ ticketId: id, firstName: ticket.firstName || '', lastName: ticket.lastName || '', email: ticket.email || '', claimed: Boolean(ticket.claimedByUid), checkedIn: Boolean(ticket.checkedInAt) }); setReason(''); setError(''); setConfirm('edit'); }} /></td>
             </tr>;
           })}</tbody></TicketingTable> : <p className="text-admin-sm text-admin-ink-secondary">No admission tickets have been issued for this order.</p>}
       </section>
       {refunds.length ? <section className="space-y-sm">
         <h3 className="text-admin-lg font-bold">Refund history</h3>
-        <ul className="space-y-xs">{refunds.map((refund) => <li key={refund.id} className="wrap-anywhere border-b-admin-hairline border-admin-rule-hairline pb-xs"><span className="font-admin-data">{refund.id}</span> — {formatTicketMoney(refund.amount, refund.currency || order.currency)} — {(refund.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(refund.status))} — {formatTicketTime(refund.createdAt, timezone)}{refund.failureReason ? ` — ${refund.failureReason}` : ''}</li>)}</ul>
+        <ul className="space-y-xs">{refunds.map((refund) => <li key={refund.id} className="wrap-anywhere border-b-admin-hairline border-admin-rule-hairline pb-xs">{formatTicketMoney(refund.amount, refund.currency || order.currency)} — {(refund.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(refund.status))} — {formatTicketTime(refund.createdAt, timezone)}{refund.failureReason ? ` — ${refund.failureReason}` : ''}</li>)}</ul>
         {isOperator ? <>
           <p className="text-admin-sm text-admin-ink-secondary">An amount-only partial refund does not identify which attendee loses admission. Record the organizer’s decision using the ticket selection above, or explicitly retain every ticket.</p>
-          <SelectField label="Refund to allocate" value={refundId} onChange={setRefundId} options={[{ value: '', label: 'Choose a refund' }, ...refunds.map((refund) => ({ value: refund.id, label: `${refund.id} — ${formatTicketMoney(refund.amount, refund.currency || order.currency)} — ${(refund.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(refund.status))}` }))]} />
+          <SelectField label="Refund to allocate" value={refundId} onChange={setRefundId} options={[{ value: '', label: 'Choose a refund' }, ...refunds.map((refund) => ({ value: refund.id, label: `${formatTicketMoney(refund.amount, refund.currency || order.currency)} · ${formatTicketTime(refund.createdAt, timezone)} · ${refund.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(refund.status)}` }))]} />
           <Checkbox tone="admin" label="Keep every ticket valid" checked={preserveAdmission} onChange={(event) => setPreserveAdmission(event.target.checked)} />
           <button type="button" className={secondaryButtonClass} onClick={() => {
             if (!refundId || (!preserveAdmission && !selected.length)) { setError('Choose a refund and select affected tickets, or choose to keep every ticket valid.'); return; }
@@ -213,22 +215,22 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
           }}>Review refund allocation</button>
         </> : null}
       </section> : null}
-      {order.disputes?.length ? <section className="space-y-sm"><h3 className="text-admin-lg font-bold">Payment disputes</h3><p className="text-admin-sm text-admin-ink-secondary">Review and respond in Stripe Dashboard. A dispute does not automatically change admission; check each ticket before deciding whether to cancel it.</p><ul className="space-y-xs">{order.disputes.map((dispute) => <li key={dispute.id} className="wrap-anywhere"><span className="font-admin-data">{dispute.id}</span> — {formatTicketMoney(dispute.amount, dispute.currency || order.currency)} — {ticketStatusLabel(dispute.status)}</li>)}</ul></section> : null}
+      {order.disputes?.length ? <section className="space-y-sm"><h3 className="text-admin-lg font-bold">Payment disputes</h3><p className="text-admin-sm text-admin-ink-secondary">Review and respond in Stripe Dashboard. A dispute does not automatically change admission; check each ticket before deciding whether to cancel it.</p><ul className="space-y-xs">{order.disputes.map((dispute) => <li key={dispute.id} className="wrap-anywhere">{formatTicketMoney(dispute.amount, dispute.currency || order.currency)} — {ticketStatusLabel(dispute.status)}</li>)}</ul></section> : null}
       <section className="space-y-sm">
         <h3 className="text-admin-lg font-bold">Audit trail</h3>
-        {data.audit?.length ? <ol className="space-y-sm">{data.audit.map((entry) => <li key={entry.id} className="space-y-3xs border-b-admin-hairline border-admin-rule-hairline pb-sm"><p className="font-semibold">{ticketStatusLabel(entry.action.replace(/^ticketing\./, '').replaceAll('-', '_'))}</p><p className="wrap-anywhere font-admin-data text-admin-xs">{formatTicketTime(entry.at, timezone)} · {entry.actorUid || 'Provider reconciliation'}</p>{entry.reason ? <p className="wrap-anywhere text-admin-sm">{entry.reason}</p> : null}{entry.ticketIds?.length ? <p className="wrap-anywhere font-admin-data text-admin-xs">Tickets: {entry.ticketIds.join(', ')}</p> : null}</li>)}</ol> : <p className="text-admin-sm text-admin-ink-secondary">No staff actions have been recorded for this order.</p>}
+        {data.audit?.length ? <ol className="space-y-sm">{data.audit.map((entry) => <li key={entry.id} className="space-y-3xs border-b-admin-hairline border-admin-rule-hairline pb-sm"><p className="font-semibold">{({ cancelTickets: 'Tickets cancelled', allocateRefund: 'Refund recorded', updateAttendee: 'Attendee updated', reconcile: 'Payment checked', resend: 'Confirmation requested', issueComp: 'Complimentary tickets issued', pauseSales: 'Sales changed', checkIn: 'Attendee checked in', undo: 'Check-in undone' }[String(entry.action).replace(/^ticketing[.:]/, '')] || 'Order updated')}</p><p className="wrap-anywhere font-admin-data text-admin-xs">{formatTicketTime(entry.at, timezone)} · {entry.actorEmail || 'Staff'}</p>{entry.reason ? <p className="wrap-anywhere text-admin-sm">{entry.reason}</p> : null}{entry.ticketIds?.length ? <p className="wrap-anywhere font-admin-data text-admin-xs">{entry.ticketIds.length} tickets affected</p> : null}</li>)}</ol> : <p className="text-admin-sm text-admin-ink-secondary">No staff actions have been recorded for this order.</p>}
       </section>
     </div> : null}
     {confirm ? <TicketingConfirmation title={confirm === 'cancel' ? 'Cancel the selected admission tickets?' : confirm === 'refund' ? 'Record this refund’s admission consequences?' : 'Correct attendee details'} confirmLabel={confirm === 'cancel' ? `Cancel ${selected.length} admission tickets` : confirm === 'refund' ? preserveAdmission ? 'Record refund with admission retained' : `Remove admission from ${selected.length} tickets` : 'Save attendee correction'} destructive={confirm === 'cancel' || (confirm === 'refund' && !preserveAdmission)} error={error} busy={busy} onClose={closeConfirmation} onConfirm={performConfirmed}>
       {confirm === 'edit' ? <>
-        <p className="wrap-anywhere font-admin-data text-admin-sm">Ticket: {edit.ticketId}</p>
+
         <TextField label="Corrected first name" value={edit.firstName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, firstName: value }))} />
         <TextField label="Corrected last name" hint="Optional for attendees who use one name." value={edit.lastName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, lastName: value }))} />
-        <TextField label="Corrected attendee email" type="email" value={edit.email} maxLength={254} readOnly={edit.claimed || edit.checkedIn} hint={edit.claimed ? 'A claimed ticket cannot change email here. Ticket transfers require a separate verified workflow.' : edit.checkedIn ? 'A checked-in ticket cannot change email here.' : 'Use a correction only. This does not transfer payment ownership.'} onChange={(value) => setEdit((previous) => ({ ...previous, email: value }))} />
+        {edit.claimed || edit.checkedIn ? <p className="text-admin-sm">Email: {edit.email}</p> : <TextField label="Corrected attendee email" type="email" value={edit.email} maxLength={254} onChange={(value) => setEdit((previous) => ({ ...previous, email: value }))} />}
       </> : <>
         {confirm === 'cancel' && notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
-        <p className="wrap-anywhere">Order: <span className="font-admin-data">{orderId}</span>. Original payment: {formatTicketMoney(order?.totalAmount, order?.currency)}.</p>
-        {confirm === 'refund' ? <p>Refund {selectedRefund?.id}: {formatTicketMoney(selectedRefund?.amount, selectedRefund?.currency || order?.currency)} — {selectedRefund?.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(selectedRefund?.status)}.</p> : null}
+        <p className="wrap-anywhere">Original payment: {formatTicketMoney(order?.totalAmount, order?.currency)}.</p>
+        {confirm === 'refund' ? <p>Refund: {formatTicketMoney(selectedRefund?.amount, selectedRefund?.currency || order?.currency)} — {selectedRefund?.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(selectedRefund?.status)}.</p> : null}
         {preserveAdmission && confirm === 'refund' ? <p>All ticket admission stays as it is. This records an amount-only payment adjustment.</p> : <>{selectedSummary}<p>These tickets will lose admission, including any that have already been checked in. Sold seats will not be returned to capacity.</p></>}
         <p>No refund payment is created by this action.</p>
       </>}

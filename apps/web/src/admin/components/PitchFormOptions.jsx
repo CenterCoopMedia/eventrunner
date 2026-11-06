@@ -1,3 +1,4 @@
+import '../plannerFields.css';
 // The pitch form's option lists (ADR 0008 §2): the formats, lengths and
 // tracks the public pitch stepper offers, and how many co-presenters one
 // pitch may name. Operator-only, like the rest of the call. An empty list
@@ -73,7 +74,12 @@ export default function PitchFormOptions({ settings, call }) {
     };
     const checked = validatePitchFormOptions(formOptions);
     if (!checked.ok) {
-      setErrors(checked.errors);
+      const labels = { formats: 'Formats', lengths: 'Lengths in minutes', tracks: 'Tracks', maxCoPresenters: 'Co-presenters' };
+      setErrors(checked.errors.map((message) => {
+        const at = message.indexOf(':');
+        const reason = message.slice(at + 1).trim();
+        return `${labels[message.slice(0, at)] || 'Choices'}: ${reason.replace(/^./, (letter) => letter.toUpperCase())}`;
+      }));
       return;
     }
     setBusy(true);
@@ -93,14 +99,14 @@ export default function PitchFormOptions({ settings, call }) {
       <form onSubmit={save} className="space-y-sm" noValidate>
         {errors.length ? <Notice tone="error" message={errors.join(' ')} /> : null}
         {serverError ? <Notice tone="error" message={serverError.message} /> : null}
-        <fieldset disabled={busy} className="grid gap-sm md:grid-cols-3">
+        <fieldset disabled={busy} className="planner-fields grid gap-sm md:grid-cols-3">
           <AddOneListField label="Formats" itemName="format" items={form.formats} onChange={edit('formats')} hint="For example: Panel, Workshop, Lightning talk." />
           <AddOneListField label="Lengths in minutes" itemName="length" inputMode="numeric" items={form.lengths} onChange={edit('lengths')} hint="Whole minutes, for example 30 or 60." />
           <AddOneListField label="Tracks" itemName="track" items={form.tracks} onChange={edit('tracks')} hint="Add none if the event has no tracks." />
         </fieldset>
         <SelectField label="Co-presenters per pitch" value={form.maxCoPresenters} onChange={edit('maxCoPresenters')} options={CO_PRESENTER_CHOICES} hint="The person who pitches is always the lead presenter." />
-        <button type="submit" className={primaryButtonClass} aria-busy={busy || undefined} aria-disabled={busy || undefined}>
-          {busy ? 'Saving…' : 'Save pitch form options'}
+        <button type="submit" aria-label="Save pitch form options" className={primaryButtonClass} aria-busy={busy || undefined} aria-disabled={busy || undefined}>
+          {busy ? 'Saving…' : 'Save'}
         </button>
         {result ? <SaveStatus message={result} /> : null}
       </form>

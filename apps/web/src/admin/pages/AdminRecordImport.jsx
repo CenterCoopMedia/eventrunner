@@ -1,3 +1,5 @@
+import { plannerMessage } from '../plannerErrors.js';
+import '../plannerFields.css';
 // Import records: staff CSV import for speakers, sessions and organizations
 // (functions/src/imports/recordImport.cjs).
 //
@@ -17,6 +19,7 @@
 //
 // The preview is a ruled table (RuledTable): each verdict a word in a badge
 // whose tint agrees with it, never colour alone and never a pill.
+import AdminIconControl from '../components/AdminIconControl.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { parseCsvFile } from '../../lib/csv.js';
@@ -68,24 +71,28 @@ const LIST_PAGES = {
 const PREVIEW_COLUMNS = [
   { id: 'row', label: 'Row', numeric: true },
   { id: 'result', label: 'Result' },
-  { id: 'externalId', label: 'External ID' },
+
   { id: 'record', label: 'Record' },
   { id: 'detail', label: 'Detail' },
 ];
 
 /** What a row's detail cell says: the reasons, the notes, or the fields that change. */
-function rowDetail(row) {
-  const lines = [...(row.reasons ?? []), ...(row.notes ?? [])];
+function rowDetail(row, type) {
+  const words = (text) => plannerMessage(text)
+    .replace(/^([a-zA-Z]+):/, (_, key) => `${type.fields.find((field) => field.id === key)?.label || 'Details'}:`)
+    .replace(/Matches the existing (\w+) "[^"]+" by its slug\./g, 'Matches an existing $1.')
+    .replace(/\bslug\b/g, 'page link');
+  const lines = [...(row.reasons ?? []), ...(row.notes ?? [])].map(words);
   if (row.verdict === 'update' && row.changedFields?.length) {
-    lines.unshift(`Changes ${row.changedFields.join(', ')}.`);
+    lines.unshift(`Changes ${row.changedFields.map((key) => type.fields.find((field) => field.id === key)?.label || 'details').join(', ')}.`);
   }
   return lines.length > 0 ? lines.join(' ') : '—';
 }
 
 function MappingFields({ type, headers, mapping, onChange }) {
-  const options = [{ value: '', label: 'Not in this file' }, ...headers.map((h) => ({ value: h, label: h }))];
+  const options = [{ value: '', label: 'Not in this file' }, ...headers.map((h) => ({ value: h, label: type.fields.find((field) => field.id === h || field.header === h)?.label || h }))];
   return (
-    <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
+    <div className="planner-fields grid grid-cols-1 gap-sm sm:grid-cols-2">
       {type.fields.map((field) => (
         <SelectField
           key={`${type.id}-${field.id}`}
@@ -111,7 +118,7 @@ function PreviewTable({ result, type }) {
       ),
       externalId: <span className="font-admin-data text-admin-ink-data wrap-anywhere">{row.externalId ?? '—'}</span>,
       record: <span className="wrap-anywhere">{row.label ?? '—'}</span>,
-      detail: <span className="text-admin-ink-secondary wrap-anywhere">{rowDetail(row)}</span>,
+      detail: <span className="text-admin-ink-secondary wrap-anywhere">{rowDetail(row, type)}</span>,
     },
   }));
   return (
@@ -231,7 +238,7 @@ export default function AdminRecordImport() {
     } catch (err) {
       if (revision !== inputRevision.current) return;
       setResult(null);
-      setNotice({ tone: 'error', message: err?.message ?? 'The preview could not be made.' });
+      setNotice({ tone: 'error', message: plannerMessage(err?.message ?? 'The preview could not be made.') });
     } finally {
       busyRef.current = null;
       setBusy(null);
@@ -262,7 +269,7 @@ export default function AdminRecordImport() {
         message: `Imported: ${summaryWords(response.summary)}. ${type.doneNote}`,
       });
     } catch (err) {
-      setNotice({ tone: 'error', message: err?.message ?? 'The import could not be completed.' });
+      setNotice({ tone: 'error', message: plannerMessage(err?.message ?? 'The import could not be completed.') });
       // A refused confirm (the file changed) needs a new preview.
       if (err?.status === 409) setResult(null);
     } finally {
@@ -292,20 +299,14 @@ export default function AdminRecordImport() {
               onChange={chooseType}
               options={RECORD_IMPORT_TYPES.map((t) => ({ value: t.id, label: t.label }))}
             />
-            <button
-              type="button"
-              className={secondaryButtonClass}
-              onClick={() => saveTextFile(`${type.id}-import-template.csv`, templateCsv(type))}
-            >
-              Download the {type.noun} template
-            </button>
+            <AdminIconControl label={`Download ${type.noun} template`} icon="download" className={secondaryButtonClass} onClick={() => saveTextFile(`${type.id}-import-template.csv`, templateCsv(type))} />
           </div>
           <div className="flex flex-col gap-3xs">
             <label htmlFor="record-import-file" className={fieldLabelClass}>
               CSV file
             </label>
             <p id="record-import-file-hint" className={fieldHintClass}>
-              Up to {MAX_ROWS} rows. Each row needs an external ID that stays the same each time you import it.
+              Up to {MAX_ROWS} rows. Use the same reference for each person or item when you import updates.
             </p>
             <input
               id="record-import-file"
@@ -327,7 +328,7 @@ export default function AdminRecordImport() {
       {parsed ? (
         <Panel
           title="Columns"
-          description={`Point each ${type.noun} field at a column of the file. A field set to "Not in this file" is not changed.`}
+          description={`Choose the file column for each detail. Leave unused details as "Not in this file".`}
         >
           <div className="flex flex-col gap-md">
             <MappingFields type={type} headers={parsed.headers} mapping={mapping} onChange={changeMapping} />

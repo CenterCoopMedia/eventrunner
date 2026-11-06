@@ -1,3 +1,6 @@
+import { plannerMessage } from '../plannerErrors.js';
+import '../plannerFields.css';
+import AdminIconControl from './AdminIconControl.jsx';
 import { useRef, useState } from 'react';
 import { formatTicketMoney, newTicketingRequestId } from '../../lib/ticketingCommerce.js';
 import { Notice, Panel, secondaryButtonClass, SelectField, TextAreaField, TextField } from './formControls.jsx';
@@ -37,7 +40,7 @@ export default function StripeCompPanel({ call, catalog, onComplete }) {
       setReason('');
       setNotice(`${result.tickets?.length || confirmation.attendees.length} complimentary tickets issued. No money was collected.`);
       onComplete(result.order?.orderId || result.order?.id);
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(plannerMessage(err.message)); }
     finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -46,12 +49,12 @@ export default function StripeCompPanel({ call, catalog, onComplete }) {
       <SelectField label="Comp ticket type" value={ticketTypeId} onChange={setTicketTypeId} options={[{ value: '', label: 'Choose a ticket type' }, ...(catalog?.ticketTypes || []).filter((candidate) => candidate.active).map((candidate) => ({ value: candidate.id, label: candidate.name }))]} />
       {attendees.map((attendee, index) => <fieldset className="space-y-sm border-admin-hairline border-admin-rule-hairline p-sm" key={index}>
         <legend className="text-admin-base font-bold">Comp attendee {index + 1}</legend>
-        <div className="grid gap-sm sm:grid-cols-2">
+        <div className="planner-fields grid gap-sm sm:grid-cols-2">
           {['firstName', 'lastName', 'email'].map((field) => <TextField key={field} label={field === 'firstName' ? 'First name' : field === 'lastName' ? 'Last name' : 'Attendee email'} type={field === 'email' ? 'email' : 'text'} required={field !== 'lastName'} hint={field === 'lastName' ? 'Optional for attendees who use one name.' : undefined} maxLength={field === 'email' ? 254 : 100} value={attendee[field]} onChange={(value) => setAttendees((previous) => previous.map((row, current) => current === index ? { ...row, [field]: value } : row))} />)}
         </div>
-        {attendees.length > 1 ? <button type="button" className={secondaryButtonClass} onClick={() => setAttendees((previous) => previous.filter((_, current) => current !== index))}>Remove comp attendee {index + 1}</button> : null}
+        {attendees.length > 1 ? <AdminIconControl label={`Remove comp attendee ${index + 1}`} icon="remove" className={secondaryButtonClass} onClick={() => setAttendees((previous) => previous.filter((_, current) => current !== index))} /> : null}
       </fieldset>)}
-      <button type="button" className={secondaryButtonClass} aria-disabled={attendees.length >= maximum} onClick={() => { if (attendees.length < maximum) setAttendees((previous) => [...previous, { firstName: '', lastName: '', email: '' }]); }}>{attendees.length >= maximum ? `Limit reached — ${maximum} attendees` : 'Add comp attendee'}</button>
+      <button type="button" className={secondaryButtonClass} aria-disabled={attendees.length >= maximum} onClick={() => { if (attendees.length < maximum) setAttendees((previous) => [...previous, { firstName: '', lastName: '', email: '' }]); }}>{attendees.length >= maximum ? `Maximum ${maximum} attendees` : 'Add comp attendee'}</button>
       <TextAreaField label="Reason for complimentary admission" value={reason} onChange={setReason} required maxLength={500} />
       {error && !confirmation ? <Notice tone="error" message={error} /> : null}
       {notice ? <Notice tone="ok" message={notice} /> : null}

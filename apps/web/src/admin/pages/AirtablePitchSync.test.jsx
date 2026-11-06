@@ -64,12 +64,12 @@ describe('Airtable refresh status and action', () => {
     open();
     const status = screen.getByLabelText('Airtable refresh status');
     expect(within(status).getByText('Completed')).toBeInTheDocument();
-    expect(within(status).getByText(/Last refresh Oct 20, 2026, 2:00 PM UTC, by staff@example.test/)).toBeInTheDocument();
+    expect(within(status).getByText(/Last refresh Oct 20, 2026, 2:00 PM UTC, by staff/)).toBeInTheDocument();
     const created = within(status).getByText('Created').closest('div');
     expect(within(created).getByText('3')).toBeInTheDocument();
     fireEvent.click(within(status).getByText('Why records were skipped'));
     expect(within(status).getByText('Consent box not ticked: 1')).toBeInTheDocument();
-    expect(within(status).getByText(/rec00000000000004 · Consent box not ticked · consent/)).toBeInTheDocument();
+    expect(within(status).queryByText(/rec00000000000004/)).toBeNull();
     expect(screen.queryByText('Connection settings')).toBeNull();
   });
 
@@ -77,7 +77,7 @@ describe('Airtable refresh status and action', () => {
     collections.session_pitch_sync = [{ id: 'airtable', lastRun: { ...lastRun, outcome: 'failed', error: { code: 'token-rejected', message: 'Airtable refused the access token.' } } }];
     open();
     expect(screen.getByText('Failed')).toBeInTheDocument();
-    expect(screen.getByText('Last error: Airtable refused the access token.')).toBeInTheDocument();
+    expect(screen.getByText('The last refresh failed. Check the Airtable connection and try again.')).toBeInTheDocument();
     cleanup();
     collections.session_pitch_sync = [{ id: 'airtable', lastRun: { ...lastRun, outcome: 'partial' } }];
     open();
@@ -102,8 +102,8 @@ describe('Airtable refresh status and action', () => {
     open();
     const button = screen.getByRole('button', { name: 'Refresh from Airtable' });
     fireEvent.click(button);
-    expect(screen.getByRole('button', { name: 'Refreshing…' })).toHaveAttribute('aria-busy', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Refreshing…' }));
+    expect(screen.getByRole('button', { name: 'Refresh from Airtable' })).toHaveAttribute('aria-busy', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh from Airtable' }));
     expect(call).toHaveBeenCalledTimes(1);
     expect(call).toHaveBeenCalledWith('refreshAirtablePitches', {});
     resolve({ outcome: 'completed', counts: { created: 2, updated: 1, unchanged: 4, restored: 0, skipped: 1, removed: 1 } });
@@ -129,12 +129,12 @@ describe('Airtable connection settings', () => {
     collections.session_pitch_sources = [];
     open();
     fireEvent.click(screen.getByText('Connection settings'));
-    expect(screen.getByLabelText('Email field')).toHaveValue('email');
-    expect(screen.getByLabelText('Consent checkbox field')).toHaveValue('consent');
-    fireEvent.change(screen.getByLabelText('Base ID'), { target: { value: ' appAAAAAAAAAAAAAA ' } });
-    fireEvent.change(screen.getByLabelText('Table ID or name'), { target: { value: 'tblBBBBBBBBBBBBBB' } });
+    expect(screen.getByLabelText('Email')).toHaveValue('email');
+    expect(screen.getByLabelText('Consent')).toHaveValue('consent');
+    fireEvent.change(screen.getByLabelText('Airtable base link'), { target: { value: ' https://airtable.com/appAAAAAAAAAAAAAA ' } });
+    fireEvent.change(screen.getByLabelText('Table name'), { target: { value: 'tblBBBBBBBBBBBBBB' } });
     fireEvent.change(screen.getByLabelText('Automatic refresh'), { target: { value: '60' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Airtable settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('updateAirtablePitchSource', {
       enabled: true, baseId: 'appAAAAAAAAAAAAAA', table: 'tblBBBBBBBBBBBBBB', view: null, scheduleMinutes: 60,
       fieldMap: { email: 'email', title: 'title', description: 'description', consent: 'consent', organization: 'organization', format: 'format', externalId: null, summary: null, lengthMinutes: null, track: null, audienceLevel: null, leadName: null, leadRole: null, accessNeeds: null, notes: null },
@@ -144,7 +144,7 @@ describe('Airtable connection settings', () => {
     // open with its result, as the browser run showed it must.
     act(() => listeners.session_pitch_sources([{ id: 'airtable', enabled: true, baseId: 'appAAAAAAAAAAAAAA', table: 'tblBBBBBBBBBBBBBB', scheduleMinutes: 60, fieldMap: {}, updatedAt: { toMillis: () => 1 } }]));
     expect(screen.getByText('Airtable settings saved. Refresh to check the connection.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save Airtable settings' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeVisible();
   });
 
   it('opens on the saved settings and refuses a malformed base ID in place', () => {
@@ -152,17 +152,17 @@ describe('Airtable connection settings', () => {
     collections.session_pitch_sources = [{ id: 'airtable', enabled: false, baseId: 'appAAAAAAAAAAAAAA', table: 'Pitches', view: 'Approved', scheduleMinutes: 15, fieldMap: { email: 'Email', title: 'Title', description: 'Summary', consent: 'OK', organization: null, format: null, externalId: 'Ref' } }];
     open();
     fireEvent.click(screen.getByText('Connection settings'));
-    expect(screen.getByLabelText('Use this Airtable connection')).not.toBeChecked();
-    expect(screen.getByLabelText('Description field')).toHaveValue('Summary');
-    expect(screen.getByLabelText('External ID field (optional)')).toHaveValue('Ref');
+    expect(screen.getByLabelText('Import from Airtable')).not.toBeChecked();
+    expect(screen.getByLabelText('Description')).toHaveValue('Summary');
+    expect(screen.getByLabelText('Reference (optional)')).toHaveValue('Ref');
     expect(screen.getByLabelText('Automatic refresh')).toHaveValue('15');
-    fireEvent.change(screen.getByLabelText('Base ID'), { target: { value: 'https://airtable' } });
-    fireEvent.submit(screen.getByRole('button', { name: 'Save Airtable settings' }).closest('form'));
+    fireEvent.change(screen.getByLabelText('Airtable base link'), { target: { value: 'https://airtable' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Save' }).closest('form'));
     expect(call).not.toHaveBeenCalled();
-    const field = screen.getByLabelText('Base ID');
+    const field = screen.getByLabelText('Airtable base link');
     expect(field).toHaveAttribute('aria-invalid', 'true');
     expect(field).toHaveFocus();
-    expect(screen.getByText('Enter the base ID: app followed by 14 letters or numbers.')).toBeInTheDocument();
+    expect(screen.getByText('Enter the link to your Airtable base.')).toBeInTheDocument();
   });
 });
 

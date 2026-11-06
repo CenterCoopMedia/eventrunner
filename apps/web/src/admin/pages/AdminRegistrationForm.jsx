@@ -1,3 +1,5 @@
+import { plannerError } from '../plannerErrors.js';
+import '../plannerFields.css';
 // /admin/registration-form: the questions each attendee answers (ADR 0008
 // §4). An operator turns the standard questions on or off and makes them
 // required, and writes up to 10 questions of their own. The preview beside
@@ -51,8 +53,14 @@ function attendeeWording({ name, label, help }) {
 }
 
 function clientError(errors) {
-  const message = errors.join('; ');
-  return { message, fieldErrors: errors.map((segment) => ({ field: segment.split(':')[0], message: segment })) };
+  const fieldErrors = errors.map((segment) => {
+    const [field, ...parts] = segment.split(':');
+    const question = field.match(/^custom\.(\d+)/);
+    const name = question ? `Question ${Number(question[1]) + 1}` : 'Registration form';
+    const reason = parts.join(':').trim();
+    return { field, message: `${name}: ${reason === 'required' ? 'Enter a question.' : reason.replace(/^./, (letter) => letter.toUpperCase())}` };
+  });
+  return { message: fieldErrors.map((entry) => entry.message).join(' '), fieldErrors };
 }
 
 export default function AdminRegistrationForm() {
@@ -77,7 +85,9 @@ export default function AdminRegistrationForm() {
   // A choice's own error (custom.0.choices.1) shows on its choices box.
   const errorFor = (field) => fieldErrors.get(field) ?? [...fieldErrors].find(([key]) => key.startsWith(`${field}.`))?.[1];
 
-  if (live === undefined || draft === null) return <AdminLoadingState label="Loading the registration form…" />;
+  if (live === undefined || draft === null) return listError
+    ? <Notice tone="caution" message="The registration form did not load. Check your connection. Reconnecting…" />
+    : <AdminLoadingState label="Loading the registration form…" />;
 
   const liveRevision = readRegistrationForm(live).revision;
   const conflict = liveRevision !== draft.revision;
@@ -112,8 +122,8 @@ export default function AdminRegistrationForm() {
     try {
       const response = await call('updateRegistrationForm', { expectedRevision: draft.revision, form: checked.form });
       setDraft((previous) => ({ ...previous, revision: response.revision }));
-      setResult('Registration form saved. New registrations use it now.');
-    } catch (err) { setError(err); } finally { setBusy(false); }
+      setResult('Registration form saved.');
+    } catch (err) { setError(plannerError(err)); } finally { setBusy(false); }
   }
 
   return (
@@ -123,7 +133,7 @@ export default function AdminRegistrationForm() {
         description="The questions each attendee answers when they register. Answers about diet and access are private to staff."
         // The editor form is named here: the preview sits outside it, so Enter
         // in a preview answer can never save the form.
-        actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}>{busy ? 'Saving…' : 'Save registration form'}</button>}
+        actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}>{busy ? 'Saving…' : 'Save'}</button>}
       />
       {listError ? <Notice tone="caution" message="The saved form did not load. Trying again…" /> : null}
       {conflict ? (
@@ -135,10 +145,10 @@ export default function AdminRegistrationForm() {
       <ServerErrorSummary error={error} errorRef={errorRef} title="The form could not be saved" />
       {result ? <SaveStatus message={result} /> : null}
 
-      <div className="grid items-start gap-md xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div className="planner-fields grid items-start gap-md xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <form id={FORM_ID} onSubmit={save} noValidate className="min-w-0">
         <fieldset disabled={busy} className="flex min-w-0 flex-col gap-md">
-          <Panel title="Standard questions" description="Fixed wording. Ask the ones you need, and make any of them required.">
+          <Panel title="Standard questions" description="Choose which questions to ask and which answers are required.">
             <ul className="flex flex-col gap-sm">
               {STANDARD_QUESTIONS.map((question) => {
                 const entry = draft.standard[question.id];
@@ -181,12 +191,12 @@ export default function AdminRegistrationForm() {
                   />
                 ))}
               </ol>
-            ) : <p className={fieldHintClass}>No questions of your own yet.</p>}
+            ) : <p className={fieldHintClass}>Add a question to ask attendees about your event.</p>}
           </Panel>
         </fieldset>
         </form>
 
-        <Panel title="Preview" description="What an attendee sees, from the unsaved form. Try an answer and check it.">
+        <Panel title="Preview" description="Try the questions as an attendee.">
           <RegistrationFormPreview form={form} />
         </Panel>
       </div>

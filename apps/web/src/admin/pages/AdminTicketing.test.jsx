@@ -209,7 +209,7 @@ describe('AdminTicketing', () => {
   it('does not show a webhook registration row when the provider does not support webhooks', async () => {
     render(<AdminTicketing />);
     await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
-    expect(screen.queryByText('Webhook registration')).not.toBeInTheDocument();
+    expect(screen.queryByText('Connection')).not.toBeInTheDocument();
   });
 
   it('shows "not connected" without an operator command for a webhook-capable provider with no registration yet', async () => {
@@ -224,8 +224,8 @@ describe('AdminTicketing', () => {
     });
     render(<AdminTicketing />);
     await waitFor(() => expect(screen.getByText('Eventbrite')).toBeInTheDocument());
-    expect(screen.getByText('Webhook registration')).toBeInTheDocument();
-    expect(screen.getByText('Not connected. Ask Joe to connect ticket updates.')).toBeInTheDocument();
+    expect(screen.getByText('Connection')).toBeInTheDocument();
+    expect(screen.getByText('Not connected. Contact support to connect ticket updates.')).toBeInTheDocument();
     expect(screen.queryByText(/register-ticketing-webhook/)).not.toBeInTheDocument();
   });
 

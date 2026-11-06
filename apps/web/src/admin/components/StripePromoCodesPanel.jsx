@@ -1,3 +1,4 @@
+import { plannerMessage } from '../plannerErrors.js';
 // Promo codes for Stripe ticket sales (ADR 0004 amendment 2026-11-04,
 // ADR 0008 §6). Staff and operators list, add, change and delete codes. A
 // used code cannot be deleted: its orders name it, so it is made inactive.
@@ -17,7 +18,7 @@ function discountText(code, currency) {
 function ticketsText(code, catalog) {
   if (!code.ticketTypeIds?.length) return 'All paid tickets';
   const names = new Map((catalog?.ticketTypes || []).map((type) => [type.id, type.name]));
-  return code.ticketTypeIds.map((id) => names.get(id) || id).join(', ');
+  return code.ticketTypeIds.map((id) => names.get(id) || 'Unavailable ticket type').join(', ');
 }
 
 function windowText(code, timezone) {
@@ -48,7 +49,7 @@ export default function StripePromoCodesPanel({ call, catalog, timezone }) {
     setNotice(null);
     return call('ticketingCommerceAdmin', { action: 'promoCodes' })
       .then((result) => setCodes(result.codes))
-      .catch((err) => setNotice({ tone: 'error', message: err.message }));
+      .catch((err) => setNotice({ tone: 'error', message: plannerMessage(err.message) }));
   }, [call]);
   useEffect(() => { load(); }, [load]);
 
@@ -62,7 +63,7 @@ export default function StripePromoCodesPanel({ call, catalog, timezone }) {
       setCodes(result.codes);
       done?.();
     } catch (err) {
-      setNotice({ tone: 'error', message: err.message });
+      setNotice({ tone: 'error', message: plannerMessage(err.message) });
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -75,12 +76,12 @@ export default function StripePromoCodesPanel({ call, catalog, timezone }) {
   });
 
   return (
-    <Panel title="Promo codes" description="A code lowers the price of each eligible ticket at checkout. Limits count discounted tickets. Stripe’s own promotion codes stay off.">
+    <Panel title="Promo codes" description="Offer a discount on selected ticket types.">
       <div className="space-y-md">
         {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
         {codes === null && !notice ? <AdminLoadingState label="Loading promo codes…" /> : null}
         {codes === null && notice?.tone === 'error' ? <button type="button" className={secondaryButtonClass} onClick={load}>Retry promo codes</button> : null}
-        {codes?.length === 0 && !editing ? <p className="text-admin-sm text-admin-ink-secondary">No promo codes yet.</p> : null}
+        {codes?.length === 0 && !editing ? <p className="text-admin-sm text-admin-ink-secondary">Add a code to offer a discount at checkout.</p> : null}
         {codes?.length ? (
           <ul className="rounded-admin-panel border-admin-hairline border-admin-rule-hairline">
             {codes.map((code) => (

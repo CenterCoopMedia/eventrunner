@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router';
 // AdminAttendees — the registration tab (issue #32, spec §3.4). Mocks
 // adminApi and adminSource directly, same convention as AdminFeedback.test.jsx.
 import { describe, expect, it, vi } from 'vitest';
@@ -45,7 +46,7 @@ const row = (overrides = {}) => ({
 
 describe('AdminAttendees', () => {
   it('lists accounts with their registration status', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row(), row({ id: 'uid-bob', displayName: 'Bob Grace', email: 'bob@example.com', registrationStatus: 'approved', approvalSource: 'ticket' })]);
 
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
@@ -56,7 +57,7 @@ describe('AdminAttendees', () => {
 
   it('approves a pending account through approveUser', async () => {
     callMock.mockResolvedValueOnce({ ok: true, changed: true, registrationStatus: 'approved' });
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row()]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
@@ -67,7 +68,7 @@ describe('AdminAttendees', () => {
 
   it('revokes an approved account through revokeUser', async () => {
     callMock.mockResolvedValueOnce({ ok: true, changed: true, registrationStatus: 'revoked' });
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row({ registrationStatus: 'approved', approvalSource: 'admin' })]);
 
     // Moment 3: revoking access states what the person loses first.
@@ -79,7 +80,7 @@ describe('AdminAttendees', () => {
   });
 
   it('offers only the actions the §3.4 table allows', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
 
     // pending: approve only — there is no pending → revoked edge.
     pushRows([row()]);
@@ -103,7 +104,7 @@ describe('AdminAttendees', () => {
   });
 
   it('filters by status and searches by name or email', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([
       row(),
       row({ id: 'uid-bob', displayName: 'Bob Grace', email: 'bob@example.com', registrationStatus: 'approved' }),
@@ -121,7 +122,7 @@ describe('AdminAttendees', () => {
 
   it('surfaces a rejected transition instead of pretending it worked', async () => {
     callMock.mockRejectedValueOnce(new Error('An account with registration status "pending" cannot be revoked.'));
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row({ registrationStatus: 'ticketed' })]);
 
     // Moment 3: revoking access states what the person loses first.
@@ -138,7 +139,7 @@ describe('AdminAttendees', () => {
   it('removes one custom badge through the admin endpoint and shows its pending state', async () => {
     let finish;
     callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row({ customBadges: ['News nerd'] })]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove “News nerd”' }));
@@ -156,7 +157,7 @@ describe('AdminAttendees', () => {
 
   it('reports a custom badge removal error', async () => {
     callMock.mockRejectedValueOnce(new Error('The custom badge could not be removed.'));
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row({ customBadges: ['News nerd'] })]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove “News nerd”' }));
@@ -173,9 +174,9 @@ describe('AdminAttendees', () => {
   });
 
   it('shows an empty state when nothing matches', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([]);
-    expect(screen.getByText('No attendees')).toBeInTheDocument();
+    expect(screen.getByText('No attendees yet')).toBeInTheDocument();
   });
 });
 
@@ -186,33 +187,33 @@ describe('AdminAttendees export', () => {
     row(),
     row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com', registrationStatus: 'approved' }),
   ];
-  const exportButton = () => screen.getByRole('button', { name: /^Export \d+ attendees?$|^Exporting…$/ });
+  const exportButton = () => screen.getByRole('button', { name: /^Download \d+ attendees?$|^Download$/ });
 
   it('renders once the list has loaded, and counts the rows on screen', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     expect(screen.queryByRole('button', { name: /^Export/ })).toBeNull();
 
     pushRows(three());
-    expect(exportButton()).toHaveTextContent('Export 3 attendees');
+    expect(exportButton()).toHaveAccessibleName('Download 3 attendees');
 
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'approved' } });
-    expect(exportButton()).toHaveTextContent('Export 2 attendees');
+    expect(exportButton()).toHaveAccessibleName('Download 2 attendees');
 
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bo@' } });
-    expect(exportButton()).toHaveTextContent('Export 1 attendee');
+    expect(exportButton()).toHaveAccessibleName('Download 1 attendee');
   });
 
   it('is natively disabled at zero rows and says so', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([]);
-    expect(exportButton()).toHaveTextContent('Export 0 attendees');
+    expect(exportButton()).toHaveAccessibleName('Download 0 attendees');
     expect(exportButton()).toBeDisabled();
   });
 
   it('sends the shown uids in screen order with the filter, and never the search text', async () => {
     callMock.mockClear();
     callMock.mockResolvedValueOnce({ filename: 'attendees-2026-09-23.csv', csv: 'x', rowCount: 2, skipped: 0 });
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows(three());
 
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'approved' } });
@@ -231,7 +232,7 @@ describe('AdminAttendees export', () => {
   it('reports a blank search as no search', async () => {
     callMock.mockClear();
     callMock.mockResolvedValueOnce({ filename: 'attendees-2026-09-23.csv', csv: 'x', rowCount: 3, skipped: 0 });
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows(three());
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: '   ' } });
     fireEvent.click(exportButton());
@@ -244,11 +245,11 @@ describe('AdminAttendees export', () => {
     saveTextFileMock.mockClear();
     let finish;
     callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows(three());
 
     fireEvent.click(exportButton());
-    const busy = screen.getByRole('button', { name: 'Exporting…' });
+    const busy = exportButton();
     expect(busy).toBeDisabled();
     expect(busy).toHaveAttribute('aria-busy', 'true');
     // A second press while the first is in flight writes no second row.
@@ -261,9 +262,9 @@ describe('AdminAttendees export', () => {
 
     expect(saveTextFileMock).toHaveBeenCalledWith('attendees-2026-09-23.csv', '\uFEFF"Name"\r\n');
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Exported 3 attendees to attendees-2026-09-23.csv. The export is in the admin log.',
+      'Exported 3 attendees to attendees-2026-09-23.csv.',
     );
-    expect(exportButton()).toHaveTextContent('Export 3 attendees');
+    expect(exportButton()).toHaveAccessibleName('Download 3 attendees');
     expect(exportButton()).toBeEnabled();
     expect(exportButton()).not.toHaveAttribute('aria-busy');
 
@@ -276,7 +277,7 @@ describe('AdminAttendees export', () => {
     callMock.mockClear();
     saveTextFileMock.mockClear();
     callMock.mockRejectedValueOnce(new Error('uids: at most 10,000 attendees per export. Narrow the filter.'));
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows(three());
 
     fireEvent.click(exportButton());
@@ -300,7 +301,7 @@ describe('AdminAttendees record and delete', () => {
   }
 
   async function deleteFromPanel(name = 'Ada Lovelace') {
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit record' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit attendee record' })[0]);
     expect(screen.getByRole('region', { name: `Record for ${name}` })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete this account' }));
@@ -308,7 +309,7 @@ describe('AdminAttendees record and delete', () => {
   }
 
   it('summarizes diet, access and photo answers, and shows each attendee their own answers', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
     expect(screen.queryByRole('heading', { name: 'Registration answers' })).toBeNull();
     act(() => {
@@ -326,14 +327,14 @@ describe('AdminAttendees record and delete', () => {
     expect(summary.getByText(/1 attendee told you about access needs/)).toBeInTheDocument();
     expect(summary.queryByText('Step-free stage.')).toBeNull();
     expect(summary.getByText('Yes: 1. No: 1.')).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Edit record' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit attendee record' })[0]);
     const answers = within(screen.getByRole('region', { name: 'Registration answers' }));
     expect(answers.getByText('Step-free stage.')).toBeInTheDocument();
     expect(answers.getByText('Access needs (private)')).toBeInTheDocument();
   });
 
   it('shows past attendance as a meta line on the row face', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row({ pastAttendance: ['2024', '2025'] }), row({ id: 'uid-bo', displayName: 'Bo Reyes' })]);
     const items = screen.getAllByRole('listitem');
     expect(items[0]).toHaveTextContent('Past attendance: 2024; 2025');
@@ -341,9 +342,9 @@ describe('AdminAttendees record and delete', () => {
   });
 
   it('opens one record at a time', () => {
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
-    const [adaToggle, boToggle] = screen.getAllByRole('button', { name: 'Edit record' });
+    const [adaToggle, boToggle] = screen.getAllByRole('button', { name: 'Edit attendee record' });
 
     fireEvent.click(adaToggle);
     expect(adaToggle).toHaveAttribute('aria-expanded', 'true');
@@ -359,7 +360,7 @@ describe('AdminAttendees record and delete', () => {
   it('states a completed delete at page level and moves focus to it once the row has left', async () => {
     callMock.mockReset();
     callMock.mockResolvedValueOnce({ ok: true, uid: 'uid-ada', removed: {} });
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
 
     await deleteFromPanel();
@@ -376,7 +377,7 @@ describe('AdminAttendees record and delete', () => {
   it('keeps a delete-incomplete notice and a retry after the row leaves; the retry deletes the kept uid', async () => {
     callMock.mockReset();
     callMock.mockRejectedValueOnce(incompleteError());
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
 
     await deleteFromPanel();
@@ -414,7 +415,7 @@ describe('AdminAttendees record and delete', () => {
   it('treats a 404 on the retry as done: nothing of the account remains', async () => {
     callMock.mockReset();
     callMock.mockRejectedValueOnce(incompleteError());
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row()]);
     await deleteFromPanel();
     pushRows([]);
@@ -441,7 +442,7 @@ describe('AdminAttendees record and delete', () => {
       callMock.mockReset();
       let fail;
       callMock.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
-      render(<AdminAttendees />);
+      render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
       pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
 
       await deleteFromPanel();
@@ -470,7 +471,7 @@ describe('AdminAttendees record and delete', () => {
       new Error('This account is linked to a speaker. Delete the speaker record first.'),
       { code: 'speaker-linked', status: 409 },
     ));
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row()]);
 
     await deleteFromPanel();
@@ -486,7 +487,7 @@ describe('AdminAttendees record and delete', () => {
     callMock.mockReset();
     let fail;
     callMock.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
-    render(<AdminAttendees />);
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([row()]);
     await deleteFromPanel();
     pushRows([]);

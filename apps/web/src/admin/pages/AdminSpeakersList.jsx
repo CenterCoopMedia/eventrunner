@@ -1,3 +1,5 @@
+import { plannerMessage } from '../plannerErrors.js';
+import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
 // Speakers list (issue #20): every canonical `speakers/{speakerId}` record
 // with its pipeline status, plus the entry points to create and edit — and
 // the invite actions the pipeline needs (issue #21).
@@ -113,7 +115,7 @@ const PIPELINE_TONES = {
 function PipelineStatus({ status }) {
   return (
     <StatusBadge tone={PIPELINE_TONES[status] ?? 'neutral'}>
-      {PIPELINE_LABELS[status] ?? status ?? 'Unknown'}
+      {PIPELINE_LABELS[status] ?? 'Unknown'}
     </StatusBadge>
   );
 }
@@ -162,7 +164,7 @@ export default function AdminSpeakersList() {
     actionFocus.remember(speaker.id);
     setBusy(`${speaker.id}:${action}`);
     setResult(speaker.id, null);
-    const name = speaker.displayName || speaker.id;
+    const name = speaker.displayName || 'Unnamed speaker';
     try {
       await call(endpoint, { speakerId: speaker.id, ...body });
       setResult(speaker.id, {
@@ -174,7 +176,7 @@ export default function AdminSpeakersList() {
       // Verbatim: the server's message is the actionable part — which
       // transition it refused, or that the invitation was recorded but not
       // delivered.
-      setResult(speaker.id, { tone: 'error', message: err?.message ?? 'Something went wrong.' });
+      setResult(speaker.id, { tone: 'error', message: plannerMessage(err?.message ?? 'Something went wrong.') });
       await refreshInvites();
     } finally {
       requestPending.current = false;
@@ -216,6 +218,7 @@ export default function AdminSpeakersList() {
           </>
         }
       />
+      <PlannerFeatureControls choices={[{ key: 'speakers', label: 'Speaker directory' }]} />
 
       {error ? (
         <Notice
@@ -229,7 +232,7 @@ export default function AdminSpeakersList() {
       ) : speakers.length === 0 ? (
         <AdminEmptyState
           title="No speakers yet"
-          description="Add the first speaker — a name is all that’s required; the rest can follow."
+          description="Add a speaker to start building your program."
           action={
             <Link to="new" className={primaryButtonClass}>
               Create a speaker
@@ -253,7 +256,7 @@ export default function AdminSpeakersList() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
                         <Link to={speaker.id} className={rowTitleLinkClass}>
-                          {speaker.displayName || speaker.id}
+                          {speaker.displayName || 'Unnamed speaker'}
                         </Link>
                         <RecordState state={recordState} />
                         <PipelineStatus status={speaker.status} />
@@ -271,7 +274,7 @@ export default function AdminSpeakersList() {
                       {pendingFieldsOf(speaker).length > 0 ? (
                         <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
                           Speaker-submitted changes awaiting review:{' '}
-                          {pendingFieldsOf(speaker).join(', ')}.
+                          {pendingFieldsOf(speaker).length} profile {pendingFieldsOf(speaker).length === 1 ? 'change' : 'changes'}.
                         </p>
                       ) : null}
                     </div>
@@ -340,7 +343,7 @@ export default function AdminSpeakersList() {
                           </button>
                           <DestructiveConfirm
                             trigger="Discard changes"
-                            title={`Discard changes from ${speaker.displayName || speaker.id}`}
+                            title={`Discard changes from ${speaker.displayName || 'Unnamed speaker'}`}
                             confirmLabel="Discard pending changes"
                             consequence="The speaker’s pending edits are removed. The published profile stays unchanged."
                             busy={busy === `${speaker.id}:discard`}
@@ -353,13 +356,13 @@ export default function AdminSpeakersList() {
                       {speaker.status === 'accepted' || speaker.status === 'approved' ? (
                         <Link
                           to={`reminders/send?speaker=${encodeURIComponent(speaker.id)}`}
-                          aria-label={`Remind ${speaker.displayName || speaker.id}`}
+                          aria-label={`Remind ${speaker.displayName || 'Unnamed speaker'}`}
                           className={linkButtonClass}
                         >
                           Remind
                         </Link>
                       ) : null}
-                      <EditRecordLink to={speaker.id} label={`Edit ${speaker.displayName || speaker.id}`} />
+                      <EditRecordLink to={speaker.id} label={`Edit ${speaker.displayName || 'Unnamed speaker'}`} />
                     </div>
                   </div>
                   <div ref={actionFocus.resultRef(speaker.id)} tabIndex={-1} className="admin-row-result">
