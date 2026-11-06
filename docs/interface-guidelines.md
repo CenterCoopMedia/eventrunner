@@ -62,10 +62,11 @@ Typography and rules do the visual work. Color decorates very little, and shadow
 
 **The eyebrow ban is absolute.** No text sits directly above a heading. Not an eyebrow label, not a chip, not a small line of description copy, and not a plain small-caps folio — a folio stacked above a headline is still an eyebrow, and a reviewer rejects it. The rule holds at every size, on every surface, in every preset. A folio lives beside a rule at a section boundary, in a margin, or in a running header. Where a label must sit near a title, put it below the title or beside it.
 
-Two things are **not** eyebrows and must never be "fixed" to satisfy this rule:
+Three things are **not** eyebrows and must never be "fixed" to satisfy this rule:
 
 - Metadata inside the rule-bounded nameplate block. The dates and the edition line are the nameplate device, wherever they sit inside it.
 - A form `<label>` above its own input. That is a control label.
+- A meaningful image caption or credit inside the homepage hero's figure below 640px. It stays with its image before the title.
 
 Cards, boxes, and chrome: A rule replaces a card border wherever a rule can do the job. Elevation is tint, not shadow — where a surface must sit above another, shift its tone with a low-opacity overlay of the theme's ink or accent.
 
