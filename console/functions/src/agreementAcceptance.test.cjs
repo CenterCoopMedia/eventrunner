@@ -11,7 +11,7 @@ const ACCEPT = { orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', lega
 const IDS = { orgId: 'o1', appId: 'a1' };
 
 function ready(extra = {}) {
-  return seededDb({ 'applications/a1': applicationDoc(), ...NAME_HELD, ...signupTerms(), ...extra });
+  return seededDb({ 'applications/a1': applicationDoc(), 'signup_links/paid-o1': { status: 'used', appId: 'a1', orgId: 'o1', usedBy: 'ana' }, ...NAME_HELD, ...signupTerms(), ...extra });
 }
 
 function deps(db, more = {}) {

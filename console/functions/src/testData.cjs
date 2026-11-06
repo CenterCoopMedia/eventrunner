@@ -48,7 +48,6 @@ function validAnswers() {
 function seededDb(extra = {}) {
   return makeFakeDb({
     'console_config/operators': { emails: ['ops@ccm.example', 'Two@CCM.example'] },
-    'signup_links/paid-o1': { status: 'used', appId: 'a1', orgId: 'o1', usedBy: 'ana' },
     'organizations/o1': { name: 'NC Local' },
     'organizations/o1/members/ana': { uid: 'ana', email: 'ana@example.org', role: 'owner' },
     'organizations/o1/members/ben': { uid: 'ben', email: 'ben@example.org', role: 'editor' },

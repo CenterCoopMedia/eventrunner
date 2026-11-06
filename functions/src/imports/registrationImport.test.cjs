@@ -30,7 +30,7 @@ function withProvider(name, fn) {
     }
   };
 }
-const dbWithForm = (seed = {}) => makeDb({ 'config/registration_form': FORM, ...seed });
+const dbWithForm = (seed = {}) => makeDb({ 'config/registration_form': FORM, 'users/uid-ada': { registrationStatus: 'pending' }, ...seed });
 
 test('a new row makes a valid manual ticket and holds its answers, unclaimed', withProvider('manual', async () => {
   const db = dbWithForm();

@@ -542,7 +542,24 @@ async function readPurchaserOrder({ db, provider, actor, orderId, requestId, now
   if (before.stripeSessionId && typeof provider.reconcileOrder === 'function') {
     const policy = await checkDemoWrites({ db });
     if (policy.ok) {
-      try { await provider.reconcileOrder(id); } catch { /* Current durable state is still safe to show. */ }
+      // Reserve before provider contact. Failed/ambiguous calls keep their
+      // cooldown; the durable queue and webhooks retain independent budgets.
+      try {
+        const refresh = await db.runTransaction(async (tx) => {
+          const current = await tx.get(ref);
+          const order = current.data();
+          if (!current.exists || order.purchaserUid !== actor.uid) return false;
+          const at = now().getTime();
+          if (millis(order.statusRefreshAfter) > at || millis(order.reconciledAt) > at - 60_000) return false;
+          tx.set(ref, { statusRefreshAfter: new Date(at + 60_000) }, { merge: true });
+          return true;
+        });
+        if (refresh) {
+          const { acquireLookupBudget } = require('./lookupBudget.cjs');
+          const budget = await acquireLookupBudget({ db, uid: actor.uid, now });
+          if (budget.allowed) await provider.reconcileOrder(id);
+        }
+      } catch { /* Current durable state is still safe to show. */ }
       snap = await ref.get();
     }
   }

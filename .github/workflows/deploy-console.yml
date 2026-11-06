@@ -6,6 +6,14 @@ name: Deploy console
 
 on:
   workflow_dispatch:
+    inputs:
+      rollout_clients:
+        description: Also deploy security fixes to every configured active client.
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths: [.github/security-rollout-2026-11-06.json]
 
 permissions:
   contents: read
@@ -24,10 +32,17 @@ jobs:
     if: github.ref == 'refs/heads/main' && !github.event.repository.fork
     environment: console
     runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      id-token: write
+      actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -85,3 +100,10 @@ jobs:
         env:
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
         run: npx firebase deploy --project "$CONSOLE_PROJECT_ID" --non-interactive
+
+      - name: Deploy security fixes to configured active clients and wait for results
+        if: github.event_name == 'push' || inputs.rollout_clients
+        env:
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/dispatch-security-rollout.cjs

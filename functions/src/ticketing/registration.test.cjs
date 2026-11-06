@@ -474,7 +474,7 @@ test('a refused claim moves no answers, and a seat without answers makes no reco
 });
 
 test('two concurrent claims on one ticket cannot both win', async () => {
-  const db = makeFakeDb({ 'tickets/tkt-1': fakeTicket() });
+  const db = seededDb({ 'tickets/tkt-1': fakeTicket() });
   // Bob's claim commits between Ada's read and her commit; the read set
   // makes Ada's transaction re-run and see the ticket taken.
   db.beforeCommit = async () => {

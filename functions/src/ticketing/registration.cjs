@@ -109,8 +109,6 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
 
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    const userSnap = await tx.get(db.collection(USERS).doc(uid));
-    if (!userSnap.exists) return { claimed: false, reason: 'account_missing' };
     if (!snap.exists) return { claimed: false, reason: 'not_found' };
     const data = snap.data() || {};
     if (data.claimedByUid === uid) return { claimed: false, reason: 'already_mine' };
@@ -126,6 +124,8 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
     // account ticketed and, when the flag is on, approved. Only a valid
     // ticket may do that (issues #358, #359, #360).
     if (data.status !== 'valid') return { claimed: false, reason: 'not_valid' };
+    const userSnap = await tx.get(db.collection(USERS).doc(uid));
+    if (!userSnap.exists) return { claimed: false, reason: 'account_missing' };
     // ADR 0008 §5: answers given at checkout wait on the order's seat until
     // this attendee claims; they then belong to the account. Every read
     // comes before any write, as a Firestore transaction requires.
