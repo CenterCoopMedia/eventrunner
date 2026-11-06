@@ -575,13 +575,21 @@ export default function AdminAccess() {
       close();
     } catch (err) {
       // Keep the actionable access rule, without exposing server diagnostics.
+      // A structured API refusal precedes the save/send. A transport failure
+      // or an unknown proxy response cannot establish whether it happened.
+      const refused = err?.status >= 400 && typeof err?.code === 'string'
+        && !['unknown', 'network'].includes(err.code);
       const message = pending.action === 'resend'
         ? err?.code === 'inactive-access'
           ? 'This account no longer has active access. No instructions were sent.'
-          : 'Email acceptance could not be confirmed. Try again checks this attempt without sending a second copy.'
+          : refused
+            ? 'No instructions were sent. Refresh the access list before trying again.'
+            : 'Email acceptance could not be confirmed. Try again checks this attempt without sending a second copy.'
         : /at least one operator/i.test(err?.message ?? '')
           ? 'At least one operator must keep access.'
-          : 'The response could not be confirmed. Access may already be saved. Refresh the list before trying again.';
+          : refused
+            ? 'Access could not be changed. Try again.'
+            : 'The response could not be confirmed. Access may already be saved. Refresh the list before trying again.';
       setChangeError(message);
       showToast(message, { tone: 'error', announce: false });
     } finally {

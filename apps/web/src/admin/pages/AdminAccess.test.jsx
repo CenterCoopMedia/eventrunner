@@ -685,6 +685,18 @@ describe('nextEndReloadDelay', () => {
 
 describe('access sign-in instructions', () => {
   it.each([
+    [serverError(500, 'internal', 'The access change could not be saved.'), 'Access could not be changed. Try again.'],
+    [serverError(0, 'network', 'response lost'), 'The response could not be confirmed. Access may already be saved. Refresh the list before trying again.'],
+    [serverError(502, 'unknown', 'proxy response'), 'The response could not be confirmed. Access may already be saved. Refresh the list before trying again.'],
+  ])('distinguishes an explicit save refusal from an unknown response (%s)', async (error, message) => {
+    await renderPage({ set: error });
+    fireEvent.click(rowFor('desk@example.org').querySelector('button'));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Change desk@example.org to operator' })).getByRole('button', { name: 'Change to operator' }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Change desk@example.org to operator' })).toBeInTheDocument();
+  });
+
+  it.each([
     ['accepted', 'The email provider accepted the sign-in instructions. This does not confirm delivery.'],
     ['failed', 'Sign-in instructions could not be sent.'],
     ['uncertain', 'Email acceptance is uncertain.'],
