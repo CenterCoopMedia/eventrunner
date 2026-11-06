@@ -25,7 +25,6 @@ import { useAdminApi } from '../adminApi.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminUpdates } from '../useAdminUpdates.js';
 import {
-  UPDATES_OFF_MESSAGE,
   UPDATES_ROOT,
   blankUpdateForm,
   categoriesIn,
@@ -46,6 +45,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
+import FeatureSwitch from '../components/FeatureSwitch.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -331,7 +331,7 @@ export default function AdminUpdateEditor({ mode }) {
         }
       />
 
-      {features?.updates ? null : <Notice tone="caution" message={UPDATES_OFF_MESSAGE} />}
+      <FeatureSwitch featureKeys={['updates']} />
 
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 

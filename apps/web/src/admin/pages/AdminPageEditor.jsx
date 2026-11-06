@@ -28,7 +28,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
-import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -36,7 +35,6 @@ import { useAdminApi } from '../adminApi.js';
 import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
 import {
-  BLOCK_TYPES,
   BLOCK_TYPE_IDS,
   blockTypeLabel,
 } from '../blockTypes.js';
@@ -58,7 +56,6 @@ import { summarizePublish } from '../publishResult.js';
 import {
   CheckboxField,
   DestructiveConfirm,
-  FieldError,
   Notice,
   Panel,
   SelectField,
@@ -520,7 +517,7 @@ export default function AdminPageEditor({ mode }) {
       }}
     >
       <AdminPageHeader
-        title={mode === 'create' ? 'New page' : page.label || page.id}
+        title={mode === 'create' ? 'New page' : page.label || 'Page'}
         state={(
           <>
             {row ? <RecordState state={row.state} /> : null}
@@ -528,7 +525,7 @@ export default function AdminPageEditor({ mode }) {
           </>
         )}
         identifiers={page.path || null}
-        description="Saving writes a draft. Publishing copies that draft to the live revision the public site reads."
+        description="Save a draft to keep your changes. Publish to show them on the site."
         actions={
           <>
             <Link to=".." relative="path" className={linkButtonClass}>
@@ -588,9 +585,9 @@ export default function AdminPageEditor({ mode }) {
               ignores a stored title on a system page for the same reason,
               so the tab and the card keep agreeing with the <h1>. */}
           {isSystemPage ? (
-            <div className="flex flex-col gap-3xs">
-              <p className={fieldLabelClass}>Page heading</p>
-              <p className={fieldHintClass}>This page draws its own heading.</p>
+            <div className="admin-field flex flex-col gap-3xs">
+              <p className={`${fieldLabelClass} admin-field__label`}>Page heading</p>
+              <p className={`${fieldHintClass} admin-field__hint`}>This built-in page sets its own heading.</p>
             </div>
           ) : (
             <TextField
@@ -615,28 +612,10 @@ export default function AdminPageEditor({ mode }) {
             readOnly={isSystemPage}
             hint={
               isSystemPage
-                ? 'A built-in page is served at a fixed address, which cannot change.'
-                : `The URL path this page is served at, e.g. /scholarships. These first segments belong to built-in routes and cannot be used: ${RESERVED_PATH_SEGMENTS.join(', ')}.`
+                ? 'This built-in page has a fixed web address.'
+                : 'The page’s web address, such as /scholarships.'
             }
           />
-          <TextField
-            label="Icon"
-            value={page.icon ?? ''}
-            onChange={(value) => update({ icon: value || null })}
-            error={errorFor('icon')}
-            hint="Optional icon name. Leave blank for none."
-          />
-          <p className={fieldHintClass}>The pages list sets where this page appears.</p>
-          {isExisting ? (
-            <TextField
-              label="Page id"
-              value={page.id}
-              onChange={() => {}}
-              error={errorFor('id')}
-              readOnly
-              hint="This id stays the same when the label changes."
-            />
-          ) : null}
           <div className="flex flex-col justify-center gap-xs">
             <CheckboxField
               label="Visible"
@@ -646,8 +625,7 @@ export default function AdminPageEditor({ mode }) {
             />
             {isSystemPage ? (
               <p className="text-admin-sm text-admin-ink-secondary">
-                This is a system page: It has a dedicated route in the app, so
-                it cannot be deleted or turned into a regular page.
+                This is a built-in page. You can edit its content, but you cannot delete it.
               </p>
             ) : null}
           </div>
@@ -760,7 +738,7 @@ export default function AdminPageEditor({ mode }) {
 
       <Panel
         title="Sections"
-        description="Expand a section to edit its name and content structure. Open its allowed block types only when you need to change the available formats."
+        description="Open a section to change its name and blocks."
         actions={
           <button
             type="button"
@@ -789,8 +767,8 @@ export default function AdminPageEditor({ mode }) {
                   {...bindReorderDrop('section:', sectionIndex, moveSections)}
                 >
                   <EditorDisclosure
-                    title={section.label || section.id || `Section ${sectionIndex + 1}`}
-                    description={`${section.defaultBlocks.length} ${section.defaultBlocks.length === 1 ? 'block' : 'blocks'} · ${section.allowedBlocks.length} allowed ${section.allowedBlocks.length === 1 ? 'type' : 'types'}`}
+                    title={section.label || `Section ${sectionIndex + 1}`}
+                    description={`${section.defaultBlocks.length} ${section.defaultBlocks.length === 1 ? 'block' : 'blocks'}`}
                     defaultOpen={!section.id}
                     reveal={[...fieldErrors.keys()].some((field) => field.startsWith(`${at}.`))}
                   >
@@ -816,16 +794,6 @@ export default function AdminPageEditor({ mode }) {
                   </div>
 
                   <div className="admin-section-fields">
-                    {section.id ? (
-                      <TextField
-                        label={`Section ${sectionIndex + 1} id`}
-                        value={section.id}
-                        onChange={() => {}}
-                        error={errorFor(`${at}.id`)}
-                        readOnly
-                        hint="Content stays attached to this id when the name changes."
-                      />
-                    ) : null}
                     <TextField
                       label={`Section ${sectionIndex + 1} label`}
                       value={section.label}
@@ -863,7 +831,7 @@ export default function AdminPageEditor({ mode }) {
                         options={SLOT_CHOICES}
                         onChange={(value) => updateSection(sectionIndex, { slot: value })}
                         error={errorFor(`${at}.slot`)}
-                        hint="Where this section is inserted, relative to the page's built-in feature."
+                        hint="Show this section before or after the main content."
                       />
                     ) : null}
                     <div className="sm:col-span-2">
@@ -878,40 +846,6 @@ export default function AdminPageEditor({ mode }) {
                       />
                     </div>
                   </div>
-
-                  <EditorDisclosure
-                    title="Allowed block types"
-                    description="Choose which kinds of content this section accepts."
-                    headingLevel="h4"
-                    className="mt-md"
-                    reveal={[...fieldErrors.keys()].some((field) => field === `${at}.allowedBlocks` || field.startsWith(`${at}.allowedBlocks[`))}
-                  >
-                  <fieldset>
-                    <legend className="sr-only">
-                      Allowed block types
-                    </legend>
-                    <p className="text-admin-sm text-admin-ink-secondary">
-                      Select the content formats editors can add. The saved choices stay unchanged until you edit them.
-                    </p>
-                    <FieldError message={errorFor(`${at}.allowedBlocks`)} />
-                    <div className="admin-block-type-choices mt-sm grid gap-sm sm:grid-cols-2">
-                      {BLOCK_TYPE_IDS.map((blockTypeId) => (
-                        <CheckboxField
-                          key={blockTypeId}
-                          label={`${BLOCK_TYPES[blockTypeId].label} — section ${sectionIndex + 1}`}
-                          checked={section.allowedBlocks.includes(blockTypeId)}
-                          onChange={(checked) =>
-                            updateSection(sectionIndex, {
-                              allowedBlocks: checked
-                                ? [...section.allowedBlocks, blockTypeId]
-                                : section.allowedBlocks.filter((id) => id !== blockTypeId),
-                            })
-                          }
-                        />
-                      ))}
-                    </div>
-                  </fieldset>
-                  </EditorDisclosure>
 
                   <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2xs">
@@ -1022,7 +956,7 @@ export default function AdminPageEditor({ mode }) {
           isSystemPage ? null : (
             <DestructiveConfirm
               trigger="Delete this page"
-              title={`Delete ${page.label || page.id}`}
+              title={`Delete ${page.label || 'this page'}`}
               confirmLabel="Delete this page"
               busyLabel="Deleting…"
               busy={busy === 'delete'}

@@ -81,7 +81,7 @@ const HOME_PAGE = {
       id: 'hero',
       label: 'Hero',
       description: 'Top of the home page.',
-      allowedBlocks: ['image', 'cta', 'link_group'],
+      allowedBlocks: ['text', 'cta', 'image'],
       maxBlocks: 5,
       reorderable: true,
       defaultBlocks: [],
@@ -145,8 +145,7 @@ describe('AdminContentBlockEditor value fields', () => {
   it('routes the image block’s url field through ImagePicker, not a plain text field', async () => {
     await renderAt('/admin/content/home/hero/_new');
 
-    // The section allows image first, so a fresh block defaults to it.
-    expect(await screen.findByRole('combobox', { name: /block type/i })).toHaveValue('image');
+    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), { target: { value: 'image' } });
 
     // ImagePicker's own affordance — a bare TextField never renders this.
     expect(await screen.findByRole('button', { name: /choose or upload/i })).toBeInTheDocument();
@@ -182,7 +181,8 @@ describe('AdminContentBlockEditor value fields', () => {
   });
 
   it('keeps link_group.url as a plain text field, never the image picker', async () => {
-    await renderAt('/admin/content/home/hero/_new');
+    pagesLive = [{ ...HOME_PAGE, sections: [{ ...HOME_PAGE.sections[0], id: 'resources', allowedBlocks: [] }] }];
+    await renderAt('/admin/content/home/resources/_new');
 
     fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
       target: { value: 'link_group' },
@@ -224,7 +224,8 @@ describe('AdminContentBlockEditor value fields', () => {
 
   it('warns on a link group item too, and says nothing while the section is on', async () => {
     liveFeatures = { schedule: true, speakers: false };
-    await renderAt('/admin/content/home/hero/_new');
+    pagesLive = [{ ...HOME_PAGE, sections: [{ ...HOME_PAGE.sections[0], id: 'resources', allowedBlocks: [] }] }];
+    await renderAt('/admin/content/home/resources/_new');
     fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
       target: { value: 'link_group' },
     });
@@ -308,7 +309,7 @@ describe('AdminContentBlockEditor value fields', () => {
     }];
     await renderAt('/admin/content/sponsors/sponsor_packages/_new');
 
-    expect(await screen.findByRole('combobox', { name: /block type/i })).toHaveValue('sponsor_package');
+    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), { target: { value: 'sponsor_package' } });
     const limit = screen.getByLabelText('Limit (optional)');
     expect(limit).toHaveAttribute('type', 'number');
     expect(limit).toHaveAccessibleDescription('How many sponsors can take this package. Leave it empty for no limit.');
@@ -355,6 +356,7 @@ describe('AdminContentBlockEditor value fields', () => {
       }],
     }];
     await renderAt('/admin/content/about/intro/_new');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Block type' }), { target: { value: 'richtext' } });
     const editor = await screen.findByRole('textbox', { name: 'Text' });
     await pasteHtml(editor, '<p><strong>Formatted</strong> body</p>', 'Formatted body');
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
@@ -506,6 +508,7 @@ describe('content editing workspace', () => {
     expect(setupHeading.compareDocumentPosition(valueHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'Block type' })).toBeVisible();
     expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Block type' }), { target: { value: 'image' } });
     fireEvent.change(screen.getByLabelText('Image'), { target: { value: 'cms-images/banner.jpg' } });
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Event banner' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -553,7 +556,7 @@ describe('content editing workspace', () => {
     expect(alert).toHaveFocus();
     expect(alert).toHaveTextContent('Order: must be a non-negative number');
     expect(screen.queryByLabelText('Order')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByLabelText('Button text')).toHaveValue('Register now');
   });
 
@@ -632,11 +635,11 @@ describe('content editing workspace', () => {
 
   it('marks a new block unsaved only after the operator edits it', async () => {
     await renderAt('/admin/content/home/hero/_new');
-    expect(await screen.findByRole('combobox', { name: /block type/i })).toHaveValue('image');
+    expect(await screen.findByRole('combobox', { name: /block type/i })).toHaveValue('text');
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Banner' } });
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Banner' } });
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: '' } });
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
   });
 

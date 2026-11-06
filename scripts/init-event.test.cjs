@@ -93,6 +93,9 @@ test('init seeds config, pages, and content, and exits 0 despite unmet readiness
 
   assert.equal(value, 0, 'init is the gate on nothing (§5.1.1)');
   assert.equal((await db.collection('config').doc('event').get()).exists, true);
+  for (const key of ['badges', 'customBadges', 'liveUpdates', 'changeRequests']) {
+    assert.equal(db.read('config', 'features')[key], true, `${key} starts on`);
+  }
   assert.equal((await db.collection('config').doc('bootstrap').get()).data().adminEmails[0], 'ops@example.org');
   assert.equal((await db.collection('cmsPages').doc('privacy').get()).exists, true);
   assert.equal((await db.collection('cmsContent').doc('hero__title').get()).data().value, 'Test Gathering');
@@ -862,4 +865,12 @@ test('re-running init on a launched site keeps the client’s venue lines and cr
   assert.match(output, /info__who: not created \(a placeholder/);
   assert.match(output, /info__where_venue: no longer seeded, kept/);
   assert.match(output, /info__where_address: no longer seeded, kept/);
+});
+
+
+test('init leaves stored feature choices unchanged when new-site defaults change', async () => {
+  const existing = { schedule: true, badges: false, liveUpdates: false, changeRequests: false };
+  const db = makeFakeDb({ 'config/features': existing });
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  assert.deepEqual(db.read('config', 'features'), existing);
 });

@@ -1,6 +1,7 @@
 // Sections use the current page revision, so an unpublished rename remains
 // visible here. Block counts wait for both content revisions before stating
 // a total; one published block plus its draft is still one block.
+import { builtInSectionBlockTypes } from 'shared/page';
 import { Link, useParams } from 'react-router';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
@@ -75,7 +76,7 @@ export default function AdminContentSections() {
             {sections.map((section) => {
               const sectionName = section.label || section.id;
               const count = contentRows.filter((row) => row.current?.section === section.id).length;
-              const types = Array.isArray(section.allowedBlocks) ? section.allowedBlocks.map(blockTypeLabel) : [];
+              const types = (builtInSectionBlockTypes(page, section) ?? []).map(blockTypeLabel);
               const to = contentSectionPath(page.id, section.id);
               return (
                 <li key={section.id} className="admin-content-section">
@@ -85,7 +86,7 @@ export default function AdminContentSections() {
                     </h2>
                     {section.description ? <p>{section.description}</p> : null}
                     <p className="admin-content-section__types">
-                      <span>Allowed content: </span>{types.length ? types.join(', ') : 'No new block types'}
+                      <span>Allowed content: </span>{types.length ? types.join(', ') : 'All block types'}
                     </p>
                   </div>
                   <div className="admin-content-section__count">

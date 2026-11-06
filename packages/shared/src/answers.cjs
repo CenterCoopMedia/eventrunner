@@ -50,8 +50,8 @@ const {
 const { safeUrlHref } = require('./urlSafety.cjs');
 const { isEmailAddress } = require('./email.cjs');
 
-/** Feature toggles default false except the first four (spec §2.2). */
-const DEFAULT_ON_FEATURES = Object.freeze(['schedule', 'speakers', 'sponsors', 'attendeeDirectory', 'autoApproveTicketHolders']);
+/** New-site defaults. Runtime readers keep omitted flags off on existing sites. */
+const DEFAULT_ON_FEATURES = Object.freeze(['schedule', 'speakers', 'sponsors', 'attendeeDirectory', 'autoApproveTicketHolders', 'badges', 'customBadges', 'liveUpdates', 'changeRequests']);
 
 /**
  * The interactive prompt set. Declared as data so the question list, its
@@ -260,9 +260,9 @@ function parseAnswersFile(text) {
 }
 
 /**
- * The features doc: every known key present, the §2.2 four and automatic
- * ticket approval on, the rest
- * off, answers-file overrides applied on top. Unknown keys are dropped
+ * The new-site features doc includes the public directories, ticket approval,
+ * badges, live updates, and change requests. Explicit answers override defaults.
+ * Unknown keys are dropped
  * here rather than passed through, so a typo surfaces as a validation
  * error naming the key instead of a silently ignored toggle.
  *

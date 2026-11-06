@@ -7,7 +7,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pageHeading, pageFeatureGate, isPublicPage } = require('./page.cjs');
+const { pageHeading, pageFeatureGate, isPublicPage, builtInSectionBlockTypes, sectionBlockTypes } = require('./page.cjs');
 
 test('pageHeading prefers the page title over the navigation label', () => {
   assert.equal(
@@ -117,4 +117,20 @@ test('isPublicPage refuses anything that is not a page document', () => {
   assert.equal(isPublicPage(undefined, ALL_ON), false);
   assert.equal(isPublicPage('travel', ALL_ON), false);
   assert.equal(isPublicPage(42, ALL_ON), false);
+});
+
+
+test('only sections with dedicated Home renderers restrict block types', () => {
+  const home = { id: 'home', systemPage: true };
+  const all = ['text', 'cta', 'image', 'fact', 'stat', 'list_item', 'link_group', 'richtext'];
+  for (const [id, expected] of Object.entries({ hero: ['text', 'cta', 'image'], info: ['fact', 'stat', 'list_item'], sponsors: ['text'], footer: ['link_group'] })) {
+    const section = { id, allowedBlocks: [] };
+    assert.deepEqual(builtInSectionBlockTypes(home, section), expected);
+    assert.deepEqual(sectionBlockTypes(home, section, all), expected);
+  }
+  for (const id of ['history', 'details', 'custom', 'toString']) {
+    assert.equal(builtInSectionBlockTypes(home, { id }), null);
+    assert.deepEqual(sectionBlockTypes(home, { id, allowedBlocks: ['text'] }, all), all);
+  }
+  assert.deepEqual(sectionBlockTypes({ id: 'other' }, { id: 'hero', allowedBlocks: [] }, all), all);
 });

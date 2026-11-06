@@ -132,7 +132,7 @@ test('the dry run prints the inventory and writes no file', async () => {
   assert.match(output, /\* cmsContent\/hero__image: cms-images\/asset-1\/crowd\.jpg\n/);
   assert.equal(output.includes('secret-download-token'), false, 'a download token is never printed');
   assert.match(output, /feedbackInbox: on \(public intake: review\)/);
-  assert.match(output, /changeRequests: off/);
+  assert.match(output, /changeRequests: on/);
   assert.match(output, /! cmsContent\/faq_items__what_is_this: names an email address/);
   assert.equal(output.includes('old-staffer@example.test'), false, 'the review line does not repeat the address');
   assert.match(output, /! cmsContent\/details__quote: a quote names a person/);

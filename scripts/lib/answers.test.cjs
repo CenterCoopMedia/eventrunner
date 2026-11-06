@@ -170,7 +170,7 @@ test('an answers file cannot turn off the legal review flag', () => {
   assert.equal(docs.event.legal.reviewRequired, true);
 });
 
-test('features default to the four §2.2 toggles, and unknown keys warn instead of landing', () => {
+test('features include the new-site defaults, and unknown keys warn instead of landing', () => {
   const built = buildConfigDocs({
     answers: { ...MINIMAL, features: { badges: true, notAFeature: true } },
     tierA: TIER_A,
@@ -183,16 +183,16 @@ test('features default to the four §2.2 toggles, and unknown keys warn instead 
   assert.match(built.warnings.join(' '), /notAFeature/);
 });
 
-// Issue #188: a public text surface is off until the client opts in.
-test('the change request flag is written false by default, and an answers file can turn it on', () => {
+// Explicit init answers can disable a default feature.
+test('the change request flag is on for new sites, and an answers file can turn it off', () => {
   const built = buildConfigDocs({ answers: MINIMAL, tierA: TIER_A, now: () => 0 });
-  assert.equal(built.docs.features.changeRequests, false);
+  assert.equal(built.docs.features.changeRequests, true);
   const optedIn = buildConfigDocs({
-    answers: { ...MINIMAL, features: { changeRequests: true } },
+    answers: { ...MINIMAL, features: { changeRequests: false } },
     tierA: TIER_A,
     now: () => 0,
   });
-  assert.equal(optedIn.docs.features.changeRequests, true);
+  assert.equal(optedIn.docs.features.changeRequests, false);
 });
 
 test('Tier A wins on provider selection, and an answers-file override warns', () => {

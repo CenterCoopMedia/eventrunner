@@ -15,6 +15,7 @@
 // allows (widening to show a mismatched existing type, same pattern
 // AdminPageEditor's block-type picker uses), and a section already at its
 // cap has no "Add block" link pointing here in the first place.
+import { sectionBlockTypes } from 'shared/page';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -263,7 +264,7 @@ export default function AdminContentBlockEditor({ mode }) {
   const section = (page?.current?.sections ?? []).find((candidate) => candidate.id === sectionId);
   // Stable reference across renders (unless the section's own list changes)
   // so the create-defaults effect below does not re-run every render.
-  const allowed = useMemo(() => section?.allowedBlocks ?? [], [section?.allowedBlocks]);
+  const allowed = useMemo(() => sectionBlockTypes(page?.current, section, BLOCK_TYPE_IDS), [page, section]);
   const existingRow =
     mode === 'edit'
       ? contentRows.find(
@@ -323,17 +324,20 @@ export default function AdminContentBlockEditor({ mode }) {
     // allowed list is actually known (waiting out pagesLoading — otherwise
     // this would lock in the bare registry fallback before the section's
     // own allowedBlocks has ever arrived), default to its first allowed
-    // type, or the whole registry if the section allows none. Only once,
+    // type, or the whole registry for a custom section. Only once,
     // and only if the operator has not already picked one.
     if (mode !== 'create') return;
     if (loadedKeyRef.current === 'create-defaults') return;
     if (pagesLoading) return;
-    const fallback = allowed[0] ?? BLOCK_TYPE_IDS[0];
+    // A section's own type (an FAQ item in the FAQ list) still leads: its
+    // listed types on older sites, else the type of its starter block.
+    const own = [...(section?.allowedBlocks ?? []), ...(section?.defaultBlocks ?? []).map((entry) => entry.blockType)];
+    const fallback = own.find((type) => allowed.includes(type)) ?? allowed[0] ?? BLOCK_TYPE_IDS[0];
     const baseline = createFormBaseline({ fieldId, content, fallbackType: fallback });
     loadedKeyRef.current = 'create-defaults';
     setSavedEdit(baseline.snapshot);
     if (baseline.nextContent) setContent(baseline.nextContent);
-  }, [mode, allowed, content.blockType, pagesLoading, content, fieldId]);
+  }, [mode, allowed, section, content.blockType, pagesLoading, content, fieldId]);
 
   useEffect(() => {
     // Strict mode runs this cleanup once during development, then the setup
@@ -617,11 +621,6 @@ export default function AdminContentBlockEditor({ mode }) {
             options={options}
             onChange={changeBlockType}
             error={errorFor('blockType')}
-            hint={
-              allowed.length
-                ? `This section allows: ${allowed.map(blockTypeLabel).join(', ')}.`
-                : 'This section does not allow any block types yet — add one in Pages.'
-            }
           />
           <div className="flex items-center">
             <CheckboxField
