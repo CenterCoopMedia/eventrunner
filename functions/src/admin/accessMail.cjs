@@ -30,39 +30,50 @@ function adminUrl(config) {
 }
 
 /** accepted means the provider accepted it, never that it was delivered. */
-async function sendAccessInstructions({ db, getConfig, sendEmail, email, onceKey, now = Date.now, env = process.env }) {
+async function sendAccessInstructions({ db, getConfig, sendEmail, email, onceKey, now = Date.now, env = process.env, log = console }) {
   let message;
   let send = sendEmail;
+  let reason = 'demo-policy';
   try {
     const policy = await checkDemoWrites({ db });
     if (!policy.ok) return { status: 'failed', reason: policy.code };
+    reason = 'event-config';
     const config = await getConfig();
     const channel = transactionalStream(config);
     if (!channel.ok) return { status: 'failed', reason: 'transactional-stream' };
+    reason = 'email-template';
     const { template, override } = await loadTemplate({ db, id: TEMPLATE_ID });
     // Read live access after preparation, immediately before the send. Ended,
     // malformed and removed grants must never be described as active.
+    reason = 'access-check';
     const account = await activeAccount({ db, email, now });
     if (!account.tier) return { status: 'failed', reason: 'inactive-access' };
+    reason = 'event-address';
+    const url = adminUrl(config);
+    reason = 'email-render';
     const rendered = render({
       template, override, config, now: () => new Date(now()),
       tokenValues: {
-        access_email: email, access_role: account.tier, admin_url: adminUrl(config),
+        access_email: email, access_role: account.tier, admin_url: url,
         access_ends: account.expiresAtMs === null ? '' : new Date(account.expiresAtMs).toISOString(),
       },
     });
+    if (rendered.usedFallback) log.warn('Admin access instructions used shipped wording', { reason: 'invalid-template-override' });
     message = {
       ...rendered, subject: rendered.subject.replace(/[\r\n]+/g, ' ').trim(),
       to: email, tag: TEMPLATE_ID, source: 'admin-access', onceKey,
       ...(channel.stream ? { messageStream: channel.stream } : {}),
     };
     if (!send) {
+      reason = 'email-provider';
       const { createEmailCore } = require('../email/send.cjs');
       const { getEmailProvider } = require('../email/providers/index.cjs');
       send = createEmailCore({ db, provider: getEmailProvider({ env }), getConfig }).send;
     }
   } catch {
-    return { status: 'failed', reason: 'email-setup' };
+    // Raw exceptions may contain provider credentials or recipient content.
+    log.warn('Admin access instructions preparation failed', { reason });
+    return { status: 'failed', reason };
   }
   try {
     const result = await send(message);
@@ -75,6 +86,7 @@ async function sendAccessInstructions({ db, getConfig, sendEmail, email, onceKey
     return { status: 'failed', reason: 'provider-refused' };
   } catch {
     // An unexpected exception at this boundary may follow provider contact.
+    log.warn('Admin access instructions acceptance is uncertain', { reason: 'email-send' });
     return { status: 'uncertain' };
   }
 }

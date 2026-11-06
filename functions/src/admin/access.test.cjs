@@ -153,7 +153,7 @@ test('setAdminAccess: grants staff to a new address, lowercased, records it, and
   assert.equal(bootstrapOf(db).createdAt, 'seeded');
 
   const logs = adminLogs(db);
-  assert.equal(logs.length, 1);
+  assert.equal(logs.length, 2);
   assert.deepEqual(logs[0], {
     action: 'setAdminAccess',
     docPath: 'config/bootstrap',
@@ -161,6 +161,10 @@ test('setAdminAccess: grants staff to a new address, lowercased, records it, and
     email: OPS,
     at: T0,
     details: { email: 'new.desk@example.org', tier: 'staff', previousTier: null },
+  });
+  assert.deepEqual(logs[1], {
+    action: 'sendAdminAccessInstructions', docPath: 'config/bootstrap', uid: 'ops-1', email: OPS, at: T0,
+    details: { email: 'new.desk@example.org', emailResult: { status: 'accepted', providerMessageId: 'mail-1' } },
   });
   assert.equal(refreshes.length, 1);
 });
@@ -889,6 +893,8 @@ test('no-op, normalization, ordinary role change, removal and refused changes ne
 test('access save and audit survive provider refusal, ambiguous throw and missing provider setup', async () => {
   for (const failure of ['refused', 'ambiguous', 'setup']) {
     const { db, deps, provider } = world();
+    const warnings = [];
+    deps.log = { ...QUIET, warn: (...args) => warnings.push(args) };
     let calls = 0;
     provider.send = async () => {
       calls += 1;
@@ -902,6 +908,12 @@ test('access save and audit survive provider refusal, ambiguous throw and missin
     assert.equal(response.body.emailResult.status, failure === 'ambiguous' ? 'uncertain' : 'failed');
     assert.ok(bootstrapOf(db).adminEmails.includes('new@example.org'));
     assert.equal(adminLogs(db)[0].action, 'setAdminAccess');
+    const audit = adminLogs(db).find((row) => row.action === 'sendAdminAccessInstructions');
+    assert.deepEqual(audit.details, { email: 'new@example.org', emailResult: response.body.emailResult });
+    if (failure === 'setup') {
+      assert.equal(response.body.emailResult.reason, 'email-provider');
+      assert.deepEqual(warnings, [['Admin access instructions preparation failed', { reason: 'email-provider' }]]);
+    }
     assert.equal(calls, failure === 'setup' ? 0 : 1, 'ambiguous exceptions are not retried');
     if (failure !== 'setup') {
       const logged = db.read('sent_emails', db.ids('sent_emails')[0]);
@@ -967,13 +979,14 @@ test('resend refuses unauthorized callers, invalid input, inactive grants and re
   assert.equal(db.ids('sent_emails').length, 0);
 });
 
-test('mail checks the stream, current access and expiry again after preparation; refusals leave the grant saved', async () => {
-  for (const failure of ['stream', 'expired', 'removed', 'demo', 'config']) {
+test('mail checks the stream, current access and expiry again after preparation; refusals leave the grant saved and auditable', async () => {
+  for (const failure of ['stream', 'expired', 'removed', 'demo', 'config', 'address']) {
     const { db, deps, messages } = world();
     const original = deps.getConfig;
     deps.getConfig = async () => {
       if (failure === 'config') throw new Error('config outage');
       const config = await original();
+      if (failure === 'address') config.tierA.publicUrl = 'invalid-address';
       if (failure === 'stream') config.providers.email.messageStream = 'announcements';
       if (failure === 'expired') {
         await db.collection('config').doc('bootstrap').set({ ...bootstrapOf(db), staffExpiry: { 'new@example.org': T0 } });
@@ -988,6 +1001,9 @@ test('mail checks the stream, current access and expiry again after preparation;
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.changed, true);
     assert.equal(response.body.emailResult.status, 'failed');
+    if (failure === 'address') assert.equal(response.body.emailResult.reason, 'event-address');
+    const audit = adminLogs(db).find((row) => row.action === 'sendAdminAccessInstructions');
+    assert.deepEqual(audit.details.emailResult, response.body.emailResult);
     if (failure !== 'removed') assert.ok(bootstrapOf(db).staffEmails.includes('new@example.org'));
     assert.equal(messages.length, 0);
     assert.equal(db.ids('email_claims').length, 0);

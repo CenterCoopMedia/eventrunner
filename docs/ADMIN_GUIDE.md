@@ -1134,6 +1134,8 @@ Operators only. One ruled table of every admin account with its tier word, and a
 
 **What is recorded.** Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. When an end time is set, moved, or removed, the row also holds the old and the new end time. When the scheduled job removes an ended account, it writes one row for that account, with "system" as the actor and the end time. A change that changes nothing writes no row. Only operators can read the access lists, the end times, and the admin log.
 
+Each automatic instructions email and explicit resend also records its outcome in the admin log, including a safe failure reason when setup fails before the email provider is contacted. Messages that reach the email core appear in **Email log** with their rendered bodies and provider result.
+
 **When it takes effect.** At once. The database rules, the server, and the admin rail all read the access lists live: A granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.
 
 ## Legal pages

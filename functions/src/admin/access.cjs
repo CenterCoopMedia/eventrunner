@@ -413,8 +413,14 @@ function createSetAdminAccessHandler({ db, auth, getConfig, refreshConfig, sendE
     // Only an actual new grant sends automatically. A replay, ordinary tier
     // change, renewal, normalization or removal never sends another email.
     const emailResult = result.changed && result.previousTier === null && nextTier !== null
-      ? await sendAccessInstructions({ db, getConfig, sendEmail, env, email, now, onceKey: `admin-access:grant:${randomUUID()}` })
+      ? await sendAccessInstructions({ db, getConfig, sendEmail, env, email, now, log, onceKey: `admin-access:grant:${randomUUID()}` })
       : null;
+    if (emailResult) {
+      await logAdminAction({
+        db, actor: gate, action: 'sendAdminAccessInstructions', docPath: 'config/bootstrap', now, log,
+        details: { email, emailResult },
+      });
+    }
     res.status(200).json({
       ok: true,
       email,
@@ -447,12 +453,12 @@ function createResendAdminAccessInstructionsHandler({ db, auth, getConfig, sendE
     }
     const addressKey = createHash('sha256').update(email).digest('hex');
     const emailResult = await sendAccessInstructions({
-      db, getConfig, sendEmail, env, email, now,
+      db, getConfig, sendEmail, env, email, now, log,
       onceKey: `admin-access:resend:${gate.uid}:${addressKey}:${sendId}`,
     });
     await logAdminAction({
       db, actor: gate, action: 'resendAdminAccessInstructions', docPath: 'config/bootstrap', now, log,
-      details: { email, sendId, emailStatus: emailResult.status },
+      details: { email, sendId, emailResult },
     });
     return res.status(200).json({ ok: true, email, emailResult });
   };

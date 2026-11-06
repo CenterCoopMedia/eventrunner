@@ -264,7 +264,13 @@ function emailNotice(outcome, saved = false) {
     return { tone: 'ok', message: `${prefix}The email provider accepted the sign-in instructions. This does not confirm delivery.` };
   }
   if (outcome?.status === 'failed') {
-    return { tone: 'caution', message: `${prefix}Sign-in instructions could not be sent. Check the email setup and Email log before choosing Send sign-in instructions again.` };
+    const cause = {
+      'event-address': 'The event admin address needs to be configured. ',
+      'email-provider': 'The email provider needs to be configured. ',
+      'transactional-stream': 'The transactional email stream needs to be corrected. ',
+      'inactive-access': 'This account no longer has active access. ',
+    }[outcome.reason] ?? '';
+    return { tone: 'caution', message: `${prefix}Sign-in instructions could not be sent. ${cause}Check the email setup and Email log before choosing Send sign-in instructions again.` };
   }
   return { tone: 'caution', message: `${prefix}Email acceptance is uncertain. This attempt will not send another copy. Check the Email log before choosing a new send.` };
 }
@@ -553,7 +559,7 @@ export default function AdminAccess() {
       const mail = response?.emailResult ? emailNotice(response.emailResult, true) : null;
       const message = mail ? `${sentence} ${mail.message}` : sentence;
       setResult({ tone: mail?.tone ?? 'ok', message });
-      showToast(message, { announce: false });
+      showToast(message, { ...(mail && mail.tone !== 'ok' ? { tone: 'error' } : {}), announce: false });
       if (standing === null && tier !== 'none' && pending.grantForm) {
         const submitted = pending.grantForm;
         setForm((current) => (

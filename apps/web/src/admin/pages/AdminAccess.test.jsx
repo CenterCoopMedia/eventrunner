@@ -707,6 +707,8 @@ describe('access sign-in instructions', () => {
     fireEvent.click(within(screen.getByRole('region', { name: 'Grant staff access to new@example.org' })).getByRole('button', { name: 'Grant staff access' }));
     const notice = await screen.findByText((text) => text.startsWith('Staff access granted to new@example.org. Access saved.'));
     expect(notice.textContent).toContain(words);
+    expect(showToastMock).toHaveBeenCalledWith(notice.textContent, status === 'accepted'
+      ? { announce: false } : { tone: 'error', announce: false });
     expect(screen.getByLabelText('Email address')).toHaveValue('');
     expect(setCalls()).toHaveLength(1);
     expect(callMock.mock.calls.filter(([name]) => name === 'resendAdminAccessInstructions')).toHaveLength(0);
