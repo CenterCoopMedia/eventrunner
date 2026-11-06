@@ -76,7 +76,7 @@ test('Tab follows a media deletion consequence instead of returning to the dialo
     await page.goto('/admin/media');
     await page.getByRole('button', { name: /Keyboard proof image/ }).click();
     const dialog = page.getByRole('dialog', { name: 'Keyboard proof image' });
-    await expect(dialog.getByText(/Deleting it is safe/)).toBeVisible();
+    await expect(dialog.getByText('This file is not used in your event.')).toBeVisible();
     await dialog.getByRole('button', { name: 'Delete this file', exact: true }).click();
     const consequence = dialog.getByRole('heading', { name: 'Delete this file', exact: true });
     await expect(consequence).toBeFocused();
@@ -84,7 +84,7 @@ test('Tab follows a media deletion consequence instead of returning to the dialo
     await expect(dialog.getByRole('button', { name: 'Delete this file', exact: true })).toBeFocused();
     await consequence.focus();
     await page.keyboard.press('Shift+Tab');
-    await expect(dialog.getByRole('button', { name: 'Done', exact: true })).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await consequence.focus();
     await page.keyboard.press('Escape');
     await expect(dialog.getByRole('button', { name: 'Delete this file', exact: true })).toBeFocused();

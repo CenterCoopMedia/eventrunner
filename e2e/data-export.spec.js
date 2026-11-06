@@ -200,7 +200,7 @@ test.describe.serial('event data export', () => {
     }
     expect(files.get('README.md').toString('utf8')).toContain('## Personal data and retention');
 
-    await expect(page.getByRole('status').filter({ hasText: 'Downloaded' })).toContainText('The download is in the admin log.');
+    await expect(page.getByRole('status').filter({ hasText: 'Downloaded' })).toContainText('This file contains personal data; share it only with people who need it.');
     const logs = await adminDb().collection('admin_logs').where('action', '==', 'downloadEventPackage').get();
     expect(logs.size).toBe(before + 1);
     await context.close();

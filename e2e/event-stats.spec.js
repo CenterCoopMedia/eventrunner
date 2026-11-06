@@ -64,7 +64,6 @@ function figureCards(stats) {
       title: 'Tickets',
       total: `${t.total} ${one(t.total, 'ticket', 'tickets')}`,
       breakdown: TICKET_STATUSES.map((status) => `${t.byStatus[status]} ${status === 'pending_info' ? 'waiting for details' : status}`),
-      note: 'One ticket record, not one seat.',
       action: 'Open ticketing',
       href: '/admin/ticketing',
     },

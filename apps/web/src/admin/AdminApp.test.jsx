@@ -361,7 +361,7 @@ describe('admin route gating', () => {
     adminCall.mockClear();
     fireEvent.change(screen.getByLabelText('Year'), { target: { value: '2023' } });
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'A staff edition' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(adminCall).toHaveBeenCalledWith('cmsCreateContent', expect.objectContaining({
       collection: 'cmsTimeline',
       fields: { year: 2023, title: 'A staff edition', description: null },
@@ -399,7 +399,7 @@ describe('admin route gating', () => {
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('aria-current', 'page');
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Staff post' } });
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Written by staff.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(adminCall).toHaveBeenCalledWith(
       'cmsSaveUpdate',
       expect.objectContaining({ update: expect.objectContaining({ title: 'Staff post' }), visible: true }),
@@ -490,7 +490,7 @@ describe('admin route gating', () => {
     });
     await renderAt('/admin/access');
     const row = (await screen.findByText('admin@example.org', { selector: 'span' })).closest('tr');
-    fireEvent.click(within(row).getByRole('button', { name: 'Remove access' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove access for admin@example.org' }));
     fireEvent.click(within(screen.getByRole('region', { name: 'Remove access for admin@example.org' })).getByRole('button', { name: 'Remove access' }));
 
     expect(await screen.findByRole('heading', { name: 'You don’t have admin access' })).toBeInTheDocument();
@@ -513,7 +513,7 @@ describe('admin route gating', () => {
     });
     await renderAt('/admin/access');
     const row = (await screen.findByText('admin@example.org', { selector: 'span' })).closest('tr');
-    fireEvent.click(within(row).getByRole('button', { name: 'Change to staff' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Change admin@example.org to staff' }));
     fireEvent.click(within(screen.getByRole('region', { name: 'Change admin@example.org to staff' })).getByRole('button', { name: 'Change to staff' }));
 
     expect(await screen.findByRole('heading', { name: 'This section needs operator access' })).toBeInTheDocument();

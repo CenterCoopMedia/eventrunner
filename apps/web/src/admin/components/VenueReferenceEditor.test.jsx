@@ -584,7 +584,7 @@ describe('VenueReferenceEditor map panel', () => {
     expect(screen.getByLabelText('Map alt text')).toHaveValue('A floor plan.');
     expect(screen.getByLabelText('Marker 1 room')).toHaveValue('studio');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove map image' }));
 
     // Both fields are gone from the panel, which is what clearing the image
     // has always looked like \u2014 the point is that they are gone from the FORM

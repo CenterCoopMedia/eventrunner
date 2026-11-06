@@ -177,7 +177,7 @@ test.describe.serial('attendee export and administration', () => {
     for (const secret of ['PRIVATE', uid]) expect(text).not.toContain(secret);
 
     await expect(page.getByRole('status').filter({ hasText: 'Exported 1 attendee to' }))
-      .toHaveText(`Exported 1 attendee to ${download.suggestedFilename()}. The export is in the admin log.`);
+      .toHaveText(`Exported 1 attendee to ${download.suggestedFilename()}.`);
 
     // The server wrote the audit row before it sent the file.
     const logs = await adminDb().collection('admin_logs').where('action', '==', 'exportAttendees').get();

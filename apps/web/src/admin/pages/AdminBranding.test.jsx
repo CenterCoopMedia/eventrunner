@@ -240,7 +240,7 @@ describe('the Homepage hero image field', () => {
     adminSources.cmsContent_drafts = [{ ...photo, url: 'cms-images/draft.jpg', alt: 'The draft picture' }];
     await renderBranding();
     expect(screen.getByLabelText('Homepage hero image')).toHaveValue('cms-images/draft.jpg');
-    expect(screen.getByLabelText('Homepage hero image')).toHaveAttribute('placeholder', 'cms-images/…');
+    expect(screen.getByLabelText('Homepage hero image')).toHaveAttribute('placeholder', 'Choose an image');
     expect(screen.getByText(/The picture at the top of your home page\./)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: '   ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));

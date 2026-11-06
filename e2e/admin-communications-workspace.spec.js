@@ -110,7 +110,7 @@ test('communications keeps drafts and review state across channels and fits desk
     await page.keyboard.press('End');
     await expect(email).toBeFocused();
     await expect(page.getByRole('heading', { name: 'Write your email' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Your preview will appear here' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review your email' })).toBeVisible();
     await page.getByLabel('Audience').selectOption({ label: 'Approved attendees' });
     await page.getByLabel('Subject', { exact: true }).fill(SUBJECT);
     await page.getByLabel('Email message').fill(MESSAGE);
@@ -128,7 +128,7 @@ test('communications keeps drafts and review state across channels and fits desk
       await capture('communications-compose', viewport);
     }
 
-    await page.getByRole('button', { name: 'Preview email', exact: true }).click();
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Preview', exact: true })).toBeFocused();
     const recipients = page.getByText(/^\d+ recipients?: Approved attendees$/);
     await expect(recipients).toBeVisible();
@@ -143,10 +143,10 @@ test('communications keeps drafts and review state across channels and fits desk
 
     // Editing invalidates the server preview and removes every send action.
     await page.getByLabel('Subject', { exact: true }).fill(`${SUBJECT}: updated`);
-    await expect(page.getByRole('heading', { name: 'Your preview will appear here' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review your email' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Preview', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Send to \d+/ })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Send a test to me' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Send test' })).toHaveCount(0);
     expect(mailFileSize()).toBe(beforeDraft);
     await expect(page.getByRole('link', { name: 'Open email log', exact: true })).toHaveAttribute('href', '/admin/email-log');
   } finally {

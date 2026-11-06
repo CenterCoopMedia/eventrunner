@@ -201,7 +201,7 @@ describe('the Home hero image slot', () => {
     fetch.mockResolvedValue(okResponse({ docId: 'hero__image', status: 'dirty' }));
     await renderAt('/admin/content/home/hero');
     expect(await screen.findByRole('heading', { name: 'Hero image' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Hero image')).toHaveAttribute('placeholder', 'cms-images/…');
+    expect(screen.getByLabelText('Hero image')).toHaveAttribute('placeholder', 'Choose an image');
     expect(screen.getByLabelText('Alt text')).toHaveAttribute('aria-required', 'true');
     fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/hero.jpg' } });
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'People at the event' } });
@@ -263,7 +263,7 @@ describe('the Home hero image slot', () => {
     fireEvent.click(screen.getByRole('link', { name: 'The old picture' }));
     fireEvent.change(await screen.findByLabelText('Image'), { target: { value: 'cms-images/new.jpg' } });
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'The new picture' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsUpdateContent$/);
     expect(bodyOf(0)).toMatchObject({ section: 'hero', field: 'photo', fields: { url: 'cms-images/new.jpg', alt: 'The new picture' } });

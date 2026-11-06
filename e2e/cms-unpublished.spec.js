@@ -33,7 +33,7 @@ async function saveSubtitle(page, pageId, value) {
   // before that would be overwritten.
   await expect(field).not.toHaveValue('');
   await field.fill(value);
-  await page.getByRole('button', { name: 'Save draft' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Draft saved. It is not public until you publish.')).toBeVisible();
 }
 

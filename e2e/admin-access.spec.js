@@ -218,7 +218,7 @@ test.describe.serial('admin tiers and the Access page', () => {
     await operatorPage.getByLabel('Access ends (optional)').fill(localValue);
     await operatorPage.getByRole('button', { name: 'Grant access' }).click();
     const surface = operatorPage.getByRole('region', { name: new RegExp(`^Grant staff access to ${LONG_EMAIL} until `) });
-    await expect(surface).toContainText('An end time does not make the account read-only.');
+    await expect(surface).toContainText('Until then, staff can edit and publish content.');
     await surface.getByRole('button', { name: 'Grant staff access' }).click();
     // The line on the page; the toast repeats it.
     await expect(operatorPage.getByText(new RegExp(`^Staff access granted to ${LONG_EMAIL} until `)).first()).toBeVisible();
@@ -267,8 +267,6 @@ test.describe.serial('admin tiers and the Access page', () => {
     const shortRow = operatorPage.getByRole('row', { name: new RegExp(SHORT_EMAIL) });
     await expect(shortRow).toContainText('Ended');
     await expect(shortRow).toContainText('No access now.');
-    // The emulator runs no scheduled functions, so the sweep never takes it off here.
-    await expect(shortRow).toContainText('The account leaves this list within a minute.');
     const longRow = operatorPage.getByRole('row', { name: new RegExp(LONG_EMAIL) });
     await expect(longRow).toContainText('Access ends');
     await operatorContext.close();

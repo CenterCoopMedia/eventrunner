@@ -72,7 +72,7 @@ test.describe.serial('announcement email', () => {
     await page.getByLabel('Button label (optional)').fill('Read the schedule');
 
     const beforePreview = mailFileSize();
-    await page.getByRole('button', { name: 'Preview email' }).click();
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
     const previewHeading = page.getByRole('heading', { name: 'Preview', exact: true });
     await expect(previewHeading).toBeFocused();
     const toLine = page.getByText(/^\d+ recipients?: Approved attendees$/);
@@ -84,7 +84,7 @@ test.describe.serial('announcement email', () => {
     expect(mailSince(beforePreview)).toHaveLength(0);
 
     // A test goes to the signed-in operator only.
-    await page.getByRole('button', { name: 'Send a test to me' }).click();
+    await page.getByRole('button', { name: 'Send test' }).click();
     const [testMail] = await waitForMessages(beforePreview, (m) => m.subject === `Test: ${SUBJECT}`, 1);
     expect(testMail.to).toBe(ADMIN_EMAIL);
     expect(testMail.text).toContain('/unsubscribe?test=1');
@@ -126,7 +126,7 @@ test.describe.serial('announcement email', () => {
     // The next preview leaves that address out.
     await page.getByLabel('Subject').fill(`${SUBJECT} again`);
     await page.getByLabel('Email message').fill('A second note.');
-    await page.getByRole('button', { name: 'Preview email' }).click();
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
     await expect(page.getByText(`${count - 1} recipient${count - 1 === 1 ? '' : 's'}: Approved attendees`)).toBeVisible();
     await expect(page.getByText('1 address is left out because they unsubscribed.')).toBeVisible();
 
@@ -152,7 +152,7 @@ test.describe.serial('announcement email', () => {
     await page.getByLabel('Subject').fill(SAVED_SUBJECT);
     await page.getByLabel('Email message').fill('Saved words.\n\nSecond paragraph.');
     await page.getByLabel('Name for this message').fill(SAVED_NAME);
-    await page.getByRole('button', { name: 'Save as a new message' }).click();
+    await page.getByRole('button', { name: 'Save new message' }).click();
     const row = saved.locator('li', { hasText: SAVED_NAME });
     await expect(row.getByText(SAVED_SUBJECT)).toBeVisible();
     const stored = await db.collection('announcement_messages').where('name', '==', SAVED_NAME).get();

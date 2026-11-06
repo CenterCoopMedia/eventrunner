@@ -23,7 +23,7 @@ import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './help
 const LABEL = 'Explore the program';
 const NO_PAGE_LABEL = 'Read the speaker notes';
 const NO_PAGE_WARNING = 'No page has this address. The public site does not show this link until a visible page does.';
-const WARNING = 'Public schedule is off in Features. The public site does not show this link until you turn it on.';
+const WARNING = 'Public schedule is off. This link is hidden until it is turned on.';
 
 async function endTour(page) {
   const button = page.getByRole('button', { name: 'End tour', exact: true });
@@ -71,7 +71,7 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     // The field names the warning, so a screen reader hears it with the field.
     const warningId = await warning.getAttribute('id');
     await expect(destination).toHaveAttribute('aria-describedby', new RegExp(warningId));
-    await page.getByRole('button', { name: 'Save and publish' }).click();
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
     await expect.poll(async () => (await findCta())?.revision ?? 0, { timeout: 20_000 }).toBeGreaterThan(0);
     ctaField = (await findCta()).field;
 
@@ -108,7 +108,7 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     await page.getByLabel('Button text').fill(NO_PAGE_LABEL);
     await page.getByLabel('Destination').fill('/speaker-notes');
     await expect(page.getByText(NO_PAGE_WARNING)).toBeVisible();
-    await page.getByRole('button', { name: 'Save and publish' }).click();
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
     await expect.poll(async () => (await findCta(NO_PAGE_LABEL))?.revision ?? 0, { timeout: 20_000 }).toBeGreaterThan(0);
     noPageField = (await findCta(NO_PAGE_LABEL)).field;
 
@@ -127,7 +127,7 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     await page.goto('/admin/pages');
     await endTour(page);
     const main = page.getByRole('main');
-    const rows = main.locator('li').filter({ has: page.getByRole('link', { name: 'Edit this page' }) });
+    const rows = main.locator('li').filter({ has: page.getByRole('link', { name: /^Edit / }) });
     await expect(rows.first()).toBeVisible();
     const count = await rows.count();
     expect(count).toBeGreaterThan(3);
@@ -136,7 +136,7 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     }
     const schedule = rows.filter({ has: page.getByRole('link', { name: /^(Schedule|Program)$/ }) }).first();
     await expect(schedule.getByText('Hidden', { exact: true })).toBeVisible();
-    await expect(schedule.getByText('Public schedule is off in Features. The public site hides this page.')).toBeVisible();
+    await expect(schedule.getByText('Public schedule is off. This page is hidden.')).toBeVisible();
   });
 
   test('the footer section draws in the site footer on every page and not in the home body', async ({ page }) => {
