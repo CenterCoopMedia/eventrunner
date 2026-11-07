@@ -91,21 +91,6 @@ async function applyTicketClaimToUser({ db, uid, now = () => new Date() }) {
 }
 
 /**
- * A directory answer sets the holder's profile visibility, as
- * saveTicketAnswers does: "public" needs the public profiles feature.
- * Reads only; returns the user ref and visibility to write, or nothing.
- */
-async function directoryVisibility({ db, tx, uid, answers }) {
-  const listing = answers.directoryListing;
-  if (typeof listing !== 'string') return {};
-  const userRef = db.collection(USERS).doc(uid);
-  const [userSnap, featuresSnap] = await tx.getAll(userRef, db.collection('config').doc('features'));
-  if (!userSnap.exists) return {};
-  const allowPublic = featuresSnap.exists && featuresSnap.data()?.publicAttendeeProfiles === true;
-  return { userRef, visibility: listing === 'public' && !allowPublic ? 'attendees_only' : listing };
-}
-
-/**
  * Claim one ticket for one uid, atomically.
  *
  * Refusals are values, not exceptions: a ticket already claimed by
@@ -139,6 +124,8 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
     // account ticketed and, when the flag is on, approved. Only a valid
     // ticket may do that (issues #358, #359, #360).
     if (data.status !== 'valid') return { claimed: false, reason: 'not_valid' };
+    const userSnap = await tx.get(db.collection(USERS).doc(uid));
+    if (!userSnap.exists) return { claimed: false, reason: 'account_missing' };
     // ADR 0008 §5: answers given at checkout wait on the order's seat until
     // this attendee claims; they then belong to the account. Every read
     // comes before any write, as a Firestore transaction requires.
@@ -151,8 +138,7 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
       const seats = Array.isArray(order?.seats) ? order.seats : [];
       const seat = seats.find((entry) => entry?.externalId === id);
       if (seat && seat.answers && typeof seat.answers === 'object') {
-        move = { order, orderRef, answersRef, seats, seat, recordExists: answersSnap.exists, userRef: null, visibility: null };
-        if (!move.recordExists) Object.assign(move, await directoryVisibility({ db, tx, uid, answers: seat.answers }));
+        move = { order, orderRef, answersRef, seats, seat, recordExists: answersSnap.exists };
       }
     }
     // ADR 0008 §7: answers from the registration import wait in a hold.
@@ -172,15 +158,17 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
       const { order, seat } = move;
       // An answer record already there is the attendee's own later answer; it wins.
       if (!move.recordExists) {
-        const ids = Object.keys(seat.answers);
+        // Privacy and consent require the holder's own authenticated answer.
+        const answers = Object.fromEntries(Object.entries(seat.answers)
+          .filter(([key]) => !['directoryListing', 'photoConsent'].includes(key)));
+        const ids = Object.keys(answers);
         tx.create(move.answersRef, {
-          ticketId: id, uid, answers: seat.answers,
+          ticketId: id, uid, answers,
           formRevision: order.registrationFormRevision ?? null,
           questions: (Array.isArray(order.registrationQuestions) ? order.registrationQuestions : [])
             .filter((question) => ids.includes(question?.id)),
           ticketStatus: data.status, updatedAt: at, updatedBy: 'checkout',
         });
-        if (move.userRef) tx.set(move.userRef, { profileVisibility: move.visibility, updatedAt: at }, { merge: true });
       }
       // Sensitive answers stay on the order only until the claim.
       tx.update(move.orderRef, {

@@ -124,10 +124,9 @@ path-selected tier. The repository-owned `scripts/ci/classify-changes.cjs`
 classifier emits the selections; mixed changes take the union of their tiers.
 A pull request runs that classifier from the base commit, so the pull request cannot replace the rules that select the security tiers.
 The `CI gate` job is the stable aggregate check for branch protection. A job
-that the classifier did not select is expected to be skipped. When two pushes
-start two runs, the older run is cancelled and its gate is skipped, not
-failed. GitHub counts a skipped required check as passed, so if you cancel the
-only run on a pull request, start it again before you merge. Merges do not
+that the classifier did not select is expected to be skipped. The gate runs
+with `always()` and rejects cancelled or failed selected tiers. A cancelled
+latest run must be rerun successfully before merging. Merges do not
 repeat the matrix that passed on the pull request. Deployment verification
 still runs. All tiers remain credential-free.
 

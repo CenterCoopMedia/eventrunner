@@ -43,7 +43,7 @@ function createUpdateRegistrationFormHandler({ db, auth, getConfig, now = Date.n
         }
         const at = new Date(now());
         const next = expected + 1;
-        tx.set(ref, { ...checked.form, revision: next, updatedAt: at, updatedBy: gate.email });
+        tx.set(ref, { ...checked.form, revision: next, updatedAt: at });
         tx.set(db.collection('admin_logs').doc(), {
           action: 'updateRegistrationForm', docPath: FORM_PATH, uid: gate.uid, email: gate.email, at,
           details: { revision: next, custom: checked.form.custom.length },

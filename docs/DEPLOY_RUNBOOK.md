@@ -1029,15 +1029,16 @@ steps below in this order.
 
 ### 10.1 Switch the site to eventrunner.org
 
-1. **DNS.** For `eventrunner.org`, add `A` records to `185.199.108.153`, `185.199.109.153`,
+1. **Verify ownership first.** In organization settings, open Pages → Verified domains and
+   verify `eventrunner.org` with the required TXT record. Keep that verification record.
+   Do not publish Pages DNS until GitHub confirms ownership.
+2. **DNS.** For `eventrunner.org`, add `A` records to `185.199.108.153`, `185.199.109.153`,
    `185.199.110.153` and `185.199.111.153`, `AAAA` records to `2606:50c0:8000::153`,
    `2606:50c0:8001::153`, `2606:50c0:8002::153` and `2606:50c0:8003::153`, and
    `CNAME www → centercoopmedia.github.io`. On Cloudflare, set each record to **DNS only** (grey
    cloud). If a record is proxied, GitHub cannot issue the certificate. Leave the `MX` and `TXT`
    records alone: they carry the domain's email. Wait until `dig +short eventrunner.org A` returns
    the four addresses.
-2. **Optional: verify the domain.** In the organization settings, go to Pages → Verified domains
-   and verify `eventrunner.org`. This prevents a domain takeover.
 3. **Variables.** Go to Settings → Secrets and variables → Actions → Variables. Add the repository
    variables `PAGES_SUPPORT_NAME` and `PAGES_SUPPORT_EMAIL`, which fill in who clients reach on the
    homepage and the support, privacy and terms pages, and `PAGES_BASE_URL` with the value
@@ -1080,7 +1081,10 @@ load from the new host.
    generated pages already send a reader to the configured address.
 4. After that pull request is merged, you can delete the `PAGES_BASE_URL` variable.
 
-**To go back** to the github.io address, delete the custom domain in Settings → Pages. Then delete
+**To go back** to the github.io address, first remove every Pages A, AAAA and CNAME record
+for the custom hostname, including `www`, and wait for their previous DNS TTLs to expire.
+Keep the Pages custom-domain binding and organization verification until those cached records
+have expired. Then delete the custom domain in Settings → Pages. Finally delete
 the `PAGES_BASE_URL` variable, or set it to `https://centercoopmedia.github.io/eventrunner/`. Run
 the Pages workflow again.
 
@@ -1543,3 +1547,42 @@ assertion.environment == 'provisioning' &&
 Fake-service tests cover the deletion contract. A live rehearsal is still
 needed to confirm provider deletion behavior and readback after Google marks
 a project for deletion.
+
+### Security remediation: signup provenance and domain retirement
+
+The console deploy runs `scripts/migrate-console-signup-links.cjs` before publishing.
+It adds provenance only when exactly one redeemed operator-issued link matches the
+draft, organization and original creator. Other old drafts are quarantined. They
+cannot accept an agreement or start provisioning; contact the hosting team for a
+new paid signup link. Acceptance checks that provenance inside its transaction.
+
+A web-address status check observes Hosting and sign-in authorization. It never
+adds a sign-in domain. The hosting team authorizes a new domain during setup.
+To retire a client's stored custom domain, keep ownership of its DNS registration,
+set `EVENT_FIREBASE_PROJECT_ID` (and `EVENT_HOSTING_SITE` if different), then run
+`node scripts/remove-web-address.cjs exact.example.org` with that project's operator
+credentials. The tool marks the record as removing, revokes Firebase sign-in,
+removes Hosting, then forgets the record. A failure keeps a retryable record.
+Retire DNS only after success. Preserve unrelated authorized domains. Previously
+removed domains with no remaining record require an operator audit of Firebase
+Authentication's authorized domains before their registrations are relinquished.
+
+App Check for the client console is being handled separately by the local operator.
+It is excluded from this remediation rollout.
+
+The November 6 security rollout is triggered once by merging
+`.github/security-rollout-2026-11-06.json`. It deploys the console through its normal
+workflow, then dispatches the normal Deploy workflow for each configured active
+client and waits for every result. Sites recorded as archived, purged or still
+building are excluded. A later manual **Deploy console** run can select
+`rollout_clients` to retry the rollout. If main advances during console deployment,
+rerun on current main; the dispatcher refuses to attribute a newer deployment to
+an older validated revision.
+
+Client function deployment runs `scripts/migrate-security-data.cjs` once per project.
+The migration removes operator email from public registration configuration, orphaned
+speaker logistics and shared schedules, and uploader identity from old speaker photo
+metadata. It removes purchaser-supplied directory/photo consent from old checkout
+answer records. When the stored consent is still attributed to checkout, public profile visibility
+returns to private until the holder explicitly chooses it again. Counts are logged without personal data.
+A completion marker makes later runs skip the scan; incomplete cleanup is retryable.

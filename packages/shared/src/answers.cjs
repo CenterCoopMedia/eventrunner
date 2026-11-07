@@ -51,7 +51,7 @@ const { safeUrlHref } = require('./urlSafety.cjs');
 const { isEmailAddress } = require('./email.cjs');
 
 /** New-site defaults. Runtime readers keep omitted flags off on existing sites. */
-const DEFAULT_ON_FEATURES = Object.freeze(['schedule', 'speakers', 'sponsors', 'attendeeDirectory', 'autoApproveTicketHolders', 'badges', 'customBadges', 'liveUpdates', 'changeRequests']);
+const DEFAULT_ON_FEATURES = Object.freeze(['schedule', 'speakers', 'sponsors', 'attendeeDirectory', 'badges', 'customBadges', 'liveUpdates', 'changeRequests']);
 
 /**
  * The interactive prompt set. Declared as data so the question list, its

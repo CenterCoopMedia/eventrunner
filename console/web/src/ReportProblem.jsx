@@ -53,7 +53,7 @@ export default function ReportProblem() {
       await callApi('reportProblem', {
         category: kind,
         description,
-        url: window.location.href,
+        url: `${window.location.origin}${window.location.pathname}`,
         surface: 'console',
         site: '',
         version: import.meta.env.VITE_BUILD_ID || '',

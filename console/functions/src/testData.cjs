@@ -62,6 +62,7 @@ function applicationDoc(overrides = {}) {
   return {
     orgId: 'o1',
     status: 'draft',
+    signupLinkId: 'paid-o1',
     answers: validAnswers(),
     frozen: null,
     createdBy: 'ana',

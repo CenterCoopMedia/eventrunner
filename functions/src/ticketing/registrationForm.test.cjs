@@ -32,7 +32,7 @@ test('an operator saves the form, the revision goes up, and an audit row names i
   assert.equal(first.body.revision, 1);
   const stored = db.read('config', 'registration_form');
   assert.equal(stored.revision, 1);
-  assert.equal(stored.updatedBy, 'operator@example.test');
+  assert.equal(stored.updatedBy, undefined);
   assert.deepEqual(stored.standard.organization, { enabled: true, required: true });
   assert.deepEqual(stored.standard.jobTitle, { enabled: false, required: false });
   assert.equal(stored.custom[0].id, 'q_shirt');

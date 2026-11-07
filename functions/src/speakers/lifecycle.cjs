@@ -55,7 +55,7 @@ const USERS = 'users';
  * left.
  */
 const MAX_TRANSACTION_WRITES = 500;
-const FIXED_WRITES = 5;
+const FIXED_WRITES = 6;
 const MAX_UNLINKED_SESSIONS = MAX_TRANSACTION_WRITES - FIXED_WRITES;
 
 /**
@@ -207,6 +207,7 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
       }
       tx.delete(publicRef);
       tx.delete(speakerRef);
+      tx.delete(db.collection('speaker_logistics').doc(speakerId));
       // Release the slug reservation (see profile.cjs findSlugOwner): a
       // hard delete frees the name for reuse. A SOFT delete deliberately
       // does not — the record still exists and still owns its slug.

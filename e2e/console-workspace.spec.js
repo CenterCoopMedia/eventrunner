@@ -145,8 +145,8 @@ test('console directories and application progress are readable across widths an
   currentApplication = { ...application('building'), build: { failed: true, needsReconnect: false } };
   await page.goto(`${origin}${APPLICATION_PATH}`);
   await expect(page.getByText('The build did not finish', { exact: true })).toBeVisible();
-  // The decorative margin Badger is not a wait; only a waiting Badger counts.
-  await expect(page.locator('.wait-buddy:not(.margin-badger .wait-buddy)')).toHaveCount(0);
+  // The still page-heading mascot is decorative; loading and build indicators must be gone.
+  await expect(page.locator('.console-loading .wait-buddy, .build-note .wait-buddy')).toHaveCount(0);
   expect(browserErrors).toEqual([]);
 });
 

@@ -319,13 +319,12 @@ test('a failed provider send keeps its ceiling slot', async () => {
   assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 3);
 });
 
-test('a throw before the provider returns the ceiling slot', async () => {
+test('an ambiguous send throw keeps the ceiling slot', async () => {
   const db = fakeDb();
   const { handler } = sendDeps({ db, sendCeilingMax: 2, sendCeilingWindowMs: 60_000 });
   await handler({ method: 'POST', body: { email: 'ok@example.org' } }, fakeRes());
 
-  // The email core turns a provider throw into status failed. A throw from
-  // sendEmail is a policy or config failure, and the provider was not called.
+  // A thrown sender may already have contacted the provider; count it.
   const failing = createSendOtpHandler({
     db,
     getConfig: async () => CONFIG,
@@ -338,7 +337,7 @@ test('a throw before the provider returns the ceiling slot', async () => {
     failing({ method: 'POST', body: { email: 'bad@example.org' } }, fakeRes()),
     /config unavailable/,
   );
-  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 1);
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 2);
 });
 
 test('a challenge write failure returns the ceiling slot, because the provider was not called', async () => {

@@ -27,6 +27,7 @@ function baseWorld(overrides = {}) {
   return {
     'speakers/s1': { firstName: 'Rae', lastName: 'Okonkwo', slug: 'rae-okonkwo', status: 'approved', uid: 'u1' },
     'speakers/s2': { firstName: 'Sam', lastName: 'Example', slug: 'sam-example', status: 'approved', uid: null },
+    'speaker_logistics/s1': { travel: 'Private itinerary' },
     'speakers_public/s1': { speakerId: 's1', displayName: 'Rae Okonkwo' },
     'users/u1': { uid: 'u1', speakerId: 's1', registrationStatus: 'approved' },
     'cmsSchedule/sess-1': { title: 'Opening', speakerIds: ['s1', 's2'], visible: true },
@@ -54,6 +55,7 @@ test('one transaction unlinks sessions, drafts, the account, and both documents'
   assert.equal(db.read('users', 'u1').speakerId, null);
   assert.equal(db.read('speakers_public', 's1'), undefined);
   assert.equal(db.read('speakers', 's1'), undefined);
+  assert.equal(db.read('speaker_logistics', 's1'), undefined);
 });
 
 test('deleting a speaker leaves zero dangling references anywhere', async () => {
@@ -88,11 +90,13 @@ test('a uid naming an account that no longer exists does not fail the delete', a
   assert.equal(result.ok, true);
   assert.equal(result.clearedUid, null);
   assert.equal(db.read('speakers', 's1'), undefined);
+  assert.equal(db.read('speaker_logistics', 's1'), undefined);
 });
 
 test('above the transaction limit it refuses, names the count, and changes NOTHING', async () => {
   const seed = {
     'speakers/s1': { firstName: 'A', lastName: 'B', status: 'approved', uid: 'u1' },
+    'speaker_logistics/s1': { travel: 'Private itinerary' },
     'speakers_public/s1': { speakerId: 's1' },
     'users/u1': { uid: 'u1', speakerId: 's1' },
   };

@@ -696,6 +696,10 @@ test('order status is owner and verified-email scoped before any provider work',
   assert.equal(owned.body.status, 'pending');
   assert.equal(owned.body.tickets.length, 0);
   assert.equal(reconciles, 1);
+  for (let index = 0; index < 10; index += 1) {
+    assert.equal((await status(deps, { orderId: created.body.orderId })).statusCode, 200);
+  }
+  assert.equal(reconciles, 1, 'serial polling serves durable state during the cooldown');
   assert.equal((await status(deps, { orderId: '../config/bootstrap' })).statusCode, 404);
 });
 

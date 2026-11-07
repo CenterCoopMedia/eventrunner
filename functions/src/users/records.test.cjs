@@ -721,12 +721,9 @@ test('deleteAttendee states its own timeout, long enough for the sweep', () => {
 });
 
 // Review finding: an ID token outlives its deleted sign-in by up to an
-// hour, and claimTicket (ticketingVerifyOrder) does not need a users doc,
-// because a new sign-up may verify an order before its account document
-// exists. A claim the deleted session makes after phase 1 must not stay
-// on the ticket, or the person's next account is told the ticket is
-// somebody else's.
-test('a ticket claimed by the deleted session after the delete is released by the next call, not answered 404', async () => {
+// hour. Claims now require a live account. Old orphan claims must still
+// be swept so the person's next account can reclaim its ticket.
+test('a deleted session cannot claim, and a legacy orphan claim is released by the next delete', async () => {
   const { claimTicket } = require('../ticketing/registration.cjs');
   const d = deps(await fullySeeded());
   await d.db.collection('tickets').doc('tkt-late').set({
@@ -734,9 +731,11 @@ test('a ticket claimed by the deleted session after the delete is released by th
   });
   assert.equal((await remove(d)).statusCode, 200);
 
-  // The deleted session, its token still valid, claims its ticket.
+  // A stale token cannot create a new claim after account deletion.
   const ghost = await claimTicket({ db: d.db, externalId: 'tkt-late', uid: 'uid-ada', email: 'ada@example.com' });
-  assert.equal(ghost.claimed, true);
+  assert.deepEqual(ghost, { claimed: false, reason: 'account_missing' });
+  // Simulate a persisted orphan from the previous implementation.
+  await d.db.collection('tickets').doc('tkt-late').update({ claimedByUid: 'uid-ada', claimedAt: T0 });
 
   const retry = await remove(d);
 
@@ -747,13 +746,14 @@ test('a ticket claimed by the deleted session after the delete is released by th
   });
   assert.deepEqual(adminLogs(d.db).find((logRow) => logRow.details)?.details, { resumed: true });
   // The person's next account can claim their own ticket.
+  await d.db.collection('users').doc('uid-ada-new').set({ registrationStatus: 'pending' });
   const again = await claimTicket({ db: d.db, externalId: 'tkt-late', uid: 'uid-ada-new', email: 'ada@example.com' });
   assert.equal(again.claimed, true);
   // And with nothing left, the call after that is a 404.
   assert.equal((await remove(d)).statusCode, 404);
 });
 
-test('a claim made while the sweep runs is released in the same call and counted with the rest', async () => {
+test('the sweep releases a legacy concurrent claim, while new stale-token claims are refused', async () => {
   const { claimTicket } = require('../ticketing/registration.cjs');
   const d = deps(await fullySeeded());
   await d.db.collection('tickets').doc('tkt-late').set({
@@ -762,7 +762,9 @@ test('a claim made while the sweep runs is released in the same call and counted
   // Between the directory commit and the rest of the sweep.
   const deleteUser = d.auth.deleteUser.bind(d.auth);
   d.auth.deleteUser = async (uid) => {
-    await claimTicket({ db: d.db, externalId: 'tkt-late', uid, email: 'ada@example.com' });
+    const ghost = await claimTicket({ db: d.db, externalId: 'tkt-late', uid, email: 'ada@example.com' });
+    assert.equal(ghost.claimed, false);
+    await d.db.collection('tickets').doc('tkt-late').update({ claimedByUid: uid, claimedAt: T0 });
     return deleteUser(uid);
   };
 

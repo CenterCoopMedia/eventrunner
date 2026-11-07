@@ -62,6 +62,7 @@ function cleanPageUrl(raw, extraOrigins = []) {
   }
   if (url.username || url.password || !reportOriginAllowed(url.origin, extraOrigins)) return null;
   url.search = '';
+  url.hash = '';
   return url.toString();
 }
 

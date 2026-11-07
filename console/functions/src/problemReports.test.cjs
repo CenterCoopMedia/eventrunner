@@ -103,10 +103,22 @@ test('origins, page addresses and fields are bounded', () => {
   assert.ok(reportOriginAllowed('https://er-x.web.app'));
   assert.ok(!reportOriginAllowed('https://eventrunner.org.evil.test'));
   assert.ok(!reportOriginAllowed('http://nclocal.eventrunner.org'));
-  assert.equal(cleanPageUrl('https://x.eventrunner.org/a?b=c#d'), 'https://x.eventrunner.org/a#d');
+  assert.equal(cleanPageUrl('https://x.eventrunner.org/a?b=c#d'), 'https://x.eventrunner.org/a');
   assert.equal(cleanPageUrl('https://user:pw@x.eventrunner.org/'), null);
   assert.equal(cleanPageUrl('https://example.com/'), null);
   assert.equal(redact('see ?oobCode=123&x=1 token eyJabcdefghij.abcdefghij.sig'), 'see ?oobCode=[removed]&x=1 token [token removed]');
   assert.throws(() => readReport({ ...BODY, category: 'other' }), (err) => err.field === 'category');
   assert.throws(() => readReport({ ...BODY, url: 'https://example.com/' }), { status: 400 });
+});
+
+test('signup and invitation fragments are never sent to triage', async () => {
+  for (const path of ['/start/link#token=live-signup-secret', '/invite/id?next=1#token=live-invite-secret']) {
+    const { deps, sent } = setup();
+    const res = makeRes();
+    await reportProblemHandler(deps)(makeReq({ token: jwt('er-console'), body: { ...BODY, url: `https://console.eventrunner.org${path}` } }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(sent[0].body.url, `https://console.eventrunner.org${path.split(/[?#]/)[0]}`);
+    assert.ok(!JSON.stringify(sent).includes('live-signup-secret'));
+    assert.ok(!JSON.stringify(sent).includes('live-invite-secret'));
+  }
 });

@@ -1037,6 +1037,9 @@
           steps below in this order.</p>
           <h3 id="101-switch-the-site-to-eventrunnerorg">10.1 Switch the site to eventrunner.org<a class="heading-anchor" href="#101-switch-the-site-to-eventrunnerorg" aria-label="Link to this section">#</a></h3>
           <ol>
+          <li><strong>Verify ownership first.</strong> In organization settings, open Pages → Verified domains and
+          verify <code>eventrunner.org</code> with the required TXT record. Keep that verification record.
+          Do not publish Pages DNS until GitHub confirms ownership.</li>
           <li><strong>DNS.</strong> For <code>eventrunner.org</code>, add <code>A</code> records to <code>185.199.108.153</code>, <code>185.199.109.153</code>,
           <code>185.199.110.153</code> and <code>185.199.111.153</code>, <code>AAAA</code> records to <code>2606:50c0:8000::153</code>,
           <code>2606:50c0:8001::153</code>, <code>2606:50c0:8002::153</code> and <code>2606:50c0:8003::153</code>, and
@@ -1044,8 +1047,6 @@
           cloud). If a record is proxied, GitHub cannot issue the certificate. Leave the <code>MX</code> and <code>TXT</code>
           records alone: they carry the domain&#39;s email. Wait until <code>dig +short eventrunner.org A</code> returns
           the four addresses.</li>
-          <li><strong>Optional: verify the domain.</strong> In the organization settings, go to Pages → Verified domains
-          and verify <code>eventrunner.org</code>. This prevents a domain takeover.</li>
           <li><strong>Variables.</strong> Go to Settings → Secrets and variables → Actions → Variables. Add the repository
           variables <code>PAGES_SUPPORT_NAME</code> and <code>PAGES_SUPPORT_EMAIL</code>, which fill in who clients reach on the
           homepage and the support, privacy and terms pages, and <code>PAGES_BASE_URL</code> with the value
@@ -1084,7 +1085,10 @@
           generated pages already send a reader to the configured address.</li>
           <li>After that pull request is merged, you can delete the <code>PAGES_BASE_URL</code> variable.</li>
           </ol>
-          <p><strong>To go back</strong> to the github.io address, delete the custom domain in Settings → Pages. Then delete
+          <p><strong>To go back</strong> to the github.io address, first remove every Pages A, AAAA and CNAME record
+          for the custom hostname, including <code>www</code>, and wait for their previous DNS TTLs to expire.
+          Keep the Pages custom-domain binding and organization verification until those cached records
+          have expired. Then delete the custom domain in Settings → Pages. Finally delete
           the <code>PAGES_BASE_URL</code> variable, or set it to <code>https://centercoopmedia.github.io/eventrunner/</code>. Run
           the Pages workflow again.</p>
           <p>To see what an address changes, without writing a file:</p>
@@ -1532,6 +1536,39 @@
           <p>Fake-service tests cover the deletion contract. A live rehearsal is still
           needed to confirm provider deletion behavior and readback after Google marks
           a project for deletion.</p>
+          <h3 id="security-remediation-signup-provenance-and-domain-retirement">Security remediation: signup provenance and domain retirement<a class="heading-anchor" href="#security-remediation-signup-provenance-and-domain-retirement" aria-label="Link to this section">#</a></h3>
+          <p>The console deploy runs <code>scripts/migrate-console-signup-links.cjs</code> before publishing.
+          It adds provenance only when exactly one redeemed operator-issued link matches the
+          draft, organization and original creator. Other old drafts are quarantined. They
+          cannot accept an agreement or start provisioning; contact the hosting team for a
+          new paid signup link. Acceptance checks that provenance inside its transaction.</p>
+          <p>A web-address status check observes Hosting and sign-in authorization. It never
+          adds a sign-in domain. The hosting team authorizes a new domain during setup.
+          To retire a client&#39;s stored custom domain, keep ownership of its DNS registration,
+          set <code>EVENT_FIREBASE_PROJECT_ID</code> (and <code>EVENT_HOSTING_SITE</code> if different), then run
+          <code>node scripts/remove-web-address.cjs exact.example.org</code> with that project&#39;s operator
+          credentials. The tool marks the record as removing, revokes Firebase sign-in,
+          removes Hosting, then forgets the record. A failure keeps a retryable record.
+          Retire DNS only after success. Preserve unrelated authorized domains. Previously
+          removed domains with no remaining record require an operator audit of Firebase
+          Authentication&#39;s authorized domains before their registrations are relinquished.</p>
+          <p>App Check for the client console is being handled separately by the local operator.
+          It is excluded from this remediation rollout.</p>
+          <p>The November 6 security rollout is triggered once by merging
+          <code>.github/security-rollout-2026-11-06.json</code>. It deploys the console through its normal
+          workflow, then dispatches the normal Deploy workflow for each configured active
+          client and waits for every result. Sites recorded as archived, purged or still
+          building are excluded. A later manual <strong>Deploy console</strong> run can select
+          <code>rollout_clients</code> to retry the rollout. If main advances during console deployment,
+          rerun on current main; the dispatcher refuses to attribute a newer deployment to
+          an older validated revision.</p>
+          <p>Client function deployment runs <code>scripts/migrate-security-data.cjs</code> once per project.
+          The migration removes operator email from public registration configuration, orphaned
+          speaker logistics and shared schedules, and uploader identity from old speaker photo
+          metadata. It removes purchaser-supplied directory/photo consent from old checkout
+          answer records. When the stored consent is still attributed to checkout, public profile visibility
+          returns to private until the holder explicitly chooses it again. Counts are logged without personal data.
+          A completion marker makes later runs skip the scan; incomplete cleanup is retryable.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>docs/DEPLOY_RUNBOOK.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">

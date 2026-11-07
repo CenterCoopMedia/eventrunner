@@ -678,6 +678,22 @@ describe('promo codes on the review step', () => {
     expect(checkoutCalls()[0][1].body.promoCode).toBe('EARLY');
   });
 
+  it('discards a pending promo response after the purchaser changes', async () => {
+    let finish;
+    ticketingRequest.mockImplementation(async (name) => {
+      if (name === 'ticketingCatalog') return CATALOG;
+      if (name === 'ticketingPromoPreview') return new Promise((resolve) => { finish = () => resolve(PREVIEW); });
+      return { orderId: 'order-synthetic', checkoutUrl: null };
+    });
+    const view = mount(); await fill(2);
+    await apply('EARLY');
+    state.auth = { ...state.auth, user: { uid: 'purchaser-b', email: 'buyer-b@example.test', emailVerified: true } };
+    view.rerender(<MemoryRouter initialEntries={['/tickets']}><Routes><Route path="/tickets" element={<Tickets />} /><Route path="*" element={<Location />} /></Routes></MemoryRouter>);
+    await act(async () => finish());
+    expect(screen.queryByText('Promo code EARLY')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Checking code…' })).not.toBeInTheDocument();
+  });
+
   it('does not start checkout while a code check is still running', async () => {
     let finish;
     ticketingRequest.mockImplementation(async (name) => {

@@ -28,9 +28,9 @@ function fakeHosting(state = {}) {
     async removeDomain(domain) { calls.push(['remove', domain]); },
   };
 }
-function fakeIdentity(domains = ['localhost', 'example-event.web.app']) {
+function fakeIdentity(domains = ['localhost', 'example-event.web.app', 'summit.example.org']) {
   const calls = [];
-  return { calls, domains, async addAuthorizedDomain(domain) { calls.push(domain); if (!this.domains.includes(domain)) this.domains.push(domain); } };
+  return { calls, domains, async hasAuthorizedDomain(domain) { return this.domains.includes(domain); }, async removeAuthorizedDomain(domain) { this.domains = this.domains.filter((entry) => entry !== domain); }, async addAuthorizedDomain(domain) { calls.push(domain); if (!this.domains.includes(domain)) this.domains.push(domain); } };
 }
 function setup({ hosting = fakeHosting(), identity = fakeIdentity(), env = { EVENT_PUBLIC_URL: 'https://example-event.eventrunner.org' }, seed = {} } = {}) {
   const db = makeFakeDb({
@@ -81,7 +81,7 @@ test('all admin roles are refused add and remove calls without service calls or 
   }
 });
 
-test('a check that finds the domain live adds it to sign-in and asks for the switch', async () => {
+test('a check observes an already authorized live domain without granting sign-in', async () => {
   const { call, hosting, identity, db } = setup({ seed: CONNECTED });
   const waiting = await call({ action: 'check' });
   assert.equal(waiting.body.state, 'records');
@@ -91,7 +91,7 @@ test('a check that finds the domain live adds it to sign-in and asks for the swi
   hosting.state.live = true;
   const live = await call({ action: 'check' });
   assert.equal(live.body.state, 'switch');
-  assert.deepEqual(identity.calls, ['summit.example.org']);
+  assert.deepEqual(identity.calls, []);
   assert.ok(db.read('web_address', 'current').liveAt);
 });
 
@@ -207,7 +207,7 @@ test('a check still running when the address is removed does not bring it back',
   const { db, hosting, identity, env } = setup();
   await db.collection('web_address').doc('current').set(CONNECTED['web_address/current']);
   let release;
-  hosting.readDomain = async () => { await new Promise((resolve) => { release = resolve; }); return { live: false, records: RECORDS }; };
+  hosting.readDomain = async () => { await new Promise((resolve) => { release = resolve; }); return { live: true, records: [] }; };
   const check = runWebAddressCheck({ db, hosting, identity, env, now: () => NOW });
   await new Promise((resolve) => setImmediate(resolve));
   await db.collection('web_address').doc('current').delete();
@@ -229,4 +229,46 @@ test('the identity client adds the domain to the authorized domains once', async
     'PATCH', 'https://identitytoolkit.googleapis.com/admin/v2/projects/example-event/config?updateMask=authorizedDomains',
     { authorizedDomains: ['localhost', 'example-event.web.app', 'summit.example.org'] },
   ]);
+});
+
+test('domain removal revokes sign-in before deleting Hosting and the stored record', async () => {
+  const { removeWebAddress } = require('./webAddress.cjs');
+  const { db, identity } = setup({ seed: CONNECTED });
+  const hosting = { async removeDomain(domain) {
+    assert.equal(identity.domains.includes(domain), false);
+    assert.equal(db.read('web_address', 'current').state, 'removing');
+  } };
+  await removeWebAddress({ db, identity, hosting, domain: 'summit.example.org' });
+  assert.equal(db.read('web_address', 'current'), undefined);
+  assert.deepEqual(identity.domains, ['localhost', 'example-event.web.app']);
+});
+
+test('a failed sign-in revocation keeps a retryable domain record and never removes Hosting', async () => {
+  const { removeWebAddress } = require('./webAddress.cjs');
+  const { db } = setup({ seed: CONNECTED });
+  let hostingCalled = false;
+  await assert.rejects(removeWebAddress({ db, domain: 'summit.example.org',
+    identity: { async removeAuthorizedDomain() { throw new Error('unavailable'); } },
+    hosting: { async removeDomain() { hostingCalled = true; } },
+  }));
+  assert.equal(hostingCalled, false);
+  assert.equal(db.read('web_address', 'current').state, 'removing');
+});
+
+test('Identity revocation preserves every unrelated authorized domain', async () => {
+  const calls = [];
+  const client = createIdentityClient({ projectId: 'example-event', getAccessToken: async () => 'token',
+    fetchImpl: async (_url, init = {}) => {
+      if (init.method === 'PATCH') calls.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => ({ authorizedDomains: ['localhost', 'example-event.web.app', 'summit.example.org', 'other.example.org'] }) };
+    },
+  });
+  await client.removeAuthorizedDomain('summit.example.org');
+  assert.deepEqual(calls, [{ authorizedDomains: ['localhost', 'example-event.web.app', 'other.example.org'] }]);
+});
+
+test('domain retirement can retry after Hosting was already removed', async () => {
+  const { requests, client } = hostingFetch([{ status: 404, body: {} }]);
+  await client.removeDomain('summit.example.org');
+  assert.equal(requests[0][0], 'DELETE');
 });

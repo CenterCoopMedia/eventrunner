@@ -120,6 +120,14 @@ async function acceptAgreement(deps, { body, user }) {
   const { eventName, agreement } = await db.runTransaction(async (tx) => {
     const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
     refuseStatus(data.status);
+    if (typeof data.signupLinkId !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(data.signupLinkId) || data.legacyQuarantined === true) {
+      throw new ConsoleError(409, 'signup-link-required', 'This request needs a paid signup link. Contact us to continue.');
+    }
+    const linkSnap = await tx.get(db.collection('signup_links').doc(data.signupLinkId));
+    const link = linkSnap.exists ? linkSnap.data() : null;
+    if (link?.status !== 'used' || link.appId !== appId || link.orgId !== orgId || link.usedBy !== data.createdBy) {
+      throw new ConsoleError(409, 'signup-link-required', 'This request needs a paid signup link. Contact us to continue.');
+    }
     const terms = await readSignupTerms((r) => tx.get(r), db);
     if (!terms.open) throw signupsClosed();
     if (terms.agreement.version !== body.version) {

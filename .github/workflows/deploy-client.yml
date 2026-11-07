@@ -308,6 +308,13 @@ jobs:
           EVENT_BOOTSTRAP: ${{ inputs.bootstrap }}
         run: node scripts/deploy-functions.cjs
 
+      - name: Remove persisted security exposure from earlier releases
+        if: inputs.bootstrap != true
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+          EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
+        run: node scripts/migrate-security-data.cjs
+
   publisher:
     name: Provision the site-publisher Cloud Run job
     needs: [guard, shared, validate-env]

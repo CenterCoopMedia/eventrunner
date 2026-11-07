@@ -267,9 +267,8 @@ function createSendOtpHandler({
     }
 
     // A provider result other than sent keeps its slot (issue #366). The
-    // email core turns a provider throw into that failed result. A throw
-    // from sendEmail itself is a policy or config failure before the
-    // provider, so that slot goes back.
+    // email core turns a provider throw into that failed result. An
+    // unexpected sender throw is ambiguous and also keeps its slot.
     const releaseCeiling = async () => {
       try {
         await releaseGlobalSendSlot({ db, takenAt: ceiling.takenAt, now, windowMs: sendCeilingWindowMs });
@@ -289,23 +288,18 @@ function createSendOtpHandler({
     }
 
     // No onceKey — every request must send a new code (spec §3.1).
-    let result;
-    try {
-      result = await sendEmail({
-        to: email,
-        subject: rendered.subject,
-        html: rendered.html,
-        text: rendered.text,
-        tag: 'auth.otp',
-        source: 'auth-otp',
-        storeRendered: rendered.storeRendered,
-        hasLegalFooterHtml: rendered.hasLegalFooterHtml,
-        hasLegalFooterText: rendered.hasLegalFooterText,
-      });
-    } catch (err) {
-      await releaseCeiling();
-      throw err;
-    }
+    // An ambiguous sender exception also keeps its reserved ceiling slot.
+    const result = await sendEmail({
+      to: email,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      tag: 'auth.otp',
+      source: 'auth-otp',
+      storeRendered: rendered.storeRendered,
+      hasLegalFooterHtml: rendered.hasLegalFooterHtml,
+      hasLegalFooterText: rendered.hasLegalFooterText,
+    });
     if (result.status !== 'sent') {
       res.status(502).json({ error: { code: 'send-failed', message: 'The sign-in email could not be sent. Try again.' } });
       return;
