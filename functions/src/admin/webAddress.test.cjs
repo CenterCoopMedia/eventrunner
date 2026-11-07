@@ -266,3 +266,9 @@ test('Identity revocation preserves every unrelated authorized domain', async ()
   await client.removeAuthorizedDomain('summit.example.org');
   assert.deepEqual(calls, [{ authorizedDomains: ['localhost', 'example-event.web.app', 'other.example.org'] }]);
 });
+
+test('domain retirement can retry after Hosting was already removed', async () => {
+  const { requests, client } = hostingFetch([{ status: 404, body: {} }]);
+  await client.removeDomain('summit.example.org');
+  assert.equal(requests[0][0], 'DELETE');
+});

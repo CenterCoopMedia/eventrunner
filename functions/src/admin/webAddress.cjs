@@ -215,7 +215,7 @@ function createHostingClient({ projectId, site, fetchImpl = globalThis.fetch, ge
       return { live, records: recordsToChange(found) };
     },
     async removeDomain(domain) {
-      await googleCall({ fetchImpl, getAccessToken, method: 'DELETE', url: `${base}/${encodeURIComponent(domain)}` });
+      await googleCall({ fetchImpl, getAccessToken, method: 'DELETE', url: `${base}/${encodeURIComponent(domain)}`, missingOk: true });
     },
   };
 }
