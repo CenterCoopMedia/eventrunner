@@ -1554,6 +1554,21 @@
           Authentication&#39;s authorized domains before their registrations are relinquished.</p>
           <p>App Check for the client console is being handled separately by the local operator.
           It is excluded from this remediation rollout.</p>
+          <p>The November 6 security rollout is triggered once by merging
+          <code>.github/security-rollout-2026-11-06.json</code>. It deploys the console through its normal
+          workflow, then dispatches the normal Deploy workflow for each configured active
+          client and waits for every result. Sites recorded as archived, purged or still
+          building are excluded. A later manual <strong>Deploy console</strong> run can select
+          <code>rollout_clients</code> to retry the rollout. If main advances during console deployment,
+          rerun on current main; the dispatcher refuses to attribute a newer deployment to
+          an older validated revision.</p>
+          <p>Client function deployment runs <code>scripts/migrate-security-data.cjs</code> once per project.
+          The migration removes operator email from public registration configuration, orphaned
+          speaker logistics and shared schedules, and uploader identity from old speaker photo
+          metadata. It removes purchaser-supplied directory/photo consent from old checkout
+          answer records. When the stored consent is still attributed to checkout, public profile visibility
+          returns to private until the holder explicitly chooses it again. Counts are logged without personal data.
+          A completion marker makes later runs skip the scan; incomplete cleanup is retryable.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>docs/DEPLOY_RUNBOOK.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">

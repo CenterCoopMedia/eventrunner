@@ -47,6 +47,8 @@ async function rollout({ db, env = process.env, fetchImpl = fetch, wait = (ms) =
     variablesFor: async (name) => Object.fromEntries((await pages(`environments/${encodeURIComponent(name)}/variables`, 'variables')).map((v) => [v.name, v.value])),
   });
   if (!clients.length) throw new Error('No configured active client deployments were found');
+  const main = await api('git/ref/heads/main');
+  if (main.object?.sha !== env.GITHUB_SHA) throw new Error('Main advanced during console deployment; rerun rollout on the current main revision');
   const started = new Date().toISOString();
   for (const client of clients) {
     await api('actions/workflows/deploy.yml/dispatches', { ref: 'main', inputs: { client, provision: 'true', bootstrap: 'false' } });

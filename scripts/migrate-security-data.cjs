@@ -15,7 +15,7 @@ async function eachDocument(collection, visit) {
 async function migrateSecurityData({ db, bucket }) {
   const marker = db.collection('security_migrations').doc('2026-11-06');
   if ((await marker.get()).data()?.complete === true) return { skipped: true };
-  const totals = { publicActorRemoved: 0, orphanLogisticsRemoved: 0, orphanSharesRemoved: 0, photoMetadataCleaned: 0 };
+  const totals = { publicActorRemoved: 0, orphanLogisticsRemoved: 0, orphanSharesRemoved: 0, photoMetadataCleaned: 0, checkoutConsentRemoved: 0, inheritedVisibilityReset: 0 };
   const formRef = db.collection('config').doc('registration_form');
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(formRef);
@@ -38,6 +38,28 @@ async function migrateSecurityData({ db, bucket }) {
       if (removed) totals[counter] += 1;
     });
   }
+  await eachDocument(db.collection('ticket_answers').where('updatedBy', '==', 'checkout'), async (doc) => {
+    const result = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(doc.ref);
+      const record = snap.data();
+      if (!record || record.updatedBy !== 'checkout' || !record.answers
+          || !['directoryListing', 'photoConsent'].some((key) => Object.hasOwn(record.answers, key))) return null;
+      const userRef = typeof record.uid === 'string' && record.uid ? db.collection('users').doc(record.uid) : null;
+      const user = userRef ? await tx.get(userRef) : null;
+      const { directoryListing: inherited, photoConsent: _consent, ...answers } = record.answers;
+      const questions = (record.questions || []).filter((question) => !['directoryListing', 'photoConsent'].includes(question.id));
+      const reset = user?.exists && inherited === 'public' && user.data().profileVisibility === 'public';
+      tx.set(doc.ref, { ...record, answers, questions });
+      // These records still attribute consent to checkout, not the holder.
+      // Narrow visibility until the holder explicitly chooses it again.
+      if (reset) tx.update(userRef, { profileVisibility: 'private', updatedAt: new Date() });
+      return { reset };
+    });
+    if (result) {
+      totals.checkoutConsentRemoved += 1;
+      if (result.reset) totals.inheritedVisibilityReset += 1;
+    }
+  });
   let pageToken;
   do {
     const [files, next] = await bucket.getFiles({ prefix: 'speaker-photos/', autoPaginate: false, maxResults: 200, ...(pageToken ? { pageToken } : {}) });

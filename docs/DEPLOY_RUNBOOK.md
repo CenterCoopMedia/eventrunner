@@ -1569,3 +1569,20 @@ Authentication's authorized domains before their registrations are relinquished.
 
 App Check for the client console is being handled separately by the local operator.
 It is excluded from this remediation rollout.
+
+The November 6 security rollout is triggered once by merging
+`.github/security-rollout-2026-11-06.json`. It deploys the console through its normal
+workflow, then dispatches the normal Deploy workflow for each configured active
+client and waits for every result. Sites recorded as archived, purged or still
+building are excluded. A later manual **Deploy console** run can select
+`rollout_clients` to retry the rollout. If main advances during console deployment,
+rerun on current main; the dispatcher refuses to attribute a newer deployment to
+an older validated revision.
+
+Client function deployment runs `scripts/migrate-security-data.cjs` once per project.
+The migration removes operator email from public registration configuration, orphaned
+speaker logistics and shared schedules, and uploader identity from old speaker photo
+metadata. It removes purchaser-supplied directory/photo consent from old checkout
+answer records. When the stored consent is still attributed to checkout, public profile visibility
+returns to private until the holder explicitly chooses it again. Counts are logged without personal data.
+A completion marker makes later runs skip the scan; incomplete cleanup is retryable.

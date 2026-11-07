@@ -485,7 +485,7 @@ test('a stored token that is gone gives a plain message when reading events', as
 });
 
 test('a new request cannot start its build until the account it chose is connected', async () => {
-  const { db, deps } = setup({ extra: { 'site_names/nclocal': { appId: 'a1', orgId: 'o1' }, ...signupTerms() } });
+  const { db, deps } = setup({ extra: { 'site_names/nclocal': { appId: 'a1', orgId: 'o1' }, 'signup_links/paid-o1': { status: 'used', appId: 'a1', orgId: 'o1', usedBy: 'ana' }, ...signupTerms() } });
   const accepting = { ...deps, mailer: fakeMailer(), publicUrl: '', startBuild: async () => {} };
   const accept = { body: { ...BASE, accept: true, name: 'Ana Owner', legalName: 'NC Local Inc.', title: 'Director', version: 1 }, user: ana };
   await assert.rejects(acceptAgreement(accepting, accept), (err) => {
