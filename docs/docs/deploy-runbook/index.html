@@ -1573,6 +1573,13 @@
           answer records. When the stored consent is still attributed to checkout, public profile visibility
           returns to private until the holder explicitly chooses it again. Counts are logged without personal data.
           A completion marker makes later runs skip the scan; incomplete cleanup is retryable.</p>
+          <p>New client builds and retries dispatch both provisioning and deployment from <code>main</code>.
+          A previous successful deployment is reusable only when GitHub proves that its commit
+          is the provisioning revision or a descendant of it, and its settings are current.
+          A deployment from older code is rebuilt. The shared web app, functions, security
+          rules and new-site defaults therefore carry these patches into future client sites;
+          there is no separate per-client patch copy to maintain. Local operator invocations
+          resolve the required main revision through GitHub before accepting a prior build.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>docs/DEPLOY_RUNBOOK.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">

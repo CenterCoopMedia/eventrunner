@@ -976,12 +976,35 @@ async function stepEnvironment(ctx) {
   return summary(notes);
 }
 
+/** A reused deployment must contain this provisioning run's code revision. */
+async function deploymentHasRevision(ctx, run) {
+  const { env } = ctx.deps;
+  const headers = { ...GITHUB_HEADERS, Authorization: `Bearer ${env.GITHUB_TOKEN}` };
+  const base = `${GITHUB}/repos/${env.GITHUB_REPOSITORY}`;
+  const validSha = (value) => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
+  if (!ctx.codeRevision) {
+    const revision = validSha(env.GITHUB_SHA) ? env.GITHUB_SHA
+      : (await call(ctx, 'read the current main revision', `${base}/git/ref/heads/main`, { headers })).object?.sha;
+    if (!validSha(revision)) throw new Error('the current code revision could not be established');
+    ctx.codeRevision = revision;
+    ctx.revisionChecks = new Map();
+  }
+  if (!validSha(run?.head_sha)) return false;
+  if (run.head_sha === ctx.codeRevision) return true;
+  if (!ctx.revisionChecks.has(run.head_sha)) {
+    const compared = await call(ctx, 'check the deployed code revision', `${base}/compare/${ctx.codeRevision}...${run.head_sha}?per_page=1`, { headers, allow: [404], quiet: true });
+    ctx.revisionChecks.set(run.head_sha, ['ahead', 'identical'].includes(compared?.status));
+  }
+  return ctx.revisionChecks.get(run.head_sha);
+}
+
 /**
  * One deploy, until it succeeds. deploy.yml names each run after its client
  * and mode, which is how a run is found again. A run that already succeeded
  * counts, a run in progress is waited for, and a failed one is run again a
  * bounded number of times, because a first deploy's failures are often transient.
- * A run older than `after` is out of date, so it doesn't count.
+ * A run older than `after`, or missing this run's code revision, cannot count.
+ * New requests and retries therefore inherit the patches on main.
  */
 async function deploy(ctx, { bootstrap, after = Number.NaN }) {
   const { deps: { env, sleep }, settings: { environment } } = ctx;
@@ -994,7 +1017,8 @@ async function deploy(ctx, { bootstrap, after = Number.NaN }) {
     const listed = await call(ctx, 'read the deploy runs', `${workflow}/runs?event=workflow_dispatch&branch=main&per_page=50`, { headers });
     const latest = (listed.workflow_runs || []).find((run) => run.display_title === title) || null;
     const current = !(Date.parse(latest?.created_at) < after);
-    const counts = latest && (dispatches === 0 ? current : latest.id !== previous);
+    const containsRevision = await deploymentHasRevision(ctx, latest);
+    const counts = latest && containsRevision && (dispatches === 0 ? current : latest.id !== previous);
     if (counts && latest.status !== 'completed') {
       await sleep(DEPLOY_WAIT_MS);
     } else if (counts && latest.conclusion === 'success') {

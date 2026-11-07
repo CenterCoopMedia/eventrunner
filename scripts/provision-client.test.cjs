@@ -46,6 +46,7 @@ const ENV = {
   GITHUB_REPOSITORY_OWNER_ID: '200',
   GITHUB_TOKEN: 'gh-run-token',
   GITHUB_RUN_ID: '42',
+  GITHUB_SHA: 'a'.repeat(40),
   GOOGLE_CLOUD_QUOTA_PROJECT: 'console-project',
   GOOGLE_CLOUD_PROJECT: 'console-project',
   GCLOUD_PROJECT: 'console-project',
@@ -87,6 +88,8 @@ function fakeCloud(options = {}) {
     branchRules: [],
     variables: {},
     runs: [],
+    sourceRevision: ENV.GITHUB_SHA,
+    compareStatus: 'behind',
     deployFailures: options.deployFailures || 0,
     policyRefusals: options.policyRefusals || 0,
     certNever: options.certNever || false,
@@ -325,6 +328,7 @@ function fakeCloud(options = {}) {
       if (failed) state.deployFailures -= 1;
       state.runs.push({
         id: state.runs.length + 1,
+        head_sha: state.sourceRevision,
         display_title: `Deploy ${body.inputs.client}${body.inputs.bootstrap === 'true' ? ' (bootstrap)' : ''}`,
         status: 'completed',
         conclusion: failed ? 'failure' : 'success',
@@ -333,6 +337,12 @@ function fakeCloud(options = {}) {
         inputs: body.inputs,
       });
       return new Response(null, { status: 204 });
+    }
+    if (method === 'GET' && p.endsWith('/git/ref/heads/main')) {
+      return answer({ object: { sha: state.sourceRevision } });
+    }
+    if (method === 'GET' && p.includes('/compare/')) {
+      return answer({ status: state.compareStatus });
     }
     if (!fromApp) return answer({ message: 'needs the App' }, 403);
     if (p.endsWith('/deployment-branch-policies')) {
@@ -742,6 +752,36 @@ test('it deploys in the bootstrap order, and seeds between the two deploys', asy
   ]);
   assert.equal(fake.answersWritten[0].providers.email.announcementStream, 'announcements');
   assert.equal(fake.answersWritten[0].event.sender.email.endsWith(`@${DOMAIN}`), true);
+});
+
+test('a retry after a code update redeploys bootstrap and full site instead of reusing older successful runs', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.runs.length, 2);
+  const patched = 'b'.repeat(40);
+  fake.deps.env.GITHUB_SHA = patched;
+  fake.state.sourceRevision = patched;
+  fake.state.clock += 3600000;
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.runs.length, 4);
+  assert.ok(fake.state.runs.slice(2).every((run) => run.head_sha === patched));
+  assert.ok(fake.calls.filter((c) => c.url.endsWith('/dispatches')).every((c) => c.body.ref === 'main'));
+});
+
+test('a deployment from a newer main revision is accepted only with proven ancestry', async () => {
+  const fake = setup();
+  fake.state.sourceRevision = 'b'.repeat(40);
+  fake.state.compareStatus = 'ahead';
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.runs.length, 2);
+  assert.equal(fake.calls.filter((c) => c.url.includes('/compare/')).length, 1, 'one cached ancestry proof covers both deployments');
+});
+
+test('a local operator invocation resolves main when no Actions revision is present', async () => {
+  const fake = setup({ env: { GITHUB_SHA: '' } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.calls.filter((c) => c.url.endsWith('/git/ref/heads/main')).length, 1);
 });
 
 test('a failed first deploy is run again, because its failures are usually transient', async () => {
