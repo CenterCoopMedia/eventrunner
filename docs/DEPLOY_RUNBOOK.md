@@ -1590,3 +1590,11 @@ metadata. It removes purchaser-supplied directory/photo consent from old checkou
 answer records. When the stored consent is still attributed to checkout, public profile visibility
 returns to private until the holder explicitly chooses it again. Counts are logged without personal data.
 A completion marker makes later runs skip the scan; incomplete cleanup is retryable.
+
+New client builds and retries dispatch both provisioning and deployment from `main`.
+A previous successful deployment is reusable only when GitHub proves that its commit
+is the provisioning revision or a descendant of it, and its settings are current.
+A deployment from older code is rebuilt. The shared web app, functions, security
+rules and new-site defaults therefore carry these patches into future client sites;
+there is no separate per-client patch copy to maintain. Local operator invocations
+resolve the required main revision through GitHub before accepting a prior build.
