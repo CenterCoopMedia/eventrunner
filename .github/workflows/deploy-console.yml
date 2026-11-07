@@ -11,6 +11,10 @@ on:
         description: Also deploy security fixes to every configured active client.
         type: boolean
         default: false
+      legacy_clients:
+        description: Additional pre-console client environments, comma-separated.
+        type: string
+        default: ''
   push:
     branches: [main]
     paths: [.github/security-rollout-2026-11-06.json]
@@ -106,4 +110,5 @@ jobs:
         env:
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
           GITHUB_TOKEN: ${{ github.token }}
+          LEGACY_CLIENTS: ${{ inputs.legacy_clients || vars.AUTO_DEPLOY_ENVIRONMENTS }}
         run: node scripts/dispatch-security-rollout.cjs
