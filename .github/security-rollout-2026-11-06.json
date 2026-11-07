@@ -1,5 +1,7 @@
 {
   "purpose": "Deploy the reviewed medium-and-higher security fixes after merging PR 759",
   "excludedFinding": "commit:762d7f2174b08191be0110ecb4d05881",
-  "scope": "Console and configured active client sites; archived and purged sites stay down"
+  "scope": "Console and configured active client sites; archived and purged sites stay down",
+  "retry": "Use authoritative console build records after environment discovery was denied",
+  "legacyClients": []
 }

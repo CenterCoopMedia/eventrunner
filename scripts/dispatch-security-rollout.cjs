@@ -1,22 +1,43 @@
 'use strict';
 
-/** Select configured live sites; archived and purged console sites stay down. */
-async function liveClients({ db, environments, variablesFor }) {
-  const clients = [];
-  for (const environment of environments) {
-    const vars = await variablesFor(environment.name);
-    if (!vars.EVENT_FIREBASE_PROJECT_ID) continue;
-    if (!vars.WIF_PROVIDER || !vars.WIF_SERVICE_ACCOUNT) throw new Error(`Incomplete deployment identity for ${environment.name}`);
-    const appId = vars.EVENTRUNNER_REQUEST_ID;
-    if (appId) {
-      const [app, tomb] = await Promise.all([
-        db.collection('applications').doc(appId).get(), db.collection('console_deleted_sites').doc(appId).get(),
-      ]);
-      if (tomb.exists || !app.exists || !['ready', 'launched'].includes(app.data().status)) continue;
+/** Console build records own target identity; no GitHub administration API is needed. */
+async function liveClients({ db, legacyClients = [] }) {
+  const clients = new Set();
+  const blocked = new Set();
+  const valid = (name) => typeof name === 'string' && /^[a-z0-9][a-z0-9-]{0,62}$/.test(name)
+    && !['console', 'provisioning', 'github-pages'].includes(name);
+  const environmentOf = (record) => record?.resources?.githubEnvironment || record?.resources?.environment || record?.environmentClaim;
+  const each = async (collection, visit) => {
+    let cursor;
+    for (;;) {
+      let query = db.collection(collection).orderBy('__name__').limit(200);
+      if (cursor) query = query.startAfter(cursor);
+      const page = await query.get();
+      for (const doc of page.docs) await visit(doc);
+      if (page.size < 200) return;
+      cursor = page.docs.at(-1);
     }
-    clients.push(environment.name);
+  };
+  await each('applications', async (doc) => {
+    const [app, build, tomb] = await Promise.all([
+      doc.ref.get(), db.collection('console_builds').doc(doc.id).get(), db.collection('console_deleted_sites').doc(doc.id).get(),
+    ]);
+    const target = environmentOf(build.data());
+    const active = app.exists && !tomb.exists && ['ready', 'launched'].includes(app.data().status);
+    if (active && !valid(target)) throw new Error('An active console site has no valid recorded deployment environment');
+    if (!valid(target)) return;
+    if (active) clients.add(target);
+    else blocked.add(target);
+  });
+  await each('console_deleted_sites', async (doc) => {
+    const target = environmentOf(doc.data());
+    if (valid(target)) blocked.add(target);
+  });
+  for (const target of legacyClients) {
+    if (!valid(target)) throw new Error('Invalid legacy client environment');
+    clients.add(target);
   }
-  return clients;
+  return [...clients].filter((name) => !blocked.has(name)).sort();
 }
 
 async function rollout({ db, env = process.env, fetchImpl = fetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), log = console }) {
@@ -29,23 +50,12 @@ async function rollout({ db, env = process.env, fetchImpl = fetch, wait = (ms) =
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(30_000),
     });
-    if (!result.ok) throw new Error(`GitHub rollout request failed (${result.status})`);
+    if (!result.ok) throw new Error(`GitHub rollout request failed (${result.status}) at ${path.split('?')[0]}`);
     return result.status === 204 ? null : result.json();
   };
-  const pages = async (path, field) => {
-    const all = [];
-    for (let page = 1; page <= 100; page += 1) {
-      const result = await api(`${path}?per_page=100&page=${page}`);
-      const rows = result[field];
-      if (!Array.isArray(rows)) throw new Error('Malformed GitHub rollout response');
-      all.push(...rows);
-      if (rows.length < 100) return all;
-    }
-    throw new Error('GitHub rollout listing exceeded its page budget');
-  };
-  const clients = await liveClients({ db, environments: await pages('environments', 'environments'),
-    variablesFor: async (name) => Object.fromEntries((await pages(`environments/${encodeURIComponent(name)}/variables`, 'variables')).map((v) => [v.name, v.value])),
-  });
+  const release = require('../.github/security-rollout-2026-11-06.json');
+  const legacyClients = [...(release.legacyClients || []), ...(env.LEGACY_CLIENTS || '').split(',').map((s) => s.trim()).filter(Boolean)];
+  const clients = await liveClients({ db, legacyClients });
   if (!clients.length) throw new Error('No configured active client deployments were found');
   const main = await api('git/ref/heads/main');
   if (main.object?.sha !== env.GITHUB_SHA) throw new Error('Main advanced during console deployment; rerun rollout on the current main revision');

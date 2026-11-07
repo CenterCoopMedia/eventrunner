@@ -1572,10 +1572,14 @@ It is excluded from this remediation rollout.
 
 The November 6 security rollout is triggered once by merging
 `.github/security-rollout-2026-11-06.json`. It deploys the console through its normal
-workflow, then dispatches the normal Deploy workflow for each configured active
-client and waits for every result. Sites recorded as archived, purged or still
+workflow, then dispatches the normal Deploy workflow for each active client recorded by the console and waits for every result.
+Target names come from the provisioner’s recorded GitHub Environment identity; the
+workflow token does not need permission to list GitHub Environment variables. Sites recorded as archived, purged or still
 building are excluded. A later manual **Deploy console** run can select
-`rollout_clients` to retry the rollout. If main advances during console deployment,
+`rollout_clients` to retry the rollout. For sites that predate the console, supply
+exact environment names in `legacy_clients` (or the existing repository-level
+`AUTO_DEPLOY_ENVIRONMENTS` list). Explicit targets still cannot restore archived,
+purged or building console sites. If main advances during console deployment,
 rerun on current main; the dispatcher refuses to attribute a newer deployment to
 an older validated revision.
 
