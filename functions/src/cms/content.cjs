@@ -695,7 +695,17 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
         paths = await db.runTransaction(async (tx) => {
           const deletable = await checkSessionDeletable({ db, tx, docId: target.docId });
           if (!deletable.ok) throw new RequestError(409, 'has-children', deletable.message);
-          return deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
+          // A pitch converted into this session stays accepted while the
+          // session exists (sessions/pitches.cjs). Deleting the session is
+          // how staff undo that, so the pitch's decision can change again.
+          // Read before any write: Firestore transactions need that order.
+          const converted = await tx.get(db.collection('session_pitches').where('conversion.sessionId', '==', target.docId));
+          const deleted = await deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
+          for (const pitch of converted.docs) {
+            const revision = Number.isSafeInteger(pitch.data().reviewRevision) ? pitch.data().reviewRevision : 0;
+            tx.update(pitch.ref, { conversion: null, reviewRevision: revision + 1 });
+          }
+          return deleted;
         });
       } else if (target.collection === ORGANIZATIONS_COLLECTION) {
         paths = await db.runTransaction(async (tx) => {

@@ -661,7 +661,7 @@ function createReviewSessionPitchHandler({ db, auth, getConfig, now = Date.now, 
       return sendError(res, 409, 'status-conflict', 'Someone else changed this pitch. Reload the page, then try again.');
     }
     if (outcome.outcome === 'converted') {
-      return sendError(res, 409, 'pitch-converted', 'This pitch is already a draft session. Delete the draft session and speakers first if it should not go ahead.');
+      return sendError(res, 409, 'pitch-converted', 'This pitch is already a draft session. Delete that session first if the pitch should not go ahead.');
     }
     return res.status(200).json({ id: review.id, status: review.status, revision: outcome.revision });
   };

@@ -175,7 +175,7 @@ function PitchReview({ initial, current, call, settings }) {
       <Panel
         title="Decision"
         description={created
-          ? 'This pitch is already a draft session, so the decision stays Accepted. Send an email separately below.'
+          ? 'This pitch is already a draft session, so the decision stays Accepted. To change it, delete that session first. Send an email separately below.'
           : 'You can change this decision. Send an email separately below.'}
       >
         {created ? null : (
