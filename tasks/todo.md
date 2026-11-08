@@ -71,7 +71,13 @@ LABELS              // staff words; client words only where they differ
       The API names `confirmUnknown` and `delivery-unknown` stay, because
       loaded pages send and read them.
 - [ ] S6. One lease helper with an owner token, used by the five leases.
-- [ ] S7. Delete dead states and code the modules show as unused.
+- [x] S7. Deleted the unused invite status lists, `exhaustRow` (an unguarded
+      copy of the queue's exhaust step) and `store.unpublishDoc` (it would
+      hide a doc with no revision bump or history row). Kept on purpose:
+      `sendSessionConfirmationEmail` (its template is live and editable; the
+      feature is unwired, not dead, which is a product call),
+      `linkSpeakerToUser`/`unlinkSpeakerFromUser` (thin tested wrappers) and
+      `claimPromptSentAt` (part of the data export).
 
 ### Done when (each step)
 
