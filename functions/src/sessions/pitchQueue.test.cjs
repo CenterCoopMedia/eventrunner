@@ -254,3 +254,27 @@ test('a name confirmed for one presenter is never used for another', async () =>
   assert.equal(fresh.res.statusCode, 200, JSON.stringify(fresh.res.body));
   assert.equal(db.read('speakers', 'pitch-proposal-2').firstName, 'Dee');
 });
+
+test('a converted pitch cannot move off accepted, but its notes can still change', async () => {
+  const { createReviewSessionPitchHandler } = require('./pitches.cjs');
+  const converted = {
+    ...row, status: 'accepted', reviewRevision: 2,
+    conversion: { sessionId: 'session-1', speakerIds: ['speaker-1'] }, convertedAt: new Date(500),
+  };
+  const db = makeFakeDb({ 'config/bootstrap': bootstrap, 'session_pitches/proposal': converted });
+  const handler = createReviewSessionPitchHandler({ db, auth, getConfig: async () => ({ bootstrap }), now: () => 1000, log: { error() {} } });
+  const send = async (body) => {
+    const res = { statusCode: 0, body: null, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return this; }, set() { return this; } };
+    await handler({ method: 'POST', headers: { authorization: 'Bearer staff' }, body }, res);
+    return res;
+  };
+  for (const status of ['rejected', 'in_review', 'new']) {
+    const refused = await send({ id: 'proposal', status, expectedStatus: 'accepted', expectedRevision: 2 });
+    assert.equal(refused.statusCode, 409, status);
+    assert.equal(refused.body.error.code, 'pitch-converted');
+  }
+  assert.equal(db.read('session_pitches', 'proposal').status, 'accepted');
+  const notes = await send({ id: 'proposal', status: 'accepted', expectedStatus: 'accepted', expectedRevision: 2, privateNotes: 'Booked.' });
+  assert.equal(notes.statusCode, 200);
+  assert.equal(db.read('session_pitches', 'proposal').privateNotes, 'Booked.');
+});

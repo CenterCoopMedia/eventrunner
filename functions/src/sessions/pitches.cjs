@@ -625,6 +625,9 @@ function createReviewSessionPitchHandler({ db, auth, getConfig, now = Date.now, 
         if (currentStatus !== review.expectedStatus || currentRevision !== review.expectedRevision) {
           return { outcome: 'conflict' };
         }
+        // Conversion made a draft session and draft speakers, and may have
+        // sent invites. Moving the pitch off accepted would leave them behind.
+        if (stored.conversion && review.status !== 'accepted') return { outcome: 'converted' };
         const at = new Date(now());
         const nextRevision = currentRevision + 1;
         tx.update(ref, {
@@ -656,6 +659,9 @@ function createReviewSessionPitchHandler({ db, auth, getConfig, now = Date.now, 
     if (outcome.outcome === 'missing') return notFound(res, 'No such session pitch.');
     if (outcome.outcome === 'conflict') {
       return sendError(res, 409, 'status-conflict', 'Someone else changed this pitch. Reload the page, then try again.');
+    }
+    if (outcome.outcome === 'converted') {
+      return sendError(res, 409, 'pitch-converted', 'This pitch is already a draft session. Delete the draft session and speakers first if it should not go ahead.');
     }
     return res.status(200).json({ id: review.id, status: review.status, revision: outcome.revision });
   };

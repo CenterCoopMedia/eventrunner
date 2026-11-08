@@ -321,6 +321,13 @@ describe('AdminSessionPitch decisions, notes and edits', () => {
     expect(call).toHaveBeenCalledWith('reviewSessionPitch', { id: PITCH.id, status: 'accepted', expectedStatus: 'new', expectedRevision: 2 });
   });
 
+  it('offers no other decision once the pitch is a draft session, and says why', () => {
+    openPitch({ ...PITCH, status: 'accepted', conversion: { sessionId: 'session-1', speakerIds: ['speaker-1'] } });
+    expect(screen.queryByRole('group', { name: 'Decision' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
+    expect(screen.getByText(/already a draft session/)).toBeInTheDocument();
+  });
+
   it('adds a signed note without touching the decision, and edits only your own', async () => {
     openPitch({ ...PITCH, status: 'in_review', reviewNotes: [
       { id: 'aaaaaaaaaaaaaaaa', uid: 'someone', email: 'other@example.test', text: 'Their note.', createdAt: '2026-11-05T15:00:00Z', editedAt: null },
