@@ -13,10 +13,14 @@ import LoadingState from '../../LoadingState.jsx';
 import IconControl from '../../IconControl.jsx';
 
 /** What the page says after a decision, with the email result. */
+const DECIDED = Object.freeze({
+  closeApplication: 'You closed the request. Its web address is free again if site setup never began.',
+  declineApplication: 'You declined the request. Its web address is free again.',
+  launchApplication: 'You marked the site as launched.',
+});
+
 function decidedMessage(name, result) {
-  const done = name === 'closeApplication'
-    ? 'You closed the request. Its web address is free again if site setup never began.'
-    : 'You declined the request. Its web address is free again.';
+  const done = DECIDED[name];
   return result.mailFailed ? `${done} Some owners did not receive the email. Contact them another way.` : `${done} The owners received an email.`;
 }
 
