@@ -11,6 +11,9 @@ const {
 } = require('./lifecycle.cjs');
 
 const NOW = new Date('2026-08-21T12:00:00Z');
+// These tests cover the trigger's own deletes; records.test.cjs covers the
+// store clearing it shares with deleteAttendee.
+const noStores = async () => ({ removed: {}, failed: [] });
 
 /** Minimal Firestore fake: doc create/update plus a write audit. */
 function fakeDb(seed = {}) {
@@ -127,7 +130,7 @@ test('deleting the auth account deletes the account document', async () => {
     'users/u1': { uid: 'u1', displayName: 'Rae' },
     'users_public/u1': { uid: 'u1', displayName: 'Rae' },
   });
-  const result = await createOnUserDeleted({ db })({ uid: 'u1' });
+  const result = await createOnUserDeleted({ db, clearStores: noStores })({ uid: 'u1' });
   assert.equal(result.deleted, true);
   assert.equal(db.docs.has('users/u1'), false);
   assert.equal(db.docs.has('users_public/u1'), false);
@@ -145,7 +148,7 @@ test('a deleted account with no document still has its projection and public sch
     'users_public/u1': { uid: 'u1', displayName: 'Rae' },
     'schedule_shares/u1': { sessionIds: ['s1'], scheduleVisibility: 'public', displayName: 'Rae' },
   });
-  const result = await createOnUserDeleted({ db })({ uid: 'u1' });
+  const result = await createOnUserDeleted({ db, clearStores: noStores })({ uid: 'u1' });
   assert.equal(result.deleted, false);
   assert.equal(db.docs.has('users_public/u1'), false);
   assert.equal(db.docs.has('schedule_shares/u1'), false);
@@ -162,7 +165,7 @@ test('deleting the auth account removes its representative grant and the edit it
     'organization_edit_requests/beacon-fund': { organizationId: 'beacon-fund', fields: { bio: 'x' }, submittedByUid: 'u1' },
     'organization_edit_requests/tide-media': { organizationId: 'tide-media', fields: { bio: 'y' }, submittedByUid: 'u2' },
   });
-  const result = await createOnUserDeleted({ db })({ uid: 'u1' });
+  const result = await createOnUserDeleted({ db, clearStores: noStores })({ uid: 'u1' });
   assert.equal(result.deleted, true);
   assert.equal(db.docs.has('users/u1'), false);
   assert.equal(db.docs.has('organization_representatives/u1'), false);
@@ -177,7 +180,7 @@ test('the cleanup runs for an account with no document too, and keeps an edit an
     // A second representative of the same organization sent this one.
     'organization_edit_requests/beacon-fund': { organizationId: 'beacon-fund', fields: { bio: 'x' }, submittedByUid: 'u3' },
   });
-  const result = await createOnUserDeleted({ db })({ uid: 'u1' });
+  const result = await createOnUserDeleted({ db, clearStores: noStores })({ uid: 'u1' });
   assert.equal(result.deleted, false);
   assert.equal(db.docs.has('organization_representatives/u1'), false);
   assert.equal(db.docs.has('organization_edit_requests/beacon-fund'), true);
@@ -186,7 +189,7 @@ test('the cleanup runs for an account with no document too, and keeps an edit an
 test('onUserDeleted without a uid writes nothing', async () => {
   const db = fakeDb({ 'users/u1': { uid: 'u1' } });
   const errors = [];
-  const result = await createOnUserDeleted({ db, log: { error: () => errors.push(1) } })(null);
+  const result = await createOnUserDeleted({ db, clearStores: noStores, log: { error: () => errors.push(1) } })(null);
   assert.equal(result.deleted, false);
   assert.deepEqual(db.writes, []);
   assert.equal(errors.length, 1);
@@ -274,10 +277,18 @@ test('Auth deletion retries public cleanup after the account document is gone', 
     };
     return col;
   };
-  const remove = createOnUserDeleted({ db });
+  const remove = createOnUserDeleted({ db, clearStores: noStores });
   await assert.rejects(remove({ uid: 'u1' }), /transient cleanup failure/);
   assert.equal(db.docs.has('users/u1'), false);
   await remove({ uid: 'u1' });
   assert.equal(db.docs.has('users_public/u1'), false);
   assert.equal(db.docs.has('schedule_shares/u1'), false);
+});
+
+test('onUserDeleted throws when a store cannot be cleared, so the trigger retries', async () => {
+  const db = fakeDb({ 'users/u1': { uid: 'u1' } });
+  const failing = async () => ({ removed: {}, failed: ['tickets'] });
+  await assert.rejects(createOnUserDeleted({ db, clearStores: failing })({ uid: 'u1' }), /could not clear tickets/);
+  // The account document went first; a retry finds it gone and clears again.
+  assert.equal(db.docs.has('users/u1'), false);
 });

@@ -143,7 +143,7 @@ async function removeRepresentativeAccess({ db, uid }) {
  * @param {{ db: object, log?: { error: Function } }} deps
  * @returns {(authUser: { uid: string }) => Promise<{ deleted: boolean }>}
  */
-function createOnUserDeleted({ db, log = console }) {
+function createOnUserDeleted({ db, getBucket, now = () => new Date(), log = console, clearStores = defaultClearStores }) {
   return async function onUserDeleted(authUser) {
     const uid = authUser && typeof authUser.uid === 'string' ? authUser.uid : '';
     if (uid.length === 0) {
@@ -158,8 +158,20 @@ function createOnUserDeleted({ db, log = console }) {
     }
     await db.collection(USERS_PUBLIC).doc(uid).delete();
     await db.collection(SCHEDULE_SHARES).doc(uid).delete();
+    // The same clearing deleteAttendee does: release the ticket claims, so
+    // another account can claim them, and remove answers, notes, bookmarks,
+    // photos and change requests. A store that fails throws, so the trigger
+    // retries; every sweep is idempotent.
+    const { failed } = await clearStores({ db, getBucket, uid, now, log });
+    if (failed.length > 0) throw new Error(`onUserDeleted: could not clear ${failed.join(', ')}`);
     return { deleted: existing.exists };
   };
+}
+
+function defaultClearStores(deps) {
+  // Required here, not at the top: records.cjs loads the admin and CMS
+  // modules, which the sign-up trigger does not need.
+  return require('./records.cjs').clearAccountStores(deps);
 }
 
 /**
@@ -226,7 +238,8 @@ function buildHandlers() {
       .auth.user()
       .onDelete(async (authUser) => {
         const { getDb } = require('../core/firestore.cjs');
-        await createOnUserDeleted({ db: getDb() })({ uid: authUser.uid });
+        const { getBucket } = require('../core/storage.cjs');
+        await createOnUserDeleted({ db: getDb(), getBucket })({ uid: authUser.uid });
       }),
     maintainProfileComplete: onDocumentWritten(
       { region, document: 'users/{uid}' },

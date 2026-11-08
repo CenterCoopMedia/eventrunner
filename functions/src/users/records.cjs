@@ -548,7 +548,6 @@ async function holdsAnything({ db, getBucket, uid, store }) {
  * @returns {Promise<{ removed: Record<string, number>, failed: string[] }>}
  */
 async function sweepAccount({ db, auth, getBucket, uid, now, log }) {
-  const removed = {};
   const failed = [];
 
   try {
@@ -560,6 +559,21 @@ async function sweepAccount({ db, auth, getBucket, uid, now, log }) {
     }
   }
 
+  const stores = await clearAccountStores({ db, getBucket, uid, now, log });
+  return { removed: stores.removed, failed: [...failed, ...stores.failed] };
+}
+
+/**
+ * Release the account's ticket claims and clear every sweep store, a page
+ * at a time. Each store is tried even when an earlier one fails. Used by
+ * deleteAttendee and by the auth onDelete trigger, so an account removed
+ * straight from Firebase Auth is cleared the same way. Idempotent.
+ *
+ * @returns {Promise<{ removed: Record<string, number>, failed: string[] }>}
+ */
+async function clearAccountStores({ db, getBucket, uid, now, log }) {
+  const removed = {};
+  const failed = [];
   for (const store of SWEEP_STORES) {
     const sweep = SWEEPERS[store.kind];
     if (!sweep) throw new TypeError(`deleteAttendee: no sweep for store kind "${store.kind}"`);
@@ -734,6 +748,7 @@ function buildHandlers() {
 module.exports = {
   ORGANIZER_OWNED_FIELDS,
   PER_ACCOUNT_STORES,
+  clearAccountStores,
   createUpdateAttendeeHandler,
   createDeleteAttendeeHandler,
   get handlers() {
