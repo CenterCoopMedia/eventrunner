@@ -160,7 +160,22 @@ function createCmsPublishHandler({
       // must stop the remainder of the run.
       const refusal = await structuralRefusal({ db }, request);
       if (refusal) return badRequest(res, refusal);
-      await queueRef.set({ status: 'running', error: null, updatedAt: new Date(now()) }, { merge: true });
+      // Claim the row in one transaction: two resumes can both pass the
+      // checks above, but only one may move the row to 'running'.
+      const claim = await db.runTransaction(async (tx) => {
+        const current = await tx.get(queueRef);
+        const status = current.exists ? current.data()?.status : undefined;
+        if (status === 'running' || status === 'done') return status;
+        tx.set(queueRef, { status: 'running', error: null, updatedAt: new Date(now()) }, { merge: true });
+        return 'claimed';
+      });
+      if (claim === 'done') {
+        const latest = (await queueRef.get()).data() || {};
+        return res.status(200).json({ queueId: queueRef.id, status: 'done', results: latest.progress || {} });
+      }
+      if (claim === 'running') {
+        return sendError(res, 409, 'already-running', 'That publish is already running. Wait for it to finish.');
+      }
     } else {
       const resolved = await resolveRequest({ db }, req.body);
       if (!resolved.ok) return badRequest(res, resolved.message);

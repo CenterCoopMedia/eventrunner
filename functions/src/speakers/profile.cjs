@@ -333,6 +333,17 @@ async function applyUpdateSpeaker({ db, bucket = null, speakerId, payload, actor
       // in this commit, which is the seam-#3 rule: the pair is written by
       // the invite/acceptance transaction and by the delete paths (a
       // soft delete is one), never independently. Read before write.
+      // Staff unpublish with "Draft" (draft, approved and removed are all an
+      // admin can set). For a speaker with an account that stores 'accepted':
+      // linked but not published. They keep their dashboard and the access
+      // users.speakerId grants, and staff can publish them again without a
+      // new invite. 'draft' stays the state of a record with no account, so
+      // the dashboard check (accepted or approved) and the rules agree.
+      const hasAccount = typeof stored.uid === 'string' && stored.uid !== '';
+      if (patch.status === 'draft' && hasAccount && ['accepted', 'approved'].includes(stored.status)) {
+        patch.status = 'accepted';
+      }
+
       const removing = patch.status === 'removed' && stored.status !== 'removed';
       const linked = removing ? await readLinkedUser({ tx, db, speaker: stored }) : null;
       if (removing) patch.uid = null;

@@ -155,6 +155,18 @@ test('only a draft can be saved or deleted', async () => {
   assert.equal((await db.collection('invoices').doc(ID).get()).data().number, 'INV-0001');
 });
 
+test('an invoice with a status the server does not know is locked, not read as a draft', async () => {
+  // A damaged or hand-edited status must fail closed: a draft can be edited
+  // and deleted, so reading an unknown status as 'draft' would open both.
+  const db = dbFor({ [`invoices/${ID}`]: { status: 'sent', number: 'INV-0009', revision: 2, currency: 'usd', lines: [], adjustments: [], totals: { subtotal: 0, discountTotal: 0, taxTotal: 0, total: 0 }, billTo: { name: 'Example' } } });
+  assert.equal((await call(db, { action: 'saveDraft', invoiceId: ID, expectedRevision: 2, invoice: draft() })).statusCode, 409);
+  assert.equal((await call(db, { action: 'deleteDraft', invoiceId: ID, expectedRevision: 2 })).statusCode, 409);
+  assert.equal((await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 2 })).statusCode, 409);
+  assert.equal((await db.collection('invoices').doc(ID).get()).data().number, 'INV-0009');
+  const listed = await call(db, { action: 'list' });
+  assert.equal(listed.body.invoices.find((row) => row.id === ID).status, 'unknown');
+});
+
 test('a draft is deleted with its revision and an audit row', async () => {
   const db = dbFor();
   await call(db, { action: 'saveDraft', invoiceId: ID, expectedRevision: 0, invoice: draft() });

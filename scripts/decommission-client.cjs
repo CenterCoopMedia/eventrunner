@@ -311,7 +311,9 @@ async function archive(ctx) {
     checkIdle(ctx, app, build);
     if (app.archive?.restoring) throw new Error('archive: a restore is in progress');
     if (app.status === 'archived') return;
-    if (!['ready', 'launched', 'draft'].includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error(`archive: status ${app.status} is not allowed`);
+    // 'declined' covers a request the hosting team closed after its build
+    // began: it may own a project, and console retention keeps it for this.
+    if (!['ready', 'launched', 'draft', 'declined'].includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error(`archive: status ${app.status} is not allowed`);
     const at = instant(ctx.deps);
     tx.update(appRef(ctx), {
       status: 'archived', archivedAt: at, purgeAfter: new Date(at.getTime() + RECOVERY_MS),
@@ -776,8 +778,19 @@ async function purge(ctx, now, confirmSite) {
         stepsCompleted: [], resources: ctx.resources,
       };
       tx.create(tombRef(ctx), ctx.tomb);
-      // Stop new build retries and connection changes even for --now.
-      tx.update(appRef(ctx), { status: 'archived', ...(app.archive?.restoring ? { archive: { ...app.archive, restoring: false } } : {}) });
+      // Stop new build retries and connection changes even for --now. A site
+      // that was not archived yet gets the same record an archive writes, due
+      // at once, so a failed run shows when it started and from what status.
+      const at = instant(ctx.deps);
+      const archiving = app.status === 'archived' ? {} : {
+        archivedAt: at, purgeAfter: at, updatedAt: at, updatedBy: 'decommission',
+        archive: { ...(app.archive || {}), previousStatus: app.status, pending: false },
+        history: [...(app.history || []), historyEntry('archived', at, 'decommission')],
+      };
+      tx.update(appRef(ctx), {
+        status: 'archived', ...archiving,
+        ...(app.archive?.restoring ? { archive: { ...(archiving.archive || app.archive), restoring: false } } : {}),
+      });
     });
   } else if (ctx.resources.projectId && !ctx.completed.includes('project')) await project(ctx);
   for (const step of STEPS) {

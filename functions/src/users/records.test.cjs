@@ -857,3 +857,24 @@ test('the admin guide names every refusal the delete sends and when the ticket c
   // And a retry releases a claim made after the delete.
   assert.match(section, /retry[^.]*releases[^.]*claim[^.]*after the delete/i);
 });
+
+// An account deleted straight from Firebase Auth (the console, or a script)
+// skips deleteAttendee. The auth onDelete trigger must still release its
+// tickets and clear what it stored, or the tickets stay claimed by a uid
+// that no longer exists and nobody can claim them again.
+test('the auth onDelete trigger releases the account\'s tickets and clears its stores', async () => {
+  const { createOnUserDeleted } = require('./lifecycle.cjs');
+  const db = await fullySeeded();
+  const { getBucket, bucket } = deps(db);
+  await createOnUserDeleted({ db, getBucket, now: () => T0, log: QUIET })({ uid: 'uid-ada' });
+
+  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.equal(db.read('tickets', 'tkt-1').claimedAt, null);
+  assert.equal(db.read('tickets', 'tkt-2').claimedByUid, 'uid-bo');
+  assert.equal(db.read('ticket_answers', 't-ada'), undefined);
+  assert.ok(db.read('ticket_answers', 't-bo'));
+  assert.equal(db.read('change_requests', 'cr-ada-1'), undefined);
+  assert.ok(db.read('change_requests', 'cr-bo-1'));
+  assert.deepEqual([...bucket.files].filter((path) => path.includes('uid-ada')), []);
+  assert.ok(bucket.files.has('profile-photos/uid-bo/photo.jpg'));
+});

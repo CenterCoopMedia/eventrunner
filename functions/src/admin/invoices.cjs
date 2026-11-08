@@ -117,8 +117,13 @@ function publicTotals(totals) {
     taxTotal: amountOr0(source.taxTotal), total: amountOr0(source.total),
   };
 }
+/**
+ * The stored status, failing closed. A status the server does not know reads
+ * as 'unknown', which no draft, issue or payment action accepts, so a damaged
+ * record is never edited or deleted as a draft. An operator can still void it.
+ */
 function statusOf(stored) {
-  return INVOICE_STATUSES.includes(stored?.status) ? stored.status : 'draft';
+  return INVOICE_STATUSES.includes(stored?.status) ? stored.status : 'unknown';
 }
 
 function dateOrNull(value) {

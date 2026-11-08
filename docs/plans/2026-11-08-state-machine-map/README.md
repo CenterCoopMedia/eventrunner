@@ -206,6 +206,32 @@ failing test first.
 | 17 | A retry re-reads live console settings and can move a build to a new region | `scripts/provision-client.cjs:1209-1214`, `:1319-1322` | No |
 | 18 | When the account document stays absent, or the profile listener never delivers a first snapshot, account pages wait for ever with no error copy. A transient error retries after 15 s | `apps/web/src/contexts/ProfileContext.jsx:64`, `apps/web/src/lib/retrySubscription.js:33-41` | Yes |
 
+## Fix status
+
+Updated 2026-11-08, after the first two batches of fixes. Each fix has a
+test that failed before it.
+
+| # | Status |
+|---|---|
+| 1 | Fixed: the resume claims the row in a transaction |
+| 2 | Fixed: the Auth trigger runs the same store sweep as `deleteAttendee` |
+| 3 | Fixed: `archived` is in the console status list, labels and queue filter |
+| 4 | Fixed: retention and spam delete keep a request whose build began, and archive accepts `declined` |
+| 5 | Fixed: an operator can release the seats of an unpaid order in review, and the order list filters by order state |
+| 6 | Fixed: the server refuses a status change on a converted pitch, and the page hides the buttons |
+| 7 | Fixed (owner decision): unpublishing a speaker with an account stores `accepted`, so the link and the dashboard agree |
+| 8 | Fixed: the CMS writers read a missing `visible` as hidden, like the rules |
+| 9 | Fixed: autosave stays `waiting` while a newer value is queued |
+| 10 | Not a defect: Postmark sends soft bounces as `Bounce`, so a later `delivered` is correct |
+| 11 | Fixed: an archived event counts as over |
+| 12 | Fixed: an unknown reason reads as `settings-changed` (paused) |
+| 13 | By design: the sweep removes message content after 90 days on purpose |
+| 14 | Fixed: an unknown status reads as `unknown` and is locked |
+| 15 | Fixed: both leases carry a token, and only the holder releases |
+| 16 | Fixed: `purge --now` writes the archive record, with `purgeAfter` set to now |
+| 17 | Fixed: a retry keeps the project, region, folder and environment the first run saved |
+| 18 | Open: needs an error state in the profile listener |
+
 ## Suggested cleanup order
 
 Do the defects first, one test-first fix per pull request, from the table

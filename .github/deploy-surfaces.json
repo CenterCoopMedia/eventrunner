@@ -1,0 +1,36 @@
+{
+  "functions": [
+    "functions/**",
+    "packages/shared/**",
+    "package-lock.json",
+    "firebase.json",
+    "scripts/prepare-functions.cjs",
+    ".github/workflows/deploy-client.yml"
+  ],
+  "web": [
+    "apps/web/**",
+    "packages/shared/**",
+    "package-lock.json",
+    "firebase.json",
+    "scripts/generate-content.cjs",
+    "scripts/write-site-files.cjs",
+    "scripts/publish-site.cjs",
+    "publisher/**",
+    "scripts/lib/**",
+    ".github/workflows/deploy-client.yml"
+  ],
+  "rules": [
+    "firestore.rules",
+    "firestore.indexes.json",
+    "storage.rules",
+    "firebase.json"
+  ],
+  "console": [
+    "console/**",
+    "packages/shared/**",
+    "package-lock.json",
+    "scripts/prepare-functions.cjs",
+    "scripts/migrate-console-signup-links.cjs",
+    ".github/workflows/deploy-console.yml"
+  ]
+}

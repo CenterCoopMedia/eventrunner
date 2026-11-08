@@ -22,9 +22,11 @@
  *     and notify.
  */
 
+const crypto = require('node:crypto');
 const { MAX_OFFSET_DAYS, planReminders } = require('shared/reminderSchedule');
 const { splitEventDateTime } = require('shared/eventDateTime');
 const { isDayPast } = require('shared/time');
+const { getEventPhase } = require('shared/config');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { isoOrNull, timestampMs } = require('../speakers/reminderCore.cjs');
@@ -76,11 +78,22 @@ function normalizeCommon(raw, { defaultOffsets, pauseReasons }) {
     approvedWordingVersion: typeof data.approvedWordingVersion === 'string' ? data.approvedWordingVersion : null,
     approvedAt: isoOrNull(data.approvedAt),
     approvedBy: typeof data.approvedBy === 'string' ? data.approvedBy : null,
-    pausedReason: Object.hasOwn(pauseReasons, data.pausedReason) ? data.pausedReason : null,
+    pausedReason: readPauseReason(data.pausedReason, pauseReasons),
     pausedAt: isoOrNull(data.pausedAt),
     updatedAt: isoOrNull(data.updatedAt),
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : null,
   };
+}
+
+/**
+ * The stored pause reason, failing closed. A reason this schedule does not
+ * know (a corrupt value, or another schedule's reason) still means paused:
+ * it reads as 'settings-changed', so staff review and approve the schedule
+ * again before any reminder goes out. No reason, or an empty one, is no pause.
+ */
+function readPauseReason(value, pauseReasons) {
+  if (typeof value !== 'string' || value === '') return null;
+  return Object.hasOwn(pauseReasons, value) ? value : 'settings-changed';
 }
 
 /** 'off', 'on' or 'paused'. */
@@ -95,11 +108,14 @@ function eventTimeZone(config) {
 }
 
 /**
- * Whether the event is over: the last configured day's end time has passed
- * on the event's clock. An event with no usable days is not over.
+ * Whether the event is over: staff archived it, or the last configured
+ * day's end time has passed on the event's clock. An archived event sends
+ * no reminders even when its days are still ahead. An event with no usable
+ * days is not over unless it is archived.
  */
 function eventEnded(config, nowMs) {
   const event = config?.event;
+  if (getEventPhase(event, new Date(nowMs)) === 'archived') return true;
   const days = Array.isArray(event?.days) ? event.days.filter((day) => day && typeof day.date === 'string') : [];
   if (days.length === 0) return false;
   const last = [...days].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).at(-1);
@@ -204,15 +220,32 @@ async function pauseFromRun({ db, id, normalize, reason, holds, now, log, notify
   return { outcome: 'paused', reason };
 }
 
-/** Take the run lease on `reminder_schedule_runs/{id}`, or say why not. */
+/**
+ * Take the run lease on `reminder_schedule_runs/{id}`, or say why not. The
+ * lease carries a token, so only the run that took it can release it.
+ */
 async function acquireLease({ db, id, nowMs }) {
   const ref = db.collection(RUNS).doc(id);
+  const token = crypto.randomUUID();
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const since = timestampMs(snap.exists ? snap.data()?.running?.startedAt : null);
     if (Number.isFinite(since) && nowMs - since < LEASE_MS) return { ok: false, reason: 'busy' };
-    tx.set(ref, { running: { startedAt: new Date(nowMs) } }, { merge: true });
-    return { ok: true };
+    tx.set(ref, { running: { startedAt: new Date(nowMs), token } }, { merge: true });
+    return { ok: true, token };
+  });
+}
+
+/**
+ * Store a run's last result and release its lease. A run that outlived its
+ * lease records its result but leaves the lease of the run that took over.
+ */
+async function releaseLease({ db, id, token, lastRun }) {
+  const ref = db.collection(RUNS).doc(id);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const holder = snap.exists ? snap.data()?.running?.token : undefined;
+    tx.set(ref, { lastRun, ...(holder === token ? { running: null } : {}) }, { merge: true });
   });
 }
 
@@ -271,7 +304,7 @@ async function runSchedule({ id, normalize, sendDue, countsOf, reached, logDetai
     error: result.error ?? null,
   };
   try {
-    await db.collection(RUNS).doc(id).set({ running: null, lastRun }, { merge: true });
+    await releaseLease({ db, id, token: lease.token, lastRun });
   } catch (err) {
     // The lease runs out on its own.
     log.warn('reminder_schedule_runs stamp failed', err);
@@ -339,6 +372,7 @@ module.exports = {
   pauseSchedule,
   pauseFromRun,
   acquireLease,
+  releaseLease,
   runSchedule,
   afterCommit,
 };

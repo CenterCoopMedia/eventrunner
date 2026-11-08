@@ -316,6 +316,47 @@ test('settings: defaults, limits, and the helpers the run uses', () => {
   assert.equal(eventEnded({ event: { timezone: ZONE } }, IN_7D), false);
 });
 
+test('a run that outlived its lease does not release the next run\'s lease', async () => {
+  const { RUNS, LEASE_MS, acquireLease, releaseLease } = require('./scheduleCore.cjs');
+  const db = makeSpeakersDb({});
+  const t0 = Date.parse('2026-11-13T15:00:00Z');
+  const first = await acquireLease({ db, id: 'speakers', nowMs: t0 });
+  assert.equal(first.ok, true);
+  // The first run is still going when its lease runs out; a second run takes over.
+  const second = await acquireLease({ db, id: 'speakers', nowMs: t0 + LEASE_MS + 1 });
+  assert.equal(second.ok, true);
+  assert.notEqual(first.token, second.token);
+  // The slow first run finishes: it records its result but keeps the second run's lease.
+  await releaseLease({ db, id: 'speakers', token: first.token, lastRun: { outcome: 'completed' } });
+  assert.equal(db.read(RUNS, 'speakers').running.token, second.token);
+  assert.deepEqual(await acquireLease({ db, id: 'speakers', nowMs: t0 + LEASE_MS + 2 }), { ok: false, reason: 'busy' });
+  // The holder releases its own lease.
+  await releaseLease({ db, id: 'speakers', token: second.token, lastRun: { outcome: 'completed' } });
+  assert.equal(db.read(RUNS, 'speakers').running, null);
+});
+
+test('an unknown pause reason keeps the schedule paused', () => {
+  const { scheduleState } = require('./scheduleCore.cjs');
+  // 'facts-changed' is an attendee-only reason. On the speaker schedule it
+  // is unknown, and an unknown reason must not read as "on".
+  const stored = normalizeSpeakerSchedule({ enabled: true, pausedReason: 'facts-changed' });
+  assert.equal(scheduleState(stored), 'paused');
+  assert.equal(stored.pausedReason, 'settings-changed');
+  // No reason, or an empty one, is not a pause.
+  assert.equal(scheduleState(normalizeSpeakerSchedule({ enabled: true, pausedReason: '' })), 'on');
+  assert.equal(scheduleState(normalizeSpeakerSchedule({ enabled: true, pausedReason: null })), 'on');
+});
+
+test('an archived event counts as over even when its days are still ahead', () => {
+  // The event days are in December, after IN_7D, but staff archived the
+  // event on 2026-11-10. An archived event sends no more reminders.
+  const archived = { event: { ...CONFIG.event, archivedAt: '2026-11-10T09:00' } };
+  assert.equal(eventEnded(archived, IN_7D), true);
+  // Archived later than now: not archived yet, and the days are ahead.
+  const later = { event: { ...CONFIG.event, archivedAt: '2026-11-30T09:00' } };
+  assert.equal(eventEnded(later, IN_7D), false);
+});
+
 // Review findings on #528. A run reads the schedule once, then sends one
 // speaker at a time; each check below happens again before each speaker.
 

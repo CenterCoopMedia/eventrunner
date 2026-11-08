@@ -692,6 +692,26 @@ test('cmsDeleteContent on an organization removes its representatives and its qu
   assert.ok(rows.some((row) => row.action === 'cms-delete-content'));
 });
 
+// A converted pitch stays accepted while its draft session exists. Deleting
+// that session is how staff undo the conversion, so the pitch's decision
+// can change again.
+test('cmsDeleteContent on a session made from a pitch clears the pitch\'s conversion', async () => {
+  const conversion = { sessionId: 'pitch-p1', speakerId: 'pitch-p1', speakerIds: ['pitch-p1'], createdSpeakerIds: ['pitch-p1'], revision: 3 };
+  const db = makeFakeDb({
+    'cmsSchedule_drafts/pitch-p1': { title: 'Session', visible: false, status: 'dirty', basedOnRevision: null },
+    'session_pitches/p1': { title: 'Session', status: 'accepted', reviewRevision: 3, conversion },
+    'session_pitches/p2': { title: 'Other', status: 'accepted', reviewRevision: 1, conversion: { ...conversion, sessionId: 'pitch-p2' } },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(req({ body: { collection: 'cmsSchedule', docId: 'pitch-p1' } }), res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const pitch = db.read('session_pitches', 'p1');
+  assert.equal(pitch.conversion, null);
+  assert.equal(pitch.status, 'accepted');
+  assert.equal(pitch.reviewRevision, 4, 'an open review page sees the change');
+  assert.ok(db.read('session_pitches', 'p2').conversion, 'another pitch keeps its conversion');
+});
+
 test('cmsDeleteContent on a cmsSchedule doc cascades: its materials and their public projections are deleted too (issue #23 follow-up)', async () => {
   const db = makeFakeDb({
     'cmsSchedule/s1': { title: 'Session', visible: true, revision: 1, materialCount: 2 },

@@ -41,4 +41,10 @@ test('withdraw is refused once the build has started, for a closed request, and 
     message: 'Your site is being built, so you cannot withdraw it here.',
   });
   await assert.rejects(withdraw(deps(ready()), ben), { status: 403 });
+  // An archived site is not being built: the refusal says what happened.
+  const archived = ready({ 'applications/a1': applicationDoc({ status: 'archived' }) });
+  await assert.rejects(withdraw(deps(archived)), {
+    status: 409, message: 'This site is archived. Ask the hosting team to restore it.',
+  });
+  assert.ok(archived.read('site_names/nclocal'), 'the name stays');
 });

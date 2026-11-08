@@ -43,6 +43,17 @@ test('an approved or later request is never deleted as spam', async () => {
   }
 });
 
+test('a closed request whose build began is not deleted as spam', async () => {
+  const db = seeded({
+    'applications/a1': application({ status: 'declined' }),
+    'console_builds/a1': { state: 'failed' },
+  });
+  await assert.rejects(deleteSpamApplication(deps(db), { body: { appId: 'a1', confirm: true }, user: ops }), {
+    status: 409, code: 'build-began',
+  });
+  assert.ok(db.read('applications/a1'));
+});
+
 test('a missing request is a 404', async () => {
   await assert.rejects(deleteSpamApplication(deps(seeded()), { body: { appId: 'zz', confirm: true }, user: ops }), { status: 404 });
 });
@@ -74,13 +85,15 @@ test('the retention job deletes old withdrawn and declined requests, frees their
   assert.equal(db.read('site_names/nclocal'), undefined);
   assert.equal(db.read('site_names/gone'), undefined);
   for (const id of ['recent', 'kept', 'draft']) assert.ok(db.read(`applications/${id}`), id);
-  // A run may have made this name's project, so it stays taken after the request goes.
+  // A build began, so the request may own a cloud project. Retention keeps
+  // it: the decommission workflow needs the request to find that project.
   const built = seeded({
     'applications/a1': application({ status: 'declined', updatedAt: old }),
     'console_builds/a1': { state: 'failed' },
   });
-  await runRetention({ db: built, secrets: makeFakeSecrets(), now: () => NOW, log: QUIET });
-  assert.equal(built.read('applications/a1'), undefined);
+  const kept = await runRetention({ db: built, secrets: makeFakeSecrets(), now: () => NOW, log: QUIET });
+  assert.deepEqual(kept.deleted, []);
+  assert.ok(built.read('applications/a1'));
   assert.ok(built.read('site_names/nclocal'));
   assert.deepEqual(auditRows(db).map((r) => [r.action, r.appId, r.by]).sort(), [
     ['retention-delete', 'a1', 'retention'],

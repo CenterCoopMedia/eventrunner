@@ -53,12 +53,15 @@ async function deleteWithConnections(deps, spec) {
 
 /**
  * Delete one request in a transaction, after `check(app)` passes on the
- * request as it is now. Frees every name it holds, unless a run began: that
- * run may have made the name's project, and Google never reuses a project id.
+ * request as it is now, and only when no build began. A request whose build
+ * began may own a cloud project, and scripts/decommission-client.cjs needs
+ * the request to find and delete that project; deleting it first would
+ * leave the project unreachable. Such a request is kept: `onBuilt` says
+ * whether to refuse (throw) or skip it. Frees every name the request holds.
  *
- * @returns {Promise<object[]|null>} its connected accounts, or null when `check` says to keep it
+ * @returns {Promise<object[]|null>} its connected accounts, or null when it is kept
  */
-async function deleteApplication(db, { appId, by, action, at, check }) {
+async function deleteApplication(db, { appId, by, action, at, check, onBuilt = 'skip' }) {
   const ref = applicationRef(db, appId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -68,9 +71,15 @@ async function deleteApplication(db, { appId, by, action, at, check }) {
     const held = await heldNames(tx, db, app.id);
     const connected = await readConnectedAccounts(tx, db, app.id);
     const build = await readBuild((r) => tx.get(r), db, app.id);
+    if (build) {
+      if (onBuilt === 'refuse') {
+        throw new ConsoleError(409, 'build-began', 'A build began for this request, so it may own a site. Delete it with the decommission workflow instead.');
+      }
+      return null;
+    }
     tx.delete(ref);
     tx.delete(db.collection(ACCOUNT_COLLECTION).doc(app.id));
-    if (!build) releaseNames(tx, db, held);
+    releaseNames(tx, db, held);
     tx.create(db.collection('console_audit').doc(), { action, appId: app.id, by, at });
     recordTokenDeletion(tx, db, app.id, connected, at);
     return connected;
@@ -93,7 +102,7 @@ async function deleteSpamApplication(deps, { body, user }) {
     return true;
   };
   check(first);
-  await deleteWithConnections(deps, { appId, by: user.uid, action: 'delete-spam', at: new Date(now()), check });
+  await deleteWithConnections(deps, { appId, by: user.uid, action: 'delete-spam', at: new Date(now()), check, onBuilt: 'refuse' });
   return { body: { appId, deleted: true } };
 }
 

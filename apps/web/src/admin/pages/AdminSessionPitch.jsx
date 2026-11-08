@@ -172,7 +172,13 @@ function PitchReview({ initial, current, call, settings }) {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {result?.where === 'top' ? <SaveStatus message={result.message} /> : null}
 
-      <Panel title="Decision" description="You can change this decision. Send an email separately below.">
+      <Panel
+        title="Decision"
+        description={created
+          ? 'This pitch is already a draft session, so the decision stays Accepted. To change it, delete that session first. Send an email separately below.'
+          : 'You can change this decision. Send an email separately below.'}
+      >
+        {created ? null : (
         <div className="flex flex-wrap gap-xs" role="group" aria-label="Decision">
           {DECISIONS.filter((choice) => choice.status !== baseline.status).map((choice) => (
             <button
@@ -186,6 +192,7 @@ function PitchReview({ initial, current, call, settings }) {
             </button>
           ))}
         </div>
+        )}
         {result?.where === 'decision' ? <div className="mt-sm"><SaveStatus message={result.message} /></div> : null}
       </Panel>
 

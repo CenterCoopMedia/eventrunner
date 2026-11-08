@@ -7,7 +7,7 @@ const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
 const { internals: { safeDocId } } = require('./index.cjs');
-const { listPromoCodes, savePromoCode, deletePromoCode } = require('./promoCodes.cjs');
+const { listPromoCodes, savePromoCode, deletePromoCode, promoRef, releasedPromoUse } = require('./promoCodes.cjs');
 
 const ORDERS = 'ticket_orders';
 const CATALOG = 'ticket_catalog';
@@ -16,7 +16,7 @@ const TICKETS = 'tickets';
 const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
-const OPERATOR_ACTIONS = new Set(['saveCatalog', 'pauseSales', 'issueComp', 'allocateRefund']);
+const OPERATOR_ACTIONS = new Set(['saveCatalog', 'pauseSales', 'issueComp', 'allocateRefund', 'releaseHold']);
 const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets', 'promoCodes']);
 // Promo codes are staff-editable (ADR 0008 §6); they live in promoCodes.cjs.
 const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee', 'cancelTickets', 'resend', 'reconcile', 'savePromoCode', 'deletePromoCode']);
@@ -183,6 +183,7 @@ function matchesFilters(row, body, kind) {
   if (kind === 'orders') {
     if (body.paymentStatus && body.paymentStatus !== row.paymentStatus) return false;
     if (body.refundStatus && body.refundStatus !== (row.refundStatus || 'none')) return false;
+    if (body.status && body.status !== row.status) return false;
   } else {
     if (body.ticketTypeId && body.ticketTypeId !== row.ticketTypeId) return false;
     if (body.status && body.status !== row.status) return false;
@@ -332,6 +333,41 @@ async function changeAdmission({ db, provider, actor, body, now, allocate = fals
   return readOrderDetail({ db, provider, orderId });
 }
 
+/**
+ * Give back the seats an unpaid order under review still holds (operator
+ * only). An order whose checkout outcome is unknown stays in 'exception'
+ * with its seats held, and nothing else releases it: it kept the seats, its
+ * promo code uses, and the buyer's lock on new orders. This is the release
+ * an expired checkout gets, done by hand with a reason. If the buyer did pay
+ * after all, reconciliation flags 'payment-after-capacity-release' for review.
+ */
+async function releaseHold({ db, provider, actor, body, now }) {
+  if (body.confirmed !== true) fail(400, 'confirmation-required', 'Confirm that the buyer has not paid for this order.');
+  const orderId = idOf(body.orderId, 'Order');
+  const reason = reasonOf(body);
+  const logRef = auditRef(db);
+  await db.runTransaction(async (tx) => {
+    await requireWrites(db, tx);
+    const orderRef = db.collection(ORDERS).doc(orderId);
+    const order = requireOrder(await tx.get(orderRef), provider);
+    if (order.inventoryState !== 'held') fail(409, 'conflict', 'This order holds no seats.');
+    if (order.paymentStatus === 'succeeded') fail(409, 'conflict', 'This order is paid. Reconcile it instead.');
+    if (order.status !== 'exception') fail(409, 'conflict', 'Only an order that needs review is released by hand. Checkout releases other holds when they expire.');
+    const inventoryRef = db.collection(INVENTORY).doc('current');
+    const inventorySnap = await tx.get(inventoryRef);
+    const promoSnap = order.promo?.code ? await tx.get(promoRef(db, order.promo.code)) : null;
+    const { inventoryTransitionPatch } = require('./stripeCommerce.cjs');
+    const transition = inventoryTransitionPatch({ order, inventory: inventorySnap.data(), to: 'released' });
+    const at = now();
+    const promoUse = releasedPromoUse(promoSnap, order, at);
+    tx.set(inventoryRef, transition.inventory);
+    if (promoUse) tx.set(promoRef(db, order.promo.code), promoUse, { merge: true });
+    tx.update(orderRef, { ...transition.orderPatch, holdReleased: { at, byUid: actor.uid, reason }, updatedAt: at });
+    audit(tx, logRef, { action: 'hold-released', actor, now, orderId, reason });
+  });
+  return readOrderDetail({ db, provider, orderId });
+}
+
 function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, now = () => new Date(), sendConfirmations, env = process.env, log = console }) {
   return async function ticketingCommerceAdmin(req, res) {
     res.set('Cache-Control', 'private, no-store');
@@ -358,6 +394,7 @@ function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, no
       else if (action === 'orders' || action === 'tickets') result = await listCommerce({ ...deps, kind: action });
       else if (action === 'order') result = await readOrderDetail({ ...deps, orderId: body.orderId });
       else if (action === 'updateAttendee') result = await correctAttendee(deps);
+      else if (action === 'releaseHold') result = await releaseHold(deps);
       else if (action === 'cancelTickets' || action === 'allocateRefund') result = await changeAdmission({ ...deps, allocate: action === 'allocateRefund' });
       else if (action === 'issueComp') {
         confirm(body);

@@ -48,7 +48,7 @@ const { withDefaults } = require('./answers.cjs');
 const { checkAnswers, stepErrors } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
 const { RETRY_STATUSES, canRetryBuild, readBuild } = require('./buildState.cjs');
-const { CLOSED, readApplication } = require('./applications.cjs');
+const { ARCHIVED_MESSAGE, CLOSED, readApplication } = require('./applications.cjs');
 const { hostName } = require('./hostName.cjs');
 const {
   BUILT_STATUSES, CHANGEABLE, PROVIDERS, PROVIDER_NAMES, connectionChanging, connectionsForClient, liveConnection,
@@ -108,6 +108,7 @@ const redirectUri = (publicUrl, provider) => `${publicUrl}/connect/${provider}/r
 
 function requireChangeable(data) {
   if (CLOSED.includes(data.status)) throw new ConsoleError(409, 'locked', 'This request is closed.');
+  if (data.status === 'archived') throw new ConsoleError(409, 'locked', ARCHIVED_MESSAGE);
   if (!CHANGEABLE.includes(data.status)) throw new ConsoleError(409, 'locked', stillBuilding);
 }
 
@@ -119,6 +120,7 @@ function requireChangeable(data) {
  */
 async function requireConnectable({ db, now = Date.now }, get, { appId, data, provider }) {
   if (CLOSED.includes(data.status)) throw new ConsoleError(409, 'locked', 'This request is closed.');
+  if (data.status === 'archived') throw new ConsoleError(409, 'locked', ARCHIVED_MESSAGE);
   if (CHANGEABLE.includes(data.status)) return;
   if (!canRetryBuild(data, await readBuild(get, db, appId), now())) throw new ConsoleError(409, 'locked', stillBuilding);
   if (withDefaults(data.frozen || data.answers).tickets.choice !== provider) {

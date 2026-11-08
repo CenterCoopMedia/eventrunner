@@ -127,7 +127,7 @@ export function groupPending(docsByCollection) {
       name: recordNameOf(choice.id, draft),
       fullName: fullNameOf(choice.id, draft),
       state: draftStateOf(draft),
-      hidden: draft.visible === false,
+      hidden: draft.visible !== true,
       section: typeof draft.section === 'string' ? draft.section : null,
       field: typeof draft.field === 'string' ? draft.field : null,
       savedAt: toMillis(draft.updatedAt),

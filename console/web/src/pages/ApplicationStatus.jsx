@@ -253,7 +253,7 @@ export default function ApplicationStatus() {
   if (!app) return error ? <div className="console-workspace"><p className="message error" role="alert">{error}</p><IconControl icon="refresh" label="Refresh request" onClick={() => load()} /></div> : <LoadingState long className="console-workspace">Loading your request.</LoadingState>;
 
   const title = app.answers.event.name || 'New event site';
-  const closed = ['withdrawn', 'declined'].includes(app.status);
+  const closed = ['withdrawn', 'declined', 'archived'].includes(app.status);
   const choice = app.answers.tickets.choice;
   const accounts = PROVIDERS.filter((provider) => connectionResults[provider] || app.connections[provider].connected || app.connections[provider].unfinished || (provider === choice && !closed));
   // An account that is gone blocks a retry whichever step failed, so it needs the same way back.

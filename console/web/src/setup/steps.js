@@ -97,4 +97,5 @@ export const STATUS_LABELS = Object.freeze({
   launched: 'Your site is open to the public',
   withdrawn: 'Withdrawn',
   declined: 'We cannot build this site',
+  archived: 'Your site is switched off',
 });

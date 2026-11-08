@@ -251,12 +251,18 @@ test('restore re-releases the saved version and restores the previous status', a
   assert.equal(s.db.writes.length, writes);
 });
 
-test('archive accepts failed builds and refuses active builds or closed applications', async () => {
+test('archive accepts failed builds and closed requests whose build began, and refuses active builds', async () => {
   const failed = setup({ app: { status: 'building', buildStart: { state: 'failed', at: new Date(NOW) } }, build: { state: 'failed' } });
   assert.equal(await failed.run('archive'), 0);
   assert.equal(failed.db.read('applications/a1').archive.previousStatus, 'building');
-  for (const status of ['approved', 'building', 'declined']) {
-    const s = setup({ app: { status }, build: { state: status === 'declined' ? 'failed' : 'running', startedAt: new Date(NOW) } });
+  // A request closed after its build began may own a project. Console
+  // retention keeps it, and archive is the way to its 7-day purge.
+  const closed = setup({ app: { status: 'declined' }, build: { state: 'failed', startedAt: new Date(NOW) } });
+  assert.equal(await closed.run('archive'), 0);
+  assert.equal(closed.db.read('applications/a1').status, 'archived');
+  assert.equal(closed.db.read('applications/a1').archive.previousStatus, 'declined');
+  for (const status of ['approved', 'building']) {
+    const s = setup({ app: { status }, build: { state: 'running', startedAt: new Date(NOW) } });
     assert.equal(await s.run('archive'), 1);
     assert.equal(mutations(s).length, 0);
   }
@@ -326,6 +332,22 @@ test('a partial purge resumes from verified checkpoints after a database failure
   assert.equal(await s.run('purge'), 0, s.logs.join('\n'));
   assert.equal(mutations(s).filter((c) => c.p === '/v1/webhook_endpoints/we_own').length, 1);
   assert.ok(mutations(s).length > firstDeletes);
+});
+
+test('purge --now on a live site records the archive, so a failed run shows when and why', async () => {
+  const s = setup({ app: { status: 'ready' } });
+  const key = `DELETE firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)`;
+  s.failures.set(key, 500);
+  assert.equal(await s.run('purge', true), 1);
+  const app = s.db.read('applications/a1');
+  assert.equal(app.status, 'archived');
+  assert.ok(app.archivedAt, 'archivedAt is set');
+  assert.ok(app.purgeAfter && app.purgeAfter.getTime() <= app.archivedAt.getTime(), 'purge is due at once');
+  assert.deepEqual([app.history.at(-1).status, app.history.at(-1).by], ['archived', 'decommission']);
+  assert.equal(app.archive.previousStatus, 'ready');
+  // A manual retry with the same id resumes from the tombstone.
+  s.failures.delete(key);
+  assert.equal(await s.run('purge', true), 0, s.logs.join('\n'));
 });
 
 test('a refused Postmark server deletion is reported and the rest of the purge continues', async () => {

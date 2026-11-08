@@ -9,11 +9,12 @@ export const STATUS_LABELS = Object.freeze({
   launched: 'Launched',
   withdrawn: 'Withdrawn',
   declined: 'Declined',
+  archived: 'Archived',
 });
 
 /** The queue filters, in the order the hosting team works through them. */
 export const STATUS_FILTERS = Object.freeze([
-  'approved', 'building', 'ready', 'launched', 'draft', 'declined', 'withdrawn',
+  'approved', 'building', 'ready', 'launched', 'draft', 'declined', 'withdrawn', 'archived',
 ]);
 
 export const LINK_STATUS_LABELS = Object.freeze({

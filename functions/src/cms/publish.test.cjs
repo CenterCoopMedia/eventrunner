@@ -277,6 +277,25 @@ test('cmsPublish resume of a still-running row → 409, no writes', async () => 
   assert.equal(db.writes.length, 0); // no revision bump, no history row
 });
 
+test('cmsPublish: two resumes of one failed row at once publish it only once', async () => {
+  const db = makeFakeDb({
+    'cmsPublishQueue/q1': { status: 'failed', request: { cmsContent: ['a'] }, progress: {} },
+    'cmsContent_drafts/a': { value: '1', visible: true, status: 'dirty' },
+  });
+  const first = fakeRes();
+  const second = fakeRes();
+  await Promise.all([
+    createCmsPublishHandler(deps(db))(req({ body: { queueId: 'q1' } }), first),
+    createCmsPublishHandler(deps(db))(req({ body: { queueId: 'q1' } }), second),
+  ]);
+  assert.deepEqual([first.statusCode, second.statusCode].sort(), [200, 409]);
+  const refused = first.statusCode === 409 ? first : second;
+  assert.equal(refused.body.error.code, 'already-running');
+  assert.equal(db.ids('cmsVersionHistory').length, 1, 'one history row, not two');
+  assert.equal(db.read('cmsContent', 'a').revision, 1, 'no double bump');
+  assert.equal(db.read('cmsPublishQueue', 'q1').status, 'done');
+});
+
 // --- site-publisher hook (spec §8.4 phase 5, issue #36) -------------------------
 
 const PUBLISHER_ENV = {

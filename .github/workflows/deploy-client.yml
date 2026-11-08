@@ -86,17 +86,13 @@ jobs:
       functions: ${{ steps.filter.outputs.functions }}
     steps:
       - uses: actions/checkout@v4
+      # The path rules live in one file that Oathgate's `eventrunner
+      # needs-deploy` also reads, so the two cannot drift. Only the
+      # `functions` output is used here.
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          filters: |
-            functions:
-              - 'functions/**'
-              - 'packages/shared/**'
-              - 'package-lock.json'
-              - 'firebase.json'
-              - 'scripts/prepare-functions.cjs'
-              - '.github/workflows/deploy-client.yml'
+          filters: .github/deploy-surfaces.json
 
   shared:
     name: Pack shared workspace

@@ -35,6 +35,21 @@ describe('useAutosave', () => {
     expect(save.mock.calls.map(([v]) => v)).toEqual([{ n: 1 }, { n: 2 }]);
   });
 
+  it('does not say saved while a newer value is still waiting', async () => {
+    let finish;
+    const save = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    const { result } = renderHook(() => useAutosave({ save }));
+    act(() => result.current.queue({ n: 1 }));
+    let first;
+    await act(async () => { first = result.current.flush(); });
+    expect(result.current.status).toBe('saving');
+    // The client types again while the first save is on its way.
+    act(() => result.current.queue({ n: 2 }));
+    await act(async () => { finish({ saved: true }); await first; });
+    expect(result.current.status).toBe('waiting');
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
   it('a flush with nothing waiting reports success', async () => {
     const { result } = renderHook(() => useAutosave({ save: vi.fn() }));
     let ok;
