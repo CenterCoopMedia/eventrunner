@@ -50,9 +50,13 @@ LABELS              // staff words; client words only where they differ
       payment, refund state, Stripe refund and Stripe dispute each have their
       own words. A pending refund no longer reads "Confirming payment", and the
       admin ticket filter no longer keeps its own word list.
-- [ ] S3. Pitch review and change request statuses. Store `declined`
-      everywhere (owner decision), with a one-time migration of stored
-      `rejected` pitches on each client site.
+- [x] S3. Pitch review statuses are in `shared/pitch` and every write stores
+      `declined`. Readers pass stored values through `pitchStatusOf` and
+      `pitchNoticesOf`, so a pitch an older site stored as `rejected`, and its
+      `notices.rejected` email record, read as declined and a sent decline is
+      never sent again. Change requests already stored `declined` in one list.
+      Still open: the one-time rewrite of stored `rejected` pitches on each
+      client site. Nothing depends on it now; it only removes the legacy read.
 - [ ] S4. Speaker, invite and material review statuses, with a speaker
       transition table checked in `applyUpdateSpeaker`.
 - [ ] S5. Delivery states (pitch notices, change request notices, speaker

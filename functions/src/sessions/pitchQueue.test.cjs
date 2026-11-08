@@ -268,7 +268,7 @@ test('a converted pitch cannot move off accepted, but its notes can still change
     await handler({ method: 'POST', headers: { authorization: 'Bearer staff' }, body }, res);
     return res;
   };
-  for (const status of ['rejected', 'in_review', 'new']) {
+  for (const status of ['declined', 'in_review', 'new']) {
     const refused = await send({ id: 'proposal', status, expectedStatus: 'accepted', expectedRevision: 2 });
     assert.equal(refused.statusCode, 409, status);
     assert.equal(refused.body.error.code, 'pitch-converted');

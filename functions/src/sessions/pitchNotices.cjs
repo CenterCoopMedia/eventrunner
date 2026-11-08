@@ -13,7 +13,7 @@
  *   nothing.
  *
  * Each email has a private delivery record on its pitch,
- * `notices.{receipt|accepted|rejected}`, with the state `queued`, `sent`,
+ * `notices.{receipt|accepted|declined}` (`rejected` on older sites), with the state `queued`, `sent`,
  * `failed` or `unknown`. Each send attempt has its own send-once key, so a
  * retried request or a repeated decision cannot send the same attempt twice.
  * A sent email is never sent again. A failed email (the provider refused it)
@@ -48,6 +48,9 @@ const {
   PITCH_NOTICE_TEMPLATE_IDS,
   PITCH_NOTICE_DEFAULTS,
   DECISION_TEMPLATE_IDS,
+  PITCH_STATUSES,
+  pitchStatusOf,
+  pitchNoticesOf,
   RECEIPT_MODES,
   MAX_NOTICE_SUBJECT_LENGTH,
   MAX_NOTICE_WORDING_LENGTH,
@@ -58,7 +61,6 @@ const {
 const PITCHES = 'session_pitches';
 const SETTINGS_COLLECTION = 'session_pitch_settings';
 const SETTINGS_DOC = 'notices';
-const STATUSES = Object.freeze(['new', 'in_review', 'accepted', 'rejected']);
 const KINDS = Object.freeze(['receipt', 'decision']);
 // A queued record older than this is treated as interrupted, and staff may
 // retry it. A younger one may still be sending.
@@ -224,8 +226,9 @@ function readSendRequest(body) {
   const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
   if (!isValidDocId(source.id)) return { ok: false, message: 'id: must be a session pitch id.' };
   if (!KINDS.includes(source.kind)) return { ok: false, message: `kind: must be one of ${KINDS.join(', ')}.` };
-  if (!STATUSES.includes(source.expectedStatus)) {
-    return { ok: false, message: `expectedStatus: must be one of ${STATUSES.join(', ')}.` };
+  const expectedStatus = pitchStatusOf(source.expectedStatus);
+  if (!PITCH_STATUSES.includes(expectedStatus)) {
+    return { ok: false, message: `expectedStatus: must be one of ${PITCH_STATUSES.join(', ')}.` };
   }
   if (!Number.isSafeInteger(source.expectedRevision) || source.expectedRevision < 0) {
     return { ok: false, message: 'expectedRevision: must be a non-negative whole number.' };
@@ -251,7 +254,7 @@ function readSendRequest(body) {
     ok: true,
     id: source.id,
     kind: source.kind,
-    expectedStatus: source.expectedStatus,
+    expectedStatus,
     expectedRevision: source.expectedRevision,
     preview: source.preview === true,
     confirmUnknown: source.confirmUnknown === true,
@@ -264,10 +267,14 @@ function readSendRequest(body) {
 function evaluate(stored, request, nowMs) {
   if (!stored) return { status: 404, code: 'not-found', message: 'No such session pitch.' };
   const revision = Number.isSafeInteger(stored.reviewRevision) ? stored.reviewRevision : 0;
-  if (stored.status !== request.expectedStatus || revision !== request.expectedRevision) {
+  // Older sites stored a decline as `rejected` and its email record as
+  // `notices.rejected`; read both under today's names.
+  const status = pitchStatusOf(stored.status);
+  const notices = pitchNoticesOf(stored.notices);
+  if (status !== request.expectedStatus || revision !== request.expectedRevision) {
     return { status: 409, code: 'status-conflict', message: 'The session pitch changed. Load the current review and try again.' };
   }
-  const target = slotFor(request.kind, stored.status);
+  const target = slotFor(request.kind, status);
   if (!target) {
     return { status: 400, code: 'bad-request', message: 'Save an accepted or declined decision before you send a decision email.' };
   }
@@ -277,7 +284,7 @@ function evaluate(stored, request, nowMs) {
   if (typeof stored.email !== 'string' || !stored.email) {
     return { status: 400, code: 'bad-request', message: 'This pitch has no email address.' };
   }
-  const previous = stored.notices?.[target.slot] || null;
+  const previous = notices[target.slot] || null;
   if (previous?.state === 'sent') {
     return { status: 409, code: 'already-sent', message: 'This email was already sent. It is not sent again.' };
   }
@@ -296,8 +303,8 @@ function evaluate(stored, request, nowMs) {
       message: 'This email may have been sent. Check the Email log, then confirm before you retry.',
     };
   }
-  const otherSlot = request.kind === 'decision' ? (stored.status === 'accepted' ? 'rejected' : 'accepted') : null;
-  const otherDecisionSent = otherSlot && stored.notices?.[otherSlot]?.state === 'sent' ? otherSlot : null;
+  const otherSlot = request.kind === 'decision' ? (status === 'accepted' ? 'declined' : 'accepted') : null;
+  const otherDecisionSent = otherSlot && notices[otherSlot]?.state === 'sent' ? otherSlot : null;
   return { ...target, previous, revision, mayHaveBeenSent, otherDecisionSent };
 }
 
@@ -366,7 +373,7 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
           uid: gate.uid,
           email: gate.email,
           at,
-          details: { templateId: target.templateId, attempt: record.attempt, status: stored.status, reviewRevision: target.revision },
+          details: { templateId: target.templateId, attempt: record.attempt, status: pitchStatusOf(stored.status), reviewRevision: target.revision },
         });
         return { slot: target.slot, record, pitch: { title: stored.title }, settings };
       });

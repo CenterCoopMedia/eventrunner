@@ -36,10 +36,9 @@ const RATE_LIMITS = 'session_pitch_rate_limits';
 const ADMIN_LOGS = 'admin_logs';
 const PITCH_CALL_PATH = 'config/pitch_call';
 
-const STATUSES = Object.freeze(['new', 'in_review', 'accepted', 'rejected']);
 const SUBMISSION_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
 const {
-  readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen,
+  readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen, PITCH_STATUSES, pitchStatusOf,
 } = require('shared/pitch');
 const {
   IMPORT_FIELDS, checkPitch, presenterList, readPitchFormOptions, readPresenters, sameValue, validatePitchFormOptions,
@@ -580,11 +579,14 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
 function readReview(body) {
   const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
   if (!isValidDocId(source.id)) return { ok: false, message: 'id: must be a session pitch id.' };
-  if (!STATUSES.includes(source.status)) {
-    return { ok: false, message: `status: must be one of ${STATUSES.join(', ')}.` };
+  // A page loaded before the rename still sends `rejected`; it means declined.
+  const status = pitchStatusOf(source.status);
+  const expectedStatus = pitchStatusOf(source.expectedStatus);
+  if (!PITCH_STATUSES.includes(status)) {
+    return { ok: false, message: `status: must be one of ${PITCH_STATUSES.join(', ')}.` };
   }
-  if (!STATUSES.includes(source.expectedStatus)) {
-    return { ok: false, message: `expectedStatus: must be one of ${STATUSES.join(', ')}.` };
+  if (!PITCH_STATUSES.includes(expectedStatus)) {
+    return { ok: false, message: `expectedStatus: must be one of ${PITCH_STATUSES.join(', ')}.` };
   }
   if (!Number.isSafeInteger(source.expectedRevision) || source.expectedRevision < 0) {
     return { ok: false, message: 'expectedRevision: must be a non-negative whole number.' };
@@ -594,8 +596,8 @@ function readReview(body) {
   return {
     ok: true,
     id: source.id,
-    status: source.status,
-    expectedStatus: source.expectedStatus,
+    status,
+    expectedStatus,
     expectedRevision: source.expectedRevision,
     privateNotesProvided: Object.hasOwn(source, 'privateNotes'),
     privateNotes: privateNotes.value,
@@ -620,7 +622,7 @@ function createReviewSessionPitchHandler({ db, auth, getConfig, now = Date.now, 
         const snap = await tx.get(ref);
         if (!snap.exists) return { outcome: 'missing' };
         const stored = snap.data() || {};
-        const currentStatus = stored.status;
+        const currentStatus = pitchStatusOf(stored.status);
         const currentRevision = Number.isSafeInteger(stored.reviewRevision) ? stored.reviewRevision : 0;
         if (currentStatus !== review.expectedStatus || currentRevision !== review.expectedRevision) {
           return { outcome: 'conflict' };
@@ -728,7 +730,7 @@ module.exports = {
   internals: {
     PITCHES,
     RATE_LIMITS,
-    STATUSES,
+    STATUSES: PITCH_STATUSES,
     MAX_TITLE_LENGTH,
     MAX_DESCRIPTION_LENGTH,
     MAX_ORGANIZATION_LENGTH,

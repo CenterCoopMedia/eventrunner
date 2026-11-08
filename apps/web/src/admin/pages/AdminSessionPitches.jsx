@@ -20,7 +20,7 @@ import { subscribeAdminCollection } from '../adminSource.js';
 import { saveTextFile } from '../downloadFile.js';
 import { toMillis } from '../versionHistory.js';
 import { pitchQueueCsv } from '../pitchCsv.js';
-import { PITCH_STATUS_LABELS, PITCH_STATUS_OPTIONS, PITCH_STATUS_TONES } from '../pitchStatus.js';
+import { PITCH_STATUS_LABELS, PITCH_STATUS_OPTIONS, PITCH_STATUS_TONES, pitchRow } from '../pitchStatus.js';
 import PitchSourceMarkers from './PitchSourceMarkers.jsx';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import {
@@ -49,7 +49,7 @@ export default function AdminSessionPitches() {
   const [listError, setListError] = useState(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
-  useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs); setListError(null); }, setListError), []);
+  useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs.map(pitchRow)); setListError(null); }, setListError), []);
 
   const needle = search.trim().toLowerCase();
   const shown = (rows || [])
