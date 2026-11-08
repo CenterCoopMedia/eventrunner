@@ -38,8 +38,8 @@
  * email log can list its rows by send. An older record has no such field.
  */
 
-const crypto = require('node:crypto');
 const { EmailBatchError } = require('../email/send.cjs');
+const { holdsLease, leaseIsLive, newLeaseToken } = require('../core/lease.cjs');
 const { newUnsubscribeKey, readSuppressedIds, suppressionIdFor, testUnsubscribeUrl, unsubscribeUrlFor } = require('./suppression.cjs');
 const { auditRedactFor, personalize, resolveChannel, unsubscribeHeaders } = require('./compose.cjs');
 
@@ -173,9 +173,8 @@ async function takeLease({ db, sendId, nowMs, guard = null }) {
     if (data.status !== 'sending') return { done: true, data };
     const stop = guard ? guard.check(guardSnap.exists ? guardSnap.data() : null) : null;
     if (stop) return { stopped: stop, data };
-    const until = toMillis(data.lease?.until);
-    if (until !== null && until > nowMs) return { busy: true, data };
-    const token = crypto.randomUUID();
+    if (leaseIsLive(data.lease, nowMs, LEASE_MS)) return { busy: true, data };
+    const token = newLeaseToken();
     const start = data.nextIndex || 0;
     tx.update(ref, { lease: { token, until: new Date(nowMs + LEASE_MS) }, updatedAt: new Date(nowMs) });
     return { token, start, data };
@@ -194,8 +193,7 @@ async function markStopped({ db, sendId, nowMs, reason }) {
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.data()?.status !== 'sending') return false;
-    const until = toMillis(snap.data().lease?.until);
-    if (until !== null && until > nowMs) return false;
+    if (leaseIsLive(snap.data().lease, nowMs, LEASE_MS)) return false;
     tx.update(ref, { status: 'stopped', stoppedReason: reason, lease: null, updatedAt: new Date(nowMs) });
     return true;
   });
@@ -205,7 +203,7 @@ async function releaseLease({ db, sendId, token }) {
   const ref = db.collection(SENDS).doc(sendId);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    if (snap.exists && snap.data()?.lease?.token === token) tx.update(ref, { lease: null });
+    if (snap.exists && holdsLease(snap.data()?.lease, token)) tx.update(ref, { lease: null });
   });
 }
 

@@ -70,7 +70,11 @@ LABELS              // staff words; client words only where they differ
       Both notice flows use one retry rule, `functions/src/email/noticeRetry.cjs`.
       The API names `confirmUnknown` and `delivery-unknown` stay, because
       loaded pages send and read them.
-- [ ] S6. One lease helper with an owner token, used by the five leases.
+- [x] S6. Every lease already releases only with its owner token (#763).
+      `functions/src/core/lease.cjs` now holds the run lease rules (live,
+      held, new token) for reminder schedules, the Airtable refresh and
+      announcement send chunks. The Stripe order leases stay beside their
+      payment steps, because each one changes payment state with it.
 - [x] S7. Deleted the unused invite status lists, `exhaustRow` (an unguarded
       copy of the queue's exhaust step) and `store.unpublishDoc` (it would
       hide a doc with no revision bump or history row). Kept on purpose:
