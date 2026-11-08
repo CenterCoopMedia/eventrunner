@@ -15,11 +15,11 @@
 //
 // The page hands this the same material array its table renders, before
 // any filter, so the panel and the table cannot disagree.
-import { sessionNeedsMaterials } from 'shared/speakerReadiness';
+import { COUNTED_MATERIAL_STATUSES, sessionNeedsMaterials } from 'shared/speakerReadiness';
 import { UNKNOWN_DAY_LABEL, resolveDayLabel } from './sessionDoc.js';
 
-/** The review states that count toward coverage. */
-export const COUNTED_REVIEW_STATUSES = Object.freeze(['pending', 'approved']);
+/** The review states that count toward coverage: the ones speaker readiness counts. */
+export const COUNTED_REVIEW_STATUSES = COUNTED_MATERIAL_STATUSES;
 
 /**
  * The live sessions, in the order the admin's session rows give them, with

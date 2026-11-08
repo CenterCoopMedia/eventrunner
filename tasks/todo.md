@@ -57,8 +57,12 @@ LABELS              // staff words; client words only where they differ
       never sent again. Change requests already stored `declined` in one list.
       Still open: the one-time rewrite of stored `rejected` pitches on each
       client site. Nothing depends on it now; it only removes the legacy read.
-- [ ] S4. Speaker, invite and material review statuses, with a speaker
-      transition table checked in `applyUpdateSpeaker`.
+- [x] S4. Speaker statuses have a transition table, `SPEAKER_TRANSITIONS` in
+      `shared/speaker`, checked by `applyUpdateSpeaker` and by the admin
+      editor's choices. Owner decisions: a draft may be published with no
+      account; a removed speaker goes back only to draft. The dashboard list,
+      the coverage list and the two admin speaker helpers import one copy.
+      Invite and material review statuses already had one list each.
 - [ ] S5. Delivery states (pitch notices, change request notices, speaker
       reminders, access mail, email send): one vocabulary for an unknown
       outcome, and one notice-record helper.

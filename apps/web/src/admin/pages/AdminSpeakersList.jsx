@@ -58,7 +58,7 @@ import AdminPageHeader, {
   StatusBadge,
   proofRowClass,
 } from '../components/adminChrome.jsx';
-import { deadMatter, state } from '../recordState.js';
+import { pendingFieldsOf, speakerRecordState } from '../speakerRecord.js';
 
 /**
  * Where a speaker is in the INVITATION pipeline. This is a different axis
@@ -74,28 +74,7 @@ const PIPELINE_LABELS = {
   removed: 'Removed',
 };
 
-/**
- * The speaker's record state, in the admin's three words (brief §5.2). A
- * speaker is on the public site only once they are approved, and an
- * approved speaker with self-service edits waiting for review is exactly
- * the third state. A removed speaker is dead matter: it keeps its word.
- */
-function speakerRecordState(speaker) {
-  if (speaker.status === 'removed') return deadMatter('Removed');
-  if (speaker.status !== 'approved') return state('draft');
-  return pendingFieldsOf(speaker).length > 0 ? state('dirty') : state('live');
-}
 
-/**
- * Field names queued in `speaker.pendingEdits` (spec §4.3, issue #22
- * review finding P1-1) — an approved speaker's self-service edit that
- * onSpeakerWritten deliberately did NOT publish, awaiting an admin's
- * apply/discard decision (functions/src/speakers/profile.cjs).
- */
-function pendingFieldsOf(speaker) {
-  const pending = speaker?.pendingEdits;
-  return pending && typeof pending === 'object' ? Object.keys(pending) : [];
-}
 
 /**
  * The tone under each pipeline word. The word itself is always rendered and

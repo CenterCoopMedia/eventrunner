@@ -48,7 +48,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
-import { deadMatter, state as recordStateWord } from '../recordState.js';
+import { speakerRecordState, speakerStatusOptions } from '../speakerRecord.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 
@@ -63,31 +63,7 @@ const PIPELINE_STATUS_LABELS = {
   accepted: 'Accepted, awaiting approval',
 };
 
-/**
- * Field names queued in `speaker.pendingEdits` (spec §4.3, issue #22 review
- * finding P1-1) — an approved speaker's self-service edit that
- * onSpeakerWritten deliberately did NOT publish, awaiting an admin's
- * apply/discard decision. Mirrors AdminSpeakersList's helper of the same
- * name; that list owns the apply/discard controls, this editor only needs
- * to know whether any are queued for the job-line state word.
- */
-function pendingFieldsOf(speaker) {
-  const pending = speaker?.pendingEdits;
-  return pending && typeof pending === 'object' ? Object.keys(pending) : [];
-}
 
-/**
- * The speaker's record state, in the admin's three words (brief §5.2,
- * moment 1). A speaker is on the public site only once approved, and an
- * approved speaker with self-service edits waiting for review is exactly
- * the third state. A removed speaker is dead matter: it keeps its word.
- */
-function speakerRecordState(speaker) {
-  if (!speaker) return null;
-  if (speaker.status === 'removed') return deadMatter('Removed');
-  if (speaker.status !== 'approved') return recordStateWord('draft');
-  return pendingFieldsOf(speaker).length > 0 ? recordStateWord('dirty') : recordStateWord('live');
-}
 
 const EMPTY = {
   firstName: '',
@@ -445,7 +421,7 @@ export default function AdminSpeakerEditor({ mode }) {
                   setStatusPicked(true);
                   set({ status: value });
                 }}
-                options={STATUS_OPTIONS}
+                options={mode === 'edit' && speaker ? speakerStatusOptions(STATUS_OPTIONS, speaker.status ?? null) : STATUS_OPTIONS}
                 error={errorFor('status')}
               />
             ) : (

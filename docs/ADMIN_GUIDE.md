@@ -346,6 +346,8 @@ The canonical speaker list, with each record's pipeline status and the entry poi
 | Invite sent | Emailed; not yet accepted | Resend |
 | Accepted / published | Speaker signed in and (optionally) edited their own profile | — |
 
+**Status changes.** On the edit form you can set **Draft**, **Published** or **Removed**. You can publish a draft speaker who never accepted an invite. Their page goes live with no account. A removed speaker lost the link to their account, so the form offers only **Draft** and **Removed**. Save the speaker as Draft first, then publish them or invite them again.
+
 **Pending-edits review.** A speaker can propose changes to their own profile after accepting an invite. Those queue rather than landing on the live record, until an admin approves them. Review and approve (or reject) from the speaker's row — the queued fields are named right there, so you are never approving a change blind.
 
 **What a speaker fills in.** An accepted speaker completes their profile at `/speaker/profile` in five steps: About you (name, pronouns, role, organization), Bio and photo, Links, Logistics, and Review. Each step saves when they move on. The Logistics answers (travel, access needs, audio and video needs) are kept in a separate staff-only record and are never published. They appear on the speaker's edit page under **Logistics**, with the time the speaker submitted the profile. The first submit sends the speaker one email, "We have your speaker profile", which says an organizer reviews it. That email does not confirm a time or a room.

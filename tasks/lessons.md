@@ -281,3 +281,13 @@ Rules written after user corrections. Read at session start.
 - Run the failing E2E spec locally before guessing: a scratch Playwright config
   with no global setup and `executablePath: '/opt/pw-browsers/chromium'` runs
   the console specs without the emulators.
+
+## 2026-11-08: after a stack merges, check that the top commit reached `main`
+
+- The S1–S3 stack merged PR by PR from the bottom. #772 merged into its stacked
+  base 44 seconds after that base had already merged into `main`, so GitHub
+  reported it merged while its commit never reached `main`. It needed a new PR
+  (#773).
+- After any stack merge, run `git merge-base --is-ancestor <top head> origin/main`
+  before deploying or saying the work is live. When a PR merges into a branch
+  that is already merged, open a new PR from the same head to `main` at once.
