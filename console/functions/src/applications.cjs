@@ -33,10 +33,11 @@ const { readSignupTerms } = require('./consoleSettings.cjs');
 
 const COLLECTION = 'applications';
 const { STATUSES } = require('./reviewAccess.cjs');
-const CLOSED = Object.freeze(['withdrawn', 'declined']);
+const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
+const CLOSED = CONSOLE_REQUEST_GROUPS.closed;
 /** The refusal for a change to a site the hosting team archived. */
 const ARCHIVED_MESSAGE = 'This site is archived. Ask the hosting team to restore it.';
-const WITHDRAWABLE = Object.freeze(['draft']);
+const WITHDRAWABLE = CONSOLE_REQUEST_GROUPS.editable;
 const STEP_IDS = Object.freeze(['organization', 'event', 'webAddress', 'team', 'tickets', 'email', 'review', 'agreement']);
 
 const NOT_FOUND = 'We could not find that request.';

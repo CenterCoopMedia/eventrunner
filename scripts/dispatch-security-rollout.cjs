@@ -1,5 +1,7 @@
 'use strict';
 
+const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
+
 /** Console build records own target identity; no GitHub administration API is needed. */
 async function liveClients({ db, legacyClients = [] }) {
   const clients = new Set();
@@ -23,7 +25,7 @@ async function liveClients({ db, legacyClients = [] }) {
       doc.ref.get(), db.collection('console_builds').doc(doc.id).get(), db.collection('console_deleted_sites').doc(doc.id).get(),
     ]);
     const target = environmentOf(build.data());
-    const active = app.exists && !tomb.exists && ['ready', 'launched'].includes(app.data().status);
+    const active = app.exists && !tomb.exists && CONSOLE_REQUEST_GROUPS.built.includes(app.data().status);
     if (active && !valid(target)) throw new Error('An active console site has no valid recorded deployment environment');
     if (!valid(target)) return;
     if (active) clients.add(target);

@@ -6,6 +6,7 @@ import LoadingState from '../LoadingState.jsx';
 import IconControl from '../IconControl.jsx';
 import { BUILD_FAILED_LABEL, STATUS_LABELS, statusPath } from '../setup/steps.js';
 import { SIGNUP_LINK_HELP } from '../text.js';
+import { CONSOLE_REQUEST_GROUPS } from 'shared/consoleRequest';
 
 /** One organization and its event sites. Each event is its own request and its own site (ADR 0007 §2). */
 export default function OrganizationHome() {
@@ -43,7 +44,7 @@ export default function OrganizationHome() {
             <li key={app.id} className="card">
               <Link to={statusPath(orgId, app.id)} className="card-title">{app.eventName || 'New event site'}</Link>
               <span className="tag">{app.buildFailed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status] || 'Status unavailable'}</span>
-              {['ready', 'launched'].includes(app.status) && app.address ? <span className="muted">{app.address}</span> : null}
+              {CONSOLE_REQUEST_GROUPS.built.includes(app.status) && app.address ? <span className="muted">{app.address}</span> : null}
             </li>
           ))}
         </ul>

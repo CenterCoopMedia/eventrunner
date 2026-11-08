@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { STATUS_FILTERS, STATUS_LABELS, firstSettingError } from './reviewText.js';
 import { STATUS_LABELS as CLIENT_STATUS_LABELS } from './setup/steps.js';
 
-// Every status the server can store (console/functions/src/reviewAccess.cjs).
-// The decommission script writes 'archived'.
-const SERVER_STATUSES = ['draft', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined', 'archived'];
+import { CONSOLE_REQUEST_STATUSES as SERVER_STATUSES } from 'shared/consoleRequest';
 
 const GOOD = { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' };
 const ALL = Object.keys(GOOD);

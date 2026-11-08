@@ -26,6 +26,7 @@ const STRIPE = 'https://api.stripe.com/v1';
 const EVENTBRITE = 'https://www.eventbriteapi.com/v3';
 const APP_ID_RE = /^[A-Za-z0-9_-]{1,200}$/;
 const encode = encodeURIComponent;
+const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
 const ownerLabel = (id) => createHash('sha256').update(id, 'utf8').digest('hex').slice(0, 32);
 const hostName = (name) => String(name || '').replace(/\.$/, '').toLowerCase();
 const dnsValue = (value) => String(value || '').replace(/\.$/, '').replaceAll('"', '');
@@ -275,7 +276,7 @@ function failedBuild(app, build, at) {
 
 function checkIdle(ctx, app, build) {
   if (connectionChanging(app.connections, ctx.deps.now())) throw new Error('guard: a connection is being changed');
-  if (['approved', 'building'].includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error('guard: stop the build and its deploy runs first');
+  if (CONSOLE_REQUEST_GROUPS.building.includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error('guard: stop the build and its deploy runs first');
   if (build.state === 'running' && !canRetryBuild({ ...app, status: 'building' }, build, ctx.deps.now())) throw new Error('guard: a build is running');
 }
 
@@ -301,7 +302,7 @@ async function archive(ctx) {
   }
   const release = await latestRelease(ctx);
   const versionName = await restorableVersion(ctx, release);
-  if (ctx.resources.site && ['ready', 'launched'].includes(ctx.app.status) && !versionName) throw new Error('archive: Hosting has no version to restore');
+  if (ctx.resources.site && CONSOLE_REQUEST_GROUPS.built.includes(ctx.app.status) && !versionName) throw new Error('archive: Hosting has no version to restore');
   // Claim the status before touching Hosting. A console retry now sees archived.
   await ctx.deps.db.runTransaction(async (tx) => {
     const [snap, buildSnap, tomb] = await Promise.all([tx.get(appRef(ctx)), tx.get(buildRef(ctx)), tx.get(tombRef(ctx))]);
@@ -313,7 +314,7 @@ async function archive(ctx) {
     if (app.status === 'archived') return;
     // 'declined' covers a request the hosting team closed after its build
     // began: it may own a project, and console retention keeps it for this.
-    if (!['ready', 'launched', 'draft', 'declined'].includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error(`archive: status ${app.status} is not allowed`);
+    if (![...CONSOLE_REQUEST_GROUPS.built, 'draft', 'declined'].includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error(`archive: status ${app.status} is not allowed`);
     const at = instant(ctx.deps);
     tx.update(appRef(ctx), {
       status: 'archived', archivedAt: at, purgeAfter: new Date(at.getTime() + RECOVERY_MS),
@@ -346,7 +347,7 @@ async function restore(ctx) {
   if (!(toMillis(ctx.app.purgeAfter) > ctx.deps.now()) && !ctx.app.archive?.restoring) throw new Error('restore: the recovery window has ended');
   const previous = ctx.app.archive;
   if (!previous?.previousStatus) throw new Error('restore: the previous status is missing');
-  if (ctx.resources.site && ['ready', 'launched'].includes(previous.previousStatus) && !previous.versionName) throw new Error('restore: the saved Hosting version is missing');
+  if (ctx.resources.site && CONSOLE_REQUEST_GROUPS.built.includes(previous.previousStatus) && !previous.versionName) throw new Error('restore: the saved Hosting version is missing');
   // A restore claim blocks purge before either mode changes an external service.
   // A failed restore keeps its claim so the same restore can finish safely.
   await ctx.deps.db.runTransaction(async (tx) => {

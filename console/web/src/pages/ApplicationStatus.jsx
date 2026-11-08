@@ -1,4 +1,5 @@
 import PageHeading from '../PageHeading.jsx';
+import { CONSOLE_REQUEST_GROUPS } from 'shared/consoleRequest';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
@@ -14,9 +15,9 @@ const REFRESH_MS = 30000;
 
 /** The plain steps (ADR 0007, amendment 2026-11-04), and the statuses that reach each one. */
 const STAGES = [
-  { label: 'Answer the setup questions and accept the agreement', reached: ['draft'] },
-  { label: 'We are building your site', reached: ['approved', 'building'] },
-  { label: 'Your site is ready', reached: ['ready', 'launched'] },
+  { label: 'Answer the setup questions and accept the agreement', reached: CONSOLE_REQUEST_GROUPS.editable },
+  { label: 'We are building your site', reached: CONSOLE_REQUEST_GROUPS.building },
+  { label: 'Your site is ready', reached: CONSOLE_REQUEST_GROUPS.built },
 ];
 
 function Stages({ app }) {
@@ -253,14 +254,14 @@ export default function ApplicationStatus() {
   if (!app) return error ? <div className="console-workspace"><p className="message error" role="alert">{error}</p><IconControl icon="refresh" label="Refresh request" onClick={() => load()} /></div> : <LoadingState long className="console-workspace">Loading your request.</LoadingState>;
 
   const title = app.answers.event.name || 'New event site';
-  const closed = ['withdrawn', 'declined', 'archived'].includes(app.status);
+  const closed = [...CONSOLE_REQUEST_GROUPS.closed, 'archived'].includes(app.status);
   const choice = app.answers.tickets.choice;
   const accounts = PROVIDERS.filter((provider) => connectionResults[provider] || app.connections[provider].connected || app.connections[provider].unfinished || (provider === choice && !closed));
   // An account that is gone blocks a retry whichever step failed, so it needs the same way back.
   const reconnectProvider = app.build?.failed && PROVIDERS.includes(choice) && (app.build.needsReconnect || !app.connections[choice].connected) ? choice : null;
   const canReconnect = Boolean(reconnectProvider) && app.myRole === 'owner';
-  const underway = ['approved', 'building'].includes(app.status) && !app.build?.failed;
-  const live = ['ready', 'launched'].includes(app.status);
+  const underway = CONSOLE_REQUEST_GROUPS.building.includes(app.status) && !app.build?.failed;
+  const live = CONSOLE_REQUEST_GROUPS.built.includes(app.status);
   return (
     <section aria-labelledby="status-title" className="console-workspace application-workspace">
       <div className={`application-layout${closed ? ' application-closed' : ''}`}>

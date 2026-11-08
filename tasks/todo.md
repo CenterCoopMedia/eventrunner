@@ -33,6 +33,10 @@ LABELS              // staff words; client words only where they differ
       last refresh (c8ef222). CI never failed, because `prepare:functions`
       rewrites the hash before `npm ci`. Refreshed in PR #763. Each later
       step runs `npm run prepare:functions` and commits the three lockfiles.
+- [x] S1a. `packages/shared/src/consoleRequest.cjs`: one list, groups,
+      transition table and both label sets; every copy in console functions,
+      console web and the provisioning scripts imports it. No behaviour change.
+- [ ] S1b. The Launch action (below).
 - [ ] S1. Console request (`applications.status`): one list, groups
       (open, closed, building, built), labels for operator and client.
       Replace the 20+ copies, the two `BUILT_STATUSES` and the six

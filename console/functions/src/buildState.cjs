@@ -16,7 +16,7 @@ const { connectionProblem } = require('./connectionState.cjs');
 const { reviewedAnswers } = require('./reviewAccess.cjs');
 
 const BUILD_COLLECTION = 'console_builds';
-const RETRY_STATUSES = Object.freeze(['approved', 'building']);
+const RETRY_STATUSES = require('shared/consoleRequest').CONSOLE_REQUEST_GROUPS.building;
 const SILENT_START_MS = 60 * 60 * 1000;
 // More than provision-client.yml's timeout-minutes, so a run this old is not alive.
 const RUN_LIMIT_MS = 6 * 60 * 60 * 1000;

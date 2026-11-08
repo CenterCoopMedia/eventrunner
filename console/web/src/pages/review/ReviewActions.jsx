@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActionResult } from '../../ActionFeedback.jsx';
 import NoteForm from './NoteForm.jsx';
+import { CONSOLE_REQUEST_GROUPS } from 'shared/consoleRequest';
 import IconControl from '../../IconControl.jsx';
 
-const SPAM_STATUSES = ['draft', 'withdrawn', 'declined'];
-const ACCEPTED = ['approved', 'building'];
+const SPAM_STATUSES = CONSOLE_REQUEST_GROUPS.spamDeletable;
+const ACCEPTED = CONSOLE_REQUEST_GROUPS.building;
 
 /** The decisions open to the hosting team for a request with this status. */
 export function decisionsFor(status, canClose = false) {

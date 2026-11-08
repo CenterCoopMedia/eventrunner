@@ -30,7 +30,9 @@ const MAX_LOGS = 50;
 const MAX_LOG_MESSAGE = 1000;
 const PROJECT_ID_RE = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 const VERSION_RE = /^[A-Za-z0-9._-]{0,64}$/;
-const BUILT_STATUSES = Object.freeze(['building', 'ready', 'launched']);
+// Requests whose build has begun: a project may exist. Not the same set as
+// the shared `built` group, which is only sites that answer at their address.
+const BUILD_BEGAN_STATUSES = Object.freeze(['building', ...require('shared/consoleRequest').CONSOLE_REQUEST_GROUPS.built]);
 const HOUR = 60 * 60 * 1000;
 const PER_HOUR = 10;
 const INTAKE_TIMEOUT_MS = 15000;
@@ -119,7 +121,7 @@ const PROJECTS_TTL_MS = 5 * 60 * 1000;
 let builtProjects = { at: -Infinity, ids: new Set(), db: null };
 
 async function readBuiltProjects(db) {
-  const snap = await db.collection('applications').where('status', 'in', BUILT_STATUSES).get();
+  const snap = await db.collection('applications').where('status', 'in', BUILD_BEGAN_STATUSES).get();
   return new Set(snap.docs.flatMap((doc) => {
     const app = doc.data();
     const stored = app.review?.settings?.projectId;

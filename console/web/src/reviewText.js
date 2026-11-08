@@ -1,16 +1,10 @@
 // Words and small checks for the hosting team's pages (ADR 0007 §5).
 // The server makes the same checks and has the last word.
 
-export const STATUS_LABELS = Object.freeze({
-  draft: 'Draft',
-  approved: 'Approved',
-  building: 'Building',
-  ready: 'Ready',
-  launched: 'Launched',
-  withdrawn: 'Withdrawn',
-  declined: 'Declined',
-  archived: 'Archived',
-});
+import { CONSOLE_REQUEST_OPERATOR_LABELS } from 'shared/consoleRequest';
+
+/** The hosting team's word for each request status (shared/consoleRequest). */
+export const STATUS_LABELS = CONSOLE_REQUEST_OPERATOR_LABELS;
 
 /** The queue filters, in the order the hosting team works through them. */
 export const STATUS_FILTERS = Object.freeze([
