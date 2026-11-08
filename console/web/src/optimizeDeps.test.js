@@ -29,4 +29,13 @@ describe('dev server shared imports', () => {
     }
     expect([...imported].filter((id) => !included.has(id)).sort()).toEqual([]);
   });
+
+  it('E2E servers built without the config reuse its prebundle list', () => {
+    const e2e = path.join(root, '..', '..', 'e2e');
+    const missing = readdirSync(e2e).filter((name) => name.endsWith('.spec.js')).filter((name) => {
+      const text = readFileSync(path.join(e2e, name), 'utf8');
+      return /configFile:\s*false/.test(text) && !text.includes('optimizeDeps: consoleConfig.optimizeDeps');
+    });
+    expect(missing).toEqual([]);
+  });
 });
