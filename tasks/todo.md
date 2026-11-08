@@ -64,9 +64,12 @@ LABELS              // staff words; client words only where they differ
       account; a removed speaker goes back only to draft. The dashboard list,
       the coverage list and the two admin speaker helpers import one copy.
       Invite and material review statuses already had one list each.
-- [ ] S5. Delivery states (pitch notices, change request notices, speaker
-      reminders, access mail, email send): one vocabulary for an unknown
-      outcome, and one notice-record helper.
+- [x] S5. Pitch and change request notices store `uncertain`, like the
+      reminders, access mail, invoices and announcements (owner decision).
+      `shared/delivery` holds the state list and reads the old `unknown`.
+      Both notice flows use one retry rule, `functions/src/email/noticeRetry.cjs`.
+      The API names `confirmUnknown` and `delivery-unknown` stay, because
+      loaded pages send and read them.
 - [ ] S6. One lease helper with an owner token, used by the five leases.
 - [ ] S7. Delete dead states and code the modules show as unused.
 

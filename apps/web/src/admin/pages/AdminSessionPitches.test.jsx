@@ -230,6 +230,13 @@ describe('AdminSessionPitches decision email', () => {
     expect(screen.getByText('An acceptance was already sent to this person.')).toBeInTheDocument();
   });
 
+  it('shows an uncertain delivery as possibly sent', () => {
+    openPitch({ ...PITCH, status: 'new', notices: { receipt: { state: 'uncertain', mode: 'automatic', attempt: 1 } } });
+    expect(screen.getByText('May have been sent')).toBeInTheDocument();
+    expect(screen.getByText('We do not know if the email went out. Check the Email log before you send it again.')).toBeInTheDocument();
+  });
+
+  // Stored before November 2026: the same state was spelled `unknown`.
   it('shows an unknown delivery and requires a log check before the retry', async () => {
     openPitch({ ...PITCH, status: 'new', notices: { receipt: { state: 'unknown', mode: 'automatic', attempt: 1, error: 'socket hang up' } } });
     expect(screen.getByText('May have been sent')).toBeInTheDocument();

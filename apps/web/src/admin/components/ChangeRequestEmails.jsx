@@ -12,6 +12,7 @@
 // changeRequestNotices.cjs and changeRequests.cjs): what may be retried,
 // which link is on this site, and who may save the settings. This file only
 // offers what the server would accept, and states its answer.
+import { deliveryStateOf } from 'shared/delivery';
 import { useEffect, useRef, useState } from 'react';
 import { StatusBadge } from './adminChrome.jsx';
 import {
@@ -36,9 +37,9 @@ const QUEUED_STALE_MS = 10 * 60 * 1000;
 const MODES = ['off', 'automatic'];
 const SLOT_NAMES = Object.freeze({ received: 'Acknowledgement', done: 'Done email', declined: 'Decline email' });
 const STATE_LABELS = Object.freeze({
-  queued: 'Sending', sent: 'Sent', failed: 'Not sent', unknown: 'May have been sent', suppressed: 'Not sent: unsubscribed',
+  queued: 'Sending', sent: 'Sent', failed: 'Not sent', uncertain: 'May have been sent', suppressed: 'Not sent: unsubscribed',
 });
-const STATE_TONES = Object.freeze({ queued: 'info', sent: 'ok', failed: 'caution', unknown: 'caution', suppressed: 'neutral' });
+const STATE_TONES = Object.freeze({ queued: 'info', sent: 'ok', failed: 'caution', uncertain: 'caution', suppressed: 'neutral' });
 
 function toMillis(value) {
   if (!value) return null;
@@ -160,7 +161,7 @@ export function ChangeRequestEmailSettings({ settings, call }) {
 
 /** Whether the server would treat this record as possibly delivered. */
 function mayHaveBeenSent(record, nowMs) {
-  if (record.state === 'unknown') return true;
+  if (deliveryStateOf(record.state) === 'uncertain') return true;
   if (record.state !== 'queued') return false;
   const queuedAt = toMillis(record.queuedAt);
   return queuedAt !== null && nowMs - queuedAt >= QUEUED_STALE_MS;
@@ -217,7 +218,7 @@ function DeliveryLine({ row, slot, record, settings, call }) {
   return (
     <li className="flex flex-wrap items-center gap-xs text-admin-sm">
       <span className="font-semibold">{SLOT_NAMES[slot]}</span>
-      <StatusBadge tone={STATE_TONES[record.state] || 'neutral'}>{STATE_LABELS[record.state] || record.state}</StatusBadge>
+      <StatusBadge tone={STATE_TONES[deliveryStateOf(record.state)] || 'neutral'}>{STATE_LABELS[deliveryStateOf(record.state)] || record.state}</StatusBadge>
       <span className="text-admin-ink-secondary">
         {at !== null ? new Date(at).toLocaleString() : ''}
         {record.attempt > 1 ? ` · Attempt ${record.attempt}` : ''}

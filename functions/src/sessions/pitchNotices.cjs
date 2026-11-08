@@ -14,10 +14,10 @@
  *
  * Each email has a private delivery record on its pitch,
  * `notices.{receipt|accepted|declined}` (`rejected` on older sites), with the state `queued`, `sent`,
- * `failed` or `unknown`. Each send attempt has its own send-once key, so a
+ * `failed` or `uncertain` (`unknown` on older records; shared/delivery reads it). Each send attempt has its own send-once key, so a
  * retried request or a repeated decision cannot send the same attempt twice.
  * A sent email is never sent again. A failed email (the provider refused it)
- * can be retried with a new attempt number. An `unknown` email (the provider
+ * can be retried with a new attempt number. An `uncertain` email (the provider
  * threw, so it may have accepted the message) and a stale queued email can
  * be retried only when staff confirm that they checked the Email log, because
  * the new attempt can deliver a second copy. The decision itself is stored
@@ -44,6 +44,7 @@ const { isValidDocId } = require('../cms/store.cjs');
 const { render } = require('../email/render.cjs');
 const { getDefaultTemplate, validateOverridePayload } = require('../email/templates.cjs');
 const { pitchNoticeOverride } = require('../email/templates/pitchNotice.cjs');
+const { QUEUED_STALE_MS, noticeRetryState } = require('../email/noticeRetry.cjs');
 const {
   PITCH_NOTICE_TEMPLATE_IDS,
   PITCH_NOTICE_DEFAULTS,
@@ -64,7 +65,6 @@ const SETTINGS_DOC = 'notices';
 const KINDS = Object.freeze(['receipt', 'decision']);
 // A queued record older than this is treated as interrupted, and staff may
 // retry it. A younger one may still be sending.
-const QUEUED_STALE_MS = 10 * 60 * 1000;
 const MAX_SEND_BODY_BYTES = 16 * 1024;
 const MAX_SETTINGS_BODY_BYTES = 128 * 1024;
 const MAX_ERROR_LENGTH = 500;
@@ -92,12 +92,6 @@ function onceKeyFor(pitchId, slot, attempt) {
   return `pitch-notice:${pitchId}:${slot}:${attempt}`;
 }
 
-function toMillis(value) {
-  if (!value) return null;
-  if (typeof value.toMillis === 'function') return value.toMillis();
-  if (value instanceof Date) return value.getTime();
-  return null;
-}
 
 /** A queued record built inside the transaction that claims the attempt. */
 function queuedRecord({ pitchId, slot, templateId, previous, to, feedback, revision, mode, by, at }) {
@@ -177,7 +171,7 @@ async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = c
     outcome = { status: 'failed', error: String(err?.message || err) };
   }
   // A provider throw is ambiguous: the message may have been accepted.
-  const state = outcome?.status === 'sent' ? 'sent' : outcome?.ambiguous ? 'unknown' : 'failed';
+  const state = outcome?.status === 'sent' ? 'sent' : outcome?.ambiguous ? 'uncertain' : 'failed';
   const error = state === 'sent' ? null : String(outcome?.error || 'The email could not be sent.').slice(0, MAX_ERROR_LENGTH);
   const ref = db.collection(PITCHES).doc(pitchId);
   try {
@@ -285,17 +279,9 @@ function evaluate(stored, request, nowMs) {
     return { status: 400, code: 'bad-request', message: 'This pitch has no email address.' };
   }
   const previous = notices[target.slot] || null;
-  if (previous?.state === 'sent') {
-    return { status: 409, code: 'already-sent', message: 'This email was already sent. It is not sent again.' };
-  }
-  let mayHaveBeenSent = previous?.state === 'unknown';
-  if (previous?.state === 'queued') {
-    const queuedAt = toMillis(previous.queuedAt);
-    if (queuedAt === null || nowMs - queuedAt < QUEUED_STALE_MS) {
-      return { status: 409, code: 'in-progress', message: 'This email is being sent. Check its state again in a few minutes.' };
-    }
-    mayHaveBeenSent = true;
-  }
+  const retry = noticeRetryState(previous, nowMs);
+  if (retry.refusal) return retry.refusal;
+  const { mayHaveBeenSent } = retry;
   if (mayHaveBeenSent && !request.preview && !request.confirmUnknown) {
     return {
       status: 409,
@@ -390,7 +376,7 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
       db, sendEmail, getConfig, now, log, pitchId: request.id, slot: claimed.slot,
       record: claimed.record, pitch: claimed.pitch, settings: claimed.settings,
     });
-    if (result.state === 'unknown') {
+    if (result.state === 'uncertain') {
       return sendError(res, 502, 'delivery-unknown', 'We do not know if the email went out. Check the Email log before you send it again. The decision is still saved.');
     }
     if (result.state !== 'sent') {

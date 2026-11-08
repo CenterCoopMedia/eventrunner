@@ -24,12 +24,12 @@
  *
  * ONE RECORD PER NOTICE. `change_requests/{id}.notices.{slot}` (slot
  * `received`, `done` or `declined`) holds the state `queued`, `sent`,
- * `failed`, `unknown` or `suppressed`, the attempt number and the send-once
+ * `failed`, `uncertain` (`unknown` on older records) or `suppressed`, the attempt number and the send-once
  * key `change-request-notice:{id}:{slot}:{attempt}`. The email core's claim
  * on that key (email/send.cjs) means one attempt reaches the provider at
  * most once, whatever retries the caller makes. A sent notice is never sent
  * again. A failed or suppressed one may be retried with a new attempt. An
- * `unknown` one (the provider threw, so it may have accepted the message)
+ * `uncertain` one (the provider threw, so it may have accepted the message)
  * and a stale queued one need staff to confirm that they checked the Email
  * log, because the new attempt may deliver a second copy. A result is
  * stored only while the record still holds that attempt, so a late finish
@@ -57,6 +57,7 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
+const { QUEUED_STALE_MS, noticeRetryState } = require('../email/noticeRetry.cjs');
 
 const COLLECTION = 'change_requests';
 const SETTINGS_COLLECTION = 'change_request_settings';
@@ -73,7 +74,6 @@ const OUTCOME_SLOTS = Object.freeze(['done', 'declined']);
 const REQUESTS_PATH = '/profile/change-requests';
 // A queued record older than this is treated as interrupted. A younger one
 // may still be sending.
-const QUEUED_STALE_MS = 10 * 60 * 1000;
 const MAX_ERROR_LENGTH = 500;
 const MAX_BODY_BYTES = 4 * 1024;
 
@@ -97,12 +97,6 @@ function onceKeyFor(id, slot, attempt) {
   return `change-request-notice:${id}:${slot}:${attempt}`;
 }
 
-function toMillis(value) {
-  if (!value) return null;
-  if (typeof value.toMillis === 'function') return value.toMillis();
-  if (value instanceof Date) return value.getTime();
-  return null;
-}
 
 /** The audit row, in the five-field shape changeRequests.cjs writes. */
 function auditRow({ action, id, actor, at }) {
@@ -197,7 +191,7 @@ async function isSuppressed(db, email) {
 /**
  * Send one queued notice and store its result. Never throws.
  *
- * @returns {Promise<{ state: 'sent'|'failed'|'unknown'|'suppressed', error: string|null }>}
+ * @returns {Promise<{ state: 'sent'|'failed'|'uncertain'|'suppressed', error: string|null }>}
  */
 async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = console, id, slot, record, to }) {
   let state;
@@ -231,7 +225,7 @@ async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = c
         ...(channel.stream ? { messageStream: channel.stream } : {}),
       });
       // A provider throw is ambiguous: the message may have been accepted.
-      state = outcome?.status === 'sent' ? 'sent' : outcome?.ambiguous ? 'unknown' : 'failed';
+      state = outcome?.status === 'sent' ? 'sent' : outcome?.ambiguous ? 'uncertain' : 'failed';
       if (state !== 'sent') error = String(outcome?.error || 'The email could not be sent.');
     }
   } catch (err) {
@@ -340,15 +334,9 @@ function evaluateRetry(stored, settings, request, nowMs) {
   }
   const previous = stored.notices?.[request.slot];
   if (!previous) return { status: 409, code: 'not-queued', message: 'This email was never queued, so there is nothing to retry.' };
-  if (previous.state === 'sent') return { status: 409, code: 'already-sent', message: 'This email was already sent. It is not sent again.' };
-  let mayHaveBeenSent = previous.state === 'unknown';
-  if (previous.state === 'queued') {
-    const queuedAt = toMillis(previous.queuedAt);
-    if (queuedAt === null || nowMs - queuedAt < QUEUED_STALE_MS) {
-      return { status: 409, code: 'in-progress', message: 'This email is being sent. Check its state again in a few minutes.' };
-    }
-    mayHaveBeenSent = true;
-  }
+  const retry = noticeRetryState(previous, nowMs);
+  if (retry.refusal) return retry.refusal;
+  const { mayHaveBeenSent } = retry;
   if (mayHaveBeenSent && !request.confirmUnknown) {
     return { status: 409, code: 'delivery-unknown', message: 'This email may have been sent. Check the Email log, then confirm before you retry.' };
   }
