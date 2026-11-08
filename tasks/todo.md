@@ -70,7 +70,11 @@ LABELS              // staff words; client words only where they differ
       Both notice flows use one retry rule, `functions/src/email/noticeRetry.cjs`.
       The API names `confirmUnknown` and `delivery-unknown` stay, because
       loaded pages send and read them.
-- [ ] S6. One lease helper with an owner token, used by the five leases.
+- [x] S6. Every lease already releases only with its owner token (#763).
+      `functions/src/core/lease.cjs` now holds the run lease rules (live,
+      held, new token) for reminder schedules, the Airtable refresh and
+      announcement send chunks. The Stripe order leases stay beside their
+      payment steps, because each one changes payment state with it.
 - [ ] S7. Delete dead states and code the modules show as unused.
 
 ### Done when (each step)

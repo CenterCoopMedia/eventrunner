@@ -22,14 +22,14 @@
  *     and notify.
  */
 
-const crypto = require('node:crypto');
 const { MAX_OFFSET_DAYS, planReminders } = require('shared/reminderSchedule');
 const { splitEventDateTime } = require('shared/eventDateTime');
 const { isDayPast } = require('shared/time');
 const { getEventPhase } = require('shared/config');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
-const { isoOrNull, timestampMs } = require('../speakers/reminderCore.cjs');
+const { holdsLease, leaseIsLive, newLeaseToken } = require('../core/lease.cjs');
+const { isoOrNull } = require('../speakers/reminderCore.cjs');
 
 const SCHEDULES = 'reminder_schedules';
 const RUNS = 'reminder_schedule_runs';
@@ -226,11 +226,10 @@ async function pauseFromRun({ db, id, normalize, reason, holds, now, log, notify
  */
 async function acquireLease({ db, id, nowMs }) {
   const ref = db.collection(RUNS).doc(id);
-  const token = crypto.randomUUID();
+  const token = newLeaseToken();
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    const since = timestampMs(snap.exists ? snap.data()?.running?.startedAt : null);
-    if (Number.isFinite(since) && nowMs - since < LEASE_MS) return { ok: false, reason: 'busy' };
+    if (leaseIsLive(snap.exists ? snap.data()?.running : null, nowMs, LEASE_MS)) return { ok: false, reason: 'busy' };
     tx.set(ref, { running: { startedAt: new Date(nowMs), token } }, { merge: true });
     return { ok: true, token };
   });
@@ -244,8 +243,8 @@ async function releaseLease({ db, id, token, lastRun }) {
   const ref = db.collection(RUNS).doc(id);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    const holder = snap.exists ? snap.data()?.running?.token : undefined;
-    tx.set(ref, { lastRun, ...(holder === token ? { running: null } : {}) }, { merge: true });
+    const held = holdsLease(snap.exists ? snap.data()?.running : null, token);
+    tx.set(ref, { lastRun, ...(held ? { running: null } : {}) }, { merge: true });
   });
 }
 

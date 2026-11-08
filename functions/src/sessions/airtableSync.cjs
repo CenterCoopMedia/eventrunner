@@ -33,8 +33,9 @@
  * a later run.
  */
 
-const { createHash, randomUUID } = require('node:crypto');
+const { createHash } = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
+const { holdsLease, leaseIsLive, newLeaseToken } = require('../core/lease.cjs');
 const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { internals: { readSubmission } } = require('./pitches.cjs');
 const { IMPORT_FIELDS, readImportedExtras, readPresenters, sameValue } = require('shared/pitchForm');
@@ -295,12 +296,11 @@ async function flagRemoved({ db, source, seen, at, counts }) {
  */
 async function acquireLease({ db, trigger, actor, nowMs, scheduleMinutes }) {
   const ref = db.collection(SYNC).doc(STATUS_DOC);
-  const token = randomUUID();
+  const token = newLeaseToken();
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const status = snap.exists ? snap.data() : {};
-    const runningSince = millis(status.running?.startedAt);
-    if (runningSince !== null && nowMs - runningSince < LEASE_MS) return { ok: false, reason: 'busy' };
+    if (leaseIsLive(status.running, nowMs, LEASE_MS)) return { ok: false, reason: 'busy' };
     const lastStart = millis(status.lastRun?.startedAt);
     if (trigger === 'manual' && lastStart !== null && nowMs - lastStart < MANUAL_GAP_MS) {
       return { ok: false, reason: 'too-soon', retryAfterMs: MANUAL_GAP_MS - (nowMs - lastStart) };
@@ -403,9 +403,9 @@ async function runAirtableSync({ db, fetchImpl, token, env = process.env, actor,
     const snap = await tx.get(statusRef);
     // A run that outlived its lease records its result, but leaves the lease
     // of the run that took over.
-    const holder = snap.exists ? snap.data()?.running?.token : undefined;
+    const held = holdsLease(snap.exists ? snap.data()?.running : null, lease.token);
     tx.set(statusRef, {
-      ...(holder === lease.token ? { running: null } : {}),
+      ...(held ? { running: null } : {}),
       lastRun,
       ...(error ? {} : { lastSuccessAt: finishedAt }),
     }, { merge: true });
