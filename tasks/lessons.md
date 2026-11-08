@@ -257,3 +257,14 @@ Rules written after user corrections. Read at session start.
   that stack, with the PR targeting that branch. Cut from `main` only when
   nothing is open, or when the owner says the work must merge on its own.
 
+## 2026-11-08: merge a stack from the top, and GitHub's API cannot do it
+
+- Joe: merge from the top of a stack so the merge waterfalls down. Merging
+  the top PR lands every PR below it in one step, with no CI rerun.
+- GitHub now keeps native stacks. Its pull-request merge endpoint refuses any
+  PR in a stack (403, "use the asynchronous merge endpoint"), and a stacked
+  PR's base cannot be changed. The MCP GitHub tools have no stack-merge
+  call, and this session may use `gh` for search only. So a stack's merge is
+  a click on the top PR in the GitHub UI: tell the owner which PR is the top,
+  and do the deploy and checks after it lands.
+
