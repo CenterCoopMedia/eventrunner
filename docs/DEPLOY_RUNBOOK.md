@@ -331,6 +331,17 @@ absent from the list only ever deploys via `workflow_dispatch`. Leave it unset (
 client is new and you want every deploy to be a manual, watched dispatch; add it once the client is
 comfortable auto-deploying on merge.
 
+### Which changes need which deploy
+
+`.github/deploy-surfaces.json` lists the paths each deploy surface depends on:
+`functions`, `web` and `rules` for a client site, and `console` for the client
+console. The client deploy reads its functions filter from this file. The fleet
+CLI (Oathgate, `eventrunner needs-deploy`) reads the same file to say whether
+the commits since an environment's last deploy touch it. Pages deploys itself
+on every push to `main`. Keep each pattern to a literal path, `dir/**`, or one
+`*` in the last segment; `scripts/deploy-surfaces.test.cjs` refuses anything
+else, because both readers must match a path the same way.
+
 ## 5. First deploy (provisioning a fresh project)
 
 A brand-new project has no `config/event` Firestore document yet — `generate-content.cjs` (the

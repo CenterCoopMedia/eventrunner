@@ -428,6 +428,15 @@
           absent from the list only ever deploys via <code>workflow_dispatch</code>. Leave it unset (or empty) while a
           client is new and you want every deploy to be a manual, watched dispatch; add it once the client is
           comfortable auto-deploying on merge.</p>
+          <h3 id="which-changes-need-which-deploy">Which changes need which deploy<a class="heading-anchor" href="#which-changes-need-which-deploy" aria-label="Link to this section">#</a></h3>
+          <p><code>.github/deploy-surfaces.json</code> lists the paths each deploy surface depends on:
+          <code>functions</code>, <code>web</code> and <code>rules</code> for a client site, and <code>console</code> for the client
+          console. The client deploy reads its functions filter from this file. The fleet
+          CLI (Oathgate, <code>eventrunner needs-deploy</code>) reads the same file to say whether
+          the commits since an environment&#39;s last deploy touch it. Pages deploys itself
+          on every push to <code>main</code>. Keep each pattern to a literal path, <code>dir/**</code>, or one
+          <code>*</code> in the last segment; <code>scripts/deploy-surfaces.test.cjs</code> refuses anything
+          else, because both readers must match a path the same way.</p>
           <h2 id="5-first-deploy-provisioning-a-fresh-project">5. First deploy (provisioning a fresh project)<a class="heading-anchor" href="#5-first-deploy-provisioning-a-fresh-project" aria-label="Link to this section">#</a></h2>
           <p>A brand-new project has no <code>config/event</code> Firestore document yet — <code>generate-content.cjs</code> (the
           <code>content</code> job) throws &quot;run scripts/init-event.cjs first&quot; against one, on purpose (spec §8.6). The
