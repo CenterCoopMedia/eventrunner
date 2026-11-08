@@ -12,7 +12,7 @@ const { promoRef, releasedPromoUse } = require('./promoCodes.cjs');
 
 const LEASE_MS = 5 * 60_000;
 const REFUND_STATES = new Set(['pending', 'requires_action', 'succeeded', 'failed', 'canceled']);
-const TERMINAL_TICKET_STATES = new Set(['cancelled', 'refunded']);
+const TERMINAL_TICKET_STATES = new Set(require('shared/ticketCommerce').TICKET_TERMINAL_STATUSES);
 
 class ReconciliationMismatch extends Error {
   constructor(code, message) { super(message); this.code = code; }

@@ -1,4 +1,5 @@
 import { plannerMessage } from '../plannerErrors.js';
+import { ORDER_STATUSES, PAYMENT_STATUSES, REFUND_STATUSES, TICKET_STATUSES } from 'shared/ticketCommerce';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatTicketMoney, formatTicketTime, ticketStatusLabel } from '../../lib/ticketingCommerce.js';
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from './adminChrome.jsx';
@@ -53,12 +54,12 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
     <form className="mb-md grid items-end gap-sm sm:grid-cols-2 lg:grid-cols-3" onSubmit={(event) => { event.preventDefault(); setSubmitted({ ...filters }); }}>
       <TextField label={isOrders ? 'Find a purchaser or order' : 'Find an attendee or ticket'} type="search" value={filters.search} onChange={(value) => setFilter('search', value.trimStart())} />
       {isOrders ? <>
-        <SelectField label="Payment state" value={filters.paymentStatus} onChange={(value) => setFilter('paymentStatus', value)} options={options(['unpaid', 'pending', 'succeeded', 'failed', 'expired'])} />
-        <SelectField label="Refund state" value={filters.refundStatus} onChange={(value) => setFilter('refundStatus', value)} options={options(['none', 'pending', 'partial', 'full', 'failed', 'requires_action'])} />
-        <SelectField label="Order state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(['exception', 'pending', 'paid', 'free', 'expired', 'refunded'])} />
+        <SelectField label="Payment state" value={filters.paymentStatus} onChange={(value) => setFilter('paymentStatus', value)} options={options(PAYMENT_STATUSES)} />
+        <SelectField label="Refund state" value={filters.refundStatus} onChange={(value) => setFilter('refundStatus', value)} options={options(REFUND_STATUSES)} />
+        <SelectField label="Order state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(ORDER_STATUSES)} />
       </> : <>
         <SelectField label="Ticket type filter" value={filters.ticketTypeId} onChange={(value) => setFilter('ticketTypeId', value)} options={[{ value: '', label: 'Any ticket type' }, ...(catalog?.ticketTypes || []).map((type) => ({ value: type.id, label: type.name }))]} />
-        <SelectField label="Admission state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(['valid', 'cancelled', 'refunded', 'pending_info'])} />
+        <SelectField label="Admission state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(TICKET_STATUSES)} />
         <SelectField label="Claim state" value={filters.claimState} onChange={(value) => setFilter('claimState', value)} options={[{ value: '', label: 'Any' }, { value: 'claimed', label: 'Claimed' }, { value: 'unclaimed', label: 'Unclaimed' }]} />
         <SelectField label="Check-in state" value={filters.checkInState} onChange={(value) => setFilter('checkInState', value)} options={[{ value: '', label: 'Any' }, { value: 'checked_in', label: 'Checked in' }, { value: 'not_checked_in', label: 'Not checked in' }]} />
       </>}

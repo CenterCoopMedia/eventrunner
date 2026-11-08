@@ -1,5 +1,6 @@
 'use strict';
 
+const { TICKET_TERMINAL_STATUSES } = require('shared/ticketCommerce');
 const { randomUUID } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 
@@ -141,7 +142,7 @@ async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPol
       return { action: 'created' };
     }
     const currentStatus = snap.data()?.status;
-    const terminal = (status) => status === 'refunded' || status === 'cancelled';
+    const terminal = (status) => TICKET_TERMINAL_STATUSES.includes(status);
     const status = terminal(currentStatus) && !terminal(ticket.status) ? currentStatus : ticket.status;
     tx.set(ref, { ...ticket, status, updatedAt: at }, { merge: true });
     return { action: 'updated' };

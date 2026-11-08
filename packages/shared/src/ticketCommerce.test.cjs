@@ -166,3 +166,21 @@ test('ES module shim exposes the same commerce validator', async () => {
   const esm = await import('./ticketCommerce.mjs');
   assert.equal(esm.validateTicketCatalog, validateTicketCatalog);
 });
+
+test('the ticketing status lists cover each other and are frozen', () => {
+  const commerce = require('./ticketCommerce.cjs');
+  for (const name of ['TICKET_STATUSES', 'TICKET_TERMINAL_STATUSES', 'ORDER_STATUSES', 'ORDER_COMPLETE_STATUSES', 'PAYMENT_STATUSES', 'INVENTORY_STATES', 'REFUND_STATUSES']) {
+    assert.ok(Object.isFrozen(commerce[name]), name);
+    assert.equal(new Set(commerce[name]).size, commerce[name].length, `${name} has a duplicate`);
+  }
+  for (const status of commerce.TICKET_TERMINAL_STATUSES) assert.ok(commerce.TICKET_STATUSES.includes(status), status);
+  for (const status of commerce.ORDER_COMPLETE_STATUSES) assert.ok(commerce.ORDER_STATUSES.includes(status), status);
+});
+
+test('an order is fulfilled only when its seats are sold and its payment succeeded', () => {
+  const { isOrderFulfilled } = require('./ticketCommerce.cjs');
+  assert.equal(isOrderFulfilled({ inventoryState: 'sold', paymentStatus: 'succeeded' }), true);
+  assert.equal(isOrderFulfilled({ inventoryState: 'held', paymentStatus: 'succeeded' }), false);
+  assert.equal(isOrderFulfilled({ inventoryState: 'sold', paymentStatus: 'pending' }), false);
+  assert.equal(isOrderFulfilled(null), false);
+});

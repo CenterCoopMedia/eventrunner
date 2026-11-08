@@ -240,7 +240,38 @@ function isSalesWindowOpen(object, at = new Date()) {
     && (!object.salesEndAt || Date.parse(object.salesEndAt) > ms);
 }
 
+/*
+ * Stripe ticketing statuses (ADR 0004; state machine map, 01-ticketing).
+ * Each list is in the order the admin filters show it. The functions,
+ * the admin and the purchaser pages read these instead of typing their own.
+ */
+
+/** `tickets.status`. Anything else normalizes to pending_info. */
+const TICKET_STATUSES = Object.freeze(['valid', 'refunded', 'cancelled', 'pending_info']);
+/** Ticket statuses no provider write may leave. */
+const TICKET_TERMINAL_STATUSES = Object.freeze(['cancelled', 'refunded']);
+/** `ticket_orders.status`. */
+const ORDER_STATUSES = Object.freeze(['exception', 'pending', 'paid', 'free', 'expired', 'refunded']);
+/** Order statuses the purchaser sees as done. */
+const ORDER_COMPLETE_STATUSES = Object.freeze(['paid', 'free']);
+/** `ticket_orders.paymentStatus`. */
+const PAYMENT_STATUSES = Object.freeze(['unpaid', 'pending', 'succeeded', 'failed', 'expired']);
+/** `ticket_orders.inventoryState`. */
+const INVENTORY_STATES = Object.freeze(['held', 'sold', 'released']);
+/** `ticket_orders.refundStatus`. */
+const REFUND_STATUSES = Object.freeze(['none', 'pending', 'partial', 'full', 'failed', 'requires_action']);
+
+/**
+ * Whether an order's seats are sold and paid for: the test check-in and the
+ * confirmation email make before they admit or confirm anyone.
+ */
+function isOrderFulfilled(order) {
+  return order?.inventoryState === 'sold' && order?.paymentStatus === 'succeeded';
+}
+
 module.exports = {
+  TICKET_STATUSES, TICKET_TERMINAL_STATUSES, ORDER_STATUSES, ORDER_COMPLETE_STATUSES,
+  PAYMENT_STATUSES, INVENTORY_STATES, REFUND_STATUSES, isOrderFulfilled,
   MAX_TICKET_TYPES, MAX_ORDER_SEATS, MAX_CAPACITY, MAX_AMOUNT, MAX_ANSWERS_BYTES,
   CURRENCY_EXPONENTS, CURRENCY_MINIMUMS, TAX_TREATMENTS,
   isTicketTypeId, isCommerceRequestId, isCommerceOrderId, normalizeAttendee, normalizePromoCode,

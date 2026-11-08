@@ -1,3 +1,4 @@
+import { ORDER_COMPLETE_STATUSES } from 'shared/ticketCommerce';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -13,7 +14,7 @@ import {
   safeCheckoutUrl, ticketingRequest, ticketStatusLabel,
 } from '../lib/ticketingCommerce.js';
 
-const COMPLETE = new Set(['paid', 'free']);
+const COMPLETE = new Set(ORDER_COMPLETE_STATUSES);
 const TERMINAL = new Set(['failed', 'expired', 'cancelled']);
 
 export default function TicketStatus() {

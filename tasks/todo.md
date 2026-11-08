@@ -42,6 +42,10 @@ LABELS              // staff words; client words only where they differ
       Replace the 20+ copies, the two `BUILT_STATUSES` and the six
       `['approved', 'building']` literals. Add the Launch action that moves
       a ready site to `launched` (owner decision).
+- [x] S2 (lists). Ticket, order, payment, inventory and refund status lists and
+      `isOrderFulfilled` are in `shared/ticketCommerce`; check-in, the confirmation
+      email, ticket sync, reconcile, the admin filters and the purchaser page read
+      them. Still open in S2: split `ticketStatusLabel` by domain.
 - [ ] S2. Stripe order, payment, refund and ticket statuses
       (`shared/ticketCommerce`). One `isOrderFulfilled(order)` for the four
       fields that say "done". Split `ticketStatusLabel` by domain.
