@@ -85,6 +85,8 @@ admin panel (the admin setup page moves onto it).
   2026-11-03: a submitted profile sends a new email, `speaker.profile_received`, once per speaker.
   `speaker.confirmation` names a confirmed time and room, so it stays for a later staff action that
   confirms a session.
+  That staff action now exists (owner decision, 2026-11-08): staff send it per speaker per session
+  from the speaker editor, after a preview, with `sendSessionConfirmation`.
 - The Logistics answers live in a separate record, `speaker_logistics/{speakerId}`, that only staff
   can read (owner choice, 2026-11-03). The public speaker copy is built from `speakers`, so these
   answers cannot reach it.

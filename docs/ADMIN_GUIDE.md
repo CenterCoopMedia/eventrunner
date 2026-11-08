@@ -356,6 +356,8 @@ The canonical speaker list, with each record's pipeline status and the entry poi
 
 One speaker record is the source of truth. If a name is wrong in three places on the public site, fix the speaker record — do not patch each place it appears.
 
+**Session confirmations.** The speaker's edit page has a **Sessions** panel. It lists each published session that names the speaker, with its day, time and room, and whether a confirmation went. A draft session, or a session that does not name the speaker yet, is not listed. Select **Preview confirmation** to read the email: it names the session title, time and room. Then select **Send confirmation**. The session needs a day and a start time, and the speaker needs an email address. A speaker gets one confirmation per title, time and room. After a confirmation goes, the preview says **Confirmation sent** and the send is off. If you later change the session's title, time or room and publish it, the preview says so, and you can send a new confirmation with the new details. If the server does not know whether a confirmation went, check the **Email log** first. Then select **I checked the Email log, send again**. Staff and operators can send confirmations. Each send writes an admin log entry.
+
 ### Speaker email wording
 
 Change the words of two emails: the **Invitation** a speaker gets when you send or resend an invitation, and the **Acceptance confirmation** a speaker gets once, after they accept. Select **Edit email wording** at the top of the Speakers list. Staff and operators can use this page.

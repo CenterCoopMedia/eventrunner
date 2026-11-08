@@ -27,6 +27,7 @@ import { toMillis } from '../versionHistory.js';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import SpeakerPhotoField from '../../components/media/SpeakerPhotoField.jsx';
 import SpeakerLogisticsPanel from '../components/SpeakerLogisticsPanel.jsx';
+import SpeakerSessionConfirmations from '../components/SpeakerSessionConfirmations.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import {
@@ -457,6 +458,9 @@ export default function AdminSpeakerEditor({ mode }) {
         </Panel>
         {mode === 'edit' && speaker ? (
           <SpeakerLogisticsPanel speakerId={speaker.id} submittedAt={toIsoOrNull(speaker.profileSubmittedAt)} timeZone={eventTimeZone} />
+        ) : null}
+        {mode === 'edit' && speaker ? (
+          <SpeakerSessionConfirmations speakerId={speaker.id} call={call} disabled={saving} />
         ) : null}
       </div>
 

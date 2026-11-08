@@ -188,7 +188,7 @@ describe('speaker editor', () => {
     const form = screen.getByLabelText('First name').closest('form');
     const layout = form.querySelector('.admin-editor-layout--speaker');
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
-      .toEqual(['Name', 'Profile', 'Contact and status', 'Logistics']);
+      .toEqual(['Name', 'Profile', 'Contact and status', 'Logistics', 'Sessions']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
       'First name', 'Last name', 'Pronouns', 'Job title', 'Organization',
       'Bio', 'Replace photo', 'None',

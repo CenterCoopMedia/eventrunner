@@ -52,6 +52,7 @@
     "resendSpeakerInvite",
     "cancelSpeakerInvite",
     "listSpeakerInvites",
+    "sendSessionConfirmation",
     "speakerReminders",
     "reminderSchedules",
     "speakerMailTemplates",

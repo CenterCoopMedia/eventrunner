@@ -49,6 +49,7 @@ const speakersProfileSteps = require('./src/speakers/profileSteps.cjs');
 const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
 const speakersProjection = require('./src/speakers/projection.cjs');
 const speakersInvites = require('./src/speakers/invites.cjs');
+const speakersSessionConfirmations = require('./src/speakers/sessionConfirmations.cjs');
 const speakersReminders = require('./src/speakers/reminders.cjs');
 const reminderSchedules = require('./src/reminders/schedules.cjs');
 const reminderScheduleRun = require('./src/reminders/run.cjs');
@@ -128,6 +129,7 @@ module.exports = {
   ...speakersLifecycle.handlers,
   ...speakersProjection.handlers,
   ...speakersInvites.handlers,
+  ...speakersSessionConfirmations.handlers,
   ...speakersReminders.handlers,
   ...reminderSchedules.handlers,
   ...reminderScheduleRun.handlers,
