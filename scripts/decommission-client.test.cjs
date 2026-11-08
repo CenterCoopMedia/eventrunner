@@ -334,6 +334,22 @@ test('a partial purge resumes from verified checkpoints after a database failure
   assert.ok(mutations(s).length > firstDeletes);
 });
 
+test('purge --now on a live site records the archive, so a failed run shows when and why', async () => {
+  const s = setup({ app: { status: 'ready' } });
+  const key = `DELETE firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)`;
+  s.failures.set(key, 500);
+  assert.equal(await s.run('purge', true), 1);
+  const app = s.db.read('applications/a1');
+  assert.equal(app.status, 'archived');
+  assert.ok(app.archivedAt, 'archivedAt is set');
+  assert.ok(app.purgeAfter && app.purgeAfter.getTime() <= app.archivedAt.getTime(), 'purge is due at once');
+  assert.deepEqual([app.history.at(-1).status, app.history.at(-1).by], ['archived', 'decommission']);
+  assert.equal(app.archive.previousStatus, 'ready');
+  // A manual retry with the same id resumes from the tombstone.
+  s.failures.delete(key);
+  assert.equal(await s.run('purge', true), 0, s.logs.join('\n'));
+});
+
 test('a refused Postmark server deletion is reported and the rest of the purge continues', async () => {
   const s = archived();
   s.failures.set('DELETE api.postmarkapp.com/servers/10', 422);
