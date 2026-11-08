@@ -22,6 +22,7 @@
  *     and notify.
  */
 
+const crypto = require('node:crypto');
 const { MAX_OFFSET_DAYS, planReminders } = require('shared/reminderSchedule');
 const { splitEventDateTime } = require('shared/eventDateTime');
 const { isDayPast } = require('shared/time');
@@ -219,15 +220,32 @@ async function pauseFromRun({ db, id, normalize, reason, holds, now, log, notify
   return { outcome: 'paused', reason };
 }
 
-/** Take the run lease on `reminder_schedule_runs/{id}`, or say why not. */
+/**
+ * Take the run lease on `reminder_schedule_runs/{id}`, or say why not. The
+ * lease carries a token, so only the run that took it can release it.
+ */
 async function acquireLease({ db, id, nowMs }) {
   const ref = db.collection(RUNS).doc(id);
+  const token = crypto.randomUUID();
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const since = timestampMs(snap.exists ? snap.data()?.running?.startedAt : null);
     if (Number.isFinite(since) && nowMs - since < LEASE_MS) return { ok: false, reason: 'busy' };
-    tx.set(ref, { running: { startedAt: new Date(nowMs) } }, { merge: true });
-    return { ok: true };
+    tx.set(ref, { running: { startedAt: new Date(nowMs), token } }, { merge: true });
+    return { ok: true, token };
+  });
+}
+
+/**
+ * Store a run's last result and release its lease. A run that outlived its
+ * lease records its result but leaves the lease of the run that took over.
+ */
+async function releaseLease({ db, id, token, lastRun }) {
+  const ref = db.collection(RUNS).doc(id);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const holder = snap.exists ? snap.data()?.running?.token : undefined;
+    tx.set(ref, { lastRun, ...(holder === token ? { running: null } : {}) }, { merge: true });
   });
 }
 
@@ -286,7 +304,7 @@ async function runSchedule({ id, normalize, sendDue, countsOf, reached, logDetai
     error: result.error ?? null,
   };
   try {
-    await db.collection(RUNS).doc(id).set({ running: null, lastRun }, { merge: true });
+    await releaseLease({ db, id, token: lease.token, lastRun });
   } catch (err) {
     // The lease runs out on its own.
     log.warn('reminder_schedule_runs stamp failed', err);
@@ -354,6 +372,7 @@ module.exports = {
   pauseSchedule,
   pauseFromRun,
   acquireLease,
+  releaseLease,
   runSchedule,
   afterCommit,
 };

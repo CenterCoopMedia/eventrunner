@@ -316,6 +316,25 @@ test('settings: defaults, limits, and the helpers the run uses', () => {
   assert.equal(eventEnded({ event: { timezone: ZONE } }, IN_7D), false);
 });
 
+test('a run that outlived its lease does not release the next run\'s lease', async () => {
+  const { RUNS, LEASE_MS, acquireLease, releaseLease } = require('./scheduleCore.cjs');
+  const db = makeSpeakersDb({});
+  const t0 = Date.parse('2026-11-13T15:00:00Z');
+  const first = await acquireLease({ db, id: 'speakers', nowMs: t0 });
+  assert.equal(first.ok, true);
+  // The first run is still going when its lease runs out; a second run takes over.
+  const second = await acquireLease({ db, id: 'speakers', nowMs: t0 + LEASE_MS + 1 });
+  assert.equal(second.ok, true);
+  assert.notEqual(first.token, second.token);
+  // The slow first run finishes: it records its result but keeps the second run's lease.
+  await releaseLease({ db, id: 'speakers', token: first.token, lastRun: { outcome: 'completed' } });
+  assert.equal(db.read(RUNS, 'speakers').running.token, second.token);
+  assert.deepEqual(await acquireLease({ db, id: 'speakers', nowMs: t0 + LEASE_MS + 2 }), { ok: false, reason: 'busy' });
+  // The holder releases its own lease.
+  await releaseLease({ db, id: 'speakers', token: second.token, lastRun: { outcome: 'completed' } });
+  assert.equal(db.read(RUNS, 'speakers').running, null);
+});
+
 test('an unknown pause reason keeps the schedule paused', () => {
   const { scheduleState } = require('./scheduleCore.cjs');
   // 'facts-changed' is an attendee-only reason. On the speaker schedule it
