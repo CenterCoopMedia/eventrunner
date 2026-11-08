@@ -291,6 +291,29 @@ test('runs never overlap, a manual refresh waits one minute, and schedules respe
   assert.equal(status.lastRun.by, null);
 });
 
+test('a refresh that outlived its lease leaves the next refresh\'s lease in place', async () => {
+  const db = makeDb();
+  const api = fakeAirtable([record(1)]);
+  const realFetch = api.fetchImpl;
+  const next = { startedAt: null, trigger: 'manual', by: 'operator@example.test', token: 'next-run' };
+  let tookOver = false;
+  api.fetchImpl = async (url, init) => {
+    if (!tookOver) {
+      // This refresh is slow: its lease runs out and a second refresh takes it.
+      tookOver = true;
+      tick = later(LEASE_MS + 1000);
+      next.startedAt = new Date(tick);
+      await db.collection('session_pitch_sync').doc('airtable').set({ running: next }, { merge: true });
+    }
+    return realFetch(url, init);
+  };
+  tick = later();
+  assert.equal((await run(db, api)).outcome, 'completed');
+  const status = db.read('session_pitch_sync', 'airtable');
+  assert.equal(status.running.token, 'next-run', 'the late refresh did not release the newer lease');
+  assert.equal(status.lastRun.outcome, 'completed', 'the late refresh still records its result');
+});
+
 test('an Airtable failure is recorded, redacted and audited, and the token is never logged', async () => {
   const db = makeDb();
   const api = fakeAirtable([record(1)], { failWith: { status: 401, body: { error: { type: 'AUTHENTICATION_REQUIRED', message: `Invalid token ${TOKEN}` } } } });

@@ -33,7 +33,7 @@
  * a later run.
  */
 
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { internals: { readSubmission } } = require('./pitches.cjs');
@@ -289,9 +289,13 @@ async function flagRemoved({ db, source, seen, at, counts }) {
   counts.removed = missing.length;
 }
 
-/** Take the run lease, or say why not. */
+/**
+ * Take the run lease, or say why not. The lease carries a token, so only the
+ * run that took it can release it.
+ */
 async function acquireLease({ db, trigger, actor, nowMs, scheduleMinutes }) {
   const ref = db.collection(SYNC).doc(STATUS_DOC);
+  const token = randomUUID();
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const status = snap.exists ? snap.data() : {};
@@ -304,8 +308,8 @@ async function acquireLease({ db, trigger, actor, nowMs, scheduleMinutes }) {
     if (trigger === 'scheduled' && lastStart !== null && nowMs - lastStart < scheduleMinutes * 60 * 1000 - SCHEDULE_SLACK_MS) {
       return { ok: false, reason: 'not-due' };
     }
-    tx.set(ref, { running: { startedAt: new Date(nowMs), trigger, by: actor.email ?? null } }, { merge: true });
-    return { ok: true };
+    tx.set(ref, { running: { startedAt: new Date(nowMs), trigger, by: actor.email ?? null, token } }, { merge: true });
+    return { ok: true, token };
   });
 }
 
@@ -396,8 +400,15 @@ async function runAirtableSync({ db, fetchImpl, token, env = process.env, actor,
   };
   const statusRef = db.collection(SYNC).doc(STATUS_DOC);
   await db.runTransaction(async (tx) => {
-    await tx.get(statusRef);
-    tx.set(statusRef, { running: null, lastRun, ...(error ? {} : { lastSuccessAt: finishedAt }) }, { merge: true });
+    const snap = await tx.get(statusRef);
+    // A run that outlived its lease records its result, but leaves the lease
+    // of the run that took over.
+    const holder = snap.exists ? snap.data()?.running?.token : undefined;
+    tx.set(statusRef, {
+      ...(holder === lease.token ? { running: null } : {}),
+      lastRun,
+      ...(error ? {} : { lastSuccessAt: finishedAt }),
+    }, { merge: true });
     tx.set(db.collection('admin_logs').doc(), {
       action: 'refreshAirtablePitches',
       docPath: PITCHES,
