@@ -316,6 +316,18 @@ test('settings: defaults, limits, and the helpers the run uses', () => {
   assert.equal(eventEnded({ event: { timezone: ZONE } }, IN_7D), false);
 });
 
+test('an unknown pause reason keeps the schedule paused', () => {
+  const { scheduleState } = require('./scheduleCore.cjs');
+  // 'facts-changed' is an attendee-only reason. On the speaker schedule it
+  // is unknown, and an unknown reason must not read as "on".
+  const stored = normalizeSpeakerSchedule({ enabled: true, pausedReason: 'facts-changed' });
+  assert.equal(scheduleState(stored), 'paused');
+  assert.equal(stored.pausedReason, 'settings-changed');
+  // No reason, or an empty one, is not a pause.
+  assert.equal(scheduleState(normalizeSpeakerSchedule({ enabled: true, pausedReason: '' })), 'on');
+  assert.equal(scheduleState(normalizeSpeakerSchedule({ enabled: true, pausedReason: null })), 'on');
+});
+
 test('an archived event counts as over even when its days are still ahead', () => {
   // The event days are in December, after IN_7D, but staff archived the
   // event on 2026-11-10. An archived event sends no more reminders.

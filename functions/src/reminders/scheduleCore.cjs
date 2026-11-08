@@ -77,11 +77,22 @@ function normalizeCommon(raw, { defaultOffsets, pauseReasons }) {
     approvedWordingVersion: typeof data.approvedWordingVersion === 'string' ? data.approvedWordingVersion : null,
     approvedAt: isoOrNull(data.approvedAt),
     approvedBy: typeof data.approvedBy === 'string' ? data.approvedBy : null,
-    pausedReason: Object.hasOwn(pauseReasons, data.pausedReason) ? data.pausedReason : null,
+    pausedReason: readPauseReason(data.pausedReason, pauseReasons),
     pausedAt: isoOrNull(data.pausedAt),
     updatedAt: isoOrNull(data.updatedAt),
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : null,
   };
+}
+
+/**
+ * The stored pause reason, failing closed. A reason this schedule does not
+ * know (a corrupt value, or another schedule's reason) still means paused:
+ * it reads as 'settings-changed', so staff review and approve the schedule
+ * again before any reminder goes out. No reason, or an empty one, is no pause.
+ */
+function readPauseReason(value, pauseReasons) {
+  if (typeof value !== 'string' || value === '') return null;
+  return Object.hasOwn(pauseReasons, value) ? value : 'settings-changed';
 }
 
 /** 'off', 'on' or 'paused'. */
