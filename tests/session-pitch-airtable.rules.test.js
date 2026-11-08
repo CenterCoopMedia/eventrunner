@@ -160,7 +160,7 @@ describe('Airtable refresh handlers', () => {
     expect(removed.sourceRemovedAt.toMillis()).toBe(clock);
 
     // A review opened on the old text now conflicts instead of overwriting.
-    const stale = await call(createReviewSessionPitchHandler, 'staff', { id, status: 'rejected', expectedStatus: 'accepted', expectedRevision: 1 });
+    const stale = await call(createReviewSessionPitchHandler, 'staff', { id, status: 'declined', expectedStatus: 'accepted', expectedRevision: 1 });
     expect(stale.statusCode).toBe(409);
 
     const status = (await db.doc('session_pitch_sync/airtable').get()).data();

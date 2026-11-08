@@ -28,7 +28,7 @@ import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { conversionMessage, presentersKey, splitName } from '../pitchConversion.js';
 import { subscribeAdminCollection } from '../adminSource.js';
-import { PITCH_STATUS_LABELS, PITCH_STATUS_TONES, pitchRevision } from '../pitchStatus.js';
+import { PITCH_STATUS_LABELS, PITCH_STATUS_TONES, pitchRevision, pitchRow } from '../pitchStatus.js';
 import PitchDetails from '../components/PitchDetails.jsx';
 import PitchEditForm from '../components/PitchEditForm.jsx';
 import PitchNotes from '../components/PitchNotes.jsx';
@@ -42,7 +42,7 @@ import {
 
 const DECISIONS = Object.freeze([
   { status: 'accepted', label: 'Accept' },
-  { status: 'rejected', label: 'Decline' },
+  { status: 'declined', label: 'Decline' },
   { status: 'in_review', label: 'Mark in review' },
 ]);
 
@@ -259,7 +259,7 @@ export default function AdminSessionPitch() {
   const [rows, setRows] = useState(null);
   const [listError, setListError] = useState(null);
   const [settings, setSettings] = useState(null);
-  useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs); setListError(null); }, setListError), []);
+  useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs.map(pitchRow)); setListError(null); }, setListError), []);
   useEffect(() => subscribePitchCall(setSettings, () => {}), []);
   const current = rows?.find((row) => row.id === pitchId);
   if (rows === null) return listError ? <Notice tone="caution" message="This pitch did not load. Trying again…" /> : <AdminLoadingState label="Loading the pitch…" />;

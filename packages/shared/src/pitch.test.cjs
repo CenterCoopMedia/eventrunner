@@ -1,4 +1,4 @@
-const { test } = require('node:test');
+const { describe, it, test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readClosesAt } = require('./pitch.cjs');
 
@@ -78,4 +78,24 @@ test('pitch email settings keep usable custom wording and drop unusable fields',
   assert.equal(settings.receiptMode, 'manual');
   assert.deepEqual(settings.templates['pitch.accepted'], { subject: 'Accepted: {{pitch_title}}', wording: 'Hi.\n\nWelcome.', custom: true });
   assert.deepEqual(settings.templates['pitch.declined'], { ...PITCH_NOTICE_DEFAULTS['pitch.declined'], custom: false });
+});
+
+describe('pitch review statuses', () => {
+  const { PITCH_STATUSES, pitchStatusOf, pitchNoticesOf, DECISION_TEMPLATE_IDS: ids } = require('./pitch.cjs');
+
+  it('stores declined, and reads the legacy rejected value as declined', () => {
+    assert.deepEqual(PITCH_STATUSES, ['new', 'in_review', 'accepted', 'declined']);
+    assert.equal(pitchStatusOf('rejected'), 'declined');
+    for (const status of PITCH_STATUSES) assert.equal(pitchStatusOf(status), status);
+    assert.equal(pitchStatusOf('other'), 'other');
+    assert.deepEqual(Object.keys(ids).sort(), ['accepted', 'declined']);
+  });
+
+  it('reads a legacy rejected notice record as the declined record', () => {
+    const sent = { state: 'sent', attempt: 1 };
+    assert.deepEqual(pitchNoticesOf({ receipt: sent, rejected: sent }), { receipt: sent, declined: sent });
+    const newer = { state: 'failed', attempt: 2 };
+    assert.deepEqual(pitchNoticesOf({ rejected: sent, declined: newer }), { declined: newer });
+    assert.deepEqual(pitchNoticesOf(undefined), {});
+  });
 });

@@ -76,7 +76,35 @@ function readPitchFormUrl(value) {
  * and {{token}} placeholders are filled when the email is sent.
  */
 const PITCH_NOTICE_TEMPLATE_IDS = Object.freeze(['pitch.receipt', 'pitch.accepted', 'pitch.declined']);
-const DECISION_TEMPLATE_IDS = Object.freeze({ accepted: 'pitch.accepted', rejected: 'pitch.declined' });
+const DECISION_TEMPLATE_IDS = Object.freeze({ accepted: 'pitch.accepted', declined: 'pitch.declined' });
+
+/**
+ * The review status of a pitch (`session_pitches.status`). Sites before
+ * November 2026 stored a decline as `rejected`; every reader passes the stored
+ * value through `pitchStatusOf`, and every write stores `declined`.
+ */
+const PITCH_STATUSES = Object.freeze(['new', 'in_review', 'accepted', 'declined']);
+const LEGACY_PITCH_STATUSES = Object.freeze({ rejected: 'declined' });
+
+function pitchStatusOf(status) {
+  return Object.hasOwn(LEGACY_PITCH_STATUSES, status) ? LEGACY_PITCH_STATUSES[status] : status;
+}
+
+/**
+ * A pitch's delivery records (`session_pitches.notices`) keyed by today's
+ * slot names. The decline email's record was `notices.rejected`; a newer
+ * `notices.declined` record wins. Without this a sent decline email would
+ * look unsent and could go out twice.
+ */
+function pitchNoticesOf(notices) {
+  const out = {};
+  for (const [slot, record] of Object.entries(notices || {})) {
+    const name = pitchStatusOf(slot);
+    if (name !== slot && Object.hasOwn(notices, name)) continue;
+    out[name] = record;
+  }
+  return out;
+}
 // automatic: the server sends the receipt after it stores a pitch from this
 // site's form. manual: staff send each receipt from the review queue.
 const RECEIPT_MODES = Object.freeze(['automatic', 'manual']);
@@ -144,6 +172,9 @@ module.exports = {
   MAX_FORM_URL_LENGTH,
   PITCH_NOTICE_TEMPLATE_IDS,
   DECISION_TEMPLATE_IDS,
+  PITCH_STATUSES,
+  pitchStatusOf,
+  pitchNoticesOf,
   RECEIPT_MODES,
   MAX_NOTICE_SUBJECT_LENGTH,
   MAX_NOTICE_WORDING_LENGTH,
