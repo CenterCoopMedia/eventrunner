@@ -1,5 +1,66 @@
 # Session task list
 
+## Plan for review: shared status modules (2026-11-08)
+
+Owner review needed before any build. Source: root causes 1 to 3 in
+`docs/plans/2026-11-08-state-machine-map/README.md`. Bug fixes from the
+map are in PR #763; this is the architecture step after it.
+
+### Goal
+
+Each lifecycle gets one module that holds its value list, named groups,
+labels and transition table. Functions, scripts, rules tests and both web
+apps import it. No status literal is typed twice. Behaviour does not change.
+
+### Module shape (one file pair per lifecycle in `packages/shared/src/status/`)
+
+```js
+STATUSES            // frozen list, in lifecycle order
+GROUPS              // named subsets: { closed, built, terminal, ... }
+TRANSITIONS         // { from: [to, ...] }, shape of registration.cjs:25-34
+canMove(from, to)   // true when TRANSITIONS allows it
+LABELS              // staff words; client words only where they differ
+```
+
+### Order (one PR each, stacked, smallest drift first)
+
+- [ ] S0. Find why `prepare-functions` gives a different `shared.tgz`
+      hash in a cloud container than the committed lockfile. Every later
+      step changes `packages/shared`, so the hash must be reproducible
+      first. Fix or document the step that makes it match CI.
+- [ ] S1. Console request (`applications.status`): one list, groups
+      (open, closed, building, built), labels for operator and client.
+      Replace the 20+ copies, the two `BUILT_STATUSES` and the six
+      `['approved', 'building']` literals. Decide `launched`: delete it or
+      add the action that sets it (owner question).
+- [ ] S2. Stripe order, payment, refund and ticket statuses
+      (`shared/ticketCommerce`). One `isOrderFulfilled(order)` for the four
+      fields that say "done". Split `ticketStatusLabel` by domain.
+- [ ] S3. Pitch review and change request statuses. Pick one spelling for
+      "declined" (owner question: stored `rejected` vs `declined`).
+- [ ] S4. Speaker, invite and material review statuses, with a speaker
+      transition table checked in `applyUpdateSpeaker`.
+- [ ] S5. Delivery states (pitch notices, change request notices, speaker
+      reminders, access mail, email send): one vocabulary for an unknown
+      outcome, and one notice-record helper.
+- [ ] S6. One lease helper with an owner token, used by the five leases.
+- [ ] S7. Delete dead states and code the modules show as unused.
+
+### Done when (each step)
+
+- A test lists every value the server writes and fails if a module lacks it.
+- `grep` finds no status literal list outside the module, except the rules
+  file, which has a parity test against the module.
+- `npm test`, `npm run test:web`, lint and the rules suite pass.
+
+### Risks
+
+- Firestore rules cannot import JS. Their copies stay, guarded by tests.
+- `apps/web` imports `shared` directly, so a shared change rebuilds the web
+  bundle; run the web build in each PR.
+- Console code goes live only after `deploy-console.yml`.
+
+
 ## What's left (updated 2026-11-04, 9 p.m. Eastern)
 
 **1. Merge the open stack, in order.** Each PR is based on the one before.
