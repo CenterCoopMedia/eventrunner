@@ -28,12 +28,13 @@ const PROVIDER_NAMES = Object.freeze({ stripe: 'Stripe', eventbrite: 'Eventbrite
 // the build (ADR 0007 §4, amendment 2026-11-04). From `approved` on, the
 // provisioner owns the tokens, and an Owner can only reconnect the chosen
 // account after a failed build (requireConnectable in connections.cjs).
-const CHANGEABLE = Object.freeze(['draft']);
-const CLOSED_STATUSES = Object.freeze(['withdrawn', 'declined']);
+const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
+const CHANGEABLE = CONSOLE_REQUEST_GROUPS.editable;
+const CLOSED_STATUSES = CONSOLE_REQUEST_GROUPS.closed;
 // A built site runs on the token the build moved to its project. An Owner can end
 // its Stripe connection at Stripe. Eventbrite has no way to, so that one is an
 // operator step (docs/DEPLOY_RUNBOOK.md §12.5).
-const BUILT_STATUSES = Object.freeze(['ready', 'launched']);
+const BUILT_STATUSES = CONSOLE_REQUEST_GROUPS.built;
 
 /** @returns {object|null} the connection state of one provider, when it is connected */
 function liveConnection(connections, provider) {

@@ -66,7 +66,9 @@ let origin;
 test.beforeAll(async () => {
   const { createServer } = await import('vite');
   const { default: react } = await import('@vitejs/plugin-react');
-  server = await createServer({ configFile: false, root: FIXTURE,
+  // configFile is off, so reuse the console's prebundle list (see console-workspace.spec.js).
+  const { default: consoleConfig } = await import('../console/web/vite.config.js');
+  server = await createServer({ configFile: false, root: FIXTURE, optimizeDeps: consoleConfig.optimizeDeps,
     plugins: [{ name: 'console-feedback-fixture', enforce: 'pre', resolveId(source, importer) {
       if (importer && source.startsWith('.') && path.resolve(path.dirname(importer.split('?')[0]), source) === FIREBASE) return path.join(FIXTURE, 'firebase.js');
       return null;

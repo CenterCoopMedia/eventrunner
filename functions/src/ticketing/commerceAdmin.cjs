@@ -21,6 +21,7 @@ const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets', 'promoCod
 // Promo codes are staff-editable (ADR 0008 §6); they live in promoCodes.cjs.
 const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee', 'cancelTickets', 'resend', 'reconcile', 'savePromoCode', 'deletePromoCode']);
 const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
+const { isOrderFulfilled } = require('shared/ticketCommerce');
 
 class CommerceError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -466,7 +467,7 @@ function createTicketingCheckInHandler({ db, provider, auth, getConfig, now = ()
           audit(tx, logRef, { action: 'check-in-corrected', actor, now, orderId: ticket.orderId, ticketIds: [ticketId], reason });
           return { result: 'corrected', ticket: { ...dto, checkedInAt: null } };
         }
-        if (ticket.status !== 'valid' || order.inventoryState !== 'sold' || order.paymentStatus !== 'succeeded' ||
+        if (ticket.status !== 'valid' || !isOrderFulfilled(order) ||
             (account?.exists && account.data().registrationStatus === 'revoked')) return { result: 'invalid', ticket: dto };
         if (ticket.checkedInAt) return { result: 'already_checked_in', ticket: dto };
         const checkedInAt = now();

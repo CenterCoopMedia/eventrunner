@@ -34,6 +34,7 @@ const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } 
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
 const { historyEntry } = require('../console/functions/src/applications.cjs');
+const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
 const { BUILD_COLLECTION } = require('../console/functions/src/buildRetry.cjs');
 const { GITHUB_HEADERS, installationToken } = require('../console/functions/src/buildDispatch.cjs');
 const { ACCOUNT_COLLECTION, connectionSecretId, deleteStoredConnection } = require('../console/functions/src/connections.cjs');
@@ -1258,12 +1259,12 @@ async function provision({ appId, testMode = false, deps }) {
     return 2;
   }
   const app = snap.data();
-  if (['ready', 'launched'].includes(app.status)) {
+  if (CONSOLE_REQUEST_GROUPS.built.includes(app.status)) {
     log.log(`provision-client: request ${appId} is already ${app.status}. Nothing to do.`);
     return 0;
   }
   // No cloud resource exists before a request is approved.
-  if (!['approved', 'building'].includes(app.status)) {
+  if (!CONSOLE_REQUEST_GROUPS.building.includes(app.status)) {
     log.error(`provision-client: request ${appId} is ${app.status} and not ready to build`);
     return 2;
   }
@@ -1291,7 +1292,7 @@ async function provision({ appId, testMode = false, deps }) {
   // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
   // closed after this sees a live run and is refused.
   const claimed = await db.runTransaction(async (tx) => {
-    if (!['approved', 'building'].includes((await tx.get(ref)).data()?.status)) return false;
+    if (!CONSOLE_REQUEST_GROUPS.building.includes((await tx.get(ref)).data()?.status)) return false;
     tx.set(recordRef, {
       appId,
       state: 'running',
@@ -1357,7 +1358,7 @@ async function markStopped({ appId, runId, deps }) {
     db.collection('applications').doc(appId).get(),
     db.collection(BUILD_COLLECTION).doc(appId).get(),
   ]);
-  if (!appSnap.exists || !['approved', 'building'].includes(appSnap.data().status)) return 0;
+  if (!appSnap.exists || !CONSOLE_REQUEST_GROUPS.building.includes(appSnap.data().status)) return 0;
   const record = recordSnap.exists ? recordSnap.data() : {};
   if (record.state === 'failed') return 0;
   if (record.state === 'queued' && runId && record.runUrl?.endsWith(`/actions/runs/${runId}`)) return 0;

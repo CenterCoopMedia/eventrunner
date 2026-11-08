@@ -1357,7 +1357,7 @@ gh workflow run provision-client.yml --ref main -f application_id=<id> -f test_m
 
 A run that dies before the script starts, for example on a refused identity token, leaves no record: the request shows a started build and nothing else. Read the workflow's run list.
 
-A new client's Environment is not added to `AUTO_DEPLOY_ENVIRONMENTS`, so a push to `main` does not deploy to it. Add it by hand once the site is launched (section 4).
+A new client's Environment is not added to `AUTO_DEPLOY_ENVIRONMENTS`, so a push to `main` does not deploy to it. When the client's event site opens to the public, select **Mark as launched** on its review page. That moves the request from `ready` to `launched` and emails each Owner "Your site is open to the public". Then add the Environment to `AUTO_DEPLOY_ENVIRONMENTS` by hand (section 4).
 
 ### 12.3 What the hand-built rehearsal taught
 

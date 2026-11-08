@@ -11,12 +11,8 @@
 const { ConsoleError } = require('./http.cjs');
 const { isOperator, validOrgId } = require('./access.cjs');
 
-/**
- * Every status an application can hold. The console writes the first seven;
- * scripts/decommission-client.cjs writes 'archived' when it turns a site off,
- * and a restore puts the earlier status back. applications.cjs uses this list.
- */
-const STATUSES = Object.freeze(['draft', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined', 'archived']);
+// Every status an application can hold, with its writers: shared/consoleRequest.
+const { CONSOLE_REQUEST_STATUSES: STATUSES } = require('shared/consoleRequest');
 
 const NOT_OPERATOR = 'This page is for the hosting team.';
 const NOT_FOUND = 'We could not find that request.';

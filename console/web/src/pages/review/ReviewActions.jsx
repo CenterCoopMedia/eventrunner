@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActionResult } from '../../ActionFeedback.jsx';
 import NoteForm from './NoteForm.jsx';
+import { CONSOLE_REQUEST_GROUPS } from 'shared/consoleRequest';
 import IconControl from '../../IconControl.jsx';
 
-const SPAM_STATUSES = ['draft', 'withdrawn', 'declined'];
-const ACCEPTED = ['approved', 'building'];
+const SPAM_STATUSES = CONSOLE_REQUEST_GROUPS.spamDeletable;
+const ACCEPTED = CONSOLE_REQUEST_GROUPS.building;
 
 /** The decisions open to the hosting team for a request with this status. */
 export function decisionsFor(status, canClose = false) {
-  return { decline: status === 'draft', close: canClose, deleteSpam: SPAM_STATUSES.includes(status) };
+  return { decline: status === 'draft', close: canClose, launch: status === 'ready', deleteSpam: SPAM_STATUSES.includes(status) };
 }
 
 /** One decision at a time, with a retained form on failure and a local result. */
@@ -60,6 +61,23 @@ export default function ReviewActions({ status, canClose = false, onDecide, busy
         help="Say why. The web address becomes free again, and the request is deleted after 90 days."
         submitLabel="Decline" danger disabled={disabled} result={result?.kind === 'error' ? result : null}
         onSubmit={(note) => submit('declineApplication', { note })} onCancel={close} /> : null}
+      {allowed.launch ? (open === 'launch' ? (
+        <>
+          <div className="confirm" role="group" aria-label="Mark as launched">
+            <span>Mark this site as open to the public? Each Owner gets an email that says so.</span>
+            <button type="button" className="button primary" disabled={busy || disabled} aria-busy={busy || undefined}
+              onClick={() => submit('launchApplication', {})}>{busy ? 'Saving…' : 'Mark as launched'}</button>
+            <button type="button" className="button" autoFocus disabled={busy || disabled} onClick={close}>Cancel</button>
+          </div>
+          <ActionResult result={result?.kind === 'error' ? result : null} />
+        </>
+      ) : (
+        <div className="row-actions">
+          <button type="button" className="button primary" disabled={busy || disabled}
+            ref={(node) => { openers.current.launch = node; }} aria-expanded={false}
+            onClick={() => setOpen('launch')}>Mark as launched</button>
+        </div>
+      )) : null}
       {allowed.close ? <div className="row-actions">{opener('close', 'Close request')}</div> : null}
       {open === 'close' ? <NoteForm id="close" title="Close this request"
         help="Give the reason for closing. Stop site setup first. Closing disconnects linked accounts. The web address can stay reserved if setup began. Anything created for this site stays until you remove it, including hosting and Eventbrite access. Hosting charges can continue until those resources are removed."

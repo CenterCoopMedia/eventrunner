@@ -31,8 +31,8 @@ const SYNC_QUEUE = 'ticket_sync_queue';
 const QUEUE_PENDING = 'pending';
 const QUEUE_EXHAUSTED = 'exhausted';
 
-/** Ticket statuses (§3.3 TicketRecord). Anything else normalizes to pending_info. */
-const TICKET_STATUSES = ['valid', 'refunded', 'cancelled', 'pending_info'];
+/** Ticket statuses (§3.3 TicketRecord), from shared/ticketCommerce. Anything else normalizes to pending_info. */
+const { TICKET_STATUSES } = require('shared/ticketCommerce');
 
 /**
  * Firestore document ids are limited to 1500 bytes, may not contain `/`,

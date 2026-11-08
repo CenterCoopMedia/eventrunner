@@ -129,6 +129,17 @@ async function declineApplication(deps, input) {
   return decide(deps, input, { from: ['draft'], to: 'declined', note, releaseName: true });
 }
 
+/**
+ * Mark a ready site as open to the public (state machine plan S1b). The
+ * hosting team does this once the client's event site goes public; the
+ * Owners get the "Your site is open to the public" email.
+ */
+async function launchApplication(deps, input) {
+  return decide(deps, input, { from: LAUNCHABLE, to: 'launched' });
+}
+// Only a ready site; shared/consoleRequest's table allows ready -> launched.
+const LAUNCHABLE = Object.freeze(['ready']);
+
 async function closeApplication(deps, { body, user }) {
   const { db, now = Date.now, log = console } = deps;
   await requireOperator(db, user);
@@ -173,4 +184,4 @@ async function closeApplication(deps, { body, user }) {
   return { body: { application: { id: app.id, status: 'declined' }, ...mail } };
 }
 
-module.exports = { NOTE_MAX, closeApplication, declineApplication, requireNote, transition };
+module.exports = { NOTE_MAX, closeApplication, declineApplication, launchApplication, requireNote, transition };

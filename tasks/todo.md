@@ -33,14 +33,23 @@ LABELS              // staff words; client words only where they differ
       last refresh (c8ef222). CI never failed, because `prepare:functions`
       rewrites the hash before `npm ci`. Refreshed in PR #763. Each later
       step runs `npm run prepare:functions` and commits the three lockfiles.
+- [x] S1a. `packages/shared/src/consoleRequest.cjs`: one list, groups,
+      transition table and both label sets; every copy in console functions,
+      console web and the provisioning scripts imports it. No behaviour change.
+- [x] S1b. The Launch action: **Mark as launched** moves a ready request to `launched` (operator only, revision-checked, emails the Owners).
 - [ ] S1. Console request (`applications.status`): one list, groups
       (open, closed, building, built), labels for operator and client.
       Replace the 20+ copies, the two `BUILT_STATUSES` and the six
       `['approved', 'building']` literals. Add the Launch action that moves
       a ready site to `launched` (owner decision).
-- [ ] S2. Stripe order, payment, refund and ticket statuses
-      (`shared/ticketCommerce`). One `isOrderFulfilled(order)` for the four
-      fields that say "done". Split `ticketStatusLabel` by domain.
+- [x] S2 (lists). Ticket, order, payment, inventory and refund status lists and
+      `isOrderFulfilled` are in `shared/ticketCommerce`; check-in, the confirmation
+      email, ticket sync, reconcile, the admin filters and the purchaser page read
+      them.
+- [x] S2 (labels). `ticketStatusLabel` is split by field: ticket, order,
+      payment, refund state, Stripe refund and Stripe dispute each have their
+      own words. A pending refund no longer reads "Confirming payment", and the
+      admin ticket filter no longer keeps its own word list.
 - [ ] S3. Pitch review and change request statuses. Store `declined`
       everywhere (owner decision), with a one-time migration of stored
       `rejected` pitches on each client site.

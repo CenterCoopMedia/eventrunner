@@ -1,3 +1,4 @@
+import { TICKET_STATUSES } from 'shared/ticketCommerce';
 import { plannerMessage } from '../plannerErrors.js';
 import '../plannerFields.css';
 // Ticketing tab (issue #31): provider status, CSV import with column
@@ -405,10 +406,7 @@ function TicketList({ call, refreshToken }) {
           onChange={setStatus}
           options={[
             { value: '', label: 'Any' },
-            { value: 'valid', label: 'Valid' },
-            { value: 'refunded', label: 'Refunded' },
-            { value: 'cancelled', label: 'Cancelled' },
-            { value: 'pending_info', label: 'Pending info' },
+            ...TICKET_STATUSES.map((value) => ({ value, label: ticketStatusLabel(value) })),
           ]}
         />
         <button type="submit" className={secondaryButtonClass} disabled={loading}>

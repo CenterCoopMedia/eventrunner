@@ -268,3 +268,16 @@ Rules written after user corrections. Read at session start.
   a click on the top PR in the GitHub UI: tell the owner which PR is the top,
   and do the deploy and checks after it lands.
 
+
+## 2026-11-08: a new shared entry in a browser app needs a dev-server prebundle
+
+- Vite's dev server serves the CommonJS shared package as-is unless the entry
+  is in `optimizeDeps.include`. The build and Vitest pass, but the page fails
+  with "does not provide an export named 'default'". Only E2E sees it.
+- When an app imports a new `shared/<entry>`, add it to that app's
+  `vite.config.js`. apps/web and console/web each have an `optimizeDeps` test
+  that fails on a missing entry. E2E servers built with `configFile: false`
+  must reuse the app config's list.
+- Run the failing E2E spec locally before guessing: a scratch Playwright config
+  with no global setup and `executablePath: '/opt/pw-browsers/chromium'` runs
+  the console specs without the emulators.

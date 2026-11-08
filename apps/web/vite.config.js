@@ -76,6 +76,7 @@ export default defineConfig({
       'shared/speakerReadiness',
       'shared/invoice',
       'shared/imageSizes',
+      'shared/ticketCommerce',
     ],
   },
   build: {

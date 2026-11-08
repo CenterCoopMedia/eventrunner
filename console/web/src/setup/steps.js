@@ -1,3 +1,4 @@
+import { CONSOLE_REQUEST_CLIENT_LABELS } from 'shared/consoleRequest';
 // The steps of the guided setup (ADR 0007 §3 and the 2026-11-04 amendment), in
 // order. `id` is the key the server uses in `answers`, `errors` and
 // `progress`; `path` is the last part of the step's address.
@@ -89,13 +90,5 @@ export const BUILD_PHASES = Object.freeze([
   { steps: ['ready'], label: 'Emailing the link to your site' },
 ]);
 
-export const STATUS_LABELS = Object.freeze({
-  draft: 'Setup not finished',
-  approved: 'We are building your site',
-  building: 'We are building your site',
-  ready: 'Your site is ready',
-  launched: 'Your site is open to the public',
-  withdrawn: 'Withdrawn',
-  declined: 'We cannot build this site',
-  archived: 'Your site is switched off',
-});
+/** The client's words for each request status (shared/consoleRequest). */
+export const STATUS_LABELS = CONSOLE_REQUEST_CLIENT_LABELS;

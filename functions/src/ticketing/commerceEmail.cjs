@@ -2,6 +2,7 @@
 
 // Firestore is a wake-up only. Re-read current financial and admission state,
 // then use the existing managed-email send-once contract. No email work queue.
+const { isOrderFulfilled } = require('shared/ticketCommerce');
 const { createHash } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { render } = require('../email/render.cjs');
@@ -30,8 +31,7 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   if (!policy.ok) return { sent: 0, alreadySent: false, skipped: 'read-only-demo' };
   const snap = await db.collection('ticket_orders').doc(orderId).get();
   const order = snap.exists ? snap.data() : null;
-  if (!order || order.provider !== 'stripe' ||
-      order.inventoryState !== 'sold' || order.paymentStatus !== 'succeeded') {
+  if (!order || order.provider !== 'stripe' || !isOrderFulfilled(order)) {
     return { sent: 0, alreadySent: false, skipped: 'not-confirmed' };
   }
   // Use the provider's normalized deployment identity without creating its

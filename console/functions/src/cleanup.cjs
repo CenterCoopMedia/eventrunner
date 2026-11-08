@@ -35,8 +35,9 @@ const {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RETENTION_DAYS = 90;
-const RETAINED_STATUSES = Object.freeze(['withdrawn', 'declined']);
-const SPAM_STATUSES = Object.freeze(['draft', 'withdrawn', 'declined']);
+const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
+const RETAINED_STATUSES = CONSOLE_REQUEST_GROUPS.closed;
+const SPAM_STATUSES = CONSOLE_REQUEST_GROUPS.spamDeletable;
 const RETENTION_BATCH = 500;
 
 /** Delete a request and everything connected to it, in the order that keeps a token findable. */

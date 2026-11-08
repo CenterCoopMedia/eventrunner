@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { closeApplication, declineApplication } = require('./reviewDecisions.cjs');
+const { closeApplication, declineApplication, launchApplication } = require('./reviewDecisions.cjs');
 const { makeFakeSecrets } = require('./fakes.cjs');
 const { NOW, PUBLIC_URL, ana, application, deps, fakeMailer, ops, ops2, seeded } = require('./fakeReview.cjs');
 
@@ -174,4 +174,33 @@ test('closeApplication is for operators, on an accepted request the page still s
   await assert.rejects(close(closeDeps(closeDb()), ana), { status: 403 });
   await assert.rejects(close(closeDeps(closeDb()), ops, { revision: 1 }), { status: 409, code: 'status-changed' });
   await assert.rejects(close(closeDeps(closeDb({ status: 'ready' }))), { status: 409, code: 'status-changed' });
+});
+
+// The Launch action (state machine plan S1b): the hosting team marks a ready
+// site as open to the public. Nothing set 'launched' before this.
+const READY = { status: 'ready' };
+const launch = (d, { user = ops, revision = 2 } = {}) => launchApplication(d, { body: { appId: 'a1', revision }, user });
+
+test('launchApplication moves a ready site to launched, keeps its name and emails each Owner', async () => {
+  const db = seeded({ 'applications/a1': application(READY) });
+  const d = deps(db);
+  const result = await launch(d);
+  assert.deepEqual(result.body, { application: { id: 'a1', status: 'launched' }, emailed: 2, mailFailed: false });
+  const app = db.read('applications/a1');
+  assert.equal(app.status, 'launched');
+  assert.deepEqual(app.history.at(-1), { status: 'launched', at: new Date(NOW), by: 'ops', note: null });
+  assert.ok(db.read('site_names/nclocal'), 'a launched site keeps its address');
+  assert.deepEqual(d.mailer.sent.map((m) => m.status), ['launched', 'launched']);
+});
+
+test('only a ready site can be launched, only by the hosting team, and only from the page the operator saw', async () => {
+  for (const status of ['draft', 'approved', 'building', 'launched', 'withdrawn', 'declined', 'archived']) {
+    const db = seeded({ 'applications/a1': application({ status }) });
+    await assert.rejects(launch(deps(db)), { status: 409, code: 'status-changed' }, status);
+    assert.equal(db.read('applications/a1').status, status);
+  }
+  const db = seeded({ 'applications/a1': application(READY) });
+  await assert.rejects(launch(deps(db), { user: ana }), { status: 403 });
+  await assert.rejects(launch(deps(db), { revision: 1 }), { status: 409, code: 'status-changed' });
+  assert.equal(db.read('applications/a1').status, 'ready');
 });

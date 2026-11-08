@@ -3,7 +3,7 @@ import AdminIconControl from './AdminIconControl.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
 import ExternalLink from '../../components/ExternalLink.jsx';
 import { Checkbox } from '../../components/forms/Choice.jsx';
-import { formatTicketMoney, formatTicketTime, newTicketingRequestId, safeStripeDashboardUrl, ticketStatusLabel } from '../../lib/ticketingCommerce.js';
+import { formatTicketMoney, formatTicketTime, newTicketingRequestId, safeStripeDashboardUrl, disputeStatusLabel, paymentStatusLabel, refundLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingCommerce.js';
 import { AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { Notice, Panel, secondaryButtonClass, dangerButtonClass, linkButtonClass, TextAreaField, TextField, SelectField } from './formControls.jsx';
 import TicketingConfirmation from './TicketingConfirmation.jsx';
@@ -173,10 +173,10 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
     {order ? <div className="space-y-md">
       <dl className="grid min-w-0 gap-md sm:grid-cols-2 lg:grid-cols-3">
         <div><dt className="text-admin-base font-semibold">Purchaser</dt><dd className="wrap-anywhere font-admin-data text-admin-sm">{order.purchaserEmail || order.purchaser?.email}</dd></div>
-        <div><dt className="text-admin-base font-semibold">Payment</dt><dd><StatusBadge>{ticketStatusLabel(order.paymentStatus)}</StatusBadge></dd></div>
+        <div><dt className="text-admin-base font-semibold">Payment</dt><dd><StatusBadge>{paymentStatusLabel(order.paymentStatus)}</StatusBadge></dd></div>
         <div><dt className="text-admin-base font-semibold">Original total</dt><dd className="font-admin-data text-admin-sm">{formatTicketMoney(order.totalAmount, order.currency)}</dd></div>
         {order.promo ? <div><dt className="text-admin-base font-semibold">Promo code</dt><dd className="font-admin-data text-admin-sm">{order.promo.code}: {formatTicketMoney(order.promo.discountAmount, order.currency)} off</dd></div> : null}
-        <div><dt className="text-admin-base font-semibold">Refund state</dt><dd>{ticketStatusLabel(order.refundStatus || 'none')}</dd></div>
+        <div><dt className="text-admin-base font-semibold">Refund state</dt><dd>{refundStateLabel(order.refundStatus || 'none')}</dd></div>
         <div><dt className="text-admin-base font-semibold">Refunded amount</dt><dd className="font-admin-data text-admin-sm">{formatTicketMoney(order.refundedAmount || 0, order.currency)}</dd></div>
         <div><dt className="text-admin-base font-semibold">Created</dt><dd className="font-admin-data text-admin-sm">{formatTicketTime(order.createdAt, timezone)}</dd></div>
       </dl>
@@ -225,10 +225,10 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       </section>
       {refunds.length ? <section className="space-y-sm">
         <h3 className="text-admin-lg font-bold">Refund history</h3>
-        <ul className="space-y-xs">{refunds.map((refund) => <li key={refund.id} className="wrap-anywhere border-b-admin-hairline border-admin-rule-hairline pb-xs">{formatTicketMoney(refund.amount, refund.currency || order.currency)} — {(refund.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(refund.status))} — {formatTicketTime(refund.createdAt, timezone)}{refund.failureReason ? ` — ${refund.failureReason}` : ''}</li>)}</ul>
+        <ul className="space-y-xs">{refunds.map((refund) => <li key={refund.id} className="wrap-anywhere border-b-admin-hairline border-admin-rule-hairline pb-xs">{formatTicketMoney(refund.amount, refund.currency || order.currency)} — {refundLabel(refund.status)} — {formatTicketTime(refund.createdAt, timezone)}{refund.failureReason ? ` — ${refund.failureReason}` : ''}</li>)}</ul>
         {isOperator ? <>
           <p className="text-admin-sm text-admin-ink-secondary">An amount-only partial refund does not identify which attendee loses admission. Record the organizer’s decision using the ticket selection above, or explicitly retain every ticket.</p>
-          <SelectField label="Refund to allocate" value={refundId} onChange={setRefundId} options={[{ value: '', label: 'Choose a refund' }, ...refunds.map((refund) => ({ value: refund.id, label: `${formatTicketMoney(refund.amount, refund.currency || order.currency)} · ${formatTicketTime(refund.createdAt, timezone)} · ${refund.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(refund.status)}` }))]} />
+          <SelectField label="Refund to allocate" value={refundId} onChange={setRefundId} options={[{ value: '', label: 'Choose a refund' }, ...refunds.map((refund) => ({ value: refund.id, label: `${formatTicketMoney(refund.amount, refund.currency || order.currency)} · ${formatTicketTime(refund.createdAt, timezone)} · ${refundLabel(refund.status)}` }))]} />
           <Checkbox tone="admin" label="Keep every ticket valid" checked={preserveAdmission} onChange={(event) => setPreserveAdmission(event.target.checked)} />
           <button type="button" className={secondaryButtonClass} onClick={() => {
             if (!refundId || (!preserveAdmission && !selected.length)) { setError('Choose a refund and select affected tickets, or choose to keep every ticket valid.'); return; }
@@ -236,7 +236,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
           }}>Review refund allocation</button>
         </> : null}
       </section> : null}
-      {order.disputes?.length ? <section className="space-y-sm"><h3 className="text-admin-lg font-bold">Payment disputes</h3><p className="text-admin-sm text-admin-ink-secondary">Review and respond in Stripe Dashboard. A dispute does not automatically change admission; check each ticket before deciding whether to cancel it.</p><ul className="space-y-xs">{order.disputes.map((dispute) => <li key={dispute.id} className="wrap-anywhere">{formatTicketMoney(dispute.amount, dispute.currency || order.currency)} — {ticketStatusLabel(dispute.status)}</li>)}</ul></section> : null}
+      {order.disputes?.length ? <section className="space-y-sm"><h3 className="text-admin-lg font-bold">Payment disputes</h3><p className="text-admin-sm text-admin-ink-secondary">Review and respond in Stripe Dashboard. A dispute does not automatically change admission; check each ticket before deciding whether to cancel it.</p><ul className="space-y-xs">{order.disputes.map((dispute) => <li key={dispute.id} className="wrap-anywhere">{formatTicketMoney(dispute.amount, dispute.currency || order.currency)} — {disputeStatusLabel(dispute.status)}</li>)}</ul></section> : null}
       <section className="space-y-sm">
         <h3 className="text-admin-lg font-bold">Audit trail</h3>
         {data.audit?.length ? <ol className="space-y-sm">{data.audit.map((entry) => <li key={entry.id} className="space-y-3xs border-b-admin-hairline border-admin-rule-hairline pb-sm"><p className="font-semibold">{AUDIT_LABELS[String(entry.action).replace(/^ticketing\./, '')] || 'Order updated'}</p><p className="wrap-anywhere font-admin-data text-admin-xs">{formatTicketTime(entry.at, timezone)} · {entry.actorEmail || 'Staff'}</p>{entry.reason ? <p className="wrap-anywhere text-admin-sm">{entry.reason}</p> : null}{entry.ticketIds?.length ? <p className="wrap-anywhere font-admin-data text-admin-xs">{entry.ticketIds.length} tickets affected</p> : null}</li>)}</ol> : <p className="text-admin-sm text-admin-ink-secondary">No staff actions have been recorded for this order.</p>}
@@ -254,7 +254,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       </> : <>
         {confirm === 'cancel' && notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
         <p className="wrap-anywhere">Original payment: {formatTicketMoney(order?.totalAmount, order?.currency)}.</p>
-        {confirm === 'refund' ? <p>Refund: {formatTicketMoney(selectedRefund?.amount, selectedRefund?.currency || order?.currency)} — {selectedRefund?.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(selectedRefund?.status)}.</p> : null}
+        {confirm === 'refund' ? <p>Refund: {formatTicketMoney(selectedRefund?.amount, selectedRefund?.currency || order?.currency)} — {refundLabel(selectedRefund?.status)}.</p> : null}
         {preserveAdmission && confirm === 'refund' ? <p>All ticket admission stays as it is. This records an amount-only payment adjustment.</p> : <>{selectedSummary}<p>These tickets will lose admission, including any that have already been checked in. Sold seats will not be returned to capacity.</p></>}
         <p>No refund payment is created by this action.</p>
       </>}
