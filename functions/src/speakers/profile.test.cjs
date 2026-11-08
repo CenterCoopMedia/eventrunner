@@ -219,6 +219,31 @@ test('setting status to removed severs both halves of the account link', async (
   assert.equal(db.read('speakers', 's1').status, 'removed');
 });
 
+test('unpublishing a speaker who has an account keeps them accepted and linked', async () => {
+  // Staff can set only draft, approved or removed, so "Draft" is how they
+  // unpublish. For a speaker with an account that stores 'accepted': the
+  // person keeps their dashboard and access, and can be published again
+  // without a new invite. 'draft' stays the state of a record with no account.
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: 'u1' },
+    'users/u1': { uid: 'u1', speakerId: 's1', registrationStatus: 'pending' },
+  });
+  const result = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, actor: ACTOR, now: NOW });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 's1').status, 'accepted');
+  assert.equal(db.read('speakers', 's1').uid, 'u1');
+  assert.equal(db.read('users', 'u1').speakerId, 's1');
+
+  // An accepted speaker set to draft stays accepted too.
+  await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, actor: ACTOR, now: NOW });
+  assert.equal(db.read('speakers', 's1').status, 'accepted');
+
+  // With no account, draft is draft.
+  const unlinked = makeSpeakersDb({ 'speakers/s2': { firstName: 'C', lastName: 'D', slug: 'c-d', status: 'approved', uid: null } });
+  await applyUpdateSpeaker({ db: unlinked, speakerId: 's2', payload: { status: 'draft' }, actor: ACTOR, now: NOW });
+  assert.equal(unlinked.read('speakers', 's2').status, 'draft');
+});
+
 test('removing a speaker whose account is already gone still succeeds', async () => {
   const db = makeSpeakersDb({
     'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'approved', uid: 'ghost' },
