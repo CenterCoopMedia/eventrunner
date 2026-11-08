@@ -37,7 +37,7 @@ const { saveApplicationStep } = require('./applicationSave.cjs');
 const { withdrawApplication } = require('./applicationStatus.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
 const { getApplicationForReview, listApplicationsForReview } = require('./reviewQueue.cjs');
-const { closeApplication, declineApplication } = require('./reviewDecisions.cjs');
+const { closeApplication, declineApplication, launchApplication } = require('./reviewDecisions.cjs');
 const { deleteSpamApplication, runRetention } = require('./cleanup.cjs');
 const { getConsoleSettings, saveAgreement, saveConsoleSettings } = require('./consoleSettings.cjs');
 const { acceptAgreement, getAgreement } = require('./agreementAcceptance.cjs');
@@ -85,6 +85,7 @@ const ENDPOINTS = Object.freeze({
   getApplicationForReview: { action: getApplicationForReview },
   declineApplication: { action: declineApplication, mail: true },
   closeApplication: { action: closeApplication, mail: true, connect: true },
+  launchApplication: { action: launchApplication, mail: true },
   retryBuild: { action: retryBuild, mail: true, build: true },
   deleteSpamApplication: { action: deleteSpamApplication, connect: true },
   getConsoleSettings: { action: getConsoleSettings },

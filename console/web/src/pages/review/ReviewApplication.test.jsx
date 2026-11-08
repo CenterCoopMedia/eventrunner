@@ -285,6 +285,28 @@ describe('ReviewApplication', () => {
     });
   });
 
+  describe('launching a ready site', () => {
+    it('offers Mark as launched for a ready site, asks to confirm, and sends the revision it read', async () => {
+      callApi.mockImplementation(async (name) => {
+        if (name === 'getApplicationForReview') return request({ status: 'ready' });
+        return { application: { id: 'a1', status: 'launched' }, emailed: 1, mailFailed: false };
+      });
+      page();
+      fireEvent.click(await screen.findByRole('button', { name: 'Mark as launched' }));
+      const confirm = screen.getByRole('group', { name: 'Mark as launched' });
+      expect(within(confirm).getByText(/open to the public/)).toBeInTheDocument();
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Mark as launched' }));
+      await vi.waitFor(() => expect(callApi).toHaveBeenCalledWith('launchApplication', { appId: 'a1', revision: 2 }));
+    });
+
+    it('offers no launch for a request that is not ready', async () => {
+      callApi.mockImplementation(async () => ({ ...request({ status: 'building' }), canRetryBuild: false }));
+      page();
+      expect(await screen.findByText(/Stop site setup before/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Mark as launched' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('closing an accepted request', () => {
     it('offers Close once the build stopped, and warns what stays', async () => {
       callApi.mockImplementation(async (name) => {

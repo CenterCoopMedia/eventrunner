@@ -36,7 +36,7 @@ LABELS              // staff words; client words only where they differ
 - [x] S1a. `packages/shared/src/consoleRequest.cjs`: one list, groups,
       transition table and both label sets; every copy in console functions,
       console web and the provisioning scripts imports it. No behaviour change.
-- [ ] S1b. The Launch action (below).
+- [x] S1b. The Launch action: **Mark as launched** moves a ready request to `launched` (operator only, revision-checked, emails the Owners).
 - [ ] S1. Console request (`applications.status`): one list, groups
       (open, closed, building, built), labels for operator and client.
       Replace the 20+ copies, the two `BUILT_STATUSES` and the six
