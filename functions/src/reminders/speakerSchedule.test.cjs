@@ -316,6 +316,16 @@ test('settings: defaults, limits, and the helpers the run uses', () => {
   assert.equal(eventEnded({ event: { timezone: ZONE } }, IN_7D), false);
 });
 
+test('an archived event counts as over even when its days are still ahead', () => {
+  // The event days are in December, after IN_7D, but staff archived the
+  // event on 2026-11-10. An archived event sends no more reminders.
+  const archived = { event: { ...CONFIG.event, archivedAt: '2026-11-10T09:00' } };
+  assert.equal(eventEnded(archived, IN_7D), true);
+  // Archived later than now: not archived yet, and the days are ahead.
+  const later = { event: { ...CONFIG.event, archivedAt: '2026-11-30T09:00' } };
+  assert.equal(eventEnded(later, IN_7D), false);
+});
+
 // Review findings on #528. A run reads the schedule once, then sends one
 // speaker at a time; each check below happens again before each speaker.
 

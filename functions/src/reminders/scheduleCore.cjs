@@ -25,6 +25,7 @@
 const { MAX_OFFSET_DAYS, planReminders } = require('shared/reminderSchedule');
 const { splitEventDateTime } = require('shared/eventDateTime');
 const { isDayPast } = require('shared/time');
+const { getEventPhase } = require('shared/config');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { isoOrNull, timestampMs } = require('../speakers/reminderCore.cjs');
@@ -95,11 +96,14 @@ function eventTimeZone(config) {
 }
 
 /**
- * Whether the event is over: the last configured day's end time has passed
- * on the event's clock. An event with no usable days is not over.
+ * Whether the event is over: staff archived it, or the last configured
+ * day's end time has passed on the event's clock. An archived event sends
+ * no reminders even when its days are still ahead. An event with no usable
+ * days is not over unless it is archived.
  */
 function eventEnded(config, nowMs) {
   const event = config?.event;
+  if (getEventPhase(event, new Date(nowMs)) === 'archived') return true;
   const days = Array.isArray(event?.days) ? event.days.filter((day) => day && typeof day.date === 'string') : [];
   if (days.length === 0) return false;
   const last = [...days].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).at(-1);
