@@ -14,6 +14,8 @@
     "firebase.json",
     "scripts/generate-content.cjs",
     "scripts/write-site-files.cjs",
+    "scripts/publish-site.cjs",
+    "publisher/**",
     "scripts/lib/**",
     ".github/workflows/deploy-client.yml"
   ],
