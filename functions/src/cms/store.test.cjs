@@ -93,6 +93,24 @@ test('writeDraft forks basedOnRevision and visible from the live doc when no dra
   assert.equal(draft.status, 'dirty');
 });
 
+test('a stored record with no visible field stays hidden, as the rules and the public site read it', async () => {
+  // firestore.rules and every public reader show a record only when
+  // visible === true. A live doc or draft with no field is hidden there, so
+  // the admin side must not turn it visible on the next save or publish.
+  const db = makeFakeDb({ 'cmsContent/hero__title': { value: 'live', revision: 3 } });
+  await writeDraft({ db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'edited' }, actor: ACTOR, now });
+  assert.equal(db.read('cmsContent_drafts', 'hero__title').visible, false);
+
+  const legacy = makeFakeDb({ 'cmsContent_drafts/hero__title': { value: 'old', status: 'dirty', basedOnRevision: null } });
+  await publishDocs({ db: legacy, collection: 'cmsContent', docIds: ['hero__title'], actor: ACTOR, now });
+  assert.equal(legacy.read('cmsContent', 'hero__title').visible, false);
+
+  // A brand-new record with no stored doc is still visible by default.
+  const fresh = makeFakeDb();
+  await writeDraft({ db: fresh, collection: 'cmsContent', docId: 'new__doc', fields: { value: 'x' }, actor: ACTOR, now });
+  assert.equal(fresh.read('cmsContent_drafts', 'new__doc').visible, true);
+});
+
 test('writeDraft preserves an existing draft basedOnRevision and re-dirties a clean draft', async () => {
   const db = makeFakeDb({
     'cmsContent_drafts/hero__title': {

@@ -147,7 +147,7 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
   if (draftSnap.exists) {
     const prior = draftSnap.data();
     basedOnRevision = typeof prior.basedOnRevision === 'number' ? prior.basedOnRevision : null;
-    priorVisible = prior.visible !== false;
+    priorVisible = isVisible(prior);
   } else {
     const liveSnap = await tx.get(db.collection(collection).doc(docId));
     // A brand-new page must not fork a draft from a live doc that already
@@ -158,7 +158,7 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
     if (liveSnap.exists) {
       const live = liveSnap.data();
       basedOnRevision = typeof live.revision === 'number' ? live.revision : null;
-      priorVisible = live.visible !== false;
+      priorVisible = isVisible(live);
     }
   }
 
@@ -175,6 +175,15 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
   if (createOnly) tx.create(ref, payload);
   else tx.set(ref, payload);
   return { docPath: `${draftCol}/${docId}`, existed: draftSnap.exists };
+}
+
+/**
+ * Whether a stored record is shown, read the way firestore.rules and every
+ * public reader read it: only `visible === true`. A record with no field is
+ * hidden, so a save or publish never turns it visible by accident.
+ */
+function isVisible(doc) {
+  return doc?.visible === true;
 }
 
 /** True for a Firestore ALREADY_EXISTS rejection (gRPC code 6). */
@@ -376,7 +385,7 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
           : await maxHistoryRevision({ db, docPath: `${collection}/${docId}` });
         const revision = baseRevision + 1;
         const contentFields = contentFieldsOf(draft);
-        const visible = draft.visible !== false;
+        const visible = isVisible(draft);
         // Carried over from the CURRENT live doc, not the draft — see the
         // RESERVED_FIELDS comment on 'materialCount'. Absent on a doc with
         // no materials yet (or a first publish), which is the same "no

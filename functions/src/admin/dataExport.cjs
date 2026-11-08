@@ -108,7 +108,7 @@ async function readCurrent({ db, collection, counter, maxDocs, cache, liveOnly =
     const current = draftDoc && typeof liveDoc?.materialCount === 'number'
       ? { ...draftDoc, materialCount: liveDoc.materialCount }
       : draftDoc ?? liveDoc;
-    return { ...toRecord(id, current), state: stateWord(liveDoc, draftDoc), hidden: current.visible === false };
+    return { ...toRecord(id, current), state: stateWord(liveDoc, draftDoc), hidden: current.visible !== true };
   });
 }
 
