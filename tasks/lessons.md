@@ -291,3 +291,12 @@ Rules written after user corrections. Read at session start.
 - After any stack merge, run `git merge-base --is-ancestor <top head> origin/main`
   before deploying or saying the work is live. When a PR merges into a branch
   that is already merged, open a new PR from the same head to `main` at once.
+
+## 2026-11-08: a shared import in first-page code counts against the demo budget
+
+- `useAccountViews` loads with the first page. Importing `shared/speakerReadiness`
+  there pulled the whole module into the initial chunk and put the public demo
+  508 gzip bytes over its 292000 budget ("Demo build hygiene").
+- Before importing a shared module into code that loads with the first page,
+  run `node scripts/build-demo.cjs --check`. For a short list, keep a local copy
+  and add a test that it equals the shared one.

@@ -55,8 +55,9 @@ LABELS              // staff words; client words only where they differ
       `pitchNoticesOf`, so a pitch an older site stored as `rejected`, and its
       `notices.rejected` email record, read as declined and a sent decline is
       never sent again. Change requests already stored `declined` in one list.
-      Still open: the one-time rewrite of stored `rejected` pitches on each
-      client site. Nothing depends on it now; it only removes the legacy read.
+      The one-time rewrite (owner approved) runs in each client deploy:
+      `scripts/migrate-pitch-declined.cjs`. Once every site has run it, the
+      legacy read in `pitchStatusOf` and `pitchNoticesOf` can go.
 - [x] S4. Speaker statuses have a transition table, `SPEAKER_TRANSITIONS` in
       `shared/speaker`, checked by `applyUpdateSpeaker` and by the admin
       editor's choices. Owner decisions: a draft may be published with no

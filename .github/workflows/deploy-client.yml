@@ -311,6 +311,14 @@ jobs:
           EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
         run: node scripts/migrate-security-data.cjs
 
+      # Runs after the functions deploy, so the code that reads both
+      # spellings is live before stored values change. Runs once (marker).
+      - name: Rewrite pitch declines stored as rejected
+        if: inputs.bootstrap != true
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+        run: node scripts/migrate-pitch-declined.cjs
+
   publisher:
     name: Provision the site-publisher Cloud Run job
     needs: [guard, shared, validate-env]
