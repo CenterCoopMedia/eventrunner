@@ -23,8 +23,8 @@ Paths are relative to `apps/web/src/` unless they start with `console/` or `pack
 - Other copies:
   - The server writes `profileComplete`. The client never reads that field and recomputes it with shared `isProfileComplete` (packages/shared/src/profile.cjs:176). Both copies use the same predicate, so they agree.
 - Problems:
-  - `pending-account` has no exit when the doc is never created, is deleted, or the listener errors. subscribeWithRetry never calls onNext on an error (lib/retrySubscription.js:33-41). The result is a permanent spinner or placeholder at pages/Dashboard.jsx:38, pages/SpeakerDashboard.jsx:79 and pages/Profile.jsx:180, with no retry and no error copy.
-  - "Listener failing" is folded into "account not seeded yet".
+  - `pending-account` has no exit when the doc is never created or is deleted, or when the listener fails on every retry before its first snapshot. A transient error does recover: subscribeWithRetry re-attaches after 15 s (lib/retrySubscription.js:33-41), and a later error keeps the loaded profile, because subscribeOwnProfile only logs it (lib/profileSource.js:52-66). In the stuck cases, pages/Dashboard.jsx:38, pages/SpeakerDashboard.jsx:79 and pages/Profile.jsx:180 wait for ever with no error copy.
+  - A persistent listener failure before the first snapshot is folded into "account not seeded yet".
 
 ## OTP sign-in form  (explicit)
 - Entity / storage: in components/SignInPanel.jsx:103-112:
@@ -131,7 +131,7 @@ Paths are relative to `apps/web/src/` unless they start with `console/` or `pack
   - useAdminSpeakers.js:41 is a single-listener variant.
 - Derived state: `recordStateOf` gives `draft | live | dirty | unknown` (admin/recordState.js:32-37). The UI re-derives the publish lifecycle from `draft.status === 'dirty'`. `deadMatter` is an ad-hoc fifth state (:55).
 - Problems:
-  - Six hand copies of useAdminRecords.
+  - Six hand copies of the two-listener subscription in useAdminRecords. The merge step is not the same in all of them: useAdminSessions calls mergeSessionRevisions with event days and time zone and returns `groups` (useAdminSessions.js:29-46), which AdminSessionsList.jsx:147-151 uses.
   - `unknown` (:36) is a dead state, because merged rows always have live or draft.
 
 ## Loading-stage timer  (explicit)
@@ -211,10 +211,10 @@ Paths are relative to `apps/web/src/` unless they start with `console/` or `pack
   - lib/ticketingCommerce.js:128-142 `ticketStatusLabel` mixes order, payment, refund, ticket and audit-event statuses in one map, with synonyms (`paid`/`succeeded`, `complete`/`completed`/`fulfilled`).
 
 ## Cross-cutting findings
-1. **Six hand copies of the admin two-listener loading machine.** They are useAdminContent/Organizations/Pages/Sessions/Timeline/Updates (e.g. admin/useAdminPages.js:37-51). The generic admin/useAdminRecords.js:24-66, which also guards against a collection switch, already exists. Fix: make each hook a one-line `useAdminRecords('cmsPages')` wrapper.
+1. **Six hand copies of the admin two-listener loading machine.** They are useAdminContent/Organizations/Pages/Sessions/Timeline/Updates (e.g. admin/useAdminPages.js:37-51). The generic admin/useAdminRecords.js:24-66, which also guards against a collection switch, already exists. Fix: share the subscription part (two listeners, the collection-switch guard, loading/ready/error), and keep each hook's merge step and return fields. useAdminSessions still needs mergeSessionRevisions and `groups`, so it cannot be a plain `useAdminRecords` wrapper.
 2. **Async-load state rewritten in 13+ files.** Each has its own `{status:loading|ready|error}`, cancellation flag and `attempt` retry (lib/useRegistrationTargets.js:40-79, pages/SpeakerDashboard.jsx:51-60, pages/SpeakerProfile.jsx:140-217, …). Only two guard against a stale scope. Fix: one `useAsyncResource(key, loader)` hook that returns `{status, data, error, retry}`.
 3. **Error states are folded into "empty" or "waiting".**
-   - A ProfileContext listener error, or a missing doc, means `pending-account` for ever (contexts/ProfileContext.jsx:47-49,64; lib/retrySubscription.js:33-41).
+   - A missing account doc, or a listener that fails on every retry before its first snapshot, means `pending-account` for ever (contexts/ProfileContext.jsx:47-49,64; lib/retrySubscription.js:33-41). Transient errors recover after 15 s.
    - A registration-form error looks like "no form" (lib/useRegistrationTargets.js:44).
    - A failed drafts probe makes an admin `denied` (contexts/AuthContext.jsx:195,207).
    - Fix: give subscribeWithRetry an error callback that flips an `error` state, and add `error` to these three machines.

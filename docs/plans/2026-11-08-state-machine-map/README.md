@@ -12,9 +12,10 @@ drift and gaps.
   combine, leases, counters, documents that move between collections, or
   React state.
 
-The work was read-only. Five agents read the code by area. Each claim cites
-`path:line`. I re-read the code for 15 of the most serious claims, and all
-15 held. They are marked "checked" below.
+The work was read-only. The code was read in five passes, one per area. Each
+claim cites `path:line`. I re-read the code for 15 of the most serious claims, and all
+15 held. Review then corrected two claims (defects 16 and 18) and one
+fix suggestion (the admin listener hooks). They are marked "checked" below.
 
 ## Files
 
@@ -201,9 +202,9 @@ failing test first.
 | 13 | Retention sweep overwrites a `sending` announcement record in full | `functions/src/maintenance/cleanup.cjs:295-301` | Yes |
 | 14 | Unknown invoice status reads as editable, deletable `draft` | `functions/src/admin/invoices.cjs:120-122` | No |
 | 15 | Reminder run lease and Airtable lease release without an owner check | `functions/src/reminders/scheduleCore.cjs:274`, `functions/src/sessions/airtableSync.cjs:397-400` | No |
-| 16 | `purge --now` writes `archived` with no history, `archivedAt` or `purgeAfter`; a failed purge cannot recover | `scripts/decommission-client.cjs:780` | No |
+| 16 | `purge --now` writes `archived` with no history entry, `archivedAt` or `purgeAfter`. A failed run resumes from its tombstone checkpoints on a manual retry, but `purge-due` never picks it up | `scripts/decommission-client.cjs:767-780`, `:839-840` | Yes |
 | 17 | A retry re-reads live console settings and can move a build to a new region | `scripts/provision-client.cjs:1209-1214`, `:1319-1322` | No |
-| 18 | A failed profile listener leaves account pages waiting for ever | `apps/web/src/contexts/ProfileContext.jsx:64`, `apps/web/src/lib/retrySubscription.js:33-41` | No |
+| 18 | When the account document stays absent, or the profile listener never delivers a first snapshot, account pages wait for ever with no error copy. A transient error retries after 15 s | `apps/web/src/contexts/ProfileContext.jsx:64`, `apps/web/src/lib/retrySubscription.js:33-41` | Yes |
 
 ## Suggested cleanup order
 
@@ -223,12 +224,13 @@ next one smaller:
    unused.
 5. **One delivery-state module** for notices, reminders and mail (pattern 5),
    and **one lease helper** with an owner token (pattern 6).
-6. **UI consolidation**: `useAdminRecords` for all admin listener hooks,
-   one async-load hook, one autosave hook, one HTTP error type (pattern 9).
+6. **UI consolidation**: one shared live-plus-drafts subscription for the
+   admin listener hooks, with each hook keeping its own merge step and return
+   fields (sessions returns `groups`), one async-load hook, one autosave hook, one HTTP error type (pattern 9).
 
 ## Limits
 
-- The agents read and searched. They did not run code. Claims marked "No" in
+- The passes read and searched. They did not run code. Claims marked "No" in
   the defect table are not yet checked against a running system.
 - Line numbers are for commit `5fcb859`.
 - `publisher/` holds only a Dockerfile. The job half is in
