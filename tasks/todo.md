@@ -655,3 +655,26 @@ timeout).
 - a3: sticky table head dropped; one pull quote per page enforced at render;
   a `[Replace]` placeholder is never created on a launched home page.
 - b2 decision 10: no sort control, no bulk row, search text kept out of the URL.
+
+## Speaker session confirmation (owner decisions, 2026-11-08)
+
+Staff send `speaker.confirmation` per speaker per session, after a preview.
+A new send is allowed only when the session's title, time or room changed
+since the last sent one.
+
+- [ ] Server `sendSessionConfirmation` (staff, POST `{ sessionId, speakerId,
+      preview?, confirmUnknown?, expectedNamed? }`). Reads the LIVE session
+      (`cmsSchedule/{id}`, visible, with a day and start time) and the
+      speaker (named in `speakerIds`, not removed, has an email).
+- [ ] Record in staff-only `session_confirmations/{sessionId}__{speakerId}`:
+      state (shared/delivery), attempt, onceKey, `named { title, time, room }`,
+      queuedAt/sentAt/by. Retry rule from `email/noticeRetry.cjs`; a `sent`
+      record allows a new attempt only when `named` changed.
+- [ ] Preview returns the rendered subject and text and whether the slot
+      changed since the last send. Send requires the preview's `named`, so
+      staff send what they saw.
+- [ ] firestore.rules: staff read, no client write. Rules test.
+- [ ] Web: Sessions panel on the speaker editor listing published sessions
+      that name the speaker, with time, room, confirmation state and
+      Preview → Send.
+- [ ] Docs: ADMIN_GUIDE speakers section; ADR 0008 note that the action exists.
