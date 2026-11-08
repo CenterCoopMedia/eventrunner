@@ -247,3 +247,13 @@ Rules written after user corrections. Read at session start.
   the three lockfiles in any branch that changes `packages/shared`, so the
   committed record stays true. `npm pack` output is reproducible in a cloud
   container; a hash change after a clean checkout means the lockfile is stale.
+
+## 2026-11-08: check for an open stack before cutting any branch
+
+- PR #764 was cut from `main` while #763 was still open, against the
+  2026-11-03 rule. Joe repeated it: stack PRs whenever possible, so a merge
+  does not force every other open PR to wait for CI again. Before creating a
+  branch, list this session's open PRs and cut the new branch from the top of
+  that stack, with the PR targeting that branch. Cut from `main` only when
+  nothing is open, or when the owner says the work must merge on its own.
+
