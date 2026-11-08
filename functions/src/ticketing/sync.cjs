@@ -176,39 +176,6 @@ async function upsertTickets({ db, tickets, providerName, now = () => new Date()
   return { created, updated, skipped };
 }
 
-/**
- * Mark a queue row exhausted and page the operator (§3.3 step 3). The row
- * is kept: "placeholder-data orders alert instead of vanishing" is the
- * whole point, and an operator needs the row to see what was lost.
- */
-async function exhaustRow({ db, orderId, attempts, reason, notifyOperator, now, log }) {
-  const at = now();
-  await db.collection(SYNC_QUEUE).doc(orderId).set({
-    status: QUEUE_EXHAUSTED,
-    attempts,
-    exhaustedAt: at,
-    lastError: reason,
-    updatedAt: at,
-  }, { merge: true });
-
-  if (typeof notifyOperator === 'function') {
-    try {
-      await notifyOperator({
-        kind: 'error',
-        title: `ticket sync gave up on order ${orderId}`,
-        summary:
-          `${attempts} attempts failed to read a complete order from the ticketing provider ` +
-          `(${reason}). The order is parked in ${SYNC_QUEUE}/${orderId}; nobody has been ` +
-          'registered from it.',
-        fields: { orderId, attempts: String(attempts), reason },
-        dedupeKey: `ticket-sync-exhausted:${orderId}`,
-      });
-    } catch (err) {
-      // Alerting must never turn a drain into a failed run.
-      log.warn('ticketing: operator notify failed', err);
-    }
-  }
-}
 
 /** Take the lease transactionally, then fence every completion by token and generation. */
 async function leaseQueueRow({ db, ref, providerName, now }) {
@@ -528,7 +495,6 @@ module.exports = {
     normalizeTicket,
     backoffMsFor,
     toMillis,
-    exhaustRow,
     MAX_ATTEMPTS,
     BASE_BACKOFF_MS,
     MAX_BACKOFF_MS,

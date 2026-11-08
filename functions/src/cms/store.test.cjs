@@ -6,7 +6,6 @@ const assert = require('node:assert/strict');
 const {
   writeDraft,
   deleteBoth,
-  unpublishDoc,
   listDirty,
   publishDocs,
   logAdminAction,
@@ -222,34 +221,6 @@ test('deleteBoth repairs an undercount before deleting a dirty draft', async () 
   await deleteBoth({ db, collection: 'cmsUpdates', docId: 'post1', now });
   assert.equal(db.read('cmsMeta', 'pending').counts.cmsUpdates, 0);
   assert.equal(db.read('cmsUpdates_drafts', 'post1'), undefined);
-});
-
-// --- unpublishDoc -----------------------------------------------------------
-
-test('unpublishDoc sets visible:false on the live doc only, keeping revision stamps', async () => {
-  const db = makeFakeDb({
-    'cmsContent/hero__title': {
-      value: 'live', visible: true, revision: 5,
-      publishedAt: new Date(1000), publishedBy: 'a@example.org',
-    },
-    'cmsContent_drafts/hero__title': { value: 'live', visible: true, status: 'clean', basedOnRevision: 5 },
-  });
-  const result = await unpublishDoc({ db, collection: 'cmsContent', docId: 'hero__title' });
-  assert.deepEqual(result, { ok: true, docPath: 'cmsContent/hero__title' });
-  const live = db.read('cmsContent', 'hero__title');
-  assert.equal(live.visible, false);
-  assert.equal(live.revision, 5);
-  assert.equal(live.value, 'live');
-  // The draft is untouched: unpublish is never an edit.
-  assert.equal(db.read('cmsContent_drafts', 'hero__title').visible, true);
-  assert.deepEqual(db.writes.map((w) => w.path), ['cmsContent/hero__title']);
-});
-
-test('unpublishDoc on a never-published doc reports not-published and writes nothing', async () => {
-  const db = makeFakeDb({ 'cmsContent_drafts/hero__title': { value: 'v', visible: true, status: 'dirty' } });
-  const result = await unpublishDoc({ db, collection: 'cmsContent', docId: 'hero__title' });
-  assert.deepEqual(result, { ok: false, reason: 'not-published' });
-  assert.equal(db.writes.length, 0);
 });
 
 // --- listDirty --------------------------------------------------------------

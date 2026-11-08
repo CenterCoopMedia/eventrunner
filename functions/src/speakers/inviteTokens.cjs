@@ -55,10 +55,6 @@ const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
  *               invalidated because the speaker left `invited` some other
  *               way (an admin status edit, a soft or hard delete)
  */
-const INVITE_STATUSES = Object.freeze(['pending', 'accepted', 'cancelled', 'superseded']);
-
-/** Statuses that no longer name a usable token. */
-const INVITE_TERMINAL_STATUSES = Object.freeze(['accepted', 'cancelled', 'superseded']);
 
 /** Speaker statuses an invite may be sent from (spec §4.3: draft → invited). */
 const INVITABLE_SPEAKER_STATUSES = Object.freeze(['draft']);
@@ -165,8 +161,6 @@ function invalidateInviteInTx({ tx, db, speaker, at, status, actorEmail = null }
 module.exports = {
   SPEAKER_INVITES,
   INVITE_TTL_MS,
-  INVITE_STATUSES,
-  INVITE_TERMINAL_STATUSES,
   INVITABLE_SPEAKER_STATUSES,
   mintInviteToken,
   hashInviteToken,

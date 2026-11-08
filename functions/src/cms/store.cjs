@@ -7,8 +7,8 @@
  * exactly one place:
  *
  *   - Editing writes DRAFTS ONLY. writeDraft never touches `C/{docId}`;
- *     the only functions that write a live collection are publishDocs,
- *     unpublishDoc (explicit visible:false), and deleteBoth.
+ *     the only functions that write a live collection are publishDocs
+ *     and deleteBoth. Hiding a doc is a published `visible: false` edit.
  *   - Publish is an atomic per-doc batch: live copy at revision+1, draft
  *     marked clean with basedOnRevision, cmsVersionHistory append — all
  *     three writes commit together or not at all.
@@ -225,22 +225,6 @@ async function deleteBoth({ db, tx = null, collection, docId, now = Date.now }) 
   return { livePath: `${collection}/${docId}`, draftPath: `${draftCol}/${docId}` };
 }
 
-/**
- * Unpublish: an EXPLICIT admin action that sets the live doc's
- * `visible: false`. Never a side effect of editing, never touches the
- * draft, never deletes (delete is deleteBoth).
- *
- * @param {{ db: FirebaseFirestore.Firestore, collection: string, docId: string }} args
- * @returns {Promise<{ ok: true, docPath: string } | { ok: false, reason: 'not-published' }>}
- */
-async function unpublishDoc({ db, collection, docId }) {
-  draftCollectionFor(collection); // validate; throws on non-publishable names
-  const ref = db.collection(collection).doc(docId);
-  const snap = await ref.get();
-  if (!snap.exists) return { ok: false, reason: 'not-published' };
-  await ref.update({ visible: false });
-  return { ok: true, docPath: `${collection}/${docId}` };
-}
 
 /**
  * Ids of every dirty draft in a collection — the admin CMS's "list
@@ -525,7 +509,6 @@ async function logAdminAction({ db, action, docPath, actor, now = Date.now, deta
 module.exports = {
   writeDraft,
   deleteBoth,
-  unpublishDoc,
   listDirty,
   publishDocs,
   ensurePendingCounts,
