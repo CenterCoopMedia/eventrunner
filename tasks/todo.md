@@ -2,7 +2,11 @@
 
 ## Plan for review: shared status modules (2026-11-08)
 
-Owner review needed before any build. Source: root causes 1 to 3 in
+Approved by the owner on 2026-11-08: start with S0. Decisions: S1 adds a
+Launch action that sets `launched` (no deletion). S3 uses `declined`
+everywhere, with a one-time migration of stored pitch statuses.
+
+Source: root causes 1 to 3 in
 `docs/plans/2026-11-08-state-machine-map/README.md`. Bug fixes from the
 map are in PR #763; this is the architecture step after it.
 
@@ -24,20 +28,22 @@ LABELS              // staff words; client words only where they differ
 
 ### Order (one PR each, stacked, smallest drift first)
 
-- [ ] S0. Find why `prepare-functions` gives a different `shared.tgz`
-      hash in a cloud container than the committed lockfile. Every later
-      step changes `packages/shared`, so the hash must be reproducible
-      first. Fix or document the step that makes it match CI.
+- [x] S0. The hash is reproducible. The committed lockfiles were stale on
+      `main`: `packages/shared` changed in 941e81d and d28579a after the
+      last refresh (c8ef222). CI never failed, because `prepare:functions`
+      rewrites the hash before `npm ci`. Refreshed in PR #763. Each later
+      step runs `npm run prepare:functions` and commits the three lockfiles.
 - [ ] S1. Console request (`applications.status`): one list, groups
       (open, closed, building, built), labels for operator and client.
       Replace the 20+ copies, the two `BUILT_STATUSES` and the six
-      `['approved', 'building']` literals. Decide `launched`: delete it or
-      add the action that sets it (owner question).
+      `['approved', 'building']` literals. Add the Launch action that moves
+      a ready site to `launched` (owner decision).
 - [ ] S2. Stripe order, payment, refund and ticket statuses
       (`shared/ticketCommerce`). One `isOrderFulfilled(order)` for the four
       fields that say "done". Split `ticketStatusLabel` by domain.
-- [ ] S3. Pitch review and change request statuses. Pick one spelling for
-      "declined" (owner question: stored `rejected` vs `declined`).
+- [ ] S3. Pitch review and change request statuses. Store `declined`
+      everywhere (owner decision), with a one-time migration of stored
+      `rejected` pitches on each client site.
 - [ ] S4. Speaker, invite and material review statuses, with a speaker
       transition table checked in `applyUpdateSpeaker`.
 - [ ] S5. Delivery states (pitch notices, change request notices, speaker

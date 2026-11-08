@@ -236,3 +236,14 @@ Rules written after user corrections. Read at session start.
   ("Organization", "Attendees see: Organization", "Ask: Organization",
   "Required: Organization") reads as noise. Show the short word, and keep the
   full name for screen readers with `aria-label` (owner, 2026-11-05).
+
+## 2026-11-08: a stale shared.tgz hash does not fail CI
+
+- The 2026-09-09 entry says CI's `npm ci` fails on a stale `shared.tgz`
+  integrity hash. It does not any more: every CI job runs
+  `npm run prepare:functions` before `npm ci`, and that script rewrites the
+  hash. A stale hash only drifts silently (it was stale on `main` from
+  2026-11-05 to 2026-11-08). Still run `npm run prepare:functions` and commit
+  the three lockfiles in any branch that changes `packages/shared`, so the
+  committed record stays true. `npm pack` output is reproducible in a cloud
+  container; a hash change after a clean checkout means the lockfile is stale.
