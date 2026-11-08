@@ -9,6 +9,10 @@ describe('speaker status choices', () => {
     expect(values(speakerStatusOptions(OPTIONS, 'removed'))).toEqual(['draft', 'removed']);
   });
 
+  it('keeps Draft for an unpublished linked speaker, as the server stores Draft as accepted', () => {
+    expect(values(speakerStatusOptions(OPTIONS, 'accepted'))).toEqual(['draft', 'approved', 'removed']);
+  });
+
   it('offers a draft, an unstored status and a new speaker every choice', () => {
     expect(values(speakerStatusOptions(OPTIONS, 'draft'))).toEqual(['draft', 'approved', 'removed']);
     expect(values(speakerStatusOptions(OPTIONS, null))).toEqual(['draft', 'approved', 'removed']);

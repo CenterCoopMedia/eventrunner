@@ -30,5 +30,8 @@ export function speakerRecordState(speaker) {
 export function speakerStatusOptions(options, storedStatus) {
   if (storedStatus === undefined) return options;
   const from = typeof storedStatus === 'string' ? storedStatus : 'draft';
-  return options.filter((option) => canMoveSpeaker(from, option.value));
+  // A staff "Draft" on a linked speaker is stored as `accepted`
+  // (applyUpdateSpeaker), so for that speaker Draft means "stay accepted".
+  const target = (value) => (from === 'accepted' && value === 'draft' ? 'accepted' : value);
+  return options.filter((option) => canMoveSpeaker(from, target(option.value)));
 }
