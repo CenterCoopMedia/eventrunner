@@ -939,6 +939,20 @@ test('a retry after a seed failure seeds again with --force', async () => {
   assert.ok(fake.commands[0].args.includes('--force'));
 });
 
+test('a retry builds in the region and folder the first run chose, even after the settings change', async () => {
+  const fake = setup({ initCode: 1 });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  const first = fake.db.read('console_builds/a1').resources;
+  assert.ok(first.region && first.gcpFolder);
+  // An operator changes the console's default region and folder before the retry.
+  const settings = fake.db.read('console_config/settings');
+  await fake.db.collection('console_config').doc('settings').set({ ...settings, region: 'europe-west1', gcpFolder: 'folders/999999999999' });
+  await provision({ appId: 'a1', deps: fake.deps }).catch(() => {});
+  const retried = fake.db.read('console_builds/a1').resources;
+  assert.equal(retried.region, first.region, 'the project and its data stay where the first run put them');
+  assert.equal(retried.gcpFolder, first.gcpFolder);
+});
+
 test('brandingProblem reads the line init-event prints', () => {
   assert.equal(brandingProblem('  branding/         3 uploaded, 0 skipped\n'), null);
   assert.match(brandingProblem('  branding/         skipped (--skip-branding)\n'), /skipped/);

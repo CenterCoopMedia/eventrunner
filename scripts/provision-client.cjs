@@ -1206,11 +1206,20 @@ async function recordFailure(ctx, step, message) {
   }));
 }
 
-/** The settings an operator approved, or the console's settings. */
-async function buildSettings(db, app) {
+/**
+ * The settings an operator approved, or the console's settings. A retry
+ * keeps the project, region, folder and environment an earlier run of this
+ * request chose and saved in `resources`: the project and its data already
+ * live there, so a console setting changed since then must not move them.
+ * The billing account is read again, so a retry can use a new one.
+ */
+async function buildSettings(db, app, saved = {}) {
   const stored = app.review?.settings;
   const defaults = stored || approvalDefaults(await readConsoleSettings(db), siteNameOf(app));
-  return checkSettings(APPROVAL_FIELDS, defaults);
+  const chosen = saved?.projectId
+    ? Object.fromEntries(['projectId', 'region', 'gcpFolder', 'environment'].filter((field) => saved[field]).map((field) => [field, saved[field]]))
+    : {};
+  return checkSettings(APPROVAL_FIELDS, defaults, chosen);
 }
 
 async function runSteps(ctx) {
@@ -1312,7 +1321,7 @@ async function provision({ appId, testMode = false, deps }) {
   try {
     const missing = REQUIRED_ENV.filter((name) => !(env[name] || '').trim());
     if (missing.length > 0) throw new Error(`the run has no value for ${missing.join(', ')}`);
-    ctx.settings = await buildSettings(db, app);
+    ctx.settings = await buildSettings(db, app, ctx.resources);
     ctx.projectId = ctx.settings.projectId;
     ctx.region = ctx.settings.region;
     ctx.domain = siteAddress(ctx.name);
