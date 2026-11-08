@@ -41,7 +41,10 @@ export function useAutosave({ save, onResult, delay = 800 }) {
       try {
         const result = await saveRef.current(value);
         setError('');
-        setStatus(result && result.saved === false ? 'unsaved' : 'saved');
+        // A newer value queued during this save is still waiting: say so,
+        // not 'saved', until its own save lands.
+        if (pending.current !== undefined) setStatus('waiting');
+        else setStatus(result && result.saved === false ? 'unsaved' : 'saved');
         onResultRef.current?.(result, value);
         return true;
       } catch (err) {
