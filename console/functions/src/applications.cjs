@@ -32,8 +32,10 @@ const { LAUNCH_OWNERS } = require('./organizations.cjs');
 const { readSignupTerms } = require('./consoleSettings.cjs');
 
 const COLLECTION = 'applications';
-const STATUSES = Object.freeze(['draft', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined']);
+const { STATUSES } = require('./reviewAccess.cjs');
 const CLOSED = Object.freeze(['withdrawn', 'declined']);
+/** The refusal for a change to a site the hosting team archived. */
+const ARCHIVED_MESSAGE = 'This site is archived. Ask the hosting team to restore it.';
 const WITHDRAWABLE = Object.freeze(['draft']);
 const STEP_IDS = Object.freeze(['organization', 'event', 'webAddress', 'team', 'tickets', 'email', 'review', 'agreement']);
 
@@ -208,6 +210,7 @@ module.exports = {
   CLOSED,
   COLLECTION,
   STATUSES,
+  ARCHIVED_MESSAGE,
   STEP_IDS,
   WITHDRAWABLE,
   applicationForClient,

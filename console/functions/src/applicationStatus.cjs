@@ -15,7 +15,7 @@ const { withDefaults } = require('./answers.cjs');
 const { checkAnswers } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
 const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames } = require('./siteNames.cjs');
-const { CLOSED, WITHDRAWABLE, historyEntry, readApplication } = require('./applications.cjs');
+const { ARCHIVED_MESSAGE, CLOSED, WITHDRAWABLE, historyEntry, readApplication } = require('./applications.cjs');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SUBMITS_PER_DAY = 5;
@@ -119,6 +119,7 @@ async function withdrawApplication(deps, { body, user }) {
   await requireOwner(db, orgId, user, 'Only an Owner can withdraw the request.');
   const refuseStatus = (status) => {
     if (CLOSED.includes(status)) throw new ConsoleError(409, 'locked', 'This request is already closed.');
+    if (status === 'archived') throw new ConsoleError(409, 'locked', ARCHIVED_MESSAGE);
     if (!WITHDRAWABLE.includes(status)) {
       throw new ConsoleError(409, 'locked', 'Your site is being built, so you cannot withdraw it here.');
     }

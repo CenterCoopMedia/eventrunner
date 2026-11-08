@@ -42,6 +42,12 @@ test('the queue filters by any status and refuses an unknown one', async () => {
   await assert.rejects(listApplicationsForReview(deps(db), { body: { status: 'deleted' }, user: ops }), { status: 400 });
 });
 
+test('the queue lists archived requests, which the decommission script writes', async () => {
+  const db = seeded({ 'applications/a5': application({ status: 'archived', archivedAt: new Date(NOW - DAY) }) });
+  const archived = await listApplicationsForReview(deps(db), { body: { status: 'archived' }, user: ops });
+  assert.deepEqual(archived.body.applications.map((a) => a.id), ['a5']);
+});
+
 test('a client cannot read the queue or a request through review', async () => {
   const db = withQueue();
   await assert.rejects(listApplicationsForReview(deps(db), { body: {}, user: ana }), { status: 403, code: 'not-operator' });
