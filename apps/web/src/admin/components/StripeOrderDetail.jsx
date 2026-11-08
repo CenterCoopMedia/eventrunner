@@ -53,6 +53,7 @@ const AUDIT_LABELS = {
   'check-in-corrected': 'Check-in corrected',
   'confirmation-sent': 'Confirmation sent',
   'confirmation-needs-attention': 'Confirmation needs attention',
+  'hold-released': 'Held seats released',
   comp: 'Complimentary tickets issued',
   order_reserved: 'Order placed',
   free_order: 'Free order placed',
@@ -155,6 +156,8 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       if (!selectedRefund) { setError('Choose the refund being allocated.'); return; }
       if (!preserveAdmission && !selected.length) { setError('Select affected tickets or choose to keep every ticket valid.'); return; }
       run({ action: 'allocateRefund', orderId, refundId, ticketIds: preserveAdmission ? [] : selected, preserveAdmission, reason: reason.trim(), confirmed: true }, preserveAdmission ? 'Refund allocation recorded. Admission remains valid.' : 'Refund allocated to the selected tickets. Their admission has been removed.');
+    } else if (confirm === 'release') {
+      run({ action: 'releaseHold', orderId, reason: reason.trim(), confirmed: true }, 'Seats released. They are on sale again, and the buyer can place a new order.');
     } else if (confirm === 'edit') {
       if (!edit.firstName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(edit.email.trim())) { setError('Enter the attendee’s name and a valid email.'); return; }
       run({ action: 'updateAttendee', ticketId: edit.ticketId, firstName: edit.firstName.trim(), lastName: edit.lastName.trim(), email: edit.email.trim(), reason: reason.trim() }, 'Attendee details corrected. Payment ownership is unchanged.');
@@ -188,6 +191,9 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
           run({ action: 'resend', orderId, requestId: resendRef.current.requestId });
         }}>Resend ticket confirmation</button>
         {dashboardUrl ? <ExternalLink href={dashboardUrl} className={secondaryButtonClass}>Open this payment in Stripe Dashboard</ExternalLink> : null}
+        {isOperator && order.status === 'exception' && order.inventoryState === 'held' && order.paymentStatus !== 'succeeded' ? (
+          <button type="button" className={dangerButtonClass} aria-busy={busy} aria-disabled={busy} onClick={() => { setReason(''); setError(''); setConfirm('release'); }}>Release the held seats</button>
+        ) : null}
       </div>
       <p className="text-admin-sm text-admin-ink-secondary">Refund money through the authorized organizer’s Stripe Dashboard. Cancelling a ticket here removes admission without refunding the purchaser. Neither action returns sold seats to inventory. Payment amounts remain the original historical record.</p>
       <section className="space-y-sm" aria-label="Order admission tickets">
@@ -236,8 +242,11 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         {data.audit?.length ? <ol className="space-y-sm">{data.audit.map((entry) => <li key={entry.id} className="space-y-3xs border-b-admin-hairline border-admin-rule-hairline pb-sm"><p className="font-semibold">{AUDIT_LABELS[String(entry.action).replace(/^ticketing\./, '')] || 'Order updated'}</p><p className="wrap-anywhere font-admin-data text-admin-xs">{formatTicketTime(entry.at, timezone)} · {entry.actorEmail || 'Staff'}</p>{entry.reason ? <p className="wrap-anywhere text-admin-sm">{entry.reason}</p> : null}{entry.ticketIds?.length ? <p className="wrap-anywhere font-admin-data text-admin-xs">{entry.ticketIds.length} tickets affected</p> : null}</li>)}</ol> : <p className="text-admin-sm text-admin-ink-secondary">No staff actions have been recorded for this order.</p>}
       </section>
     </div> : null}
-    {confirm ? <TicketingConfirmation title={confirm === 'cancel' ? 'Cancel the selected admission tickets?' : confirm === 'refund' ? 'Record this refund’s admission consequences?' : 'Correct attendee details'} confirmLabel={confirm === 'cancel' ? `Cancel ${selected.length} admission tickets` : confirm === 'refund' ? preserveAdmission ? 'Record refund with admission retained' : `Remove admission from ${selected.length} tickets` : 'Save attendee correction'} destructive={confirm === 'cancel' || (confirm === 'refund' && !preserveAdmission)} error={error} busy={busy} onClose={closeConfirmation} onConfirm={performConfirmed}>
-      {confirm === 'edit' ? <>
+    {confirm ? <TicketingConfirmation title={confirm === 'cancel' ? 'Cancel the selected admission tickets?' : confirm === 'refund' ? 'Record this refund’s admission consequences?' : confirm === 'release' ? 'Release this order’s held seats?' : 'Correct attendee details'} confirmLabel={confirm === 'cancel' ? `Cancel ${selected.length} admission tickets` : confirm === 'refund' ? preserveAdmission ? 'Record refund with admission retained' : `Remove admission from ${selected.length} tickets` : confirm === 'release' ? 'Release the held seats' : 'Save attendee correction'} destructive={confirm === 'cancel' || confirm === 'release' || (confirm === 'refund' && !preserveAdmission)} error={error} busy={busy} onClose={closeConfirmation} onConfirm={performConfirmed}>
+      {confirm === 'release' ? <>
+        <p>Check in Stripe that this buyer has not paid. The seats go back on sale, the promo code gets its uses back, and the buyer can place a new order.</p>
+        <p>If a payment arrives later, the order is marked for review so you can refund it.</p>
+      </> : confirm === 'edit' ? <>
 
         <TextField label="Corrected first name" value={edit.firstName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, firstName: value }))} />
         <TextField label="Corrected last name" hint="Optional for attendees who use one name." value={edit.lastName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, lastName: value }))} />

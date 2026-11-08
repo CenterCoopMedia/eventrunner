@@ -55,6 +55,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
       {isOrders ? <>
         <SelectField label="Payment state" value={filters.paymentStatus} onChange={(value) => setFilter('paymentStatus', value)} options={options(['unpaid', 'pending', 'succeeded', 'failed', 'expired'])} />
         <SelectField label="Refund state" value={filters.refundStatus} onChange={(value) => setFilter('refundStatus', value)} options={options(['none', 'pending', 'partial', 'full', 'failed', 'requires_action'])} />
+        <SelectField label="Order state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(['exception', 'pending', 'paid', 'free', 'expired', 'refunded'])} />
       </> : <>
         <SelectField label="Ticket type filter" value={filters.ticketTypeId} onChange={(value) => setFilter('ticketTypeId', value)} options={[{ value: '', label: 'Any ticket type' }, ...(catalog?.ticketTypes || []).map((type) => ({ value: type.id, label: type.name }))]} />
         <SelectField label="Admission state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(['valid', 'cancelled', 'refunded', 'pending_info'])} />

@@ -276,3 +276,46 @@ test('an operator comp uses the shared reservation and one ticket per assigned a
   assert.equal((await db.collection('ticket_inventory').doc('current').get()).data().sold, 3);
   assert.equal((await db.collection('admin_logs').get()).size, 1);
 });
+
+// An order whose checkout outcome is unknown sits in 'exception' with its
+// seats held. Nothing released it, so it kept the seats, its promo code use
+// and the buyer's lock on new orders for ever.
+test('an operator releases the hold of an unpaid exception order, once, with an audit', async () => {
+  const stuck = {
+    ...order, id: 'order-stuck', status: 'exception', paymentStatus: 'pending', inventoryState: 'held',
+    stripePaymentIntentId: null, stripeSessionId: null, ticketIds: [], promo: { code: 'EARLY', discountedSeats: 2 },
+    reconciliationException: { code: 'checkout-outcome-unknown', message: 'Stripe did not answer.' },
+  };
+  const db = dbFor({
+    'ticket_orders/order-stuck': stuck,
+    'ticket_inventory/current': { eventId: provider.externalEventId, held: 2, sold: 2, types: { general: { held: 2, sold: 2 } } },
+    'ticket_promo_codes/EARLY': { used: 5, maxUses: 10 },
+  });
+  const body = { action: 'releaseHold', orderId: 'order-stuck', reason: 'Stripe has no session for this order.', confirmed: true };
+  assert.equal((await call(admin(db), body, 'staff')).statusCode, 403, 'operator only');
+  assert.equal((await call(admin(db), { ...body, confirmed: false }, 'operator')).statusCode, 400);
+
+  const done = await call(admin(db), body, 'operator');
+  assert.equal(done.statusCode, 200, JSON.stringify(done.body));
+  assert.equal(done.body.order.inventoryState, 'released');
+  assert.deepEqual(db.read('ticket_inventory', 'current').types.general, { held: 0, sold: 2 });
+  assert.equal(db.read('ticket_inventory', 'current').held, 0);
+  assert.equal(db.read('ticket_promo_codes', 'EARLY').used, 3);
+  assert.equal(done.body.audit[0].action, 'ticketing.hold-released');
+
+  // A second release changes nothing.
+  assert.equal((await call(admin(db), body, 'operator')).statusCode, 409);
+  assert.equal(db.read('ticket_promo_codes', 'EARLY').used, 3);
+
+  // A paid order, or one that is not under review, is not released by hand.
+  const paid = dbFor({ 'ticket_orders/order-stuck': { ...stuck, paymentStatus: 'succeeded' } });
+  assert.equal((await call(admin(paid), body, 'operator')).statusCode, 409);
+  const pending = dbFor({ 'ticket_orders/order-stuck': { ...stuck, status: 'pending' } });
+  assert.equal((await call(admin(pending), body, 'operator')).statusCode, 409);
+});
+
+test('the order list filters by order status, so staff can find orders that need review', async () => {
+  const db = dbFor({ 'ticket_orders/order-stuck': { ...order, id: 'order-stuck', status: 'exception', inventoryState: 'held' } });
+  const listed = await call(admin(db), { action: 'orders', status: 'exception' });
+  assert.deepEqual(listed.body.orders.map((row) => row.id), ['order-stuck']);
+});

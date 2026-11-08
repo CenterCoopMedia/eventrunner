@@ -291,3 +291,35 @@ describe('StripeOrderDetail: audit trail', () => {
     for (const label of ['Refund recorded', 'Attendee checked in', 'Order updated']) expect(screen.getByText(label)).toBeInTheDocument();
   });
 });
+
+describe('releasing the seats of an order that needs review', () => {
+  const STUCK = { ...DETAIL.order, status: 'exception', paymentStatus: 'pending', inventoryState: 'held',
+    reconciliationException: { code: 'checkout-outcome-unknown', message: 'Stripe did not answer.' } };
+
+  async function stuckSetup({ isOperator = true } = {}) {
+    const call = vi.fn(async (_name, body) => {
+      if (body.action === 'order') return { ...DETAIL, order: STUCK };
+      if (body.action === 'releaseHold') return { ...DETAIL, order: { ...STUCK, inventoryState: 'released' } };
+      throw new Error(`Unexpected action: ${body.action}`);
+    });
+    render(<StripeOrderDetail call={call} orderId="order-1" isOperator={isOperator} timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
+    await screen.findByRole('button', { name: 'Resend ticket confirmation' });
+    return call;
+  }
+
+  it('lets an operator release the held seats with a reason', async () => {
+    const call = await stuckSetup();
+    fireEvent.click(screen.getByRole('button', { name: 'Release the held seats' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Reason for this action'), { target: { value: 'Stripe has no session.' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Release the held seats' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', {
+      action: 'releaseHold', orderId: 'order-1', reason: 'Stripe has no session.', confirmed: true,
+    }));
+  });
+
+  it('offers staff no release', async () => {
+    await stuckSetup({ isOperator: false });
+    expect(screen.queryByRole('button', { name: 'Release the held seats' })).not.toBeInTheDocument();
+  });
+});
