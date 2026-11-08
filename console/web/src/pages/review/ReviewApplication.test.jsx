@@ -297,6 +297,8 @@ describe('ReviewApplication', () => {
       expect(within(confirm).getByText(/open to the public/)).toBeInTheDocument();
       fireEvent.click(within(confirm).getByRole('button', { name: 'Mark as launched' }));
       await vi.waitFor(() => expect(callApi).toHaveBeenCalledWith('launchApplication', { appId: 'a1', revision: 2 }));
+      expect(await screen.findByText('You marked the site as launched. The owners received an email.')).toBeInTheDocument();
+      expect(screen.queryByText(/declined/)).not.toBeInTheDocument();
     });
 
     it('offers no launch for a request that is not ready', async () => {
