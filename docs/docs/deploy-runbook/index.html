@@ -1582,6 +1582,12 @@
           answer records. When the stored consent is still attributed to checkout, public profile visibility
           returns to private until the holder explicitly chooses it again. Counts are logged without personal data.
           A completion marker makes later runs skip the scan; incomplete cleanup is retryable.</p>
+          <p>It then runs <code>scripts/migrate-pitch-declined.cjs</code> once per project. It rewrites
+          pitches stored as <code>rejected</code> to <code>declined</code>, and moves each decline email record
+          from <code>notices.rejected</code> to <code>notices.declined</code>. If a pitch already has a
+          <code>notices.declined</code> record, the old record stays as it is. The code reads both
+          spellings, so the step is safe to run before or after any review. The marker
+          is <code>data_migrations/pitch-declined-2026-11-08</code>, and the log shows only counts.</p>
           <p>New client builds and retries dispatch both provisioning and deployment from <code>main</code>.
           A previous successful deployment is reusable only when GitHub proves that its commit
           is the provisioning revision or a descendant of it, and its settings are current.
