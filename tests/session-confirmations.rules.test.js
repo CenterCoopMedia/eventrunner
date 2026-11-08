@@ -75,6 +75,11 @@ function makeRes() {
 }
 
 async function confirm(body, token = 'staff', now = () => T0) {
+  // A send carries the preview's content hash, as the panel does.
+  if (!body.preview && !body.expectedContent) {
+    const preview = await confirm({ sessionId: body.sessionId, speakerId: body.speakerId, preview: true }, 'staff', now);
+    body = { ...body, expectedContent: preview.body?.preview?.contentHash ?? 'f'.repeat(64) };
+  }
   const res = makeRes();
   await createSendSessionConfirmationHandler({ db, auth, getConfig, sendEmail, now, log: QUIET })(
     { method: 'POST', headers: token ? { authorization: `Bearer ${token}` } : {}, body },

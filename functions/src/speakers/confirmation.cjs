@@ -102,7 +102,19 @@ async function renderConfirmation({ db, config, speaker, named }) {
     config,
   });
   // A subject is one line, whatever the session title holds.
-  return { ...rendered, subject: rendered.subject.replace(/\s+/g, ' ').trim() };
+  const subject = rendered.subject.replace(/\s+/g, ' ').trim();
+  return { ...rendered, subject, contentHash: contentHashOf({ subject, html: rendered.html, text: rendered.text }) };
+}
+
+/**
+ * A fingerprint of the exact email: subject, HTML and text. The preview
+ * returns it and a send must return it, so a wording change between the two
+ * (an operator edit, or another function instance's template cache) is
+ * refused rather than sent.
+ */
+function contentHashOf({ subject, html, text }) {
+  const { createHash } = require('node:crypto');
+  return createHash('sha256').update(JSON.stringify([subject, html, text])).digest('hex');
 }
 
 /**
@@ -124,14 +136,15 @@ async function renderConfirmation({ db, config, speaker, named }) {
  *           log?: Console }} args
  * @returns {Promise<{ status: string, error?: string, ambiguous?: boolean }>}
  */
-async function sendSessionConfirmationEmail({ db, sendEmail, getConfig, onceKey, speaker, named, log = console }) {
+async function sendSessionConfirmationEmail({ db, sendEmail, getConfig, onceKey, speaker, named, rendered: prepared = null, log = console }) {
   try {
     if (typeof sendEmail !== 'function' || typeof getConfig !== 'function') {
       throw new Error('Email sending is not configured.');
     }
     if (typeof onceKey !== 'string' || !onceKey) throw new Error('A send-once key is required.');
     const config = await getConfig();
-    const rendered = await renderConfirmation({ db, config, speaker, named });
+    // The caller passes the email it checked against the preview, so that is what goes.
+    const rendered = prepared || await renderConfirmation({ db, config, speaker, named });
     if (rendered.usedFallback) {
       log.warn('speaker.confirmation: stored wording failed its token checks; sent the shipped wording', rendered.overrideErrors);
     }
@@ -160,5 +173,6 @@ module.exports = {
   namedSlotOf,
   sameNamedSlot,
   renderConfirmation,
+  contentHashOf,
   sendSessionConfirmationEmail,
 };

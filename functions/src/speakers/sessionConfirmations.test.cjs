@@ -83,9 +83,18 @@ function setup(seed = world(), { email = STAFF.email, outcome = { status: 'sent'
 }
 
 const BODY = { sessionId: 'sess-1', speakerId: 'rae' };
-const send = (extra = {}) => ({ ...BODY, expectedNamed: NAMED, ...extra });
+// Every send carries the preview's slot and wording, as the panel does.
+let previewHash = null;
+/** The preview's content hash for the session as it is now. */
+const hashOf = async (t) => (await t.call({ ...BODY, preview: true })).body.preview.contentHash;
+const send = (extra = {}) => ({ ...BODY, expectedNamed: NAMED, expectedContent: previewHash, ...extra });
 
-test.beforeEach(() => resetTemplateCacheForTest());
+test.beforeEach(async () => {
+  resetTemplateCacheForTest();
+  const t = setup();
+  previewHash = (await t.call({ ...BODY, preview: true })).body.preview.contentHash;
+  resetTemplateCacheForTest();
+});
 
 test('a preview renders the email and writes nothing', async () => {
   const t = setup();
@@ -162,13 +171,13 @@ test('a changed slot allows attempt 2 with a new onceKey', async () => {
   assert.equal(stale.statusCode, 409);
   assert.equal(stale.body.error.code, 'slot-changed');
 
-  const res = await t.call(send({ expectedNamed: moved }));
+  const res = await t.call(send({ expectedNamed: moved, expectedContent: preview.body.preview.contentHash }));
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, { state: 'sent', attempt: 2 });
   assert.equal(t.sent[1].onceKey, 'speaker-confirmation:rae:sess-1:2');
   assert.ok(t.sent[1].text.includes('Room C'));
   assert.deepEqual(t.record().named, moved);
-  assert.equal((await t.call(send({ expectedNamed: moved }))).body.error.code, 'already-sent');
+  assert.equal((await t.call(send({ expectedNamed: moved, expectedContent: preview.body.preview.contentHash }))).body.error.code, 'already-sent');
 });
 
 test('a failed send can be retried with a new attempt', async () => {
@@ -190,7 +199,7 @@ test('a failed new attempt does not let the already-confirmed slot go again', as
   assert.equal((await t.call(send())).statusCode, 200);
   await t.db.collection('cmsSchedule').doc('sess-1').set({ ...SESSION, location: 'Room C' });
   t.setOutcome({ status: 'failed', error: 'Inactive recipient' });
-  assert.equal((await t.call(send({ expectedNamed: { ...NAMED, room: 'Room C' } }))).statusCode, 502);
+  assert.equal((await t.call(send({ expectedNamed: { ...NAMED, room: 'Room C' }, expectedContent: await hashOf(t) }))).statusCode, 502);
   // The room goes back to the one the speaker already has.
   await t.db.collection('cmsSchedule').doc('sess-1').set(SESSION);
   t.setOutcome({ status: 'sent' });
@@ -267,6 +276,43 @@ for (const [label, overrides, status, code] of refusals) {
     assert.equal(t.logs().length, 0);
   });
 }
+
+test('refuses a session whose day is no longer on the event', async () => {
+  const t = setup(world({ 'cmsSchedule/sess-1': { ...SESSION, dayId: 'day-9' } }));
+  const res = await t.call({ ...BODY, preview: true });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'session-incomplete');
+});
+
+test('a send whose previewed wording is out of date is refused, and nothing goes', async () => {
+  const t = setup();
+  assert.match(previewHash, /^[0-9a-f]{64}$/);
+  const stale = await t.call(send({ expectedContent: 'b'.repeat(64) }));
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'wording-changed');
+  assert.equal(t.sent.length, 0);
+  assert.equal(t.record(), undefined);
+});
+
+test('after an uncertain send of another slot, staff can correct back to the confirmed one', async () => {
+  const t = setup();
+  assert.equal((await t.call(send())).statusCode, 200);
+  const roomC = { ...NAMED, room: 'Room C' };
+  await t.db.collection('cmsSchedule').doc('sess-1').set({ ...SESSION, location: 'Room C' });
+  t.setOutcome({ status: 'failed', ambiguous: true, error: 'socket hang up' });
+  const previewC = await t.call({ ...BODY, preview: true });
+  assert.equal((await t.call(send({ expectedNamed: roomC, expectedContent: previewC.body.preview.contentHash }))).statusCode, 502);
+  // Room B again: the speaker may have last read Room C, so a checked resend may go.
+  await t.db.collection('cmsSchedule').doc('sess-1').set(SESSION);
+  t.setOutcome({ status: 'sent' });
+  const preview = await t.call({ ...BODY, preview: true });
+  assert.equal(preview.body.preview.blocked, null);
+  assert.equal(preview.body.preview.mayHaveBeenSent, true);
+  assert.equal((await t.call(send())).body.error.code, 'delivery-unknown');
+  const res = await t.call(send({ confirmUnknown: true }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.attempt, 3);
+});
 
 test('refuses a caller who is not staff or an operator', async () => {
   const t = setup(world(), { email: 'attendee@example.org' });

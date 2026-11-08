@@ -95,6 +95,7 @@ function SessionConfirmation({ session, speakerId, record, call, disabled }) {
       await call('sendSessionConfirmation', {
         ...request,
         expectedNamed: preview.named,
+        expectedContent: preview.contentHash,
         ...(confirmUnknown ? { confirmUnknown: true } : {}),
       });
       setResult(`Confirmation sent to ${preview.to}.`);
@@ -102,7 +103,7 @@ function SessionConfirmation({ session, speakerId, record, call, disabled }) {
     } catch (err) {
       setError(err);
       // The session or the record changed: the preview is out of date.
-      if (['slot-changed', 'delivery-unknown', 'already-sent', 'in-progress'].includes(err?.code)) setPreview(null);
+      if (['slot-changed', 'wording-changed', 'delivery-unknown', 'already-sent', 'in-progress'].includes(err?.code)) setPreview(null);
     } finally { setBusy(false); }
   }
 

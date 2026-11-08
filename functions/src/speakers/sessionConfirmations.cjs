@@ -34,6 +34,7 @@ const { sendError, badRequest, methodNotAllowed, internal } = require('../core/e
 const { isValidDocId } = require('../cms/store.cjs');
 const { noticeRetryState, toMillis } = require('../email/noticeRetry.cjs');
 const { deliveryStateOf } = require('shared/delivery');
+const { getDay } = require('shared/time');
 const {
   namedSlotOf, sameNamedSlot, renderConfirmation, sendSessionConfirmationEmail,
 } = require('./confirmation.cjs');
@@ -84,6 +85,11 @@ function readRequest(body) {
   if (!preview && !expectedNamed) {
     return { ok: false, message: 'expectedNamed: Preview the confirmation first, then send it with the preview’s named slot.' };
   }
+  const expectedContent = typeof source.expectedContent === 'string' && /^[0-9a-f]{64}$/.test(source.expectedContent)
+    ? source.expectedContent : null;
+  if (!preview && !expectedContent) {
+    return { ok: false, message: 'expectedContent: Preview the confirmation first, then send it with the preview’s contentHash.' };
+  }
   return {
     ok: true,
     sessionId: source.sessionId,
@@ -91,6 +97,7 @@ function readRequest(body) {
     preview,
     confirmUnknown: source.confirmUnknown === true,
     expectedNamed,
+    expectedContent,
   };
 }
 
@@ -126,6 +133,10 @@ function evaluate({ session, speaker, previous, eventConfig, request, nowMs }) {
   if (!session.dayId || typeof session.startTime !== 'string' || !session.startTime.trim()) {
     return refuse(409, 'session-incomplete', 'This session has no day or start time. Schedule it and publish it first.');
   }
+  const day = getDay(eventConfig, session.dayId);
+  if (!day || typeof day.date !== 'string' || !day.date) {
+    return refuse(409, 'session-incomplete', 'This session’s day is not on the event any more. Pick a day and publish it first.');
+  }
   const speakerIds = Array.isArray(session.speakerIds) ? session.speakerIds : [];
   if (!speakerIds.includes(request.speakerId)) {
     return refuse(409, 'not-on-session', 'This speaker is not on the published session.');
@@ -157,7 +168,10 @@ function evaluate({ session, speaker, previous, eventConfig, request, nowMs }) {
     target.blocked = retry.refusal;
     return target;
   }
-  if (lastSent?.named && !changedSinceLastSend) {
+  // The speaker already has this slot, unless a later attempt for another
+  // slot may have reached them: then a checked resend can correct it.
+  const laterMayHaveGone = retry.mayHaveBeenSent && readNamed(previous?.named) && !sameNamedSlot(previous.named, lastSent?.named);
+  if (lastSent?.named && !changedSinceLastSend && !laterMayHaveGone) {
     target.blocked = { status: 409, code: 'already-sent', message: 'The speaker already has a confirmation for this title, time and room.' };
     return target;
   }
@@ -206,9 +220,9 @@ function previousSummary(previous, lastSent) {
  * holds this attempt in the queued state, so a late finish cannot overwrite
  * a newer one.
  */
-async function deliverConfirmation({ db, sendEmail, getConfig, now = Date.now, log = console, ref, record, speaker }) {
+async function deliverConfirmation({ db, sendEmail, getConfig, now = Date.now, log = console, ref, record, speaker, rendered = null }) {
   const outcome = await sendSessionConfirmationEmail({
-    db, sendEmail, getConfig, onceKey: record.onceKey, speaker, named: record.named, log,
+    db, sendEmail, getConfig, onceKey: record.onceKey, speaker, named: record.named, rendered, log,
   });
   const state = outcome?.status === 'sent' ? 'sent' : outcome?.ambiguous ? 'uncertain' : 'failed';
   const error = state === 'sent' ? null : String(outcome?.error || 'The email could not be sent.').slice(0, MAX_ERROR_LENGTH);
@@ -265,6 +279,7 @@ function createSendSessionConfirmationHandler({ db, auth, getConfig, sendEmail, 
             to: speaker.email,
             subject: rendered.subject,
             text: rendered.text,
+            contentHash: rendered.contentHash,
             named: target.named,
             changedSinceLastSend: target.changedSinceLastSend,
             mayHaveBeenSent: target.mayHaveBeenSent,
@@ -279,8 +294,13 @@ function createSendSessionConfirmationHandler({ db, auth, getConfig, sendEmail, 
     }
 
     let claimed;
+    let rendered;
     try {
       const config = await getConfig();
+      // Render the email this send would carry. The claim compares it with
+      // the preview after the data checks, and the send uses this render.
+      const speakerNow = dataOf(await speakerRef.get());
+      rendered = speakerNow ? await renderConfirmation({ db, config, speaker: speakerNow, named: request.expectedNamed }) : null;
       claimed = await db.runTransaction(async (tx) => {
         const [sessionSnap, speakerSnap, recordSnap, policy] = await Promise.all([
           tx.get(sessionRef), tx.get(speakerRef), tx.get(ref), checkDemoWrites({ db, transaction: tx }),
@@ -294,6 +314,9 @@ function createSendSessionConfirmationHandler({ db, auth, getConfig, sendEmail, 
         if (target.refusal) return target;
         if (!sameNamedSlot(target.named, request.expectedNamed)) {
           return refuse(409, 'slot-changed', 'The session’s title, time or room changed. Preview the confirmation again.');
+        }
+        if (rendered?.contentHash !== request.expectedContent) {
+          return refuse(409, 'wording-changed', 'The email wording changed since the preview. Preview the confirmation again.');
         }
         if (target.blocked) return { refusal: target.blocked };
         if (target.mayHaveBeenSent && !request.confirmUnknown) {
@@ -330,7 +353,7 @@ function createSendSessionConfirmationHandler({ db, auth, getConfig, sendEmail, 
     }
 
     const result = await deliverConfirmation({
-      db, sendEmail, getConfig, now, log, ref, record: claimed.record, speaker: claimed.speaker,
+      db, sendEmail, getConfig, now, log, ref, record: claimed.record, speaker: claimed.speaker, rendered,
     });
     if (result.state === 'uncertain') {
       return sendError(res, 502, 'delivery-unknown', 'We do not know if the confirmation went out. Check the Email log before you send it again.');

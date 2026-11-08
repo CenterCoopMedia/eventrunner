@@ -26,6 +26,7 @@ const PREVIEW = {
   subject: 'Your session at Example Summit is confirmed: Reporting on Deadline',
   text: 'Hi Rae Okonkwo,\n\nReporting on Deadline\nRoom B',
   named: NAMED,
+  contentHash: 'a'.repeat(64),
   changedSinceLastSend: false,
   mayHaveBeenSent: false,
   blocked: null,
@@ -94,7 +95,7 @@ describe('SpeakerSessionConfirmations', () => {
     expect(region).toHaveFocus();
     expect(within(region).getByText(`Subject: ${PREVIEW.subject}`)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Send confirmation' }));
-    await waitFor(() => expect(call).toHaveBeenLastCalledWith('sendSessionConfirmation', { sessionId: 'sess-1', speakerId: 'rae', expectedNamed: NAMED }));
+    await waitFor(() => expect(call).toHaveBeenLastCalledWith('sendSessionConfirmation', { sessionId: 'sess-1', speakerId: 'rae', expectedNamed: NAMED, expectedContent: 'a'.repeat(64) }));
     expect(await screen.findByText('Confirmation sent to rae@example.org.')).toBeInTheDocument();
   });
 
@@ -116,7 +117,7 @@ describe('SpeakerSessionConfirmations', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview confirmation: Reporting on Deadline' }));
     expect(await screen.findByText(/The title, time or room changed since the last confirmation/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Send confirmation' }));
-    await waitFor(() => expect(call).toHaveBeenLastCalledWith('sendSessionConfirmation', { sessionId: 'sess-1', speakerId: 'rae', expectedNamed: moved }));
+    await waitFor(() => expect(call).toHaveBeenLastCalledWith('sendSessionConfirmation', { sessionId: 'sess-1', speakerId: 'rae', expectedNamed: moved, expectedContent: 'a'.repeat(64) }));
   });
 
   it('explains an uncertain send and sends again only with confirmUnknown', async () => {
@@ -129,7 +130,7 @@ describe('SpeakerSessionConfirmations', () => {
     expect(screen.queryByRole('button', { name: 'Send confirmation' })).toBeNull();
     fireEvent.click(again);
     await waitFor(() => expect(call).toHaveBeenLastCalledWith('sendSessionConfirmation', {
-      sessionId: 'sess-1', speakerId: 'rae', expectedNamed: NAMED, confirmUnknown: true,
+      sessionId: 'sess-1', speakerId: 'rae', expectedNamed: NAMED, expectedContent: 'a'.repeat(64), confirmUnknown: true,
     }));
   });
 
