@@ -11,7 +11,7 @@ const {
   internals: { SECTION_IDS, SECTIONS, FORMAT, SCHEMA_VERSION, readPackageRequest, EXCLUDED },
 } = require('./eventPackage.cjs');
 const { readEventPackage, verifyEventPackage } = require('./eventPackageReader.cjs');
-const { admissionRecord, isSecretKey, orderRecord, scrub } = require('./exportRecords.cjs');
+const { admissionRecord, isSecretKey, orderRecord, pitchRecord, scrub } = require('./exportRecords.cjs');
 const { ADMIN, STAFF, BOOTSTRAP_DOC, FORBIDDEN, FORBIDDEN_VALUES, exportSeed } = require('./exportFixture.cjs');
 
 const QUIET = { warn() {}, error() {}, info() {} };
@@ -175,6 +175,11 @@ test('a pitch converted by convertSessionPitch names its session and speaker in 
   assert.equal(pitch.convertedSessionId, 'pitch-pitch-2');
   assert.equal(rel('convertedSessionId').unresolved, 0);
   assert.equal(rel('convertedSpeakerId').unresolved, 0);
+});
+
+test('a decline stored as rejected by an older site is exported as declined', () => {
+  assert.equal(pitchRecord('p1', { status: 'rejected' }).status, 'declined');
+  assert.equal(pitchRecord('p2', { status: 'accepted' }).status, 'accepted');
 });
 
 test('the reader reports damage: a changed file and a dangling reference', async () => {

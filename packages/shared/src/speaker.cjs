@@ -56,6 +56,28 @@ const ADMIN_SETTABLE_STATUSES = Object.freeze(['draft', 'approved', 'removed']);
 /** The one status that publishes a projection. */
 const PUBLISHED_SPEAKER_STATUSES = Object.freeze(['approved']);
 
+/**
+ * Every status move the code may make (owner decisions, 2026-11-08). Staff
+ * may publish a draft with no account. A removed speaker lost its account
+ * link, so it goes back only to draft, where staff choose to publish or
+ * invite again. `invited` and `accepted` are entered only by the invite and
+ * acceptance transactions; a staff "Draft" on a linked speaker stores
+ * `accepted` (profile.cjs). Keeping the same status is always allowed.
+ */
+const SPEAKER_TRANSITIONS = Object.freeze({
+  draft: Object.freeze(['invited', 'approved', 'removed']),
+  invited: Object.freeze(['draft', 'accepted', 'approved', 'removed']),
+  accepted: Object.freeze(['approved', 'removed']),
+  approved: Object.freeze(['accepted', 'draft', 'removed']),
+  removed: Object.freeze(['draft']),
+});
+
+/** Whether a speaker may move from `from` to `to`. */
+function canMoveSpeaker(from, to) {
+  if (!Object.hasOwn(SPEAKER_TRANSITIONS, from) || !Object.hasOwn(SPEAKER_TRANSITIONS, to)) return false;
+  return from === to || SPEAKER_TRANSITIONS[from].includes(to);
+}
+
 /** Fields an admin may write through createSpeaker / updateSpeaker. */
 const EDITABLE_SPEAKER_FIELDS = Object.freeze([
   'firstName',
@@ -403,6 +425,8 @@ module.exports = {
   SPEAKER_STATUSES,
   ADMIN_SETTABLE_STATUSES,
   PUBLISHED_SPEAKER_STATUSES,
+  SPEAKER_TRANSITIONS,
+  canMoveSpeaker,
   EDITABLE_SPEAKER_FIELDS,
   SELF_EDITABLE_SPEAKER_FIELDS,
   SERVER_OWNED_SPEAKER_FIELDS,

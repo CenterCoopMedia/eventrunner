@@ -21,12 +21,12 @@ const templateNames = {
   'pitch.accepted': 'Acceptance email',
   'pitch.declined': 'Decline email',
 };
-const slotNames = { receipt: 'Receipt', accepted: 'Acceptance email', rejected: 'Decline email' };
+const slotNames = { receipt: 'Receipt', accepted: 'Acceptance email', declined: 'Decline email' };
 const stateLabels = { queued: 'Sending', sent: 'Sent', failed: 'Not sent', unknown: 'May have been sent' };
 const stateTones = { queued: 'info', sent: 'ok', failed: 'caution', unknown: 'caution' };
 const otherDecisionNotes = {
   accepted: 'An acceptance was already sent to this person.',
-  rejected: 'A decline was already sent to this person.',
+  declined: 'A decline was already sent to this person.',
 };
 // The server treats a queued email as in progress for this long
 // (functions/src/sessions/pitchNotices.cjs QUEUED_STALE_MS).

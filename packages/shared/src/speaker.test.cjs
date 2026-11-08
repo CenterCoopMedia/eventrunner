@@ -1,6 +1,7 @@
 'use strict';
 
 const test = require('node:test');
+const { describe, it } = test;
 const assert = require('node:assert/strict');
 
 const {
@@ -233,4 +234,29 @@ test('pronouns are a short public field a speaker may set', () => {
   assert.match(long.errors[0], /^pronouns: must be at most 80/);
   assert.equal(buildPublicSpeaker({ firstName: 'A', lastName: 'B', pronouns: ' she/her ' }).pronouns, 'she/her');
   assert.equal(buildPublicSpeaker({ firstName: 'A', lastName: 'B' }).pronouns, '');
+});
+
+describe('speaker status moves', () => {
+  const { SPEAKER_STATUSES, SPEAKER_TRANSITIONS, canMoveSpeaker } = require('./speaker.cjs');
+
+  it('names every status, and only statuses', () => {
+    assert.deepEqual(Object.keys(SPEAKER_TRANSITIONS).sort(), [...SPEAKER_STATUSES].sort());
+    for (const targets of Object.values(SPEAKER_TRANSITIONS)) {
+      for (const to of targets) assert.ok(SPEAKER_STATUSES.includes(to), to);
+    }
+  });
+
+  it('publishes a draft, but restores a removed speaker only to draft', () => {
+    assert.equal(canMoveSpeaker('draft', 'approved'), true);
+    assert.equal(canMoveSpeaker('removed', 'approved'), false);
+    assert.equal(canMoveSpeaker('removed', 'draft'), true);
+    assert.equal(canMoveSpeaker('accepted', 'draft'), false);
+    assert.equal(canMoveSpeaker('approved', 'accepted'), true);
+  });
+
+  it('always lets a speaker keep its status, and refuses unknown values', () => {
+    for (const status of SPEAKER_STATUSES) assert.equal(canMoveSpeaker(status, status), true);
+    assert.equal(canMoveSpeaker('other', 'draft'), false);
+    assert.equal(canMoveSpeaker('draft', 'other'), false);
+  });
 });

@@ -29,7 +29,7 @@ const {
 } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
-const { validateSpeaker, SELF_EDITABLE_SPEAKER_FIELDS } = require('shared/speaker');
+const { validateSpeaker, SELF_EDITABLE_SPEAKER_FIELDS, canMoveSpeaker } = require('shared/speaker');
 const { readLogistics } = require('shared/speakerLogistics');
 
 const SPEAKER_LOGISTICS = 'speaker_logistics';
@@ -342,6 +342,22 @@ async function applyUpdateSpeaker({ db, bucket = null, speakerId, payload, actor
       const hasAccount = typeof stored.uid === 'string' && stored.uid !== '';
       if (patch.status === 'draft' && hasAccount && ['accepted', 'approved'].includes(stored.status)) {
         patch.status = 'accepted';
+      }
+
+      // The shared table decides which moves exist. A removed speaker lost
+      // its account link, so it goes back only to draft (owner decision).
+      // A record with no stored status reads as draft everywhere else.
+      const fromStatus = typeof stored.status === 'string' ? stored.status : 'draft';
+      if (patch.status !== undefined && !canMoveSpeaker(fromStatus, patch.status)) {
+        const err = new Error('STATUS_MOVE');
+        err.conflict = {
+          status: 409,
+          code: 'status-conflict',
+          message: fromStatus === 'removed'
+            ? 'A removed speaker can only go back to Draft. Save it as Draft first, then publish or invite it.'
+            : `A speaker cannot move from ${fromStatus} to ${patch.status}.`,
+        };
+        throw err;
       }
 
       const removing = patch.status === 'removed' && stored.status !== 'removed';

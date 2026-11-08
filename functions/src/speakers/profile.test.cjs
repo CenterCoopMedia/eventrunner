@@ -266,6 +266,32 @@ test('an unrelated edit to an already-removed speaker does not re-run the unlink
   );
 });
 
+test('a removed speaker goes back only to draft; a draft may be published with no account', async () => {
+  // Owner decision (2026-11-08): removal cleared the account link, so the
+  // speaker returns to draft, where staff choose to publish or invite again.
+  const db = makeSpeakersDb({
+    'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', status: 'removed', uid: null },
+  });
+  const refused = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.status, 409);
+  assert.equal(refused.code, 'status-conflict');
+  assert.match(refused.message, /Draft/);
+  assert.equal(db.read('speakers', 's1').status, 'removed');
+  assert.deepEqual(db.writes, []);
+  const restored = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'draft' }, actor: ACTOR, now: NOW });
+  assert.equal(restored.ok, true);
+  const published = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
+  assert.equal(published.ok, true);
+  assert.equal(db.read('speakers', 's1').status, 'approved');
+});
+
+test('a speaker stored without a status moves as a draft does', async () => {
+  const db = makeSpeakersDb({ 'speakers/s1': { firstName: 'A', lastName: 'B', slug: 'a-b', uid: null } });
+  const published = await applyUpdateSpeaker({ db, speakerId: 's1', payload: { status: 'approved' }, actor: ACTOR, now: NOW });
+  assert.equal(published.ok, true);
+});
+
 test('create reserves the slug, and the reservation blocks a second create', async () => {
   // The reservation document is the lock a `where('slug','==',…)` query
   // cannot be: an empty query result puts nothing in the read set.

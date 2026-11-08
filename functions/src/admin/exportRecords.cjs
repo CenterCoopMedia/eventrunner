@@ -31,6 +31,7 @@
  */
 
 const { readLogistics } = require('shared/speakerLogistics');
+const { pitchStatusOf } = require('shared/pitch');
 
 /** Keys removed at every depth of every exported record. */
 const SECRET_KEY_RE = /^(?:raw|rawPayload|payload|stripeRequest|idempotencyKey|checkoutUrl)$|token(?!s$)|secret|password|passcode|apikey|api_key|privatekey|private_key|credential|signature/i;
@@ -254,7 +255,7 @@ function pitchRecord(id, data, { includeStaffNotes = false } = {}) {
     format: text(source.format),
     consentVersion: textOrNull(source.consent?.version),
     consentAt: toIso(source.consent?.at),
-    status: text(source.status),
+    status: text(pitchStatusOf(source.status)),
     reviewRevision: numberOrNull(source.reviewRevision) ?? 0,
     reviewedAt: toIso(source.reviewedAt),
     convertedSessionId: textOrNull(source.conversion?.sessionId),

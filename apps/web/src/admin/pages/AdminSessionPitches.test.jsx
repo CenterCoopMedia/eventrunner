@@ -272,6 +272,7 @@ describe('AdminSessionPitches decision email', () => {
 const QUEUE = [
   { ...PITCH, id: 'p-new', title: 'Newest pitch', status: 'new', format: 'Workshop', lengthMinutes: 60, createdAt: new Date('2026-11-02T10:00:00Z'),
     presenters: [{ name: 'Ada', email: 'presenter@example.test', lead: true }, { name: 'Bo', email: 'bo@example.test', lead: false }] },
+  // Stored by an older site as rejected; the queue reads it as declined.
   { ...PITCH, id: 'p-old', title: 'Older pitch', status: 'rejected', createdAt: new Date('2026-11-01T10:00:00Z'), submitted: { title: 'Old' } },
 ];
 
@@ -295,7 +296,7 @@ describe('AdminSessionPitches queue', () => {
   it('filters by decision and searches presenter names', () => {
     collections.session_pitches = QUEUE;
     renderAt('/admin/pitches');
-    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'rejected' } });
+    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'declined' } });
     expect(screen.getByText('Showing 1 of 2.')).toHaveAttribute('role', 'status');
     fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'all' } });
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bo' } });

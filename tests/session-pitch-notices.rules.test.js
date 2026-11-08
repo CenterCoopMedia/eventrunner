@@ -348,11 +348,11 @@ describe('decision emails', () => {
     expect(repeat.body.error.code).toBe('already-sent');
 
     // A repeated decision (declined, then accepted again) cannot resend the acceptance.
-    const declinedRevision = await accept(PITCH_ID, 'rejected');
+    const declinedRevision = await accept(PITCH_ID, 'declined');
     // The decline preview tells staff that an acceptance already went.
-    const declinePreview = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'rejected', expectedRevision: declinedRevision, preview: true });
+    const declinePreview = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'declined', expectedRevision: declinedRevision, preview: true });
     expect(declinePreview.body.preview.otherDecisionSent).toBe('accepted');
-    const decline = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'rejected', expectedRevision: declinedRevision });
+    const decline = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'declined', expectedRevision: declinedRevision });
     expect(decline.statusCode).toBe(200);
     expect(provider.messages[1].tag).toBe('pitch.declined');
     expect(provider.messages[1].subject).toBe('About your session pitch for Example Summit');
@@ -360,6 +360,26 @@ describe('decision emails', () => {
     const resend = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'accepted', expectedRevision: reacceptedRevision });
     expect(resend.statusCode).toBe(409);
     expect(provider.messages).toHaveLength(2);
+  });
+
+  it('reads a decline stored as rejected by an older site, and never resends its email', async () => {
+    const revision = await accept(PITCH_ID, 'declined');
+    // Rewrite the pitch the way sites stored a decline before the rename.
+    const sent = { state: 'sent', templateId: 'pitch.declined', attempt: 1, onceKey: `pitch-notice:${PITCH_ID}:rejected:1` };
+    await db.collection('session_pitches').doc(PITCH_ID).update({ status: 'rejected', 'notices.rejected': sent });
+    const resend = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'declined', expectedRevision: revision });
+    expect(resend.statusCode).toBe(409);
+    expect(resend.body.error.code).toBe('already-sent');
+    // A page loaded before the rename sends `rejected`; it means the same.
+    const legacy = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'rejected', expectedRevision: revision });
+    expect(legacy.body.error.code).toBe('already-sent');
+    expect(provider.messages).toHaveLength(0);
+    // The next review stores today's value.
+    const moved = await review({ id: PITCH_ID, status: 'in_review', expectedStatus: 'declined', expectedRevision: revision });
+    expect(moved.statusCode).toBe(200);
+    const back = await review({ id: PITCH_ID, status: 'rejected', expectedStatus: 'in_review', expectedRevision: moved.body.revision });
+    expect(back.body.status).toBe('declined');
+    expect((await readPitch()).status).toBe('declined');
   });
 
   it('sends one email when staff send the same decision twice at once', async () => {

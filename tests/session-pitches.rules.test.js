@@ -759,7 +759,7 @@ describe('pitch review', () => {
     expect((await review({ id: PITCH_ID, status: 'accepted', expectedStatus: 'new', expectedRevision: 0 }, 'submitter')).statusCode).toBe(403);
     expect((await review({ id: PITCH_ID, status: 'published', expectedStatus: 'new', expectedRevision: 0 })).statusCode).toBe(400);
     expect((await review({ id: PITCH_ID, status: 'accepted', expectedStatus: 'new' })).statusCode).toBe(400);
-    expect((await review({ id: 'missing-pitch', status: 'rejected', expectedStatus: 'new', expectedRevision: 0 })).statusCode).toBe(404);
+    expect((await review({ id: 'missing-pitch', status: 'declined', expectedStatus: 'new', expectedRevision: 0 })).statusCode).toBe(404);
     expect((await db.collection('admin_logs').where('action', '==', 'reviewSessionPitch').get()).empty).toBe(true);
     expect((await db.collection('session_pitches').doc(PITCH_ID).get()).data().status).toBe('new');
     expect((await db.collection('cmsSchedule').get()).empty).toBe(true);
