@@ -11,7 +11,7 @@ import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import {
   forgetCheckoutAttempt, formatTicketMoney, formatTicketTime, readCheckoutAttempt, rememberCheckoutAttempt,
-  safeCheckoutUrl, ticketingRequest, ticketStatusLabel,
+  safeCheckoutUrl, ticketingRequest, paymentStatusLabel, refundStateLabel,
 } from '../lib/ticketingCommerce.js';
 
 const COMPLETE = new Set(ORDER_COMPLETE_STATUSES);
@@ -121,9 +121,9 @@ export default function TicketStatus() {
           <p role="status">{complete ? 'Your admission records have been issued. Each attendee can claim their own ticket with their verified email.' : needsReview ? 'The organizers are reviewing a payment or admission exception. Contact them before attempting another payment.' : refunded || terminal ? 'Check each ticket below for its current admission status. A cancelled ticket does not by itself mean money was refunded.' : 'Payment is not yet confirmed. You do not have new admission from this order until confirmation finishes.'}</p>
           <dl className="grid min-w-0 gap-sm sm:grid-cols-2">
             <div><dt className="font-semibold">Order reference</dt><dd className="wrap-anywhere font-data">{order.orderId}</dd></div>
-            <div><dt className="font-semibold">Payment</dt><dd>{order.status === 'free' ? 'No payment required' : ticketStatusLabel(order.paymentStatus)}</dd></div>
+            <div><dt className="font-semibold">Payment</dt><dd>{order.status === 'free' ? 'No payment required' : paymentStatusLabel(order.paymentStatus)}</dd></div>
             <div><dt className="font-semibold">Order total</dt><dd className="font-data tabular-nums">{formatTicketMoney(order.totalAmount, order.currency)}</dd></div>
-            <div><dt className="font-semibold">Refund</dt><dd>{ticketStatusLabel(order.refundStatus || 'none')}{order.refundedAmount > 0 ? ` — ${formatTicketMoney(order.refundedAmount, order.currency)}` : ''}</dd></div>
+            <div><dt className="font-semibold">Refund</dt><dd>{refundStateLabel(order.refundStatus || 'none')}{order.refundedAmount > 0 ? ` — ${formatTicketMoney(order.refundedAmount, order.currency)}` : ''}</dd></div>
           </dl>
           {order.refundStatus && order.refundStatus !== 'none' ? <p>A refund status describes the payment. Each ticket below shows whether it still grants admission.</p> : null}
           {!complete && !terminal && !needsReview && !refunded ? <div className="space-y-sm no-print">

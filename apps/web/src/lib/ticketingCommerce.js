@@ -125,19 +125,43 @@ export function forgetCheckoutAttempt(uid) {
   try { sessionStorage.removeItem(attemptKey(uid)); } catch { /* Private browsing can refuse storage. */ }
 }
 
-export function ticketStatusLabel(status) {
-  return ({
-    valid: 'Valid', cancelled: 'Cancelled', refunded: 'Refunded', pending_info: 'Awaiting attendee details',
-    paid: 'Paid', succeeded: 'Paid', unpaid: 'Unpaid', pending: 'Confirming payment',
-    processing: 'Confirming payment', complete: 'Complete', completed: 'Complete',
-    failed: 'Failed', expired: 'Expired', none: 'No refund', partial: 'Partly refunded',
-    full: 'Fully refunded', requires_action: 'Needs organizer attention',
-    fulfilled: 'Complete', checked_in: 'Checked in', not_checked_in: 'Not checked in',
-    free: 'Free order', exception: 'Needs organizer attention',
-    catalog_saved: 'Catalog saved', sales_paused: 'Sales paused', sales_resumed: 'Sales reopened',
-    attendee_corrected: 'Attendee corrected', refund_allocated: 'Refund admission decision recorded',
-    tickets_cancelled: 'Tickets cancelled', reconciliation_requested: 'Payment resync requested',
-    check_in_corrected: 'Check-in corrected', comp_issued: 'Complimentary tickets issued',
-    refunded_partial: 'Partly refunded', no_payment_required: 'No payment required',
-  })[status] || String(status || 'Not available').replaceAll('_', ' ');
+// Each stored field has its own words. One shared map made a pending refund
+// read "Confirming payment" and a succeeded refund read "Paid". The keys follow
+// the lists in shared/ticketCommerce; the test checks every value has words.
+const TICKET_LABELS = Object.freeze({
+  valid: 'Valid', cancelled: 'Cancelled', refunded: 'Refunded', pending_info: 'Awaiting attendee details',
+});
+const ORDER_LABELS = Object.freeze({
+  pending: 'Confirming payment', paid: 'Paid', free: 'Free order', expired: 'Expired',
+  refunded: 'Refunded', exception: 'Needs organizer attention',
+});
+const PAYMENT_LABELS = Object.freeze({
+  unpaid: 'Unpaid', pending: 'Confirming payment', succeeded: 'Paid', failed: 'Payment failed', expired: 'Expired',
+});
+/** The order's summary of its refunds (`order.refundStatus`). */
+const REFUND_STATE_LABELS = Object.freeze({
+  none: 'No refund', pending: 'Refund pending', partial: 'Partly refunded', full: 'Fully refunded',
+  failed: 'Refund failed', requires_action: 'Needs organizer attention',
+});
+/** One Stripe refund object (`order.refunds[].status`). */
+const REFUND_LABELS = Object.freeze({
+  pending: 'Pending', requires_action: 'Needs organizer attention', succeeded: 'Succeeded',
+  failed: 'Failed', canceled: 'Cancelled',
+});
+/** One Stripe dispute (`order.disputes[].status`). */
+const DISPUTE_LABELS = Object.freeze({
+  warning_needs_response: 'Inquiry needs a response', warning_under_review: 'Inquiry under review',
+  warning_closed: 'Inquiry closed', needs_response: 'Needs a response', under_review: 'Under review',
+  won: 'Won', lost: 'Lost', prevented: 'Prevented',
+});
+
+function label(words, status) {
+  return (Object.hasOwn(words, status) && words[status]) || String(status || 'Not available').replaceAll('_', ' ');
 }
+
+export const ticketStatusLabel = (status) => label(TICKET_LABELS, status);
+export const orderStatusLabel = (status) => label(ORDER_LABELS, status);
+export const paymentStatusLabel = (status) => label(PAYMENT_LABELS, status);
+export const refundStateLabel = (status) => label(REFUND_STATE_LABELS, status);
+export const refundLabel = (status) => label(REFUND_LABELS, status);
+export const disputeStatusLabel = (status) => label(DISPUTE_LABELS, status);

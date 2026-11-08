@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   formatTicketMoney, readCheckoutAttempt, rememberCheckoutAttempt, safeCheckoutUrl,
   safeStripeDashboardUrl, ticketingRequest,
+  disputeStatusLabel, orderStatusLabel, paymentStatusLabel, refundLabel, refundStateLabel, ticketStatusLabel,
 } from './ticketingCommerce.js';
+import {
+  ORDER_STATUSES, PAYMENT_STATUSES, REFUND_STATUSES, TICKET_STATUSES,
+} from 'shared/ticketCommerce';
 import { appCheckHeaders } from '../firebase.js';
 
 describe('ticketing commerce transport and credentials', () => {
@@ -47,5 +51,33 @@ describe('ticketing commerce transport and credentials', () => {
     expect(safeStripeDashboardUrl('https://dashboard.stripe.com/acct_test/test/payments/pi_synthetic')).toContain('dashboard.stripe.com');
     for (const url of ['javascript:alert(1)', '/pay/cs_test_synthetic', 'https://someone@checkout.stripe.com/pay', 'https://checkout.stripe.com:8443/pay', 'http://checkout.stripe.com/pay']) expect(safeCheckoutUrl(url)).toBeNull();
     expect(safeStripeDashboardUrl('https://dashboard.stripe.com.evil.test')).toBeNull();
+  });
+});
+
+describe('commerce status labels', () => {
+  it('names every stored value of each field in words for that field', () => {
+    for (const [values, label] of [
+      [TICKET_STATUSES, ticketStatusLabel], [ORDER_STATUSES, orderStatusLabel],
+      [PAYMENT_STATUSES, paymentStatusLabel], [REFUND_STATUSES, refundStateLabel],
+    ]) {
+      for (const value of values) expect(label(value)).not.toMatch(/_|^[a-z]/);
+    }
+  });
+
+  it('keeps payment words out of the refund fields', () => {
+    expect(refundStateLabel('pending')).toBe('Refund pending');
+    expect(refundStateLabel('failed')).toBe('Refund failed');
+    expect(refundLabel('pending')).toBe('Pending');
+    expect(refundLabel('succeeded')).toBe('Succeeded');
+    expect(refundLabel('canceled')).toBe('Cancelled');
+    expect(paymentStatusLabel('pending')).toBe('Confirming payment');
+    expect(paymentStatusLabel('failed')).toBe('Payment failed');
+  });
+
+  it('names Stripe dispute states and falls back to readable text', () => {
+    expect(disputeStatusLabel('needs_response')).toBe('Needs a response');
+    expect(disputeStatusLabel('warning_closed')).toBe('Inquiry closed');
+    expect(disputeStatusLabel('brand_new_state')).toBe('brand new state');
+    expect(ticketStatusLabel(undefined)).toBe('Not available');
   });
 });

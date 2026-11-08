@@ -45,10 +45,11 @@ LABELS              // staff words; client words only where they differ
 - [x] S2 (lists). Ticket, order, payment, inventory and refund status lists and
       `isOrderFulfilled` are in `shared/ticketCommerce`; check-in, the confirmation
       email, ticket sync, reconcile, the admin filters and the purchaser page read
-      them. Still open in S2: split `ticketStatusLabel` by domain.
-- [ ] S2. Stripe order, payment, refund and ticket statuses
-      (`shared/ticketCommerce`). One `isOrderFulfilled(order)` for the four
-      fields that say "done". Split `ticketStatusLabel` by domain.
+      them.
+- [x] S2 (labels). `ticketStatusLabel` is split by field: ticket, order,
+      payment, refund state, Stripe refund and Stripe dispute each have their
+      own words. A pending refund no longer reads "Confirming payment", and the
+      admin ticket filter no longer keeps its own word list.
 - [ ] S3. Pitch review and change request statuses. Store `declined`
       everywhere (owner decision), with a one-time migration of stored
       `rejected` pitches on each client site.

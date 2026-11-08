@@ -406,7 +406,7 @@ function TicketList({ call, refreshToken }) {
           onChange={setStatus}
           options={[
             { value: '', label: 'Any' },
-            ...TICKET_STATUSES.map((value) => ({ value, label: TICKET_STATUS_WORDS[value] })),
+            ...TICKET_STATUSES.map((value) => ({ value, label: ticketStatusLabel(value) })),
           ]}
         />
         <button type="submit" className={secondaryButtonClass} disabled={loading}>
@@ -458,9 +458,6 @@ function TicketList({ call, refreshToken }) {
   );
 }
 
-
-/** Words for each ticket status in the imported-ticket filter (shared/ticketCommerce lists the values). */
-const TICKET_STATUS_WORDS = Object.freeze({ valid: 'Valid', refunded: 'Refunded', cancelled: 'Cancelled', pending_info: 'Pending info' });
 export default function AdminTicketing() {
   const call = useAdminApi();
   const [status, setStatus] = useState(null);
