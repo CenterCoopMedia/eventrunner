@@ -536,7 +536,8 @@ export default function AdminInvoiceEditor({ mode }) {
     return <AdminLoadingState label="Loading invoice…" />;
   }
 
-  const statusWord = INVOICE_STATUS_WORDS[invoice?.status ?? 'draft'];
+  // The server sends 'unknown' for a status it does not know; it is locked like an issued one.
+  const statusWord = INVOICE_STATUS_WORDS[invoice?.status ?? 'draft'] ?? 'Unknown';
   const title = mode === 'create'
     ? 'New invoice'
     : invoice?.number ?? `Draft for ${invoice?.billTo?.name || 'no name yet'}`;
