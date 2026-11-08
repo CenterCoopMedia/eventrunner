@@ -251,12 +251,18 @@ test('restore re-releases the saved version and restores the previous status', a
   assert.equal(s.db.writes.length, writes);
 });
 
-test('archive accepts failed builds and refuses active builds or closed applications', async () => {
+test('archive accepts failed builds and closed requests whose build began, and refuses active builds', async () => {
   const failed = setup({ app: { status: 'building', buildStart: { state: 'failed', at: new Date(NOW) } }, build: { state: 'failed' } });
   assert.equal(await failed.run('archive'), 0);
   assert.equal(failed.db.read('applications/a1').archive.previousStatus, 'building');
-  for (const status of ['approved', 'building', 'declined']) {
-    const s = setup({ app: { status }, build: { state: status === 'declined' ? 'failed' : 'running', startedAt: new Date(NOW) } });
+  // A request closed after its build began may own a project. Console
+  // retention keeps it, and archive is the way to its 7-day purge.
+  const closed = setup({ app: { status: 'declined' }, build: { state: 'failed', startedAt: new Date(NOW) } });
+  assert.equal(await closed.run('archive'), 0);
+  assert.equal(closed.db.read('applications/a1').status, 'archived');
+  assert.equal(closed.db.read('applications/a1').archive.previousStatus, 'declined');
+  for (const status of ['approved', 'building']) {
+    const s = setup({ app: { status }, build: { state: 'running', startedAt: new Date(NOW) } });
     assert.equal(await s.run('archive'), 1);
     assert.equal(mutations(s).length, 0);
   }

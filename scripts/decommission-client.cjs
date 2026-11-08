@@ -311,7 +311,9 @@ async function archive(ctx) {
     checkIdle(ctx, app, build);
     if (app.archive?.restoring) throw new Error('archive: a restore is in progress');
     if (app.status === 'archived') return;
-    if (!['ready', 'launched', 'draft'].includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error(`archive: status ${app.status} is not allowed`);
+    // 'declined' covers a request the hosting team closed after its build
+    // began: it may own a project, and console retention keeps it for this.
+    if (!['ready', 'launched', 'draft', 'declined'].includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error(`archive: status ${app.status} is not allowed`);
     const at = instant(ctx.deps);
     tx.update(appRef(ctx), {
       status: 'archived', archivedAt: at, purgeAfter: new Date(at.getTime() + RECOVERY_MS),
