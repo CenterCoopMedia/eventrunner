@@ -8,6 +8,7 @@
     ".": { "require": "./src/index.cjs", "import": "./src/index.mjs" },
     "./config": { "require": "./src/config/index.cjs", "import": "./src/config/index.mjs" },
     "./pitch": { "require": "./src/pitch.cjs", "import": "./src/pitch.mjs" },
+    "./delivery": { "require": "./src/delivery.cjs", "import": "./src/delivery.mjs" },
     "./pitchForm": { "require": "./src/pitchForm.cjs", "import": "./src/pitchForm.mjs" },
     "./speakerLogistics": { "require": "./src/speakerLogistics.cjs", "import": "./src/speakerLogistics.mjs" },
     "./registrationForm": { "require": "./src/registrationForm.cjs", "import": "./src/registrationForm.mjs" },

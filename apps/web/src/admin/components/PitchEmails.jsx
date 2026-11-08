@@ -6,6 +6,7 @@
 // so a second click or a repeated decision cannot send it twice. An email
 // whose delivery is unknown (the email service did not answer) is retried
 // only after staff confirm that they checked the Email log.
+import { deliveryStateOf } from 'shared/delivery';
 import { useEffect, useRef, useState } from 'react';
 import {
   PITCH_NOTICE_TEMPLATE_IDS, PITCH_NOTICE_DEFAULTS, DECISION_TEMPLATE_IDS,
@@ -22,8 +23,8 @@ const templateNames = {
   'pitch.declined': 'Decline email',
 };
 const slotNames = { receipt: 'Receipt', accepted: 'Acceptance email', declined: 'Decline email' };
-const stateLabels = { queued: 'Sending', sent: 'Sent', failed: 'Not sent', unknown: 'May have been sent' };
-const stateTones = { queued: 'info', sent: 'ok', failed: 'caution', unknown: 'caution' };
+const stateLabels = { queued: 'Sending', sent: 'Sent', failed: 'Not sent', uncertain: 'May have been sent' };
+const stateTones = { queued: 'info', sent: 'ok', failed: 'caution', uncertain: 'caution' };
 const otherDecisionNotes = {
   accepted: 'An acceptance was already sent to this person.',
   declined: 'A decline was already sent to this person.',
@@ -111,13 +112,13 @@ function DeliveryState({ slot, record }) {
   const at = toMillis(record.sentAt || record.updatedAt || record.queuedAt);
   return <li className="flex flex-wrap items-center gap-sm text-admin-sm">
     <span className="font-semibold">{slotNames[slot]}</span>
-    <StatusBadge tone={stateTones[record.state] || 'neutral'}>{stateLabels[record.state] || 'Unknown'}</StatusBadge>
+    <StatusBadge tone={stateTones[deliveryStateOf(record.state)] || 'neutral'}>{stateLabels[deliveryStateOf(record.state)] || 'Unknown'}</StatusBadge>
     <span className="text-admin-ink-secondary">
       {record.mode === 'automatic' ? 'Automatic' : `By ${record.queuedBy || 'staff'}`}
       {at !== null ? ` · ${new Date(at).toLocaleString()}` : ''}
       {record.attempt > 1 ? ` · Attempt ${record.attempt}` : ''}
     </span>
-    {record.state === 'unknown' || (record.state === 'queued' && !isSending(record))
+    {deliveryStateOf(record.state) === 'uncertain' || (record.state === 'queued' && !isSending(record))
       ? <span className="basis-full break-words font-semibold">We do not know if the email went out. Check the Email log before you send it again.</span> : null}
     {record.state === 'failed' && record.error ? <span className="basis-full break-words text-admin-ink-secondary">The email service refused it. The Email log has the details.</span> : null}
   </li>;

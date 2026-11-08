@@ -228,7 +228,7 @@ describe('automatic pitch receipt', () => {
   it('records a provider throw as unknown and retries it only after staff confirm', async () => {
     provider.mode = 'throw';
     expect((await submit()).statusCode).toBe(201);
-    expect((await readPitch()).notices.receipt).toMatchObject({ state: 'unknown', error: 'socket hang up' });
+    expect((await readPitch()).notices.receipt).toMatchObject({ state: 'uncertain', error: 'socket hang up' });
 
     provider.mode = 'ok';
     const body = { id: PITCH_ID, kind: 'receipt', expectedStatus: 'new', expectedRevision: 0 };

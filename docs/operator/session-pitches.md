@@ -288,7 +288,7 @@ Each pitch shows the state of its emails, with the time, who sent it and the att
 - **Not sent**: the provider refused the email. The reason shows. Choose **Retry the receipt** or prepare the decision email again to retry.
 - **May have been sent**: the email service did not answer, or a send stopped before it recorded a result. The provider may have delivered the email. Check the **Email log** before you retry. The retry asks you to confirm **I checked the Email log. The earlier email was not delivered.**
 
-Each attempt has its own send-once key (`pitch-notice:{id}:{receipt|accepted|rejected}:{attempt}`), so a repeated request cannot send one attempt twice. A retry is a new attempt. After a refusal it is safe. After an unknown result it can deliver a second copy. The records sit on the private pitch row in `notices`. The **Email log** keeps each sent message.
+Each attempt has its own send-once key (`pitch-notice:{id}:{receipt|accepted|declined}:{attempt}`; records from before November 2026 used `rejected`), so a repeated request cannot send one attempt twice. A retry is a new attempt. After a refusal it is safe. After an uncertain result it can deliver a second copy. The records sit on the private pitch row in `notices`, with the state `queued`, `sent`, `failed` or `uncertain`. Older records say `unknown` for `uncertain`, and the page reads both. The **Email log** keeps each sent message.
 
 A decision is stored apart from its email. A failed email never changes the decision.
 

@@ -301,7 +301,7 @@ test('acknowledgement: a refused or uncertain send never fails the stored reques
 
   const unknown = makeFakeDb();
   assert.equal((await submit(unknown, makeMailer('throw'))).statusCode, 201);
-  assert.equal(notices(unknown).received.state, 'unknown');
+  assert.equal(notices(unknown).received.state, 'uncertain');
 
   // A sender that throws before it reaches the provider is a plain failure.
   const broken = makeFakeDb();
@@ -428,7 +428,8 @@ test('retry: staff retry a failed email with a new attempt and a new send-once k
 
 test('retry: an email whose delivery is unknown, or a stale queued one, needs the Email log check', async () => {
   for (const record of [
-    failedRecord('done', { state: 'unknown' }),
+    failedRecord('done', { state: 'uncertain' }),
+    failedRecord('done', { state: 'unknown' }), // stored before November 2026
     failedRecord('done', { state: 'queued', queuedAt: new Date(T0 + 5000 - QUEUED_STALE_MS) }),
   ]) {
     const db = makeFakeDb({ seed: { [`change_requests/${KEY}`]: storedRequest({ status: 'done', notices: { done: record } }) } });
