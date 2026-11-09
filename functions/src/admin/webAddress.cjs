@@ -10,10 +10,12 @@
  *   remove          → refused for every admin; the team removes domains
  *                     with scripts/remove-web-address.cjs
  *
+ * The team adds a domain with scripts/add-web-address.cjs (addWebAddress).
+ *
  * STATES. `none` → `records` (the team adds the records; checks run) →
- * `switch` (Hosting serves the domain with a certificate, and the domain is
- * an authorized sign-in domain; the site's public address still has to
- * change by a deploy) → `done` (EVENT_PUBLIC_URL is the domain).
+ * `switch` (Hosting serves the domain with a certificate, and the check has
+ * made it an authorized sign-in domain; the site's public address still has
+ * to change by a deploy) → `done` (EVENT_PUBLIC_URL is the domain).
  *
  * The switch is a deploy because EVENT_PUBLIC_URL is a deploy-time value.
  * Until the console's GitHub App exists (P8), the hosting team runs it.
@@ -33,6 +35,9 @@ const COLLECTION = 'web_address';
 const DOC = 'current';
 const HOSTING_API = 'https://firebasehosting.googleapis.com/v1beta1';
 const IDENTITY_API = 'https://identitytoolkit.googleapis.com/admin/v2';
+const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+// Addresses the site already has, or that belong to the platform.
+const RESERVED_SUFFIXES = Object.freeze(['.web.app', '.firebaseapp.com', '.eventrunner.org']);
 const WAITING = 'records';
 
 class WebAddressError extends Error {
@@ -40,6 +45,17 @@ class WebAddressError extends Error {
 }
 const fail = (status, code, message) => { throw new WebAddressError(status, code, message); };
 const UNAVAILABLE = 'The web address service did not answer. Try again in a few minutes.';
+
+/** A plain domain in lowercase, or null. No scheme, path, port or trailing dot. */
+function normalizeDomain(value) {
+  if (typeof value !== 'string') return null;
+  const domain = value.trim().toLowerCase().replace(/\.$/, '');
+  if (domain.length > 253 || /[^a-z0-9.-]/.test(domain)) return null;
+  const labels = domain.split('.');
+  if (labels.length < 2 || !labels.every((label) => LABEL.test(label))) return null;
+  if (RESERVED_SUFFIXES.some((suffix) => domain.endsWith(suffix))) return null;
+  return domain;
+}
 
 function iso(value) {
   if (value instanceof Date) return value.toISOString();
@@ -63,15 +79,28 @@ function view(record, env) {
 
 /**
  * Read Hosting's state for the stored domain and move the record on. Live
- * means Hosting serves the domain with a certificate; the domain is then
- * already authorized by the hosting team before the state says so. Checks
- * never grant sign-in access: a stale check cannot revive a removed domain.
+ * means Hosting serves the domain with a certificate. Only then does the
+ * check add the stored domain to the sign-in authorized domains, once, and
+ * the state says so after that succeeds. A failure throws before any write,
+ * so the record stays as it was and the next check retries.
  */
 async function checkRecord({ db, hosting, identity, env, now, record }) {
   if (record.state === 'removing') return record;
+  const ref = db.collection(COLLECTION).doc(DOC);
+  const isStill = (data) => data && data.domain === record.domain && data.state !== 'removing';
   const at = now();
   const read = await hosting.readDomain(record.domain);
   const next = { ...record, lastCheckedAt: at, updatedAt: at };
+  let authorized = false;
+  if (read.live && !await identity.hasAuthorizedDomain(record.domain)) {
+    // The Hosting read can take a while: never authorize a domain that was
+    // removed or replaced in the meantime.
+    const fresh = await ref.get();
+    if (isStill(fresh.exists ? fresh.data() : null)) {
+      await identity.addAuthorizedDomain(record.domain);
+      authorized = true;
+    }
+  }
   if (!read.live || !await identity.hasAuthorizedDomain(record.domain)) {
     next.state = WAITING;
     next.records = read.records;
@@ -80,16 +109,18 @@ async function checkRecord({ db, hosting, identity, env, now, record }) {
     next.records = [];
     next.liveAt = record.liveAt ?? at;
   }
-  // The Hosting read can take a while. Write only if the record is still the
-  // one this check started from, so a removal or a new domain in the
-  // meantime wins over a stale check.
-  const ref = db.collection(COLLECTION).doc(DOC);
-  return db.runTransaction(async (tx) => {
+  // Write only if the record is still the one this check started from, so a
+  // removal or a new domain in the meantime wins over a stale check.
+  const result = await db.runTransaction(async (tx) => {
     const current = await tx.get(ref);
-    if (!current.exists || current.data().domain !== record.domain || current.data().state === 'removing') return current.exists ? current.data() : null;
+    if (!isStill(current.exists ? current.data() : null)) return { stale: true, data: current.exists ? current.data() : null };
     tx.set(ref, next);
-    return next;
+    return { stale: false, data: next };
   });
+  // A removal marks the record before it revokes, so a stale check sees the
+  // mark here and takes back the sign-in domain it just added.
+  if (result.stale && authorized) await identity.removeAuthorizedDomain(record.domain);
+  return result.data;
 }
 
 /** The scheduled check: only while a domain waits for its records. */
@@ -178,6 +209,23 @@ function createHostingClient({ projectId, site, fetchImpl = globalThis.fetch, ge
   // Null while Hosting has no such domain, or has not finished making it.
   const read = (domain) => googleCall({ fetchImpl, getAccessToken, url: `${base}/${encodeURIComponent(domain)}`, missingOk: true });
   return {
+    /**
+     * Create the domain, reuse it when Hosting already has it, or restore it
+     * when it was removed in the last 30 days. Creating is a long-running
+     * operation; when it has not finished, there are no records yet and the
+     * next check reads them.
+     */
+    async addDomain(domain) {
+      const found = await read(domain);
+      if (found && !found.deleteTime) return { records: recordsToChange(found) };
+      if (found) {
+        await googleCall({ fetchImpl, getAccessToken, method: 'POST', url: `${base}/${encodeURIComponent(domain)}:undelete`, body: {} });
+      } else {
+        await googleCall({ fetchImpl, getAccessToken, method: 'POST', url: `${base}?customDomainId=${encodeURIComponent(domain)}`, body: {} });
+      }
+      const after = await read(domain);
+      return { records: after ? recordsToChange(after) : [] };
+    },
     async readDomain(domain) {
       const found = await read(domain);
       if (!found) return { live: false, records: [] };
@@ -205,6 +253,12 @@ function createIdentityClient({ projectId, fetchImpl = globalThis.fetch, getAcce
       await googleCall({ fetchImpl, getAccessToken, method: 'PATCH', url: `${url}?updateMask=authorizedDomains`,
         body: { authorizedDomains: domains.filter((entry) => entry !== domain) } });
     },
+    async addAuthorizedDomain(domain) {
+      const config = await googleCall({ fetchImpl, getAccessToken, url });
+      const domains = Array.isArray(config.authorizedDomains) ? config.authorizedDomains : [];
+      if (domains.includes(domain)) return;
+      await googleCall({ fetchImpl, getAccessToken, method: 'PATCH', url: `${url}?updateMask=authorizedDomains`, body: { authorizedDomains: [...domains, domain] } });
+    },
   };
 }
 
@@ -222,6 +276,35 @@ async function removeWebAddress({ db, hosting, identity, domain }) {
     const current = await tx.get(ref);
     if (current.exists && current.data().domain === domain && current.data().state === 'removing') tx.delete(ref);
   });
+}
+
+/**
+ * Operator tooling only. Hosting comes first and the record last: the
+ * Hosting call is safe to repeat, so a run that fails part way stores
+ * nothing and the same command finishes it. Sign-in is not touched here;
+ * the check authorizes the domain once Hosting serves it. Returns an
+ * outcome: invalid, other-domain, removing, stored, planned or added.
+ */
+async function addWebAddress({ db, hosting, domain: value, dryRun = false, now = () => new Date() }) {
+  const domain = normalizeDomain(value);
+  if (!domain) return { outcome: 'invalid' };
+  const ref = db.collection(COLLECTION).doc(DOC);
+  const snap = await ref.get();
+  const stored = snap.exists ? snap.data() : null;
+  if (stored) {
+    if (stored.domain !== domain) return { outcome: 'other-domain', domain, record: stored };
+    return { outcome: stored.state === 'removing' ? 'removing' : 'stored', domain, record: stored };
+  }
+  if (dryRun) return { outcome: 'planned', domain };
+  const added = await hosting.addDomain(domain);
+  const at = now();
+  const record = { domain, state: WAITING, records: added.records, createdAt: at, updatedAt: at, lastCheckedAt: null };
+  await db.runTransaction(async (tx) => {
+    const current = await tx.get(ref);
+    if (current.exists) throw new Error('A web address was stored while this ran');
+    tx.set(ref, record);
+  });
+  return { outcome: 'added', domain, record };
 }
 
 function realClients(env = process.env) {
@@ -259,6 +342,6 @@ function buildHandlers() {
 }
 
 module.exports = {
-  removeWebAddress, realClients, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
+  normalizeDomain, addWebAddress, removeWebAddress, realClients, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
   get handlers() { return buildHandlers(); },
 };

@@ -771,22 +771,55 @@ An operator sets up a custom web address. A client admin cannot add or remove on
 function refuses `add` and `remove` for every admin tier. **Settings → Web address** (ADR 0007 §8)
 shows the site's current address and, for a stored domain, its status (**Waiting for the
 records**, **Ready to switch**, or **In use**) and **Check now**. A check, and the hourly
-`webAddressCheck`, reads the domain's state in Firebase Hosting and looks for the domain in the
-Auth authorized domains. A check never adds an authorized domain.
+`webAddressCheck`, reads the domain's state in Firebase Hosting. The first time Hosting serves the
+stored domain with a certificate, the check adds that domain to the Auth authorized domains, and
+then the status says **Ready to switch**. A check never authorizes a domain Hosting does not serve,
+or any domain but the stored one. If adding it fails, the record stays as it was and the next check
+tries again.
 
 The page reads the domain from the record `web_address/current`. Without that record the page shows
 only the current address, and **Check now** answers "Contact us to set up your domain first."
 
-> **Gap.** No script, workflow or function in this repository writes `web_address/current`.
-> The steps to add the Hosting domain and the authorized domain are in `docs/CLIENT_ONBOARDING.md`
-> §3 items 2 and 3 (Firebase console), and `scripts/provision-client.cjs` adds the Hosting domain for a
-> console build. None of them writes the record, so after those steps the page still shows no
-> domain status. There is no documented procedure to create the record yet.
+To add a domain, run `scripts/add-web-address.cjs` with the client project's operator credentials,
+the same as the removal script. Set `EVENT_HOSTING_SITE` too when the site is not the project id.
 
-To remove a stored domain, use `scripts/remove-web-address.cjs` (see "Security remediation: signup
-provenance and domain retirement" below).
+```bash
+EVENT_FIREBASE_PROJECT_ID=<GCP_PROJECT_ID> node scripts/add-web-address.cjs summit.example.org --dry-run
+EVENT_FIREBASE_PROJECT_ID=<GCP_PROJECT_ID> node scripts/add-web-address.cjs summit.example.org
+```
 
-The functions runtime account needs two roles on the client project for the status check, once:
+`--dry-run` checks the domain and the stored record, and changes nothing. Without it the script:
+
+1. Refuses a domain that is not a plain domain, and `*.web.app`, `*.firebaseapp.com` and
+   `*.eventrunner.org` addresses. It refuses when a different domain is stored (remove that one
+   first), and when a removal did not finish (run the removal again). When the same domain is
+   stored it changes nothing and says so.
+2. Asks Firebase Hosting for the domain. It reuses a domain Hosting already has, and restores one
+   removed in the last 30 days.
+3. Writes `web_address/current` with the status **Waiting for the records**, and prints the DNS
+   records. Lines marked `Remove` are records that conflict with Hosting.
+
+The record is written last. If the script stops part way, nothing is stored: run the same command
+again. Hosting does not add the domain twice. The script does not change the authorized domains:
+the check does that once Hosting serves the domain. The Hosting default domain stays a console
+step (`docs/CLIENT_ONBOARDING.md` §3).
+
+Then:
+
+1. Give the client the printed records. If Hosting had not listed them yet, **Check now** on
+   **Settings → Web address** shows them a few minutes later.
+2. The hourly `webAddressCheck` and **Check now** move the status. It stays **Waiting for the
+   records** until Hosting serves the domain with a certificate, which can take from minutes to
+   about a day after the records are in. The first check after that adds the domain to the
+   authorized domains, and the status shows **Ready to switch**.
+
+The script needs, on the client project: `roles/firebasehosting.admin` (the Hosting domain),
+`roles/datastore.user` (the record) and `roles/serviceusage.serviceUsageConsumer` (its Google calls
+name the project for quota). A project Owner has all three, and so does the deploy service account
+(§2).
+
+The functions runtime account needs two roles on the client project for the status check, once.
+`roles/firebaseauth.admin` lets the check read the authorized domains and add the stored domain:
 
 ```bash
 gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
@@ -1591,8 +1624,9 @@ new paid signup link. Acceptance checks that provenance inside its transaction.
 The marker `data_migrations/console-signup-links-2026-11-06` makes later deploys
 skip the scan, and the log shows only counts.
 
-A web-address status check observes Hosting and sign-in authorization. It never
-adds a sign-in domain. The hosting team authorizes a new domain during setup.
+A web-address status check adds the stored domain to the sign-in authorized domains
+only once Hosting serves it, and never while the record is being removed. If a removal
+starts while a check is adding the domain, the check takes it back off.
 To retire a client's stored custom domain, keep ownership of its DNS registration,
 set `EVENT_FIREBASE_PROJECT_ID` (and `EVENT_HOSTING_SITE` if different), then run
 `node scripts/remove-web-address.cjs exact.example.org` with that project's operator
