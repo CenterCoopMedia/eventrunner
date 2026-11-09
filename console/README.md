@@ -10,7 +10,7 @@ This folder holds sign-in, organizations and the team (P4), the guided setup wit
 |---|---|
 | `firebase.json` | The console project's own Firebase configuration: functions, rules, indexes and hosting. |
 | `firestore.rules` | Read rules for the browser. The browser writes nothing. |
-| `firestore.indexes.json` | The collection-group index for "my organizations", and the review queue index (`status`, `updatedAt` descending). |
+| `firestore.indexes.json` | The collection-group index for "my organizations", the review queue index (`status`, `updatedAt` descending), and the retention index (`status`, `updatedAt` ascending). |
 | `functions/` | The server functions. They own every write. `functions/vendor/shared.tgz` is the shared package, packed by `npm run prepare:functions`. |
 | `web/` | The web app (Vite and React). It builds to `web/dist`. |
 | `tests/` | The rules suite. It runs on the Firestore emulator. |
@@ -31,7 +31,7 @@ The console uses plain words. It never says Firebase, project, tenant, environme
 | `organizations/{orgId}/members/{uid}` | `uid`, `email` (lowercase), `role` (`owner` or `editor`), `joinedAt` | `redeemSignupLink`, `acceptInvite`, `changeMemberRole`, `removeMember` |
 | `invites/{inviteId}` | `orgId`, `email` (lowercase), `role`, `tokenHash` (SHA-256 of the token), `status` (`pending`, `accepted` or `replaced`), `invitedBy`, `invitedByEmail`, `createdAt`, `expiresAt`, and after use `acceptedBy` and `acceptedAt` | `inviteMember`, `acceptInvite` |
 | `signup_links/{linkId}` | `organizationName`, `tokenHash` (SHA-256 of the token), `status` (`open`, `used` or `revoked`), `createdBy`, `createdAt`, `expiresAt`, and after use `usedBy`, `usedEmail`, `usedAt`, `orgId` and `appId`. No browser can read it. | `createSignupLink`, `revokeSignupLink`, `redeemSignupLink` |
-| `applications/{appId}` | `orgId`, `status`, `answers`, `frozen` (a copy of `answers` at acceptance, else null), `createdBy`, `createdAt`, `updatedAt`, `updatedBy`, `submittedAt`, `submittedBy`, `history` (a list of `{ status, at, by, note }`, oldest first), `review` (null, or `{ note, by, at, settings: null }` on a decline), `agreementAcceptance` (null, or `{ id, version, sha256, name, email, at }`, the pointer to the current record), `buildStart` (`{ state, at }`, with `state` `pending`, `started` or `failed`), `connections` (see "Account connections") | `redeemSignupLink`, `saveApplicationStep`, `acceptAgreement`, `withdrawApplication`, `retryBuild`; `declineApplication`, `closeApplication`, `deleteSpamApplication`, the retention job. Only `declineApplication` and `closeApplication` write `review`. Only `completeConnection`, `disconnectAccount`, `chooseEventbriteEvent` and `closeApplication` write `connections`. |
+| `applications/{appId}` | `orgId`, `status`, `answers`, `frozen` (a copy of `answers` at acceptance, else null), `createdBy`, `createdAt`, `updatedAt`, `updatedBy`, `submittedAt`, `submittedBy`, `history` (a list of `{ status, at, by, note }`, oldest first), `review` (null, or `{ note, by, at, settings: null }` on a decline, a close or a launch), `agreementAcceptance` (null, or `{ id, version, sha256, name, legalName, title, email, at }`, the pointer to the current record), `buildStart` (`{ state, at }`, with `state` `pending`, `started` or `failed`), `connections` (see "Account connections") | `redeemSignupLink`, `saveApplicationStep`, `acceptAgreement`, `withdrawApplication`, `retryBuild`; `declineApplication`, `closeApplication`, `launchApplication`, `deleteSpamApplication`, the retention job. Only `declineApplication`, `closeApplication` and `launchApplication` write `review`. Only `completeConnection`, `disconnectAccount`, `chooseEventbriteEvent` and `closeApplication` write `connections`. |
 | `console_connections/{appId}` | `stripe` (`accountId`, `connectedBy`), `eventbrite` (`accountId`, `connectedBy`, `eventOrganizationId`). No browser can read it, operators included. | `completeConnection`, `disconnectAccount`, `chooseEventbriteEvent`; deleted with the application by spam delete and the retention job |
 | `console_connection_states/{hash}` | `uid`, `orgId`, `appId`, `provider`, `createdAt`, `expiresAt` for a connection in progress. The id is the SHA-256 of the `state` value. No browser can read it. | `startConnection`, `completeConnection`; the retention job sweeps expired ones |
 | `console_token_deletions/{appId}` | `connected` (the accounts) and `at`, for a deleted request whose stored tokens are not gone yet. No browser can read it. | The delete of a request; removed once its tokens are deleted, and the retention job retries what is left |
@@ -40,10 +40,10 @@ The console uses plain words. It never says Firebase, project, tenant, environme
 | `console_config/settings` | `gcpFolder`, `billingAccount`, `region` | `saveConsoleSettings`. The site builder reads them for every build. |
 | `console_config/agreement` | `version`, `title`, `body`, `sha256`, `savedAt`, `savedBy`: the current agreement | `saveAgreement` |
 | `console_config/agreement/versions/{version}` | The same fields. Each version is created once and never changes. | `saveAgreement` |
-| `agreement_acceptances/{id}` | `version`, `sha256`, `typedName`, `email` (verified), `uid`, `orgId`, `appId`, `at`. Created once, never changed, and kept when the request is deleted. | `acceptAgreement` |
+| `agreement_acceptances/{id}` | `version`, `sha256`, `typedName`, `legalName`, `title`, `email` (verified), `uid`, `orgId`, `appId`, `at`. Created once, never changed, and kept when the request is deleted. | `acceptAgreement` |
 | `console_rate_limits/{key}` | `count`, `windowStart` | The functions |
 | `console_builds/{appId}` | The build record: `state` (`queued`, `running`, `failed` or `done`), `runUrl`, `testMode`, `startedAt`, `updatedAt`, `finishedAt`, `failedStep`, `error`, `ownersEmailedAt`, `steps` (a list of `{ id, label, state, at, detail }`). No browser can read it: an operator sees it through `getApplicationForReview`, and a client sees only the status. | `scripts/provision-client.cjs`, `retryBuild` |
-| `console_audit/{id}` | `action`, `appId` or `linkId`, `by` (a uid, `retention`, `console` or `build`), `at`, and `version` on `save-agreement`. No client data. | `saveConsoleSettings`, `saveAgreement`, `createSignupLink`, `revokeSignupLink`, `closeApplication`, `deleteSpamApplication`, `retryBuild`, the retention job, and a build that does not start |
+| `console_audit/{id}` | `action`, `appId` or `linkId`, `by` (a uid, `retention`, `console`, `build` or `build-watch`), `at`, and `version` on `save-agreement`. No client data. | `saveConsoleSettings`, `saveAgreement`, `createSignupLink`, `revokeSignupLink`, `closeApplication`, `deleteSpamApplication`, `retryBuild`, the retention job, the build watch, and a build that does not start |
 
 An application is one event and one site. The client sees it as "your request". Its statuses are `draft`, `approved`, `building`, `ready`, `launched`, `withdrawn`, `declined` and `archived` (ADR 0007, the invoice and signup link amendment). One module, `packages/shared/src/consoleRequest.cjs`, holds the list, the groups the code checks, the moves the code makes and both sets of labels. An application is open unless it is `withdrawn` or `declined`. The hosting team moves a `ready` site to `launched` with **Mark as launched** when the event site opens to the public. `archived` is written by `scripts/decommission-client.cjs`.
 
@@ -98,7 +98,7 @@ Each function is an HTTP POST with a JSON body and the person's ID token. The we
 | `saveApplicationStep` | Members | Saves one step's answers while the request is `draft`. Returns that step's errors by field. The web-address step saves only a name the request can hold: it reserves the name and releases the old one in one transaction. |
 | `checkWebAddress` | Anyone signed in | Says at once if a name has a bad format, is reserved, or is held by another request. |
 | `getAgreement` | Members and operators | Reads the current agreement. Once a request is accepted, reads the accepted version and who accepted it. `agreement` is null when none is set. |
-| `acceptAgreement` | Owners | Needs a draft, every step to pass, sign-ups open, a live connection (on a live console, not a test-mode one), the version on the page, and a typed name. Copies `answers` to `frozen`, creates the record in `agreement_acceptances`, sets `approved` and starts the build. See "Signup links and the agreement". Five a day for one account. An older version gets `409 agreement-changed`. |
+| `acceptAgreement` | Owners | Needs a draft, every step to pass, sign-ups open, a live connection (on a live console, not a test-mode one), the version on the page, and a typed name, legal name and job title. Copies `answers` to `frozen`, creates the record in `agreement_acceptances`, sets `approved` and starts the build. See "Signup links and the agreement". Five a day for one account. An older version gets `409 agreement-changed`. |
 | `withdrawApplication` | Owners | Sets `withdrawn` on a draft, releases the name, and emails the Owners. After acceptance it refuses, because the site is being built. |
 
 A refusal for a form carries `error.fields`, a map of field path to message, for example `{ "event.days.0.date": "Enter a real date." }`.
@@ -111,6 +111,7 @@ A status email that fails is logged and does not undo the change. The status pag
 | `getApplicationForReview` | Operators | One request: its `revision`, the frozen answers, the history, the team and its open invites, the ticket choice, the connection state and the build record. |
 | `declineApplication` | Operators | `draft` to `declined`. Needs a note of at most 2,000 characters. Frees the web-address name. Emails the Owners. |
 | `closeApplication` | Operators | Closes an accepted request once no run is alive, with a note: it becomes `declined`, ends its connections in the console, and writes an audit record. An Eventbrite token a run moved stays in the client project until that project is deleted. It frees its name only if no run ever began, because a run may have made the name's project. It removes nothing a run made. |
+| `launchApplication` | Operators | `ready` to `launched` (**Mark as launched**), when the event site opens to the public. Emails the Owners. |
 | `deleteSpamApplication` | Operators | Deletes a request that is not approved, frees its name, and writes an audit record. Needs `confirm: true`. |
 | `retryBuild` | Owners and operators | Runs a failed build again. An Owner has a daily limit. A build that has not failed gets `409 not-retryable`, and a ticket account that is gone, in test mode or being changed gets `409 connection-needed`. |
 | `createSignupLink` | Operators | Makes a signup link for an organization name. The answer holds the only copy of its URL. See "Signup links". |
@@ -152,6 +153,8 @@ The agreement text is plain text. The web page renders it as text in paragraphs,
 No operator decision stands between a client and a build (ADR 0007, the invoice and signup link amendment). The queue at `/review` and the page at `/review/<appId>` show the frozen answers, the team, the history and the build record. An operator can:
 
 - **Decline** a draft with a note. The web-address name becomes free, and each Owner gets an email. A failed email does not undo the decision, and when any Owner was not emailed, the page says so.
+- **Close request** for an accepted request once no run is alive, with a note. See `closeApplication`.
+- **Mark as launched** when a `ready` site opens to the public.
 - **Retry the build** when a build has failed.
 - **Delete as spam**. See below.
 
@@ -215,6 +218,11 @@ The console does not hear about a client who removes the app from their provider
 | `VITE_CONSOLE_HELP_EMAIL` | Build environment | The address clients see for reaching the hosting team. Unset, no page shows one. |
 | `CONSOLE_HELP_NAME` | Repo variable, passed to the web build and the functions | The person clients are told to ask, in the help line and in messages about signup links, withdrawn requests, failed builds and notes. Unset, they say the hosting team. |
 | `VITE_CONSOLE_API_BASE` | Build environment | Only for local development against the functions emulator |
+| `VITE_CONSOLE_SIGN_IN_PROVIDERS` | Repo variable, passed to the web build | The sign-in buttons, comma-separated. Unset: `google,microsoft` |
+| `CONSOLE_REPORT_INTAKE_URL` | `functions/.env` | Where "Report a problem" sends reports (the operator's triage service) |
+| `CONSOLE_REPORT_PROJECTS` | `functions/.env` | Extra client projects whose admins may report, for sites from before the console |
+| `CONSOLE_REPORT_INTAKE_SECRET` | Secret Manager in the console project | The triage service's intake key |
+| `CONSOLE_REPORT_ACCESS_ID`, `CONSOLE_REPORT_ACCESS_SECRET` | Secret Manager in the console project | The access-gate service token for that intake path: its id and its secret |
 
 ## The guided setup in the web app
 

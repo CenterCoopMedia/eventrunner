@@ -39,7 +39,7 @@ The reference implementation is the [2026 Collaborative Journalism Summit](https
 - Google sign-in and emailed 6-digit codes
 - Attendee directory and profiles
 - Sponsors and organizations
-- Per-event theming: six site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode
+- Per-event theming: seven site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode
 
 **Registration and tickets**
 
@@ -88,7 +88,7 @@ apps/web            Vite frontend: the public site, the admin CMS, the demo, the
 functions           Cloud Functions by domain module
 packages/shared     Config schema, theme, lifecycle clock, time, registration, badges
 scripts             Operator tools, generators, and the CI checks
-design/tokens       The three token tiers, the six site styles, the admin's own set
+design/tokens       The three token tiers, the seven site styles, the admin's own set
 docs                Spec, roadmap, design records, and the GitHub Pages site
 ```
 
@@ -99,9 +99,10 @@ docs                Spec, roadmap, design records, and the GitHub Pages site
 Node 22 (22.12 or later), Node 24, or Node 26 and later. Vitest 5 does not run on Node 23 or 25.
 
 ```bash
+npm run prepare:functions
 npm install
-npm test            # shared package, Cloud Functions, and scripts (Node's test runner)
-npm run test:web    # the web app (Vitest)
+npm test            # shared package, Cloud Functions, console functions, and scripts (Node's test runner)
+npm run test:web    # the web app and the console web app (Vitest)
 npm run test:rules  # Firestore and Storage rules on the emulators (needs Java)
 npm run test:e2e    # browser journeys on the emulators (Playwright)
 npm run lint

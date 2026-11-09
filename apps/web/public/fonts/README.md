@@ -9,11 +9,11 @@ subset, and every face clears the four tests in brief §9:
 3. It stays legible at nameplate size and at `--text-h3`.
 4. It holds contrast in both modes.
 
-**Twenty-three families live in this directory. A deployed site loads two to
+**Twenty-four families live in this directory. A deployed site loads two to
 four of them.** The bundle is the repo's, not the reader's: `buildTokenCss`
 (`scripts/lib/tokens.cjs`) resolves the active preset plus the operator's
 picked options down to the faces that preset actually names, and emits an
-`@font-face` block for those files only. The other twenty families are never
+`@font-face` block for those files only. The other families are never
 mentioned in `apps/web/src/generated/theme.css`, so a browser never requests
 them. The two admin faces — Source Sans 3 and IBM Plex Mono — are emitted on
 every deployment, because the admin identity is fixed and ships with the

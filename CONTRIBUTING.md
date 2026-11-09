@@ -105,7 +105,7 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | Command | What it covers |
 |---|---|
 | `npm run lint` | ESLint over every workspace, including the hex-literal ban (spec §7.6) and `react-hooks/rules-of-hooks` |
-| `npm test` | `packages/shared`, `functions` and `scripts` unit tests (Node `--test`, fakes — no emulator) |
+| `npm test` | `packages/shared`, `functions`, `console/functions` and `scripts` unit tests (Node `--test`, fakes — no emulator) |
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 | `npm run test -w apps/web` | `apps/web` component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator) |
 | `npm run build -w apps/web` | Production build of `apps/web`; credential-free with dummy `VITE_FIREBASE_*` values |
@@ -191,15 +191,16 @@ HTML has drifted from a fresh render — the same freshness rule
 
 | Changed paths | Selected tier |
 |---|---|
-| Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links, generated Pages HTML markup, and `docs/docs/**` freshness |
-| Documentation generators (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks and lint |
-| `scripts/build-demo.cjs` or `scripts/build-demo.test.cjs` | Lint, demo generator tests, and demo build hygiene: two identical builds and the demo bundle budget |
-| The Pages site address (`scripts/lib/pages-site.cjs` and its test) | Documentation checks, lint, and demo build hygiene |
-| `apps/web/**` | Lint, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E |
-| `functions/**` | Lint, shared/functions unit tests, rules emulators, and E2E |
-| `packages/shared/**` | Lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
+| Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links, generated Pages HTML markup, and `docs/docs/**` freshness. `README.md`, `console/README.md`, `docs/index.html`, `docs/handbook/**` and five guides in `docs/` also select lint, because `npm run check:copy` reads them |
+| Documentation generators (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks, lint, and the dependency audit policy |
+| `scripts/build-demo.cjs` or `scripts/build-demo.test.cjs` | Lint, the dependency audit policy, demo generator tests, and demo build hygiene: two identical builds and the demo bundle budget |
+| The Pages site address (`scripts/lib/pages-site.cjs` and its test) | Documentation checks, lint, the dependency audit policy, and demo build hygiene |
+| `apps/web/**` | Lint, the dependency audit policy, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E |
+| `functions/**` | Lint, the dependency audit policy, shared/functions unit tests, rules emulators, and E2E |
+| `packages/shared/**` | Lint, the dependency audit policy, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
 | `firestore.rules` or `storage.rules` | Rules emulators and E2E |
-| Workflows, tool configuration, package manifests or locks, Firebase configuration, `e2e/**`, `publisher/**`, other scripts, or an unrecognized path | Full matrix: documentation checks, lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
+| `tests/*.rules.test.js` | Lint and rules emulators |
+| Workflows, tool configuration, package manifests or locks, Firebase configuration, `e2e/**`, `publisher/**`, other scripts, or an unrecognized path | Full matrix: documentation checks, lint, the dependency audit policy, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
 
 Changes that match more than one row run the union of the selected tiers.
 The main branch protection rule requires the stable `CI gate` check.
@@ -212,7 +213,7 @@ CI runs the browser suite in three shards and the web unit tests in two, each on
 
 Tags, `CHANGELOG.md` hygiene, and what a release includes are in [RELEASING.md](RELEASING.md).
 
-One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, `functions/src/pdf/kit.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
+One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, `functions/src/pdf/kit.cjs`, `console/functions/src/emailLayout.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 
 ## Security
 

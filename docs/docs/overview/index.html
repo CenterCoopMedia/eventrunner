@@ -161,7 +161,7 @@
           <li>Google sign-in and emailed 6-digit codes</li>
           <li>Attendee directory and profiles</li>
           <li>Sponsors and organizations</li>
-          <li>Per-event theming: six site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode</li>
+          <li>Per-event theming: seven site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode</li>
           </ul>
           <p><strong>Registration and tickets</strong></p>
           <ul>
@@ -205,15 +205,16 @@
           functions           Cloud Functions by domain module
           packages/shared     Config schema, theme, lifecycle clock, time, registration, badges
           scripts             Operator tools, generators, and the CI checks
-          design/tokens       The three token tiers, the six site styles, the admin&#39;s own set
+          design/tokens       The three token tiers, the seven site styles, the admin&#39;s own set
           docs                Spec, roadmap, design records, and the GitHub Pages site
           </code></pre>
           <p><code>packages/shared</code> is CommonJS with hand-written ESM shims so the same module serves Vite and Cloud Functions with no transpile step.</p>
           <h2 id="develop">Develop<a class="heading-anchor" href="#develop" aria-label="Link to this section">#</a></h2>
           <p>Node 22 (22.12 or later), Node 24, or Node 26 and later. Vitest 5 does not run on Node 23 or 25.</p>
-          <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">npm install
-          npm test            # shared package, Cloud Functions, and scripts (Node&#39;s test runner)
-          npm run test:web    # the web app (Vitest)
+          <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">npm run prepare:functions
+          npm install
+          npm test            # shared package, Cloud Functions, console functions, and scripts (Node&#39;s test runner)
+          npm run test:web    # the web app and the console web app (Vitest)
           npm run test:rules  # Firestore and Storage rules on the emulators (needs Java)
           npm run test:e2e    # browser journeys on the emulators (Playwright)
           npm run lint
