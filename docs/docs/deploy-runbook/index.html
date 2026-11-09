@@ -800,12 +800,25 @@
           of scope here and tracked there, not in this runbook. The Cloud Run site-publisher has since landed
           (#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
           ordinary per-client environment with no domain coupling, so nothing in §9 waits on #66.</p>
-          <h3 id="custom-web-address-from-the-admin">Custom web address from the admin<a class="heading-anchor" href="#custom-web-address-from-the-admin" aria-label="Link to this section">#</a></h3>
-          <p>An operator can add a custom web address on <strong>Settings → Web address</strong> (ADR 0007 §8). The
-          <code>webAddress</code> function asks Firebase Hosting for the domain, shows the client the records to add,
-          and checks every hour (<code>webAddressCheck</code>). When the domain is live it adds the domain to the Auth
-          authorized domains. The functions runtime account needs two roles on the client project for this,
-          once:</p>
+          <h3 id="custom-web-address-status-in-the-admin">Custom web address status in the admin<a class="heading-anchor" href="#custom-web-address-status-in-the-admin" aria-label="Link to this section">#</a></h3>
+          <p>An operator sets up a custom web address. A client admin cannot add or remove one: the <code>webAddress</code>
+          function refuses <code>add</code> and <code>remove</code> for every admin tier. <strong>Settings → Web address</strong> (ADR 0007 §8)
+          shows the site&#39;s current address and, for a stored domain, its status (<strong>Waiting for the
+          records</strong>, <strong>Ready to switch</strong>, or <strong>In use</strong>) and <strong>Check now</strong>. A check, and the hourly
+          <code>webAddressCheck</code>, reads the domain&#39;s state in Firebase Hosting and looks for the domain in the
+          Auth authorized domains. A check never adds an authorized domain.</p>
+          <p>The page reads the domain from the record <code>web_address/current</code>. Without that record the page shows
+          only the current address, and <strong>Check now</strong> answers &quot;Contact us to set up your domain first.&quot;</p>
+          <blockquote>
+          <p><strong>Gap.</strong> No script, workflow or function in this repository writes <code>web_address/current</code>.
+          The steps to add the Hosting domain and the authorized domain are in <code>docs/CLIENT_ONBOARDING.md</code>
+          §3 items 2 and 3 (Firebase console), and <code>scripts/provision-client.cjs</code> adds the Hosting domain for a
+          console build. None of them writes the record, so after those steps the page still shows no
+          domain status. There is no documented procedure to create the record yet.</p>
+          </blockquote>
+          <p>To remove a stored domain, use <code>scripts/remove-web-address.cjs</code> (see &quot;Security remediation: signup
+          provenance and domain retirement&quot; below).</p>
+          <p>The functions runtime account needs two roles on the client project for the status check, once:</p>
           <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
             --member=&quot;serviceAccount:&lt;FUNCTIONS_RUNTIME_ACCOUNT&gt;&quot; --role=&quot;roles/firebasehosting.admin&quot;
           gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
@@ -820,7 +833,7 @@
           <li>Set <code>EVENT_PUBLIC_URL</code> to <code>https://&lt;domain&gt;</code> in the client&#39;s GitHub Environment (§3), and add
           the same origin to <code>EVENT_ALLOWED_ORIGINS</code>.</li>
           <li>Deploy from <code>main</code>.</li>
-          <li>Run <code>node scripts/init-event.cjs --check</code>. The page then shows <strong>In use</strong>.</li>
+          <li>Run <code>node scripts/init-event.cjs --check</code>. The page shows <strong>In use</strong> after the next check.</li>
           </ol>
           <p>The console&#39;s provisioner (ADR 0007, P8) will run this deploy for the client.</p>
           <h2 id="9-site-publisher-optional-per-client">9. Site publisher (optional, per client)<a class="heading-anchor" href="#9-site-publisher-optional-per-client" aria-label="Link to this section">#</a></h2>

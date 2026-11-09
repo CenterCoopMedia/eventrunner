@@ -2,7 +2,7 @@
 
 ## Is this the Collaborative Journalism Summit site?
 
-No. The 2026 summit site is the reference implementation. This project is the white-label extract. Summit-only tools (video generator, invoices) stay there.
+No. The 2026 summit site is the reference implementation. This project is the white-label extract. Summit-only tools (video generator) stay there.
 
 ## Why a 6-digit code instead of a magic link?
 

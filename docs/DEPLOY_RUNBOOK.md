@@ -765,13 +765,28 @@ of scope here and tracked there, not in this runbook. The Cloud Run site-publish
 (#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
 ordinary per-client environment with no domain coupling, so nothing in §9 waits on #66.
 
-### Custom web address from the admin
+### Custom web address status in the admin
 
-An operator can add a custom web address on **Settings → Web address** (ADR 0007 §8). The
-`webAddress` function asks Firebase Hosting for the domain, shows the client the records to add,
-and checks every hour (`webAddressCheck`). When the domain is live it adds the domain to the Auth
-authorized domains. The functions runtime account needs two roles on the client project for this,
-once:
+An operator sets up a custom web address. A client admin cannot add or remove one: the `webAddress`
+function refuses `add` and `remove` for every admin tier. **Settings → Web address** (ADR 0007 §8)
+shows the site's current address and, for a stored domain, its status (**Waiting for the
+records**, **Ready to switch**, or **In use**) and **Check now**. A check, and the hourly
+`webAddressCheck`, reads the domain's state in Firebase Hosting and looks for the domain in the
+Auth authorized domains. A check never adds an authorized domain.
+
+The page reads the domain from the record `web_address/current`. Without that record the page shows
+only the current address, and **Check now** answers "Contact us to set up your domain first."
+
+> **Gap.** No script, workflow or function in this repository writes `web_address/current`.
+> The steps to add the Hosting domain and the authorized domain are in `docs/CLIENT_ONBOARDING.md`
+> §3 items 2 and 3 (Firebase console), and `scripts/provision-client.cjs` adds the Hosting domain for a
+> console build. None of them writes the record, so after those steps the page still shows no
+> domain status. There is no documented procedure to create the record yet.
+
+To remove a stored domain, use `scripts/remove-web-address.cjs` (see "Security remediation: signup
+provenance and domain retirement" below).
+
+The functions runtime account needs two roles on the client project for the status check, once:
 
 ```bash
 gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
@@ -790,7 +805,7 @@ is a deploy-time value:
 1. Set `EVENT_PUBLIC_URL` to `https://<domain>` in the client's GitHub Environment (§3), and add
    the same origin to `EVENT_ALLOWED_ORIGINS`.
 2. Deploy from `main`.
-3. Run `node scripts/init-event.cjs --check`. The page then shows **In use**.
+3. Run `node scripts/init-event.cjs --check`. The page shows **In use** after the next check.
 
 The console's provisioner (ADR 0007, P8) will run this deploy for the client.
 
