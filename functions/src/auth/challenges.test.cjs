@@ -24,29 +24,51 @@ function fakeDb() {
   const reads = []; // "collection/id" of every plain (non-transactional) read
   const singleDeletes = []; // "collection/id" deleted one round trip at a time
   const commits = []; // size of each committed batch
+  const updateTimes = new Map(); // "collection/id" -> write counter (fake updateTime)
+  let writeClock = 0;
   const key = (c, id) => `${c}/${id}`;
+  const write = (k, data) => { store.set(k, data); writeClock += 1; updateTimes.set(k, writeClock); };
+  // A { lastUpdateTime } precondition fails when the document changed or
+  // went away after it was read, as in the Admin SDK.
+  const checkPrecondition = (k, precondition) => {
+    if (precondition?.lastUpdateTime === undefined) return;
+    if (!store.has(k) || updateTimes.get(k) !== precondition.lastUpdateTime) {
+      throw Object.assign(new Error(`FAILED_PRECONDITION: ${k} changed since it was read`), { code: 9 });
+    }
+  };
   const docRef = (c, id) => ({
     __c: c,
     __id: id,
-    async set(data) { store.set(key(c, id), data); },
-    async delete() { singleDeletes.push(key(c, id)); store.delete(key(c, id)); },
+    async set(data) { write(key(c, id), data); },
+    async delete(precondition) {
+      checkPrecondition(key(c, id), precondition);
+      singleDeletes.push(key(c, id));
+      store.delete(key(c, id));
+    },
     async get() {
       reads.push(key(c, id));
       const data = store.get(key(c, id));
       return { exists: data !== undefined, data: () => data };
     },
   });
-  return {
+  const db = {
     store,
     reads,
     singleDeletes,
     commits,
+    /** One-shot hook run before a batch commit, to model a write after the read. */
+    beforeBatchCommit: null,
     batch() {
       const ops = [];
       return {
-        delete(ref) { ops.push(key(ref.__c, ref.__id)); },
+        delete(ref, precondition) { ops.push({ k: key(ref.__c, ref.__id), precondition }); },
         async commit() {
-          for (const k of ops) store.delete(k);
+          const hook = db.beforeBatchCommit;
+          db.beforeBatchCommit = null;
+          if (hook) await hook();
+          // One failed precondition fails the whole batch and applies nothing.
+          for (const { k, precondition } of ops) checkPrecondition(k, precondition);
+          for (const { k } of ops) store.delete(k);
           commits.push(ops.length);
         },
       };
@@ -63,7 +85,7 @@ function fakeDb() {
               const ms = fieldValue instanceof Date ? fieldValue.getTime() : NaN;
               const boundMs = value instanceof Date ? value.getTime() : NaN;
               if (op === '<' && ms < boundMs) {
-                docs.push({ ref: docRef(c, k.slice(c.length + 1)) });
+                docs.push({ ref: docRef(c, k.slice(c.length + 1)), updateTime: updateTimes.get(k) });
                 if (docs.length >= n) break;
               }
             }
@@ -78,14 +100,16 @@ function fakeDb() {
           const data = store.get(key(ref.__c, ref.__id));
           return { exists: data !== undefined, data: () => data };
         },
-        set: (ref, data) => { store.set(key(ref.__c, ref.__id), data); },
+        set: (ref, data) => { write(key(ref.__c, ref.__id), data); },
         update: (ref, patch) => {
-          Object.assign(store.get(key(ref.__c, ref.__id)), patch);
+          const k = key(ref.__c, ref.__id);
+          write(k, Object.assign(store.get(k), patch));
         },
         delete: (ref) => { store.delete(key(ref.__c, ref.__id)); },
       });
     },
   };
+  return db;
 }
 
 test('normalizeEmail trims and lowercases; emailHash keys never store the address', () => {
@@ -456,4 +480,24 @@ test('sweepExpired deletes in batches and stops after maxBatches pages', async (
   const second = await sweepExpired({ db, now, batchLimit: 2, maxBatches: 2 });
   assert.equal(second.challenges, 1);
   assert.equal([...db.store.keys()].some((k) => k.startsWith('auth_challenges/')), false);
+});
+
+test('sweepExpired keeps a bucket refreshed between its read and the delete', async () => {
+  // A request can refresh a stale bucket after the sweep read it. Deleting
+  // it then would hand the next request a second budget in the same window.
+  const db = fakeDb();
+  let clock = 0;
+  const now = () => clock;
+  await takeRateLimitSlot({ db, email: 'busy@example.org', now });
+  await takeRateLimitSlot({ db, email: 'idle@example.org', now });
+  clock = internals.RATE_LIMIT_WINDOW_MS + 1000;
+  const { rateBucketHash } = require('./challenges.cjs');
+  const busy = `auth_rate_limits/${rateBucketHash('busy@example.org')}`;
+  const idle = `auth_rate_limits/${rateBucketHash('idle@example.org')}`;
+  db.beforeBatchCommit = () => takeRateLimitSlot({ db, email: 'busy@example.org', now });
+
+  const swept = await sweepExpired({ db, now });
+  assert.equal(swept.rateLimits, 1);
+  assert.equal(db.store.has(idle), false, 'the unchanged stale bucket on the same page is still deleted');
+  assert.deepEqual(db.store.get(busy).requests, [clock], 'the refreshed bucket survives');
 });

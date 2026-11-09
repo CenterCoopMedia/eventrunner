@@ -353,6 +353,12 @@ async function releaseChallenge({ db, token }) {
   });
 }
 
+/** True for a FAILED_PRECONDITION / NOT_FOUND rejection (gRPC 9 / 5). */
+function isPreconditionFailure(err) {
+  if (err?.code === 9 || err?.code === 5) return true;
+  return /FAILED_PRECONDITION|NOT_FOUND/i.test(String(err?.message || ''));
+}
+
 /**
  * Sweep expired challenges and stale rate-limit docs (the auth module's
  * own cleanup export, spec §1.3; maintenance/cleanup.cjs calls the same).
@@ -380,11 +386,34 @@ async function sweepExpired({ db, now = Date.now, batchLimit = 250, maxBatches =
     for (let i = 0; i < maxBatches; i += 1) {
       const page = await query.get();
       if (page.docs.length === 0) break;
-      const batch = db.batch();
-      for (const doc of page.docs) batch.delete(doc.ref);
-      await batch.commit();
-      deleted += page.docs.length;
+      deleted += await deletePage(page.docs);
       if (page.docs.length < batchLimit) break;
+    }
+    return deleted;
+  }
+
+  // Each delete carries the update time the sweep read. A request can
+  // refresh a bucket between the read and the delete; deleting it then
+  // would give the next request a second budget in the same window. One
+  // failed precondition fails the whole batch, so that page is retried one
+  // document at a time and the changed documents are left alone.
+  async function deletePage(docs) {
+    const batch = db.batch();
+    for (const doc of docs) batch.delete(doc.ref, { lastUpdateTime: doc.updateTime });
+    try {
+      await batch.commit();
+      return docs.length;
+    } catch (err) {
+      if (!isPreconditionFailure(err)) throw err;
+    }
+    let deleted = 0;
+    for (const doc of docs) {
+      try {
+        await doc.ref.delete({ lastUpdateTime: doc.updateTime });
+        deleted += 1;
+      } catch (err) {
+        if (!isPreconditionFailure(err)) throw err;
+      }
     }
     return deleted;
   }
