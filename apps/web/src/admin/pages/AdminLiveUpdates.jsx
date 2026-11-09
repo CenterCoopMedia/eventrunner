@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
+import { toDate } from '../versionHistory.js';
 import {
   Notice,
   Panel,
@@ -34,13 +35,6 @@ import AdminPageHeader, {
 import { UPDATE_CATEGORY_MAX } from 'shared/update';
 import OperationIcon from '../components/OperationIcon.jsx';
 import '../operationRecovery.css';
-
-function toDate(value) {
-  if (!value) return null;
-  if (typeof value.toDate === 'function') return value.toDate();
-  const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed : null;
-}
 
 const EMPTY_FORM = { message: '', pinned: false, category: '', audience: 'everyone' };
 

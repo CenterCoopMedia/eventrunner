@@ -18,6 +18,7 @@
 // display name, and the track's name has to meet the letter the session
 // stores. Everything folds to lower case once, here, so the page compares
 // with indexOf and nothing else.
+import { parentFinder } from './scheduleGrid.js';
 
 /** Lower-case, or ''. */
 function fold(value) {
@@ -124,15 +125,7 @@ export function matchesFilters(session, selected) {
 export function filterEntries(sessions, keep) {
   const list = Array.isArray(sessions) ? sessions : [];
   const byId = new Map(list.map((session) => [session.id, session]));
-  const parentOf = (session) => {
-    const id = typeof session?.parentId === 'string' ? session.parentId : null;
-    if (!id || id === session.id) return null;
-    const parent = byId.get(id);
-    if (!parent) return null;
-    const grandparent =
-      typeof parent.parentId === 'string' ? byId.get(parent.parentId) : null;
-    return grandparent && grandparent.id !== parent.id ? null : parent;
-  };
+  const parentOf = parentFinder(byId);
 
   const matchedIds = new Set(
     list.filter((session) => keep(session)).map((session) => session.id),
@@ -173,7 +166,7 @@ export function filterEntries(sessions, keep) {
 // back rather than rendering a wrong or empty page.
 
 /** The sort orders the schedule offers. 'saved' needs the bookmark counts. */
-export const SCHEDULE_SORTS = Object.freeze(['time', 'saved']);
+const SCHEDULE_SORTS = Object.freeze(['time', 'saved']);
 
 /** A comma-separated parameter as a list, kept only where `allowed` knows a token. */
 function csvParam(value, allowed) {
@@ -235,9 +228,21 @@ export function writeScheduleView(view, defaults = {}) {
 
 // ------------------------------------------------------------------- sort
 
+/** Sort sessions the same way everywhere they're grouped by day (the
+ * schedule pages and the speaker page use this). Start time first, then
+ * explicit `order`, then title as a stable tiebreaker. */
+export function sortSessions(sessions) {
+  return [...sessions].sort(
+    (a, b) =>
+      String(a.startTime).localeCompare(String(b.startTime)) ||
+      (a.order ?? 0) - (b.order ?? 0) ||
+      String(a.title).localeCompare(String(b.title)),
+  );
+}
+
 /**
  * Entries in the chosen order (issue #164). 'time' is the programme order
- * the caller's sortSessions already produced; 'saved' puts the sessions the
+ * sortSessions above already produced; 'saved' puts the sessions the
  * most attendees bookmarked first, with an absent count reading as zero and
  * ties keeping the programme order (the platform's sort is stable).
  *

@@ -50,7 +50,6 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({
     features: FEATURES,
     theme: { preset: 'newsroom', mode: 'light' },
   }),
-  useFeatures: () => FEATURES,
 }));
 vi.mock('../../contexts/ContentContext.jsx', () => ({
   useContent: () => ({

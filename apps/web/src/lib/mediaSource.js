@@ -69,7 +69,7 @@ export function typeLabel(contentType) {
 // (functions/src/speakers/profile.cjs) allows — one namespace, three
 // checkpoints that agree.
 
-export const DEFAULT_AVATAR_PREFIX = 'default-avatars/';
+const DEFAULT_AVATAR_PREFIX = 'default-avatars/';
 
 /** The neutral defaults, in the order the picker offers them. */
 export const DEFAULT_AVATARS = Object.freeze(

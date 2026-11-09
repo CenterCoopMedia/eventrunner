@@ -481,7 +481,7 @@ export function fontSetFaces(setId) {
  * @param {string} family
  * @returns {boolean}
  */
-export function isFontAvailable(family) {
+function isFontAvailable(family) {
   const fonts = typeof document !== 'undefined' ? document.fonts : null;
   if (!fonts || typeof fonts.check !== 'function') return true;
   try {

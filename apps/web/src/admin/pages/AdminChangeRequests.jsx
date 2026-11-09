@@ -29,7 +29,8 @@ import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { createSubmissionKey } from '../../lib/submissionKey.js';
 import { useAdminApi } from '../adminApi.js';
-import { subscribeAdminCollection } from '../adminSource.js';
+import { subscribeAdminCollection, subscribeAdminDoc } from '../adminSource.js';
+import { toDate } from '../versionHistory.js';
 import {
   DestructiveConfirm,
   Notice,
@@ -114,13 +115,6 @@ export function readFilter(value) {
 /** A stored status the page does not know reads as New. */
 function statusOf(row) {
   return Object.hasOwn(STATUS_LABELS, row?.status) ? row.status : 'new';
-}
-
-function toDate(value) {
-  if (!value) return null;
-  if (typeof value.toDate === 'function') return value.toDate();
-  const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
 
 function matches(row, filter) {
@@ -264,9 +258,9 @@ export default function AdminChangeRequests() {
   // A failed settings listener leaves the email state unknown; staff are
   // told so until the next good snapshot (review finding 2 on #539).
   const [settingsError, setSettingsError] = useState(null);
-  useEffect(() => subscribeAdminCollection(
-    'change_request_settings',
-    (docs) => { setEmailSettings(readEmailSettings(docs)); setSettingsError(null); },
+  useEffect(() => subscribeAdminDoc(
+    'change_request_settings/notices',
+    (data) => { setEmailSettings(readEmailSettings([{ id: 'notices', ...data }])); setSettingsError(null); },
     setSettingsError,
   ), []);
   const settingsForRows = emailSettings ?? readEmailSettings([]);

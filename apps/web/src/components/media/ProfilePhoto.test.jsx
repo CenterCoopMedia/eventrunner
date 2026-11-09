@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import ProfilePhoto, { initialOf, profilePhotoUrl } from './ProfilePhoto.jsx';
+import ProfilePhoto, { profilePhotoUrl } from './ProfilePhoto.jsx';
 import { BRAND_UTILITY_PREFIX } from '../../test/retiredUtilityNames.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -47,15 +47,6 @@ describe('profilePhotoUrl', () => {
       expect(profilePhotoUrl(value, 'u1')).toBeNull();
     }
     expect(profilePhotoUrl('profile-photos/u1/photo.png')).toBeNull();
-  });
-});
-
-describe('initialOf', () => {
-  it('takes the first character of a name, uppercased', () => {
-    expect(initialOf('rae okonkwo')).toBe('R');
-    expect(initialOf('  Émile')).toBe('É');
-    expect(initialOf('')).toBe('?');
-    expect(initialOf(undefined)).toBe('?');
   });
 });
 

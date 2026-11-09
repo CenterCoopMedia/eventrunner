@@ -611,11 +611,10 @@ function AdminDesk() {
     if (wide || !mobileDocketOpen) return undefined;
     const onKeyDown = (event) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
-      // A modal opened from a flyout link (unsaved changes) owns Escape.
-      if (event.target instanceof Element && event.target.closest('dialog')) return;
       const target = event.target;
-      // A dialog inside the sheet, including a nested media dialog, answers
-      // Escape first. The sheet stays open until that dialog is gone.
+      // A dialog inside the sheet, including a nested media dialog or the
+      // unsaved changes modal a flyout link opens, answers Escape first. The
+      // sheet stays open until that dialog is gone.
       if (target instanceof Element && target.closest('dialog, [role="dialog"]')) return;
       event.preventDefault();
       setMobileDocketOpen(false);

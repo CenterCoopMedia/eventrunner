@@ -93,7 +93,7 @@ export function subscribeMySessionReaction(sessionId, uid, onNext, onError) {
 }
 
 /** Thrown by {@link setSessionReaction} on any non-2xx response. */
-export class ReactionRequestError extends Error {
+class ReactionRequestError extends Error {
   constructor({ code, message, status }) {
     super(message);
     this.name = 'ReactionRequestError';

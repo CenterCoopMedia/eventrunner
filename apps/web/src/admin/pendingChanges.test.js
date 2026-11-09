@@ -11,10 +11,8 @@ import * as storeCjs from '../../../../functions/src/cms/store.cjs';
 import {
   draftStateOf,
   editorPathFor,
-  formatPublishedAt,
   groupPending,
   mergeRuns,
-  recordNameOf,
   runSummary,
   summarizeAll,
   toMillis,
@@ -102,7 +100,7 @@ describe('groupPending', () => {
     expect(content.rows[4].savedAt).toBeNull();
   });
 
-  it('carries the name, the state, the hidden flag, the section and field, and who saved it', () => {
+  it('carries the state, the hidden flag, the section and field, and who saved it', () => {
     const [content] = groupPending({
       cmsContent: [{
         id: 'a__b__c', section: 'a__b', field: 'c', visible: false,
@@ -111,8 +109,6 @@ describe('groupPending', () => {
     });
     expect(content.rows[0]).toEqual({
       id: 'a__b__c',
-      name: 'a__b › c',
-      fullName: 'a__b › c',
       state: { id: 'draft', label: 'Draft' },
       hidden: true,
       section: 'a__b',
@@ -123,48 +119,9 @@ describe('groupPending', () => {
   });
 });
 
-describe('recordNameOf', () => {
-  it('takes the title, name, label or question, then section and field for a block, then the id', () => {
-    expect(recordNameOf('cmsSchedule', { id: 's1', title: 'Opening' })).toBe('Opening');
-    expect(recordNameOf('cmsOrganizations', { id: 'o1', name: 'Acme' })).toBe('Acme');
-    expect(recordNameOf('cmsPages', { id: 'home', label: 'Home' })).toBe('Home');
-    expect(recordNameOf('cmsContent', { id: 'faq__q1', question: 'Where?', section: 'faq', field: 'q1' })).toBe('Where?');
-    expect(recordNameOf('cmsContent', { id: 'hero__subtitle', section: 'hero', field: 'subtitle' })).toBe('hero › subtitle');
-    expect(recordNameOf('cmsUpdates', { id: 'u1', title: '   ' })).toBe('u1');
-  });
-
-  it('cuts a long name at 80 characters', () => {
-    const name = recordNameOf('cmsSchedule', { id: 's', title: 'x'.repeat(200) });
-    expect(name).toHaveLength(80);
-    expect(name.endsWith('…')).toBe(true);
-  });
-
-  it('keeps the whole name beside the cut one on each row', () => {
-    const title = `An update whose title runs long ${'and longer '.repeat(10)}to the end`;
-    const [, , , , updates] = groupPending({ cmsUpdates: [{ id: 'u1', title }] });
-    expect(updates.rows[0].name).toHaveLength(80);
-    expect(updates.rows[0].fullName).toBe(title);
-  });
-});
-
-describe('formatPublishedAt', () => {
-  it('writes the event clock with its zone', () => {
-    expect(formatPublishedAt(NOW, 'America/New_York')).toBe('Sep 23, 2026, 2:02 PM EDT');
-  });
-
-  it('falls back to the reader’s clock with no zone or an unknown one', () => {
-    // Whatever zone the machine runs in: the reader's own clock, as Intl
-    // writes it, then that zone's label.
-    const reader = formatPublishedAt(NOW);
-    const clock = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(NOW));
-    expect(reader.startsWith(`${clock} `)).toBe(true);
-    expect(reader.length).toBeGreaterThan(clock.length + 1);
-    expect(formatPublishedAt(NOW, 'Not/AZone')).toBe(reader);
-    expect(formatPublishedAt(null, 'America/New_York')).toBeNull();
-  });
-
+describe('toMillis', () => {
   it('takes a Timestamp through toMillis', () => {
-    expect(formatPublishedAt(toMillis({ toMillis: () => NOW }), 'America/New_York')).toBe('Sep 23, 2026, 2:02 PM EDT');
+    expect(toMillis({ toMillis: () => NOW })).toBe(NOW);
   });
 });
 

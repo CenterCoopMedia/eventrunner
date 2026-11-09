@@ -18,7 +18,6 @@ import { speakers } from '@generated/scheduleData.js';
 
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig, features, theme: { preset: 'newsroom', mode: 'light' } }),
-  useFeatures: () => features,
 }));
 vi.mock('../../contexts/ContentContext.jsx', () => ({
   useContent: () => ({

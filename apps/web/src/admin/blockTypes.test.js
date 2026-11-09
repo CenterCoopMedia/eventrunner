@@ -9,7 +9,6 @@ import {
   BLOCK_TYPES,
   BLOCK_TYPE_IDS,
   FACT_HINTS,
-  QUOTE_HINTS,
   STAT_CONTRACT_HINTS,
   blockTypeFor,
   blockTypeLabel,
@@ -66,7 +65,7 @@ describe('admin block palette', () => {
   });
 
   it('writes a hint only for a field the block type has', () => {
-    for (const [id, hints] of [['fact', FACT_HINTS], ['quote', QUOTE_HINTS], ['sponsor_package', SPONSOR_PACKAGE_HINTS]]) {
+    for (const [id, hints] of [['fact', FACT_HINTS], ['sponsor_package', SPONSOR_PACKAGE_HINTS]]) {
       const fields = BLOCK_TYPES[id].fields.map((field) => field.id);
       for (const key of Object.keys(hints)) expect(fields, `${id}.${key}`).toContain(key);
     }

@@ -16,7 +16,7 @@ const OPEN_PREFIXES = Object.freeze([
 ]);
 
 /** Whether a path is one of the pages that stay open while the site is coming soon. */
-export function staysOpen(pathname) {
+function staysOpen(pathname) {
   const first = String(pathname ?? '').split('/').filter(Boolean)[0] ?? '';
   return OPEN_PREFIXES.includes(first);
 }

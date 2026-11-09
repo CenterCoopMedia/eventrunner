@@ -4,15 +4,10 @@
 // The rows are loaded by the page's useDirtyDrafts hook. The runs are the
 // cmsPublishQueue rows cmsPublish writes (functions/src/cms/publish.cjs),
 // read as the progress and failure record beside them.
-import { zoneLabel } from '../lib/eventTime.js';
 import { COLLECTION_CHOICES, countWords } from './collectionWords.js';
 import { summarizePublish } from './publishResult.js';
 import { state } from './recordState.js';
 import { sectionTier } from './AdminLayout.jsx';
-
-/** Names longer than this are cut, so a hostile title cannot stretch a row. */
-const NAME_LIMIT = 80;
-const DISPLAY_LOCALE = 'en-US';
 
 /**
  * Epoch milliseconds from a Firestore Timestamp, a Date, or a number; null
@@ -43,61 +38,6 @@ function byId(a, b) {
   return a.id < b.id ? -1 : 1;
 }
 
-function cut(text) {
-  return text.length > NAME_LIMIT ? `${text.slice(0, NAME_LIMIT - 1)}…` : text;
-}
-
-/** A record's whole readable name, uncut: see recordNameOf. */
-function fullNameOf(collection, doc) {
-  for (const key of ['title', 'name', 'label', 'question']) {
-    const value = doc?.[key];
-    if (typeof value === 'string' && value.trim()) return value.trim();
-  }
-  if (collection === 'cmsContent' && typeof doc?.section === 'string' && typeof doc?.field === 'string') {
-    return `${doc.section} › ${doc.field}`;
-  }
-  return String(doc?.id ?? '');
-}
-
-/**
- * A record's readable name: its title, name, label or question; for a
- * content block, then "section › field"; else the document id. Cut at 80
- * characters.
- *
- * @param {string} collection
- * @param {{ id: string } & Record<string, unknown>} doc
- * @returns {string}
- */
-export function recordNameOf(collection, doc) {
-  return cut(fullNameOf(collection, doc));
-}
-
-/**
- * "Sep 23, 2026, 2:02 PM EDT" on the event's clock; the reader's clock and
- * its label with no zone or one Intl does not know.
- *
- * @param {number|null} ms
- * @param {string} [timeZone]
- * @returns {string|null}
- */
-export function formatPublishedAt(ms, timeZone) {
-  if (!Number.isFinite(ms)) return null;
-  const instant = new Date(ms);
-  const options = { dateStyle: 'medium', timeStyle: 'short' };
-  let text;
-  let zone;
-  try {
-    if (typeof timeZone !== 'string' || !timeZone) throw new RangeError('no zone');
-    text = new Intl.DateTimeFormat(DISPLAY_LOCALE, { ...options, timeZone }).format(instant);
-    zone = timeZone;
-  } catch {
-    text = new Intl.DateTimeFormat(DISPLAY_LOCALE, options).format(instant);
-    zone = undefined;
-  }
-  const label = zoneLabel(zone, instant);
-  return label ? `${text} ${label}` : text;
-}
-
 /**
  * A draft's state word, from the draft alone: a draft forked from a live
  * revision is "Live with unpublished changes"; one that never went live is
@@ -113,8 +53,8 @@ export function draftStateOf(draft) {
 /**
  * The page's rows: per collection in the admin's order, every dirty draft,
  * newest save first and then by id. Nothing is filtered, so each
- * collection's row count is its share of the page's count. `name` is cut
- * at 80 characters for the row; `fullName` is the whole name, for readers.
+ * collection's row count is its share of the page's count. The page adds
+ * each row's name (versionDisplay.js versionRecordName).
  *
  * @param {Record<string, Array<object>>} docsByCollection
  * @returns {Array<{ choice: typeof COLLECTION_CHOICES[number], rows: Array<object> }>}
@@ -124,8 +64,6 @@ export function groupPending(docsByCollection) {
     const docs = Array.isArray(docsByCollection?.[choice.id]) ? docsByCollection[choice.id] : [];
     const rows = docs.map((draft) => ({
       id: draft.id,
-      name: recordNameOf(choice.id, draft),
-      fullName: fullNameOf(choice.id, draft),
       state: draftStateOf(draft),
       hidden: draft.visible !== true,
       section: typeof draft.section === 'string' ? draft.section : null,

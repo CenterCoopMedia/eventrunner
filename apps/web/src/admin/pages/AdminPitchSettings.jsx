@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { subscribePitchCall } from '../../lib/pitchSource.js';
 import { useAdminApi } from '../adminApi.js';
-import { subscribeAdminCollection } from '../adminSource.js';
+import { subscribeAdminDoc } from '../adminSource.js';
 import PitchCallSettings from '../components/PitchCallSettings.jsx';
 import PitchFormOptions from '../components/PitchFormOptions.jsx';
 import { PitchEmailSettings } from '../components/PitchEmails.jsx';
@@ -23,8 +23,7 @@ export default function AdminPitchSettings() {
   const [configError, setConfigError] = useState(false);
   const [noticeSettings, setNoticeSettings] = useState(null);
   useEffect(() => subscribePitchCall((value) => { setSettings(value); setConfigError(false); }, () => setConfigError(true)), []);
-  useEffect(() => subscribeAdminCollection('session_pitch_settings', (docs) => {
-    const stored = docs.find((d) => d.id === 'notices');
+  useEffect(() => subscribeAdminDoc('session_pitch_settings/notices', (stored) => {
     setNoticeSettings({ ...readPitchNoticeSettings(stored), revision: stored?.revision ?? 0 });
   }), []);
   return (

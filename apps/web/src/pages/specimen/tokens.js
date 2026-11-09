@@ -161,7 +161,7 @@ export const COLOUR_TOKENS = Object.freeze(
 );
 
 /** The ground every measurement below is taken against. */
-export const SURFACE_TOKEN = '--color-surface-rgb';
+const SURFACE_TOKEN = '--color-surface-rgb';
 
 /**
  * One custom property's resolved value, trimmed.

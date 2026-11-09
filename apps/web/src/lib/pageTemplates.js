@@ -116,7 +116,7 @@ export const PAGE_TEMPLATES = Object.freeze({
 });
 
 /** @param {unknown} id @returns {boolean} */
-export function isKnownTemplate(id) {
+function isKnownTemplate(id) {
   return typeof id === 'string' && Object.prototype.hasOwnProperty.call(PAGE_TEMPLATES, id);
 }
 

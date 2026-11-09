@@ -29,7 +29,7 @@ const PINNED_CAP = 100;
  * Who may read a row, widest first. functions/src/admin/liveUpdates.cjs
  * (AUDIENCES) and firestore.rules carry the same three words.
  */
-export const LIVE_UPDATE_AUDIENCES = Object.freeze(['everyone', 'attendees', 'speakers']);
+const LIVE_UPDATE_AUDIENCES = Object.freeze(['everyone', 'attendees', 'speakers']);
 
 /**
  * The audiences this reader may see, as firestore.rules decide them:

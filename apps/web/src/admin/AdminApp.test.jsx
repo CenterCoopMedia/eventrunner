@@ -22,6 +22,10 @@ vi.mock('./adminSource.js', () => ({
     onNext([]);
     return () => {};
   },
+  subscribeAdminDoc: (_path, onNext) => {
+    onNext(null);
+    return () => {};
+  },
 }));
 
 // Auth state is decided before render: a visitor who is already signed in

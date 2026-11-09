@@ -5,12 +5,13 @@
 import { blankContent } from './contentDoc.js';
 
 /**
- * Stable comparison key for one content-block form.
+ * A stable comparison snapshot of one content-block form. It is a new
+ * object, so later edits cannot mutate it.
  *
  * @param {string} fieldId
  * @param {{ blockType?: string, order?: number|string, visible?: boolean, values?: object }} content
  */
-export function contentEditKey(fieldId, content) {
+export function contentEditSnapshot(fieldId, content) {
   const values = {};
   const source = content?.values ?? {};
   for (const key of Object.keys(source).sort()) {
@@ -29,12 +30,7 @@ export function contentEditKey(fieldId, content) {
 /** @returns {boolean} true when the form differs from the last saved snapshot */
 export function contentEditIsDirty(saved, fieldId, content) {
   if (saved == null) return false;
-  return JSON.stringify(saved) !== JSON.stringify(contentEditKey(fieldId, content));
-}
-
-/** A snapshot that later edits cannot mutate. */
-export function contentEditSnapshot(fieldId, content) {
-  return contentEditKey(fieldId, content);
+  return JSON.stringify(saved) !== JSON.stringify(contentEditSnapshot(fieldId, content));
 }
 
 /**

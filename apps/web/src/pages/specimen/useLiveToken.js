@@ -26,7 +26,7 @@ const RUNTIME_STYLE_ID = 'event-theme-runtime';
  * @param {string} name the token name to read
  * @returns {T | null}
  */
-export function useLiveValue(compute, name) {
+function useLiveValue(compute, name) {
   const [value, setValue] = useState(null);
 
   useEffect(() => {
@@ -54,5 +54,3 @@ export function useLiveToken(name) {
 export function useLiveContrast(name) {
   return useLiveValue(measureContrast, name);
 }
-
-export default useLiveValue;

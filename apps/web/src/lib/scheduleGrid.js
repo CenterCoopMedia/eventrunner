@@ -69,6 +69,26 @@ function trackOf(session, letters) {
 }
 
 /**
+ * A session's parent in one day, or null when the stored shape is refused
+ * (see withCallingPoints). filterEntries in scheduleView.js reads the same
+ * rule.
+ *
+ * @param {Map<string, object>} byId the day's sessions by id
+ * @returns {(session: object) => object|null}
+ */
+export function parentFinder(byId) {
+  return (session) => {
+    const id = typeof session?.parentId === 'string' ? session.parentId : null;
+    if (!id || id === session.id) return null;
+    const parent = byId.get(id);
+    if (!parent) return null;
+    const grandparent =
+      typeof parent.parentId === 'string' ? byId.get(parent.parentId) : null;
+    return grandparent && grandparent.id !== parent.id ? null : parent;
+  };
+}
+
+/**
  * One day's sessions as top-level entries, each carrying its calling points.
  *
  * A child is a session whose `parentId` names another session in the same
@@ -79,7 +99,7 @@ function trackOf(session, letters) {
  * keeps "one level deep" true in the renderer even where a stored document
  * broke it.
  *
- * Order is the caller's: pass the day already sorted (Schedule's
+ * Order is the caller's: pass the day already sorted (scheduleView.js
  * sortSessions), and both the entries and each entry's calling points come
  * back in that order.
  *
@@ -89,15 +109,7 @@ function trackOf(session, letters) {
 export function withCallingPoints(sessions) {
   const list = Array.isArray(sessions) ? sessions : [];
   const byId = new Map(list.map((session) => [session.id, session]));
-  const parentOf = (session) => {
-    const id = typeof session?.parentId === 'string' ? session.parentId : null;
-    if (!id || id === session.id) return null;
-    const parent = byId.get(id);
-    if (!parent) return null;
-    const grandparent =
-      typeof parent.parentId === 'string' ? byId.get(parent.parentId) : null;
-    return grandparent && grandparent.id !== parent.id ? null : parent;
-  };
+  const parentOf = parentFinder(byId);
 
   const callingPoints = new Map();
   for (const session of list) {

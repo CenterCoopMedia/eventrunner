@@ -24,6 +24,14 @@ vi.mock('../adminSource.js', () => ({
     }
     return () => {};
   },
+  // The settings are one document; the tests push them as the collection.
+  subscribeAdminDoc: (path, onNext, onError) => {
+    const [name, id] = path.split('/');
+    subscribedTo.push(name);
+    settingsCallback = (docs) => onNext(docs.find((doc) => doc.id === id) ?? null);
+    settingsErrorCallback = onError;
+    return () => {};
+  },
 }));
 
 let isOperator = false;

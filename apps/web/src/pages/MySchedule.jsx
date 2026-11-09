@@ -27,7 +27,7 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import TransferLine from '../components/TransferLine.jsx';
 import { isBackIssue } from '../lib/backIssue.js';
 import { formatDayDate } from '../lib/eventTime.js';
-import { sortSessions } from './Schedule.jsx';
+import { sortSessions } from '../lib/scheduleView.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 import { downloadMySchedulePdf } from '../lib/schedulePdf.js';
 import { sessionMovement } from 'shared/venue';

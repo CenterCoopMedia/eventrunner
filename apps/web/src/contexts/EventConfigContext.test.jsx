@@ -18,7 +18,6 @@ vi.mock('../lib/configSource.js', () => ({
 import {
   EventConfigProvider,
   useEventConfig,
-  useFeatures,
 } from './EventConfigContext.jsx';
 import Layout from '../components/Layout.jsx';
 import AuthContext from './AuthContext.jsx';
@@ -34,8 +33,7 @@ import { resolveShape } from 'shared/theme';
 const hex = (digits) => `#${digits}`;
 
 function Probe() {
-  const { eventConfig, source } = useEventConfig();
-  const features = useFeatures();
+  const { eventConfig, source, features } = useEventConfig();
   return (
     <>
       <span data-testid="name">{eventConfig.name}</span>

@@ -27,7 +27,7 @@ import { speakerCandidates } from 'shared/pitchForm';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { conversionMessage, presentersKey, splitName } from '../pitchConversion.js';
-import { subscribeAdminCollection } from '../adminSource.js';
+import { subscribeAdminDoc } from '../adminSource.js';
 import { PITCH_STATUS_LABELS, PITCH_STATUS_TONES, pitchRevision, pitchRow } from '../pitchStatus.js';
 import PitchDetails from '../components/PitchDetails.jsx';
 import PitchEditForm from '../components/PitchEditForm.jsx';
@@ -253,16 +253,35 @@ function PitchReview({ initial, current, call, settings }) {
   );
 }
 
+/**
+ * Whether Firestore could hold a document with this id. Any other id in the
+ * address cannot name a pitch, so the page says so without a read.
+ */
+function isDocumentId(id) {
+  return typeof id === 'string' && id !== '' && id !== '.' && id !== '..' && !id.includes('/')
+    && !/^__.*__$/.test(id) && new TextEncoder().encode(id).length <= 1500;
+}
+
 export default function AdminSessionPitch() {
   const call = useAdminApi();
   const { pitchId } = useParams();
-  const [rows, setRows] = useState(null);
-  const [listError, setListError] = useState(null);
+  const readable = isDocumentId(pitchId);
+  // Each state names the pitch it belongs to, so a new address never shows
+  // the last pitch while its own document loads.
+  const [loaded, setLoaded] = useState(null);
+  const [failedId, setFailedId] = useState(null);
   const [settings, setSettings] = useState(null);
-  useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs.map(pitchRow)); setListError(null); }, setListError), []);
+  // One pitch's document, not the whole queue.
+  useEffect(() => {
+    if (!readable) return undefined;
+    return subscribeAdminDoc(`session_pitches/${pitchId}`, (data) => {
+      setLoaded({ pitchId, row: data ? pitchRow({ id: pitchId, ...data }) : null });
+      setFailedId(null);
+    }, () => setFailedId(pitchId));
+  }, [pitchId, readable]);
   useEffect(() => subscribePitchCall(setSettings, () => {}), []);
-  const current = rows?.find((row) => row.id === pitchId);
-  if (rows === null) return listError ? <Notice tone="caution" message="This pitch did not load. Trying again…" /> : <AdminLoadingState label="Loading the pitch…" />;
+  const current = !readable ? null : loaded?.pitchId === pitchId ? loaded.row : undefined;
+  if (current === undefined) return failedId === pitchId ? <Notice tone="caution" message="This pitch did not load. Trying again…" /> : <AdminLoadingState label="Loading the pitch…" />;
   if (!current) {
     return (
       <AdminEmptyState

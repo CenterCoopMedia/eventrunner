@@ -85,7 +85,7 @@ export function describeTimeZone(timeZone, instant = new Date()) {
  * @param {string} timeZone
  * @returns {string}
  */
-export function formatEventClock(instant, timeZone) {
+function formatEventClock(instant, timeZone) {
   const withSeconds = wallParts(instant, timeZone).second !== '00';
   return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
     timeZone, hour: 'numeric', minute: '2-digit', ...(withSeconds ? { second: '2-digit' } : {}),

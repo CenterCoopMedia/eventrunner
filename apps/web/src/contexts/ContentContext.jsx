@@ -315,23 +315,13 @@ export function ContentProvider({ readSource = 'published', children }) {
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }
 
-/**
- * useContent() — the whole content context.
- * useContent(section, field) — shorthand for getBlock(section, field).
- */
-export function useContent(section, field) {
+/** useContent() — the whole content context. */
+export function useContent() {
   const ctx = useContext(ContentContext);
   if (!ctx) {
     throw new Error('useContent must be used inside <ContentProvider>.');
   }
-  if (section !== undefined) return ctx.getBlock(section, field);
   return ctx;
-}
-
-/** The cmsPages surface: ordered visible-aware pages plus lookups. */
-export function usePages() {
-  const { pages, getPage, getPublicPage, loading } = useContent();
-  return { pages, getPage, getPublicPage, loading };
 }
 
 export default ContentContext;

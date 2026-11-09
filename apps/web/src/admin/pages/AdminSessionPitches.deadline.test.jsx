@@ -15,6 +15,7 @@ vi.mock('../../lib/pitchSource.js', () => ({
 }));
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (_name, onNext) => { onNext([]); return () => {}; },
+  subscribeAdminDoc: (_path, onNext) => { onNext(null); return () => {}; },
 }));
 vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ isOperator: operator }) }));
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: { days: [], timezone: 'America/New_York' } }) }));

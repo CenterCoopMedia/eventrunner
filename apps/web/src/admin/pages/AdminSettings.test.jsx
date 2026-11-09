@@ -46,6 +46,14 @@ vi.mock('../adminSource.js', () => ({
     if (deliverFirstAdminSnapshot) onNext([]);
     return () => adminSubscriptions.delete(name);
   },
+  // A one-document read, as the collection it lives in.
+  subscribeAdminDoc: (path, onNext, onError) => {
+    const [name, id] = path.split('/');
+    adminSubscriptions.set(name, (docs) => onNext(docs.find((doc) => doc.id === id) ?? null));
+    adminSubscriptionErrors.set(name, onError);
+    if (deliverFirstAdminSnapshot) onNext(null);
+    return () => adminSubscriptions.delete(name);
+  },
 }));
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},

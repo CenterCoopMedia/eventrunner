@@ -7,7 +7,7 @@ import AdminIconControl from '../components/AdminIconControl.jsx';
 import PlannerSwitch from '../components/PlannerSwitch.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
-import { subscribeAdminCollection } from '../adminSource.js';
+import { subscribeAdminDoc } from '../adminSource.js';
 import { formatPublishedAt } from '../versionHistory.js';
 import { StatusBadge } from '../components/adminChrome.jsx';
 import { Notice, SaveStatus, TextField, SelectField, ServerErrorSummary,
@@ -68,7 +68,7 @@ function useDoc(collection, id, enabled = true) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!enabled) return undefined;
-    return subscribeAdminCollection(collection, (docs) => { setValue(docs.find((doc) => doc.id === id) || null); setFailed(false); }, () => setFailed(true));
+    return subscribeAdminDoc(`${collection}/${id}`, (data) => { setValue(data ? { id, ...data } : null); setFailed(false); }, () => setFailed(true));
   }, [collection, id, enabled]);
   return [value, failed];
 }

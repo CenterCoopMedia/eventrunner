@@ -73,7 +73,7 @@ function text(value) {
  * @param {string} displayName
  * @returns {string}
  */
-export function indexLetter(displayName) {
+function indexLetter(displayName) {
   const first = (displayName ?? '').trim().slice(0, 1).toLocaleUpperCase();
   if (!/\p{Letter}/u.test(first)) return '#';
   return first.normalize('NFD').replace(/\p{Mark}/gu, '') || first;
