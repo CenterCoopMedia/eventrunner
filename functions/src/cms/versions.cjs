@@ -154,7 +154,10 @@ function change(path, kind, before, after) {
  * row before `current`, or null when `current` is the oldest stored row,
  * whose every leaf then reads as added. `visible` is a reserved field
  * (store.cjs RESERVED_FIELDS), so no content path can collide with it; it
- * shows when it moved, and on a first row that went out hidden.
+ * shows when it moved, and on a first row that went out hidden. It is read
+ * the way the site reads it (store.cjs isVisible): only `true` is shown.
+ * Every row publishDocs writes stores a boolean, so this only changes a row
+ * written some other way.
  *
  * @param {{ fields?: object, visible?: boolean }|null} previous
  * @param {{ fields?: object, visible?: boolean }} current
@@ -166,7 +169,7 @@ function describeChanges(previous, current) {
   const changes = [];
   if (!previous) {
     for (const [path, value] of after) changes.push(change(path, 'added', null, value));
-    if (current?.visible === false) changes.push(change('visible', 'added', null, false));
+    if (current?.visible !== true) changes.push(change('visible', 'added', null, false));
   } else {
     const before = leavesOf(previous.fields);
     for (const path of new Set([...before.keys(), ...after.keys()])) {
@@ -176,8 +179,8 @@ function describeChanges(previous, current) {
         changes.push(change(path, 'changed', before.get(path), after.get(path)));
       }
     }
-    const wasVisible = previous.visible !== false;
-    const isVisible = current?.visible !== false;
+    const wasVisible = previous.visible === true;
+    const isVisible = current?.visible === true;
     if (wasVisible !== isVisible) changes.push(change('visible', 'changed', wasVisible, isVisible));
   }
   changes.sort((a, b) => comparePaths(a.path, b.path));
@@ -217,7 +220,7 @@ function toEntry(doc, previousDoc) {
     docPath: data.docPath,
     revision: data.revision,
     fields: jsonSafe(isPlainObject(data.fields) ? data.fields : {}),
-    visible: data.visible !== false,
+    visible: data.visible === true,
     publishedAt: toMillis(data.publishedAt),
     publishedBy: typeof data.publishedBy === 'string' ? data.publishedBy : null,
     publishedByUid: typeof data.publishedByUid === 'string' ? data.publishedByUid : null,
