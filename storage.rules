@@ -100,14 +100,6 @@ service firebase.storage {
       allow read, write, delete: if false;
     }
 
-    // Generated artifacts (the schedule PDF, §9): world-readable output of
-    // generateSchedulePdf, never client-written.
-    match /exports/{allPaths=**} {
-      allow get: if true;
-      allow list: if false;
-      allow write, delete: if false;
-    }
-
     // Everything else — including any namespace a future feature adds
     // before its rule does — stays denied.
     match /{allPaths=**} {
