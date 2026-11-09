@@ -67,7 +67,7 @@ A request is `draft` from the moment a signup link is used. It becomes `approved
 
 `tickets.choice` is `stripe`, `eventbrite`, `spreadsheet`, `none`, or null before the client chooses. The team step has no answers: it uses the members and invites.
 
-A web-address name is 3 to 30 characters of lowercase letters, digits and hyphens. It does not start or end with a hyphen, and it is not on the reserved list in `functions/src/siteNames.cjs`. One `site_names` document per name means one holder per name.
+A web-address name is 3 to 27 characters of lowercase letters, digits and hyphens. It does not start or end with a hyphen, and it is not on the reserved list in `functions/src/siteNames.cjs`. One `site_names` document per name means one holder per name.
 
 A member record repeats its own uid. Firestore cannot query a collection group by document id, and "my organizations" is one collection-group query on that field.
 
@@ -117,7 +117,7 @@ A status email that fails is logged and does not undo the change. The status pag
 | `listSignupLinks` | Operators | The newest 100 links, with an open link past its date shown as `expired`. Never the URL or the token hash. |
 | `revokeSignupLink` | Operators | Revokes an open link. Any other link gets `409`. Writes an audit record. |
 | `getConsoleSettings` | Operators | Reads `console_config/settings` and the current agreement. |
-| `saveConsoleSettings` | Operators | Checks and saves the build settings, and writes an audit record. Other fields on the document stay. |
+| `saveConsoleSettings` | Operators | Checks and saves the build settings, and writes an audit record. |
 | `saveAgreement` | Operators | Saves the title and text as a new version, and writes an audit record. The same text saves nothing. |
 | `startConnection` | Owners | Returns the provider's page to send the browser to. Thirty a day for one account. |
 | `completeConnection` | The person who started it | Takes `state` and `code` from the return page, and finishes the connection. |
