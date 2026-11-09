@@ -63,6 +63,9 @@ export function useUnsavedNavigation(unsaved, { blocked = false } = {}) {
   useEffect(() => {
     if (!unsaved) {
       editorIdxRef.current = null;
+      // A discard lets one leave through. When the same instance is clean
+      // again (the next record of the same route), its next edits are guarded.
+      allowLeaveRef.current = false;
       return;
     }
     if (editorIdxRef.current != null) return;

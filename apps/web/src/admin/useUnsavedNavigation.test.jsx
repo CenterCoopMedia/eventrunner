@@ -120,6 +120,35 @@ describe('useUnsavedNavigation', () => {
     go.mockRestore();
   });
 
+  it('guards again when the same editor has new changes after a discard', () => {
+    // React Router keeps one editor instance across two records of one route
+    // (Back from a duplicated invoice to its source). A discard must not turn
+    // the guard off for the rest of that instance's life.
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {});
+    const tree = (unsaved) => (
+      <MemoryRouter initialEntries={['/edit']}>
+        <Routes>
+          <Route path="/edit" element={<Editor unsaved={unsaved} />} />
+          <Route path="/other" element={<h1>Other page</h1>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const view = render(tree(true));
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+
+    view.rerender(tree(false)); // the other record loads clean
+    view.rerender(tree(true)); // and is edited
+    const reload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(reload);
+    expect(reload.defaultPrevented).toBe(true);
+    fireEvent.click(screen.getByRole('link', { name: 'Other page' }));
+    expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
+    go.mockRestore();
+  });
+
   it('undoes a forward history move by the index delta', () => {
     window.history.replaceState({ idx: 2 }, '');
     const go = vi.spyOn(window.history, 'go').mockImplementation(() => {});
