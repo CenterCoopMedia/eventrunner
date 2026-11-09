@@ -169,11 +169,12 @@ function notifierSecretNames(env) {
 
 /**
  * Build the { db, getConfig, notifyOperator } trio these handlers share —
- * mirrors otp.cjs's buildDeps: the email core is always constructed and
- * always wired into createOperatorNotifier as sendEmail, since the notifier
- * itself is what decides whether the email sink is actually used ('none'
- * and 'webhook' never touch sendEmail; omitting it here is exactly the bug
- * this function exists to avoid — the email sink would silently no-op).
+ * sendEmail is always wired into createOperatorNotifier, since the notifier
+ * itself decides whether the email sink is used; omitting it would make the
+ * email sink silently no-op. The mail provider is built only when a message
+ * is sent: 'none' and 'webhook' never send, and the handlers bind the
+ * provider's secrets only for 'email' (notifierSecretNames), so building it
+ * up front throws there for a missing key.
  */
 function buildNotifyDeps() {
   const { getDb } = require('../core/firestore.cjs');
@@ -183,8 +184,13 @@ function buildNotifyDeps() {
   const { createOperatorNotifier } = require('../notify/operator.cjs');
   const db = getDb();
   const getConfig = () => getEventConfig({ db });
-  const emailCore = createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig });
-  const notifier = createOperatorNotifier({ env: process.env, getConfig, sendEmail: emailCore.send });
+  const notifier = createOperatorNotifier({
+    env: process.env,
+    getConfig,
+    sendEmail: async (message) => createEmailCore({
+      db, provider: getEmailProvider({ env: process.env }), getConfig,
+    }).send(message),
+  });
   return { db, getConfig, notifyOperator: notifier.notify };
 }
 

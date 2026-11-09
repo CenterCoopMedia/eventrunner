@@ -300,8 +300,8 @@ test('account.welcome renders login_url in both bodies and next_steps_html from 
     tokenValues: { first_name: 'Ada', profile_url: 'https://summit.example.org/profile' },
     config: CONFIG,
   });
-  assert.equal(linkHref(out.html, 'Sign in'), 'https://summit.example.org/login');
-  assert.match(out.text, /^Sign in: https:\/\/summit\.example\.org\/login$/m);
+  assert.equal(linkHref(out.html, 'Sign in'), 'https://summit.example.org/signin');
+  assert.match(out.text, /^Sign in: https:\/\/summit\.example\.org\/signin$/m);
   assert.ok(out.html.includes('<ul>')); // next_steps_html raw in html
   assert.ok(!out.text.includes('<ul>')); // stripped in text
   assert.deepEqual(out.warnings, []);

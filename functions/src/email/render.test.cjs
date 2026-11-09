@@ -321,7 +321,7 @@ test('validateTemplateBody rejects an {{#if}} guarding an undeclared token', () 
 test('buildGlobalTokens derives urls, dates, and year', () => {
   const tokens = buildGlobalTokens(CONFIG, { now: () => new Date('2027-01-01T00:00:00Z') });
   assert.equal(tokens.site_url, 'https://summit.example.org');
-  assert.equal(tokens.login_url, 'https://summit.example.org/login');
+  assert.equal(tokens.login_url, 'https://summit.example.org/signin');
   assert.equal(tokens.event_dates, '2027-05-13 to 2027-05-14');
   assert.equal(tokens.current_year, '2027');
   assert.equal(tokens.venue_address, '1 Main St, Springfield, IL, 11111, USA');
