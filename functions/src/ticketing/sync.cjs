@@ -3,6 +3,7 @@
 const { TICKET_TERMINAL_STATUSES } = require('shared/ticketCommerce');
 const { randomUUID } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
+const { millis } = require('./stripeCommerce.cjs');
 
 /**
  * The sync queue and the ticket upsert (spec §3.3 steps 3–4, §4.2).
@@ -72,15 +73,6 @@ async function writesAllowed(db, transaction) {
 function backoffMsFor(attempts) {
   const n = Math.max(1, Number.isFinite(attempts) ? attempts : 1);
   return Math.min(BASE_BACKOFF_MS * 2 ** (n - 1), MAX_BACKOFF_MS);
-}
-
-/** @param {unknown} value @returns {number} ms since epoch, or NaN */
-function toMillis(value) {
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === 'number') return value;
-  if (value && typeof value.toDate === 'function') return value.toDate().getTime();
-  if (typeof value === 'string') return Date.parse(value);
-  return NaN;
 }
 
 /**
@@ -202,7 +194,7 @@ async function leaseQueueRow({ db, ref, providerName, now }) {
     const at = now();
     if (!snap.exists || row.status !== QUEUE_PENDING ||
         (row.provider && row.provider !== providerName) ||
-        toMillis(row.readyAt) > at.getTime() || toMillis(row.leaseExpiresAt) > at.getTime()) return null;
+        millis(row.readyAt) > at.getTime() || millis(row.leaseExpiresAt) > at.getTime()) return null;
     const attempts = (Number.isInteger(row.attempts) ? row.attempts : 0) + 1;
     tx.set(ref, {
       leaseId: token, leaseExpiresAt: new Date(at.getTime() + QUEUE_LEASE_MS),
@@ -270,7 +262,7 @@ async function drainTicketSyncQueue({
 
   for (const doc of snap.docs) {
     const row = doc.data() || {};
-    const readyAtMs = toMillis(row.readyAt);
+    const readyAtMs = millis(row.readyAt);
     // An unparseable readyAt is treated as ready: a row that cannot be
     // scheduled must still be worked, not stranded.
     if (Number.isFinite(readyAtMs) && readyAtMs > nowMs) continue;
@@ -564,7 +556,6 @@ module.exports = {
   internals: {
     normalizeTicket,
     backoffMsFor,
-    toMillis,
     MAX_ATTEMPTS,
     BASE_BACKOFF_MS,
     MAX_BACKOFF_MS,

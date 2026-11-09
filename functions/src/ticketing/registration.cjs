@@ -200,9 +200,9 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
  * ticket).
  *
  * @param {{ db: object, uid: string, email?: string|null, externalIds: string[],
- *           getConfig?: () => Promise<object>, now?: () => Date }} deps
+ *           now?: () => Date }} deps
  */
-async function claimTicketsForUser({ db, uid, email = null, externalIds, getConfig, now = () => new Date() }) {
+async function claimTicketsForUser({ db, uid, email = null, externalIds, now = () => new Date() }) {
   const claimed = [];
   const refused = [];
   for (const externalId of Array.isArray(externalIds) ? externalIds : []) {
@@ -211,7 +211,7 @@ async function claimTicketsForUser({ db, uid, email = null, externalIds, getConf
     else refused.push({ externalId, reason: result.reason });
   }
   const state = claimed.length > 0
-    ? await applyTicketClaimToUser({ db, uid, getConfig, now })
+    ? await applyTicketClaimToUser({ db, uid, now })
     : { registrationStatus: null, changed: false };
   return { claimed, refused, ...state };
 }
@@ -257,9 +257,9 @@ async function lookupOrder({ provider, orderNumber, email }) {
  * caller.
  *
  * @param {{ db: object, provider: object, auth: object,
- *           getConfig: () => Promise<object>, now?: () => Date, log?: object }} deps
+ *           now?: () => Date, log?: object }} deps
  */
-function createTicketingVerifyOrderHandler({ db, provider, auth, getConfig, now = () => new Date(), log = console }) {
+function createTicketingVerifyOrderHandler({ db, provider, auth, now = () => new Date(), log = console }) {
   const { verifyAuthToken } = require('../core/auth.cjs');
   const notFound = { error: { code: 'not-found', message: 'No ticket matches that order number.' } };
 
@@ -338,7 +338,7 @@ function createTicketingVerifyOrderHandler({ db, provider, auth, getConfig, now 
     }
 
     const result = await claimTicketsForUser({
-      db, uid: decoded.uid, email, externalIds: mine, getConfig, now,
+      db, uid: decoded.uid, email, externalIds: mine, now,
     });
     if (result.claimed.length === 0) {
       // Already claimed (by this account or another): the same answer, for
@@ -443,7 +443,7 @@ function createCreateUserFromTicketHandler({ db, auth, getConfig, now = () => ne
     }
 
     const result = await claimTicketsForUser({
-      db, uid: user.uid, email, externalIds: [externalId], getConfig, now,
+      db, uid: user.uid, email, externalIds: [externalId], now,
     });
     if (result.claimed.length === 0) {
       // The status check above is not the claim. A sync can refund the

@@ -73,8 +73,11 @@ async function allProviderPages(list, params) {
   throw new Error('Stripe reconciliation exceeded its bounded page limit.');
 }
 
+// `scope` is a stripeScope() result or a provider built from one. A
+// provider with no event or account matches no order.
 function scopeMatches(order, scope) {
-  return order?.provider === 'stripe' && order.eventId === scope.externalEventId &&
+  return Boolean(scope?.externalEventId && scope?.stripeAccountId) &&
+    order?.provider === 'stripe' && order.eventId === scope.externalEventId &&
     order.stripeAccountId === scope.stripeAccountId && order.livemode === scope.livemode;
 }
 
@@ -114,7 +117,7 @@ function isInvoiceCheckoutRequest(params, scope) {
     && !params.subscription_data && !params.discounts;
 }
 
-function createStripeProvider({ env = process.env, db, getConfig, stripeClient, now = () => new Date() } = {}) {
+function createStripeProvider({ env = process.env, db, stripeClient, now = () => new Date() } = {}) {
   const scope = stripeScope(env);
   let client = null;
   let accountCheck = null;
@@ -328,20 +331,19 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
         if (result.complete !== true) throw new Error('An order is still being reconciled; retry the sync.');
         tickets.push(...result.tickets);
       }
-      return { tickets, ticketsPersisted: true, nextPageToken: page.size === ORDER_PAGE_SIZE ? page.docs.at(-1).id : null };
+      return { tickets, nextPageToken: page.size === ORDER_PAGE_SIZE ? page.docs.at(-1).id : null };
     },
 
     async getRegistrationPrompt(ctx = {}) {
       // Registration prompt entitlement skips apply to every provider and
-      // trigger, before configuration reads or any delivery onceKey is used.
+      // trigger, before any delivery onceKey is used.
       if (ctx?.isSpeaker === true || ctx?.hasClaimedTicket === true) {
         return { send: false, templateId: null, ctaLabel: null, ctaUrl: null, action: null, bodyNote: null };
       }
-      const config = typeof getConfig === 'function' ? await getConfig() : null;
       const publicUrl = env.EVENT_PUBLIC_URL?.trim();
       let origin;
       try { origin = new URL(publicUrl); } catch { return { send: false }; }
-      if (origin.protocol !== 'https:' || config?.features?.ticketing === false) return { send: false };
+      if (origin.protocol !== 'https:') return { send: false };
       return { send: true, templateId: 'ticket.get_ticket', ctaLabel: 'Choose tickets',
         ctaUrl: new URL('/tickets', origin).href, action: 'purchase', bodyNote: null };
     },
@@ -366,6 +368,6 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
 }
 
 module.exports = {
-  createStripeProvider, createStripeClient, stripeScope,
+  createStripeProvider, stripeScope,
   internals: { WEBHOOK_EVENTS, scopeMatches, metadataMatches, objectId, safeId, allProviderPages, isInvoiceCheckoutRequest },
 };

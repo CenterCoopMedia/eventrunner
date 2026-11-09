@@ -49,4 +49,4 @@ function buildHandlers() {
   };
 }
 
-module.exports = { buildCommerceDeps, invokeCommerceHandler, get handlers() { return buildHandlers(); } };
+module.exports = { invokeCommerceHandler, get handlers() { return buildHandlers(); } };

@@ -4,8 +4,10 @@
  * Ticketing registry (spec §1.3 `ticketing/index.cjs`).
  *
  * Three jobs, and no request handling beyond the last one:
- *   1. Re-export the provider registry (`providers/index.cjs`) so nothing
- *      outside this module ever names an adapter file.
+ *   1. Re-export the provider registry (`providers/index.cjs`), so callers
+ *      get a provider by name. The Stripe commerce modules and
+ *      scripts/provision-client.cjs read providers/stripe.cjs directly,
+ *      for its scope checks and its webhook event list.
  *   2. Own the collection names and the document-id discipline every
  *      ticketing write shares — provider-supplied strings become Firestore
  *      document ids here, so they are validated in exactly one place.
@@ -87,24 +89,26 @@ async function readTicketingStatus({ db, provider, getConfig, now = () => new Da
   const config = await getConfig();
   const configured = config?.providers?.ticketing || {};
 
-  const pendingSnap = await db.collection(SYNC_QUEUE)
-    .where('status', '==', QUEUE_PENDING)
-    .limit(STATUS_SCAN_LIMIT + 1)
-    .get();
-  const exhaustedSnap = await db.collection(SYNC_QUEUE)
-    .where('status', '==', QUEUE_EXHAUSTED)
-    .limit(STATUS_SCAN_LIMIT + 1)
-    .get();
+  const [pendingSnap, exhaustedSnap, lastDeliverySnap] = await Promise.all([
+    db.collection(SYNC_QUEUE)
+      .where('status', '==', QUEUE_PENDING)
+      .limit(STATUS_SCAN_LIMIT + 1)
+      .get(),
+    db.collection(SYNC_QUEUE)
+      .where('status', '==', QUEUE_EXHAUSTED)
+      .limit(STATUS_SCAN_LIMIT + 1)
+      .get(),
+    db.collection(WEBHOOK_DELIVERIES)
+      .orderBy('receivedAt', 'desc')
+      .limit(1)
+      .get(),
+  ]);
 
   const pendingRows = pendingSnap.docs.slice(0, STATUS_SCAN_LIMIT).map((d) => d.data());
   const readyAtMs = pendingRows
     .map((row) => millis(row?.readyAt))
     .filter((ms) => Number.isFinite(ms));
 
-  const lastDeliverySnap = await db.collection(WEBHOOK_DELIVERIES)
-    .orderBy('receivedAt', 'desc')
-    .limit(1)
-    .get();
   const lastDelivery = lastDeliverySnap.docs[0]?.data() || null;
 
   return {
