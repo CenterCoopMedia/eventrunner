@@ -81,6 +81,7 @@ export const SOURCE_LABELS = Object.freeze({
   'attendee-approval': 'Attendee approval',
   'session-pitches': 'Pitch notice',
   'ticketing-confirmation': 'Ticket confirmation',
+  'account-welcome': 'Welcome email',
 });
 
 /**

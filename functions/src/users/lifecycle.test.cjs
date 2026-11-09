@@ -292,3 +292,177 @@ test('onUserDeleted throws when a store cannot be cleared, so the trigger retrie
   // The account document went first; a retry finds it gone and clears again.
   assert.equal(db.docs.has('users/u1'), false);
 });
+
+// --- the welcome email (ADR 0001 §3.1, §6.2; audit 02 #9) -------------------
+
+const SITE = 'https://summit.example.org';
+const welcomeConfig = async () => ({ event: { name: 'Summit 2027' }, tierA: { publicUrl: `${SITE}/` } });
+
+/** A recording sendEmail that answers as the core does. */
+function fakeSend(result = { status: 'sent', providerMessageId: 'pm-1', retries: 0 }) {
+  const calls = [];
+  const send = async (message) => {
+    calls.push(message);
+    return typeof result === 'function' ? result(message) : result;
+  };
+  return { calls, send };
+}
+
+test('a new account gets one welcome email with the right template, tokens and send-once key', async () => {
+  const db = fakeDb();
+  const mail = fakeSend();
+  const result = await createOnUserCreated({ db, now: () => NOW, sendEmail: mail.send, getConfig: welcomeConfig })({
+    uid: 'u1', email: 'Rae@Example.org', displayName: 'Rae Kim',
+  });
+  assert.deepEqual(result, { created: true });
+  assert.equal(db.docs.get('users/u1').registrationStatus, 'pending');
+  assert.equal(mail.calls.length, 1);
+  const [message] = mail.calls;
+  assert.equal(message.to, 'rae@example.org');
+  assert.equal(message.tag, 'account.welcome');
+  assert.equal(message.source, 'account-welcome');
+  assert.equal(message.onceKey, 'welcome:u1');
+  assert.equal(message.subject, 'Welcome to Summit 2027');
+  assert.match(message.text, /^Hi Rae,/);
+  assert.match(message.text, new RegExp(`Sign in: ${SITE}/signin`));
+  assert.match(message.text, new RegExp(`your profile: ${SITE}/profile`));
+  assert.match(message.html, new RegExp(`href="${SITE}/signin"`));
+  assert.match(message.html, new RegExp(`href="${SITE}/profile"`));
+  assert.equal(message.storeRendered, true);
+});
+
+test('an account with no name is greeted as "there", never by its address', async () => {
+  const mail = fakeSend();
+  await createOnUserCreated({ db: fakeDb(), now: () => NOW, sendEmail: mail.send, getConfig: welcomeConfig })({
+    uid: 'u1', email: 'rae@example.org', displayName: null,
+  });
+  assert.match(mail.calls[0].text, /^Hi there,/);
+});
+
+test('a repeat delivery asks for the same send-once key and writes the account only once', async () => {
+  const db = fakeDb();
+  const mail = fakeSend();
+  const create = createOnUserCreated({ db, now: () => NOW, sendEmail: mail.send, getConfig: welcomeConfig });
+  await create({ uid: 'u1', email: 'rae@example.org' });
+  await create({ uid: 'u1', email: 'rae@example.org' });
+  assert.deepEqual(db.writes, [{ type: 'create', path: 'users/u1' }]);
+  // The core's email_claims row makes the second call send nothing.
+  assert.deepEqual(mail.calls.map((m) => m.onceKey), ['welcome:u1', 'welcome:u1']);
+});
+
+test('an account another path wrote first still gets the welcome email', async () => {
+  // createUserFromTicket can write users/{uid} before this trigger runs.
+  const db = fakeDb({ 'users/u1': { uid: 'u1', email: 'rae@example.org', registrationStatus: 'approved' } });
+  const mail = fakeSend();
+  const result = await createOnUserCreated({ db, now: () => NOW, sendEmail: mail.send, getConfig: welcomeConfig })({
+    uid: 'u1', email: 'rae@example.org',
+  });
+  assert.equal(result.created, false);
+  assert.equal(db.docs.get('users/u1').registrationStatus, 'approved');
+  assert.equal(mail.calls.length, 1);
+});
+
+test('an account with no email address gets no welcome email', async () => {
+  const db = fakeDb();
+  const mail = fakeSend();
+  for (const email of [null, undefined, '', '   ']) {
+    await createOnUserCreated({ db, now: () => NOW, sendEmail: mail.send, getConfig: welcomeConfig })({ uid: `u-${String(email)}`, email });
+  }
+  assert.equal(mail.calls.length, 0);
+});
+
+test('a historical demo sends no welcome email', async () => {
+  const db = fakeDb({ 'config/event': { historicalDemo: true } });
+  const mail = fakeSend();
+  await createOnUserCreated({ db, sendEmail: mail.send, getConfig: welcomeConfig })({ uid: 'u1', email: 'rae@example.org' });
+  assert.equal(mail.calls.length, 0);
+});
+
+test('an event with no public site address sends no welcome email: the sign-in link would be empty', async () => {
+  const mail = fakeSend();
+  await createOnUserCreated({
+    db: fakeDb(), now: () => NOW, sendEmail: mail.send, getConfig: async () => ({ event: { name: 'Summit' } }),
+  })({ uid: 'u1', email: 'rae@example.org' });
+  assert.equal(mail.calls.length, 0);
+});
+
+test('a welcome email on the announcement stream is refused, as other notices are', async () => {
+  const mail = fakeSend();
+  const getConfig = async () => ({
+    ...(await welcomeConfig()),
+    providers: { email: { messageStream: 'broadcast', announcementStream: 'broadcast' } },
+  });
+  await createOnUserCreated({ db: fakeDb(), now: () => NOW, sendEmail: mail.send, getConfig })({ uid: 'u1', email: 'rae@example.org' });
+  assert.equal(mail.calls.length, 0);
+});
+
+test('a send that throws leaves the account written and does not fail the trigger', async () => {
+  const db = fakeDb();
+  const errors = [];
+  const log = { error: (...args) => errors.push(args), warn() {} };
+  const send = async () => { throw new Error('provider unreachable'); };
+  const result = await createOnUserCreated({ db, now: () => NOW, sendEmail: send, getConfig: welcomeConfig, log })({
+    uid: 'u1', email: 'rae@example.org',
+  });
+  assert.deepEqual(result, { created: true });
+  assert.equal(db.docs.get('users/u1').registrationStatus, 'pending');
+  assert.equal(errors.length, 1);
+});
+
+test('a config read that fails, or a refused send, leaves the account written and does not throw', async () => {
+  const log = { error() {}, warn() {} };
+  const failingConfig = async () => { throw new Error('config unavailable'); };
+  const db = fakeDb();
+  const mail = fakeSend();
+  assert.deepEqual(
+    await createOnUserCreated({ db, now: () => NOW, sendEmail: mail.send, getConfig: failingConfig, log })({ uid: 'u1', email: 'rae@example.org' }),
+    { created: true },
+  );
+  assert.equal(db.docs.has('users/u1'), true);
+  assert.equal(mail.calls.length, 0);
+
+  const refused = fakeSend({ status: 'failed', providerStatus: 422, error: 'inactive recipient', retries: 0 });
+  const errors = [];
+  assert.deepEqual(
+    await createOnUserCreated({ db, now: () => NOW, sendEmail: refused.send, getConfig: welcomeConfig, log: { error: (...a) => errors.push(a), warn() {} } })({ uid: 'u2', email: 'kim@example.org' }),
+    { created: true },
+  );
+  assert.equal(db.docs.has('users/u2'), true);
+  assert.equal(errors.length, 1);
+});
+
+test('only onUserCreated binds the send secrets, and building the handlers builds no email provider', () => {
+  const saved = { provider: process.env.EVENT_EMAIL_PROVIDER, project: process.env.GCLOUD_PROJECT };
+  // A postmark deployment: getEmailProvider would throw here with no API key,
+  // so a handler built eagerly would fail this test.
+  process.env.EVENT_EMAIL_PROVIDER = 'postmark';
+  // v1 functions read their endpoint lazily and need a project id.
+  process.env.GCLOUD_PROJECT = saved.project || 'demo-run-of-show';
+  try {
+    const { handlers } = require('./lifecycle.cjs');
+    const secretsOf = (fn) => (fn.__endpoint?.secretEnvironmentVariables ?? []).map((s) => s.key);
+    assert.deepEqual(secretsOf(handlers.onUserCreated), ['EMAIL_PROVIDER_API_KEY']);
+    assert.equal(handlers.onUserCreated.__endpoint.eventTrigger.retry, true);
+    assert.deepEqual(secretsOf(handlers.onUserDeleted), []);
+  } finally {
+    for (const [key, name] of [['provider', 'EVENT_EMAIL_PROVIDER'], ['project', 'GCLOUD_PROJECT']]) {
+      if (saved[key] === undefined) delete process.env[name];
+      else process.env[name] = saved[key];
+    }
+  }
+});
+
+test('an Owner or an Editor on config/bootstrap gets no welcome email, and the account is still written', async () => {
+  // The same rule as the ticket prompt: whoever runs the site is not welcomed to it.
+  const db = fakeDb({
+    'config/bootstrap': { adminEmails: ['Owner@Example.org'], staffEmails: ['editor@example.org'] },
+  });
+  const mail = fakeSend();
+  const create = createOnUserCreated({ db, now: () => NOW, sendEmail: mail.send, getConfig: welcomeConfig });
+  await create({ uid: 'owner', email: 'owner@example.org' });
+  await create({ uid: 'editor', email: 'Editor@example.org' });
+  await create({ uid: 'attendee', email: 'rae@example.org' });
+  assert.equal(db.docs.get('users/owner').registrationStatus, 'pending');
+  assert.equal(db.docs.get('users/editor').registrationStatus, 'pending');
+  assert.deepEqual(mail.calls.map((m) => m.to), ['rae@example.org']);
+});

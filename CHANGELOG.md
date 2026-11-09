@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A new account gets one welcome email with a sign-in link. An Owner or an Editor gets none. The
+  Email log lists it under the source **Welcome email**.
 - Operators can set the announce and archive dates in admin Event settings, and the page shows
   the event's current phase. Before this, nothing could set them, and every site stayed in draft:
   no home countdown, and registration answers never locked. `validateEventConfig` refuses a

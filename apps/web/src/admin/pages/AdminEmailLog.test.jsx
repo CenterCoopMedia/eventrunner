@@ -220,6 +220,7 @@ describe('AdminEmailLog', () => {
       'attendee-approval': 'Attendee approval',
       'session-pitches': 'Pitch notice',
       'ticketing-confirmation': 'Ticket confirmation',
+      'account-welcome': 'Welcome email',
     };
     expect(SOURCE_LABELS).toMatchObject(stamped);
     for (const [source, label] of Object.entries(stamped)) {
