@@ -112,6 +112,21 @@ function splitEventDateTime(value, timeZone) {
 }
 
 /**
+ * Whether the value is a 'YYYY-MM-DD' date that exists.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isCalendarDate(value) {
+  const d = typeof value === 'string' ? value.match(DATE_RE) : null;
+  if (!d) return false;
+  const [y, mo, day] = [d[1], d[2], d[3]].map(Number);
+  const check = new Date(Date.UTC(y, mo - 1, day));
+  // Date.UTC rolls 2027-02-30 into March. A date that rolls is not a date.
+  return check.getUTCFullYear() === y && check.getUTCMonth() === mo - 1 && check.getUTCDate() === day;
+}
+
+/**
  * A 'YYYY-MM-DD' date and an 'HH:MM' or 'HH:MM:SS' time read as if they
  * were UTC, in milliseconds. Null for a malformed value or a date that does
  * not exist.
@@ -121,15 +136,10 @@ function splitEventDateTime(value, timeZone) {
  * @returns {number|null}
  */
 function readWall(date, time) {
-  const d = typeof date === 'string' ? date.match(DATE_RE) : null;
   const t = typeof time === 'string' ? time.match(TIME_RE) : null;
-  if (!d || !t) return null;
-  const [y, mo, day] = [d[1], d[2], d[3]].map(Number);
-  const wall = Date.UTC(y, mo - 1, day, Number(t[1]), Number(t[2]), Number(t[3] ?? 0));
-  const check = new Date(wall);
-  // Date.UTC rolls 2027-02-30 into March. A date that rolls is not a date.
-  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== day) return null;
-  return wall;
+  if (!t || !isCalendarDate(date)) return null;
+  const [y, mo, day] = date.split('-').map(Number);
+  return Date.UTC(y, mo - 1, day, Number(t[1]), Number(t[2]), Number(t[3] ?? 0));
 }
 
 /**
@@ -170,6 +180,7 @@ module.exports = {
   partsIn,
   wallParts,
   readWall,
+  isCalendarDate,
   isKnownTimeZone,
   zoneOffsetMinutes,
   splitEventDateTime,

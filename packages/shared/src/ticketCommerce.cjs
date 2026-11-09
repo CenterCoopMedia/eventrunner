@@ -1,6 +1,9 @@
 'use strict';
 
 /** Ticket commerce values shared by the catalog editor and server pricing. */
+
+const { isEmailAddress } = require('./email.cjs');
+
 const MAX_TICKET_TYPES = 20;
 const MAX_ORDER_SEATS = 20;
 const MAX_CAPACITY = 1000000;
@@ -145,7 +148,7 @@ function normalizeAttendee(input) {
   const firstName = text(input.firstName, 100, true);
   const lastName = text(input.lastName, 100);
   const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
-  if (!firstName || lastName === null || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  if (!firstName || lastName === null || email.length > 254 || !isEmailAddress(email)) return null;
   return { firstName, lastName, email };
 }
 

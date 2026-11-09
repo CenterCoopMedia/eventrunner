@@ -70,6 +70,8 @@ test('checkout accepts selections and normalized per-seat assignments only', () 
     request({ lines: [{ ...request().lines[0], price: 1 }] }),
     request({ lines: [{ ...request().lines[0], attendees: [{ ...attendee, claimedByUid: 'admin' }] }] }),
     request({ lines: [{ ...request().lines[0], attendees: [{ ...attendee, email: '' }] }] }),
+    request({ lines: [{ ...request().lines[0], attendees: [{ ...attendee, email: 'ada@example' }] }] }),
+    request({ lines: [{ ...request().lines[0], attendees: [{ ...attendee, email: 'ada@@example.com' }] }] }),
     request({ lines: [{ ...request().lines[0], quantity: 1.1 }] }),
     request({ lines: [{ ...request().lines[0], quantity: 2 }] }),
     request({ lines: [request().lines[0], request().lines[0]] }),

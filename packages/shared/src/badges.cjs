@@ -4,11 +4,11 @@
  * Badge-set validation against per-event config (spec §4.5).
  *
  * Badge definitions live in config/badges — nothing here knows any event's
- * badge names. Free-text custom badges do not exist in v1, so validation is
- * a pure intersection with the configured set plus per-category maxPicks
- * enforcement. Used by the profile-save Cloud Function and the
- * users_public projection trigger, which rewrites the stored set to the
- * `valid` result.
+ * badge names. A selection of configured badges is checked as a pure
+ * intersection with the configured set plus per-category maxPicks
+ * enforcement; free-text custom badges (below) have their own check. Used
+ * by the profile-save Cloud Function and the users_public projection
+ * trigger, which rewrites the stored set to the `valid` result.
  */
 
 /**

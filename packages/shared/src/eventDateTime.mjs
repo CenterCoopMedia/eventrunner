@@ -2,6 +2,7 @@ export {
   partsIn,
   wallParts,
   readWall,
+  isCalendarDate,
   isKnownTimeZone,
   zoneOffsetMinutes,
   splitEventDateTime,

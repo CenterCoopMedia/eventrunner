@@ -9,7 +9,9 @@
  * segment outright, so a generic page may never claim one of those
  * segments for itself — this list is the single source of truth for that
  * collision check, imported by BOTH the functions validator
- * (functions/src/cms/pages.cjs) and the web router (apps/web/src/App.jsx).
+ * (functions/src/cms/pages.cjs) and the web page renderer
+ * (apps/web/src/pages/ContentPage.jsx), which 404s a stored page on a
+ * reserved segment.
  *
  * `p` is reserved too, even though the route it names is gone: old
  * `/p/<slug>` links must keep 404ing rather than a new page silently
@@ -19,10 +21,8 @@
  * #17): /profile, /attendees, and /attendees/:uid are statically mounted,
  * so a generic page may not claim either segment.
  *
- * `admin` is reserved ahead of its own route landing: an authenticated
- * `/admin` area is under construction on a parallel branch, and this list
- * also covers system areas that exist on paper before their route does, so
- * a generic page can never squat the prefix first.
+ * `admin` is the authenticated admin area: App.jsx mounts `admin/*` above
+ * the public layout, so a generic page may not claim the segment.
  *
  * `updates` is the updates list/detail route (issue #27 follow-up):
  * /updates and /updates/:id are statically mounted, and updatesMeta's

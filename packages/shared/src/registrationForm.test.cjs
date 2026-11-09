@@ -185,3 +185,9 @@ test('choice import parsing bounds work by configured choices even for a delimit
   assert.deepEqual(answerFromText(question, ';'.repeat(4990) + 'unknown'), ['unknown']);
   assert.deepEqual(answerFromText(question, 'news ; LOCAL; Revenue'), ['News; local', 'Revenue']);
 });
+
+test('the directory answer offers each profile visibility once, in the same order', () => {
+  const { DIRECTORY_CHOICES } = require('./registrationForm.cjs');
+  const { PROFILE_VISIBILITIES } = require('./profile.cjs');
+  assert.deepEqual(DIRECTORY_CHOICES.map((choice) => choice.id), PROFILE_VISIBILITIES);
+});

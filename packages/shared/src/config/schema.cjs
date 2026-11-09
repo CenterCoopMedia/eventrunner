@@ -161,6 +161,9 @@ function isNonEmptyString(v) {
 
 /**
  * True when the string matches YYYY-MM-DD *and* names a real calendar date.
+ * eventDateTime.cjs `isCalendarDate` is the same check. This module keeps
+ * its own because it is in the public site's first paint and that one is
+ * not.
  * `new Date(Date.UTC(...))` normalizes out-of-range components instead of
  * rejecting them (e.g. 2026-02-30 silently becomes 2026-03-02) — round-trip
  * the parsed components against the normalized result to catch that.
@@ -181,6 +184,8 @@ function isValidCalendarDate(v) {
 
 /**
  * True when the string names a real IANA timezone, probed via Intl.
+ * eventDateTime.cjs `isKnownTimeZone` is the same probe, kept apart for the
+ * same first-paint reason as isValidCalendarDate.
  *
  * @param {*} tz
  * @returns {boolean}
@@ -1173,4 +1178,5 @@ module.exports = {
   MAX_REGISTRATION_GOAL,
   isHttpsUrl,
   httpsUrlHref,
+  isValidCalendarDate,
 };

@@ -8,6 +8,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  isCalendarDate,
   isKnownTimeZone,
   readWall,
   resolveEventDateTime,
@@ -61,6 +62,13 @@ test('malformed dates, times and zones are invalid', () => {
   assert.equal(isKnownTimeZone('Mars/Olympus'), false);
   assert.equal(isKnownTimeZone(NY), true);
   assert.equal(readWall('2027-02-29', '00:00'), null);
+});
+
+test('isCalendarDate accepts only a YYYY-MM-DD date that exists', () => {
+  for (const value of ['2028-02-29', '2027-12-31']) assert.equal(isCalendarDate(value), true, value);
+  for (const value of ['2027-02-29', '2027-13-01', '2027-1-01', '2027-01-01T00:00', '', null, 20270101]) {
+    assert.equal(isCalendarDate(value), false, String(value));
+  }
 });
 
 test('splitEventDateTime shows a stored instant on the event clock', () => {

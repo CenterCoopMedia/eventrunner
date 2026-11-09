@@ -32,6 +32,9 @@ const ISO_DATETIME_RE =
  * ("YYYY-MM-DDTHH:MM:SS"), suitable for lexicographic moment compare
  * against other strings of the same shape in the same zone.
  *
+ * eventDateTime.cjs `wallParts` reads the same parts. This module keeps its
+ * own because it is in the public site's first paint and that one is not.
+ *
  * @param {string} timezone - IANA zone, e.g. "America/New_York"
  * @param {Date} [now]
  * @returns {string}
