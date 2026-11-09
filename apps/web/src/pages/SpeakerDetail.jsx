@@ -103,7 +103,8 @@ export default function SpeakerDetail() {
   const sessions = features.schedule
     ? sortSessions(
         scheduleData.filter(
-          (session) => Array.isArray(session.speakerIds) && session.speakerIds.includes(speaker.id),
+          (session) =>
+            session.visible && Array.isArray(session.speakerIds) && session.speakerIds.includes(speaker.id),
         ),
       ).sort((a, b) => (dayOrder.get(a.dayId) ?? Infinity) - (dayOrder.get(b.dayId) ?? Infinity))
     : [];

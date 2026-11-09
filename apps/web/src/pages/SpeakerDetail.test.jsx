@@ -155,6 +155,18 @@ describe('SpeakerDetail', () => {
     expect(getRouteTitlePart()).toBeNull();
   });
 
+  it('does not list a hidden session, as every other reader of the schedule', () => {
+    // The draft preview and the snapshot fallback carry hidden sessions.
+    speakers = [PROJECTED];
+    scheduleData = [
+      { id: 'sess-1', title: 'Reporting on Deadline', dayId: 'day-1', startTime: '10:00', speakerIds: ['rae-okonkwo'], visible: true },
+      { id: 'sess-2', title: 'Not announced yet', dayId: 'day-1', startTime: '11:00', speakerIds: ['rae-okonkwo'], visible: false },
+    ];
+    renderAt('/speakers/rae-okonkwo');
+    expect(screen.getByRole('link', { name: 'Reporting on Deadline' })).toBeInTheDocument();
+    expect(screen.queryByText('Not announced yet')).toBeNull();
+  });
+
   it('does not render a session list when features.schedule is off (issue #22 review P2-6)', () => {
     speakers = [PROJECTED];
     scheduleData = [
