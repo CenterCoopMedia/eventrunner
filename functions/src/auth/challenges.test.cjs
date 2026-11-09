@@ -22,12 +22,14 @@ const {
 function fakeDb() {
   const store = new Map(); // "collection/id" -> data
   const reads = []; // "collection/id" of every plain (non-transactional) read
+  const singleDeletes = []; // "collection/id" deleted one round trip at a time
+  const commits = []; // size of each committed batch
   const key = (c, id) => `${c}/${id}`;
   const docRef = (c, id) => ({
     __c: c,
     __id: id,
     async set(data) { store.set(key(c, id), data); },
-    async delete() { store.delete(key(c, id)); },
+    async delete() { singleDeletes.push(key(c, id)); store.delete(key(c, id)); },
     async get() {
       reads.push(key(c, id));
       const data = store.get(key(c, id));
@@ -37,6 +39,18 @@ function fakeDb() {
   return {
     store,
     reads,
+    singleDeletes,
+    commits,
+    batch() {
+      const ops = [];
+      return {
+        delete(ref) { ops.push(key(ref.__c, ref.__id)); },
+        async commit() {
+          for (const k of ops) store.delete(k);
+          commits.push(ops.length);
+        },
+      };
+    },
     collection: (c) => ({
       doc: (id) => docRef(c, id),
       where: (field, op, value) => ({
@@ -397,4 +411,49 @@ test('sweepExpired deletes expired challenges and stale rate buckets only', asyn
   assert.equal(swept.rateLimits, 1);
   assert.equal(db.store.has(`auth_challenges/${oldToken}`), false);
   assert.equal(db.store.has(`auth_challenges/${freshToken}`), true);
+});
+
+test('sweepExpired clears expired per-IP rate-limit rows and keeps rows inside their window', async () => {
+  // Both endpoints are unauthenticated, so every client address leaves a
+  // row; the sweep is the only thing that removes it.
+  const clientErrors = require('../telemetry/clientErrors.cjs');
+  const feedback = require('../admin/feedback.cjs');
+  const clientWindow = clientErrors.internals.RATE_LIMIT_WINDOW_MS;
+  const feedbackWindow = feedback.internals.RATE_LIMIT_WINDOW_MS;
+  const db = fakeDb();
+  let clock = 0;
+  const now = () => clock;
+  await clientErrors.takeClientErrorRateLimitSlot({ db, ipHash: 'old-ip', now });
+  await feedback.takeFeedbackRateLimitSlot({ db, ipHash: 'old-ip', now });
+  clock = Math.max(clientWindow, feedbackWindow) + 1000;
+  await clientErrors.takeClientErrorRateLimitSlot({ db, ipHash: 'new-ip', now });
+  await feedback.takeFeedbackRateLimitSlot({ db, ipHash: 'new-ip', now });
+  // A row whose last request is exactly one window old is not yet expired.
+  await clientErrors.takeClientErrorRateLimitSlot({ db, ipHash: 'edge-ip', now: () => clock - clientWindow });
+  await feedback.takeFeedbackRateLimitSlot({ db, ipHash: 'edge-ip', now: () => clock - feedbackWindow });
+
+  const swept = await sweepExpired({ db, now });
+  assert.equal(swept.clientErrorRateLimits, 1);
+  assert.equal(swept.feedbackRateLimits, 1);
+  assert.equal(db.store.has('client_error_rate_limits/old-ip'), false);
+  assert.equal(db.store.has('feedback_rate_limits/old-ip'), false);
+  assert.equal(db.store.has('client_error_rate_limits/new-ip'), true);
+  assert.equal(db.store.has('feedback_rate_limits/new-ip'), true);
+  assert.equal(db.store.has('client_error_rate_limits/edge-ip'), true);
+  assert.equal(db.store.has('feedback_rate_limits/edge-ip'), true);
+});
+
+test('sweepExpired deletes in batches and stops after maxBatches pages', async () => {
+  const db = fakeDb();
+  for (let i = 0; i < 5; i += 1) {
+    db.store.set(`auth_challenges/t${i}`, { expiresAt: new Date(0) });
+  }
+  const now = () => 1000;
+  const first = await sweepExpired({ db, now, batchLimit: 2, maxBatches: 2 });
+  assert.equal(first.challenges, 4);
+  assert.deepEqual(db.singleDeletes, [], 'no document is deleted one round trip at a time');
+  assert.deepEqual(db.commits, [2, 2]);
+  const second = await sweepExpired({ db, now, batchLimit: 2, maxBatches: 2 });
+  assert.equal(second.challenges, 1);
+  assert.equal([...db.store.keys()].some((k) => k.startsWith('auth_challenges/')), false);
 });

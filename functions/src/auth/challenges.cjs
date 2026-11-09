@@ -356,25 +356,35 @@ async function releaseChallenge({ db, token }) {
 /**
  * Sweep expired challenges and stale rate-limit docs (the auth module's
  * own cleanup export, spec §1.3; maintenance/cleanup.cjs calls the same).
+ * It also clears the two per-IP buckets that copy this module's shape
+ * (client errors and feedback): nothing else removes them.
  *
  * @param {{ db: FirebaseFirestore.Firestore, now?: () => number,
- *           batchLimit?: number }} args
- * @returns {Promise<{ challenges: number, rateLimits: number, sendCeilings: number }>}
+ *           batchLimit?: number, maxBatches?: number }} args
+ * @returns {Promise<{ challenges: number, rateLimits: number, sendCeilings: number,
+ *   clientErrorRateLimits: number, feedbackRateLimits: number }>}
  */
 async function sweepExpired({ db, now = Date.now, batchLimit = 250, maxBatches = 40 }) {
+  // Required here, not at the top: the auth endpoints load this module and
+  // do not need the feedback module's own imports.
+  const clientErrorWindowMs = require('../telemetry/clientErrors.cjs').internals.RATE_LIMIT_WINDOW_MS;
+  const feedbackWindowMs = require('../admin/feedback.cjs').internals.RATE_LIMIT_WINDOW_MS;
+
   // Drain in batches until a batch comes back short — a daily run capped at
   // one batch would let a busy event accumulate an unbounded backlog of
   // expired auth data. maxBatches bounds a single invocation; the next run
-  // continues.
+  // continues. One batch commit per page, as sweepExpiredSentEmails does,
+  // so a full run fits in the scheduled function's time limit.
   async function drain(query) {
     let deleted = 0;
     for (let i = 0; i < maxBatches; i += 1) {
-      const batch = await query.get();
-      for (const doc of batch.docs) {
-        await doc.ref.delete();
-        deleted += 1;
-      }
-      if (batch.docs.length < batchLimit) break;
+      const page = await query.get();
+      if (page.docs.length === 0) break;
+      const batch = db.batch();
+      for (const doc of page.docs) batch.delete(doc.ref);
+      await batch.commit();
+      deleted += page.docs.length;
+      if (page.docs.length < batchLimit) break;
     }
     return deleted;
   }
@@ -394,7 +404,19 @@ async function sweepExpired({ db, now = Date.now, batchLimit = 250, maxBatches =
       .where('updatedAt', '<', new Date(now() - SEND_CEILING_WINDOW_MS))
       .limit(batchLimit),
   );
-  return { challenges, rateLimits, sendCeilings };
+  // Each write sets updatedAt to its newest request, so a row older than
+  // one window holds no request that still counts.
+  const clientErrorRateLimits = await drain(
+    db.collection('client_error_rate_limits')
+      .where('updatedAt', '<', new Date(now() - clientErrorWindowMs))
+      .limit(batchLimit),
+  );
+  const feedbackRateLimits = await drain(
+    db.collection('feedback_rate_limits')
+      .where('updatedAt', '<', new Date(now() - feedbackWindowMs))
+      .limit(batchLimit),
+  );
+  return { challenges, rateLimits, sendCeilings, clientErrorRateLimits, feedbackRateLimits };
 }
 
 module.exports = {
