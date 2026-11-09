@@ -8,8 +8,22 @@ tool. Rule the owner gave for unused code: a part that is half built or
 planned gets finished; a part with no design intent and no reader is removed.
 
 Builders run on Opus at medium effort. The director reviews each diff and
-runs the checks. Bug fixes are test-first. Each pull request merges before
-the next one starts, on the one branch, so generated output never conflicts.
+runs the checks. Bug fixes are test-first.
+
+The four pull requests are a stack (owner, 2026-11-09). Each later branch
+starts from the tip of the one before it, and its pull request is based on
+that branch, so no step waits for a merge:
+
+| PR | Branch | Base |
+|---|---|---|
+| 1 | `claude/project-audit-cleanup-rkmnhg` | `main` |
+| 2 | `claude/project-audit-cleanup-rkmnhg-2-features` | PR 1 branch |
+| 3 | `claude/project-audit-cleanup-rkmnhg-3-docs` | PR 2 branch |
+| 4 | `claude/project-audit-cleanup-rkmnhg-4-cleanup` | PR 3 branch |
+
+A review fix on a lower branch is merged up the stack, and generated output
+is regenerated on each tip, never hand-merged. The stack merges top down.
+After it merges, check `git merge-base --is-ancestor <top head> origin/main`.
 
 ### PR 1. Defects, rules and data handling
 

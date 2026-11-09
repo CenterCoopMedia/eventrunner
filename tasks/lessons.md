@@ -308,3 +308,12 @@ Rules written after user corrections. Read at session start.
   subagents; Opus at medium effort only. Pass `model: "opus"` and
   `effort: "medium"` on every Agent call. Fable directs and does not delegate
   to itself.
+
+## 2026-11-09: stack the pull requests of one plan
+
+- The audit follow-up plan first said each of its four pull requests merges
+  before the next one starts. Joe said: use stacked pull requests when
+  possible. When a plan has several pull requests in an order, cut each
+  later branch from the tip of the one before it and base its pull request
+  on that branch. The earlier stack rules in this file still hold (base on
+  the tip, regenerate on the tip, merge top down, check the ancestor).
