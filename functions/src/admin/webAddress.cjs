@@ -2,12 +2,13 @@
 
 /**
  * `webAddress`: the custom web address, an optional upgrade (ADR 0007 §8,
- * slice P9a). Operator tier, POST `{ action }`:
+ * slice P9a). POST `{ action }`:
  *
- *   status          → the stored address and its state
- *   add { domain }  → refused; the team sets up domains
- *   check           → read Hosting's state now ("Check now")
- *   remove          → refused; the team removes domains
+ *   status          → the stored address and its state (operator)
+ *   add { domain }  → refused for every admin; the team sets up domains
+ *   check           → read Hosting's state now ("Check now") (operator)
+ *   remove          → refused for every admin; the team removes domains
+ *                     with scripts/remove-web-address.cjs
  *
  * STATES. `none` → `records` (the team adds the records; checks run) →
  * `switch` (Hosting serves the domain with a certificate, and the domain is
@@ -32,9 +33,6 @@ const COLLECTION = 'web_address';
 const DOC = 'current';
 const HOSTING_API = 'https://firebasehosting.googleapis.com/v1beta1';
 const IDENTITY_API = 'https://identitytoolkit.googleapis.com/admin/v2';
-const LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-// Addresses the site already has, or that belong to the platform.
-const RESERVED_SUFFIXES = Object.freeze(['.web.app', '.firebaseapp.com', '.eventrunner.org']);
 const WAITING = 'records';
 
 class WebAddressError extends Error {
@@ -42,17 +40,6 @@ class WebAddressError extends Error {
 }
 const fail = (status, code, message) => { throw new WebAddressError(status, code, message); };
 const UNAVAILABLE = 'The web address service did not answer. Try again in a few minutes.';
-
-/** A plain domain in lowercase, or null. No scheme, path, port or trailing dot. */
-function normalizeDomain(value) {
-  if (typeof value !== 'string') return null;
-  const domain = value.trim().toLowerCase().replace(/\.$/, '');
-  if (domain.length > 253 || /[^a-z0-9.-]/.test(domain)) return null;
-  const labels = domain.split('.');
-  if (labels.length < 2 || !labels.every((label) => LABEL.test(label))) return null;
-  if (RESERVED_SUFFIXES.some((suffix) => domain.endsWith(suffix))) return null;
-  return domain;
-}
 
 function iso(value) {
   if (value instanceof Date) return value.toISOString();
@@ -191,23 +178,6 @@ function createHostingClient({ projectId, site, fetchImpl = globalThis.fetch, ge
   // Null while Hosting has no such domain, or has not finished making it.
   const read = (domain) => googleCall({ fetchImpl, getAccessToken, url: `${base}/${encodeURIComponent(domain)}`, missingOk: true });
   return {
-    /**
-     * Create the domain, reuse it when Hosting already has it, or restore it
-     * when it was removed in the last 30 days. Creating is a long-running
-     * operation; when it has not finished, there are no records yet and the
-     * next check reads them.
-     */
-    async addDomain(domain) {
-      const found = await read(domain);
-      if (found && !found.deleteTime) return { records: recordsToChange(found) };
-      if (found) {
-        await googleCall({ fetchImpl, getAccessToken, method: 'POST', url: `${base}/${encodeURIComponent(domain)}:undelete`, body: {} });
-      } else {
-        await googleCall({ fetchImpl, getAccessToken, method: 'POST', url: `${base}?customDomainId=${encodeURIComponent(domain)}`, body: {} });
-      }
-      const after = await read(domain);
-      return { records: after ? recordsToChange(after) : [] };
-    },
     async readDomain(domain) {
       const found = await read(domain);
       if (!found) return { live: false, records: [] };
@@ -234,12 +204,6 @@ function createIdentityClient({ projectId, fetchImpl = globalThis.fetch, getAcce
       if (!domains.includes(domain)) return;
       await googleCall({ fetchImpl, getAccessToken, method: 'PATCH', url: `${url}?updateMask=authorizedDomains`,
         body: { authorizedDomains: domains.filter((entry) => entry !== domain) } });
-    },
-    async addAuthorizedDomain(domain) {
-      const config = await googleCall({ fetchImpl, getAccessToken, url });
-      const domains = Array.isArray(config.authorizedDomains) ? config.authorizedDomains : [];
-      if (domains.includes(domain)) return;
-      await googleCall({ fetchImpl, getAccessToken, method: 'PATCH', url: `${url}?updateMask=authorizedDomains`, body: { authorizedDomains: [...domains, domain] } });
     },
   };
 }
@@ -295,6 +259,6 @@ function buildHandlers() {
 }
 
 module.exports = {
-  normalizeDomain, removeWebAddress, realClients, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
+  removeWebAddress, realClients, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
   get handlers() { return buildHandlers(); },
 };

@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const {
-  normalizeDomain, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
+  createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
 } = require('./webAddress.cjs');
 
 const NOW = new Date('2026-11-04T15:00:00Z');
@@ -23,14 +23,13 @@ function fakeHosting(state = {}) {
   return {
     calls,
     state: { live: false, records: RECORDS, ...state },
-    async addDomain(domain) { calls.push(['add', domain]); return { records: this.state.records }; },
     async readDomain(domain) { calls.push(['read', domain]); return { live: this.state.live, records: this.state.live ? [] : this.state.records }; },
     async removeDomain(domain) { calls.push(['remove', domain]); },
   };
 }
 function fakeIdentity(domains = ['localhost', 'example-event.web.app', 'summit.example.org']) {
   const calls = [];
-  return { calls, domains, async hasAuthorizedDomain(domain) { return this.domains.includes(domain); }, async removeAuthorizedDomain(domain) { this.domains = this.domains.filter((entry) => entry !== domain); }, async addAuthorizedDomain(domain) { calls.push(domain); if (!this.domains.includes(domain)) this.domains.push(domain); } };
+  return { calls, domains, async hasAuthorizedDomain(domain) { return this.domains.includes(domain); }, async removeAuthorizedDomain(domain) { calls.push(['remove', domain]); this.domains = this.domains.filter((entry) => entry !== domain); } };
 }
 function setup({ hosting = fakeHosting(), identity = fakeIdentity(), env = { EVENT_PUBLIC_URL: 'https://example-event.eventrunner.org' }, seed = {} } = {}) {
   const db = makeFakeDb({
@@ -46,14 +45,6 @@ function setup({ hosting = fakeHosting(), identity = fakeIdentity(), env = { EVE
   }
   return { db, hosting, identity, call, env };
 }
-
-test('normalizeDomain takes a plain domain and refuses what cannot be one', () => {
-  assert.equal(normalizeDomain(' Summit.Example.ORG. '), 'summit.example.org');
-  assert.equal(normalizeDomain('https://summit.example.org/path'), null);
-  for (const bad of ['localhost', 'example', '-bad.example.org', 'a..b.org', 'x'.repeat(64) + '.org', 'site.web.app', 'site.firebaseapp.com', 'event.eventrunner.org', 42]) {
-    assert.equal(normalizeDomain(bad), null, String(bad));
-  }
-});
 
 test('only an operator reads web address status', async () => {
   const { call } = setup();
@@ -160,37 +151,6 @@ function hostingFetch(answers) {
   };
   return { requests, client: createHostingClient({ projectId: 'example-event', site: 'example-site', fetchImpl, getAccessToken: async () => 'token' }) };
 }
-const BASE = 'https://firebasehosting.googleapis.com/v1beta1/projects/example-event/sites/example-site/customDomains';
-
-test('adding a new domain creates it, and a slow operation still gives a record to check later', async () => {
-  const { requests, client } = hostingFetch([
-    { status: 404, body: {} },                       // not there yet
-    { status: 200, body: { name: 'operations/1', done: false } },
-    { status: 404, body: {} },                       // creation not finished
-  ]);
-  const added = await client.addDomain('summit.example.org');
-  assert.deepEqual(added, { records: [] });
-  assert.deepEqual(requests.map(([method, url]) => [method, url.replace(BASE, '')]), [
-    ['GET', '/summit.example.org'], ['POST', '?customDomainId=summit.example.org'], ['GET', '/summit.example.org'],
-  ]);
-});
-
-test('adding a domain Hosting already has reuses it, and a removed one is restored', async () => {
-  const live = { hostState: 'HOST_ACTIVE', requiredDnsUpdates: { desired: [] } };
-  const existing = hostingFetch([{ status: 200, body: live }]);
-  await existing.client.addDomain('summit.example.org');
-  assert.deepEqual(existing.requests.map(([method]) => method), ['GET']);
-
-  const removed = hostingFetch([
-    { status: 200, body: { ...live, deleteTime: '2026-11-01T00:00:00Z' } },
-    { status: 200, body: { name: 'operations/2' } },
-    { status: 200, body: live },
-  ]);
-  await removed.client.addDomain('summit.example.org');
-  assert.deepEqual(removed.requests.map(([method, url]) => [method, url.replace(BASE, '')]), [
-    ['GET', '/summit.example.org'], ['POST', '/summit.example.org:undelete'], ['GET', '/summit.example.org'],
-  ]);
-});
 
 test('the scheduled check changes nothing on a read-only historical demo', async () => {
   const { db, hosting, identity, env } = setup();
@@ -214,21 +174,6 @@ test('a check still running when the address is removed does not bring it back',
   release();
   await check;
   assert.equal(db.read('web_address', 'current'), undefined);
-});
-
-test('the identity client adds the domain to the authorized domains once', async () => {
-  const requests = [];
-  const fetchImpl = async (url, init = {}) => {
-    requests.push([init.method || 'GET', url, init.body ? JSON.parse(init.body) : null]);
-    return { ok: true, status: 200, async json() { return { authorizedDomains: ['localhost', 'example-event.web.app'] }; } };
-  };
-  const client = createIdentityClient({ projectId: 'example-event', fetchImpl, getAccessToken: async () => 'token' });
-  await client.addAuthorizedDomain('summit.example.org');
-  assert.equal(requests.length, 2);
-  assert.deepEqual(requests[1], [
-    'PATCH', 'https://identitytoolkit.googleapis.com/admin/v2/projects/example-event/config?updateMask=authorizedDomains',
-    { authorizedDomains: ['localhost', 'example-event.web.app', 'summit.example.org'] },
-  ]);
 });
 
 test('domain removal revokes sign-in before deleting Hosting and the stored record', async () => {
