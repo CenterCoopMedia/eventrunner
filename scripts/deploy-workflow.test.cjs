@@ -273,6 +273,19 @@ test('no continue-on-error key anywhere, publisher included (spec §8.1)', () =>
   assert.doesNotMatch(workflow, /^\s*continue-on-error:/m);
 });
 
+test('the one-time data rewrites run after the functions deploy, never on a bootstrap', () => {
+  const order = [
+    'Deploy functions',
+    'Remove persisted security exposure from earlier releases',
+    'Rewrite pitch declines stored as rejected',
+    'Rewrite numeric ticket dates as timestamps',
+  ].map((name) => workflow.indexOf(`      - name: ${name}\n`));
+  assert.ok(order.every((at, i) => at !== -1 && (i === 0 || at > order[i - 1])), 'steps missing or out of order');
+  const tickets = step('Rewrite numeric ticket dates as timestamps');
+  assert.match(tickets, /if: inputs\.bootstrap != true/);
+  assert.match(tickets, /run: node scripts\/migrate-ticket-dates\.cjs$/m);
+});
+
 // ----------------------------------------------------------- firebase.json
 //
 // The hosting rewrites decide which requests reach a function and which
@@ -296,6 +309,14 @@ const PRIVATE_SOURCES = [
   '/schedule/mine',
   '/speaker/**',
   '/ticket/**',
+  // Signed-in pages: each shows only a sign-in prompt to a visitor with
+  // no account, and the order number in a /tickets/status link gives no
+  // access by itself.
+  '/dashboard',
+  '/registration',
+  '/registration/**',
+  '/tickets/mine',
+  '/tickets/status',
   '/admin',
   '/admin/**',
 ];

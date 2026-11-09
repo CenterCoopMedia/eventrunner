@@ -577,9 +577,10 @@ client already past step 3 never needs it again.
   self-fetch is failing: check `EVENT_PUBLIC_URL` and that hosting is actually serving
   `/index.html`.
 - `firebase.json`'s rewrite **order** is load-bearing. `/updates/**` goes to `updatesMeta` first;
-  then the account and staff routes (`/signin`, `/profile`, `/attendees`, `/attendees/**`,
-  `/schedule/mine`, `/speaker/**`, `/ticket/**`, `/admin`, `/admin/**`) are rewritten straight to
-  `/index.html`, because they carry nothing a crawler should index and spending a function
+  then the account and staff routes (`/signin`, `/profile`, `/profile/**`, `/attendees`,
+  `/attendees/**`, `/schedule/mine`, `/speaker/**`, `/ticket/**`, `/dashboard`, `/registration`,
+  `/registration/**`, `/tickets/mine`, `/tickets/status`, `/admin`, `/admin/**`) are rewritten
+  straight to `/index.html`, because they carry nothing a crawler should index and spending a function
   invocation to say so is waste; then the `**` catch-all goes to `routeMeta`. Adding a public route
   needs nothing here — the catch-all already covers it. Adding an authenticated one means adding it
   to that middle block, **above** the catch-all, and to the `headers` block below it. Hosting
@@ -1566,6 +1567,8 @@ It adds provenance only when exactly one redeemed operator-issued link matches t
 draft, organization and original creator. Other old drafts are quarantined. They
 cannot accept an agreement or start provisioning; contact the hosting team for a
 new paid signup link. Acceptance checks that provenance inside its transaction.
+The marker `data_migrations/console-signup-links-2026-11-06` makes later deploys
+skip the scan, and the log shows only counts.
 
 A web-address status check observes Hosting and sign-in authorization. It never
 adds a sign-in domain. The hosting team authorizes a new domain during setup.
@@ -1608,6 +1611,12 @@ from `notices.rejected` to `notices.declined`. If a pitch already has a
 `notices.declined` record, the old record stays as it is. The code reads both
 spellings, so the step is safe to run before or after any review. The marker
 is `data_migrations/pitch-declined-2026-11-08`, and the log shows only counts.
+
+Then it runs `scripts/migrate-ticket-dates.cjs` once per project. Before a fix,
+the CSV ticket import stored `tickets` `createdAt` and `updatedAt` as numbers.
+The step writes each one as a timestamp for the same moment and changes nothing
+else. Add `--dry-run` to count without writing. The marker is
+`data_migrations/ticket-dates-2026-11-09`, and the log shows only counts.
 
 New client builds and retries dispatch both provisioning and deployment from `main`.
 A previous successful deployment is reusable only when GitHub proves that its commit

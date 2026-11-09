@@ -32,6 +32,11 @@
       { "source": "/schedule/mine", "destination": "/index.html" },
       { "source": "/speaker/**", "destination": "/index.html" },
       { "source": "/ticket/**", "destination": "/index.html" },
+      { "source": "/dashboard", "destination": "/index.html" },
+      { "source": "/registration", "destination": "/index.html" },
+      { "source": "/registration/**", "destination": "/index.html" },
+      { "source": "/tickets/mine", "destination": "/index.html" },
+      { "source": "/tickets/status", "destination": "/index.html" },
       { "source": "/admin", "destination": "/index.html" },
       { "source": "/admin/**", "destination": "/index.html" },
       {
@@ -87,6 +92,26 @@
       },
       {
         "source": "/ticket/**",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
+      },
+      {
+        "source": "/dashboard",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
+      },
+      {
+        "source": "/registration",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
+      },
+      {
+        "source": "/registration/**",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
+      },
+      {
+        "source": "/tickets/mine",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
+      },
+      {
+        "source": "/tickets/status",
         "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }, { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=300, must-revalidate" }]
       },
       {

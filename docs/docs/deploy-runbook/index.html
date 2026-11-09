@@ -641,9 +641,10 @@
           self-fetch is failing: check <code>EVENT_PUBLIC_URL</code> and that hosting is actually serving
           <code>/index.html</code>.</p></li>
           <li><p><code>firebase.json</code>&#39;s rewrite <strong>order</strong> is load-bearing. <code>/updates/**</code> goes to <code>updatesMeta</code> first;
-          then the account and staff routes (<code>/signin</code>, <code>/profile</code>, <code>/attendees</code>, <code>/attendees/**</code>,
-          <code>/schedule/mine</code>, <code>/speaker/**</code>, <code>/ticket/**</code>, <code>/admin</code>, <code>/admin/**</code>) are rewritten straight to
-          <code>/index.html</code>, because they carry nothing a crawler should index and spending a function
+          then the account and staff routes (<code>/signin</code>, <code>/profile</code>, <code>/profile/**</code>, <code>/attendees</code>,
+          <code>/attendees/**</code>, <code>/schedule/mine</code>, <code>/speaker/**</code>, <code>/ticket/**</code>, <code>/dashboard</code>, <code>/registration</code>,
+          <code>/registration/**</code>, <code>/tickets/mine</code>, <code>/tickets/status</code>, <code>/admin</code>, <code>/admin/**</code>) are rewritten
+          straight to <code>/index.html</code>, because they carry nothing a crawler should index and spending a function
           invocation to say so is waste; then the <code>**</code> catch-all goes to <code>routeMeta</code>. Adding a public route
           needs nothing here — the catch-all already covers it. Adding an authenticated one means adding it
           to that middle block, <strong>above</strong> the catch-all, and to the <code>headers</code> block below it. Hosting
@@ -1550,7 +1551,9 @@
           It adds provenance only when exactly one redeemed operator-issued link matches the
           draft, organization and original creator. Other old drafts are quarantined. They
           cannot accept an agreement or start provisioning; contact the hosting team for a
-          new paid signup link. Acceptance checks that provenance inside its transaction.</p>
+          new paid signup link. Acceptance checks that provenance inside its transaction.
+          The marker <code>data_migrations/console-signup-links-2026-11-06</code> makes later deploys
+          skip the scan, and the log shows only counts.</p>
           <p>A web-address status check observes Hosting and sign-in authorization. It never
           adds a sign-in domain. The hosting team authorizes a new domain during setup.
           To retire a client&#39;s stored custom domain, keep ownership of its DNS registration,
@@ -1588,6 +1591,11 @@
           <code>notices.declined</code> record, the old record stays as it is. The code reads both
           spellings, so the step is safe to run before or after any review. The marker
           is <code>data_migrations/pitch-declined-2026-11-08</code>, and the log shows only counts.</p>
+          <p>Then it runs <code>scripts/migrate-ticket-dates.cjs</code> once per project. Before a fix,
+          the CSV ticket import stored <code>tickets</code> <code>createdAt</code> and <code>updatedAt</code> as numbers.
+          The step writes each one as a timestamp for the same moment and changes nothing
+          else. Add <code>--dry-run</code> to count without writing. The marker is
+          <code>data_migrations/ticket-dates-2026-11-09</code>, and the log shows only counts.</p>
           <p>New client builds and retries dispatch both provisioning and deployment from <code>main</code>.
           A previous successful deployment is reusable only when GitHub proves that its commit
           is the provisioning revision or a descendant of it, and its settings are current.

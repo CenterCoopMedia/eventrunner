@@ -164,7 +164,10 @@ test('classifyPages splits public pages from excluded pages and appends the stat
 
   // Every static private route from apps/web/src/App.jsx is present, each
   // carrying no cmsPages id.
-  const staticPaths = ['/admin', '/signin', '/profile', '/dashboard', '/schedule/mine', '/speaker/profile', '/speaker/accept', '/ticket/claim'];
+  const staticPaths = [
+    '/admin', '/signin', '/profile', '/dashboard', '/registration', '/tickets/mine', '/tickets/status',
+    '/schedule/mine', '/speaker/profile', '/speaker/accept', '/ticket/claim',
+  ];
   for (const path of staticPaths) {
     assert.ok(excluded.some((r) => r.path === path && r.id === null), `${path} must be a static excluded route`);
   }
@@ -179,6 +182,9 @@ test('only routes with their own subtree of further pages carry hasChildren', ()
   // Account pages live under /profile, such as /profile/organization (#334).
   assert.equal(byPath['/profile'].hasChildren, true);
   assert.equal(byPath['/dashboard'].hasChildren, false);
+  // Its steps live under it, as /registration/:stepSlug.
+  assert.equal(byPath['/registration'].hasChildren, true);
+  assert.equal(byPath['/tickets/mine'].hasChildren, false);
   assert.equal(byPath['/signin'].hasChildren, false);
 });
 
@@ -279,7 +285,7 @@ test('robots.txt names the hidden page, the flag-off system page, and the attend
 
 test('robots.txt names every non-token static private route, exact-path anchored', () => {
   const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
-  for (const path of ['/signin', '/profile', '/schedule/mine', '/speaker/profile']) {
+  for (const path of ['/signin', '/profile', '/dashboard', '/registration', '/tickets/mine', '/tickets/status', '/schedule/mine', '/speaker/profile']) {
     assert.ok(robots.split('\n').includes(`Disallow: ${path}$`), path);
   }
 });
