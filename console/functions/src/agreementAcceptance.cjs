@@ -113,7 +113,6 @@ async function acceptAgreement(deps, { body, user }) {
   const title = typed(body.title, 'title', 'Type your job title to accept the agreement.');
   if (!(await readSignupTerms((r) => r.get(), db)).open) throw signupsClosed();
   refuseIncomplete(checkAnswers(first.data.answers, first.data.connections, { testMode }));
-  await takeSubmitSlot(db, user, now);
 
   const at = new Date(now());
   const recordRef = db.collection(COLLECTION).doc();
@@ -134,6 +133,8 @@ async function acceptAgreement(deps, { body, user }) {
       throw new ConsoleError(409, 'agreement-changed', 'The agreement changed. Read the new version, then accept it.');
     }
     const answers = await answersToFreeze(tx, db, appId, data, { testMode });
+    // Last read, first write: every refusal above has charged nothing.
+    await takeSubmitSlot(tx, db, user, now);
     const { version, sha256 } = terms.agreement;
     tx.create(recordRef, { version, sha256, typedName: name, legalName, title, email: user.email, uid: user.uid, orgId, appId, at });
     tx.update(ref, {

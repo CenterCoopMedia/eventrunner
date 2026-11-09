@@ -13,7 +13,7 @@ const { ConsoleError } = require('./http.cjs');
 const { requireOwner, validOrgId } = require('./access.cjs');
 const { withDefaults } = require('./answers.cjs');
 const { checkAnswers } = require('./checks.cjs');
-const { takeSlot } = require('./rateLimit.cjs');
+const { takeSlotIn } = require('./rateLimit.cjs');
 const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames } = require('./siteNames.cjs');
 const { ARCHIVED_MESSAGE, CLOSED, WITHDRAWABLE, historyEntry, readApplication } = require('./applications.cjs');
 
@@ -102,9 +102,13 @@ async function answersToFreeze(tx, db, appId, data, { testMode = false } = {}) {
   return answers;
 }
 
-/** The limit on accepting. A refused acceptance does not use a slot. */
-function takeSubmitSlot(db, user, now) {
-  return takeSlot(db, {
+/**
+ * The limit on accepting, inside the acceptance's own transaction, so a
+ * refused acceptance does not use a slot. Call it after the last read and
+ * before the first write: Firestore wants every read first.
+ */
+function takeSubmitSlot(tx, db, user, now) {
+  return takeSlotIn(tx, db, {
     key: `submit-app-${user.uid}`,
     max: SUBMITS_PER_DAY,
     windowMs: DAY_MS,
