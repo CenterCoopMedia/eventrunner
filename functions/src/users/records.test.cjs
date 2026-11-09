@@ -11,6 +11,7 @@ const {
   createDeleteAttendeeHandler,
   internals: { MAX_RELEASED_CLAIMS, DELETE_INCOMPLETE_MESSAGE },
 } = require('./records.cjs');
+const { internals: { rateLimitIdFor } } = require('../sessions/pitches.cjs');
 
 // requireAdmin reads config/bootstrap LIVE and fails closed on an absent
 // document, so every fake carries it. The delete's admin guard reads the
@@ -289,6 +290,12 @@ async function fullySeeded(overrides = {}) {
     // Registration answers (ADR 0008 §4): Ada's go with her; Bo's stay.
     'ticket_answers/t-ada': { ticketId: 't-ada', uid: 'uid-ada', answers: { accessNeeds: 'Step-free stage.' } },
     'ticket_answers/t-bo': { ticketId: 't-bo', uid: 'uid-bo', answers: {} },
+    // Session pitches and the pitch rate-limit row, keyed by a hash of the uid.
+    'session_pitches/p-ada-1': { title: 'Data desks', uid: 'uid-ada', email: 'ada@example.com', status: 'new' },
+    'session_pitches/p-ada-2': { title: 'Shared tips', uid: 'uid-ada', email: 'ada@example.com', status: 'declined' },
+    'session_pitches/p-bo-1': { title: 'Keep me', uid: 'uid-bo', email: 'bo@example.com', status: 'new' },
+    [`session_pitch_rate_limits/${rateLimitIdFor('uid-ada')}`]: { requests: [T0.getTime()], updatedAt: T0 },
+    [`session_pitch_rate_limits/${rateLimitIdFor('uid-bo')}`]: { requests: [T0.getTime()], updatedAt: T0 },
   });
   await db.collection('users/uid-ada/bookmarks').doc('s1').set({ bookmarkedAt: T0 });
   await db.collection('users/uid-ada/bookmarks').doc('s2').set({ bookmarkedAt: T0 });
@@ -329,6 +336,8 @@ function assertUntouched(d) {
   assert.ok(db.read('change_request_rate_limits', 'uid-ada'));
   assert.ok(db.read('organization_representatives', 'uid-ada'));
   assert.ok(db.read('organization_edit_requests', 'beacon-fund'));
+  assert.ok(db.read('session_pitches', 'p-ada-1'));
+  assert.ok(db.read('session_pitch_rate_limits', rateLimitIdFor('uid-ada')));
   assert.deepEqual(adminLogs(db), []);
 }
 
@@ -346,6 +355,8 @@ function assertNeighbourKept({ db, auth, bucket }) {
   assert.ok(db.read('organization_representatives', 'uid-bo'));
   assert.ok(db.read('organization_edit_requests', 'tide-media'));
   assert.ok(db.read('ticket_answers', 't-bo'));
+  assert.ok(db.read('session_pitches', 'p-bo-1'));
+  assert.ok(db.read('session_pitch_rate_limits', rateLimitIdFor('uid-bo')));
 }
 
 test('the per-account store list is one named constant the delete reads', () => {
@@ -354,7 +365,7 @@ test('the per-account store list is one named constant the delete reads', () => 
     [
       'users_public', 'schedule_shares', 'organization_representatives', 'tickets', 'bookmarks',
       'sessionNotes', 'profile-photos', 'profile_photo_uploads', 'change_requests', 'change_request_rate_limits',
-      'organization_edit_requests', 'ticket_answers',
+      'organization_edit_requests', 'ticket_answers', 'session_pitches', 'session_pitch_rate_limits',
     ],
   );
   assert.ok(Object.isFrozen(PER_ACCOUNT_STORES));
@@ -374,10 +385,12 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
     uid: 'uid-ada',
     removed: {
       tickets: 1, bookmarks: 2, notes: 1, photos: 2, photoUploads: 1, changeRequests: 2, changeRequestLimits: 1, organizationEdits: 1,
-      registrationAnswers: 1,
+      registrationAnswers: 1, sessionPitches: 2, sessionPitchLimits: 1,
     },
   });
   assert.equal(db.read('ticket_answers', 't-ada'), undefined);
+  assert.deepEqual(db.ids('session_pitches'), ['p-bo-1']);
+  assert.equal(db.read('session_pitch_rate_limits', rateLimitIdFor('uid-ada')), undefined);
   // Out of the directory, and no longer a representative.
   assert.equal(db.read('users', 'uid-ada'), undefined);
   assert.equal(db.read('organization_representatives', 'uid-ada'), undefined);
@@ -653,6 +666,15 @@ test('404 only when no account, sign-in, saved session, note, or photo remains',
   const signIn = deps(makeFakeDb(), { auth: makeAuth({ 'uid-left': 'left@example.com' }), bucket: makeBucket([]) });
   assert.equal((await remove(signIn, 'uid-left')).statusCode, 200);
   assert.ok(!signIn.auth.users.has('uid-left'));
+
+  // And a pitch rate-limit row, found by the hash of the uid.
+  const limit = deps(makeFakeDb({
+    [`session_pitch_rate_limits/${rateLimitIdFor('uid-left')}`]: { requests: [T0.getTime()], updatedAt: T0 },
+  }), { auth: makeAuth({}), bucket: makeBucket([]) });
+  const limitRes = await remove(limit, 'uid-left');
+  assert.equal(limitRes.statusCode, 200);
+  assert.equal(limitRes.body.removed.sessionPitchLimits, 1);
+  assert.deepEqual(limit.db.ids('session_pitch_rate_limits'), []);
 });
 
 test('a resumed delete re-checks the admin guard against the remaining sign-in', async () => {
@@ -700,7 +722,7 @@ test('the sweep clears more than one page of every store, a page at a time', asy
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.deepEqual(res.body.removed, {
     tickets: 0, bookmarks: 250, notes: 450, photos: 501, photoUploads: 0, changeRequests: 450, changeRequestLimits: 0,
-    organizationEdits: 0, registrationAnswers: 0,
+    organizationEdits: 0, registrationAnswers: 0, sessionPitches: 0, sessionPitchLimits: 0,
   });
   assert.deepEqual(db.ids('change_requests'), []);
   assert.deepEqual(db.ids('users/uid-ada/bookmarks'), []);
@@ -875,6 +897,8 @@ test('the auth onDelete trigger releases the account\'s tickets and clears its s
   assert.ok(db.read('ticket_answers', 't-bo'));
   assert.equal(db.read('change_requests', 'cr-ada-1'), undefined);
   assert.ok(db.read('change_requests', 'cr-bo-1'));
+  assert.deepEqual(db.ids('session_pitches'), ['p-bo-1']);
+  assert.equal(db.read('session_pitch_rate_limits', rateLimitIdFor('uid-ada')), undefined);
   assert.deepEqual([...bucket.files].filter((path) => path.includes('uid-ada')), []);
   assert.ok(bucket.files.has('profile-photos/uid-bo/photo.jpg'));
 });

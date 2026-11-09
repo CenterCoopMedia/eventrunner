@@ -34,8 +34,9 @@
  *      claims, and writes the audit row — together. After it, the account
  *      is out of the directory.
  *   2. The sweep deletes the sign-in, the saved sessions (lowering each
- *      session's count), the private notes, the profile photo files, and
- *      the change requests the account sent with their rate-limit window.
+ *      session's count), the private notes, the profile photo files, the
+ *      change requests the account sent with their rate-limit window, and
+ *      the session pitches it sent with theirs.
  *      These can outgrow one transaction's 500-write ceiling, which would
  *      strand an account that could never be deleted, so they run after
  *      the commit, each step on its own. The sweep also releases any ticket
@@ -59,6 +60,9 @@ const { logAdminAction } = require('../cms/store.cjs');
 const {
   internals: { readUid },
 } = require('./approval.cjs');
+const {
+  internals: { rateLimitIdFor: pitchRateLimitIdFor },
+} = require('../sessions/pitches.cjs');
 
 const USERS = 'users';
 const ADMIN_LOGS = 'admin_logs';
@@ -91,7 +95,9 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
  *   a claim the deleted session makes after the commit does not stay on
  *   the record; a resumed delete that finds one does not answer 404.
  *
- *   kind 'doc'        — the document `{collection}/{uid}`.
+ *   kind 'doc'        — the document `{collection}/{uid}`, or
+ *                       `{collection}/{idOf(uid)}` when the store keys it
+ *                       by a hash of the uid.
  *   kind 'owned'      — every `{collection}` document whose `{field}` is the
  *                       uid. The documents are deleted.
  *   kind 'claim'      — every `{collection}` document whose `{field}` is the
@@ -141,7 +147,21 @@ const PER_ACCOUNT_STORES = Object.freeze([
   // saveTicketAnswers checks the ticket's claim in its transaction, and the
   // directory phase clears that claim, so no answer lands after this sweep.
   { phase: 'sweep', kind: 'owned', collection: 'ticket_answers', field: 'uid', key: 'registrationAnswers' },
+  // The session pitches the account sent and its pitch rate-limit window.
+  // A pitch holds the address and free text, so it goes with the account.
+  // The submit endpoint checks the ID token for revocation, and the sweep
+  // deletes the sign-in before this step, so none lands after it.
+  { phase: 'sweep', kind: 'owned', collection: 'session_pitches', field: 'uid', key: 'sessionPitches' },
+  {
+    phase: 'sweep', kind: 'doc', collection: 'session_pitch_rate_limits', idOf: pitchRateLimitIdFor,
+    key: 'sessionPitchLimits',
+  },
 ]);
+
+/** The id of a 'doc' store's document for the account. */
+function docIdOf(store, uid) {
+  return store.idOf ? store.idOf(uid) : uid;
+}
 
 /** Firestore's per-transaction write ceiling. */
 const MAX_TRANSACTION_WRITES = 500;
@@ -387,7 +407,7 @@ async function removeFromDirectory({ db, uid, signInEmail, actor, now }) {
       released[store.key] = docs.length;
     }
     for (const store of DIRECTORY_STORES) {
-      if (store.kind === 'doc') tx.delete(db.collection(store.collection).doc(uid));
+      if (store.kind === 'doc') tx.delete(db.collection(store.collection).doc(docIdOf(store, uid)));
     }
     tx.delete(userRef);
     tx.set(db.collection(ADMIN_LOGS).doc(), {
@@ -513,9 +533,9 @@ async function sweepOwned({ db, uid, store }) {
   }
 }
 
-/** Delete the document `{collection}/{uid}`, counting it when it was there. */
+/** Delete the store's document for the account, counting it when it was there. */
 async function sweepDoc({ db, uid, store }) {
-  const ref = db.collection(store.collection).doc(uid);
+  const ref = db.collection(store.collection).doc(docIdOf(store, uid));
   const snap = await ref.get();
   if (!snap.exists) return 0;
   await ref.delete();
@@ -536,7 +556,7 @@ async function holdsAnything({ db, getBucket, uid, store }) {
   if (store.kind === 'claim') return !(await claimsOn(db, uid, store).limit(1).get()).empty;
   if (store.kind === 'files') return (await pageOfFiles(getBucket(), store.prefix, uid, 1)).length > 0;
   if (store.kind === 'owned') return !(await ownedBy(db, uid, store).limit(1).get()).empty;
-  if (store.kind === 'doc') return (await db.collection(store.collection).doc(uid).get()).exists;
+  if (store.kind === 'doc') return (await db.collection(store.collection).doc(docIdOf(store, uid)).get()).exists;
   return (await pageOfMembers(db, uid, store.subcollection, 1)).length > 0;
 }
 
