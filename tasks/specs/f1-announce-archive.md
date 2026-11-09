@@ -35,6 +35,7 @@ An operator can set and clear `config/event.announcedAt` and `config/event.archi
 - The form keeps the naive string. The field gets the instant that the naive string names in the event zone. A changed instant goes back into the form as a naive string in that zone. A change to the event time zone keeps the wall clock.
 - A time the clocks pass twice: the operator chooses one, and the choice stays. Both send the same wall clock.
 - The values travel in the existing `toPayload` (operator only). The existing save button, unsaved state and save message apply.
+- An operator save sends a date only when the operator changed it. The form compares each date with its baseline: the value the form adopted from the live config, and after a save, the value that save sent. An untouched date is not sent, and the server's merge keeps the stored value. Thus a save of another field does not undo an announce or archive that another operator made while this page was open.
 - A field with an incomplete or skipped time stops the save: the field shows its problem, and focus moves to it. A blank field sends `null` (clears the date).
 - A server error on `announcedAt` or `archivedAt` shows under that field, and in the existing error summary.
 
@@ -49,4 +50,4 @@ An operator can set and clear `config/event.announcedAt` and `config/event.archi
 
 - `packages/shared/src/config/schema.test.cjs`: the accept and refuse cases above.
 - `functions/src/admin/config.test.cjs`: staff change refused, staff unchanged accepted and stored bytes kept, operator change accepted, `findOperatorKeyChanges` names each key.
-- `apps/web/src/admin/pages/AdminEventSettings.test.jsx`: operator sees editable fields and the phase, the saved payload carries naive local strings, a cleared field sends null, staff sees read-only text and the payload has no lifecycle keys, a server error shows on the field, an incomplete field stops the save and gets focus, a time the clocks pass twice keeps its choice.
+- `apps/web/src/admin/pages/AdminEventSettings.test.jsx`: operator sees editable fields and the phase, the saved payload carries naive local strings, a cleared field sends null, an untouched date is not sent (also when the stored value changed after the form adopted it), the next save is measured from the dates the last save sent, staff sees read-only text and the payload has no lifecycle keys, a server error shows on the field, an incomplete field stops the save and gets focus, a time the clocks pass twice keeps its choice.

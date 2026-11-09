@@ -282,6 +282,25 @@ function toPayload(form, { includeSender = true, includeLifecycle = true } = {})
   };
 }
 
+/** The announce and archive dates as the form would send them. */
+function lifecycleOf(form) {
+  return { announcedAt: orNull(form.announcedAt), archivedAt: orNull(form.archivedAt) };
+}
+
+/**
+ * The payload without the lifecycle dates this form did not change. The
+ * form adopts the live config once, so an untouched date can be stale:
+ * another operator may have announced or archived the event since. A key
+ * left out is kept as stored by the server's merge.
+ */
+function withoutUntouchedLifecycle(payload, baseline) {
+  const sent = { ...payload };
+  for (const key of Object.keys(baseline)) {
+    if (key in sent && sent[key] === baseline[key]) delete sent[key];
+  }
+  return sent;
+}
+
 export default function AdminEventSettings() {
   const { eventConfig, sources } = useEventConfig();
   const call = useAdminApi();
@@ -319,11 +338,17 @@ export default function AdminEventSettings() {
   // merge over the stored doc — seeded-from-snapshot values would overwrite
   // production ones field by field.
   const adoptedRef = useRef(sources.event === 'live');
+  // The lifecycle dates the form adopted, then the ones the last save sent.
+  // A save sends a date only when the form differs from this.
+  const lifecycleBaseline = useRef(null);
+  if (lifecycleBaseline.current === null) lifecycleBaseline.current = lifecycleOf(form);
 
   useEffect(() => {
     if (adoptedRef.current || sources.event !== 'live') return;
     adoptedRef.current = true;
-    setForm(toForm(eventConfig));
+    const adopted = toForm(eventConfig);
+    lifecycleBaseline.current = lifecycleOf(adopted);
+    setForm(adopted);
   }, [sources.event, eventConfig]);
 
   useEffect(() => {
@@ -486,8 +511,13 @@ export default function AdminEventSettings() {
     // values afterwards, not with anything typed while the save runs.
     const sentLetters = submittedTrackLetters(form.tracks);
     const sentPlaceIds = new Set(form.venue.places.map((place) => String(place.id ?? '').trim()));
+    const payload = withoutUntouchedLifecycle(toPayload(form, payloadOptions), lifecycleBaseline.current);
     try {
-      await call('updateEventConfig', { event: toPayload(form, payloadOptions) });
+      await call('updateEventConfig', { event: payload });
+      // The sent dates are now stored. The next save is measured from them.
+      for (const key of Object.keys(lifecycleBaseline.current)) {
+        if (key in payload) lifecycleBaseline.current = { ...lifecycleBaseline.current, [key]: payload[key] };
+      }
       setForm((current) => ({
         ...current,
         venue: {
