@@ -67,6 +67,31 @@ page disagree, this page is the later word.
 | 20 | Console README: name limit (27, not 30) and the settings save. | 08 #1, #2 |
 | 21 | Documentation statements the code contradicts. | `11-doc-fixes.md` |
 
+## Follow-up (2026-11-09)
+
+The owner decided each item in the list below on the same day. Four stacked
+pull requests closed them: #783 (defects, rules, data handling), #784 (the
+half-built features), #786 (docs and repository weight) and #787 (dead code
+and refactors). `tasks/todo.md`, "Plan for review: audit follow-up", has the
+decision and the result for each item.
+
+Still open after the follow-up:
+
+- `getSiteContent` stays deployed. A deploy stops on a function that left
+  the code until an operator deletes it for each client site (A 10, D 2).
+- The four one-time migrations stay in the deploys until every site has run
+  them. Each now has a completion marker (D 1).
+- The console `applications` read grant stays, by decision (B 2).
+- The WAV audio stays: the video kit checks each file against a stored
+  hash. The evidence folders that a GitHub thread names stay (D 6).
+- `deploy-client.yml` action pinning, App Check in ADR 0007, the
+  `VITE_` variables, and `video/tests` in CI were not in the follow-up
+  (B 6, B 7, C 2, C 3).
+- The Eventbrite adapter, the sync resume token included, is not verified
+  against the live API. Issue #79 has the acceptance criteria.
+- The public demo's initial bundle is about 100 gzip bytes under its
+  limit. The next first-paint change needs room made first.
+
 ## For the owner to review
 
 Ordered by effect. Each line names the area file and finding that holds the
