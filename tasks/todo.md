@@ -92,19 +92,32 @@ After it merges, check `git merge-base --is-ancestor <top head> origin/main`.
 
 ### PR 4. Dead code and refactors (no product change)
 
-- [ ] Each dead item gets the owner's test first. Planned or half-built
-      items go back to the owner as a list. The rest are removed:
-      `ticketsPersisted`, `claimPromptSentAt`, order status `cancelled`,
-      `features.ticketing`, the speaker link primitives, the
-      `review.settings` branches, unused exports and CSS rules, four
-      unreferenced public files (01 #3, #4; 03 #4; 04 #5, #6; 05 #8;
-      06 #3, #10; 08 #8, #12).
-- [ ] Complete the five `.mjs` shims; a test compares each shim with its
-      module (07 #4).
-- [ ] One `CommerceError`; merge copied helpers where no first-page bundle
-      cost results (01 #7; 04 #8; 05 #9; 06 #9; 07 #9; 08 #9).
-- [ ] Single-record admin screens use `subscribeAdminDoc` (04 #7).
-- [ ] Batch the sequential reads (01 #8; 02 #14; 03 #9; 08 #10).
+- [x] Each dead item got the owner's test. Removed (no design intent, no
+      reader): `ticketsPersisted`, the order status `cancelled` reads,
+      `features.ticketing`, the speaker link wrappers (S7 below had kept
+      them; the owner's rule of 2026-11-09 is newer), `resolveSessionTrack`,
+      unused exports and CSS rules, four unreferenced public files.
+- [x] Planned, kept: `claimPromptSentAt` and the `ticket_unclaimed` and
+      `admin_resend` prompt triggers (ADR 0001); the status tables only
+      tests read (the shared status plan, S1, S2, S5).
+- [x] Not sure, kept: the `review.settings` branches (an earlier release
+      may have stored a value), `transitionOrderInventory` and
+      `takeFeedbackRateLimitSlot` (tests set up state with them),
+      `sessionIdFromTitle` (comments elsewhere name it).
+- [x] The five `.mjs` shims are complete; a test compares each shim, and
+      each entry of the exports map, with its module (07 #4).
+- [x] One `CommerceError`; copied helpers merged where no first-page
+      bundle cost results. Left: copies that keep a module off the first
+      paint, and copies whose results differ.
+- [x] The pitch page and three settings readers use `subscribeAdminDoc`.
+      `SpeakerSessionConfirmations` needs a filtered query and stays (04 #7).
+- [x] Sequential reads batched in the ticket reconcile, the purchaser
+      list, the publish path, the console review queue and organization list.
+- Not done, each a behaviour change and not a refactor: merge
+  `notifyOwners`/`ownerEmails` (changes an `emailed` count), the repeated
+  read in `users/lifecycle.cjs`, `isValidDocId` in `resolveRequest`, the
+  dashboard resource cards' visibility test, the console refusal text for
+  a built site.
 
 ### Done when
 
