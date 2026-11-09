@@ -295,7 +295,7 @@ function entryNames(files) {
  */
 const parseSize = parseStorageSize;
 
-/** "250.3" for 262,458,573 bytes. */
+/** "8.5" for 8,912,896 bytes. */
 function megabytes(bytes) {
   return (bytes / BYTES_PER_MB).toFixed(1);
 }
@@ -596,7 +596,7 @@ function buildHandlers() {
     listAllSessionMaterials: onRequest({ region }, withCors(async (req, res) => {
       await createListAllSessionMaterialsHandler(buildDeps())(req, res);
     })),
-    // 540 s: at the byte cap that is about 3.1 Mbit/s to the admin.
+    // 540 s: at the 9 MiB byte cap that is about 0.14 Mbit/s to the admin.
     downloadSessionMaterialsArchive: onRequest({ region, timeoutSeconds: 540 }, withCors(async (req, res) => {
       await createDownloadSessionMaterialsArchiveHandler(buildDeps())(req, res);
     })),

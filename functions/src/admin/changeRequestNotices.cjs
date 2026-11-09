@@ -72,8 +72,6 @@ const SLOT_TEMPLATES = Object.freeze({
 const OUTCOME_SLOTS = Object.freeze(['done', 'declined']);
 /** The requester's own page, which every notice links to. */
 const REQUESTS_PATH = '/profile/change-requests';
-// A queued record older than this is treated as interrupted. A younger one
-// may still be sending.
 const MAX_ERROR_LENGTH = 500;
 const MAX_BODY_BYTES = 4 * 1024;
 

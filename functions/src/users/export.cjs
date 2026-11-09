@@ -11,7 +11,9 @@
  *      are one list (EXPORT_COLUMNS), and each column reads one named field
  *      — no spread of the account document, so a field added to `users`
  *      later is private until it is added to that list. No uid, pronouns,
- *      bio, photo path, approval source, speaker id, or timestamp.
+ *      bio, photo path, approval source, speaker id, or timestamp. After
+ *      those columns comes one "Answer: …" column per registration
+ *      question (csvHeader), which can hold diet and access answers.
  *   2. A cell a spreadsheet would read as a formula is escaped (escapeCell).
  *   3. Every export writes an admin_logs row, and the file is refused when
  *      that write fails. This is a deliberate exception to the
@@ -118,6 +120,15 @@ function badgeLabels(badgesConfig) {
   return labels;
 }
 
+// One export builds every row from the same config, so the label map is
+// built once per config/badges object rather than once per account.
+const labelsByConfig = new WeakMap();
+function labelsFor(badgesConfig) {
+  if (!badgesConfig || typeof badgesConfig !== 'object') return badgeLabels(badgesConfig);
+  if (!labelsByConfig.has(badgesConfig)) labelsByConfig.set(badgesConfig, badgeLabels(badgesConfig));
+  return labelsByConfig.get(badgesConfig);
+}
+
 /**
  * The export's columns, in file order. Each reads one named field of the
  * account document (`user`) or of its public projection (`profile`, for the
@@ -176,7 +187,7 @@ function escapeCell(value) {
 function exportRow(user, config) {
   const source = user && typeof user === 'object' ? user : {};
   const profile = buildPublicProfile(source, config?.badges ?? null, config?.features ?? null);
-  const context = { user: source, profile, labels: badgeLabels(config?.badges) };
+  const context = { user: source, profile, labels: labelsFor(config?.badges) };
   return EXPORT_COLUMNS.map((column) => column.value(context));
 }
 

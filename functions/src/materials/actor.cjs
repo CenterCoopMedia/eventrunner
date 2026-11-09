@@ -2,7 +2,7 @@
 
 /**
  * Shared actor resolution for the materials HTTP handlers (store.cjs,
- * review.cjs, access.cjs) — one place that turns a request into
+ * access.cjs, download.cjs) — one place that turns a request into
  * `{ uid, email, isAdmin, speakerId }` so the three write-ACL variants in
  * store.cjs (admin-or-speaker-of-session create, admin-or-owning-speaker
  * update/delete) and the embargo predicate in access.cjs share a single

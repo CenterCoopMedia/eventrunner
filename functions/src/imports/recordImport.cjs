@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * `importRecordsCsv`: the staff CSV import for speakers, sessions and
- * organizations (sponsors). It follows the ticket import
+ * `importRecordsCsv`: the staff CSV import for speakers, sessions,
+ * organizations (sponsors) and registrations. It follows the ticket import
  * (ticketing/csvImport.cjs): the browser parses the file and sends
  * `{ type, mapping, rows }`, where `mapping` points this module's fixed
  * field names at the file's own column names, and the server runs one

@@ -359,8 +359,8 @@ test('a retry after the link committed but the transition did not still succeeds
 
   // Simulate the crash window: the pair write landed, the status/token
   // transition did not.
-  const { linkSpeakerToUser } = require('./lifecycle.cjs');
-  await linkSpeakerToUser({ db, speakerId: 'rae', uid: 'u1', now: () => T0 + 5 });
+  await db.collection('speakers').doc('rae').set({ uid: 'u1' }, { merge: true });
+  await db.collection('users').doc('u1').set({ speakerId: 'rae' }, { merge: true });
   assert.equal(db.read('speakers', 'rae').status, 'invited');
 
   const result = await acceptWith({ db, token: minted.token, uid: 'u1', email: 'rae@example.org', now: () => T0 + 10 });

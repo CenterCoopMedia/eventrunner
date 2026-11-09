@@ -271,12 +271,17 @@ function validateSessionShape(fields, docId) {
  * transaction's read set: a concurrent settings save that drops the track
  * this session is claiming aborts the save rather than racing it.
  */
-async function readTrackLetters({ db, tx }) {
-  const ref = db.collection(CONFIG_COLLECTION).doc(CONFIG_EVENT_DOC);
-  const snap = tx ? await tx.get(ref) : await ref.get();
+async function readTrackLetters({ db, tx, readEvent = () => readEventDoc({ db, tx }) }) {
+  const snap = await readEvent();
   const tracks = snap.exists ? snap.data()?.tracks : null;
   if (!Array.isArray(tracks)) return [];
   return tracks.map((t) => statedTrack(t?.letter)).filter((letter) => letter !== null);
+}
+
+/** config/event, read in `tx` when there is one. */
+async function readEventDoc({ db, tx }) {
+  const ref = db.collection(CONFIG_COLLECTION).doc(CONFIG_EVENT_DOC);
+  return tx ? tx.get(ref) : ref.get();
 }
 
 /**
@@ -289,9 +294,8 @@ async function readTrackLetters({ db, tx }) {
  * read also puts config/event in the write's read set, so a settings save
  * that drops this place aborts the session write rather than racing it.
  */
-async function readPlaceIds({ db, tx }) {
-  const ref = db.collection(CONFIG_COLLECTION).doc(CONFIG_EVENT_DOC);
-  const snap = tx ? await tx.get(ref) : await ref.get();
+async function readPlaceIds({ db, tx, readEvent = () => readEventDoc({ db, tx }) }) {
+  const snap = await readEvent();
   const places = snap.exists ? snap.data()?.venue?.places : null;
   if (!Array.isArray(places)) return [];
   return places
@@ -315,14 +319,15 @@ async function readPlaceIds({ db, tx }) {
  * stored before its place was removed keeps publishing and rendering until
  * someone edits it.
  *
- * @param {{ db: object, tx?: object, fields: object }} args
+ * @param {{ db: object, tx?: object, fields: object,
+ *           readEvent?: () => Promise<object> }} args a shared config/event read
  * @returns {Promise<{ ok: boolean, errors: string[] }>}
  */
-async function checkSessionPlace({ db, tx = null, fields }) {
+async function checkSessionPlace({ db, tx = null, fields, readEvent }) {
   const placeId = fields?.placeId;
   if (typeof placeId !== 'string' || placeId.trim().length === 0) return { ok: true, errors: [] };
 
-  const ids = await readPlaceIds({ db, tx });
+  const ids = await readPlaceIds({ db, tx, readEvent });
   if (ids.length === 0) {
     return {
       ok: false,
@@ -359,14 +364,15 @@ async function checkSessionPlace({ db, tx = null, fields }) {
  * the stat contract, so a session stored before its track was removed keeps
  * publishing and rendering until someone edits it.
  *
- * @param {{ db: object, tx?: object, fields: object }} args
+ * @param {{ db: object, tx?: object, fields: object,
+ *           readEvent?: () => Promise<object> }} args a shared config/event read
  * @returns {Promise<{ ok: boolean, errors: string[] }>}
  */
-async function checkSessionTrack({ db, tx = null, fields }) {
+async function checkSessionTrack({ db, tx = null, fields, readEvent }) {
   const track = statedTrack(fields?.track);
   if (track === null) return { ok: true, errors: [] };
 
-  const letters = await readTrackLetters({ db, tx });
+  const letters = await readTrackLetters({ db, tx, readEvent });
   if (letters.length === 0) {
     return {
       ok: false,
@@ -420,6 +426,17 @@ async function readSession({ db, tx, docId }) {
  * @returns {Promise<Array<{ id: string, data: object }>>}
  */
 async function findChildren({ db, tx, docId }) {
+  return (await readChildren({ db, tx, docId })).children;
+}
+
+/**
+ * findChildren's set, plus the live sessions whose parentId is `docId`
+ * (ignoring a draft that moved), from the same live query.
+ *
+ * @returns {Promise<{ children: Array<{ id: string, data: object }>,
+ *                     published: Array<{ id: string, data: object }> }>}
+ */
+async function readChildren({ db, tx, docId }) {
   const queries = [
     db.collection(SESSIONS).where('parentId', '==', docId),
     db.collection(SESSIONS_DRAFTS).where('parentId', '==', docId),
@@ -445,9 +462,13 @@ async function findChildren({ db, tx, docId }) {
     });
   }
 
-  return [...byId.entries()]
+  const children = [...byId.entries()]
     .filter(([id, data]) => id !== docId && data?.parentId === docId)
     .map(([id, data]) => ({ id, data }));
+  const published = snaps[0].docs
+    .filter((doc) => doc.id !== docId)
+    .map((doc) => ({ id: doc.id, data: doc.data() }));
+  return { children, published };
 }
 
 
@@ -462,8 +483,7 @@ async function findChildren({ db, tx, docId }) {
  * field puts it in another.
  *
  * Absence stays first-class: a child with no track is not missing data, it
- * is a child that inherits (resolveSessionTrack does the inheriting for
- * renderers), so nothing forces a letter onto it.
+ * is a child that inherits, so nothing forces a letter onto it.
  *
  * @param {{ childTrack: unknown, parent: object, parentId: string }} args
  * @returns {string[]} at most one error
@@ -479,28 +499,6 @@ function checkChildTrack({ childTrack, parent, parentId }) {
     'a child session runs on its parent\'s line, so leave its track unset to inherit, ' +
     'or set it to the same letter',
   ];
-}
-
-/**
- * The track a session RENDERS on: its own if it states one, otherwise its
- * parent's — which is what "a child inherits its parent's line" means at
- * the reading end, and why a child is allowed to state nothing at all.
- *
- * Parents are one level deep, so this never recurses: a parent's own track
- * is the end of the chain.
- *
- * @param {object|null} session
- * @param {Map<string, object>|Record<string, object>|null} byId every session
- *   the renderer holds, keyed by document id (a Map or a plain object)
- * @returns {string|null} the letter, or null for a session on no line
- */
-function resolveSessionTrack(session, byId) {
-  const own = statedTrack(session?.track);
-  if (own !== null) return own;
-  const parentId = session?.parentId;
-  if (typeof parentId !== 'string' || parentId.trim().length === 0) return null;
-  const parent = byId instanceof Map ? byId.get(parentId) : byId?.[parentId];
-  return statedTrack(parent?.track);
 }
 
 /**
@@ -625,15 +623,6 @@ async function checkSessionChildren({ db, tx = null, docId, fields, children = n
   return { ok: errors.length === 0, errors };
 }
 
-/** Live sessions whose parentId is `docId`, ignoring a draft that moved. */
-async function publishedChildren({ db, tx, docId }) {
-  const query = db.collection(SESSIONS).where('parentId', '==', docId);
-  const snap = tx ? await tx.get(query) : await query.get();
-  return snap.docs
-    .filter((doc) => doc.id !== docId)
-    .map((doc) => ({ id: doc.id, data: doc.data() }));
-}
-
 /**
  * May this session be deleted? (spec §8.4 step 4, brief §4.6.)
  *
@@ -662,8 +651,7 @@ async function publishedChildren({ db, tx, docId }) {
  * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
  */
 async function checkSessionDeletable({ db, tx = null, docId }) {
-  const editor = await findChildren({ db, tx, docId });
-  const published = await publishedChildren({ db, tx, docId });
+  const { children: editor, published } = await readChildren({ db, tx, docId });
   const ids = [];
   const seen = new Set();
   for (const child of [...editor, ...published]) {
@@ -689,34 +677,6 @@ async function getAllChunked(db, refs) {
   return snaps;
 }
 
-/**
- * The publish set, checked for children that would go live ahead of their
- * parents (spec §8.4 step 3, brief §4.6).
- *
- * Publishing is where the draft world and the live world meet, and the
- * parent rules were only ever enforced in the draft world. A child saved
- * against a parent that exists only as a draft is a legitimate draft — that
- * is the point of readSession reading the draft revision. Publishing THAT
- * CHILD ALONE put a live session on the public schedule whose parentId
- * names nothing live: the same orphan a delete would have made, arriving
- * through the one path that had no check at all.
- *
- * Two ways to satisfy it, and the message says both: the parent is already
- * live, or the parent is in this same publish set (its draft goes live in
- * the same run, so the pair lands together). `{ all: true }` — the ordinary
- * "publish everything" — satisfies it by construction.
- *
- * A docId with no draft publishes nothing (publishDocs reports it as
- * `no-draft`), so it neither needs a parent nor counts as one.
- *
- * A later draft may move a child to another parent before that draft is
- * published. The live child still points here. Publishing a day, line, or
- * parent change for this session has to take that live child with it, or
- * include the child draft in the same set. A title-only publish does not.
- *
- * @param {{ db: object, docIds: string[] }} args
- * @returns {Promise<{ ok: boolean, errors: string[] }>}
- */
 function parentLink(data) {
   return hasParent(data) ? data.parentId.trim() : '';
 }
@@ -767,6 +727,34 @@ function liveChildPublishErrors(parentId, parentDraft, childId, childFields) {
   return errors;
 }
 
+/**
+ * The publish set, checked for children that would go live ahead of their
+ * parents (spec §8.4 step 3, brief §4.6).
+ *
+ * Publishing is where the draft world and the live world meet, and the
+ * parent rules were only ever enforced in the draft world. A child saved
+ * against a parent that exists only as a draft is a legitimate draft — that
+ * is the point of readSession reading the draft revision. Publishing THAT
+ * CHILD ALONE put a live session on the public schedule whose parentId
+ * names nothing live: the same orphan a delete would have made, arriving
+ * through the one path that had no check at all.
+ *
+ * Two ways to satisfy it, and the message says both: the parent is already
+ * live, or the parent is in this same publish set (its draft goes live in
+ * the same run, so the pair lands together). `{ all: true }` — the ordinary
+ * "publish everything" — satisfies it by construction.
+ *
+ * A docId with no draft publishes nothing (publishDocs reports it as
+ * `no-draft`), so it neither needs a parent nor counts as one.
+ *
+ * A later draft may move a child to another parent before that draft is
+ * published. The live child still points here. Publishing a day, line, or
+ * parent change for this session has to take that live child with it, or
+ * include the child draft in the same set. A title-only publish does not.
+ *
+ * @param {{ db: object, docIds: string[] }} args
+ * @returns {Promise<{ ok: boolean, errors: string[] }>}
+ */
 async function checkSchedulePublishSet({ db, docIds }) {
   const ids = [...new Set((docIds || []).filter((id) => typeof id === 'string' && id.length > 0))];
   if (ids.length === 0) return { ok: true, errors: [] };
@@ -835,11 +823,17 @@ async function validateSessionStructure({ db, tx = null, docId, fields }) {
   // session become a child" (no, if it is already a parent) and "do the
   // children it carries still hold after this edit".
   const children = await findChildren({ db, tx, docId });
+  // The track and the place both read config/event: one read serves both.
+  let eventRead = null;
+  const readEvent = () => {
+    eventRead ??= readEventDoc({ db, tx });
+    return eventRead;
+  };
 
   const errors = [];
   for (const check of [
-    () => checkSessionTrack({ db, tx, fields }),
-    () => checkSessionPlace({ db, tx, fields }),
+    () => checkSessionTrack({ db, tx, fields, readEvent }),
+    () => checkSessionPlace({ db, tx, fields, readEvent }),
     () => checkSessionParent({ db, tx, docId, fields, children }),
     () => checkSessionChildren({ db, tx, docId, fields, children }),
   ]) {
@@ -886,7 +880,6 @@ module.exports = {
   checkSessionDeletable,
   checkSchedulePublishSet,
   validateSessionStructure,
-  resolveSessionTrack,
   internals: {
     SESSIONS,
     SESSIONS_DRAFTS,

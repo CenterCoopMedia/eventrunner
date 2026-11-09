@@ -714,3 +714,18 @@ test('publishDocs after deleteBoth + recreate resumes above the historical max r
   const revisions = db.ids('cmsVersionHistory').map((id) => db.read('cmsVersionHistory', id).revision).sort();
   assert.deepEqual(revisions, [1, 2, 3]);
 });
+
+test('publishDocs resumes each doc with no live copy from its own history, in one chunk', async () => {
+  // The history lookups run together; each doc must still get its own max.
+  const db = makeFakeDb({
+    'cmsContent_drafts/a__one': { value: 'a', section: 'a', field: 'one', visible: true, status: 'dirty' },
+    'cmsContent_drafts/b__two': { value: 'b', section: 'b', field: 'two', visible: true, status: 'dirty' },
+    'cmsContent_drafts/c__three': { value: 'c', section: 'c', field: 'three', visible: true, status: 'dirty' },
+    'cmsVersionHistory/h1': { docPath: 'cmsContent/a__one', revision: 4 },
+    'cmsVersionHistory/h2': { docPath: 'cmsContent/b__two', revision: 9 },
+  });
+  await publishDocs({ db, collection: 'cmsContent', docIds: ['a__one', 'b__two', 'c__three'], actor: ACTOR, now });
+  assert.equal(db.read('cmsContent', 'a__one').revision, 5);
+  assert.equal(db.read('cmsContent', 'b__two').revision, 10);
+  assert.equal(db.read('cmsContent', 'c__three').revision, 1);
+});

@@ -7,7 +7,7 @@
  *   cmsCreateContent  admin POST — new draft; 409 if the doc exists
  *   cmsUpdateContent  admin POST — merge onto the draft (forking one from
  *                     the live doc if only that exists); DRAFTS ONLY
- *   cmsDeleteContent  admin POST — removes live + draft in one batch
+ *   cmsDeleteContent  admin POST — removes live + draft in one transaction
  *   getSiteContent    PUBLIC GET — published cmsContent where visible==true
  *
  * cmsContent docs are keyed section+field (spec §4.1): the doc id is
@@ -250,6 +250,23 @@ async function checkSessionStructure({ db, tx = null, collection, docId, fields 
 }
 
 /**
+ * A sponsor package's limit, when set, is a whole number of sponsors (issue
+ * #193): the page draws "Open to N sponsors" only for one, so any other
+ * value would be saved, published, and then silently not shown. The
+ * deletion sentinel clears it.
+ *
+ * @param {object} fields the block's fields as they will be stored
+ * @returns {string[]}
+ */
+function sponsorPackageErrors(fields) {
+  if (!fields || fields.blockType !== 'sponsor_package') return [];
+  const { limit } = fields;
+  if (limit === undefined || limit === null || limit === DELETE_FIELD_SENTINEL) return [];
+  if (Number.isSafeInteger(limit) && limit >= 1) return [];
+  return ['limit: must be a whole number of 1 or more. Leave it empty for no limit.'];
+}
+
+/**
  * Block-shape contracts at the content-write seam (design brief §2.1.1).
  *
  * Required fields come from the block registry, and the stat block keeps
@@ -267,23 +284,6 @@ async function checkSessionStructure({ db, tx = null, collection, docId, fields 
  * @param {{ collection: string, fields: object }} args
  * @returns {{ ok: true } | { ok: false, message: string }}
  */
-/**
- * A sponsor package's limit, when set, is a whole number of sponsors (issue
- * #193): the page draws "Open to N sponsors" only for one, so any other
- * value would be saved, published, and then silently not shown. The
- * deletion sentinel clears it.
- *
- * @param {object} fields the block's fields as they will be stored
- * @returns {string[]}
- */
-function sponsorPackageErrors(fields) {
-  if (!fields || fields.blockType !== 'sponsor_package') return [];
-  const { limit } = fields;
-  if (limit === undefined || limit === null || limit === DELETE_FIELD_SENTINEL) return [];
-  if (Number.isSafeInteger(limit) && limit >= 1) return [];
-  return ['limit: must be a whole number of 1 or more. Leave it empty for no limit.'];
-}
-
 function checkBlockContract({ collection, fields }) {
   if (collection !== 'cmsContent') return { ok: true };
   const errors = [...requiredBlockErrors(fields), ...sponsorPackageErrors(fields)];

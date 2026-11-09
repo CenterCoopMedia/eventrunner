@@ -5,8 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   applyDeleteSpeaker,
-  linkSpeakerToUser,
-  unlinkSpeakerFromUser,
+  applySpeakerLinkInTx,
   createDeleteSpeakerHandler,
   internals,
 } = require('./lifecycle.cjs');
@@ -183,12 +182,30 @@ test('an invalid speakerId is refused before any read', async () => {
   assert.deepEqual(db.reads, []);
 });
 
-test('linkSpeakerToUser sets both halves of the pair in one commit', async () => {
+// applySpeakerLinkInTx runs inside its caller's transaction. This runs it
+// in one of its own and merges the patch, the way the acceptance path does.
+async function writeLink({ db, speakerId, uid }) {
+  const at = new Date(NOW());
+  const ref = db.collection('speakers').doc(speakerId);
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const patch = await applySpeakerLinkInTx({ tx, db, speakerId, speaker: snap.data(), uid, at });
+      tx.set(ref, { ...patch, updatedAt: at }, { merge: true });
+    });
+  } catch (err) {
+    if (err?.conflict) return { ok: false, ...err.conflict };
+    throw err;
+  }
+  return { ok: true };
+}
+
+test('a link sets both halves of the pair in one commit', async () => {
   const db = makeSpeakersDb({
     'speakers/s1': { firstName: 'A', lastName: 'B', uid: null, status: 'accepted' },
     'users/u1': { uid: 'u1', speakerId: null },
   });
-  assert.deepEqual(await linkSpeakerToUser({ db, speakerId: 's1', uid: 'u1', now: NOW }), { ok: true });
+  assert.deepEqual(await writeLink({ db, speakerId: 's1', uid: 'u1' }), { ok: true });
   assert.equal(db.read('speakers', 's1').uid, 'u1');
   assert.equal(db.read('users', 'u1').speakerId, 's1');
 });
@@ -199,42 +216,34 @@ test('relinking a speaker clears the previous account in the same commit', async
     'users/u1': { uid: 'u1', speakerId: 's1' },
     'users/u2': { uid: 'u2', speakerId: null },
   });
-  await linkSpeakerToUser({ db, speakerId: 's1', uid: 'u2', now: NOW });
+  await writeLink({ db, speakerId: 's1', uid: 'u2' });
   assert.equal(db.read('users', 'u1').speakerId, null);
   assert.equal(db.read('users', 'u2').speakerId, 's1');
   assert.equal(db.read('speakers', 's1').uid, 'u2');
 });
 
-test('unlinkSpeakerFromUser clears both halves', async () => {
+test('an unlink clears both halves', async () => {
   const db = makeSpeakersDb({
     'speakers/s1': { firstName: 'A', lastName: 'B', uid: 'u1' },
     'users/u1': { uid: 'u1', speakerId: 's1' },
   });
-  assert.deepEqual(await unlinkSpeakerFromUser({ db, speakerId: 's1', now: NOW }), { ok: true });
+  assert.deepEqual(await writeLink({ db, speakerId: 's1', uid: null }), { ok: true });
   assert.equal(db.read('speakers', 's1').uid, null);
   assert.equal(db.read('users', 'u1').speakerId, null);
-});
-
-test('linking a speaker that does not exist is a 404 and writes nothing', async () => {
-  const db = makeSpeakersDb({ 'users/u1': { uid: 'u1', speakerId: null } });
-  const result = await linkSpeakerToUser({ db, speakerId: 'ghost', uid: 'u1', now: NOW });
-  assert.equal(result.ok, false);
-  assert.equal(result.status, 404);
-  assert.deepEqual(db.writes, []);
 });
 
 test('linking to an account already claimed by another speaker is REFUSED', async () => {
   // users.speakerId is single-valued. Stealing it would either orphan the
   // other record (its uid still names this account) or silently revoke a
   // third party's speaker access as a side effect of somebody accepting an
-  // invitation. Refusing keeps the evidence; unlinkSpeakerFromUser is how
-  // an operator resolves it deliberately.
+  // invitation. Refusing keeps the evidence; an operator resolves it
+  // deliberately by removing or deleting the other speaker.
   const db = makeSpeakersDb({
     'speakers/s1': { firstName: 'A', lastName: 'B', uid: null },
     'speakers/s2': { firstName: 'C', lastName: 'D', uid: 'u1' },
     'users/u1': { uid: 'u1', speakerId: 's2' },
   });
-  const result = await linkSpeakerToUser({ db, speakerId: 's1', uid: 'u1', now: NOW });
+  const result = await writeLink({ db, speakerId: 's1', uid: 'u1' });
 
   assert.equal(result.ok, false);
   assert.equal(result.status, 409);
@@ -251,7 +260,7 @@ test('re-linking a speaker to the account it already holds is idempotent', async
     'speakers/s1': { firstName: 'A', lastName: 'B', uid: 'u1' },
     'users/u1': { uid: 'u1', speakerId: 's1' },
   });
-  assert.deepEqual(await linkSpeakerToUser({ db, speakerId: 's1', uid: 'u1', now: NOW }), { ok: true });
+  assert.deepEqual(await writeLink({ db, speakerId: 's1', uid: 'u1' }), { ok: true });
   assert.equal(db.read('speakers', 's1').uid, 'u1');
   assert.equal(db.read('users', 'u1').speakerId, 's1');
 });
@@ -261,7 +270,7 @@ test('linking to an account document that does not exist yet FAILS, writing noth
   // Writing speakers.uid anyway would leave a permanent one-sided link
   // that no later write repairs.
   const db = makeSpeakersDb({ 'speakers/s1': { firstName: 'A', lastName: 'B', uid: null } });
-  const result = await linkSpeakerToUser({ db, speakerId: 's1', uid: 'not-yet', now: NOW });
+  const result = await writeLink({ db, speakerId: 's1', uid: 'not-yet' });
 
   assert.equal(result.ok, false);
   assert.equal(result.status, 409);
@@ -275,7 +284,7 @@ test('unlink tolerates a previous account that is already gone', async () => {
   // Only the TARGET of a link must exist; a vanished previous account
   // means the link is already broken in that direction.
   const db = makeSpeakersDb({ 'speakers/s1': { firstName: 'A', lastName: 'B', uid: 'ghost' } });
-  assert.deepEqual(await unlinkSpeakerFromUser({ db, speakerId: 's1', now: NOW }), { ok: true });
+  assert.deepEqual(await writeLink({ db, speakerId: 's1', uid: null }), { ok: true });
   assert.equal(db.read('speakers', 's1').uid, null);
 });
 

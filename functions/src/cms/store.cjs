@@ -344,13 +344,21 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
       const keptIds = [];
       let dirtyPublished = 0;
       const publishedAt = new Date(now());
+      const conflicted = (docId, j) => prevTimes.has(docId)
+        && !sameUpdateTime(prevTimes.get(docId), draftSnaps[j].updateTime);
+      // A doc with no live revision resumes from its history (see below).
+      // Those lookups run together here, not one after another in the loop.
+      const historyRevisions = new Map(await Promise.all(chunkIds
+        .filter((docId, j) => draftSnaps[j].exists && !conflicted(docId, j)
+          && !(liveSnaps[j].exists && typeof liveSnaps[j].data()?.revision === 'number'))
+        .map(async (docId) => [docId, await maxHistoryRevision({ db, docPath: `${collection}/${docId}` })])));
       for (let j = 0; j < chunkIds.length; j += 1) {
         const docId = chunkIds[j];
         if (!draftSnaps[j].exists) {
           attemptSkipped.push({ docId, reason: 'no-draft' });
           continue;
         }
-        if (prevTimes.has(docId) && !sameUpdateTime(prevTimes.get(docId), draftSnaps[j].updateTime)) {
+        if (conflicted(docId, j)) {
           // An editor saved between our earlier read and its failed commit.
           // Leave the newer draft dirty rather than publishing content the
           // editor never saw; the next publish picks it up.
@@ -366,7 +374,7 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
         // invariant versions.cjs's cursor pagination depends on.
         const baseRevision = typeof live?.revision === 'number'
           ? live.revision
-          : await maxHistoryRevision({ db, docPath: `${collection}/${docId}` });
+          : historyRevisions.get(docId);
         const revision = baseRevision + 1;
         const contentFields = contentFieldsOf(draft);
         const visible = isVisible(draft);

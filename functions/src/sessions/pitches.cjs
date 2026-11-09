@@ -24,7 +24,7 @@
  */
 
 const crypto = require('node:crypto');
-const { requireAdmin, internals: { extractBearerToken } } = require('../core/auth.cjs');
+const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
 const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
@@ -219,19 +219,6 @@ function auditRow({ action, docPath, actor, at, details }) {
   };
 }
 
-// Pitch intake checks revocation so a disabled or deleted Firebase account
-// cannot submit with an ID token that has not expired yet. A ticket and a
-// Firestore users document remain deliberately unnecessary.
-async function verifySubmitter(auth, req) {
-  const token = extractBearerToken(req);
-  if (!token) return null;
-  try {
-    return await auth.verifyIdToken(token, true);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The transaction reads config/pitch_call before it creates a pitch. A
  * concurrent operator update makes Firestore retry this function against
@@ -298,7 +285,10 @@ function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now =
   return async function submitSessionPitch(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
-    const decoded = await verifySubmitter(auth, req);
+    // verifyAuthToken checks revocation, so a disabled or deleted account
+    // cannot submit with an ID token that has not expired yet. A ticket and
+    // a Firestore users document remain deliberately unnecessary.
+    const decoded = await verifyAuthToken({ auth }, req);
     if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Sign in to submit a session pitch.');
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
     if (!email || decoded.email_verified !== true) {

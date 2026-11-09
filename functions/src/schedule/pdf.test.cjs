@@ -621,6 +621,33 @@ test('createBuildMySchedulePdfHandler: a bookmark matches the document id when t
   assert.equal(drawn.includes('Other session title'), false);
 });
 
+test('createBuildMySchedulePdfHandler: the bookmarked sessions carry their approved speaker names', async () => {
+  const db = makeFakeDb({
+    'users/u1': { displayName: 'Alex Rivera', registrationStatus: 'approved' },
+    'cmsSchedule/s1': session({ id: 's1', title: 'Kept session title', speakerIds: ['sp-1', 'sp-2'] }),
+    'cmsSchedule/s2': session({ id: 's2', title: 'Other session title', speakerIds: ['sp-3'] }),
+    'speakers/sp-1': { firstName: 'Rae', lastName: 'Okonkwo', status: 'approved' },
+    'speakers/sp-2': { firstName: 'Sam', lastName: 'NotYetApproved', status: 'pending' },
+    'speakers/sp-3': { firstName: 'Lee', lastName: 'Unbookmarked', status: 'approved' },
+  });
+  await db.collection('users/u1/bookmarks').doc('s1').set({ bookmarkedAt: new Date() });
+  const handler = createBuildMySchedulePdfHandler({
+    db,
+    auth: fakeAuth('u1'),
+    getConfig: async () => ({ features: { schedulePdf: true }, event: EVENT, theme: THEME }),
+  });
+  const res = fakeRes();
+  await handler(
+    { method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: {} },
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const drawn = pdfDrawnText(res.sent);
+  assert.equal(drawn.includes('Rae Okonkwo'), true);
+  assert.equal(drawn.includes('NotYetApproved'), false);
+  assert.equal(drawn.includes('Unbookmarked'), false);
+});
+
 test('createBuildMySchedulePdfHandler: a request naming another uid is refused, never substituted', async () => {
   const db = makeFakeDb({
     'users/u1': { displayName: 'Alex Rivera', registrationStatus: 'approved' },

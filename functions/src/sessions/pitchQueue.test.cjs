@@ -278,3 +278,14 @@ test('a converted pitch cannot move off accepted, but its notes can still change
   assert.equal(notes.statusCode, 200);
   assert.equal(db.read('session_pitches', 'proposal').privateNotes, 'Booked.');
 });
+test('the deployed handlers read the region the way every other module does, trimmed', (t) => {
+  const before = process.env.EVENT_FIREBASE_REGION;
+  t.after(() => {
+    if (before === undefined) delete process.env.EVENT_FIREBASE_REGION;
+    else process.env.EVENT_FIREBASE_REGION = before;
+  });
+  process.env.EVENT_FIREBASE_REGION = ' europe-west1 \n';
+  const { handlers } = require('./pitchQueue.cjs');
+  assert.deepEqual(handlers.importSessionPitches.__endpoint.region, ['europe-west1']);
+  assert.deepEqual(handlers.convertSessionPitch.__endpoint.region, ['europe-west1']);
+});

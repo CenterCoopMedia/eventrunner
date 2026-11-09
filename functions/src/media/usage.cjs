@@ -180,21 +180,13 @@ async function scanUsage({
 }
 
 /**
- * The paths to scan for one request: an explicit list, or every indexed
- * asset when none is given (the library's "show me what is unused" view).
+ * The paths to scan for one request. The caller names them: the asset
+ * dialog sends the one path it shows.
  *
- * @param {{ db: object, requested: unknown }} args
- * @returns {Promise<{ ok: true, paths: string[] } |
- *                    { ok: false, message: string }>}
+ * @param {{ requested: unknown }} args
+ * @returns {{ ok: true, paths: string[] } | { ok: false, message: string }}
  */
-async function resolveScanPaths({ db, requested }) {
-  if (requested === undefined || requested === null) {
-    const snapshot = await db.collection('media_assets').get();
-    const paths = snapshot.docs
-      .map((doc) => doc.data()?.path)
-      .filter((path) => typeof path === 'string' && path.length > 0);
-    return { ok: true, paths: [...new Set(paths)].slice(0, MAX_PATHS_PER_SCAN) };
-  }
+function resolveScanPaths({ requested }) {
   if (!Array.isArray(requested)) {
     return { ok: false, message: 'paths: must be an array of object paths' };
   }
@@ -212,7 +204,7 @@ async function resolveScanPaths({ db, requested }) {
 }
 
 /**
- * `scanMediaUsage` handler: POST `{ paths?: string[] }` →
+ * `scanMediaUsage` handler: POST `{ paths: string[] }` →
  * `{ usage: { [path]: [{ docPath, field }] }, scannedAt }`.
  *
  * Admin-gated like every other media endpoint: the response describes what
@@ -224,13 +216,7 @@ function createScanMediaUsageHandler({ db, auth, getConfig, now = Date.now, log 
     const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
-    let resolved;
-    try {
-      resolved = await resolveScanPaths({ db, requested: req.body?.paths });
-    } catch (err) {
-      log.error('scanMediaUsage could not list media_assets', err);
-      return internal(res, 'The media library could not be scanned.');
-    }
+    const resolved = resolveScanPaths({ requested: req.body?.paths });
     if (!resolved.ok) return badRequest(res, resolved.message);
 
     let usage;

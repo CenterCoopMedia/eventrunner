@@ -139,12 +139,6 @@ const SENDER_VERIFICATION_FIELDS = Object.freeze([
 ]);
 
 /**
- * Top-level config/event keys only an operator may CHANGE (issue #186).
- * Everything else on EVENT_EDITABLE_KEYS is staff content.
- */
-const EVENT_OPERATOR_KEYS = Object.freeze(['sender', 'announcedAt', 'archivedAt']);
-
-/**
  * The lifecycle stamps (ADR 0001 §2.2, audit 07 #1). announcedAt takes the
  * site out of draft and archivedAt ends it, so a CHANGE to either is the
  * operator's, the same as the sender block.
@@ -737,7 +731,6 @@ module.exports = {
     senderChanged,
     WRITABLE_CONFIG_DOCS,
     CONFIG_DOC_TIERS,
-    EVENT_OPERATOR_KEYS,
     SENDER_EDITABLE_FIELDS,
     TIER_A_FIELDS,
     EVENT_EDITABLE_KEYS,

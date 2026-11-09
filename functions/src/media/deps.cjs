@@ -1,10 +1,11 @@
 'use strict';
 
 /**
- * Runtime wiring shared by the four media endpoints (spec §1.3 media/).
+ * Runtime wiring shared by the media endpoints (spec §1.3 media/).
  *
  * The same buildDeps + CORS wrapper admin/config.cjs uses, factored out
- * because three modules (upload, metadata, usage) need it identically.
+ * because four modules (upload, metadata, usage, profilePhoto) need it
+ * identically.
  * firebase-functions and firebase-admin are required lazily here — inside
  * the returned handler, not at module load — so requiring a media module
  * from a test never initializes the Admin SDK.

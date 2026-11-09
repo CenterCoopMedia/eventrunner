@@ -32,7 +32,11 @@ function getBucket(env = process.env) {
   }
   const { initializeApp, getApps } = require('firebase-admin/app');
   const { getStorage } = require('firebase-admin/storage');
-  if (getApps().length === 0) initializeApp();
+  // The DEFAULT app, not "any app", for the reason core/firestore.cjs
+  // gives: under the Functions emulator a named app is registered before a
+  // Storage trigger runs, and getStorage() with no argument needs
+  // `[DEFAULT]`.
+  if (!getApps().some((app) => app?.name === '[DEFAULT]')) initializeApp();
   cachedBucket = getStorage().bucket(name);
   return cachedBucket;
 }

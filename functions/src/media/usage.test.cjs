@@ -153,20 +153,9 @@ test('scanUsage propagates a read failure rather than reporting "unused"', async
 
 // ------------------------------------------------------------ path resolve
 
-test('resolveScanPaths defaults to every indexed asset path, deduplicated', async () => {
-  const db = makeFakeDb({
-    'media_assets/a1': { path: HERO },
-    'media_assets/a2': { path: LOGO },
-    'media_assets/a3': { path: HERO },
-    'media_assets/a4': { size: 10 },
-  });
-  const resolved = await resolveScanPaths({ db, requested: undefined });
-  assert.equal(resolved.ok, true);
-  assert.deepEqual(resolved.paths.sort(), [LOGO, HERO].sort());
-});
-
-test('resolveScanPaths rejects a non-array and an oversize list', async () => {
+test('resolveScanPaths rejects a missing list, a non-array and an oversize list', async () => {
   const db = makeFakeDb({});
+  assert.equal((await resolveScanPaths({ db, requested: undefined })).ok, false);
   assert.equal((await resolveScanPaths({ db, requested: 'x' })).ok, false);
   const many = Array.from({ length: MAX_PATHS_PER_SCAN + 1 }, (_, i) => `cms-images/a/${i}.png`);
   const verdict = await resolveScanPaths({ db, requested: many });

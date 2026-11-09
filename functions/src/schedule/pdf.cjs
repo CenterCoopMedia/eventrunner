@@ -104,7 +104,6 @@ function resolveSpeakerLine(speakerIds, namesById) {
     .join(', ');
 }
 
-// The one speaker status this file will resolve a public display name for.
 /**
  * Derive a speaker's public display name from the canonical `speakers/{id}`
  * record (spec §4.3).
@@ -468,7 +467,7 @@ function createBuildSchedulePdfHandler({ db, getConfig, now = Date.now, log = co
   };
 }
 
-/** Deployable export: buildSchedulePdf (public GET, spec §9). */
+/** Deployable export: buildMySchedulePdf (owner POST, spec §9). */
 function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
@@ -495,7 +494,7 @@ function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console })
     }
 
     try {
-      const [membersSnap, userSnap, sessionsSnap, speakersSnap] = await Promise.all([
+      const [membersSnap, userSnap, sessionsSnap] = await Promise.all([
         db.collection(`users/${gate.uid}/bookmarks`).get(),
         db
           .collection('users')
@@ -503,7 +502,6 @@ function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console })
           .get()
           .catch(() => null),
         db.collection('cmsSchedule').where('visible', '==', true).get(),
-        db.collection('speakers').get().catch(() => ({ docs: [] })),
       ]);
 
       const onlySessionIds = membersSnap.docs.map((d) => d.id);
@@ -514,11 +512,11 @@ function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console })
       // Bookmark ids are document ids. A published body often has no id.
       // The document id wins over a stale id stored in the body.
       const sessions = sessionsSnap.docs.map((d) => ({ ...d.data(), id: d.id }));
-      const speakerNamesById = {};
-      for (const d of speakersSnap.docs) {
-        const name = deriveApprovedSpeakerName(d.data());
-        if (name) speakerNamesById[d.id] = name;
-      }
+      // Only the bookmarked sessions are drawn, so only their speakers are
+      // read. A failed speaker read still gives a PDF without names.
+      const wanted = new Set(onlySessionIds);
+      const speakerNamesById = await publicSpeakerNames(db, sessions.filter((s) => wanted.has(s.id)))
+        .catch(() => ({}));
 
       const bytes = await buildSchedulePdf({
         event: config.event,

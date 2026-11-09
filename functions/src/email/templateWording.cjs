@@ -165,7 +165,6 @@ async function renderWording({ db, id, draft = null, tokenValues, config, now = 
 
 module.exports = {
   WordingError,
-  WORDING_FIELDS,
   MAX_WORDING_FIELD_LENGTH,
   readWording,
   readDraft,

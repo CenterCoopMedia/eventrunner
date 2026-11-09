@@ -160,8 +160,9 @@ async function takeRateLimitSlot({ db, email, now = Date.now }) {
  *           max?: number, windowMs?: number }} args
  * The slot is a RESERVATION, taken before the send so concurrent requests
  * cannot both pass a stale count. `releaseGlobalSendSlot` gives it back
- * when the send does not happen, so the ceiling counts codes that actually
- * went out rather than provider outages.
+ * only when the challenge write fails, before any send. A send the
+ * provider refuses keeps its slot, so the ceiling counts attempts, not
+ * delivered codes.
  *
  * @returns {Promise<{ limited: boolean, count: number, firstTrip: boolean,
  *           takenAt?: number, retryAfterMs?: number }>}
@@ -205,9 +206,9 @@ async function takeGlobalSendSlot({
 
 /**
  * Give back a reservation taken by `takeGlobalSendSlot` when the provider
- * was never called, such as a failed challenge write or a sendEmail throw
- * during policy or config. A provider result other than `sent` keeps the
- * slot. The email core turns a provider throw into that failed result.
+ * was never called: the challenge write failed. A provider result other
+ * than `sent` keeps the slot, and so does a sendEmail throw, which is
+ * ambiguous. The email core turns a provider throw into that failed result.
  *
  * Removes exactly one timestamp equal to `takenAt`. Two requests reserving
  * in the same millisecond are indistinguishable, but returning "one slot"
@@ -355,7 +356,7 @@ async function releaseChallenge({ db, token }) {
 
 /**
  * Sweep expired challenges and stale rate-limit docs (the auth module's
- * own cleanup export, spec §1.3; maintenance/cleanup.cjs calls the same).
+ * own cleanup export, spec §1.3, run daily by cleanupExpiredAuthChallenges).
  * It also clears the two per-IP buckets that copy this module's shape
  * (client errors and feedback): nothing else removes them.
  *
