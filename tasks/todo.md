@@ -76,16 +76,19 @@ After it merges, check `git merge-base --is-ancestor <top head> origin/main`.
 
 ### PR 3. Docs and repository weight
 
-- [ ] One support address, `info@eventrunner.org`, in every file (09 #4).
-- [ ] `NOTICE`: product name and the full font list with each licence. The
-      owner confirms the licence facts before the commit (10 #5).
-- [ ] Handbook pages describe invoices and Stripe tickets as built (10 #3).
-- [ ] Runbook: the custom web address is an operator procedure; remove the
-      dead add helpers in `admin/webAddress.cjs` (02 #3).
-- [ ] Pages does not serve `docs/plans` or `docs/pr-evidence` (10 #8).
-- [ ] Remove `video/assets/audio/*.wav` and ignore the folder (10 #15).
-- [ ] List the plan-evidence and PR-evidence folders nothing references;
-      remove them after the owner confirms the list (10 #12, #13).
+- [x] One support address, `info@eventrunner.org`, in every file (09 #4).
+- [x] `NOTICE`: product name and each group of bundled fonts with its
+      licence. The owner approved the text (10 #5).
+- [x] Handbook pages describe invoices and Stripe tickets as built (10 #3).
+- [x] Custom web address (02 #3). The runbook describes the operator
+      procedure. `scripts/add-web-address.cjs` is new (owner): nothing
+      could create the record the status page reads. The check authorizes
+      the domain for sign-in when Hosting shows it live (owner).
+- [x] Pages does not serve `docs/plans` or `docs/pr-evidence` (10 #8).
+- [x] The WAV audio stays (owner): the video kit checks each file against
+      a stored hash (10 #15).
+- [x] Thirteen evidence folders that no file, pull request or issue names
+      are removed. The folders a GitHub thread names stay (10 #12, #13).
 
 ### PR 4. Dead code and refactors (no product change)
 
