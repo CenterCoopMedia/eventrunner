@@ -329,6 +329,11 @@ test('buildSchedulePdf: a 3-day synthetic event produces a correctly grouped, br
   // Config-driven branding: the doc title comes straight from config/event.
   assert.equal(loaded.getTitle(), EVENT.name);
   assert.equal(loaded.getSubject(), EVENT.tagline);
+  // The product's name, not the repository's old one. A default load
+  // stamps pdf-lib's own name over what the file says.
+  const stored = await PDFDocument.load(bytes, { updateMetadata: false });
+  assert.equal(stored.getProducer(), 'EventRunner');
+  assert.equal(stored.getCreator(), 'EventRunner');
   // One page per configured day, at minimum.
   assert.ok(loaded.getPageCount() >= THREE_DAYS.length);
 });

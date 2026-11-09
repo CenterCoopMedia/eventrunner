@@ -89,6 +89,15 @@ test('the PDF carries the number, both parties, the dates, every line, the total
   assert.equal(await pageCount(bytes), 1);
 });
 
+test('the PDF names EventRunner as its producer and creator', async () => {
+  const { PDFDocument } = require('pdf-lib');
+  const bytes = await buildInvoicePdf({ invoice: publicInvoice(issued(), ID), theme: THEME });
+  // A default load stamps pdf-lib's own name over what the file says.
+  const loaded = await PDFDocument.load(bytes, { updateMetadata: false });
+  assert.equal(loaded.getProducer(), 'EventRunner');
+  assert.equal(loaded.getCreator(), 'EventRunner');
+});
+
 test('a long invoice runs onto more pages and repeats the number on each', async () => {
   const lines = Array.from({ length: 50 }, (_, index) => ({
     description: `Line ${index + 1}: ${'a long description that wraps onto a second line in the table '.repeat(2)}`,

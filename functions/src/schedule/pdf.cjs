@@ -209,8 +209,8 @@ async function buildSchedulePdf({
   const doc = await PDFDocument.create();
   doc.setTitle(ownerName ? `${ownerName}'s schedule` : branding.name);
   doc.setSubject(branding.tagline || 'Event schedule');
-  doc.setProducer('run-of-show');
-  doc.setCreator('run-of-show');
+  doc.setProducer('EventRunner');
+  doc.setCreator('EventRunner');
 
   const bodyFont = await doc.embedFont(StandardFonts.Helvetica);
   const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
