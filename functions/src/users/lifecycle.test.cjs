@@ -324,10 +324,10 @@ test('a new account gets one welcome email with the right template, tokens and s
   assert.equal(message.onceKey, 'welcome:u1');
   assert.equal(message.subject, 'Welcome to Summit 2027');
   assert.match(message.text, /^Hi Rae,/);
-  assert.match(message.text, new RegExp(`Sign in: ${SITE}/signin`));
-  assert.match(message.text, new RegExp(`your profile: ${SITE}/profile`));
-  assert.match(message.html, new RegExp(`href="${SITE}/signin"`));
-  assert.match(message.html, new RegExp(`href="${SITE}/profile"`));
+  assert.match(message.text, /Sign in: https:\/\/summit\.example\.org\/signin/);
+  assert.match(message.text, /your profile: https:\/\/summit\.example\.org\/profile/);
+  assert.match(message.html, /href="https:\/\/summit\.example\.org\/signin"/);
+  assert.match(message.html, /href="https:\/\/summit\.example\.org\/profile"/);
   assert.equal(message.storeRendered, true);
 });
 
