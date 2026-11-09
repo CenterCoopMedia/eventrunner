@@ -73,6 +73,14 @@ export const SOURCE_LABELS = Object.freeze({
   'ticketing-registration-prompt': 'Ticket prompt',
   announcement: 'Announcement',
   'announcement-test': 'Announcement test',
+  invoice: 'Invoice',
+  'speaker-reminder': 'Speaker reminder',
+  'speaker-profile': 'Speaker profile request',
+  'admin-access': 'Admin access',
+  'change-requests': 'Change request notice',
+  'attendee-approval': 'Attendee approval',
+  'session-pitches': 'Pitch notice',
+  'ticketing-confirmation': 'Ticket confirmation',
 });
 
 /**
