@@ -491,8 +491,10 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
      * with Eventbrite's continuation-token pagination, flattening every
      * order's attendees into TicketRecord[] the same way fetchOrder does.
      * `since` maps to Eventbrite's documented `changed_since` order filter.
+     * A page is one API call, so the full sync's `shouldStop` deadline is
+     * not used here: the sync checks it between pages.
      *
-     * @param {{ since?: string, pageToken?: string }} [opts]
+     * @param {{ since?: string, pageToken?: string, shouldStop?: () => boolean }} [opts]
      */
     async listTickets(opts = {}) {
       if (!externalEventId) return { tickets: [], nextPageToken: null };
@@ -501,21 +503,30 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       if (typeof opts?.pageToken === 'string' && opts.pageToken.trim()) {
         params.set('continuation', opts.pageToken.trim());
       }
+      const resuming = params.has('continuation');
+      const refused = () => Object.assign(new Error('Eventbrite did not accept the ticket page token.'), { code: 'invalid-page-token' });
       let page;
       try {
         page = await apiCall(`/events/${encodeURIComponent(externalEventId)}/orders/?${params.toString()}`);
       } catch (err) {
         // Eventbrite answers 400 for a continuation it no longer accepts.
         // A full sync resumed with that token must start again.
-        if (params.has('continuation') && err?.status === 400) err.code = 'invalid-page-token';
+        if (resuming && err?.status === 400) err.code = 'invalid-page-token';
         throw err;
       }
+      // apiCall answers null for a 404. For a continuation that is a
+      // refusal too, never the end of the list.
+      if (resuming && page === null) throw refused();
       const orders = Array.isArray(page?.orders) ? page.orders : [];
       const tickets = orders.flatMap((order) => ticketsFromOrder(order));
       const hasMore = page?.pagination?.has_more_items === true;
       const nextPageToken = hasMore && typeof page?.pagination?.continuation === 'string'
         ? page.pagination.continuation
         : null;
+      // A continuation names a page that has orders or points on. An empty
+      // last page cannot be told apart from a stale token, so the sync
+      // starts again rather than report itself finished.
+      if (resuming && orders.length === 0 && !nextPageToken) throw refused();
       return { tickets, nextPageToken };
     },
 

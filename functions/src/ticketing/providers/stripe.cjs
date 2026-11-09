@@ -313,20 +313,47 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
       return result.tickets.filter((ticket) => ticket.email === email.trim().toLowerCase());
     },
 
-    async listTickets({ pageToken } = {}) {
+    /**
+     * One page of orders, each reconciled and committed in turn. The page
+     * token is the id of the last order handled, so a resumed page starts
+     * at the first order it did not handle.
+     *
+     * `shouldStop` is the full sync's deadline. It is checked before each
+     * order after the first, so one call always makes progress. A stopped
+     * page answers `stoppedEarly: true`.
+     *
+     * An order that fails ends the page. The error carries
+     * `partialProgress`: the tickets already committed, the token that
+     * resumes at the failed order, and `outcomeKnown` (false when the
+     * failed order may have written).
+     */
+    async listTickets({ pageToken, shouldStop } = {}) {
       if (!db) throw new Error('Stripe ticket reconciliation requires a database.');
       let query = db.collection('ticket_orders').where('provider', '==', 'stripe').orderBy('id').limit(ORDER_PAGE_SIZE);
       if (pageToken) {
         if (!safeId(pageToken)) throw Object.assign(new Error('Invalid Stripe ticket page token.'), { code: 'invalid-page-token' });
         query = query.startAfter(pageToken);
       }
-      const page = await query.get();
       const tickets = [];
-      for (const doc of page.docs) {
-        if (!scopeMatches(doc.data(), scope)) continue;
-        const result = await provider.reconcileOrder(doc.id);
-        if (result.complete !== true) throw new Error('An order is still being reconciled; retry the sync.');
-        tickets.push(...result.tickets);
+      let lastId = pageToken || null;
+      const stopped = (cause, outcomeKnown) => Object.assign(
+        new Error(`Stripe ticket sync stopped part way through a page: ${cause?.message || cause}`, { cause }),
+        { partialProgress: { tickets, nextPageToken: lastId, outcomeKnown } },
+      );
+      let page;
+      try { page = await query.get(); } catch (err) { throw stopped(err, true); }
+      for (const [index, doc] of page.docs.entries()) {
+        if (index > 0 && typeof shouldStop === 'function' && shouldStop()) {
+          return { tickets, ticketsPersisted: true, nextPageToken: lastId, stoppedEarly: true };
+        }
+        if (scopeMatches(doc.data(), scope)) {
+          let result;
+          try { result = await provider.reconcileOrder(doc.id); } catch (err) { throw stopped(err, false); }
+          // A busy or blocked order writes nothing; the next run retries it.
+          if (result.complete !== true) throw stopped(new Error('An order is still being reconciled; retry the sync.'), true);
+          tickets.push(...result.tickets);
+        }
+        lastId = doc.id;
       }
       return { tickets, ticketsPersisted: true, nextPageToken: page.size === ORDER_PAGE_SIZE ? page.docs.at(-1).id : null };
     },
