@@ -6,10 +6,8 @@ const PATHS = {
   edit: 'm15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z',
   delete: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
   remove: 'M5 12h14',
-  download: 'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5',
   copy: 'M8 8h12v13H8zM16 8V3H3v13h5',
   close: 'm6 6 12 12M6 18 18 6',
-  more: 'M5 12h.01M12 12h.01M19 12h.01',
   disconnect: 'm8 8 8 8M3 3l18 18M9 5l2-2a4.2 4.2 0 0 1 6 6l-2 2M9 13l-2 2a4.2 4.2 0 0 0 6 6l2-2',
 };
 

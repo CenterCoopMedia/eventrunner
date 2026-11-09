@@ -27,7 +27,6 @@ export const TICKET_LABELS = Object.freeze({
 
 export const NOTE_MAX = 2000;
 
-/** A time for people, for example "4 November 2026, 10:00". */
 /** "14:30" as "2:30 p.m.", for a client reading their own answers. */
 function clockText(time) {
   const match = /^(\d{2}):(\d{2})$/.exec(time ?? '');
@@ -55,6 +54,7 @@ export function eventDayText(day) {
   return `${[dateText, hours].filter(Boolean).join(', ')}${label}`;
 }
 
+/** A time for people, for example "4 November 2026, 10:00". */
 export function formatDateTime(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';

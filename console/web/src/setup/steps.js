@@ -78,7 +78,6 @@ export const TICKET_CHOICES = Object.freeze([
 /** What the client reads in place of the status while a build has failed. */
 export const BUILD_FAILED_LABEL = 'We did not finish building your site';
 
-/** What the client reads for each status (ADR 0007 §3 and §5). */
 /** The build's steps (scripts/provision-client.cjs), grouped in the client's words. */
 export const BUILD_PHASES = Object.freeze([
   { steps: ['project', 'firebase', 'deploy-identity'], label: 'Setting up your hosting' },
