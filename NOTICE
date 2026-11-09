@@ -1,4 +1,4 @@
-Run of Show
+Event Runner
 Copyright 2026 Center for Cooperative Media
 
 This product was developed by the Center for Cooperative Media at
@@ -7,15 +7,18 @@ Montclair State University (https://collaborativejournalism.org).
 Bundled fonts
 -------------
 
-This product bundles self-hosted woff2 font files, each licensed under the
-SIL Open Font License 1.1 (https://openfontlicense.org):
+The event site bundles 24 self-hosted font families as woff2 files. The
+documentation site (GitHub Pages) bundles three: Bricolage Grotesque,
+Source Sans 3 and IBM Plex Mono. Each family is licensed under the SIL Open
+Font License 1.1 (https://openfontlicense.org). The families, their
+designers and their licence files are listed in
+apps/web/public/fonts/README.md (the event site) and docs/fonts/README.md
+(the documentation site).
 
-  Bricolage Grotesque   Copyright The Bricolage Project Authors
-  IBM Plex Mono         Copyright IBM Corp.
-  Source Sans 3         Copyright Adobe (https://github.com/adobe-fonts)
-  Source Serif 4        Copyright Adobe (https://github.com/adobe-fonts)
-  Caveat                Copyright The Caveat Project Authors
+The client console bundles two font families to draw the agreement PDF:
 
-The files, and which surface serves each of them, are listed in
-docs/fonts/README.md (GitHub Pages) and apps/web/public/fonts/README.md
-(the attendee app).
+  Noto Sans     SIL Open Font License 1.1
+  DejaVu Sans   Bitstream Vera license, with public domain changes
+
+Their licence texts and the record of how the files were made are in
+console/functions/fonts/.

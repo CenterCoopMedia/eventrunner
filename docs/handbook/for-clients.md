@@ -40,4 +40,4 @@ Never send a provider key or password through the site or in a public thread. Th
 
 ## How to start
 
-Open a [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) thread or email info@collaborativejournalism.org. Do not send an attendee list to GitHub.
+Open a [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) thread or email info@eventrunner.org. Do not send an attendee list to GitHub.
