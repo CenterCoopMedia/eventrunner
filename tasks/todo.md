@@ -57,15 +57,22 @@ After it merges, check `git merge-base --is-ancestor <top head> origin/main`.
 
 ### PR 2. Features that were half built (a short spec each, in `tasks/specs/`)
 
-- [ ] Announce and Archive controls in admin Event settings (operator);
+- [x] Announce and Archive controls in admin Event settings (operator);
       `validateEventConfig` checks `announcedAt` and `archivedAt`; runbook
       and admin guide (07 #1, #6).
-- [ ] "Sync all tickets" staff action in admin Ticketing; `ticketingSync`
+- [x] "Sync all tickets" staff action in admin Ticketing; `ticketingSync`
       gets a time limit that fits a real event (01 #5).
-- [ ] "Create account from ticket" staff action on a ticket (01 #5).
-- [ ] `account.welcome` is sent once when an account is created
+- [x] "Create account from ticket" staff action on a ticket (01 #5).
+- [x] `account.welcome` is sent once when an account is created
       (`welcome:{uid}`), as ADR 0001 section 6 has it (02 #9).
-- [ ] Remove `getSiteContent`: no design intent, no caller (02 #10).
+- [x] `getSiteContent` stays (owner, 2026-11-09). A deploy does not delete
+      a function that left the code: it stops until an operator runs the
+      delete command for each client site. Remove it when that is planned.
+- Decisions made during the build (owner, 2026-11-09): the welcome email
+  skips Owners and Editors; a stopped ticket sync resumes with Continue
+  sync. The date checks are at the save endpoint, not in the shared
+  validator, to keep the public bundle inside its budget (it has 72 gzip
+  bytes left).
 
 ### PR 3. Docs and repository weight
 
