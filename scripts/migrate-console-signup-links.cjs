@@ -2,7 +2,13 @@
 
 // A redeemed operator link is the only evidence that can backfill a paid
 // draft. Never infer payment from ownership, answers, or an email address.
+// Every draft made since has its link, so a marker makes it run once; without
+// it each console deploy rewrote every quarantined draft again.
+const MARKER = ['data_migrations', 'console-signup-links-2026-11-06'];
+
 async function migrateDrafts({ db, now = () => new Date() }) {
+  const marker = db.collection(MARKER[0]).doc(MARKER[1]);
+  if ((await marker.get()).data()?.complete === true) return { skipped: true };
   const drafts = db.collection('applications').where('status', '==', 'draft');
   let cursor;
   const totals = { linked: 0, quarantined: 0 };
@@ -32,6 +38,7 @@ async function migrateDrafts({ db, now = () => new Date() }) {
     if (page.size < 200) break;
     cursor = page.docs.at(-1);
   }
+  await marker.set({ complete: true, totals, completedAt: new Date() });
   return totals;
 }
 
