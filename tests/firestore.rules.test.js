@@ -72,6 +72,9 @@ const ADMIN_READABLE = [
   // Airtable pitch intake: the operator chooses the source; staff see runs.
   { path: "session_pitch_sources/airtable", tier: "operator" },
   { path: "session_pitch_sync/airtable", tier: "admin" },
+  // Session confirmation delivery records: staff read them on the speaker
+  // editor; only sendSessionConfirmation writes them.
+  { path: "session_confirmations/sess-tier__spk-tier", tier: "admin" },
   // A speaker-only live update (issue #200): both tiers read every audience.
   { path: "live_updates/lu-tier", tier: "admin" },
 ];
@@ -239,6 +242,13 @@ beforeAll(async () => {
     await setDoc(doc(db, "session_pitch_settings/notices"), {
       receiptMode: "automatic",
       templates: {},
+    });
+    await setDoc(doc(db, "session_confirmations/sess-tier__spk-tier"), {
+      sessionId: "sess-tier",
+      speakerId: "spk-tier",
+      state: "sent",
+      attempt: 1,
+      named: { title: "Tier fixture", time: "2027-05-13 · 10:00 AM", room: "Room B" },
     });
     await setDoc(doc(db, "change_request_settings/notices"), {
       acknowledgement: "automatic",
@@ -457,6 +467,20 @@ describe("admin tiers on every admin-readable collection (issue 186)", () => {
         staffEmails: [STAFF_EMAIL],
       });
     });
+  });
+});
+
+// The speaker editor's Sessions panel lists every confirmation record
+// (sendSessionConfirmation). The matrix above reads one document; this pins
+// the list query the panel runs.
+describe("session confirmation records", () => {
+  it("staff may list them; an attendee and an anonymous client may not, and no client writes one", async () => {
+    await assertSucceeds(getDocs(collection(staff(), "session_confirmations")));
+    await assertSucceeds(getDocs(collection(admin(), "session_confirmations")));
+    await assertFails(getDocs(collection(nonAdmin(), "session_confirmations")));
+    await assertFails(getDocs(collection(anon(), "session_confirmations")));
+    await assertFails(setDoc(doc(staff(), "session_confirmations/s__p"), { state: "sent" }));
+    await assertFails(setDoc(doc(nonAdmin(), "session_confirmations/s__p"), { state: "sent" }));
   });
 });
 

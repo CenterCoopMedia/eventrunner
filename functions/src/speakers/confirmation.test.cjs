@@ -3,7 +3,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { formatSessionTime, buildConfirmationTokenValues, sendSessionConfirmationEmail } = require('./confirmation.cjs');
+const {
+  formatSessionTime, buildConfirmationTokenValues, namedSlotOf, sameNamedSlot, sendSessionConfirmationEmail,
+} = require('./confirmation.cjs');
 const { resetTemplateCacheForTest } = require('../email/templates.cjs');
 const { makeSpeakersDb } = require('./speakersFake.cjs');
 
@@ -42,47 +44,55 @@ test('buildConfirmationTokenValues assembles the four §6.2 per-template tokens'
   });
 });
 
-test('sendSessionConfirmationEmail renders and sends with a per-session onceKey', async () => {
+test('namedSlotOf and sameNamedSlot describe the slot a confirmation names', () => {
+  const named = namedSlotOf(CONFIG.event, SESSION);
+  assert.deepEqual(named, { title: 'Reporting on Deadline', time: '2027-05-13 · 10:00 AM–10:45 AM', room: 'Room B' });
+  assert.equal(sameNamedSlot(named, { ...named }), true);
+  assert.equal(sameNamedSlot(named, { ...named, room: 'Room C' }), false);
+  assert.equal(sameNamedSlot(named, null), false);
+});
+
+test('sendSessionConfirmationEmail renders and sends with the attempt’s onceKey and returns the outcome', async () => {
   const db = makeSpeakersDb();
   const sent = [];
-  const result = await sendSessionConfirmationEmail({
+  const outcome = await sendSessionConfirmationEmail({
     db,
     sendEmail: async (message) => {
       sent.push(message);
       return { status: 'sent' };
     },
     getConfig: async () => CONFIG,
-    speakerId: 'rae',
-    sessionId: 'sess-1',
+    onceKey: 'speaker-confirmation:rae:sess-1:1',
     speaker: SPEAKER,
-    session: SESSION,
-    log: { error() {} },
+    named: namedSlotOf(CONFIG.event, SESSION),
+    log: { error() {}, warn() {} },
   });
 
-  assert.equal(result.ok, true);
+  assert.equal(outcome.status, 'sent');
   assert.equal(sent.length, 1);
   const [message] = sent;
   assert.equal(message.to, 'rae@example.org');
   assert.equal(message.tag, 'speaker.confirmation');
-  assert.equal(message.onceKey, 'speaker-confirmation:rae:sess-1');
+  assert.equal(message.source, 'speaker-confirmation');
+  assert.equal(message.onceKey, 'speaker-confirmation:rae:sess-1:1');
   assert.equal(message.storeRendered, true);
   assert.ok(message.html.includes('Reporting on Deadline'));
   assert.ok(message.text.includes('Room B'));
 });
 
-test('sendSessionConfirmationEmail is best-effort: a send failure resolves ok:false, not a throw', async () => {
-  const db = makeSpeakersDb();
-  const result = await sendSessionConfirmationEmail({
-    db,
-    sendEmail: async () => {
-      throw new Error('provider unavailable');
-    },
+test('sendSessionConfirmationEmail never throws: a sender throw is a failed outcome, an ambiguous one passes through', async () => {
+  const base = {
+    db: makeSpeakersDb(),
     getConfig: async () => CONFIG,
-    speakerId: 'rae',
-    sessionId: 'sess-1',
+    onceKey: 'speaker-confirmation:rae:sess-1:1',
     speaker: SPEAKER,
-    session: SESSION,
-    log: { error() {} },
-  });
-  assert.equal(result.ok, false);
+    named: namedSlotOf(CONFIG.event, SESSION),
+    log: { error() {}, warn() {} },
+  };
+  const failed = await sendSessionConfirmationEmail({ ...base, sendEmail: async () => { throw new Error('provider unavailable'); } });
+  assert.deepEqual(failed, { status: 'failed', error: 'provider unavailable' });
+  const ambiguous = await sendSessionConfirmationEmail({ ...base, sendEmail: async () => ({ status: 'failed', ambiguous: true, error: 'socket hang up' }) });
+  assert.equal(ambiguous.ambiguous, true);
+  const noKey = await sendSessionConfirmationEmail({ ...base, onceKey: '', sendEmail: async () => ({ status: 'sent' }) });
+  assert.equal(noKey.status, 'failed');
 });

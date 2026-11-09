@@ -664,6 +664,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Session confirmations: one delivery record per speaker and session
+    // (state, attempt, send-once key, the title, time and room it named).
+    // Staff read it on the speaker editor; only sendSessionConfirmation
+    // (functions/src/speakers/sessionConfirmations.cjs) writes it.
+    match /session_confirmations/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Pitch email settings: the receipt mode and the edited wording of the
     // receipt, acceptance and decline emails. The admin page reads them; only
     // savePitchNoticeSettings writes them.
