@@ -631,6 +631,10 @@ client already past step 3 never needs it again.
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
   run's log against what the binding names.
 
+### Recover tickets after missed provider webhooks
+
+Staff select **Sync all tickets** in admin **Ticketing**. One `ticketingSync` run lasts at most 540 seconds. It starts no new page after 7 minutes or 50 pages and answers 200 with `truncated: true`, `stoppedReason` (`time-limit`, `page-limit` or `provider-error`) and `nextCursor`. To go on, POST `{ "cursor": "<nextCursor>" }`; the admin page does this with **Continue sync**. The cursor is the provider's page token and is not stored. A cursor the provider refuses answers 400 `bad-cursor`: start again with `{}`. Each ticket write is idempotent, so a repeated page or a new run is safe.
+
 ### Archiving an event with ticket sales
 
 Pause new sales with the catalog's `salesPaused` setting while payment, held-capacity,

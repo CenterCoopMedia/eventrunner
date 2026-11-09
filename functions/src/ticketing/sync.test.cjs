@@ -457,6 +457,156 @@ test('a non-terminating page cursor stops at the page cap', async () => {
 
   assert.equal(totals.pages, internals.MAX_SYNC_PAGES);
   assert.equal(totals.truncated, true);
+  assert.equal(totals.stoppedReason, 'page-limit');
+  assert.equal(totals.nextCursor, 'always-more');
+});
+
+test('a full sync stops before a new page once its time budget is spent', async () => {
+  const db = makeFakeDb();
+  const provider = createFakeTicketingProvider();
+  let clock = T0.getTime();
+  let page = 0;
+  // Each page takes three minutes of the clock.
+  provider.listTickets = async () => {
+    page += 1;
+    clock += 3 * 60 * 1000;
+    return { tickets: [fakeTicket({ externalId: `t-${page}` })], nextPageToken: 'more' };
+  };
+
+  const totals = await runFullSync({ db, provider, now: () => new Date(clock), log: QUIET });
+
+  // Pages start at 0, 3 and 6 minutes; the 9-minute start is past the 7-minute budget.
+  assert.equal(totals.pages, 3);
+  assert.equal(totals.created, 3);
+  assert.equal(totals.truncated, true);
+  assert.equal(totals.stoppedReason, 'time-limit');
+  assert.equal(totals.nextCursor, 'more');
+  assert.ok(internals.SYNC_TIME_BUDGET_MS < 540 * 1000);
+});
+
+test('a complete full sync returns no cursor', async () => {
+  const db = makeFakeDb();
+  const provider = createFakeTicketingProvider({ pages: [{ tickets: [fakeTicket()], nextPageToken: null }] });
+  const totals = await runFullSync({ db, provider, now: () => T0, log: QUIET });
+  assert.equal(totals.truncated, false);
+  assert.equal(totals.nextCursor, null);
+});
+
+const ADMIN_AUTH = { verifyIdToken: async () => ({ uid: 'u1', email: 'admin@example.com', email_verified: true }) };
+const ADMIN_CONFIG = async () => ({ bootstrap: { adminEmails: ['admin@example.com'] } });
+const syncAs = (handler, body = {}) => {
+  const res = makeRes();
+  return handler({ method: 'POST', headers: { authorization: 'Bearer admin' }, body }, res).then(() => res);
+};
+
+test('a provider failure after some pages stops the run with a cursor for the failed page', async () => {
+  const db = makeFakeDb();
+  const provider = createFakeTicketingProvider();
+  const tokens = [];
+  provider.listTickets = async ({ pageToken } = {}) => {
+    tokens.push(pageToken);
+    if (pageToken === 'page-2') throw new Error('rate limited');
+    return { tickets: [fakeTicket({ externalId: 'a' }), fakeTicket({ externalId: 'b' })], nextPageToken: 'page-2' };
+  };
+  const handler = createTicketingSyncHandler({ db, provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+
+  const res = await syncAs(handler);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.truncated, true);
+  assert.equal(res.body.stoppedReason, 'provider-error');
+  assert.equal(res.body.nextCursor, 'page-2');
+  assert.equal(res.body.created, 2);
+  assert.equal(res.body.pages, 1);
+  assert.deepEqual(db.ids('tickets').sort(), ['a', 'b']);
+});
+
+test('a resumed run starts at the cursor and reports only its own counts', async () => {
+  const db = makeFakeDb({ 'tickets/a': { ...fakeTicket({ externalId: 'a' }), claimedByUid: null } });
+  const provider = createFakeTicketingProvider();
+  const tokens = [];
+  provider.listTickets = async ({ pageToken } = {}) => {
+    tokens.push(pageToken);
+    return { tickets: [fakeTicket({ externalId: 'c' })], nextPageToken: null };
+  };
+  const handler = createTicketingSyncHandler({ db, provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+
+  const res = await syncAs(handler, { cursor: ' page-2 ' });
+
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(tokens, ['page-2']);
+  assert.equal(res.body.created, 1);
+  assert.equal(res.body.updated, 0);
+  assert.equal(res.body.truncated, false);
+  assert.equal(res.body.nextCursor, null);
+});
+
+test('a resumed run whose first page fails returns the same cursor, so Continue retries that page', async () => {
+  const provider = createFakeTicketingProvider();
+  provider.listTickets = async () => { throw new Error('An order is still being reconciled; retry the sync.'); };
+  const handler = createTicketingSyncHandler({ db: makeFakeDb(), provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+
+  const res = await syncAs(handler, { cursor: 'ord_0025' });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.stoppedReason, 'provider-error');
+  assert.equal(res.body.nextCursor, 'ord_0025');
+  assert.equal(res.body.pages, 0);
+});
+
+test('a cursor that is not a short plain string is refused before the provider is read', async () => {
+  const provider = createFakeTicketingProvider();
+  let read = false;
+  provider.listTickets = async () => { read = true; return { tickets: [], nextPageToken: null }; };
+  const handler = createTicketingSyncHandler({ db: makeFakeDb(), provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+
+  for (const cursor of [42, { token: 'x' }, '   ', 'x'.repeat(internals.MAX_CURSOR_LENGTH + 1), 'a\u0000b', 'line\nbreak']) {
+    const res = await syncAs(handler, { cursor });
+    assert.equal(res.statusCode, 400, JSON.stringify(cursor));
+    assert.equal(res.body.error.code, 'bad-cursor');
+    assert.equal(res.body.error.message, 'The sync cannot continue from this point. Start the sync again from the beginning.');
+  }
+  assert.equal(read, false);
+});
+
+test('a cursor the provider refuses is the same actionable refusal, not a crash', async () => {
+  const provider = createFakeTicketingProvider();
+  provider.listTickets = async () => { throw Object.assign(new Error('Invalid Stripe ticket page token.'), { code: 'invalid-page-token' }); };
+  const handler = createTicketingSyncHandler({ db: makeFakeDb(), provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+
+  const res = await syncAs(handler, { cursor: 'stale' });
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.code, 'bad-cursor');
+});
+
+test('a write failure part way through the first page still counts the tickets written before it', async () => {
+  const db = makeFakeDb();
+  const provider = createFakeTicketingProvider({
+    pages: [{ tickets: [fakeTicket({ externalId: 'a' }), fakeTicket({ externalId: 'b' })], nextPageToken: null }],
+  });
+  const runTransaction = db.runTransaction.bind(db);
+  let transactions = 0;
+  db.runTransaction = async (fn, opts) => {
+    transactions += 1;
+    if (transactions === 2) throw new Error('aborted');
+    return runTransaction(fn, opts);
+  };
+  const handler = createTicketingSyncHandler({ db, provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+
+  const res = await syncAs(handler);
+
+  // The first page has no cursor: the next run starts from the beginning.
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.stoppedReason, 'provider-error');
+  assert.equal(res.body.nextCursor, null);
+  assert.equal(res.body.created, 1);
+  assert.deepEqual(db.ids('tickets'), ['a']);
+});
+
+test('ticketingSync has a time limit that fits a full sync', () => {
+  const endpoint = Object.getOwnPropertyDescriptor(require('./sync.cjs').handlers.ticketingSync, '__endpoint').value;
+  assert.equal(endpoint.timeoutSeconds, 540);
 });
 
 test('ticketingSync is admin-gated and POST-only', async () => {
@@ -505,4 +655,5 @@ test('a provider failure during a full sync is a 502, not a stack trace', async 
   await handler({ method: 'POST', headers: { authorization: 'Bearer admin' }, body: {} }, res);
   assert.equal(res.statusCode, 502);
   assert.equal(res.body.error.code, 'provider-error');
+  assert.equal(res.body.error.message, 'The ticketing provider could not be read. No tickets changed. Try again in a few minutes.');
 });

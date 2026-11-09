@@ -261,3 +261,8 @@ test('a Session event for an invoice routes to the invoice, and its PaymentInten
   assert.equal(acknowledged.valid, true);
   assert.equal(acknowledged.eventType, 'ignored');
 });
+
+test('listTickets refuses an unusable page token with a code the full sync can act on', async () => {
+  const { provider } = fixture();
+  await assert.rejects(() => provider.listTickets({ pageToken: '../ticket_orders' }), (err) => err.code === 'invalid-page-token');
+});

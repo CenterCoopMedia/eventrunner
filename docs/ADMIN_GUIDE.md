@@ -560,6 +560,14 @@ The workspace follows the deployment's configured provider ([`CLIENT_ONBOARDING.
 
 Ticket records are server-only in Firestore. Every list, search, import, and commerce action goes through an authenticated endpoint; even an admin browser cannot read the commerce collections directly.
 
+### Sync all tickets and create an account
+
+**Sync all tickets.** Shown for Eventbrite and Stripe. Use it when ticket updates were missed. Event Runner reads every ticket from the provider and updates the ticket list. Claimed tickets stay claimed. Refunded and cancelled tickets stay refunded or cancelled. A sync starts from the beginning and can take several minutes. Keep the page open until it finishes.
+
+A run can stop before it reaches every ticket: at its time limit, at its page limit, or when the provider cannot be read. The result says why and gives the totals so far. Select **Continue sync** to go on from where it stopped. Continue until the result says **Sync finished**. If the result says to start again, select **Sync all tickets**. A repeated sync does not make duplicate tickets.
+
+**Create account.** Shown on a ticket that is valid, not claimed, and has an email address. Event Runner creates a sign-in account for the ticket's email address, or uses the account that already has it, and claims the ticket for that account. The person then signs in with a code sent to that address. A new account also gets the welcome email.
+
 ### Stripe sales and catalog
 
 The **Stripe sales** panel identifies **Test mode** or **Live payments**, the publication/pause state, and held/issued seats. An operator opens **Ticket settings** to set currency, capacity, prices, quantity limits, UTC sale windows, tax treatment, and refund policy. Currency becomes fixed after the first save. Every type grants full-event access; an early-bird type changes its offer and sale window, not its access rights. Hidden types stay out of public purchase selection.

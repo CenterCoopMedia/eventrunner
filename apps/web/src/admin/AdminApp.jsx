@@ -31,7 +31,6 @@ import AdminMedia from './pages/AdminMedia.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
-import AdminTicketing from './pages/AdminTicketing.jsx';
 import AdminAccess from './pages/AdminAccess.jsx';
 import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 
@@ -60,6 +59,9 @@ const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
 // one link, exactly like the session editor above, so it is loaded when
 // somebody asks for it.
 const AdminEventSettings = lazy(() => import('./pages/AdminEventSettings.jsx'));
+// Lazy, as the other large pages: with its sync and account actions the page
+// put the admin entry chunk over the lazy-chunk budget.
+const AdminTicketing = lazy(() => import('./pages/AdminTicketing.jsx'));
 // The block editor carries a form for every block type, and each new type
 // (the fact and the quote, design wave 2) added its fields to the entry
 // chunk. It opens from one link in a section list, so it loads the same way.
@@ -310,7 +312,10 @@ export default function AdminApp() {
             path="attendees"
             element={<DeferredAdminPage label="attendees"><AdminAttendees /></DeferredAdminPage>}
           />
-          <Route path="ticketing" element={<AdminTicketing />} />
+          <Route
+            path="ticketing"
+            element={<DeferredAdminPage label="ticketing"><AdminTicketing /></DeferredAdminPage>}
+          />
           <Route
             path="invoices"
             element={<DeferredAdminPage label="invoices"><AdminInvoicesList /></DeferredAdminPage>}

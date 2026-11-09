@@ -333,7 +333,7 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
     }
     if (response.status < 200 || response.status > 299) {
       const detail = parsed?.error_description || parsed?.error || `eventbrite responded ${response.status}`;
-      throw new Error(redact(`eventbrite API ${method} ${path} failed: ${detail}`));
+      throw Object.assign(new Error(redact(`eventbrite API ${method} ${path} failed: ${detail}`)), { status: response.status });
     }
     return parsed;
   }
@@ -501,7 +501,15 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       if (typeof opts?.pageToken === 'string' && opts.pageToken.trim()) {
         params.set('continuation', opts.pageToken.trim());
       }
-      const page = await apiCall(`/events/${encodeURIComponent(externalEventId)}/orders/?${params.toString()}`);
+      let page;
+      try {
+        page = await apiCall(`/events/${encodeURIComponent(externalEventId)}/orders/?${params.toString()}`);
+      } catch (err) {
+        // Eventbrite answers 400 for a continuation it no longer accepts.
+        // A full sync resumed with that token must start again.
+        if (params.has('continuation') && err?.status === 400) err.code = 'invalid-page-token';
+        throw err;
+      }
       const orders = Array.isArray(page?.orders) ? page.orders : [];
       const tickets = orders.flatMap((order) => ticketsFromOrder(order));
       const hasMore = page?.pagination?.has_more_items === true;

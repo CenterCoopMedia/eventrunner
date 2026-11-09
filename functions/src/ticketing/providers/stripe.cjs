@@ -317,7 +317,7 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
       if (!db) throw new Error('Stripe ticket reconciliation requires a database.');
       let query = db.collection('ticket_orders').where('provider', '==', 'stripe').orderBy('id').limit(ORDER_PAGE_SIZE);
       if (pageToken) {
-        if (!safeId(pageToken)) throw new Error('Invalid Stripe ticket page token.');
+        if (!safeId(pageToken)) throw Object.assign(new Error('Invalid Stripe ticket page token.'), { code: 'invalid-page-token' });
         query = query.startAfter(pageToken);
       }
       const page = await query.get();

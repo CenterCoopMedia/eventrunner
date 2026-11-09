@@ -112,6 +112,10 @@ async function readTicketingStatus({ db, provider, getConfig, now = () => new Da
     externalEventId: provider.externalEventId ?? null,
     // Capability, not enablement (§3.3).
     webhookSupported: typeof provider.registerWebhook === 'function',
+    // A full sync (`ticketingSync`) recovers missed webhook deliveries. A
+    // provider with no webhook has nothing to recover: manual reads its own
+    // rows back and none has no tickets.
+    fullSyncSupported: typeof provider.registerWebhook === 'function',
     webhookRegisteredAt: toIso(configured.webhookRegisteredAt),
     webhookId: typeof configured.webhookId === 'string' ? configured.webhookId : null,
     lastDeliveryAt: toIso(lastDelivery?.receivedAt),

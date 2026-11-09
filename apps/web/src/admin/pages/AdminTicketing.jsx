@@ -2,7 +2,9 @@ import { TICKET_STATUSES } from 'shared/ticketCommerce';
 import { plannerMessage } from '../plannerErrors.js';
 import '../plannerFields.css';
 // Ticketing tab (issue #31): provider status, CSV import with column
-// mapping + dry-run preview, and a searchable ticket list.
+// mapping + dry-run preview, and a searchable ticket list. Two staff
+// actions (audit 01 #5): "Sync all tickets" calls ticketingSync, and
+// "Create account" on a ticket row calls createUserFromTicket.
 //
 // `tickets/{externalId}` is server-only (firestore.rules `allow read, write:
 // if false` — same reasoning as the other two ticketing collections), so
@@ -22,7 +24,7 @@ import '../plannerFields.css';
 // in a tinted badge at the smallest radius, never a pill (admin story part 5
 // refuses that device by name): the word carries the meaning and the tint
 // agrees with it.
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
 import AdminIconControl from '../components/AdminIconControl.jsx';
@@ -42,6 +44,8 @@ import AdminPageHeader, {
   StatusBadge,
 } from '../components/adminChrome.jsx';
 import { ticketStatusLabel } from '../../lib/ticketingCommerce.js';
+import TicketingConfirmation from '../components/TicketingConfirmation.jsx';
+import CreateAccountFromTicket, { canCreateAccountFromTicket } from '../components/CreateAccountFromTicket.jsx';
 
 const StripeTicketingWorkspace = lazy(() => import('../components/StripeTicketingWorkspace.jsx'));
 
@@ -96,7 +100,145 @@ function GalleyHead({ children, align = 'start' }) {
   );
 }
 
-function StatusCard({ status, error, onRefresh, busy }) {
+/** "1 new ticket", "3 new tickets". */
+function counted(n, singular, plural) {
+  return `${n} ${n === 1 ? singular : plural}`;
+}
+
+const STOP_SENTENCES = {
+  'time-limit': 'The sync stopped at its time limit before it reached every ticket.',
+  'page-limit': 'The sync stopped at its page limit before it reached every ticket.',
+  'provider-error': 'The sync stopped because the ticketing provider could not be read.',
+};
+
+/**
+ * The result line for one sync: the running totals of its runs, and what
+ * to do next. `progress.result` is the 200 answer of the last run.
+ */
+function syncResultNotice(progress) {
+  const { result, runs } = progress;
+  const created = counted(progress.created, 'new ticket', 'new tickets');
+  const checked = counted(progress.updated, 'existing ticket', 'existing tickets');
+  const skipped = progress.skipped
+    ? ` ${counted(progress.skipped, 'record had', 'records had')} no ticket reference and Event Runner skipped ${progress.skipped === 1 ? 'it' : 'them'}.`
+    : '';
+  if (result.skippedReason === 'read-only-demo') {
+    return { tone: 'caution', message: (progress.created || progress.updated)
+      ? `This historical demo is read-only. The sync stopped after it saved ${created} and checked ${checked}.`
+      : 'This historical demo is read-only. No tickets changed.' };
+  }
+  if (result.truncated) {
+    const stopped = STOP_SENTENCES[result.stoppedReason] || 'The sync stopped before it reached every ticket.';
+    const next = result.nextCursor
+      ? 'Select Continue sync to go on from where it stopped.'
+      : 'Select Sync all tickets to start again from the beginning.';
+    return { tone: 'caution', message: `${stopped} So far the sync saved ${created} and checked ${checked}.${skipped} ${next}` };
+  }
+  const across = runs > 1 ? `Across ${runs} runs it` : 'It';
+  return { tone: 'ok', message: `Sync finished. ${across} saved ${created} and checked ${checked}.${skipped}` };
+}
+
+/** Words for a failed sync. The upsert is idempotent, so a new run is safe. */
+function syncErrorMessage(err) {
+  if (err?.code === 'provider-error') return plannerMessage(err.message);
+  if (err?.code === 'network' || (err?.status >= 500 && err?.code !== 'config-unavailable')) {
+    return 'The sync did not answer. Some tickets may be saved. Run the sync again. It does not make duplicate tickets.';
+  }
+  return plannerMessage(err?.message ?? 'The sync did not finish. Try again.');
+}
+
+/**
+ * "Sync all tickets": the recovery tool after missed provider updates.
+ * Shown only when the status says the provider supports a full sync.
+ */
+function SyncAllTickets({ call, providerLabel, onSynced }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [continueError, setContinueError] = useState('');
+  // The runs of one sync: totals so far and the last answer. The cursor
+  // in that answer lives only here, never in Firestore.
+  const [progress, setProgress] = useState(null);
+  const busyRef = useRef(false);
+
+  /** A fresh sync sends no cursor. Continue sends the last run's cursor. */
+  async function run(cursor) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setError('');
+    setContinueError('');
+    const fresh = cursor === undefined;
+    if (fresh) setProgress(null);
+    try {
+      const result = await call('ticketingSync', fresh ? {} : { cursor });
+      setOpen(false);
+      setProgress((prev) => {
+        const base = fresh || !prev ? { created: 0, updated: 0, skipped: 0, runs: 0 } : prev;
+        return {
+          created: base.created + (result.created || 0),
+          updated: base.updated + (result.updated || 0),
+          skipped: base.skipped + (result.skipped || 0),
+          runs: base.runs + 1,
+          result,
+        };
+      });
+      onSynced();
+    } catch (err) {
+      const message = syncErrorMessage(err);
+      if (fresh) {
+        setError(message);
+      } else {
+        setContinueError(message);
+        // A refused cursor cannot be sent again. The sync starts over.
+        if (err?.code === 'bad-cursor') setProgress((prev) => prev && { ...prev, result: { ...prev.result, nextCursor: null } });
+      }
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  const notice = progress ? syncResultNotice(progress) : null;
+  const cursor = progress?.result?.truncated ? progress.result.nextCursor : null;
+
+  return (
+    <div className="mt-md flex flex-col items-start gap-sm">
+      <div className="flex flex-wrap gap-xs">
+        <button type="button" className={secondaryButtonClass} onClick={() => { setError(''); setOpen(true); }}>
+          Sync all tickets
+        </button>
+        {cursor ? (
+          <button type="button" className={secondaryButtonClass} aria-busy={busy && !open} aria-disabled={busy}
+            onClick={() => run(cursor)}>
+            {busy && !open ? 'Syncing…' : 'Continue sync'}
+          </button>
+        ) : null}
+      </div>
+      {busy && !open ? <AdminLoadingState label="Syncing tickets…" /> : null}
+      {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
+      {continueError ? <Notice tone="error" message={continueError} /> : null}
+      {open ? (
+        <TicketingConfirmation
+          title="Sync all tickets?"
+          confirmLabel="Sync all tickets"
+          busyLabel="Syncing…"
+          busy={busy}
+          error={error}
+          onClose={() => { setOpen(false); setError(''); }}
+          onConfirm={() => run(undefined)}
+        >
+          <p>Event Runner reads every ticket from {providerLabel} and updates the tickets here. Use this when ticket updates were missed.</p>
+          <p>Claimed tickets stay claimed. Refunded and cancelled tickets stay refunded or cancelled.</p>
+          <p>The sync starts from the beginning and can take several minutes. Keep this page open until it finishes. If the sync stops before it reaches every ticket, select Continue sync.</p>
+          {busy ? <AdminLoadingState label="Syncing tickets…" /> : null}
+        </TicketingConfirmation>
+      ) : null}
+    </div>
+  );
+}
+
+function StatusCard({ status, error, onRefresh, busy, call }) {
   return (
     <Panel
       title="Ticket updates"
@@ -151,6 +293,9 @@ function StatusCard({ status, error, onRefresh, busy }) {
           </div>
         </dl>
       )}
+      {status?.fullSyncSupported ? (
+        <SyncAllTickets call={call} providerLabel={PROVIDER_LABELS[status.provider] || 'the ticketing provider'} onSynced={onRefresh} />
+      ) : null}
     </Panel>
   );
 }
@@ -353,11 +498,25 @@ function TicketList({ call, refreshToken }) {
   const [applied, setApplied] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [accountResult, setAccountResult] = useState(null);
+  const accountResultRef = useRef(null);
+
+  // The row's action goes away once the ticket is claimed, so focus moves
+  // to the result line instead of the page body.
+  useEffect(() => {
+    if (accountResult) accountResultRef.current?.focus();
+  }, [accountResult]);
+
+  const onAccountDone = useCallback(({ ticketId, uid, message }) => {
+    setTickets((prev) => (prev ?? []).map((t) => (t.id === ticketId ? { ...t, claimedByUid: uid || t.claimedByUid } : t)));
+    setAccountResult({ message });
+  }, []);
 
   const search = useCallback(
     async (append = false) => {
       setLoading(true);
       setError(null);
+      setAccountResult(null);
       try {
         let filter = applied;
         if (!append) {
@@ -422,6 +581,11 @@ function TicketList({ call, refreshToken }) {
       </form>
 
       {error ? <Notice tone="error" message={error} /> : null}
+      {accountResult ? (
+        <div ref={accountResultRef} tabIndex={-1} className="mb-sm">
+          <Notice tone="ok" message={accountResult.message} />
+        </div>
+      ) : null}
 
       {tickets === null ? (
         <AdminLoadingState label="Loading tickets…" />
@@ -436,6 +600,7 @@ function TicketList({ call, refreshToken }) {
                 <GalleyHead>Name</GalleyHead>
                 <GalleyHead>Status</GalleyHead>
                 <GalleyHead>Claimed</GalleyHead>
+                <GalleyHead>Account</GalleyHead>
               </tr>
             </thead>
             <tbody>
@@ -447,6 +612,11 @@ function TicketList({ call, refreshToken }) {
                   </td>
                   <td className="px-sm py-xs font-admin-data text-admin-ink-data">{t.status ? ticketStatusLabel(t.status) : '—'}</td>
                   <td className="px-sm py-xs text-admin-ink-secondary">{t.claimedByUid ? 'Yes' : 'No'}</td>
+                  <td className="px-sm py-xs text-admin-ink-secondary">
+                    {canCreateAccountFromTicket(t) ? (
+                      <CreateAccountFromTicket call={call} ticket={t} ticketId={t.id} onDone={onAccountDone} />
+                    ) : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -498,7 +668,7 @@ export default function AdminTicketing() {
         description="Manage ticket sales, registration records, and attendee admission."
       />
 
-      <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} />
+      <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} call={call} />
       {confirmedProvider === 'stripe' ? <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
         <StripeTicketingWorkspace call={call} />
       </Suspense> : ['eventbrite', 'manual', 'none'].includes(confirmedProvider) ? <>

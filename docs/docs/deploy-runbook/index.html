@@ -692,6 +692,8 @@
           first thing to re-check — copy the exact <code>repository</code> and <code>ref</code> claims GitHub sent from the failed
           run&#39;s log against what the binding names.</p></li>
           </ul>
+          <h3 id="recover-tickets-after-missed-provider-webhooks">Recover tickets after missed provider webhooks<a class="heading-anchor" href="#recover-tickets-after-missed-provider-webhooks" aria-label="Link to this section">#</a></h3>
+          <p>Staff select <strong>Sync all tickets</strong> in admin <strong>Ticketing</strong>. One <code>ticketingSync</code> run lasts at most 540 seconds. It starts no new page after 7 minutes or 50 pages and answers 200 with <code>truncated: true</code>, <code>stoppedReason</code> (<code>time-limit</code>, <code>page-limit</code> or <code>provider-error</code>) and <code>nextCursor</code>. To go on, POST <code>{ &quot;cursor&quot;: &quot;&lt;nextCursor&gt;&quot; }</code>; the admin page does this with <strong>Continue sync</strong>. The cursor is the provider&#39;s page token and is not stored. A cursor the provider refuses answers 400 <code>bad-cursor</code>: start again with <code>{}</code>. Each ticket write is idempotent, so a repeated page or a new run is safe.</p>
           <h3 id="archiving-an-event-with-ticket-sales">Archiving an event with ticket sales<a class="heading-anchor" href="#archiving-an-event-with-ticket-sales" aria-label="Link to this section">#</a></h3>
           <p>Pause new sales with the catalog&#39;s <code>salesPaused</code> setting while payment, held-capacity,
           refund, dispute, or reconciliation work remains. Keep the event writable until those

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatTicketMoney, formatTicketTime, orderStatusLabel, paymentStatusLabel, refundStateLabel, ticketStatusLabel } from '../../lib/ticketingCommerce.js';
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { Notice, Panel, secondaryButtonClass, SelectField, TextField, linkButtonClass } from './formControls.jsx';
+import CreateAccountFromTicket, { canCreateAccountFromTicket } from './CreateAccountFromTicket.jsx';
 
 export function TicketingTable({ label, children }) {
   return <div role="region" aria-label={label} tabIndex={0} className="max-h-[32rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline"><table className="w-full min-w-[48rem] border-collapse text-admin-sm">{children}</table></div>;
@@ -22,12 +23,20 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
   const [cursor, setCursor] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [accountResult, setAccountResult] = useState('');
+  const accountResultRef = useRef(null);
   const runRef = useRef(0);
   const busyRef = useRef(false);
   const activeRef = useRef(true);
   const isOrders = kind === 'orders';
   const label = isOrders ? 'Orders' : 'Admission tickets';
   useEffect(() => { activeRef.current = true; return () => { activeRef.current = false; runRef.current += 1; }; }, []);
+  // The row's action goes away once the ticket is claimed, so focus moves to the result line.
+  useEffect(() => { if (accountResult) accountResultRef.current?.focus(); }, [accountResult]);
+  const onAccountDone = useCallback(({ ticketId, uid, message }) => {
+    setRows((previous) => (previous || []).map((row) => ((row.externalId || row.id) === ticketId ? { ...row, claimedByUid: uid || row.claimedByUid } : row)));
+    setAccountResult(message);
+  }, []);
 
   const search = useCallback(async (criteria, appendCursor = null) => {
     if (appendCursor && busyRef.current) return;
@@ -35,6 +44,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
     busyRef.current = true;
     setBusy(true);
     setError('');
+    setAccountResult('');
     if (!appendCursor) { setCursor(null); setRows(null); }
     try {
       const body = Object.fromEntries(Object.entries(criteria).filter(([, value]) => value));
@@ -66,6 +76,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
       <button type="submit" className={secondaryButtonClass} aria-busy={busy}>{isOrders ? 'Search' : 'Search'}</button>
     </form>
     {error ? <Notice tone="error" message={error} /> : null}
+    {accountResult ? <div ref={accountResultRef} tabIndex={-1} className="mb-sm"><Notice tone="ok" message={accountResult} /></div> : null}
     {rows === null && !error ? <AdminLoadingState label={`Loading ${label.toLowerCase()}…`} /> : rows?.length === 0 ? <AdminEmptyState title={`No ${label.toLowerCase()} found`} description="Adjust the filters to find another record." /> : rows?.length ? <>
       <p role="status" className="mb-xs text-admin-sm text-admin-ink-secondary">Showing {rows.length} {isOrders ? 'orders' : 'tickets'}{cursor ? '; more are available' : ''}.</p>
       <TicketingTable label={label}>
@@ -84,7 +95,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
             <td className={dataCellClass}>{row.email}</td>
             <td className={cellClass}>{row.ticketClass}</td>
             <td className={cellClass}><StatusBadge tone={row.status === 'valid' ? 'ok' : 'caution'}>{ticketStatusLabel(row.status)}</StatusBadge></td>
-            <td className={cellClass}>{row.claimedByUid ? 'Claimed' : 'Unclaimed'}</td>
+            <td className={cellClass}><div className="flex flex-wrap items-center gap-xs">{row.claimedByUid ? 'Claimed' : 'Unclaimed'}{canCreateAccountFromTicket(row) ? <CreateAccountFromTicket call={call} ticket={row} ticketId={row.externalId || row.id} onDone={onAccountDone} /> : null}</div></td>
             <td className={cellClass}>{row.checkedInAt ? 'Checked in' : 'Not checked in'}</td>
             <td className={cellClass}><button type="button" className={linkButtonClass} onClick={() => onOpenOrder(row.orderId)}>View order</button></td>
           </>}

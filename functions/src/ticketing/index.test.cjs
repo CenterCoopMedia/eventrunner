@@ -84,6 +84,29 @@ test('status reports capability, not enablement (§3.3)', async () => {
   assert.equal(eventbriteish.webhookSupported, true);
 });
 
+test('status offers a full sync only to a provider with a webhook to recover', async () => {
+  const db = makeFakeDb();
+  const getConfig = async () => ({ providers: { ticketing: {} } });
+  const statusOf = (provider) => readTicketingStatus({ db, provider, getConfig, now: () => T0 });
+
+  assert.equal((await statusOf(createFakeTicketingProvider({ withRegisterWebhook: true }))).fullSyncSupported, true);
+  assert.equal((await statusOf(createFakeTicketingProvider({ name: 'manual' }))).fullSyncSupported, false);
+  // The real adapters: manual reads its own rows back, none has no tickets.
+  const { createManualProvider } = require('./providers/manual.cjs');
+  const { createNoneProvider } = require('./providers/none.cjs');
+  assert.equal((await statusOf(createManualProvider({ env: {}, db, getConfig }))).fullSyncSupported, false);
+  assert.equal((await statusOf(createNoneProvider({ env: {} }))).fullSyncSupported, false);
+  const { createEventbriteProvider } = require('./providers/eventbrite.cjs');
+  const { createStripeProvider } = require('./providers/stripe.cjs');
+  const eventbrite = createEventbriteProvider({ env: { TICKETING_API_TOKEN: 'token', EVENT_TICKETING_EVENT_ID: 'evt-1' } });
+  assert.equal((await statusOf(eventbrite)).fullSyncSupported, true);
+  const stripe = createStripeProvider({
+    env: { EVENT_TICKETING_EVENT_ID: 'conference-1', EVENT_STRIPE_ACCOUNT_ID: 'acct_fixture', EVENT_STRIPE_MODE: 'test' },
+    db, getConfig, stripeClient: {},
+  });
+  assert.equal((await statusOf(stripe)).fullSyncSupported, true);
+});
+
 test('status reports the registration config readiness.cjs reads, and the queue', async () => {
   const db = makeFakeDb({
     'ticket_sync_queue/ord-1': { orderId: 'ord-1', status: 'pending', readyAt: new Date('2026-08-20T09:00:00.000Z') },
