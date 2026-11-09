@@ -227,7 +227,9 @@ export default function Schedule() {
   const [copyState, setCopyState] = useState('idle'); // idle | copied | error
   // The event's lines, in the client's own order (config/event.tracks). No
   // lines means no second axis, so there is nothing for a grid to be.
-  const columns = resolveTracks(eventConfig);
+  // Memoized: resolveTracks returns a new array on every call, and a new
+  // identity each render would rebuild the plain text below every time.
+  const columns = useMemo(() => resolveTracks(eventConfig), [eventConfig]);
   // The whole programme as plain text (issue #166), recomputed only when
   // the data changes — the copy action and the visible text read the same
   // string, so the two can never disagree.
