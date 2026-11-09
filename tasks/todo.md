@@ -1,5 +1,93 @@
 # Session task list
 
+## Plan for review: audit follow-up (2026-11-09)
+
+Source: `docs/plans/2026-11-09-project-audit/README.md` ("For the owner to
+review"). The owner decided each item on 2026-11-09 through the question
+tool. Rule the owner gave for unused code: a part that is half built or
+planned gets finished; a part with no design intent and no reader is removed.
+
+Builders run on Opus at medium effort. The director reviews each diff and
+runs the checks. Bug fixes are test-first. Each pull request merges before
+the next one starts, on the one branch, so generated output never conflicts.
+
+### PR 1. Defects, rules and data handling
+
+- [ ] Tickets "Load more" sends the applied filter, not the form's (04 #4).
+- [ ] `/updates/:id` claims its tab title (05 #3).
+- [ ] Console: a refused acceptance spends no daily slot (`takeSlotIn`) (08 #5).
+- [ ] `text-status` becomes `text-text-secondary`; `text-body-lg` becomes
+      `text-lead` (05 #2).
+- [ ] Email log: eight source labels: Invoice, Speaker reminder, Speaker
+      profile request, Admin access, Change request notice, Attendee
+      approval, Pitch notice, Ticket confirmation (04 #2).
+- [ ] `firebase.json`: `/dashboard`, `/registration`, `/tickets/mine`,
+      `/tickets/status` join the private block, after a check that each
+      needs sign-in or a private token; runbook and deploy tests (07 #2).
+- [ ] `storage.rules`: remove the `exports/` grant (the PDF is streamed) (07 #3).
+- [ ] Daily sweep also clears `client_error_rate_limits` and
+      `feedback_rate_limits`, deletes in batches, longer limit (02 #5, #6).
+- [ ] Attendee delete clears the account's session pitches and its pitch
+      rate-limit row (`PER_ACCOUNT_STORES`) (03 #6).
+- [ ] Material approve, reject, create, update and delete write an
+      `admin_logs` row (03 #5).
+- [ ] Three readers use `visible === true` (02 #13).
+- [ ] One-time migration, run in each client deploy with a completion
+      marker: numeric ticket dates become timestamps (01 #1).
+- [ ] `migrate-console-signup-links` gets a completion marker. The four
+      one-time jobs stay in the deploys (09 #5, #6).
+- [ ] Schedule and invoice PDFs name EventRunner as Producer and Creator (03 #8).
+- [ ] The classifier selects the unit tier for `apps/web`, rules and
+      generator changes; CONTRIBUTING table (09 #2).
+- [ ] Not changed, by decision: the console `applications` read grant (08 #3).
+
+### PR 2. Features that were half built (a short spec each, in `tasks/specs/`)
+
+- [ ] Announce and Archive controls in admin Event settings (operator);
+      `validateEventConfig` checks `announcedAt` and `archivedAt`; runbook
+      and admin guide (07 #1, #6).
+- [ ] "Sync all tickets" staff action in admin Ticketing; `ticketingSync`
+      gets a time limit that fits a real event (01 #5).
+- [ ] "Create account from ticket" staff action on a ticket (01 #5).
+- [ ] `account.welcome` is sent once when an account is created
+      (`welcome:{uid}`), as ADR 0001 section 6 has it (02 #9).
+- [ ] Remove `getSiteContent`: no design intent, no caller (02 #10).
+
+### PR 3. Docs and repository weight
+
+- [ ] One support address, `info@eventrunner.org`, in every file (09 #4).
+- [ ] `NOTICE`: product name and the full font list with each licence. The
+      owner confirms the licence facts before the commit (10 #5).
+- [ ] Handbook pages describe invoices and Stripe tickets as built (10 #3).
+- [ ] Runbook: the custom web address is an operator procedure; remove the
+      dead add helpers in `admin/webAddress.cjs` (02 #3).
+- [ ] Pages does not serve `docs/plans` or `docs/pr-evidence` (10 #8).
+- [ ] Remove `video/assets/audio/*.wav` and ignore the folder (10 #15).
+- [ ] List the plan-evidence and PR-evidence folders nothing references;
+      remove them after the owner confirms the list (10 #12, #13).
+
+### PR 4. Dead code and refactors (no product change)
+
+- [ ] Each dead item gets the owner's test first. Planned or half-built
+      items go back to the owner as a list. The rest are removed:
+      `ticketsPersisted`, `claimPromptSentAt`, order status `cancelled`,
+      `features.ticketing`, the speaker link primitives, the
+      `review.settings` branches, unused exports and CSS rules, four
+      unreferenced public files (01 #3, #4; 03 #4; 04 #5, #6; 05 #8;
+      06 #3, #10; 08 #8, #12).
+- [ ] Complete the five `.mjs` shims; a test compares each shim with its
+      module (07 #4).
+- [ ] One `CommerceError`; merge copied helpers where no first-page bundle
+      cost results (01 #7; 04 #8; 05 #9; 06 #9; 07 #9; 08 #9).
+- [ ] Single-record admin screens use `subscribeAdminDoc` (04 #7).
+- [ ] Batch the sequential reads (01 #8; 02 #14; 03 #9; 08 #10).
+
+### Done when
+
+Each pull request: `npm test`, `npm run test:web`, lint, the copy and docs
+checks pass locally, "CI gate" is green, every review thread is resolved,
+and the audit README marks the item closed.
+
 ## Plan for review: shared status modules (2026-11-08)
 
 Approved by the owner on 2026-11-08: start with S0. Decisions: S1 adds a
