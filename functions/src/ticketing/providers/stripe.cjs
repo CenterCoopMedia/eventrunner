@@ -347,7 +347,7 @@ function createStripeProvider({ env = process.env, db, stripeClient, now = () =>
       try { page = await query.get(); } catch (err) { throw stopped(err, true); }
       for (const [index, doc] of page.docs.entries()) {
         if (index > 0 && typeof shouldStop === 'function' && shouldStop()) {
-          return { tickets, ticketsPersisted: true, nextPageToken: lastId, stoppedEarly: true };
+          return { tickets, nextPageToken: lastId, stoppedEarly: true };
         }
         if (scopeMatches(doc.data(), scope)) {
           let result;
