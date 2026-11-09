@@ -17,6 +17,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import { Dateline } from '../components/editorial/Byline.jsx';
 import { publishDateLabel, toPublishDate } from '../lib/updateDates.js';
 import { primaryActionClass } from '../components/controlClasses.js';
+import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
 function NotFoundState() {
   return (
@@ -37,6 +38,12 @@ export default function UpdateDetail() {
   const { features, eventConfig } = useEventConfig();
   const { updates } = useContent();
 
+  // Looked up ahead of the early returns so useDocumentTitle (a hook) runs
+  // on every render. Gated on the feature too: with updates off this route
+  // renders "not available", and the tab must not name a post over it.
+  const update = updates.find((u) => u.id === id && u.visible !== false);
+  useDocumentTitle(features.updates ? update?.title : null);
+
   if (!features.updates) {
     return (
       <EmptyState
@@ -51,7 +58,6 @@ export default function UpdateDetail() {
     );
   }
 
-  const update = updates.find((u) => u.id === id && u.visible !== false);
   if (!update) return <NotFoundState />;
 
   // On the event's clock (design record §3.1), never the reader's.

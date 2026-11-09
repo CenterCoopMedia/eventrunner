@@ -2,11 +2,12 @@
 // No Firebase, no network; context providers only, same pattern as
 // SessionDetail.test.jsx.
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import UpdateDetail from './UpdateDetail.jsx';
+import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 
 const VISIBLE_UPDATE = {
   id: 'update-1',
@@ -85,6 +86,28 @@ describe('UpdateDetail', () => {
       'href',
       '/updates',
     );
+  });
+
+  it('names the update in the tab, and names nothing when updates are switched off', () => {
+    resetRouteTitleForTest();
+    renderDetail('update-1');
+    expect(getRouteTitlePart()).toBe(VISIBLE_UPDATE.title);
+    cleanup();
+
+    resetRouteTitleForTest();
+    renderDetail('update-1', { features: { updates: false } });
+    expect(getRouteTitlePart()).toBeNull();
+  });
+
+  it('names nothing in the tab for an unknown or hidden update', () => {
+    resetRouteTitleForTest();
+    renderDetail('no-such-update');
+    expect(getRouteTitlePart()).toBeNull();
+    cleanup();
+
+    resetRouteTitleForTest();
+    renderDetail('update-2', { updates: [HIDDEN_UPDATE] });
+    expect(getRouteTitlePart()).toBeNull();
   });
 
   it('404s for a hidden (unpublished draft) update rather than leaking it', () => {
