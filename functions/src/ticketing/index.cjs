@@ -33,6 +33,7 @@ const QUEUE_EXHAUSTED = 'exhausted';
 
 /** Ticket statuses (§3.3 TicketRecord), from shared/ticketCommerce. Anything else normalizes to pending_info. */
 const { TICKET_STATUSES } = require('shared/ticketCommerce');
+const { iso: toIso, millis } = require('./stripeCommerce.cjs');
 
 /**
  * Firestore document ids are limited to 1500 bytes, may not contain `/`,
@@ -97,7 +98,7 @@ async function readTicketingStatus({ db, provider, getConfig, now = () => new Da
 
   const pendingRows = pendingSnap.docs.slice(0, STATUS_SCAN_LIMIT).map((d) => d.data());
   const readyAtMs = pendingRows
-    .map((row) => (row?.readyAt instanceof Date ? row.readyAt.getTime() : Date.parse(row?.readyAt)))
+    .map((row) => millis(row?.readyAt))
     .filter((ms) => Number.isFinite(ms));
 
   const lastDeliverySnap = await db.collection(WEBHOOK_DELIVERIES)
@@ -105,11 +106,6 @@ async function readTicketingStatus({ db, provider, getConfig, now = () => new Da
     .limit(1)
     .get();
   const lastDelivery = lastDeliverySnap.docs[0]?.data() || null;
-
-  const toIso = (value) => {
-    if (value instanceof Date) return value.toISOString();
-    return typeof value === 'string' && value ? value : null;
-  };
 
   return {
     provider: provider.name,

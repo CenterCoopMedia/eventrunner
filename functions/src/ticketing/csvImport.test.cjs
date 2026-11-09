@@ -229,6 +229,25 @@ test('ticketingImportCsv: commit upserts through sync.cjs semantics and logs an 
   assert.equal(logs.length, 1);
 });
 
+test('ticketingImportCsv: the default clock stores ticket dates as dates, not epoch numbers', async () => {
+  // The handler shares one clock between the admin log (epoch milliseconds)
+  // and the ticket upsert (a Date). With the deployed default, Date.now, the
+  // upsert must still get a Date: Firestore sorts numbers before timestamps,
+  // so a numeric createdAt breaks the list order and its cursor.
+  const db = makeFakeDb();
+  const { auth, getConfig } = makeAuthDeps();
+  const handler = createTicketingImportCsvHandler({ db, auth, getConfig, log: QUIET });
+  const res = makeRes();
+  await handler(req({
+    body: { mapping: MAPPING, dryRun: false, rows: [{ Email: 'a@example.com', 'Order ID': 'ord-1' }] },
+  }), res);
+  assert.equal(res.statusCode, 200);
+
+  const ticket = db.read('tickets', 'ord-1');
+  assert.ok(ticket.createdAt instanceof Date);
+  assert.ok(ticket.updatedAt instanceof Date);
+});
+
 test('ticketingImportCsv: commit idempotence — re-importing the same file is a no-op update, not a duplicate write', async () => {
   const db = makeFakeDb();
   const { auth, getConfig } = makeAuthDeps();
@@ -322,6 +341,24 @@ test('ticketingListTickets: filters by email and status, newest first', async ()
   await handler(req({ body: { status: 'valid' } }), byStatus);
   assert.equal(byStatus.body.tickets.length, 2);
   assert.ok(byStatus.body.tickets.every((t) => t.status === 'valid'));
+});
+
+test('ticketingListTickets: a stored Firestore Timestamp reads as an ISO string and gives a cursor', async () => {
+  // The Admin SDK returns a Timestamp, not a Date, for a stored date.
+  const stored = (date) => ({ toMillis: () => date.getTime(), toDate: () => date });
+  const db = makeFakeDb({
+    'tickets/tkt-1': ticket({ createdAt: stored(T0), updatedAt: stored(T0), claimedAt: stored(T0) }),
+  });
+  const { auth, getConfig } = makeAuthDeps();
+  const handler = createTicketingListTicketsHandler({ db, auth, getConfig, log: QUIET });
+
+  const res = makeRes();
+  await handler(req({ body: { limit: 1 } }), res);
+  assert.equal(res.body.tickets.length, 1);
+  assert.equal(res.body.tickets[0].createdAt, T0.toISOString());
+  assert.equal(res.body.tickets[0].updatedAt, T0.toISOString());
+  assert.equal(res.body.tickets[0].claimedAt, T0.toISOString());
+  assert.equal(res.body.nextCursor, T0.toISOString());
 });
 
 test('ticketingListTickets: an invalid status is a 400', async () => {
