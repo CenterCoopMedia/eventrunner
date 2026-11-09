@@ -24,7 +24,7 @@
  */
 
 const crypto = require('node:crypto');
-const { requireAdmin, internals: { extractBearerToken } } = require('../core/auth.cjs');
+const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
 const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
@@ -57,6 +57,11 @@ const MAX_SUBMISSION_BODY_BYTES = 96 * 1024;
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const CLOSED_MESSAGE = 'Session pitch submissions are closed.';
+const ACCOUNT_GONE_MESSAGE = 'Your account was not found. Sign in again to submit a session pitch.';
+// An account delete (users/records.cjs) leaves this field on the account's
+// rate-limit row in place of its window. A pitch needs no account document,
+// so this row, which the store transaction already reads, is the fence.
+const ACCOUNT_FENCE_FIELD = 'accountDeletedAt';
 
 function bodyBytes(body) {
   try {
@@ -219,23 +224,15 @@ function auditRow({ action, docPath, actor, at, details }) {
   };
 }
 
-// Pitch intake checks revocation so a disabled or deleted Firebase account
-// cannot submit with an ID token that has not expired yet. A ticket and a
-// Firestore users document remain deliberately unnecessary.
-async function verifySubmitter(auth, req) {
-  const token = extractBearerToken(req);
-  if (!token) return null;
-  try {
-    return await auth.verifyIdToken(token, true);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The transaction reads config/pitch_call before it creates a pitch. A
  * concurrent operator update makes Firestore retry this function against
  * the new config, so a close cannot race past a stale preflight read.
+ *
+ * It also reads the rate-limit row, which an account delete replaces with
+ * a fence BEFORE it sweeps session_pitches. The revocation check cannot see
+ * a delete that lands after it. So a pitch that commits first is swept, and
+ * a pitch that reads after the fence is refused.
  */
 async function storePitch({ db, actor, pitch, now = Date.now }) {
   const id = pitchIdFor(actor.uid, pitch.submissionKey);
@@ -246,6 +243,8 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
     const [callSnap, pitchSnap, limitSnap] = await Promise.all([
       tx.get(callRef), tx.get(pitchRef), tx.get(limitRef),
     ]);
+
+    if (limitSnap.exists && limitSnap.data()?.[ACCOUNT_FENCE_FIELD]) return { outcome: 'account-gone' };
 
     if (pitchSnap.exists) {
       const stored = pitchSnap.data() || {};
@@ -298,7 +297,10 @@ function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now =
   return async function submitSessionPitch(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
-    const decoded = await verifySubmitter(auth, req);
+    // verifyAuthToken checks revocation, so a disabled or deleted account
+    // cannot submit with an ID token that has not expired yet. A ticket and
+    // a Firestore users document remain deliberately unnecessary.
+    const decoded = await verifyAuthToken({ auth }, req);
     if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Sign in to submit a session pitch.');
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
     if (!email || decoded.email_verified !== true) {
@@ -338,6 +340,7 @@ function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now =
       return internal(res, 'The session pitch could not be saved. Try again.');
     }
 
+    if (result.outcome === 'account-gone') return sendError(res, 403, 'forbidden', ACCOUNT_GONE_MESSAGE);
     if (result.outcome === 'closed') return notFound(res, CLOSED_MESSAGE);
     if (result.outcome === 'form-changed') {
       return sendError(res, 409, 'form-changed', 'The organizers changed the pitch form. Reload the page and check your choices.');
@@ -741,6 +744,8 @@ module.exports = {
     RATE_LIMIT_MAX,
     RATE_LIMIT_WINDOW_MS,
     CLOSED_MESSAGE,
+    ACCOUNT_GONE_MESSAGE,
+    ACCOUNT_FENCE_FIELD,
     readClosesAt,
     readSubmission,
     readFormSubmission,

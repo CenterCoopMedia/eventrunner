@@ -89,6 +89,7 @@ const RESERVED_SESSION_IDS = new Set(['mine']);
  * own route tree (apps/web/src/admin), or a signed-in-only or single-use
  * page under the public `Layout` route tree (apps/web/src/App.jsx) whose
  * component itself checks `useAuth()` before rendering (Login.jsx,
+ * Dashboard.jsx, CompleteRegistration.jsx, MyTickets.jsx, TicketStatus.jsx,
  * MySchedule.jsx, Profile.jsx, SpeakerAccept.jsx, SpeakerProfile.jsx,
  * TicketClaim.jsx). None of these has content worth a search result.
  *
@@ -118,6 +119,18 @@ const STATIC_PRIVATE_ROUTES = Object.freeze([
   }),
   Object.freeze({
     path: '/dashboard', access: 'authenticated', hasChildren: false, tokenBearing: false,
+  }),
+  Object.freeze({
+    // Its steps sit under it, as /registration/:stepSlug.
+    path: '/registration', access: 'authenticated', hasChildren: true, tokenBearing: false,
+  }),
+  Object.freeze({
+    path: '/tickets/mine', access: 'authenticated', hasChildren: false, tokenBearing: false,
+  }),
+  Object.freeze({
+    // The order number in its return link gives no access without the
+    // purchaser's sign-in, so it is a plain signed-in page, not a token.
+    path: '/tickets/status', access: 'authenticated', hasChildren: false, tokenBearing: false,
   }),
   Object.freeze({
     path: '/schedule/mine', access: 'authenticated', hasChildren: false, tokenBearing: false,

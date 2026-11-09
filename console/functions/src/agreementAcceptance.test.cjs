@@ -156,6 +156,48 @@ test('the existing answer checks and rate limit still apply', async () => {
   for (const db of [incomplete, nameGone, limited]) assert.deepEqual(records(db), []);
 });
 
+/** Firestore refuses a read after a write in one transaction; the fake does not, so this wrapper does. */
+function readsBeforeWrites(db) {
+  const run = db.runTransaction.bind(db);
+  db.runTransaction = (fn) => run((tx) => {
+    let wrote = false;
+    const guarded = { ...tx };
+    for (const key of ['get', 'getAll']) {
+      guarded[key] = (...args) => {
+        if (wrote) throw new Error('read after write in a transaction');
+        return tx[key](...args);
+      };
+    }
+    for (const key of ['set', 'create', 'update', 'delete']) {
+      guarded[key] = (...args) => {
+        wrote = true;
+        return tx[key](...args);
+      };
+    }
+    return fn(guarded);
+  });
+  return db;
+}
+
+test('a refusal inside the transaction does not use a daily slot', async () => {
+  const changed = ready();
+  await saveAgreement({ db: changed, now: () => NOW }, { body: { agreement: { title: 'Test agreement', body: 'A changed test paragraph.' } }, user: ops });
+  const nameGone = ready({ 'site_names/nclocal': { appId: 'other', orgId: 'o2', reservedAt: new Date(NOW) } });
+  const noLink = ready({ 'signup_links/paid-o1': { status: 'used', appId: 'other', orgId: 'o1', usedBy: 'ana' } });
+  const cases = [[changed, 'agreement-changed'], [nameGone, 'incomplete'], [noLink, 'signup-link-required']];
+  for (const [db, code] of cases) {
+    await assert.rejects(accept(deps(readsBeforeWrites(db))), { code }, code);
+    assert.equal(db.read('console_rate_limits/submit-app-ana'), undefined, code);
+  }
+});
+
+test('an acceptance uses one slot, in the same transaction as the record', async () => {
+  const db = readsBeforeWrites(ready());
+  await accept(deps(db));
+  assert.deepEqual(db.read('console_rate_limits/submit-app-ana'), { count: 1, windowStart: new Date(NOW) });
+  assert.equal(records(db).length, 1);
+});
+
 test('only a draft can accept', async () => {
   for (const status of ['approved', 'building', 'withdrawn', 'declined']) {
     const db = ready({ 'applications/a1': applicationDoc({ status }) });

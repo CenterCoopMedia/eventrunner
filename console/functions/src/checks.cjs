@@ -218,4 +218,4 @@ function stepErrors(errors, step) {
   return Object.fromEntries(Object.entries(errors).filter(([path]) => path === step || path.startsWith(`${step}.`)));
 }
 
-module.exports = { LIMITS, checkAnswers, senderAddress, stepErrors, toInitAnswers, websiteHref };
+module.exports = { checkAnswers, senderAddress, stepErrors, toInitAnswers };

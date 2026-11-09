@@ -152,23 +152,15 @@ export const STAT_CONTRACT_HINTS = Object.freeze({
 });
 
 /**
- * What to write in each part of a fact (#234) and a quote, shown under the
- * field in the block editor. Neither type is enforced on write beyond its
- * required fields; the hints exist because `label` and `value` are the
- * registry's names and "the term" and "the description" are the operator's.
+ * What to write in each part of a fact (#234), shown under the field in the
+ * block editor. The type is not enforced on write beyond its required
+ * fields; the hints exist because `label` and `value` are the registry's
+ * names and "the term" and "the description" are the operator's.
  */
 export const FACT_HINTS = Object.freeze({
   label: 'The term. “Where”, “Who”, “Format”.',
   value: 'The fact itself. “The main hall”, “Local newsroom staff”.',
   note: 'One line under the fact, if it needs one. An address, a way to get there.',
-});
-
-export const QUOTE_HINTS = Object.freeze({
-  text:
-    'The sentence as it was said, without quotation marks: the page draws them in every site ' +
-    'style. The first quote on a page is set as the pull quote; any quote after it is set as a ' +
-    'plain quotation in the body.',
-  attribution: 'Who said it, and in what role. “Marisol Reyes, opening talk”.',
 });
 
 /** Registry order — the palette's display order. */

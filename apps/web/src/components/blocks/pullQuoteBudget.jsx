@@ -23,7 +23,7 @@ function text(value) {
 }
 
 /** The key a block is known by: its document id, or its section and field. */
-export function quoteKey(block) {
+function quoteKey(block) {
   return block?.id ?? `${block?.section}__${block?.field}`;
 }
 
@@ -34,7 +34,7 @@ export function quoteKey(block) {
  * @param {(id: string) => object[]} getSectionBlocks the section's visible blocks, in order
  * @returns {string|null}
  */
-export function firstQuoteKey(sections, getSectionBlocks) {
+function firstQuoteKey(sections, getSectionBlocks) {
   for (const section of sections ?? []) {
     for (const block of getSectionBlocks(section.id) ?? []) {
       if (block?.blockType === 'quote' && text(block.text)) return quoteKey(block);

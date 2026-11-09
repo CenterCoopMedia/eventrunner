@@ -3,6 +3,7 @@
 const { TICKET_TERMINAL_STATUSES } = require('shared/ticketCommerce');
 const { randomUUID } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
+const { millis } = require('./stripeCommerce.cjs');
 
 /**
  * The sync queue and the ticket upsert (spec §3.3 steps 3–4, §4.2).
@@ -47,6 +48,21 @@ const PAYMENT_RECHECK_LIMIT = 48;
 /** Pages one manual full sync will walk before it reports itself truncated. */
 const MAX_SYNC_PAGES = 50;
 
+/**
+ * Time after which a full sync starts no new page, and the Stripe
+ * provider starts no new order. `ticketingSync` runs for at most 540
+ * seconds. The 2 minutes left give the last page or order time to
+ * finish. The run then answers with what it did.
+ */
+const SYNC_TIME_BUDGET_MS = 7 * 60 * 1000;
+const SYNC_TIMEOUT_SECONDS = 540;
+
+/**
+ * Longest resume cursor a request may send. The cursor is the provider's
+ * own page token (Eventbrite continuation, Stripe order id), opaque here.
+ */
+const MAX_CURSOR_LENGTH = 1024;
+
 async function writesAllowed(db, transaction) {
   const policy = await checkDemoWrites({ db, transaction });
   throwIfDemoPolicyUnavailable(policy);
@@ -57,15 +73,6 @@ async function writesAllowed(db, transaction) {
 function backoffMsFor(attempts) {
   const n = Math.max(1, Number.isFinite(attempts) ? attempts : 1);
   return Math.min(BASE_BACKOFF_MS * 2 ** (n - 1), MAX_BACKOFF_MS);
-}
-
-/** @param {unknown} value @returns {number} ms since epoch, or NaN */
-function toMillis(value) {
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === 'number') return value;
-  if (value && typeof value.toDate === 'function') return value.toDate().getTime();
-  if (typeof value === 'string') return Date.parse(value);
-  return NaN;
 }
 
 /**
@@ -187,7 +194,7 @@ async function leaseQueueRow({ db, ref, providerName, now }) {
     const at = now();
     if (!snap.exists || row.status !== QUEUE_PENDING ||
         (row.provider && row.provider !== providerName) ||
-        toMillis(row.readyAt) > at.getTime() || toMillis(row.leaseExpiresAt) > at.getTime()) return null;
+        millis(row.readyAt) > at.getTime() || millis(row.leaseExpiresAt) > at.getTime()) return null;
     const attempts = (Number.isInteger(row.attempts) ? row.attempts : 0) + 1;
     tx.set(ref, {
       leaseId: token, leaseExpiresAt: new Date(at.getTime() + QUEUE_LEASE_MS),
@@ -255,7 +262,7 @@ async function drainTicketSyncQueue({
 
   for (const doc of snap.docs) {
     const row = doc.data() || {};
-    const readyAtMs = toMillis(row.readyAt);
+    const readyAtMs = millis(row.readyAt);
     // An unparseable readyAt is treated as ready: a row that cannot be
     // scheduled must still be worked, not stranded.
     if (Number.isFinite(readyAtMs) && readyAtMs > nowMs) continue;
@@ -366,33 +373,106 @@ async function drainTicketSyncQueue({
  * serve them; a full sync reads what the provider already has.
  *
  * Bounded by MAX_SYNC_PAGES so a provider that returns a non-terminating
- * page cursor cannot spin the function until its timeout.
+ * page cursor cannot spin the function until its timeout, and by
+ * SYNC_TIME_BUDGET_MS so a long walk answers before the function limit.
  *
- * @param {{ db: object, provider: object, since?: string,
+ * A run that stops early returns `nextCursor`, the provider page token of
+ * the first page it did not finish. The next request sends it back as
+ * `cursor`. The cursor is never stored: ticket_sync_queue stays the only
+ * record of work for a later run (§10 question 9).
+ *
+ * Each ticket is its own idempotent transaction, so a run that stops
+ * part way leaves no ticket half written, and a retried page writes the
+ * same values again. Counts are per ticket and per run.
+ *
+ * A provider that commits while it lists (Stripe) also gets the deadline
+ * as `shouldStop`. It can stop inside a page (`stoppedEarly`), and on an
+ * error it reports what it committed (`partialProgress`), so neither case
+ * loses counts or restarts the page from its start.
+ *
+ * @param {{ db: object, provider: object, since?: string, cursor?: string,
  *           now?: () => Date, log?: object }} deps
  */
-async function runFullSync({ db, provider, since, now = () => new Date(), log = console }) {
-  const totals = { created: 0, updated: 0, skipped: 0, pages: 0, truncated: false };
-  let pageToken;
-  for (let page = 0; page < MAX_SYNC_PAGES; page += 1) {
-    if (!await writesAllowed(db)) return { ...totals, skippedReason: 'read-only-demo' };
-    const result = await provider.listTickets({ since, pageToken });
-    if (!await writesAllowed(db)) return { ...totals, skippedReason: 'read-only-demo' };
-    totals.pages += 1;
-    const counts = provider.ownsTicketPersistence
-      ? { created: 0, updated: result?.tickets?.length || 0, skipped: 0 }
-      : await upsertTickets({ db, tickets: result?.tickets, providerName: provider.name, now, log, respectDemoPolicy: true });
-    totals.created += counts.created;
-    totals.updated += counts.updated;
-    totals.skipped += counts.skipped;
-    if (counts.blocked) return { ...totals, skippedReason: 'read-only-demo' };
-    pageToken = result?.nextPageToken || null;
-    if (!pageToken) return totals;
+async function runFullSync({ db, provider, since, cursor, now = () => new Date(), log = console }) {
+  const totals = { created: 0, updated: 0, skipped: 0, pages: 0, truncated: false, nextCursor: null };
+  const startedAt = now().getTime();
+  const shouldStop = () => now().getTime() - startedAt >= SYNC_TIME_BUDGET_MS;
+  let pageToken = cursor || undefined;
+  // True while the provider lists. A listing that fails has written
+  // nothing, unless the provider commits while it lists.
+  let listing = false;
+  try {
+    for (let page = 0; page < MAX_SYNC_PAGES; page += 1) {
+      if (page > 0 && shouldStop()) {
+        log.warn(`ticketing: full sync stopped at its time budget after ${totals.pages} pages`);
+        return { ...totals, truncated: true, stoppedReason: 'time-limit', nextCursor: pageToken };
+      }
+      if (!await writesAllowed(db)) return { ...totals, skippedReason: 'read-only-demo' };
+      listing = true;
+      const result = await provider.listTickets({ since, pageToken, shouldStop });
+      listing = false;
+      if (!await writesAllowed(db)) return { ...totals, skippedReason: 'read-only-demo' };
+      if (provider.ownsTicketPersistence) {
+        // The provider committed these tickets itself while it listed them.
+        totals.updated += result?.tickets?.length || 0;
+      } else {
+        for (const record of Array.isArray(result?.tickets) ? result.tickets : []) {
+          const counts = await upsertTickets({ db, tickets: [record], providerName: provider.name, now, log, respectDemoPolicy: true });
+          totals.created += counts.created;
+          totals.updated += counts.updated;
+          totals.skipped += counts.skipped;
+          if (counts.blocked) return { ...totals, skippedReason: 'read-only-demo' };
+        }
+      }
+      totals.pages += 1;
+      pageToken = result?.nextPageToken || null;
+      if (result?.stoppedEarly && pageToken) {
+        log.warn(`ticketing: full sync stopped at its time budget inside page ${totals.pages}`);
+        return { ...totals, truncated: true, stoppedReason: 'time-limit', nextCursor: pageToken };
+      }
+      if (!pageToken) return totals;
+    }
+  } catch (err) {
+    // A token the provider refuses cannot be retried: the caller says so.
+    if (err?.code === 'invalid-page-token' && pageToken) throw err;
+    // The provider committed part of the page before it failed. Count it,
+    // and resume at the order that failed, not at the start of the page.
+    const partial = err?.partialProgress;
+    if (partial) {
+      totals.updated += Array.isArray(partial.tickets) ? partial.tickets.length : 0;
+      if (partial.nextPageToken) pageToken = partial.nextPageToken;
+    }
+    // Nothing counted and nothing to resume: the caller answers 502. It
+    // says no tickets changed only when that is known.
+    if (!pageToken && totals.created + totals.updated + totals.skipped === 0) {
+      const nothingSaved = partial ? partial.outcomeKnown === true : listing && !provider.ownsTicketPersistence;
+      throw Object.assign(new Error('The full sync failed before it saved a ticket it could count.', { cause: err }), { nothingSaved });
+    }
+    // Otherwise the run stopped part way. The cursor points at the page
+    // or order that failed, so the next run retries it (a Stripe order
+    // that was still reconciling, a rate limit, a failed write).
+    log.error('ticketing: full sync stopped on an error', err);
+    return { ...totals, truncated: true, stoppedReason: 'provider-error', nextCursor: pageToken || null };
   }
-  totals.truncated = true;
   log.warn(`ticketing: full sync stopped after ${MAX_SYNC_PAGES} pages`);
-  return totals;
+  return { ...totals, truncated: true, stoppedReason: 'page-limit', nextCursor: pageToken };
 }
+
+/** The resume cursor from a request: absent, a usable string, or refused. */
+function readCursor(value) {
+  if (value === undefined || value === null) return { ok: true, cursor: undefined };
+  if (typeof value !== 'string') return { ok: false };
+  const cursor = value.trim();
+  // eslint-disable-next-line no-control-regex -- control characters are the thing refused
+  if (!cursor || cursor.length > MAX_CURSOR_LENGTH || /[\u0000-\u001f\u007f]/.test(cursor)) return { ok: false };
+  return { ok: true, cursor };
+}
+
+const BAD_CURSOR_MESSAGE = 'The sync cannot continue from this point. Start the sync again from the beginning.';
+const NOTHING_SAVED_MESSAGE = 'The ticketing provider could not be read. No tickets changed. Try again in a few minutes.';
+// A failed write, or a provider that commits while it lists, can leave
+// tickets saved that the run could not count. Each write is idempotent.
+const UNKNOWN_OUTCOME_MESSAGE = 'The sync stopped on an error. Some tickets may be saved. Run the sync again. It does not make duplicate tickets.';
 
 /**
  * Admin-gated HTTP handler for `ticketingSync`.
@@ -416,13 +496,25 @@ function createTicketingSyncHandler({ db, provider, auth, getConfig, now, log = 
     const since = typeof req.body?.since === 'string' && req.body.since.trim()
       ? req.body.since.trim()
       : undefined;
+    const { ok: cursorOk, cursor } = readCursor(req.body?.cursor);
+    if (!cursorOk) {
+      res.status(400).json({ error: { code: 'bad-cursor', message: BAD_CURSOR_MESSAGE } });
+      return;
+    }
     try {
-      const totals = await runFullSync({ db, provider, since, now, log });
+      const totals = await runFullSync({ db, provider, since, cursor, now, log });
       res.status(200).json({ ok: true, ...totals });
     } catch (err) {
+      if (err?.code === 'invalid-page-token') {
+        res.status(400).json({ error: { code: 'bad-cursor', message: BAD_CURSOR_MESSAGE } });
+        return;
+      }
       log.error('ticketing: full sync failed', err);
       res.status(502).json({
-        error: { code: 'provider-error', message: 'The ticketing provider could not be read.' },
+        error: {
+          code: 'provider-error',
+          message: err?.nothingSaved === true ? NOTHING_SAVED_MESSAGE : UNKNOWN_OUTCOME_MESSAGE,
+        },
       });
     }
   };
@@ -467,7 +559,7 @@ function buildHandlers() {
   };
 
   return {
-    ticketingSync: onRequest({ region, secrets }, withCors(async (req, res) => {
+    ticketingSync: onRequest({ region, secrets, timeoutSeconds: SYNC_TIMEOUT_SECONDS }, withCors(async (req, res) => {
       const { buildTicketingDeps } = require('./index.cjs');
       await createTicketingSyncHandler(buildTicketingDeps())(req, res);
     })),
@@ -494,7 +586,6 @@ module.exports = {
   internals: {
     normalizeTicket,
     backoffMsFor,
-    toMillis,
     MAX_ATTEMPTS,
     BASE_BACKOFF_MS,
     MAX_BACKOFF_MS,
@@ -502,5 +593,8 @@ module.exports = {
     QUEUE_LEASE_MS,
     PAYMENT_RECHECK_LIMIT,
     MAX_SYNC_PAGES,
+    SYNC_TIME_BUDGET_MS,
+    SYNC_TIMEOUT_SECONDS,
+    MAX_CURSOR_LENGTH,
   },
 };

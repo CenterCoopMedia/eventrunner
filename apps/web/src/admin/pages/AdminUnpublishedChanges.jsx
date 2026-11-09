@@ -29,7 +29,6 @@ import { countWords } from '../collectionWords.js';
 import { summarizePublish } from '../publishResult.js';
 import {
   editorPathFor,
-  formatPublishedAt,
   groupPending,
   mergeRuns,
   runSummary,
@@ -37,6 +36,7 @@ import {
   toMillis,
 } from '../pendingChanges.js';
 import { useAdminPages } from '../useAdminPages.js';
+import { formatPublishedAt } from '../versionHistory.js';
 import { versionAuthor, versionRecordName } from './versionDisplay.js';
 import { useComingSoon } from '../../lib/launchSource.js';
 import {

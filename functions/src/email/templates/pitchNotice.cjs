@@ -64,4 +64,4 @@ function pitchNoticeTemplate(id) {
   };
 }
 
-module.exports = { buildPitchNoticeBodies, pitchNoticeOverride, pitchNoticeTemplate, RECEIPT_TOKENS, DECISION_TOKENS };
+module.exports = { pitchNoticeOverride, pitchNoticeTemplate };

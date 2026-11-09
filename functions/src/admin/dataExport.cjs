@@ -182,7 +182,7 @@ const DATASETS = Object.freeze({
       const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs, cache }, speakerRecord);
       // Published: a live session the site shows, not a hidden one.
       const sessions = (await readRecords({ db, collection: 'cmsSchedule', counter, maxDocs, cache }, sessionRecord))
-        .filter((session) => session.visible !== false);
+        .filter((session) => session.visible === true);
       return speakers.map((speaker) => ({
         ...speaker,
         sessionTitles: sessions.filter((session) => session.speakerIds.includes(speaker.id)).map((session) => session.title),

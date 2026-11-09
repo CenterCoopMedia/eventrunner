@@ -73,8 +73,11 @@ async function allProviderPages(list, params) {
   throw new Error('Stripe reconciliation exceeded its bounded page limit.');
 }
 
+// `scope` is a stripeScope() result or a provider built from one. A
+// provider with no event or account matches no order.
 function scopeMatches(order, scope) {
-  return order?.provider === 'stripe' && order.eventId === scope.externalEventId &&
+  return Boolean(scope?.externalEventId && scope?.stripeAccountId) &&
+    order?.provider === 'stripe' && order.eventId === scope.externalEventId &&
     order.stripeAccountId === scope.stripeAccountId && order.livemode === scope.livemode;
 }
 
@@ -114,7 +117,7 @@ function isInvoiceCheckoutRequest(params, scope) {
     && !params.subscription_data && !params.discounts;
 }
 
-function createStripeProvider({ env = process.env, db, getConfig, stripeClient, now = () => new Date() } = {}) {
+function createStripeProvider({ env = process.env, db, stripeClient, now = () => new Date() } = {}) {
   const scope = stripeScope(env);
   let client = null;
   let accountCheck = null;
@@ -313,35 +316,61 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
       return result.tickets.filter((ticket) => ticket.email === email.trim().toLowerCase());
     },
 
-    async listTickets({ pageToken } = {}) {
+    /**
+     * One page of orders, each reconciled and committed in turn. The page
+     * token is the id of the last order handled, so a resumed page starts
+     * at the first order it did not handle.
+     *
+     * `shouldStop` is the full sync's deadline. It is checked before each
+     * order after the first, so one call always makes progress. A stopped
+     * page answers `stoppedEarly: true`.
+     *
+     * An order that fails ends the page. The error carries
+     * `partialProgress`: the tickets already committed, the token that
+     * resumes at the failed order, and `outcomeKnown` (false when the
+     * failed order may have written).
+     */
+    async listTickets({ pageToken, shouldStop } = {}) {
       if (!db) throw new Error('Stripe ticket reconciliation requires a database.');
       let query = db.collection('ticket_orders').where('provider', '==', 'stripe').orderBy('id').limit(ORDER_PAGE_SIZE);
       if (pageToken) {
-        if (!safeId(pageToken)) throw new Error('Invalid Stripe ticket page token.');
+        if (!safeId(pageToken)) throw Object.assign(new Error('Invalid Stripe ticket page token.'), { code: 'invalid-page-token' });
         query = query.startAfter(pageToken);
       }
-      const page = await query.get();
       const tickets = [];
-      for (const doc of page.docs) {
-        if (!scopeMatches(doc.data(), scope)) continue;
-        const result = await provider.reconcileOrder(doc.id);
-        if (result.complete !== true) throw new Error('An order is still being reconciled; retry the sync.');
-        tickets.push(...result.tickets);
+      let lastId = pageToken || null;
+      const stopped = (cause, outcomeKnown) => Object.assign(
+        new Error(`Stripe ticket sync stopped part way through a page: ${cause?.message || cause}`, { cause }),
+        { partialProgress: { tickets, nextPageToken: lastId, outcomeKnown } },
+      );
+      let page;
+      try { page = await query.get(); } catch (err) { throw stopped(err, true); }
+      for (const [index, doc] of page.docs.entries()) {
+        if (index > 0 && typeof shouldStop === 'function' && shouldStop()) {
+          return { tickets, nextPageToken: lastId, stoppedEarly: true };
+        }
+        if (scopeMatches(doc.data(), scope)) {
+          let result;
+          try { result = await provider.reconcileOrder(doc.id); } catch (err) { throw stopped(err, false); }
+          // A busy or blocked order writes nothing; the next run retries it.
+          if (result.complete !== true) throw stopped(new Error('An order is still being reconciled; retry the sync.'), true);
+          tickets.push(...result.tickets);
+        }
+        lastId = doc.id;
       }
-      return { tickets, ticketsPersisted: true, nextPageToken: page.size === ORDER_PAGE_SIZE ? page.docs.at(-1).id : null };
+      return { tickets, nextPageToken: page.size === ORDER_PAGE_SIZE ? page.docs.at(-1).id : null };
     },
 
     async getRegistrationPrompt(ctx = {}) {
       // Registration prompt entitlement skips apply to every provider and
-      // trigger, before configuration reads or any delivery onceKey is used.
+      // trigger, before any delivery onceKey is used.
       if (ctx?.isSpeaker === true || ctx?.hasClaimedTicket === true) {
         return { send: false, templateId: null, ctaLabel: null, ctaUrl: null, action: null, bodyNote: null };
       }
-      const config = typeof getConfig === 'function' ? await getConfig() : null;
       const publicUrl = env.EVENT_PUBLIC_URL?.trim();
       let origin;
       try { origin = new URL(publicUrl); } catch { return { send: false }; }
-      if (origin.protocol !== 'https:' || config?.features?.ticketing === false) return { send: false };
+      if (origin.protocol !== 'https:') return { send: false };
       return { send: true, templateId: 'ticket.get_ticket', ctaLabel: 'Choose tickets',
         ctaUrl: new URL('/tickets', origin).href, action: 'purchase', bodyNote: null };
     },
@@ -366,6 +395,6 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
 }
 
 module.exports = {
-  createStripeProvider, createStripeClient, stripeScope,
+  createStripeProvider, stripeScope,
   internals: { WEBHOOK_EVENTS, scopeMatches, metadataMatches, objectId, safeId, allProviderPages, isInvoiceCheckoutRequest },
 };

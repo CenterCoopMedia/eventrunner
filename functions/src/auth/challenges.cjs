@@ -160,8 +160,9 @@ async function takeRateLimitSlot({ db, email, now = Date.now }) {
  *           max?: number, windowMs?: number }} args
  * The slot is a RESERVATION, taken before the send so concurrent requests
  * cannot both pass a stale count. `releaseGlobalSendSlot` gives it back
- * when the send does not happen, so the ceiling counts codes that actually
- * went out rather than provider outages.
+ * only when the challenge write fails, before any send. A send the
+ * provider refuses keeps its slot, so the ceiling counts attempts, not
+ * delivered codes.
  *
  * @returns {Promise<{ limited: boolean, count: number, firstTrip: boolean,
  *           takenAt?: number, retryAfterMs?: number }>}
@@ -205,9 +206,9 @@ async function takeGlobalSendSlot({
 
 /**
  * Give back a reservation taken by `takeGlobalSendSlot` when the provider
- * was never called, such as a failed challenge write or a sendEmail throw
- * during policy or config. A provider result other than `sent` keeps the
- * slot. The email core turns a provider throw into that failed result.
+ * was never called: the challenge write failed. A provider result other
+ * than `sent` keeps the slot, and so does a sendEmail throw, which is
+ * ambiguous. The email core turns a provider throw into that failed result.
  *
  * Removes exactly one timestamp equal to `takenAt`. Two requests reserving
  * in the same millisecond are indistinguishable, but returning "one slot"
@@ -353,28 +354,67 @@ async function releaseChallenge({ db, token }) {
   });
 }
 
+/** True for a FAILED_PRECONDITION / NOT_FOUND rejection (gRPC 9 / 5). */
+function isPreconditionFailure(err) {
+  if (err?.code === 9 || err?.code === 5) return true;
+  return /FAILED_PRECONDITION|NOT_FOUND/i.test(String(err?.message || ''));
+}
+
 /**
  * Sweep expired challenges and stale rate-limit docs (the auth module's
- * own cleanup export, spec §1.3; maintenance/cleanup.cjs calls the same).
+ * own cleanup export, spec §1.3, run daily by cleanupExpiredAuthChallenges).
+ * It also clears the two per-IP buckets that copy this module's shape
+ * (client errors and feedback): nothing else removes them.
  *
  * @param {{ db: FirebaseFirestore.Firestore, now?: () => number,
- *           batchLimit?: number }} args
- * @returns {Promise<{ challenges: number, rateLimits: number, sendCeilings: number }>}
+ *           batchLimit?: number, maxBatches?: number }} args
+ * @returns {Promise<{ challenges: number, rateLimits: number, sendCeilings: number,
+ *   clientErrorRateLimits: number, feedbackRateLimits: number }>}
  */
 async function sweepExpired({ db, now = Date.now, batchLimit = 250, maxBatches = 40 }) {
+  // Required here, not at the top: the auth endpoints load this module and
+  // do not need the feedback module's own imports.
+  const clientErrorWindowMs = require('../telemetry/clientErrors.cjs').internals.RATE_LIMIT_WINDOW_MS;
+  const feedbackWindowMs = require('../admin/feedback.cjs').internals.RATE_LIMIT_WINDOW_MS;
+
   // Drain in batches until a batch comes back short — a daily run capped at
   // one batch would let a busy event accumulate an unbounded backlog of
   // expired auth data. maxBatches bounds a single invocation; the next run
-  // continues.
+  // continues. One batch commit per page, as sweepExpiredSentEmails does,
+  // so a full run fits in the scheduled function's time limit.
   async function drain(query) {
     let deleted = 0;
     for (let i = 0; i < maxBatches; i += 1) {
-      const batch = await query.get();
-      for (const doc of batch.docs) {
-        await doc.ref.delete();
+      const page = await query.get();
+      if (page.docs.length === 0) break;
+      deleted += await deletePage(page.docs);
+      if (page.docs.length < batchLimit) break;
+    }
+    return deleted;
+  }
+
+  // Each delete carries the update time the sweep read. A request can
+  // refresh a bucket between the read and the delete; deleting it then
+  // would give the next request a second budget in the same window. One
+  // failed precondition fails the whole batch, so that page is retried one
+  // document at a time and the changed documents are left alone.
+  async function deletePage(docs) {
+    const batch = db.batch();
+    for (const doc of docs) batch.delete(doc.ref, { lastUpdateTime: doc.updateTime });
+    try {
+      await batch.commit();
+      return docs.length;
+    } catch (err) {
+      if (!isPreconditionFailure(err)) throw err;
+    }
+    let deleted = 0;
+    for (const doc of docs) {
+      try {
+        await doc.ref.delete({ lastUpdateTime: doc.updateTime });
         deleted += 1;
+      } catch (err) {
+        if (!isPreconditionFailure(err)) throw err;
       }
-      if (batch.docs.length < batchLimit) break;
     }
     return deleted;
   }
@@ -394,7 +434,19 @@ async function sweepExpired({ db, now = Date.now, batchLimit = 250, maxBatches =
       .where('updatedAt', '<', new Date(now() - SEND_CEILING_WINDOW_MS))
       .limit(batchLimit),
   );
-  return { challenges, rateLimits, sendCeilings };
+  // Each write sets updatedAt to its newest request, so a row older than
+  // one window holds no request that still counts.
+  const clientErrorRateLimits = await drain(
+    db.collection('client_error_rate_limits')
+      .where('updatedAt', '<', new Date(now() - clientErrorWindowMs))
+      .limit(batchLimit),
+  );
+  const feedbackRateLimits = await drain(
+    db.collection('feedback_rate_limits')
+      .where('updatedAt', '<', new Date(now() - feedbackWindowMs))
+      .limit(batchLimit),
+  );
+  return { challenges, rateLimits, sendCeilings, clientErrorRateLimits, feedbackRateLimits };
 }
 
 module.exports = {

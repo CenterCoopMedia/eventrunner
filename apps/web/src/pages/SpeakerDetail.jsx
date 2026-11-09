@@ -31,7 +31,7 @@ import Rule from '../components/editorial/Rule.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
-import { sortSessions } from './Schedule.jsx';
+import { sortSessions } from '../lib/scheduleView.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 function text(value) {

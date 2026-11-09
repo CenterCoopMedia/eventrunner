@@ -13,7 +13,7 @@ function idTokenGetter(user) {
 }
 
 /** The record id for an event that sells no tickets: one per account. */
-export const accountRecordId = (uid) => `account-${uid}`;
+const accountRecordId = (uid) => `account-${uid}`;
 
 /**
  * What the attendee answers for: each valid ticket they hold, or their

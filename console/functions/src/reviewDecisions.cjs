@@ -184,4 +184,4 @@ async function closeApplication(deps, { body, user }) {
   return { body: { application: { id: app.id, status: 'declined' }, ...mail } };
 }
 
-module.exports = { NOTE_MAX, closeApplication, declineApplication, launchApplication, requireNote, transition };
+module.exports = { NOTE_MAX, closeApplication, declineApplication, launchApplication };

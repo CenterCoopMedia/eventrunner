@@ -67,8 +67,8 @@ const EXTENSIONS = Object.freeze({
 /**
  * 5 MiB of image, which is ~6.7 MB of base64 in the request body — inside
  * the platform's HTTP request limit with room for the JSON envelope, and
- * well above any sensible web image. Profile photos are capped lower (2 MiB)
- * by storage.rules, since those upload directly.
+ * well above any sensible web image. Profile photos are capped lower
+ * (2 MiB) by their own upload endpoint, users/photos.cjs.
  */
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -580,8 +580,8 @@ function createSpeakerPhotoUploadHandler({
     }
     const decodedUpload = decodeUpload(req.body?.data);
     if (!decodedUpload.ok) return badRequest(res, decodedUpload.message);
-    // storage.rules refuses a profile-class photo of EXACTLY the cap
-    // (`size < 2 MiB`); this mirrors that so the two paths agree.
+    // A photo of EXACTLY the cap is refused, the same as the attendee
+    // photo upload (users/photos.cjs), so the two paths agree.
     if (decodedUpload.buffer.length >= SPEAKER_PHOTO_MAX_BYTES) {
       return badRequest(res, `data: must be under ${SPEAKER_PHOTO_MAX_BYTES} bytes`);
     }

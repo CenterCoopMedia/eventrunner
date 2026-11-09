@@ -641,9 +641,10 @@
           self-fetch is failing: check <code>EVENT_PUBLIC_URL</code> and that hosting is actually serving
           <code>/index.html</code>.</p></li>
           <li><p><code>firebase.json</code>&#39;s rewrite <strong>order</strong> is load-bearing. <code>/updates/**</code> goes to <code>updatesMeta</code> first;
-          then the account and staff routes (<code>/signin</code>, <code>/profile</code>, <code>/attendees</code>, <code>/attendees/**</code>,
-          <code>/schedule/mine</code>, <code>/speaker/**</code>, <code>/ticket/**</code>, <code>/admin</code>, <code>/admin/**</code>) are rewritten straight to
-          <code>/index.html</code>, because they carry nothing a crawler should index and spending a function
+          then the account and staff routes (<code>/signin</code>, <code>/profile</code>, <code>/profile/**</code>, <code>/attendees</code>,
+          <code>/attendees/**</code>, <code>/schedule/mine</code>, <code>/speaker/**</code>, <code>/ticket/**</code>, <code>/dashboard</code>, <code>/registration</code>,
+          <code>/registration/**</code>, <code>/tickets/mine</code>, <code>/tickets/status</code>, <code>/admin</code>, <code>/admin/**</code>) are rewritten
+          straight to <code>/index.html</code>, because they carry nothing a crawler should index and spending a function
           invocation to say so is waste; then the <code>**</code> catch-all goes to <code>routeMeta</code>. Adding a public route
           needs nothing here — the catch-all already covers it. Adding an authenticated one means adding it
           to that middle block, <strong>above</strong> the catch-all, and to the <code>headers</code> block below it. Hosting
@@ -691,6 +692,8 @@
           first thing to re-check — copy the exact <code>repository</code> and <code>ref</code> claims GitHub sent from the failed
           run&#39;s log against what the binding names.</p></li>
           </ul>
+          <h3 id="recover-tickets-after-missed-provider-webhooks">Recover tickets after missed provider webhooks<a class="heading-anchor" href="#recover-tickets-after-missed-provider-webhooks" aria-label="Link to this section">#</a></h3>
+          <p>Staff select <strong>Sync all tickets</strong> in admin <strong>Ticketing</strong>. One <code>ticketingSync</code> run lasts at most 540 seconds. It starts no new page after 7 minutes or 50 pages and answers 200 with <code>truncated: true</code>, <code>stoppedReason</code> (<code>time-limit</code>, <code>page-limit</code> or <code>provider-error</code>) and <code>nextCursor</code>. To go on, POST <code>{ &quot;cursor&quot;: &quot;&lt;nextCursor&gt;&quot; }</code>; the admin page does this with <strong>Continue sync</strong>. The cursor is the provider&#39;s page token and is not stored. A cursor the provider refuses answers 400 <code>bad-cursor</code>: start again with <code>{}</code>. Each ticket write is idempotent, so a repeated page or a new run is safe.</p>
           <h3 id="archiving-an-event-with-ticket-sales">Archiving an event with ticket sales<a class="heading-anchor" href="#archiving-an-event-with-ticket-sales" aria-label="Link to this section">#</a></h3>
           <p>Pause new sales with the catalog&#39;s <code>salesPaused</code> setting while payment, held-capacity,
           refund, dispute, or reconciliation work remains. Keep the event writable until those
@@ -797,12 +800,53 @@
           of scope here and tracked there, not in this runbook. The Cloud Run site-publisher has since landed
           (#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
           ordinary per-client environment with no domain coupling, so nothing in §9 waits on #66.</p>
-          <h3 id="custom-web-address-from-the-admin">Custom web address from the admin<a class="heading-anchor" href="#custom-web-address-from-the-admin" aria-label="Link to this section">#</a></h3>
-          <p>An operator can add a custom web address on <strong>Settings → Web address</strong> (ADR 0007 §8). The
-          <code>webAddress</code> function asks Firebase Hosting for the domain, shows the client the records to add,
-          and checks every hour (<code>webAddressCheck</code>). When the domain is live it adds the domain to the Auth
-          authorized domains. The functions runtime account needs two roles on the client project for this,
-          once:</p>
+          <h3 id="custom-web-address-status-in-the-admin">Custom web address status in the admin<a class="heading-anchor" href="#custom-web-address-status-in-the-admin" aria-label="Link to this section">#</a></h3>
+          <p>An operator sets up a custom web address. A client admin cannot add or remove one: the <code>webAddress</code>
+          function refuses <code>add</code> and <code>remove</code> for every admin tier. <strong>Settings → Web address</strong> (ADR 0007 §8)
+          shows the site&#39;s current address and, for a stored domain, its status (<strong>Waiting for the
+          records</strong>, <strong>Ready to switch</strong>, or <strong>In use</strong>) and <strong>Check now</strong>. A check, and the hourly
+          <code>webAddressCheck</code>, reads the domain&#39;s state in Firebase Hosting. The first time Hosting serves the
+          stored domain with a certificate, the check adds that domain to the Auth authorized domains, and
+          then the status says <strong>Ready to switch</strong>. A check never authorizes a domain Hosting does not serve,
+          or any domain but the stored one. If adding it fails, the record stays as it was and the next check
+          tries again.</p>
+          <p>The page reads the domain from the record <code>web_address/current</code>. Without that record the page shows
+          only the current address, and <strong>Check now</strong> answers &quot;Contact us to set up your domain first.&quot;</p>
+          <p>To add a domain, run <code>scripts/add-web-address.cjs</code> with the client project&#39;s operator credentials,
+          the same as the removal script. Set <code>EVENT_HOSTING_SITE</code> too when the site is not the project id.</p>
+          <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">EVENT_FIREBASE_PROJECT_ID=&lt;GCP_PROJECT_ID&gt; node scripts/add-web-address.cjs summit.example.org --dry-run
+          EVENT_FIREBASE_PROJECT_ID=&lt;GCP_PROJECT_ID&gt; node scripts/add-web-address.cjs summit.example.org
+          </code></pre>
+          <p><code>--dry-run</code> checks the domain and the stored record, and changes nothing. Without it the script:</p>
+          <ol>
+          <li>Refuses a domain that is not a plain domain, and <code>*.web.app</code>, <code>*.firebaseapp.com</code> and
+          <code>*.eventrunner.org</code> addresses. It refuses when a different domain is stored (remove that one
+          first), and when a removal did not finish (run the removal again). When the same domain is
+          stored it changes nothing and says so.</li>
+          <li>Asks Firebase Hosting for the domain. It reuses a domain Hosting already has, and restores one
+          removed in the last 30 days.</li>
+          <li>Writes <code>web_address/current</code> with the status <strong>Waiting for the records</strong>, and prints the DNS
+          records. Lines marked <code>Remove</code> are records that conflict with Hosting.</li>
+          </ol>
+          <p>The record is written last. If the script stops part way, nothing is stored: run the same command
+          again. Hosting does not add the domain twice. The script does not change the authorized domains:
+          the check does that once Hosting serves the domain. The Hosting default domain stays a console
+          step (<code>docs/CLIENT_ONBOARDING.md</code> §3).</p>
+          <p>Then:</p>
+          <ol>
+          <li>Give the client the printed records. If Hosting had not listed them yet, <strong>Check now</strong> on
+          <strong>Settings → Web address</strong> shows them a few minutes later.</li>
+          <li>The hourly <code>webAddressCheck</code> and <strong>Check now</strong> move the status. It stays <strong>Waiting for the
+          records</strong> until Hosting serves the domain with a certificate, which can take from minutes to
+          about a day after the records are in. The first check after that adds the domain to the
+          authorized domains, and the status shows <strong>Ready to switch</strong>.</li>
+          </ol>
+          <p>The script needs, on the client project: <code>roles/firebasehosting.admin</code> (the Hosting domain),
+          <code>roles/datastore.user</code> (the record) and <code>roles/serviceusage.serviceUsageConsumer</code> (its Google calls
+          name the project for quota). A project Owner has all three, and so does the deploy service account
+          (§2).</p>
+          <p>The functions runtime account needs two roles on the client project for the status check, once.
+          <code>roles/firebaseauth.admin</code> lets the check read the authorized domains and add the stored domain:</p>
           <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
             --member=&quot;serviceAccount:&lt;FUNCTIONS_RUNTIME_ACCOUNT&gt;&quot; --role=&quot;roles/firebasehosting.admin&quot;
           gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
@@ -817,7 +861,7 @@
           <li>Set <code>EVENT_PUBLIC_URL</code> to <code>https://&lt;domain&gt;</code> in the client&#39;s GitHub Environment (§3), and add
           the same origin to <code>EVENT_ALLOWED_ORIGINS</code>.</li>
           <li>Deploy from <code>main</code>.</li>
-          <li>Run <code>node scripts/init-event.cjs --check</code>. The page then shows <strong>In use</strong>.</li>
+          <li>Run <code>node scripts/init-event.cjs --check</code>. The page shows <strong>In use</strong> after the next check.</li>
           </ol>
           <p>The console&#39;s provisioner (ADR 0007, P8) will run this deploy for the client.</p>
           <h2 id="9-site-publisher-optional-per-client">9. Site publisher (optional, per client)<a class="heading-anchor" href="#9-site-publisher-optional-per-client" aria-label="Link to this section">#</a></h2>
@@ -1356,6 +1400,7 @@
           </code></pre>
           <p>A run that dies before the script starts, for example on a refused identity token, leaves no record: the request shows a started build and nothing else. Read the workflow&#39;s run list.</p>
           <p>A new client&#39;s Environment is not added to <code>AUTO_DEPLOY_ENVIRONMENTS</code>, so a push to <code>main</code> does not deploy to it. When the client&#39;s event site opens to the public, select <strong>Mark as launched</strong> on its review page. That moves the request from <code>ready</code> to <code>launched</code> and emails each Owner &quot;Your site is open to the public&quot;. Then add the Environment to <code>AUTO_DEPLOY_ENVIRONMENTS</code> by hand (section 4).</p>
+          <p>A new site starts in draft: <code>config/event.announcedAt</code> is null. When the client&#39;s event goes public, an operator sets <strong>Announced</strong> in admin <strong>Event settings → Announce and archive</strong>. Until then the home page shows no countdown, and registration answers do not lock.</p>
           <h3 id="123-what-the-hand-built-rehearsal-taught">12.3 What the hand-built rehearsal taught<a class="heading-anchor" href="#123-what-the-hand-built-rehearsal-taught" aria-label="Link to this section">#</a></h3>
           <p>The script does each of these, and sections 1 to 3 are wrong or silent on them. Anyone building a client by hand has to do them too.</p>
           <ul>
@@ -1550,9 +1595,12 @@
           It adds provenance only when exactly one redeemed operator-issued link matches the
           draft, organization and original creator. Other old drafts are quarantined. They
           cannot accept an agreement or start provisioning; contact the hosting team for a
-          new paid signup link. Acceptance checks that provenance inside its transaction.</p>
-          <p>A web-address status check observes Hosting and sign-in authorization. It never
-          adds a sign-in domain. The hosting team authorizes a new domain during setup.
+          new paid signup link. Acceptance checks that provenance inside its transaction.
+          The marker <code>data_migrations/console-signup-links-2026-11-06</code> makes later deploys
+          skip the scan, and the log shows only counts.</p>
+          <p>A web-address status check adds the stored domain to the sign-in authorized domains
+          only once Hosting serves it, and never while the record is being removed. If a removal
+          starts while a check is adding the domain, the check takes it back off.
           To retire a client&#39;s stored custom domain, keep ownership of its DNS registration,
           set <code>EVENT_FIREBASE_PROJECT_ID</code> (and <code>EVENT_HOSTING_SITE</code> if different), then run
           <code>node scripts/remove-web-address.cjs exact.example.org</code> with that project&#39;s operator
@@ -1588,6 +1636,11 @@
           <code>notices.declined</code> record, the old record stays as it is. The code reads both
           spellings, so the step is safe to run before or after any review. The marker
           is <code>data_migrations/pitch-declined-2026-11-08</code>, and the log shows only counts.</p>
+          <p>Then it runs <code>scripts/migrate-ticket-dates.cjs</code> once per project. Before a fix,
+          the CSV ticket import stored <code>tickets</code> <code>createdAt</code> and <code>updatedAt</code> as numbers.
+          The step writes each one as a timestamp for the same moment and changes nothing
+          else. Add <code>--dry-run</code> to count without writing. The marker is
+          <code>data_migrations/ticket-dates-2026-11-09</code>, and the log shows only counts.</p>
           <p>New client builds and retries dispatch both provisioning and deployment from <code>main</code>.
           A previous successful deployment is reusable only when GitHub proves that its commit
           is the provisioning revision or a descendant of it, and its settings are current.

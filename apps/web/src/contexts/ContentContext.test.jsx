@@ -27,7 +27,7 @@ vi.mock('../lib/contentSource.js', () => ({
   subscribeSpeakersPublic,
 }));
 
-import { ContentProvider, useContent, usePages } from './ContentContext.jsx';
+import { ContentProvider, useContent } from './ContentContext.jsx';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotPages from '@generated/pagesData.js';
 import snapshotScheduleData, { speakers as snapshotScheduleSpeakers } from '@generated/scheduleData.js';
@@ -35,10 +35,11 @@ import snapshotOrganizationsData from '@generated/organizationsData.js';
 import snapshotTimelineData from '@generated/timelineData.js';
 
 function Probe() {
-  const { source, contentSource, getBlock, getSectionBlocks, scheduleData, organizationsData, speakers, loading } =
-    useContent();
-  const heroTitle = useContent('hero', 'title');
-  const { pages, getPage, getPublicPage } = usePages();
+  const {
+    source, contentSource, getBlock, getSectionBlocks, scheduleData, organizationsData, speakers, loading,
+    pages, getPage, getPublicPage,
+  } = useContent();
+  const heroTitle = getBlock('hero', 'title');
   return (
     <>
       <span data-testid="source">{source}</span>

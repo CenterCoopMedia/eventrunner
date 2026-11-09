@@ -319,3 +319,16 @@ test('the order list filters by order status, so staff can find orders that need
   const listed = await call(admin(db), { action: 'orders', status: 'exception' });
   assert.deepEqual(listed.body.orders.map((row) => row.id), ['order-stuck']);
 });
+
+test('a server fault from the shared commerce code keeps the generic answer, while the organizer checks keep theirs', async () => {
+  const logged = [];
+  const db = dbFor({ 'ticket_catalog/current': catalog() });
+  await db.collection('ticket_inventory').doc('current').set({ eventId: 'other-event', held: 0, sold: 0, types: {} });
+  const fault = await call(admin(db, { log: { error: (...args) => logged.push(args) } }), { action: 'saveCatalog', catalog: catalog(), expectedRevision: 1 }, 'operator');
+  assert.equal(fault.statusCode, 503);
+  assert.deepEqual(fault.body.error, { code: 'unavailable', message: 'Ticketing could not complete this action. Reload its current status before trying again.' });
+  assert.deepEqual(logged, [['ticketing organizer operation failed', { action: 'saveCatalog', code: 'inventory-event-mismatch' }]]);
+
+  const conflict = await call(admin(dbFor({ 'ticket_catalog/current': catalog() })), { action: 'saveCatalog', catalog: catalog(), expectedRevision: 0 }, 'operator');
+  assert.deepEqual(conflict.body.error, { code: 'conflict', message: 'The catalog changed. Reload it before saving.' });
+});

@@ -746,7 +746,6 @@ function buildHandlers() {
 
 module.exports = {
   createEmailCore,
-  providerCan,
   withLegalFooter,
   createDeliveryWebhookHandler,
   EmailBatchError,
@@ -759,7 +758,6 @@ module.exports = {
     isRetryable,
     truncateForAudit,
     extrasProblem,
-    providerCan,
     claimIdForOnceKey,
     isAlreadyExists,
     resolveMessage,

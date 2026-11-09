@@ -7,8 +7,9 @@
  *                           the server-owned defaults: registrationStatus
  *                           'pending' (the only entry state in the §3.4
  *                           table), speakerId null, and the default
- *                           profile visibility.
- *   onUserDeleted           auth onDelete — removes the account document, so
+ *                           profile visibility. Then it sends the
+ *                           `account.welcome` email once (ADR 0001 §3.1).
+ *   onUserDeleted          auth onDelete — removes the account document, so
  *                           a deleted sign-in does not leave an unreachable
  *                           profile or a public schedule behind.
  *   maintainProfileComplete users onWrite — recomputes the derived
@@ -74,6 +75,70 @@ function buildNewUserDoc(authUser, now) {
   };
 }
 
+/** First word of a display name, or 'there'. Never guessed from the email local part. */
+function welcomeName(displayName) {
+  const trimmed = typeof displayName === 'string' ? displayName.trim() : '';
+  return trimmed ? trimmed.split(/\s+/)[0] : 'there';
+}
+
+/**
+ * The welcome email (ADR 0001 §3.1, §6.2): once per account, through the
+ * one send path. The `welcome:{uid}` claim makes a repeat delivery send
+ * nothing. Never throws: the account document is already written, and a
+ * retry for a lost email would only repeat the trigger. An admin resend is
+ * the recovery path.
+ *
+ * @returns {Promise<{ sent: boolean, reason: string }>}
+ */
+async function sendWelcomeEmail({ db, sendEmail, getConfig, uid, email, displayName, now, log }) {
+  if (!email) return { sent: false, reason: 'no-email' };
+  try {
+    const { render } = require('../email/render.cjs');
+    const { loadTemplate } = require('../email/templates.cjs');
+    const { transactionalStream } = require('../email/stream.cjs');
+    const { listedAdminTier, loadBootstrap } = require('../core/auth.cjs');
+    // Whoever runs the site is not welcomed to it: an Owner or an Editor
+    // gets no welcome, as with the ticket prompt (ticketing/registrationPrompt.cjs).
+    if (listedAdminTier(await loadBootstrap({ db }), email)) return { sent: false, reason: 'site-team' };
+    const config = await getConfig();
+    const site = String(config?.tierA?.publicUrl || '').trim().replace(/\/+$/, '');
+    // login_url is the required token; without a site address it is empty.
+    if (!site) return { sent: false, reason: 'no-site-url' };
+    // Never on the announcement stream (issue #330).
+    const channel = transactionalStream(config);
+    if (!channel.ok) return { sent: false, reason: 'transactional-stream' };
+    const { template, override } = await loadTemplate({ db, id: 'account.welcome', now: () => now().getTime() });
+    const rendered = render({
+      template, override, config, now,
+      tokenValues: { first_name: welcomeName(displayName), profile_url: `${site}/profile` },
+    });
+    if (rendered.usedFallback) log.warn('account.welcome used the shipped wording', { reason: 'invalid-template-override' });
+    const result = await sendEmail({
+      to: email,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      tag: 'account.welcome',
+      source: 'account-welcome',
+      onceKey: `welcome:${uid}`,
+      storeRendered: rendered.storeRendered,
+      hasLegalFooterHtml: rendered.hasLegalFooterHtml,
+      hasLegalFooterText: rendered.hasLegalFooterText,
+      ...(channel.stream ? { messageStream: channel.stream } : {}),
+    });
+    // The send boundary checks the demo policy again; its refusal is a skip.
+    if (result?.error === 'read-only-demo') return { sent: false, reason: 'read-only-demo' };
+    if (result?.status !== 'sent') {
+      log.error('account.welcome email was not sent', { uid, error: result?.error ?? null });
+      return { sent: false, reason: 'send-failed' };
+    }
+    return { sent: true, reason: result.skipped ? 'already-sent' : 'sent' };
+  } catch (err) {
+    log.error('account.welcome email failed', { uid, error: String(err?.message || err) });
+    return { sent: false, reason: 'error' };
+  }
+}
+
 /**
  * Core of the auth onCreate trigger.
  *
@@ -83,11 +148,16 @@ function buildNewUserDoc(authUser, now) {
  * approval — must win over a fresh `pending` default. ALREADY_EXISTS is
  * therefore success, not an error.
  *
- * @param {{ db: object, now?: () => Date, log?: { error: Function } }} deps
+ * Then the welcome email, when `sendEmail` is given. It goes in both cases:
+ * the ticket path (createUserFromTicket) can write the document before
+ * this trigger runs, and the send-once key stops a second email.
+ *
+ * @param {{ db: object, now?: () => Date, log?: { error: Function, warn?: Function },
+ *           sendEmail?: Function, getConfig?: () => Promise<object> }} deps
  * @returns {(authUser: { uid: string, email?: string|null, displayName?: string|null })
  *   => Promise<{ created: boolean }>}
  */
-function createOnUserCreated({ db, now = () => new Date(), log = console }) {
+function createOnUserCreated({ db, now = () => new Date(), log = console, sendEmail = null, getConfig = null }) {
   return async function onUserCreated(authUser) {
     if (!authUser || typeof authUser.uid !== 'string' || authUser.uid.length === 0) {
       log.error('onUserCreated called without a uid');
@@ -99,15 +169,20 @@ function createOnUserCreated({ db, now = () => new Date(), log = console }) {
     throwIfDemoPolicyUnavailable(policy);
     if (!policy.ok) return { created: false, reason: policy.code };
 
+    const doc = buildNewUserDoc(authUser, now());
+    let created = true;
     try {
-      await db.collection(USERS).doc(authUser.uid).create(buildNewUserDoc(authUser, now()));
-      return { created: true };
+      await db.collection(USERS).doc(authUser.uid).create(doc);
     } catch (err) {
-      if (err && (err.code === 6 || err.code === 'already-exists')) {
-        return { created: false };
-      }
-      throw err;
+      if (!(err && (err.code === 6 || err.code === 'already-exists'))) throw err;
+      created = false;
     }
+    if (sendEmail && getConfig) {
+      await sendWelcomeEmail({
+        db, sendEmail, getConfig, uid: authUser.uid, email: doc.email, displayName: doc.displayName, now, log,
+      });
+    }
+    return { created };
   };
 }
 
@@ -215,18 +290,34 @@ function buildHandlers() {
   // document (firestore.rules), so a single transient failure here would
   // otherwise leave an account that can never be seeded — permanently
   // stuck at "setting up your account". Retries are safe by construction:
-  // onUserCreated uses create() and treats ALREADY_EXISTS as success, and
-  // onUserDeleted's deletes are idempotent.
+  // onUserCreated uses create() and treats ALREADY_EXISTS as success, its
+  // welcome email has a send-once key and never throws, and onUserDeleted's
+  // deletes are idempotent.
   const retryOnFailure = { failurePolicy: true };
+  // onUserCreated sends the welcome email, so it binds the provider's send
+  // secrets.
+  const { defineSecret } = require('firebase-functions/params');
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  const sendSecrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
 
   return {
     onUserCreated: functionsV1
-      .runWith(retryOnFailure)
+      .runWith({ ...retryOnFailure, secrets: sendSecrets })
       .region(region)
       .auth.user()
       .onCreate(async (authUser) => {
         const { getDb } = require('../core/firestore.cjs');
-        await createOnUserCreated({ db: getDb() })({
+        const { getEventConfig } = require('../core/config.cjs');
+        const db = getDb();
+        const getConfig = () => getEventConfig({ db });
+        // Built on first use, so a missing email provider fails only the
+        // email, never the account document.
+        const sendEmail = (message) => {
+          const { createEmailCore } = require('../email/send.cjs');
+          const { getEmailProvider } = require('../email/providers/index.cjs');
+          return createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig }).send(message);
+        };
+        await createOnUserCreated({ db, sendEmail, getConfig })({
           uid: authUser.uid,
           email: authUser.email,
           displayName: authUser.displayName,

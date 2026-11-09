@@ -3,12 +3,12 @@
 // A version is one row functions/src/cms/store.cjs publishDocs appends to
 // cmsVersionHistory each time a record is published. The server compares
 // each row with the one before it (functions/src/cms/versions.cjs
-// describeChanges) and answers a list of changed paths; this module turns
-// those paths and values into the words the page shows. Every value is
-// text: nothing here builds markup, and a stored URL stays a string.
+// describeChanges) and answers a list of changed paths; pages/versionDisplay.js
+// turns those into words. This module holds the collection choices, the
+// time formatters and the restore request. Nothing here builds markup.
 //
-// The lazy version pages use this module; the pitch queue shares its
-// timestamp reader. It stays out of the admin entry chunk
+// The lazy version pages use this module; other lazy admin pages share its
+// timestamp readers and formatters. It stays out of the admin entry chunk
 // (scripts/ci/bundle-budget.json).
 import { zoneLabel } from '../lib/eventTime.js';
 import { DELETE_FIELD_SENTINEL } from './contentDoc.js';
@@ -35,35 +35,7 @@ export function collectionChoice(id) {
 }
 
 const DISPLAY_LOCALE = 'en-US';
-const NAME_FIELDS = Object.freeze(['title', 'name', 'label', 'question']);
-export const MAX_NAME_LENGTH = 80;
-
 const nonEmpty = (value) => typeof value === 'string' && value.trim().length > 0;
-
-/** A name cut to MAX_NAME_LENGTH characters, the last one an ellipsis. */
-function cut(text) {
-  const trimmed = text.trim();
-  return trimmed.length > MAX_NAME_LENGTH ? `${trimmed.slice(0, MAX_NAME_LENGTH - 1)}…` : trimmed;
-}
-
-/**
- * The name a record goes by in a list: its title, name, label or question,
- * the first one that holds text; for a content block, then its section and
- * field; else its id.
- *
- * @param {string} collection
- * @param {object|null} doc a live or draft document, `{ id, ...fields }`
- * @returns {string}
- */
-export function recordNameOf(collection, doc) {
-  for (const key of NAME_FIELDS) {
-    if (nonEmpty(doc?.[key])) return cut(doc[key]);
-  }
-  if (collection === 'cmsContent' && nonEmpty(doc?.section) && nonEmpty(doc?.field)) {
-    return cut(`${doc.section} › ${doc.field}`);
-  }
-  return cut(String(doc?.id ?? ''));
-}
 
 /**
  * Milliseconds from a Date, a Firestore Timestamp (anything with
@@ -80,6 +52,20 @@ export function toMillis(value) {
   }
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   return null;
+}
+
+/**
+ * A Date from a Firestore Timestamp (anything with `toDate()`), a Date, a
+ * number or an ISO string; null for anything else.
+ *
+ * @param {unknown} value
+ * @returns {Date|null}
+ */
+export function toDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
 
 /**
@@ -123,51 +109,6 @@ export function formatClock(value, timeZone) {
   if (ms === null) return null;
   const instant = new Date(ms);
   return withZone(formatIn(timeZone, instant, { hour: 'numeric', minute: '2-digit' }), instant);
-}
-
-const isScalar = (value) => value === null || value === undefined || typeof value !== 'object';
-
-/**
- * One stored value as words. A value in a change the server marked as a
- * time (`publishAt`) is an instant in milliseconds, and reads as a date.
- *
- * @param {unknown} value
- * @param {{ time?: boolean, timeZone?: string }} [options]
- * @returns {string}
- */
-export function valueText(value, { time = false, timeZone } = {}) {
-  if (value === null || value === undefined) return 'Not set';
-  if (time) {
-    const formatted = formatPublishedAt(value, timeZone);
-    if (formatted) return formatted;
-  }
-  if (value === '') return 'Empty';
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'number') return String(value);
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) {
-    if (value.length === 0) return 'None';
-    if (value.every(isScalar)) return value.map((item) => (item === null || item === undefined ? 'Not set' : String(item))).join(', ');
-  } else if (typeof value === 'object' && Object.keys(value).length === 0) {
-    return 'None';
-  }
-  return JSON.stringify(value);
-}
-
-/**
- * A changed path as words: segments joined by " › ", an index counted from
- * one ("sections › item 2 › label"). `visible` is the publish model's own
- * flag and reads as what it does.
- *
- * @param {string} path
- * @returns {string}
- */
-export function pathText(path) {
-  if (path === 'visible') return 'Shown on the site';
-  return String(path)
-    .split('.')
-    .map((segment) => (/^\d+$/.test(segment) ? `item ${Number(segment) + 1}` : segment))
-    .join(' › ');
 }
 
 /** Publish-model and listener bookkeeping that never belongs to content. */

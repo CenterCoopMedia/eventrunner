@@ -13,7 +13,6 @@ const {
   checkSessionDeletable,
   checkSchedulePublishSet,
   validateSessionStructure,
-  resolveSessionTrack,
 } = require('./sessions.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 
@@ -205,6 +204,29 @@ function dbWithPlaces(ids, seed = {}) {
     ...seed,
   });
 }
+
+test('a save with a track and a place reads config/event once', async () => {
+  const db = makeFakeDb({
+    'config/event': { tracks: [{ letter: 'A', name: 'Main' }], venue: { places: [{ id: 'main-hall', name: 'Main hall' }] } },
+  });
+  let eventReads = 0;
+  const collection = db.collection.bind(db);
+  db.collection = (name) => {
+    const col = collection(name);
+    if (name !== 'config') return col;
+    const doc = col.doc.bind(col);
+    return { ...col, doc: (id) => {
+      const ref = doc(id);
+      const get = ref.get.bind(ref);
+      return { ...ref, get: () => { eventReads += 1; return get(); } };
+    } };
+  };
+  const result = await validateSessionStructure({
+    db, docId: 'session-1', fields: session({ track: 'A', placeId: 'main-hall' }),
+  });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(eventReads, 1);
+});
 
 test('a session may be in no recorded place at all', () => {
   // The ordinary state for most events: a venue that has recorded no places
@@ -570,26 +592,6 @@ test('a track on a child of a parent that runs on none is rejected too', async (
   });
   assert.equal(verdict.ok, false);
   assert.match(verdict.errors[0], /which runs on no track/);
-});
-
-test('resolveSessionTrack: own line first, the parent’s otherwise', () => {
-  const parent = { id: 'p', dayId: 'day-2', track: 'B' };
-  const byId = { p: parent, plain: { id: 'plain', dayId: 'day-2' } };
-  assert.equal(resolveSessionTrack({ track: 'A' }, byId), 'A');
-  assert.equal(resolveSessionTrack({ parentId: 'p' }, byId), 'B');
-  assert.equal(resolveSessionTrack({ track: 'B', parentId: 'p' }, byId), 'B');
-  // A session on no line, a parent on no line, and a parent the renderer
-  // does not hold all read the same way: no line.
-  assert.equal(resolveSessionTrack({ dayId: 'day-2' }, byId), null);
-  assert.equal(resolveSessionTrack({ parentId: 'plain' }, byId), null);
-  assert.equal(resolveSessionTrack({ parentId: 'ghost' }, byId), null);
-  assert.equal(resolveSessionTrack(null, byId), null);
-  assert.equal(resolveSessionTrack({ parentId: 'p' }, null), null);
-});
-
-test('resolveSessionTrack reads a Map as well as a plain object', () => {
-  const byId = new Map([['p', { track: 'C' }]]);
-  assert.equal(resolveSessionTrack({ parentId: 'p' }, byId), 'C');
 });
 
 test('a session with no parent never reads anything', async () => {

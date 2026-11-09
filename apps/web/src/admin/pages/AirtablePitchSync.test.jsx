@@ -14,6 +14,13 @@ vi.mock('../../lib/pitchSource.js', () => ({
 }));
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext) => { listeners[name] = onNext; onNext(collections[name] || []); return () => {}; },
+  // A one-document read, served from the same collection fixture.
+  subscribeAdminDoc: (path, onNext) => {
+    const [name, id] = path.split('/');
+    listeners[name] = (docs) => onNext(docs.find((doc) => doc.id === id) ?? null);
+    listeners[name](collections[name] || []);
+    return () => {};
+  },
 }));
 vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ isOperator: operator }) }));
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: { days: [], timezone: 'UTC' } }) }));

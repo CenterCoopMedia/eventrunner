@@ -116,9 +116,7 @@ module.exports = {
   TAKEN,
   checkWebAddress,
   heldNames,
-  normalizeSiteName,
   releaseNames,
   siteAddress,
   siteNameProblem,
-  siteNameVerdict,
 };

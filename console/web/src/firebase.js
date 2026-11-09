@@ -11,7 +11,7 @@ const config = {
   appId: import.meta.env.VITE_CONSOLE_FIREBASE_APP_ID,
 };
 
-export const app = initializeApp(config);
+const app = initializeApp(config);
 export const auth = getAuth(app);
 
 if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true') {

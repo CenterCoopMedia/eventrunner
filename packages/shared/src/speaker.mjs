@@ -12,4 +12,5 @@ export {
   isPubliclyVisibleSpeaker,
   buildPublicSpeaker,
   validateSpeaker,
+  internals,
 } from './speaker.cjs';

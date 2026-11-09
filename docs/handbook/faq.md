@@ -2,7 +2,7 @@
 
 ## Is this the Collaborative Journalism Summit site?
 
-No. The 2026 summit site is the reference implementation. This project is the white-label extract. Summit-only tools (video generator, invoices) stay there.
+No. The 2026 summit site is the reference implementation. This project is the white-label extract. Summit-only tools (video generator) stay there.
 
 ## Why a 6-digit code instead of a magic link?
 
@@ -28,4 +28,4 @@ The separate [hosted admin/client demo](https://eventrunner-demo.web.app/) has a
 
 ## Who do I talk to about money or a contract?
 
-Email info@collaborativejournalism.org. Do not negotiate that in a public issue.
+Email info@eventrunner.org. Do not negotiate that in a public issue.

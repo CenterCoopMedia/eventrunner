@@ -106,4 +106,4 @@ function quietLog() {
   return { errors: [], error(...args) { this.errors.push(args); } };
 }
 
-module.exports = { BUILD_SETTINGS, NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers, zed };
+module.exports = { NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers, zed };

@@ -200,7 +200,7 @@ function buildHandlers() {
   const { defineSecret } = require('firebase-functions/params');
   const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
   const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
-  const region = process.env.EVENT_FIREBASE_REGION || 'us-central1';
+  const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
   // Conversion can send the speaker invites, so it binds the send secrets.
   const secrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
   const expose = (action, options = {}) => onRequest({ region, ...options }, async (req, res) => {

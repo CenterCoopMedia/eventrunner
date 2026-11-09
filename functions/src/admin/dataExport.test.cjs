@@ -330,3 +330,15 @@ test('a page larger than one read page is read in id order, every document once'
   assert.equal(new Set(ids).size, 650);
   assert.deepEqual(ids, [...ids].sort());
 });
+
+test('speakers: a live session with no visible field is not published, as the site reads it', async () => {
+  const { db, handler } = setup();
+  // firestore.rules and the public readers show a record only when visible === true.
+  await db.collection('cmsSchedule').doc('session-old').set({
+    title: 'Old session', dayId: 'day-1', speakerIds: ['speaker-ada'], revision: 1,
+  });
+  const res = await run(handler, 'staff', { dataset: 'speakers' });
+  assert.equal(res.statusCode, 200);
+  const ada = asObjects(parseCsv(res.body.csv)).find((row) => row['Speaker ID'] === 'speaker-ada');
+  assert.doesNotMatch(ada['Published sessions'], /Old session/);
+});

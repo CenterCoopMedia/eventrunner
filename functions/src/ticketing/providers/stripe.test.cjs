@@ -261,3 +261,85 @@ test('a Session event for an invoice routes to the invoice, and its PaymentInten
   assert.equal(acknowledged.valid, true);
   assert.equal(acknowledged.eventType, 'ignored');
 });
+
+test('listTickets refuses an unusable page token with a code the full sync can act on', async () => {
+  const { provider } = fixture();
+  await assert.rejects(() => provider.listTickets({ pageToken: '../ticket_orders' }), (err) => err.code === 'invalid-page-token');
+});
+
+/** Three in-scope orders and a reconcile stub that records each order it starts. */
+function listFixture(reconcile) {
+  const ids = ['ord_a', 'ord_b', 'ord_c'];
+  const db = makeFakeDb({ 'config/event': { historicalDemo: false },
+    ...Object.fromEntries(ids.map((id) => [`ticket_orders/${id}`, { ...ORDER, id }])) });
+  const provider = createStripeProvider({ env: ENV, db, stripeClient: {} });
+  const started = [];
+  provider.reconcileOrder = async (orderId) => {
+    started.push(orderId);
+    return reconcile ? reconcile(orderId) : { complete: true, tickets: [{ externalId: `t_${orderId}` }] };
+  };
+  return { provider, started };
+}
+
+test('listTickets stops before the next order once the deadline passes and resumes at the first order it did not process', async () => {
+  const { provider, started } = listFixture();
+  let stop = false;
+  const shouldStop = () => stop;
+  provider.reconcileOrder = ((reconcile) => async (orderId) => { stop = true; return reconcile(orderId); })(provider.reconcileOrder);
+
+  const first = await provider.listTickets({ shouldStop });
+  assert.deepEqual(first.tickets.map((t) => t.externalId), ['t_ord_a']);
+  assert.equal(first.stoppedEarly, true);
+  assert.equal(first.nextPageToken, 'ord_a');
+
+  stop = false;
+  const rest = await provider.listTickets({ pageToken: first.nextPageToken, shouldStop: () => false });
+  assert.deepEqual(rest.tickets.map((t) => t.externalId), ['t_ord_b', 't_ord_c']);
+  assert.equal(rest.stoppedEarly, undefined);
+  assert.equal(rest.nextPageToken, null);
+  // No order skipped, none repeated.
+  assert.deepEqual(started, ['ord_a', 'ord_b', 'ord_c']);
+});
+
+test('listTickets always finishes one order, so a run past its deadline still makes progress', async () => {
+  const { provider, started } = listFixture();
+  const page = await provider.listTickets({ shouldStop: () => true });
+  assert.deepEqual(started, ['ord_a']);
+  assert.equal(page.nextPageToken, 'ord_a');
+  assert.equal(page.stoppedEarly, true);
+});
+
+test('listTickets reports the orders it committed when a later order is still reconciling', async () => {
+  const { provider } = listFixture((orderId) => (orderId === 'ord_b'
+    ? { complete: false, retryWithoutAttempt: true, tickets: [] }
+    : { complete: true, tickets: [{ externalId: `t_${orderId}` }] }));
+  await assert.rejects(() => provider.listTickets(), (err) => {
+    assert.deepEqual(err.partialProgress.tickets.map((t) => t.externalId), ['t_ord_a']);
+    // Resume after ord_a: ord_b is the first order this page did not finish.
+    assert.equal(err.partialProgress.nextPageToken, 'ord_a');
+    // A busy order writes nothing, so the committed list is the whole story.
+    assert.equal(err.partialProgress.outcomeKnown, true);
+    return true;
+  });
+});
+
+test('listTickets reports partial progress when an order fails, and says the failed order may be written', async () => {
+  const { provider } = listFixture((orderId) => {
+    if (orderId === 'ord_c') throw new Error('Stripe reconciliation is temporarily unavailable.');
+    return { complete: true, tickets: [{ externalId: `t_${orderId}` }] };
+  });
+  await assert.rejects(() => provider.listTickets({ pageToken: 'ord_0' }), (err) => {
+    assert.deepEqual(err.partialProgress.tickets.map((t) => t.externalId), ['t_ord_a', 't_ord_b']);
+    assert.equal(err.partialProgress.nextPageToken, 'ord_b');
+    assert.equal(err.partialProgress.outcomeKnown, false);
+    assert.match(err.cause.message, /temporarily unavailable/);
+    return true;
+  });
+});
+
+test('listTickets keeps the page token it was given when the first order of a page fails', async () => {
+  const { provider } = listFixture(() => { throw new Error('Stripe reconciliation is temporarily unavailable.'); });
+  await assert.rejects(() => provider.listTickets({ pageToken: 'ord_0' }), (err) => err.partialProgress.nextPageToken === 'ord_0' &&
+    err.partialProgress.tickets.length === 0);
+  await assert.rejects(() => provider.listTickets(), (err) => err.partialProgress.nextPageToken === null);
+});

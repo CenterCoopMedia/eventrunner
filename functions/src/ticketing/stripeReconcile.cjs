@@ -9,6 +9,8 @@ const { randomUUID } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { internals: { scopeMatches, metadataMatches, objectId, safeId } } = require('./providers/stripe.cjs');
 const { promoRef, releasedPromoUse } = require('./promoCodes.cjs');
+const { ORDERS, INVENTORY, CURRENT, inventoryTransitionPatch, millis } = require('./stripeCommerce.cjs');
+const { internals: { TICKETS } } = require('./index.cjs');
 
 const LEASE_MS = 5 * 60_000;
 const REFUND_STATES = new Set(['pending', 'requires_action', 'succeeded', 'failed', 'canceled']);
@@ -16,12 +18,6 @@ const TERMINAL_TICKET_STATES = new Set(require('shared/ticketCommerce').TICKET_T
 
 class ReconciliationMismatch extends Error {
   constructor(code, message) { super(message); this.code = code; }
-}
-
-function millis(value) {
-  if (value instanceof Date) return value.getTime();
-  if (typeof value?.toMillis === 'function') return value.toMillis();
-  return Date.parse(value);
 }
 
 function requireMatch(condition, code = 'stripe-order-mismatch', message = 'Payment details do not match the saved order.') {
@@ -143,7 +139,6 @@ function financialPatch(order, state, at) {
   if (!paid && ['canceled', 'requires_payment_method'].includes(state.paymentIntent?.status)) paymentStatus = 'failed';
   if (!paid && session.status === 'expired') { status = 'expired'; paymentStatus = 'expired'; }
   if (fullRefund || order.status === 'refunded') status = 'refunded';
-  if (order.status === 'cancelled') status = 'cancelled';
   // A failed refund does not silently restore a credential invalidated by
   // a previous successful refund; that correction is an organizer action.
   return {
@@ -157,7 +152,6 @@ function financialPatch(order, state, at) {
 
 function admissionStatus(order, patch, ticketId, existing) {
   if (TERMINAL_TICKET_STATES.has(existing?.status)) return existing.status;
-  if (order.status === 'cancelled') return 'cancelled';
   if (patch.refundedAmount === order.totalAmount && order.totalAmount > 0) return 'refunded';
   const allocated = patch.refunds.some((refund) => refund.status === 'succeeded' &&
     order.refundAllocations?.[refund.id]?.includes(ticketId));
@@ -165,16 +159,15 @@ function admissionStatus(order, patch, ticketId, existing) {
 }
 
 async function readTickets(db, order) {
-  const records = [];
-  for (const id of order.ticketIds || []) {
-    const snap = await db.collection('tickets').doc(id).get();
-    if (snap.exists) records.push(snap.data());
-  }
-  return records;
+  const refs = (order.ticketIds || []).map((id) => db.collection(TICKETS).doc(id));
+  // getAll refuses an empty list.
+  if (refs.length === 0) return [];
+  const snaps = await db.getAll(...refs);
+  return snaps.filter((snap) => snap.exists).map((snap) => snap.data());
 }
 
 async function finishException({ db, orderId, leaseId, exception, now }) {
-  const ref = db.collection('ticket_orders').doc(orderId);
+  const ref = db.collection(ORDERS).doc(orderId);
   await db.runTransaction(async (tx) => {
     if (!await writesAllowed(db, tx)) return;
     const snap = await tx.get(ref);
@@ -189,10 +182,10 @@ async function finishException({ db, orderId, leaseId, exception, now }) {
 
 async function reconcileStripeOrder({ db, provider, orderId, now = () => new Date() }) {
   if (!db || !safeId(orderId)) throw new Error('An internal order identifier and database are required.');
-  const ref = db.collection('ticket_orders').doc(orderId);
+  const ref = db.collection(ORDERS).doc(orderId);
   const leaseId = randomUUID();
   const blocked = { orderId, externalEventId: provider.externalEventId, complete: false,
-    retryWithoutAttempt: true, writeBlocked: true, tickets: [], ticketsPersisted: true };
+    retryWithoutAttempt: true, writeBlocked: true, tickets: [] };
   const acquired = await db.runTransaction(async (tx) => {
     if (!await writesAllowed(db, tx)) return { blocked: true };
     const snap = await tx.get(ref);
@@ -203,15 +196,15 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
     return { order };
   });
   if (acquired.blocked) return blocked;
-  if (acquired.missing) return { orderId, externalEventId: provider.externalEventId, complete: true, tickets: [], ticketsPersisted: true };
-  if (acquired.busy) return { orderId, externalEventId: provider.externalEventId, complete: false, retryWithoutAttempt: true, tickets: [], ticketsPersisted: true };
+  if (acquired.missing) return { orderId, externalEventId: provider.externalEventId, complete: true, tickets: [] };
+  if (acquired.busy) return { orderId, externalEventId: provider.externalEventId, complete: false, retryWithoutAttempt: true, tickets: [] };
   let order = acquired.order;
   try {
     // Zero-payment orders are fulfilled atomically by commerce itself.
     if (order.totalAmount === 0 && order.paymentStatus === 'succeeded' && order.inventoryState === 'sold') {
       const tickets = await readTickets(db, order);
       await finishException({ db, orderId, leaseId, exception: order.reconciliationException || null, now });
-      return { orderId, externalEventId: provider.externalEventId, complete: true, tickets, ticketsPersisted: true, status: order.status };
+      return { orderId, externalEventId: provider.externalEventId, complete: true, tickets, status: order.status };
     }
     if (!order.stripeSessionId) {
       const { recoverCheckoutAttempt } = require('./stripeCheckout.cjs');
@@ -222,7 +215,7 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
           ? { code: 'checkout-outcome-unknown', message: 'Checkout creation is unresolved. Capacity remains reserved until an organizer confirms the outcome.' }
           : null;
         await finishException({ db, orderId, leaseId, exception, now });
-        return { orderId, externalEventId: provider.externalEventId, complete: Boolean(exception), tickets: [], ticketsPersisted: true, exception };
+        return { orderId, externalEventId: provider.externalEventId, complete: Boolean(exception), tickets: [], exception };
       }
     }
     if (!await writesAllowed(db)) return blocked;
@@ -234,27 +227,27 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
       const current = snap.data();
       if (!scopeMatches(current, provider) || current.reconciliationLease?.id !== leaseId ||
           current.stripeSessionId !== state.session.id || current.attemptId !== order.attemptId) {
-        return { complete: false, retryWithoutAttempt: true, tickets: [], ticketsPersisted: true };
+        return { complete: false, retryWithoutAttempt: true, tickets: [] };
       }
-      // Re-read local cancellation and refund allocations after the API
-      // calls; these are human decisions, not provider-owned fields.
+      // Re-read refund allocations after the API calls; they are human
+      // decisions, not provider-owned fields. Ticket cancellations are read
+      // with the tickets below.
       validateFinancialState(current, state, provider);
       const patch = financialPatch(current, state, at);
-      const inventoryRef = db.collection('ticket_inventory').doc('current');
+      const inventoryRef = db.collection(INVENTORY).doc(CURRENT);
       const inventorySnap = await tx.get(inventoryRef);
       // Read before any write: an expired hold gives its promo code uses back.
       // Only that case reads the code, so a busy code does not slow other passes.
       const releasing = current.inventoryState === 'held' && state.session.status === 'expired';
       const promoSnap = releasing && current.promo?.code ? await tx.get(promoRef(db, current.promo.code)) : null;
-      const ticketSnapshots = [];
-      for (const seat of current.seats) ticketSnapshots.push(await tx.get(db.collection('tickets').doc(seat.externalId)));
+      const ticketRefs = current.seats.map((seat) => db.collection(TICKETS).doc(seat.externalId));
+      const ticketSnapshots = ticketRefs.length ? await tx.getAll(...ticketRefs) : [];
       let inventory = inventorySnap.data();
       let inventoryPatch = {};
       const paid = patch.paymentStatus === 'succeeded';
       let promoUse = null;
       if ((paid && current.inventoryState === 'held') ||
           (state.session.status === 'expired' && current.inventoryState === 'held')) {
-        const { inventoryTransitionPatch } = require('./stripeCommerce.cjs');
         const transition = inventoryTransitionPatch({ order: current, inventory, to: paid ? 'sold' : 'released' });
         inventory = transition.inventory;
         inventoryPatch = transition.orderPatch;
@@ -286,13 +279,13 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
           purchasedAt: existing?.purchasedAt || new Date(millis(current.createdAt) || at.getTime()).toISOString(),
           createdAt: existing?.createdAt || at, updatedAt: at,
         };
-        tx.set(db.collection('tickets').doc(seat.externalId), ticket);
+        tx.set(ticketRefs[i], ticket);
         tickets.push(ticket);
       }
       if (Object.keys(inventoryPatch).length) tx.set(inventoryRef, inventory);
       if (promoUse) tx.set(promoRef(db, current.promo.code), promoUse, { merge: true });
       tx.set(ref, { ...patch, ...inventoryPatch, reconciliationLease: null }, { merge: true });
-      return { complete: true, tickets, ticketsPersisted: true, status: patch.status,
+      return { complete: true, tickets, status: patch.status,
         ...(patch.reconciliationException ? { exception: patch.reconciliationException } : {}),
         paymentPending: !paid && state.session.status !== 'expired',
         nextReconciliationAt: !paid && state.session.status === 'open'
@@ -306,7 +299,7 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
       const exception = { code: err.code, message: err.message };
       await finishException({ db, orderId, leaseId, exception, now });
       return { orderId, externalEventId: provider.externalEventId, complete: true,
-        tickets: await readTickets(db, order), ticketsPersisted: true, exception };
+        tickets: await readTickets(db, order), exception };
     }
     await db.runTransaction(async (tx) => {
       if (!await writesAllowed(db, tx)) return;

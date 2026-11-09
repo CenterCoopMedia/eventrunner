@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
+import { toDate } from '../versionHistory.js';
 import {
   Notice,
   Panel,
@@ -49,13 +50,6 @@ function feedbackMailtoHref(email) {
   const at = value.indexOf('@');
   if (at <= 0 || at === value.length - 1) return `mailto:${encodeURIComponent(value)}`;
   return `mailto:${encodeURIComponent(value.slice(0, at))}@${encodeURIComponent(value.slice(at + 1))}`;
-}
-
-function toDate(value) {
-  if (!value) return null;
-  if (typeof value.toDate === 'function') return value.toDate();
-  const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
 
 // The tone under each status word. The word (rendered verbatim below) is

@@ -30,20 +30,6 @@ import { demoUpdates } from './demoCommunity.js';
 const NO_OVERLAY = () => {};
 
 /**
- * Subscribe to one published cms collection (or its _drafts sibling).
- * Calls onNext(docs) with an array of `{ id, ...data }` on every snapshot.
- * A listener error leaves the committed build-time snapshot (or last-known
- * live values) in charge (fail soft — first paint already rendered from it),
- * then re-attaches a fresh listener after a delay (subscribeWithRetry) so a
- * transient error doesn't permanently freeze content updates for the rest of
- * the session. Returns the unsubscribe function, which also cancels any
- * pending retry.
- *
- * @param {string} name       Publishable collection name, e.g. 'cmsContent'.
- * @param {'published'|'draft'} readSource
- * @param {(docs: Array<object>) => void} onNext
- */
-/**
  * Subscribe to `speakers_public`, the one-way projection of the canonical
  * speaker store (spec §4.3).
  *
@@ -76,6 +62,20 @@ export function subscribeSpeakersPublic(onNext) {
   );
 }
 
+/**
+ * Subscribe to one published cms collection (or its _drafts sibling).
+ * Calls onNext(docs) with an array of `{ id, ...data }` on every snapshot.
+ * A listener error leaves the committed build-time snapshot (or last-known
+ * live values) in charge (fail soft — first paint already rendered from it),
+ * then re-attaches a fresh listener after a delay (subscribeWithRetry) so a
+ * transient error doesn't permanently freeze content updates for the rest of
+ * the session. Returns the unsubscribe function, which also cancels any
+ * pending retry.
+ *
+ * @param {string} name       Publishable collection name, e.g. 'cmsContent'.
+ * @param {'published'|'draft'} readSource
+ * @param {(docs: Array<object>) => void} onNext
+ */
 export function subscribeContentCollection(name, readSource, onNext) {
   if (IS_DEMO) {
     if (name === 'cmsUpdates') onNext(demoUpdates);

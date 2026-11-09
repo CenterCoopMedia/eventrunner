@@ -2,12 +2,10 @@
 // the admin client, but every authorization decision remains on the server.
 // The browser sends file bytes to the function because storage.rules keeps
 // session-materials closed to direct client reads and writes.
-import { callAdminEndpoint, AdminApiError } from '../admin/adminApi.js';
+import { callAdminEndpoint } from '../admin/adminApi.js';
 import { fileToBase64, formatBytes } from './mediaSource.js';
 
 export const MAX_SPEAKER_MATERIAL_FILE_BYTES = 9 * 1024 * 1024;
-
-export { AdminApiError };
 
 function idTokenGetter(user) {
   return () => {

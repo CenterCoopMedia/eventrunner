@@ -21,11 +21,15 @@ function fakeDb(seed = {}) {
       async update(patch) {
         docs.set(key, { ...docs.get(key), ...patch });
       },
+      async set(data) {
+        docs.set(key, data);
+      },
     };
   }
+  let counter = 0;
   return {
     docs,
-    collection: (name) => ({ doc: (id) => docRef(name, id) }),
+    collection: (name) => ({ doc: (id) => docRef(name, id ?? `auto-${++counter}`) }),
     async runTransaction(fn) {
       return fn({
         get: (ref) => ref.get(),
@@ -57,4 +61,31 @@ test('setMaterialReviewStatus: an unknown material rejects', async () => {
     setMaterialReviewStatus({ db, materialId: 'nope', reviewStatus: 'approved', now }),
     MaterialNotFoundError,
   );
+});
+
+test('setMaterialReviewStatus: an approval and a rejection each write one audit row', async () => {
+  const db = fakeDb({ 'session_materials/m1': { sessionId: 's1', filename: 'deck.pdf', reviewStatus: 'pending' } });
+  const actor = { uid: 'staff-1', email: 'staff@example.org' };
+  await setMaterialReviewStatus({ db, materialId: 'm1', reviewStatus: 'approved', actor, now });
+  await setMaterialReviewStatus({ db, materialId: 'm1', reviewStatus: 'rejected', actor, now });
+  const rows = [...db.docs.entries()].filter(([k]) => k.startsWith('admin_logs/')).map(([, v]) => v);
+  const row = (reviewStatus) => ({
+    action: 'setMaterialReviewStatus',
+    docPath: 'session_materials/m1',
+    uid: 'staff-1',
+    email: 'staff@example.org',
+    at: new Date(now()),
+    details: { sessionId: 's1', reviewStatus },
+  });
+  assert.deepEqual(rows, [row('approved'), row('rejected')]);
+});
+
+test('setMaterialReviewStatus: an unknown material writes no audit row', async () => {
+  const db = fakeDb();
+  const actor = { uid: 'staff-1', email: 'staff@example.org' };
+  await assert.rejects(
+    setMaterialReviewStatus({ db, materialId: 'nope', reviewStatus: 'approved', actor, now }),
+    MaterialNotFoundError,
+  );
+  assert.equal([...db.docs.keys()].some((k) => k.startsWith('admin_logs/')), false);
 });

@@ -76,8 +76,8 @@ async function buildInvoicePdf({ invoice, theme = null, now = new Date(), timeZo
 
   doc.setTitle(safe(body, `Invoice ${number}`));
   doc.setSubject(safe(body, `Invoice ${number}${issuerName ? ` from ${issuerName}` : ''}`));
-  doc.setProducer('run-of-show');
-  doc.setCreator('run-of-show');
+  doc.setProducer('EventRunner');
+  doc.setCreator('EventRunner');
 
   let page;
   let y;

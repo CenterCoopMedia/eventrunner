@@ -272,9 +272,16 @@ describe("session-materials — closed on both verbs", () => {
   });
 });
 
-describe("exports — readable output, never client-written", () => {
-  it("is publicly readable", async () => {
-    await assertSucceeds(getBytes(ref(anon(), "exports/schedule.pdf")));
+// The schedule PDF is streamed by the function, never stored, so the old
+// world-readable exports/ grant is gone. The seeded object proves the
+// catch-all now denies the path rather than finding nothing there.
+describe("exports — no longer readable", () => {
+  it("denies an anonymous read", async () => {
+    await assertFails(getBytes(ref(anon(), "exports/schedule.pdf")));
+  });
+
+  it("denies a signed-in read", async () => {
+    await assertFails(getBytes(ref(asUser(OTHER), "exports/schedule.pdf")));
   });
 
   it("denies a client write", async () => {

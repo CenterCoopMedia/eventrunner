@@ -68,10 +68,12 @@ async function gateAdminPost({ auth, db, getConfig }, req, res) {
 async function resolveRequest({ db }, body) {
   if (body?.all === true) {
     const request = {};
-    for (const collection of PUBLISHABLE_COLLECTIONS) {
-      const dirty = await listDirty({ db, collection });
-      if (dirty.length > 0) request[collection] = dirty;
-    }
+    const dirtyLists = await Promise.all(
+      PUBLISHABLE_COLLECTIONS.map((collection) => listDirty({ db, collection })),
+    );
+    PUBLISHABLE_COLLECTIONS.forEach((collection, i) => {
+      if (dirtyLists[i].length > 0) request[collection] = dirtyLists[i];
+    });
     return { ok: true, request };
   }
   const { collection, docIds } = body || {};

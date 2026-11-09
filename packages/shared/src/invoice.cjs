@@ -19,7 +19,7 @@
  */
 const { CURRENCY_EXPONENTS } = require('./ticketCommerce.cjs');
 const { EMAIL_ADDRESS_RE, isBareEmailAddress } = require('./email.cjs');
-const { isKnownTimeZone, wallParts } = require('./eventDateTime.cjs');
+const { isCalendarDate, isKnownTimeZone, wallParts } = require('./eventDateTime.cjs');
 
 /** The largest single amount or total: 99,999,999.99 in a two-digit currency. */
 const MAX_INVOICE_AMOUNT = 9999999999;
@@ -76,7 +76,6 @@ const DEFAULT_INVOICE_CURRENCY = 'usd';
 const PREFIX_RE = /^[A-Z][A-Z0-9-]{0,9}$/;
 const INVOICE_ID_RE = /^inv_[a-z0-9]{16,40}$/;
 const ORGANIZATION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/;
-const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 // C0 and C1 controls (a newline is handled on its own), direction overrides
 // and isolates, and the zero-width characters that make two strings look
@@ -241,14 +240,6 @@ function resolveInvoiceCurrency(catalogCurrency, settingsCurrency) {
 /** "INV-0001". The number has at least four digits. */
 function formatInvoiceNumber(prefix, sequence) {
   return `${prefix}-${String(sequence).padStart(4, '0')}`;
-}
-
-function isCalendarDate(value) {
-  const match = DATE_RE.exec(value);
-  if (!match) return false;
-  const [year, month, day] = match.slice(1).map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 /**

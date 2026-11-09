@@ -245,7 +245,7 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
         <h3 id="submitted-materials-heading" className="font-heading text-h3 font-semibold text-text-primary">
           Submitted materials
         </h3>
-        {notice ? <p role="status" className="mt-xs text-caption text-status">{notice}</p> : null}
+        {notice ? <p role="status" className="mt-xs text-caption text-text-secondary">{notice}</p> : null}
         {load.materials.length === 0 ? (
           <p className="mt-sm text-body text-text-secondary">No materials have been sent for this session.</p>
         ) : (

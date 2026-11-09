@@ -421,6 +421,20 @@ function validateSpeaker(payload, { partial = false, fieldsAllowed = EDITABLE_SP
   return { ok: true, fields };
 }
 
+// Named, not written inline below, so the .mjs shim can re-export it: Node
+// finds CommonJS export names only for plain identifiers.
+const internals = {
+  MAX_NAME_LENGTH,
+  MAX_SHORT_TEXT_LENGTH,
+  MAX_PRONOUNS_LENGTH,
+  MAX_BIO_LENGTH,
+  MAX_SOCIAL_HANDLES,
+  MAX_SOCIAL_LABEL_LENGTH,
+  MAX_SOCIAL_HANDLE_LENGTH,
+  SLUG_RE,
+  EMAIL_RE: EMAIL_ADDRESS_RE,
+};
+
 module.exports = {
   SPEAKER_STATUSES,
   ADMIN_SETTABLE_STATUSES,
@@ -435,15 +449,5 @@ module.exports = {
   isPubliclyVisibleSpeaker,
   buildPublicSpeaker,
   validateSpeaker,
-  internals: {
-    MAX_NAME_LENGTH,
-    MAX_SHORT_TEXT_LENGTH,
-    MAX_PRONOUNS_LENGTH,
-    MAX_BIO_LENGTH,
-    MAX_SOCIAL_HANDLES,
-    MAX_SOCIAL_LABEL_LENGTH,
-    MAX_SOCIAL_HANDLE_LENGTH,
-    SLUG_RE,
-    EMAIL_RE: EMAIL_ADDRESS_RE,
-  },
+  internals,
 };

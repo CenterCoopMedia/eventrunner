@@ -54,8 +54,6 @@ export default function ReportProblem() {
         category: kind,
         description,
         url: `${window.location.origin}${window.location.pathname}`,
-        surface: 'console',
-        site: '',
         version: import.meta.env.VITE_BUILD_ID || '',
         consoleLogs: recentMessages(),
       });

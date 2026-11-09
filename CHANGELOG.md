@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Admin Ticketing has a **Sync all tickets** action (Eventbrite and Stripe), with **Continue sync**
+  for a run that stops early, and a **Create account** action on an unclaimed ticket. `ticketingSync`
+  has a 540-second limit, stops before it, reports what it saved, and resumes from a returned
+  `nextCursor`.
+- A new account gets one welcome email with a sign-in link. An Owner or an Editor gets none. The
+  Email log lists it under the source **Welcome email**.
+- Operators can set the announce and archive dates in admin Event settings, and the page shows
+  the event's current phase. Before this, nothing could set them, and every site stayed in draft:
+  no home countdown, and registration answers never locked. The save refuses a
+  malformed date, and an archive date with no announce date or before it.
+
 - A client homepage, plus support, privacy and terms pages, for the project site. The former
   landing page is now the project status page at `/project/`. The address for the custom domain
   is `https://eventrunner.org/`, and repository variables set the support name and address.

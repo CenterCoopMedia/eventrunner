@@ -28,8 +28,9 @@ it('keeps the report open after sending and returns focus when the success is cl
   fireEvent.click(screen.getByRole('button', { name: 'Send' }));
   expect(await screen.findByRole('status')).toHaveTextContent('Report sent.');
   expect(callApi).toHaveBeenCalledWith('reportProblem', expect.objectContaining({
-    category: 'bug', description: 'The event name did not save.', surface: 'console',
+    category: 'bug', description: 'The event name did not save.',
   }));
+  expect(callApi.mock.calls[0][1]).not.toHaveProperty('surface');
   fireEvent.click(screen.getByRole('button', { name: 'Close report' }));
   expect(opener).toHaveFocus();
 });

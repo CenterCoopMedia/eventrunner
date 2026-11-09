@@ -29,12 +29,12 @@ function cleanName(value) {
 
 async function listOrganizations({ db }, { user }) {
   const memberships = await db.collectionGroup('members').where('uid', '==', user.uid).get();
+  const orgs = await Promise.all(memberships.docs.map((doc) => doc.ref.parent.parent.get()));
   const mine = [];
-  for (const doc of memberships.docs) {
-    const orgRef = doc.ref.parent.parent;
-    const org = await orgRef.get();
-    if (org.exists) mine.push({ id: orgRef.id, name: org.data().name, role: doc.data().role });
-  }
+  memberships.docs.forEach((doc, i) => {
+    const org = orgs[i];
+    if (org.exists) mine.push({ id: doc.ref.parent.parent.id, name: org.data().name, role: doc.data().role });
+  });
   mine.sort((a, b) => a.name.localeCompare(b.name));
   const operator = await isOperator(db, user.email);
   const body = { operator, organizations: mine };
@@ -49,22 +49,27 @@ async function listOrganizations({ db }, { user }) {
 
 const ROLE_ORDER = { owner: 0, editor: 1 };
 
-async function getTeam({ db, now = Date.now }, { body, user }) {
-  const access = await requireMemberOrOperator(db, body.orgId, user);
-  const orgRef = db.collection('organizations').doc(body.orgId);
-  const [org, memberSnap, inviteSnap] = await Promise.all([
-    orgRef.get(),
+/** The team as the Team page shows it: members, then invites still open. */
+async function readTeam(db, orgId, at) {
+  const orgRef = db.collection('organizations').doc(orgId);
+  const [memberSnap, inviteSnap] = await Promise.all([
     orgRef.collection('members').get(),
-    db.collection('invites').where('orgId', '==', body.orgId).where('status', '==', 'pending').get(),
+    db.collection('invites').where('orgId', '==', orgId).where('status', '==', 'pending').get(),
   ]);
   const members = memberSnap.docs
     .map((doc) => ({ uid: doc.id, email: doc.data().email, role: doc.data().role, joinedAt: toIso(doc.data().joinedAt) }))
-    .sort((a, b) => (ROLE_ORDER[a.role] - ROLE_ORDER[b.role]) || a.email.localeCompare(b.email));
-  const at = now();
+    .sort((a, b) => (ROLE_ORDER[a.role] - ROLE_ORDER[b.role]) || String(a.email).localeCompare(String(b.email)));
   const invites = inviteSnap.docs
     .filter((doc) => toMillis(doc.data().expiresAt) > at)
     .map((doc) => ({ id: doc.id, email: doc.data().email, role: doc.data().role, expiresAt: toIso(doc.data().expiresAt) }))
-    .sort((a, b) => a.email.localeCompare(b.email));
+    .sort((a, b) => String(a.email).localeCompare(String(b.email)));
+  return { members, invites };
+}
+
+async function getTeam({ db, now = Date.now }, { body, user }) {
+  const access = await requireMemberOrOperator(db, body.orgId, user);
+  const orgRef = db.collection('organizations').doc(body.orgId);
+  const [org, { members, invites }] = await Promise.all([orgRef.get(), readTeam(db, body.orgId, now())]);
   const owners = members.filter((m) => m.role === 'owner').length;
   return {
     body: {
@@ -78,4 +83,4 @@ async function getTeam({ db, now = Date.now }, { body, user }) {
   };
 }
 
-module.exports = { getTeam, listOrganizations, cleanName, LAUNCH_OWNERS, NAME_MAX, NAME_MIN };
+module.exports = { getTeam, listOrganizations, readTeam, cleanName, LAUNCH_OWNERS, NAME_MAX, NAME_MIN };

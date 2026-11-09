@@ -317,3 +317,25 @@ test('Pages checks require index.html for relative directory links', () => {
     assert.deepEqual(checkPages(root), ['docs/index.html: missing guide/']);
   });
 });
+
+test('Pages checks refuse a site link into the folders Pages does not serve', () => {
+  withTempRoot((root) => {
+    for (const dir of ['plans', 'pr-evidence/pr-1']) {
+      fs.mkdirSync(path.join(root, 'docs', dir), { recursive: true });
+    }
+    fs.writeFileSync(path.join(root, 'docs', 'plans', 'plan.md'), '# Plan\n');
+    fs.writeFileSync(path.join(root, 'docs', 'pr-evidence', 'pr-1', 'index.html'), '<a href="../../plans/plan.md">Plan</a>');
+    writeLanding(root, [
+      '<a href="./plans/plan.md">Plan</a>',
+      '<a href="/eventrunner/pr-evidence/pr-1/">Evidence</a>',
+      '<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/plan.md">Plan on GitHub</a>',
+    ].join(''));
+
+    // The files stay in the repository, so only the link is wrong. A page
+    // inside those folders is not served, so its own links are not refused.
+    assert.deepEqual(checkPages(root), [
+      'docs/index.html: ./plans/plan.md (Pages does not serve docs/plans; link to the file on GitHub)',
+      'docs/index.html: /eventrunner/pr-evidence/pr-1/ (Pages does not serve docs/pr-evidence; link to the file on GitHub)',
+    ]);
+  });
+});

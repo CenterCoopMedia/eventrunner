@@ -1,5 +1,130 @@
 # Session task list
 
+## Plan for review: audit follow-up (2026-11-09)
+
+Source: `docs/plans/2026-11-09-project-audit/README.md` ("For the owner to
+review"). The owner decided each item on 2026-11-09 through the question
+tool. Rule the owner gave for unused code: a part that is half built or
+planned gets finished; a part with no design intent and no reader is removed.
+
+Builders run on Opus at medium effort. The director reviews each diff and
+runs the checks. Bug fixes are test-first.
+
+The four pull requests are a stack (owner, 2026-11-09). Each later branch
+starts from the tip of the one before it, and its pull request is based on
+that branch, so no step waits for a merge:
+
+| PR | Branch | Base |
+|---|---|---|
+| 1 | `claude/project-audit-cleanup-rkmnhg` | `main` |
+| 2 | `claude/project-audit-cleanup-rkmnhg-2-features` | PR 1 branch |
+| 3 | `claude/project-audit-cleanup-rkmnhg-3-docs` | PR 2 branch |
+| 4 | `claude/project-audit-cleanup-rkmnhg-4-cleanup` | PR 3 branch |
+
+A review fix on a lower branch is merged up the stack, and generated output
+is regenerated on each tip, never hand-merged. The stack merges top down.
+After it merges, check `git merge-base --is-ancestor <top head> origin/main`.
+
+### PR 1. Defects, rules and data handling
+
+- [x] Tickets "Load more" sends the applied filter, not the form's (04 #4).
+- [x] `/updates/:id` claims its tab title (05 #3).
+- [x] Console: a refused acceptance spends no daily slot (`takeSlotIn`) (08 #5).
+- [x] `text-status` becomes `text-text-secondary`; `text-body-lg` becomes
+      `text-lead` (05 #2).
+- [x] Email log: eight source labels: Invoice, Speaker reminder, Speaker
+      profile request, Admin access, Change request notice, Attendee
+      approval, Pitch notice, Ticket confirmation (04 #2).
+- [x] `firebase.json`: `/dashboard`, `/registration`, `/tickets/mine`,
+      `/tickets/status` join the private block, after a check that each
+      needs sign-in or a private token; runbook and deploy tests (07 #2).
+- [x] `storage.rules`: remove the `exports/` grant (the PDF is streamed) (07 #3).
+- [x] Daily sweep also clears `client_error_rate_limits` and
+      `feedback_rate_limits`, deletes in batches, longer limit (02 #5, #6).
+- [x] Attendee delete clears the account's session pitches and its pitch
+      rate-limit row (`PER_ACCOUNT_STORES`) (03 #6).
+- [x] Material approve, reject, create, update and delete write an
+      `admin_logs` row (03 #5).
+- [x] Three readers use `visible === true` (02 #13).
+- [x] One-time migration, run in each client deploy with a completion
+      marker: numeric ticket dates become timestamps (01 #1).
+- [x] `migrate-console-signup-links` gets a completion marker. The four
+      one-time jobs stay in the deploys (09 #5, #6).
+- [x] Schedule and invoice PDFs name EventRunner as Producer and Creator (03 #8).
+- [x] The classifier selects the unit tier for `apps/web`, rules and
+      generator changes; CONTRIBUTING table (09 #2).
+- [ ] Not changed, by decision: the console `applications` read grant (08 #3).
+
+### PR 2. Features that were half built (a short spec each, in `tasks/specs/`)
+
+- [x] Announce and Archive controls in admin Event settings (operator);
+      `validateEventConfig` checks `announcedAt` and `archivedAt`; runbook
+      and admin guide (07 #1, #6).
+- [x] "Sync all tickets" staff action in admin Ticketing; `ticketingSync`
+      gets a time limit that fits a real event (01 #5).
+- [x] "Create account from ticket" staff action on a ticket (01 #5).
+- [x] `account.welcome` is sent once when an account is created
+      (`welcome:{uid}`), as ADR 0001 section 6 has it (02 #9).
+- [x] `getSiteContent` stays (owner, 2026-11-09). A deploy does not delete
+      a function that left the code: it stops until an operator runs the
+      delete command for each client site. Remove it when that is planned.
+- Decisions made during the build (owner, 2026-11-09): the welcome email
+  skips Owners and Editors; a stopped ticket sync resumes with Continue
+  sync. The date checks are at the save endpoint, not in the shared
+  validator, to keep the public bundle inside its budget (it has 72 gzip
+  bytes left).
+
+### PR 3. Docs and repository weight
+
+- [x] One support address, `info@eventrunner.org`, in every file (09 #4).
+- [x] `NOTICE`: product name and each group of bundled fonts with its
+      licence. The owner approved the text (10 #5).
+- [x] Handbook pages describe invoices and Stripe tickets as built (10 #3).
+- [x] Custom web address (02 #3). The runbook describes the operator
+      procedure. `scripts/add-web-address.cjs` is new (owner): nothing
+      could create the record the status page reads. The check authorizes
+      the domain for sign-in when Hosting shows it live (owner).
+- [x] Pages does not serve `docs/plans` or `docs/pr-evidence` (10 #8).
+- [x] The WAV audio stays (owner): the video kit checks each file against
+      a stored hash (10 #15).
+- [x] Thirteen evidence folders that no file, pull request or issue names
+      are removed. The folders a GitHub thread names stay (10 #12, #13).
+
+### PR 4. Dead code and refactors (no product change)
+
+- [x] Each dead item got the owner's test. Removed (no design intent, no
+      reader): `ticketsPersisted`, the order status `cancelled` reads,
+      `features.ticketing`, the speaker link wrappers (S7 below had kept
+      them; the owner's rule of 2026-11-09 is newer), `resolveSessionTrack`,
+      unused exports and CSS rules, four unreferenced public files.
+- [x] Planned, kept: `claimPromptSentAt` and the `ticket_unclaimed` and
+      `admin_resend` prompt triggers (ADR 0001); the status tables only
+      tests read (the shared status plan, S1, S2, S5).
+- [x] Not sure, kept: the `review.settings` branches (an earlier release
+      may have stored a value), `transitionOrderInventory` and
+      `takeFeedbackRateLimitSlot` (tests set up state with them),
+      `sessionIdFromTitle` (comments elsewhere name it).
+- [x] The five `.mjs` shims are complete; a test compares each shim, and
+      each entry of the exports map, with its module (07 #4).
+- [x] One `CommerceError`; copied helpers merged where no first-page
+      bundle cost results. Left: copies that keep a module off the first
+      paint, and copies whose results differ.
+- [x] The pitch page and three settings readers use `subscribeAdminDoc`.
+      `SpeakerSessionConfirmations` needs a filtered query and stays (04 #7).
+- [x] Sequential reads batched in the ticket reconcile, the purchaser
+      list, the publish path, the console review queue and organization list.
+- Not done, each a behaviour change and not a refactor: merge
+  `notifyOwners`/`ownerEmails` (changes an `emailed` count), the repeated
+  read in `users/lifecycle.cjs`, `isValidDocId` in `resolveRequest`, the
+  dashboard resource cards' visibility test, the console refusal text for
+  a built site.
+
+### Done when
+
+Each pull request: `npm test`, `npm run test:web`, lint, the copy and docs
+checks pass locally, "CI gate" is green, every review thread is resolved,
+and the audit README marks the item closed.
+
 ## Plan for review: shared status modules (2026-11-08)
 
 Approved by the owner on 2026-11-08: start with S0. Decisions: S1 adds a

@@ -48,8 +48,9 @@ const {
 
 /**
  * The fixed reaction vocabulary (see module doc above for why this is
- * fixed rather than free text). Exported so the web client and its tests
- * can render/validate against the same list instead of a second copy.
+ * fixed rather than free text). Exported for this module's tests. The web
+ * cannot import functions code, so apps/web/src/lib/reactionsSource.js
+ * keeps its own copy, which must match.
  */
 const REACTION_KINDS = Object.freeze(['👍', '❤️', '🎉', '💡', '👏']);
 

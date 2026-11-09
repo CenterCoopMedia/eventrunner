@@ -12,7 +12,7 @@
  *                 a generic page's `path` must be root-level, normalized, not
  *                 reserved (shared/routing, issue #52), and not already
  *                 claimed by another page (draft or live).
- *   cmsDeletePage POST { id }   — remove live + draft in one batch; refuses
+ *   cmsDeletePage POST { id }   — remove live + draft in one transaction; refuses
  *                 to delete a systemPage (those own a dedicated React route;
  *                 deleting the doc would strand the route's content).
  *

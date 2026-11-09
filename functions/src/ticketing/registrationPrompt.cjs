@@ -43,14 +43,13 @@
  *
  * **Scope: `trigger: 'account_created'` only.** §3.5's table has a second
  * column, "Ticket exists, unclaimed" (`trigger: 'ticket_unclaimed'`,
- * template `ticket.claim_prompt`) — every provider already implements that
- * branch of `getRegistrationPrompt` (manual.cjs, eventbrite.cjs), but
+ * template `ticket.claim_prompt`) — the manual and Eventbrite adapters
+ * already implement that branch of `getRegistrationPrompt`, but
  * nothing yet calls it with that trigger value. It fires from a DIFFERENT
  * event than "an account was just created" — a ticket getting imported or
  * synced for an address that already has an account, sometime after
- * sign-up — and neither adapter's `ctaUrl` for that branch is wired to a
- * real page yet either (both return `ctaUrl: null` pending the claim
- * surface this issue also builds; see providers/manual.cjs). Building that
+ * sign-up. Both adapters already point that branch's `ctaUrl` at
+ * `/ticket/claim` (or null when no public URL is configured). Building that
  * second trigger is future work; this module's job per the issue is the
  * new-account prompt, and `sendRegistrationPrompt` below is written so a
  * future caller CAN pass `trigger: 'ticket_unclaimed'` with an

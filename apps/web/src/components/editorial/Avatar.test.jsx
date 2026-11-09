@@ -37,6 +37,7 @@ describe('Avatar', () => {
   });
 
   it('spells the initial from the first letter, and a question mark from nothing', () => {
+    expect(initialOf('rae okonkwo')).toBe('R');
     expect(initialOf('  Émile')).toBe('É');
     expect(initialOf('')).toBe('?');
     expect(initialOf(undefined)).toBe('?');

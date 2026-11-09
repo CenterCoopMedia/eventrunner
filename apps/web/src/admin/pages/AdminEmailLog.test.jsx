@@ -20,7 +20,7 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig: { timezone: 'UTC' } }),
 }));
 
-import AdminEmailLog, { figureSentence } from './AdminEmailLog.jsx';
+import AdminEmailLog, { figureSentence, SOURCE_LABELS } from './AdminEmailLog.jsx';
 import { PREVIEW_POLICY } from '../emailPreview.js';
 
 const SENT_AT = Date.UTC(2023, 10, 14, 22, 13);
@@ -207,6 +207,31 @@ describe('AdminEmailLog', () => {
     expect(listCalls()[1]).toEqual({ limit: 25 });
     await waitFor(() => expect(location()).toBe('/admin/email-log'));
     expect(screen.getByRole('group', { name: 'Filters' })).toBeInTheDocument();
+  });
+
+  it('names every source the server stamps, and keeps each one as a URL filter', async () => {
+    // The sources functions/src stamps on its sends, in the owner's words.
+    const stamped = {
+      invoice: 'Invoice',
+      'speaker-reminder': 'Speaker reminder',
+      'speaker-profile': 'Speaker profile request',
+      'admin-access': 'Admin access',
+      'change-requests': 'Change request notice',
+      'attendee-approval': 'Attendee approval',
+      'session-pitches': 'Pitch notice',
+      'ticketing-confirmation': 'Ticket confirmation',
+      'account-welcome': 'Welcome email',
+    };
+    expect(SOURCE_LABELS).toMatchObject(stamped);
+    for (const [source, label] of Object.entries(stamped)) {
+      callMock.mockReset();
+      const { unmount } = await renderPage(`/admin/email-log?source=${source}`);
+      expect(listCalls()[0], source).toEqual({ limit: 25, source });
+      const select = screen.getByRole('combobox', { name: 'Source' });
+      expect(select).toHaveValue(source);
+      expect(within(select).getByRole('option', { name: label })).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it('ignores a URL filter the server would refuse, or one that names an object key instead of a source or a status', async () => {

@@ -366,6 +366,23 @@ test('describeChanges: visibility shows when it moves, and on a first version th
   ]);
 });
 
+test('a version with no visible field reads as hidden, as the site reads it', () => {
+  // firestore.rules and the public readers show a record only when
+  // visible === true. Every row publishDocs writes stores a boolean.
+  assert.deepEqual(describeChanges(row({ value: 'v' }, true), { fields: { value: 'v' } }).changes, [
+    { path: 'visible', kind: 'changed', before: true, after: false },
+  ]);
+  assert.deepEqual(describeChanges({ fields: { value: 'v' } }, row({ value: 'v' }, true)).changes, [
+    { path: 'visible', kind: 'changed', before: false, after: true },
+  ]);
+  assert.deepEqual(describeChanges(null, { fields: { value: 'v' } }).changes, [
+    { path: 'value', kind: 'added', before: null, after: 'v' },
+    { path: 'visible', kind: 'added', before: null, after: false },
+  ]);
+  const entry = internals.toEntry({ id: 'h1', data: () => ({ docPath: 'cmsPages/home', revision: 1, fields: {} }) }, null);
+  assert.equal(entry.visible, false);
+});
+
 test('describeChanges: with no predecessor, every leaf reads as added', () => {
   const { changes } = describeChanges(null, row({ title: 'T', layout: { header: 'plain' }, tags: ['a'] }));
   assert.deepEqual(changes, [

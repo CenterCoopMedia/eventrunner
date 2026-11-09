@@ -34,8 +34,10 @@
  *      claims, and writes the audit row — together. After it, the account
  *      is out of the directory.
  *   2. The sweep deletes the sign-in, the saved sessions (lowering each
- *      session's count), the private notes, the profile photo files, and
- *      the change requests the account sent with their rate-limit window.
+ *      session's count), the private notes, the profile photo files, the
+ *      change requests the account sent with their rate-limit window, and
+ *      the session pitches it sent with theirs. The pitch rate-limit row is
+ *      replaced by a fence first, which the pitch transaction refuses on.
  *      These can outgrow one transaction's 500-write ceiling, which would
  *      strand an account that could never be deleted, so they run after
  *      the commit, each step on its own. The sweep also releases any ticket
@@ -59,6 +61,9 @@ const { logAdminAction } = require('../cms/store.cjs');
 const {
   internals: { readUid },
 } = require('./approval.cjs');
+const {
+  internals: { rateLimitIdFor: pitchRateLimitIdFor, ACCOUNT_FENCE_FIELD: pitchFenceField },
+} = require('../sessions/pitches.cjs');
 
 const USERS = 'users';
 const ADMIN_LOGS = 'admin_logs';
@@ -91,7 +96,11 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
  *   a claim the deleted session makes after the commit does not stay on
  *   the record; a resumed delete that finds one does not answer 404.
  *
- *   kind 'doc'        — the document `{collection}/{uid}`.
+ *   kind 'doc'        — the document `{collection}/{uid}`, or
+ *                       `{collection}/{idOf(uid)}` when the store keys it
+ *                       by a hash of the uid. With `fence`, the document is
+ *                       replaced by `{ [fence]: deletedAt }` instead of
+ *                       deleted, and a fence alone is not account data.
  *   kind 'owned'      — every `{collection}` document whose `{field}` is the
  *                       uid. The documents are deleted.
  *   kind 'claim'      — every `{collection}` document whose `{field}` is the
@@ -141,7 +150,24 @@ const PER_ACCOUNT_STORES = Object.freeze([
   // saveTicketAnswers checks the ticket's claim in its transaction, and the
   // directory phase clears that claim, so no answer lands after this sweep.
   { phase: 'sweep', kind: 'owned', collection: 'ticket_answers', field: 'uid', key: 'registrationAnswers' },
+  // The pitch rate-limit window and the session pitches the account sent.
+  // A pitch holds the address and free text, so it goes with the account.
+  // A pitch needs no account document, and its revocation check cannot see
+  // a delete that lands after it. So the window is replaced by a fence that
+  // the pitch transaction reads and refuses on, BEFORE the pitches are
+  // swept: a pitch that commits first is swept, one that reads after it is
+  // refused. The fence stays; it holds no data of the person.
+  {
+    phase: 'sweep', kind: 'doc', collection: 'session_pitch_rate_limits', idOf: pitchRateLimitIdFor,
+    fence: pitchFenceField, key: 'sessionPitchLimits',
+  },
+  { phase: 'sweep', kind: 'owned', collection: 'session_pitches', field: 'uid', key: 'sessionPitches' },
 ]);
+
+/** The id of a 'doc' store's document for the account. */
+function docIdOf(store, uid) {
+  return store.idOf ? store.idOf(uid) : uid;
+}
 
 /** Firestore's per-transaction write ceiling. */
 const MAX_TRANSACTION_WRITES = 500;
@@ -387,7 +413,7 @@ async function removeFromDirectory({ db, uid, signInEmail, actor, now }) {
       released[store.key] = docs.length;
     }
     for (const store of DIRECTORY_STORES) {
-      if (store.kind === 'doc') tx.delete(db.collection(store.collection).doc(uid));
+      if (store.kind === 'doc') tx.delete(db.collection(store.collection).doc(docIdOf(store, uid)));
     }
     tx.delete(userRef);
     tx.set(db.collection(ADMIN_LOGS).doc(), {
@@ -513,13 +539,26 @@ async function sweepOwned({ db, uid, store }) {
   }
 }
 
-/** Delete the document `{collection}/{uid}`, counting it when it was there. */
-async function sweepDoc({ db, uid, store }) {
-  const ref = db.collection(store.collection).doc(uid);
+/** Whether a 'doc' store's snapshot holds account data, not only a fence. */
+function holdsAccountData(store, snap) {
+  return snap.exists && !(store.fence && snap.data()?.[store.fence]);
+}
+
+/**
+ * Delete the store's document for the account, counting it when it was
+ * there. A fenced store writes its fence even when no document is there:
+ * a first request already in flight must still meet it.
+ */
+async function sweepDoc({ db, uid, store, now }) {
+  const ref = db.collection(store.collection).doc(docIdOf(store, uid));
   const snap = await ref.get();
-  if (!snap.exists) return 0;
-  await ref.delete();
-  return 1;
+  const held = holdsAccountData(store, snap);
+  if (store.fence) {
+    if (held || !snap.exists) await ref.set({ [store.fence]: now() });
+  } else if (held) {
+    await ref.delete();
+  }
+  return held ? 1 : 0;
 }
 
 const SWEEPERS = Object.freeze({
@@ -536,7 +575,7 @@ async function holdsAnything({ db, getBucket, uid, store }) {
   if (store.kind === 'claim') return !(await claimsOn(db, uid, store).limit(1).get()).empty;
   if (store.kind === 'files') return (await pageOfFiles(getBucket(), store.prefix, uid, 1)).length > 0;
   if (store.kind === 'owned') return !(await ownedBy(db, uid, store).limit(1).get()).empty;
-  if (store.kind === 'doc') return (await db.collection(store.collection).doc(uid).get()).exists;
+  if (store.kind === 'doc') return holdsAccountData(store, await db.collection(store.collection).doc(docIdOf(store, uid)).get());
   return (await pageOfMembers(db, uid, store.subcollection, 1)).length > 0;
 }
 

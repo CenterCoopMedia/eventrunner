@@ -518,7 +518,9 @@ function buildHandlers() {
       const { getAuth } = require('firebase-admin/auth');
       await createVerifyOtpHandler({ db: getDb(), auth: getAuth() })(req, res);
     })),
-    cleanupExpiredAuthChallenges: onSchedule({ region, schedule: 'every 24 hours' }, async () => {
+    // A full sweep is up to 40 pages in each of five collections; the
+    // 60-second default does not fit it.
+    cleanupExpiredAuthChallenges: onSchedule({ region, schedule: 'every 24 hours', timeoutSeconds: 300 }, async () => {
       const { getDb } = require('../core/firestore.cjs');
       await sweepExpired({ db: getDb() });
     }),

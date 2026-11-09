@@ -45,6 +45,13 @@ const COPY_CHECKED_DOC_FILES = new Set([
   'console/README.md',
 ]);
 
+// Documents whose words a unit test reads, so an edit to one runs `unit`:
+// functions/src/users/records.test.cjs and scripts/lib/tokens.test.cjs.
+const UNIT_READ_DOC_FILES = new Set([
+  'docs/ADMIN_GUIDE.md',
+  'apps/web/public/fonts/README.md',
+]);
+
 const ALWAYS_FULL_PATHS = new Set([
   '.env.example',
   'eslint.config.mjs',
@@ -167,6 +174,7 @@ function resultForPaths(paths, mode, categories) {
   const {
     docs,
     copyDocs,
+    unitDocs,
     demo,
     demoGenerator,
     docsGenerator,
@@ -192,7 +200,9 @@ function resultForPaths(paths, mode, categories) {
     // The audit policy reads package.json/package-lock.json across the
     // workspace. Documentation copy does not change that dependency surface.
     audit: demoGenerator || docsGenerator || app || backend || shared || consoleApp || consoleBackend || full,
-    unit: backend || shared || consoleBackend || full,
+    // npm test also runs scripts/** tests that read apps/web, the rules
+    // files and the generators, so each of those selects this tier.
+    unit: backend || shared || consoleBackend || app || rules || docsGenerator || demoGenerator || unitDocs || full,
     unitWeb: app || shared || consoleApp || full,
     build: app || shared || consoleApp || consoleHosting || full,
     hygiene: app || shared || full,
@@ -211,6 +221,7 @@ function classifyPaths(input) {
   const categories = {
     docs: paths.some(isDocsPath),
     copyDocs: paths.some(isCopyCheckedDocsPath),
+    unitDocs: paths.some((path) => UNIT_READ_DOC_FILES.has(path)),
     demo: paths.some(isDemoPath),
     demoGenerator: paths.some(isDemoGeneratorPath),
     docsGenerator: paths.some(isDocsGeneratorPath),

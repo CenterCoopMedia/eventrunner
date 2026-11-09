@@ -1259,3 +1259,81 @@ test('a staff caller saves milestones and the goal: alone, and in the whole form
   assert.equal(written.sender.email, stored.sender.email);
   assert.equal(written.updatedBy, STAFF_EMAIL);
 });
+
+// ------------------------------------------- the lifecycle stamps (audit 07 #1)
+
+// announcedAt takes a site out of draft and archivedAt ends it, so a CHANGE
+// to either is the operator's, the same as the sender block.
+const announcedEvent = () => validEvent({ announcedAt: '2027-01-15T09:00', archivedAt: null });
+
+test('a staff save that CHANGES announcedAt or archivedAt is refused by name, and nothing is written', async () => {
+  for (const [stamps, message] of [
+    [{ announcedAt: '2027-02-01T09:00' }, 'announcedAt: operator access required'],
+    [{ announcedAt: null }, 'announcedAt: operator access required'],
+    [{ archivedAt: '2027-06-01T00:00' }, 'archivedAt: operator access required'],
+    [{ announcedAt: '2027-02-01T09:00', archivedAt: '2027-06-01T00:00' }, 'announcedAt: operator access required; archivedAt: operator access required'],
+  ]) {
+    const stored = announcedEvent();
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: { tagline: 'Must not save', ...stamps } }, { token: 'staff-token' }), res);
+    assert.equal(res.statusCode, 403, JSON.stringify(stamps));
+    assert.equal(res.body.error.message, message);
+    assert.deepEqual(deps.db.docs.get('config/event'), stored);
+    assert.equal(deps.db.writes.length, 0);
+  }
+});
+
+test('a staff save that carries the stamps unchanged, or leaves them out, goes through and keeps the stored bytes', async () => {
+  for (const stamps of [
+    {},
+    { announcedAt: '2027-01-15T09:00', archivedAt: null },
+    { announcedAt: ' 2027-01-15T09:00 ', archivedAt: '' },
+  ]) {
+    const stored = announcedEvent();
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: { tagline: 'Set by the desk', ...stamps } }, { token: 'staff-token' }), res);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    const written = deps.db.docs.get('config/event');
+    assert.equal(written.tagline, 'Set by the desk');
+    assert.equal(written.announcedAt, '2027-01-15T09:00');
+    assert.equal(written.archivedAt, null);
+  }
+});
+
+test('an operator may set, change and clear the stamps', async () => {
+  const deps = tieredDeps({ 'config/event': validEvent({ announcedAt: null, archivedAt: null }) });
+  let res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { announcedAt: '2027-01-15T09:00', archivedAt: '2027-06-01T00:00' } }, { token: 'admin-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(deps.db.docs.get('config/event').announcedAt, '2027-01-15T09:00');
+  assert.equal(deps.db.docs.get('config/event').archivedAt, '2027-06-01T00:00');
+  res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { archivedAt: null } }, { token: 'admin-token' }), res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(deps.db.docs.get('config/event').archivedAt, null);
+});
+
+test('an operator stamp the save refuses is a 400 naming the field, and nothing is written', async () => {
+  const stored = validEvent({ announcedAt: null, archivedAt: null });
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { archivedAt: '2027-06-01T00:00' } }, { token: 'admin-token' }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /archivedAt: needs an announce date/);
+  assert.deepEqual(deps.db.docs.get('config/event'), stored);
+});
+
+test('findOperatorKeyChanges names each stamp only when a staff payload changes it', () => {
+  const { findOperatorKeyChanges } = internals;
+  const stored = { announcedAt: '2027-01-15T09:00', archivedAt: null };
+  assert.deepEqual(findOperatorKeyChanges('event', { announcedAt: '2027-01-15T09:00', archivedAt: null }, stored, 'staff'), []);
+  assert.deepEqual(findOperatorKeyChanges('event', { archivedAt: undefined }, stored, 'staff'), []);
+  assert.deepEqual(findOperatorKeyChanges('event', { announcedAt: '2027-01-16T09:00' }, stored, 'staff'), ['announcedAt: operator access required']);
+  assert.deepEqual(findOperatorKeyChanges('event', { archivedAt: '2027-06-01T00:00' }, {}, 'staff'), ['archivedAt: operator access required']);
+  assert.deepEqual(findOperatorKeyChanges('event', { announcedAt: '2027-01-16T09:00' }, stored, 'operator'), []);
+});

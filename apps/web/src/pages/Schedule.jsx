@@ -46,6 +46,7 @@ import {
   matchesQuery,
   readScheduleView,
   sortEntries,
+  sortSessions,
   writeScheduleView,
 } from '../lib/scheduleView.js';
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
@@ -72,18 +73,6 @@ function dayClass(isActive) {
       ? 'border-b-rule-strong font-semibold text-text-primary'
       : 'border-b-transparent text-text-secondary hover:text-text-primary',
   ].join(' ');
-}
-
-/** Sort sessions the same way everywhere they're grouped by day (Schedule
- * and MySchedule both use this). Start time first, then explicit `order`,
- * then title as a stable tiebreaker. */
-export function sortSessions(sessions) {
-  return [...sessions].sort(
-    (a, b) =>
-      String(a.startTime).localeCompare(String(b.startTime)) ||
-      (a.order ?? 0) - (b.order ?? 0) ||
-      String(a.title).localeCompare(String(b.title)),
-  );
 }
 
 export default function Schedule() {
@@ -214,7 +203,8 @@ export default function Schedule() {
     }),
     [days, formatOptions, trackOptions],
   );
-  const view = useMemo(() => readScheduleView(searchParams, knownView), [searchParams, knownView]);  // The sort control offers most saved only where bookmarking exists, so a
+  const view = useMemo(() => readScheduleView(searchParams, knownView), [searchParams, knownView]);
+  // The sort control offers most saved only where bookmarking exists, so a
   // stale URL cannot select an order the page never offered.
   const sort = view.sort === 'saved' && features.sessionBookmarks ? 'saved' : 'time';
   const sortOptions = [

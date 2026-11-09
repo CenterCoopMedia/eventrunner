@@ -891,3 +891,10 @@ test('OTP send sees changed server policy even when the rendered config is stale
   assert.equal(sent.length, 1);
   assert.deepEqual(db.store, before);
 });
+
+test('cleanupExpiredAuthChallenges states a time limit that fits a full sweep', () => {
+  // A full run is up to 40 pages in each of five collections, one query and
+  // one batch commit per page. The 60-second default does not fit that.
+  const { handlers } = require('./otp.cjs');
+  assert.equal(handlers.cleanupExpiredAuthChallenges.__endpoint.timeoutSeconds, 300);
+});

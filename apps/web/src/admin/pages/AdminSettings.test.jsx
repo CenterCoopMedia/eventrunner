@@ -46,6 +46,14 @@ vi.mock('../adminSource.js', () => ({
     if (deliverFirstAdminSnapshot) onNext([]);
     return () => adminSubscriptions.delete(name);
   },
+  // A one-document read, as the collection it lives in.
+  subscribeAdminDoc: (path, onNext, onError) => {
+    const [name, id] = path.split('/');
+    adminSubscriptions.set(name, (docs) => onNext(docs.find((doc) => doc.id === id) ?? null));
+    adminSubscriptionErrors.set(name, onError);
+    if (deliverFirstAdminSnapshot) onNext(null);
+    return () => adminSubscriptions.delete(name);
+  },
 }));
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},
@@ -728,7 +736,9 @@ describe('event settings', () => {
       },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Remove Main hall' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('1 unsaved route');
+    // The page has other status regions (each date field has one), so find
+    // this one by its words.
+    expect((await screen.findByText(/1 unsaved route/)).closest('[role="status"]')).not.toBeNull();
     expect(screen.queryByLabelText('Movement 1 from')).toBeNull();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Remove Studio' })).toHaveFocus(),

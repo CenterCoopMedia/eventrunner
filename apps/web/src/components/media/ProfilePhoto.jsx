@@ -24,9 +24,7 @@ import { useEffect, useState } from 'react';
 import { isPublishablePhotoPath } from 'shared/profile';
 import { assetUrl, isDefaultAvatarPath, storagePath } from '../../lib/mediaSource.js';
 import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
-import Avatar, { initialOf } from '../editorial/Avatar.jsx';
-
-export { initialOf };
+import Avatar from '../editorial/Avatar.jsx';
 
 /**
  * Uploaded photos use this account's own prefix. Default avatars and

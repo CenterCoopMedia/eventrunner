@@ -6,13 +6,11 @@ const { randomUUID } = require('node:crypto');
 const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
-const { internals: { safeDocId } } = require('./index.cjs');
+const { internals: { safeDocId, TICKETS } } = require('./index.cjs');
 const { listPromoCodes, savePromoCode, deletePromoCode, promoRef, releasedPromoUse } = require('./promoCodes.cjs');
+const { ORDERS, CATALOG, INVENTORY, CommerceError, normalizeInventory, inventoryTransitionPatch } = require('./stripeCommerce.cjs');
+const { internals: { scopeMatches } } = require('./providers/stripe.cjs');
 
-const ORDERS = 'ticket_orders';
-const CATALOG = 'ticket_catalog';
-const INVENTORY = 'ticket_inventory';
-const TICKETS = 'tickets';
 const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
@@ -23,10 +21,14 @@ const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee',
 const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
 const { isOrderFulfilled } = require('shared/ticketCommerce');
 
-class CommerceError extends Error {
-  constructor(status, code, message) { super(message); this.status = status; this.code = code; }
+// An organizer check answers with its own status, 5xx included. A 5xx
+// CommerceError from the checkout or inventory code gets the generic answer.
+const ORGANIZER_ERRORS = new WeakSet();
+function fail(status, code, message) {
+  const error = new CommerceError(code, message, status);
+  ORGANIZER_ERRORS.add(error);
+  throw error;
 }
-function fail(status, code, message) { throw new CommerceError(status, code, message); }
 async function requireWrites(db, transaction) {
   const policy = await checkDemoWrites({ db, transaction });
   if (!policy.ok) fail(policy.status, policy.code, policy.message);
@@ -49,11 +51,6 @@ function iso(value) {
   if (typeof value?.toDate === 'function') return value.toDate().toISOString();
   if (value instanceof Date) return value.toISOString();
   return typeof value === 'string' ? value : null;
-}
-function scopeMatches(order, provider) {
-  return Boolean(provider?.externalEventId && provider?.stripeAccountId) &&
-    order?.provider === 'stripe' && order.eventId === provider.externalEventId &&
-    order.stripeAccountId === provider.stripeAccountId && order.livemode === provider.livemode;
 }
 function requireOrder(snap, provider) {
   const order = snap.exists ? snap.data() : null;
@@ -146,7 +143,6 @@ async function saveCatalog({ db, provider, actor, body, now }) {
     const ref = db.collection(CATALOG).doc('current');
     const [oldSnap, invSnap] = await Promise.all([tx.get(ref), tx.get(db.collection(INVENTORY).doc('current'))]);
     const old = oldSnap.exists ? oldSnap.data() : null;
-    const { normalizeInventory } = require('./stripeCommerce.cjs');
     const inventory = normalizeInventory(invSnap.data(), provider.externalEventId);
     if ((old?.revision || 0) !== body.expectedRevision) fail(409, 'conflict', 'The catalog changed. Reload it before saving.');
     const next = verdict.value;
@@ -357,7 +353,6 @@ async function releaseHold({ db, provider, actor, body, now }) {
     const inventoryRef = db.collection(INVENTORY).doc('current');
     const inventorySnap = await tx.get(inventoryRef);
     const promoSnap = order.promo?.code ? await tx.get(promoRef(db, order.promo.code)) : null;
-    const { inventoryTransitionPatch } = require('./stripeCommerce.cjs');
     const transition = inventoryTransitionPatch({ order, inventory: inventorySnap.data(), to: 'released' });
     const at = now();
     const promoUse = releasedPromoUse(promoSnap, order, at);
@@ -423,7 +418,7 @@ function createTicketingCommerceAdminHandler({ db, provider, auth, getConfig, no
       }
       return res.status(200).json(result);
     } catch (error) {
-      if (error instanceof CommerceError || (Number.isInteger(error.status) && error.status >= 400 && error.status < 500)) {
+      if (ORGANIZER_ERRORS.has(error) || (Number.isInteger(error.status) && error.status >= 400 && error.status < 500)) {
         return sendError(res, error.status, error.code || 'bad-request', error.message);
       }
       log.error('ticketing organizer operation failed', { action, code: error?.code || 'internal' });
@@ -477,7 +472,7 @@ function createTicketingCheckInHandler({ db, provider, auth, getConfig, now = ()
       });
       return res.status(200).json(result);
     } catch (error) {
-      if (error instanceof CommerceError) return sendError(res, error.status, error.code, error.message);
+      if (ORGANIZER_ERRORS.has(error)) return sendError(res, error.status, error.code, error.message);
       log.error('ticket check-in failed', { code: error?.code || 'internal' });
       return sendError(res, 503, 'unavailable', 'Check-in could not be confirmed. Check the ticket again.');
     }
@@ -501,13 +496,17 @@ function createTicketingMyTicketsHandler({ db, provider, auth }) {
     }
     const snap = await query.limit(MAX_PAGE + 1).get();
     const tickets = [];
+    const orderCache = new Map();
     for (const row of snap.docs.slice(0, MAX_PAGE)) {
       const ticket = row.data();
       if (ticket.provider !== provider.name) continue;
       if (provider.name === 'stripe') {
         if (!safeDocId(ticket.orderId)) continue;
-        const parent = await db.collection(ORDERS).doc(ticket.orderId).get();
-        if (!parent.exists || !scopeMatches(parent.data(), provider)) continue;
+        if (!orderCache.has(ticket.orderId)) {
+          const parent = await db.collection(ORDERS).doc(ticket.orderId).get();
+          orderCache.set(ticket.orderId, parent.exists && scopeMatches(parent.data(), provider));
+        }
+        if (!orderCache.get(ticket.orderId)) continue;
       }
       const dto = publicTicket(ticket, row.id);
       delete dto.claimedByUid;
@@ -540,7 +539,6 @@ function buildHandlers() {
 
 module.exports = {
   createTicketingCommerceAdminHandler, createTicketingCheckInHandler, createTicketingMyTicketsHandler,
-  readOrderDetail, publicOrder, publicTicket,
   get handlers() { return buildHandlers(); },
-  internals: { scopeMatches, dashboardUrl, saveCatalog, changeAdmission, listCommerce, MAX_SCAN },
+  internals: { dashboardUrl, saveCatalog, changeAdmission, listCommerce, MAX_SCAN },
 };

@@ -66,7 +66,8 @@ export function subscribeOwnScheduleShare(uid, onNext, onError) {
  */
 export { subscribeOwnScheduleShare as subscribeScheduleShare };
 
-/** Thrown by {@link setScheduleVisibility} on any non-2xx response. */export class ScheduleShareError extends Error {
+/** Thrown by {@link setScheduleVisibility} on any non-2xx response. */
+export class ScheduleShareError extends Error {
   constructor({ message, status }) {
     super(message);
     this.name = 'ScheduleShareError';

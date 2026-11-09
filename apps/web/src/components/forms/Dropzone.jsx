@@ -31,7 +31,7 @@ import Progress from '../Progress.jsx';
 import { quietActionClass } from '../controlClasses.js';
 
 /** The word for each state a sent file can be in. */
-export const SENT_STATE_WORD = Object.freeze({
+const SENT_STATE_WORD = Object.freeze({
   sending: 'Sending…',
   sent: 'Sent',
   failed: 'Failed',

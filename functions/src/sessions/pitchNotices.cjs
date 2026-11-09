@@ -63,8 +63,6 @@ const PITCHES = 'session_pitches';
 const SETTINGS_COLLECTION = 'session_pitch_settings';
 const SETTINGS_DOC = 'notices';
 const KINDS = Object.freeze(['receipt', 'decision']);
-// A queued record older than this is treated as interrupted, and staff may
-// retry it. A younger one may still be sending.
 const MAX_SEND_BODY_BYTES = 16 * 1024;
 const MAX_SETTINGS_BODY_BYTES = 128 * 1024;
 const MAX_ERROR_LENGTH = 500;

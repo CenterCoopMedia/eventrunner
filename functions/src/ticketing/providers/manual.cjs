@@ -22,7 +22,7 @@
  *     there is no webhook to verify, ever — capability-gated provisioning
  *     (`registerWebhook` absent) skips registration entirely.
  *   • listTickets     → `tickets/{externalId}` where `provider == 'manual'`,
- *     paginated by document id. A full sync (`ticketingSync`) walking this
+ *     paginated by `createdAt`. A full sync (`ticketingSync`) walking this
  *     provider is therefore a no-op confirmation, never a duplicate import.
  *   • lookupByOrderNumber → exact match on `orderId` among manual tickets
  *     that are still valid (§3.3). A refunded, cancelled, or undecided row

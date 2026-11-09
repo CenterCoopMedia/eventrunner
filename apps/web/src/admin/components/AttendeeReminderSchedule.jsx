@@ -16,6 +16,7 @@ import {
   attendeeStateWords,
   attendeeWord,
   addressWord,
+  dayCount,
   draftProblems,
   eventTime,
   nextRunWords,
@@ -57,13 +58,9 @@ function sameForm(form, data) {
     === JSON.stringify([settings.offsetsDays, settings.sendTime, settings.draft.subject, settings.draft.message]);
 }
 
-function dayWords(days) {
-  return `${days} ${days === 1 ? 'day' : 'days'}`;
-}
-
 function SampleMessage({ sample, timeZone }) {
   const srcDoc = useMemo(() => (sample.html ? buildPreviewDoc(sample.html) : null), [sample.html]);
-  const name = `Attendee reminder, ${dayWords(sample.offsetDays)} before`;
+  const name = `Attendee reminder, ${dayCount(sample.offsetDays)} before`;
   return (
     <section aria-label={name} className="flex flex-col gap-xs border-admin-rule-hairline border-t-admin-hairline pt-sm">
       <h4 className="text-admin-base font-bold text-admin-ink">{name}</h4>

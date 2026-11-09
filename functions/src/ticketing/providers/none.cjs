@@ -4,10 +4,9 @@
  * The `none` ticketing provider (spec §3.3).
  *
  * "`none` is `manual` with an empty ticket set; every deployment therefore
- * has a working registration path." Until the manual/CSV adapter lands
- * (issue #31) this is a standalone built-in rather than a configuration of
- * that adapter — the shape is identical either way, because an empty CSV
- * import produces exactly these answers:
+ * has a working registration path." It is a standalone built-in, not a
+ * configuration of the manual/CSV adapter (providers/manual.cjs), and it
+ * needs no database. An empty CSV import gives exactly these answers:
  *
  *   • no webhook to verify        → { valid: false, reason: 'no webhook' }
  *   • no orders to fetch          → an empty, COMPLETE order

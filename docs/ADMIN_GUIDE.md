@@ -31,7 +31,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, closing a flagged card payment, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
 | Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, make a card payment link, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
-Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Operators can change the sender name, reply-to address, and social sharing image. Staff can read those values. No admin can change the from address or the mailing address in the email footer. Our team manages those settings on request.
+Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Operators can change the sender name, reply-to address, social sharing image, and the announce and archive dates. Staff can read those values. Staff can read those values. No admin can change the from address or the mailing address in the email footer. Our team manages those settings on request.
 
 An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.
 
@@ -72,6 +72,17 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 6. **Publish.** The live public site restyles with no deploy. This is a config write, not a code change.
 
 **Two things are worth knowing before you start.** A contrast failure stops a publish, not a save — you can leave a draft broken and come back. And nothing you do here reaches attendees until step 6.
+
+## Announce and archive
+
+In **Event settings**, under **Registration and deadlines**, the **Announce and archive** panel shows the phase the site is in now. An operator sets two dates on the event's clock:
+
+- **Announced.** Before this date the site is in draft: the home page shows no countdown, and attendees can change their registration answers at any time. From this date the site follows its dates: registration opens and closes, and the event starts and ends. After registration closes, attendees cannot change their answers.
+- **Archived.** From this date the event reads as archived. Every day is shown as a back issue, live controls go away, and scheduled reminders stop. Set the announce date first. The archive date cannot be before it.
+
+Leave a date empty, or use the clear control beside it, to remove it. Staff see both dates as text.
+
+A new site has no announce date, so it starts in draft. Set **Announced** when the event goes public.
 
 ## Launch early with tickets and pitches only
 
@@ -525,7 +536,9 @@ A cell with more than one entry joins them with a semicolon. The file carries no
 
 **Past attendance.** Select **Edit record** on a row to open that account's record. In **Past attendance**, add each past event this person attended, such as a year: at most 20, of up to 40 characters each, with no repeats. Select **Save** to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.
 
-**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, its shared schedule, and its access as an organization representative, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, the profile photo, the change requests the person sent, any organization edit the person sent that is still waiting for review, and the person's registration answers. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history. An operator who deletes the sign-in in the Firebase console instead gets the same result: the site releases the ticket claims and removes the same data on its own.
+**Welcome email.** Each new account gets one welcome email when it is made: at the first sign-in, or when staff make an account from a ticket. It has a sign-in link and the wording of the `account.welcome` template. An Owner or an Editor gets none, and neither does an account with no email address. A historical demo sends none. The site sends it once for each account.
+
+**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, its shared schedule, and its access as an organization representative, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, the profile photo, the change requests the person sent, any organization edit the person sent that is still waiting for review, the person's registration answers, and the session pitches the person sent. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history. An operator who deletes the sign-in in the Firebase console instead gets the same result: the site releases the ticket claims and removes the same data on its own.
 
 The server refuses a delete in four cases, and says why:
 
@@ -546,6 +559,14 @@ The workspace follows the deployment's configured provider ([`CLIENT_ONBOARDING.
 - **None**: Nothing to configure.
 
 Ticket records are server-only in Firestore. Every list, search, import, and commerce action goes through an authenticated endpoint; even an admin browser cannot read the commerce collections directly.
+
+### Sync all tickets and create an account
+
+**Sync all tickets.** Shown for Eventbrite and Stripe. Use it when ticket updates were missed. Event Runner reads every ticket from the provider and updates the ticket list. Claimed tickets stay claimed. Refunded and cancelled tickets stay refunded or cancelled. A sync starts from the beginning and can take several minutes. Keep the page open until it finishes.
+
+A run can stop before it reaches every ticket: at its time limit, at its page limit, or when the provider cannot be read. The result says why and gives the totals so far. Select **Continue sync** to go on from where it stopped. Continue until the result says **Sync finished**. If the result says to start again, select **Sync all tickets**. A repeated sync does not make duplicate tickets.
+
+**Create account.** Shown on a ticket that is valid, not claimed, and has an email address. Event Runner creates a sign-in account for the ticket's email address, or uses the account that already has it, and claims the ticket for that account. The person then signs in with a code sent to that address. A new account also gets the welcome email.
 
 ### Stripe sales and catalog
 
@@ -858,7 +879,7 @@ Every submission from the public feedback modal, newest first, with a mark-revie
 
 ## Email log
 
-Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, pitch receipts and decision emails, operator alerts, ticket prompts, and announcement email with its test sends. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
+Every message the site sent, newest first: Sign-in codes, welcome emails to new accounts, speaker invitations, acceptances and confirmations, feedback receipts, pitch receipts and decision emails, operator alerts, ticket prompts, and announcement email with its test sends. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
 
 - **Search** looks for your text in the recipient address and in the subject. Case does not matter. One search reads the 500 most recent messages. If nothing in those 500 matches, the page says so and offers **Search older messages**, which reads the next 500.
 - **Source** picks one kind of message. **Status** picks **Sent** or **Failed**, which is what the mail provider answered when the site sent the message. A later delivery report shows as a word in the Status column: Delivered, Bounced, Complained, or Suppressed. **Bounced** means the recipient's mail server refused the message. **Complained** means the recipient marked it as spam. **Suppressed** means the mail provider did not send it, because the address is on the provider's block list.

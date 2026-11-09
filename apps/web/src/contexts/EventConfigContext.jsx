@@ -325,8 +325,4 @@ export function useEventConfig() {
   return ctx;
 }
 
-export function useFeatures() {
-  return useEventConfig().features;
-}
-
 export default EventConfigContext;

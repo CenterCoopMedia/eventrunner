@@ -14,6 +14,13 @@ let collections = {};
 const listeners = {};
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext) => { listeners[name] = onNext; onNext(collections[name] || []); return () => {}; },
+  // A one-document read, served from the same collection fixture.
+  subscribeAdminDoc: (path, onNext) => {
+    const [name, id] = path.split('/');
+    listeners[name] = (docs) => onNext(docs.find((doc) => doc.id === id) ?? null);
+    listeners[name](collections[name] || []);
+    return () => {};
+  },
 }));
 // A live snapshot after mount, as Firestore delivers one.
 function push(name, docs) { act(() => listeners[name](docs)); }
@@ -405,5 +412,16 @@ describe('AdminSessionPitch decisions, notes and edits', () => {
     collections.session_pitches = [];
     renderAt('/admin/pitches/no-such-pitch');
     expect(screen.getByText('No such pitch')).toBeInTheDocument();
+  });
+
+  it('says so for an address no document id can match, without a read', () => {
+    collections.session_pitches = [{ ...PITCH, id: 'a/b' }];
+    for (const path of ['/admin/pitches/a%2Fb', '/admin/pitches/..', '/admin/pitches/__all__']) {
+      delete listeners.session_pitches;
+      const { unmount } = renderAt(path);
+      expect(screen.getByText('No such pitch')).toBeInTheDocument();
+      expect(listeners.session_pitches).toBeUndefined();
+      unmount();
+    }
   });
 });

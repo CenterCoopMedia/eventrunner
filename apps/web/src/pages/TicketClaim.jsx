@@ -105,7 +105,6 @@ function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null); // the server's success payload
   const [error, setError] = useState(null); // { message } — one shape, every cause
-  const inputRef = useRef(null);
   const errorRef = useRef(null);
   const active = useRef(true);
   const inFlight = useRef(false);
@@ -190,7 +189,6 @@ function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
             Order number
           </label>
           <input
-            ref={inputRef}
             id="order-number"
             name="orderNumber"
             type="text"

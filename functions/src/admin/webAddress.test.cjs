@@ -5,7 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const {
-  normalizeDomain, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
+  normalizeDomain, addWebAddress, createWebAddressHandler, runWebAddressCheck, createHostingClient, createIdentityClient,
 } = require('./webAddress.cjs');
 
 const NOW = new Date('2026-11-04T15:00:00Z');
@@ -30,7 +30,7 @@ function fakeHosting(state = {}) {
 }
 function fakeIdentity(domains = ['localhost', 'example-event.web.app', 'summit.example.org']) {
   const calls = [];
-  return { calls, domains, async hasAuthorizedDomain(domain) { return this.domains.includes(domain); }, async removeAuthorizedDomain(domain) { this.domains = this.domains.filter((entry) => entry !== domain); }, async addAuthorizedDomain(domain) { calls.push(domain); if (!this.domains.includes(domain)) this.domains.push(domain); } };
+  return { calls, domains, async hasAuthorizedDomain(domain) { return this.domains.includes(domain); }, async removeAuthorizedDomain(domain) { calls.push(['remove', domain]); this.domains = this.domains.filter((entry) => entry !== domain); }, async addAuthorizedDomain(domain) { calls.push(['add', domain]); if (!this.domains.includes(domain)) this.domains.push(domain); } };
 }
 function setup({ hosting = fakeHosting(), identity = fakeIdentity(), env = { EVENT_PUBLIC_URL: 'https://example-event.eventrunner.org' }, seed = {} } = {}) {
   const db = makeFakeDb({
@@ -93,6 +93,55 @@ test('a check observes an already authorized live domain without granting sign-i
   assert.equal(live.body.state, 'switch');
   assert.deepEqual(identity.calls, []);
   assert.ok(db.read('web_address', 'current').liveAt);
+});
+
+test('a check never authorizes a domain Hosting does not report live', async () => {
+  const identity = fakeIdentity(['localhost']);
+  const { call, db } = setup({ identity, seed: CONNECTED });
+  assert.equal((await call({ action: 'check' })).body.state, 'records');
+  assert.deepEqual(await runWebAddressCheck({ db, hosting: fakeHosting(), identity, env: {}, now: () => NOW }), { checked: true });
+  assert.deepEqual(identity.calls, []);
+  assert.deepEqual(identity.domains, ['localhost']);
+});
+
+test('the first check that finds the domain live authorizes it once, then reads it as ready', async () => {
+  const identity = fakeIdentity(['localhost']);
+  const { call, hosting, db, env } = setup({ identity, seed: CONNECTED });
+  hosting.state.live = true;
+  const live = await call({ action: 'check' });
+  assert.equal(live.body.state, 'switch');
+  assert.deepEqual(identity.calls, [['add', 'summit.example.org']]);
+  assert.deepEqual(identity.domains, ['localhost', 'summit.example.org']);
+  await runWebAddressCheck({ db, hosting, identity, env, now: () => NOW });
+  assert.equal((await call({ action: 'check' })).body.state, 'switch');
+  assert.deepEqual(identity.calls, [['add', 'summit.example.org']]);
+});
+
+test('a failed authorization keeps the stored record and state for the next check', async () => {
+  const identity = fakeIdentity(['localhost']);
+  identity.addAuthorizedDomain = async () => { throw new Error('PERMISSION_DENIED identitytoolkit'); };
+  const { call, hosting, db, env } = setup({ identity, seed: CONNECTED });
+  hosting.state.live = true;
+  const res = await call({ action: 'check' });
+  assert.equal(res.statusCode, 503);
+  assert.doesNotMatch(res.body.error.message, /PERMISSION|identitytoolkit/i);
+  await assert.rejects(runWebAddressCheck({ db, hosting, identity, env, now: () => NOW }));
+  assert.deepEqual(db.read('web_address', 'current'), CONNECTED['web_address/current']);
+});
+
+test('a removal that starts while a check authorizes the domain still leaves it unauthorized', async () => {
+  const identity = fakeIdentity(['localhost']);
+  const { db, hosting, env } = setup({ identity, seed: CONNECTED });
+  hosting.state.live = true;
+  const add = identity.addAuthorizedDomain.bind(identity);
+  identity.addAuthorizedDomain = async (domain) => {
+    await add(domain);
+    // The removal marks the record and revokes before this check writes.
+    await db.collection('web_address').doc('current').update({ state: 'removing' });
+  };
+  await runWebAddressCheck({ db, hosting, identity, env, now: () => NOW });
+  assert.deepEqual(identity.domains, ['localhost']);
+  assert.equal(db.read('web_address', 'current').state, 'removing');
 });
 
 test('the address is done once the site runs on it', async () => {
@@ -192,6 +241,83 @@ test('adding a domain Hosting already has reuses it, and a removed one is restor
   ]);
 });
 
+test('the identity client adds the domain to the authorized domains once', async () => {
+  const requests = [];
+  const fetchImpl = async (url, init = {}) => {
+    requests.push([init.method || 'GET', url, init.body ? JSON.parse(init.body) : null]);
+    return { ok: true, status: 200, async json() { return { authorizedDomains: ['localhost', 'example-event.web.app'] }; } };
+  };
+  const client = createIdentityClient({ projectId: 'example-event', fetchImpl, getAccessToken: async () => 'token' });
+  await client.addAuthorizedDomain('summit.example.org');
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests[1], [
+    'PATCH', 'https://identitytoolkit.googleapis.com/admin/v2/projects/example-event/config?updateMask=authorizedDomains',
+    { authorizedDomains: ['localhost', 'example-event.web.app', 'summit.example.org'] },
+  ]);
+});
+
+test('adding a web address asks Hosting, then stores the record the page and the check read', async () => {
+  const identity = fakeIdentity(['localhost']);
+  const { db, hosting, call, env } = setup({ identity });
+  const result = await addWebAddress({ db, hosting, identity, domain: ' Summit.Example.org ', now: () => NOW });
+  assert.equal(result.outcome, 'added');
+  assert.deepEqual(hosting.calls, [['add', 'summit.example.org']]);
+  assert.deepEqual(db.read('web_address', 'current'), {
+    domain: 'summit.example.org', state: 'records', records: RECORDS, createdAt: NOW, updatedAt: NOW, lastCheckedAt: null,
+  });
+  const status = await call({ action: 'status' });
+  assert.deepEqual(status.body, { domain: 'summit.example.org', state: 'records', records: RECORDS, currentAddress: 'https://example-event.eventrunner.org', lastCheckedAt: null });
+  hosting.state.live = true;
+  assert.deepEqual(await runWebAddressCheck({ db, hosting, identity, env, now: () => NOW }), { checked: true });
+  assert.equal(db.read('web_address', 'current').state, 'switch');
+});
+
+test('adding refuses a bad domain, another stored domain, and an unfinished removal, and repeats nothing', async () => {
+  const cases = [
+    [{}, 'https://summit.example.org', 'invalid'],
+    [{}, 'site.web.app', 'invalid'],
+    [CONNECTED, 'other.example.org', 'other-domain'],
+    [CONNECTED, 'summit.example.org', 'stored'],
+    [{ 'web_address/current': { ...CONNECTED['web_address/current'], state: 'removing' } }, 'summit.example.org', 'removing'],
+  ];
+  for (const [seed, domain, outcome] of cases) {
+    const { db, hosting, identity } = setup({ seed });
+    const before = db.read('web_address', 'current');
+    assert.equal((await addWebAddress({ db, hosting, identity, domain })).outcome, outcome, domain);
+    assert.deepEqual(hosting.calls, []);
+    assert.deepEqual(identity.calls, []);
+    assert.deepEqual(db.read('web_address', 'current'), before);
+  }
+});
+
+test('adding a web address never authorizes sign-in; the check does once Hosting serves it', async () => {
+  const identity = fakeIdentity(['localhost']);
+  const { db, hosting } = setup({ identity });
+  await addWebAddress({ db, hosting, identity, domain: 'summit.example.org', now: () => NOW });
+  assert.deepEqual(identity.calls, []);
+  assert.deepEqual(identity.domains, ['localhost']);
+});
+
+test('a dry run of an add calls no service and writes nothing', async () => {
+  const { db, hosting, identity } = setup();
+  assert.deepEqual(await addWebAddress({ db, hosting, identity, domain: 'summit.example.org', dryRun: true }), { outcome: 'planned', domain: 'summit.example.org' });
+  assert.deepEqual(hosting.calls, []);
+  assert.deepEqual(identity.calls, []);
+  assert.equal(db.read('web_address', 'current'), undefined);
+});
+
+test('an add that fails part way stores no record, and the same command then finishes it', async () => {
+  const { db, hosting, identity } = setup();
+  const add = hosting.addDomain;
+  hosting.addDomain = async () => { throw new Error('Google API answered 403'); };
+  await assert.rejects(addWebAddress({ db, hosting, identity, domain: 'summit.example.org' }));
+  assert.equal(db.read('web_address', 'current'), undefined);
+
+  hosting.addDomain = add;
+  assert.equal((await addWebAddress({ db, hosting, identity, domain: 'summit.example.org' })).outcome, 'added');
+  assert.equal(db.read('web_address', 'current').state, 'records');
+});
+
 test('the scheduled check changes nothing on a read-only historical demo', async () => {
   const { db, hosting, identity, env } = setup();
   await db.collection('web_address').doc('current').set(CONNECTED['web_address/current']);
@@ -214,21 +340,6 @@ test('a check still running when the address is removed does not bring it back',
   release();
   await check;
   assert.equal(db.read('web_address', 'current'), undefined);
-});
-
-test('the identity client adds the domain to the authorized domains once', async () => {
-  const requests = [];
-  const fetchImpl = async (url, init = {}) => {
-    requests.push([init.method || 'GET', url, init.body ? JSON.parse(init.body) : null]);
-    return { ok: true, status: 200, async json() { return { authorizedDomains: ['localhost', 'example-event.web.app'] }; } };
-  };
-  const client = createIdentityClient({ projectId: 'example-event', fetchImpl, getAccessToken: async () => 'token' });
-  await client.addAuthorizedDomain('summit.example.org');
-  assert.equal(requests.length, 2);
-  assert.deepEqual(requests[1], [
-    'PATCH', 'https://identitytoolkit.googleapis.com/admin/v2/projects/example-event/config?updateMask=authorizedDomains',
-    { authorizedDomains: ['localhost', 'example-event.web.app', 'summit.example.org'] },
-  ]);
 });
 
 test('domain removal revokes sign-in before deleting Hosting and the stored record', async () => {

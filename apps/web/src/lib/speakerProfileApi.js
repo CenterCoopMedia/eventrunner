@@ -11,14 +11,12 @@
 // client. The server is the real gate either way: requireAdmin has no part
 // in these handlers, which check `speakers/{id}.uid === caller uid`
 // instead (functions/src/speakers/profile.cjs's gateSpeakerSelfOrAdmin).
-import { callAdminEndpoint, AdminApiError } from '../admin/adminApi.js';
+import { callAdminEndpoint } from '../admin/adminApi.js';
 import { checkFile, fileToBase64, formatBytes, typeLabel } from './mediaSource.js';
 
 /** Mirrors functions/src/media/upload.cjs SPEAKER_PHOTO_TYPES — keep in step. */
 export const SPEAKER_PHOTO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
 export const SPEAKER_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
-
-export { AdminApiError };
 
 function idTokenGetter(user) {
   return () => {
@@ -36,9 +34,7 @@ function idTokenGetter(user) {
  * @returns {Promise<object>} the self-service view (see buildOwnSpeakerView)
  */
 export function getOwnSpeakerProfile({ user, speakerId }) {
-  return callAdminEndpoint('getOwnSpeakerProfile', { speakerId }, idTokenGetter(user)).then(
-    (payload) => payload.speaker,
-  );
+  return loadOwnSpeakerProfile({ user, speakerId }).then((result) => result.speaker);
 }
 
 /**

@@ -319,6 +319,14 @@ jobs:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
         run: node scripts/migrate-pitch-declined.cjs
 
+      # Runs after the functions deploy, so the fixed CSV import is live
+      # before stored dates change. Runs once (marker).
+      - name: Rewrite numeric ticket dates as timestamps
+        if: inputs.bootstrap != true
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+        run: node scripts/migrate-ticket-dates.cjs
+
   publisher:
     name: Provision the site-publisher Cloud Run job
     needs: [guard, shared, validate-env]

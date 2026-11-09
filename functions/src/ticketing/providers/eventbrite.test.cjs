@@ -511,6 +511,41 @@ test('listTickets: walks continuation-token pages, flattens every order into Tic
   assert.equal(calls.length, 2);
 });
 
+test('listTickets: a continuation Eventbrite refuses is a page-token refusal, not a generic failure', async () => {
+  const fetchImpl = fakeFetch({
+    'GET /events/evt-1/orders/?expand=attendees&continuation=stale': { status: 400, body: { error: 'INVALID_CONTINUATION', error_description: 'The continuation is not valid.' } },
+    'GET /events/evt-1/orders/?expand=attendees': { status: 400, body: { error: 'ARGUMENTS_ERROR' } },
+  });
+  const p = provider({ fetchImpl });
+  await assert.rejects(() => p.listTickets({ pageToken: 'stale' }), (err) => err.code === 'invalid-page-token');
+  // Without a page token a 400 stays an ordinary provider failure.
+  await assert.rejects(() => p.listTickets(), (err) => err.code !== 'invalid-page-token');
+});
+
+test('listTickets: a continuation Eventbrite answers with 404 is a page-token refusal, not a finished sync', async () => {
+  const fetchImpl = fakeFetch({
+    'GET /events/evt-1/orders/?expand=attendees&continuation=gone': { status: 404, body: { error: 'NOT_FOUND' } },
+  });
+  const p = provider({ fetchImpl });
+  await assert.rejects(() => p.listTickets({ pageToken: 'gone' }), (err) => err.code === 'invalid-page-token');
+});
+
+test('listTickets: an empty last page for a continuation is a page-token refusal, not a finished sync', async () => {
+  const fetchImpl = fakeFetch({
+    'GET /events/evt-1/orders/?expand=attendees&continuation=stale': { orders: [], pagination: { has_more_items: false } },
+    'GET /events/evt-1/orders/?expand=attendees&continuation=no-orders': { pagination: { has_more_items: false } },
+    'GET /events/evt-1/orders/?expand=attendees&continuation=between': { orders: [], pagination: { has_more_items: true, continuation: 'next' } },
+    'GET /events/evt-1/orders/?expand=attendees': { orders: [], pagination: { has_more_items: false } },
+  });
+  const p = provider({ fetchImpl });
+  await assert.rejects(() => p.listTickets({ pageToken: 'stale' }), (err) => err.code === 'invalid-page-token');
+  await assert.rejects(() => p.listTickets({ pageToken: 'no-orders' }), (err) => err.code === 'invalid-page-token');
+  // An empty page that points on is still a page.
+  assert.deepEqual(await p.listTickets({ pageToken: 'between' }), { tickets: [], nextPageToken: 'next' });
+  // Without a page token an empty list is an event with no orders.
+  assert.deepEqual(await p.listTickets(), { tickets: [], nextPageToken: null });
+});
+
 test('listTickets: since maps to changed_since query param', async () => {
   const calls = [];
   const fetchImpl = fakeFetch({

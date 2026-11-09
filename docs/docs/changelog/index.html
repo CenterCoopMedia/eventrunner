@@ -129,6 +129,18 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Admin Ticketing has a <strong>Sync all tickets</strong> action (Eventbrite and Stripe), with <strong>Continue sync</strong>
+          for a run that stops early, and a <strong>Create account</strong> action on an unclaimed ticket. <code>ticketingSync</code>
+          has a 540-second limit, stops before it, reports what it saved, and resumes from a returned
+          <code>nextCursor</code>.</li>
+          <li>A new account gets one welcome email with a sign-in link. An Owner or an Editor gets none. The
+          Email log lists it under the source <strong>Welcome email</strong>.</li>
+          <li>Operators can set the announce and archive dates in admin Event settings, and the page shows
+          the event&#39;s current phase. Before this, nothing could set them, and every site stayed in draft:
+          no home countdown, and registration answers never locked. The save refuses a
+          malformed date, and an archive date with no announce date or before it.</li>
+          </ul>
+          <ul>
           <li>A client homepage, plus support, privacy and terms pages, for the project site. The former
           landing page is now the project status page at <code>/project/</code>. The address for the custom domain
           is <code>https://eventrunner.org/</code>, and repository variables set the support name and address.</li>

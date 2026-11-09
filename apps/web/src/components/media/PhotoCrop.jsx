@@ -37,7 +37,6 @@ export default function PhotoCrop({ file, label, onApply, onCancel }) {
   const [zoom, setZoom] = useState(ZOOM_MIN);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [failed, setFailed] = useState(false);
-  const frameRef = useRef(null);
   const dragRef = useRef(null);
 
   useEffect(() => {
@@ -157,7 +156,6 @@ export default function PhotoCrop({ file, label, onApply, onCancel }) {
         {/* The frame. One tab stop; the instructions are its accessible
             description, and every arrow is a real, stated move. */}
         <div
-          ref={frameRef}
           role="application"
           aria-label={`Position the crop for ${label}`}
           aria-describedby={`crop-instructions-${file.name.length}`}

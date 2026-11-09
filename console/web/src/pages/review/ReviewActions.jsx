@@ -8,7 +8,7 @@ const SPAM_STATUSES = CONSOLE_REQUEST_GROUPS.spamDeletable;
 const ACCEPTED = CONSOLE_REQUEST_GROUPS.building;
 
 /** The decisions open to the hosting team for a request with this status. */
-export function decisionsFor(status, canClose = false) {
+function decisionsFor(status, canClose = false) {
   return { decline: status === 'draft', close: canClose, launch: status === 'ready', deleteSpam: SPAM_STATUSES.includes(status) };
 }
 

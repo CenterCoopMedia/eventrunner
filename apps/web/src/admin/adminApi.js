@@ -4,7 +4,7 @@
 // Every admin endpoint is `POST <functionsOrigin>/<name>` with an
 // `Authorization: Bearer <Firebase ID token>` header; the server's
 // requireAdmin (core/auth.cjs) is the enforcement boundary — the client-side
-// gate in AdminGate.jsx is convenience only.
+// gate (AdminGate in AdminApp.jsx) is convenience only.
 //
 // Failures normalize to AdminApiError carrying the server's `error.message`
 // verbatim. `fieldErrors` splits that message into the per-field segments the
@@ -42,14 +42,6 @@ export class AdminApiError extends Error {
 }
 
 /**
- * Split a server validation message into `{ field, message }` segments.
- * Segments that do not start with `field:` are returned with field null, so
- * nothing is ever silently dropped.
- *
- * @param {string} message
- * @returns {Array<{ field: string|null, message: string }>}
- */
-/**
  * A readable name for a server field key: its last part, in words.
  * `registration.externalUrl` -> "External url", `milestones[0].date` -> "Date".
  *
@@ -61,6 +53,14 @@ export function fieldLabel(key) {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'This field';
 }
 
+/**
+ * Split a server validation message into `{ field, message }` segments.
+ * Segments that do not start with `field:` are returned with field null, so
+ * nothing is ever silently dropped.
+ *
+ * @param {string} message
+ * @returns {Array<{ field: string|null, message: string }>}
+ */
 export function fieldErrorsOf(message) {
   if (typeof message !== 'string' || message.length === 0) return [];
   return message

@@ -71,10 +71,18 @@ const {
   validateBadgesConfig,
 } = require('shared/config');
 const { findThemeContrastFailures, resolveLegacyColors } = require('shared/theme');
+const { lifecycleStampErrors } = require('./lifecycleStamps.cjs');
+
+/** The shared event checks, plus the lifecycle stamps this endpoint saves. */
+function validateEventWithStamps(event) {
+  const verdict = validateEventConfig(event);
+  const errors = [...verdict.errors, ...lifecycleStampErrors(event)];
+  return { ...verdict, ok: errors.length === 0, errors };
+}
 
 /** Panel-writable doc ids and their shared-schema validators. */
 const WRITABLE_CONFIG_DOCS = Object.freeze({
-  event: validateEventConfig,
+  event: validateEventWithStamps,
   features: validateFeatures,
   theme: validateTheme,
   badges: validateBadgesConfig,
@@ -131,10 +139,18 @@ const SENDER_VERIFICATION_FIELDS = Object.freeze([
 ]);
 
 /**
- * Top-level config/event keys only an operator may CHANGE (issue #186).
- * Everything else on EVENT_EDITABLE_KEYS is staff content.
+ * The lifecycle stamps (ADR 0001 §2.2, audit 07 #1). announcedAt takes the
+ * site out of draft and archivedAt ends it, so a CHANGE to either is the
+ * operator's, the same as the sender block.
  */
-const EVENT_OPERATOR_KEYS = Object.freeze(['sender']);
+const LIFECYCLE_STAMP_KEYS = Object.freeze(['announcedAt', 'archivedAt']);
+
+/** A stamp the way the save compares it: trimmed; '' and absent both null. */
+function normalizeStamp(value) {
+  if (typeof value !== 'string') return value == null ? null : value;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
 
 /** Sender fields compared for the existing operator-only restriction. */
 const SENDER_EDITABLE_FIELDS = Object.freeze(['email', 'name', 'replyTo']);
@@ -231,6 +247,11 @@ function findOperatorKeyChanges(docId, payload, stored, tier) {
   if ('seo' in payload && ogImageChanged(payload.seo, stored?.seo)) {
     violations.push(`seo.${OG_IMAGE_KEY}: operator access required`);
   }
+  for (const key of LIFECYCLE_STAMP_KEYS) {
+    if (key in payload && normalizeStamp(payload[key]) !== normalizeStamp(stored?.[key])) {
+      violations.push(`${key}: operator access required`);
+    }
+  }
   return violations;
 }
 
@@ -249,6 +270,7 @@ function withoutUnchangedOperatorKeys(payload, tier) {
   if (tier === 'operator') return payload;
   const out = { ...payload };
   delete out.sender;
+  for (const key of LIFECYCLE_STAMP_KEYS) delete out[key];
   if (isPlainObject(out.seo) && OG_IMAGE_KEY in out.seo) {
     const seo = { ...out.seo };
     delete seo[OG_IMAGE_KEY];
@@ -709,7 +731,6 @@ module.exports = {
     senderChanged,
     WRITABLE_CONFIG_DOCS,
     CONFIG_DOC_TIERS,
-    EVENT_OPERATOR_KEYS,
     SENDER_EDITABLE_FIELDS,
     TIER_A_FIELDS,
     EVENT_EDITABLE_KEYS,

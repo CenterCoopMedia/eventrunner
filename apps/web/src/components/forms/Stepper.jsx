@@ -26,7 +26,7 @@ import { Link } from 'react-router';
 import { controlStateClass } from '../controlClasses.js';
 import './stepper.css';
 
-export const STEP_STATE_WORDS = Object.freeze({
+const STEP_STATE_WORDS = Object.freeze({
   done: 'Done',
   todo: 'To do',
   locked: 'Not started',

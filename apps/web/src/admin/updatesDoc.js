@@ -178,21 +178,6 @@ export function toUpdatePayload(form, row, timeZone) {
 }
 
 /**
- * What the record carries that this editor keeps but does not edit: its
- * picture and its content blocks.
- *
- * @param {{ current?: object }|null} row
- * @returns {{ picture: boolean, blocks: number }}
- */
-export function extrasOf(row) {
-  const current = row?.current ?? {};
-  return {
-    picture: current.featuredImage != null,
-    blocks: Array.isArray(current.content) ? current.content.length : 0,
-  };
-}
-
-/**
  * Merge live and draft cmsUpdates docs into one row per update, in the
  * public feed's order (pinned first, then newest first, undated last),
  * with the id as the tie-break so the order is stable.

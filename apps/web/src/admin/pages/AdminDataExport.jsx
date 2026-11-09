@@ -3,8 +3,8 @@
 //
 // SPREADSHEETS. Each row asks exportEventData (functions/src/admin/
 // dataExport.cjs) for one CSV file and saves it with the attendee export's
-// download code. Sessions, speakers, organizations, and invoices are staff
-// tier.
+// download code. Sessions, speakers, speaker logistics, organizations, and
+// invoices are staff tier.
 // Ticket orders and admissions name purchasers and amounts, so the server
 // gives them to an operator only, and this page does not draw those rows
 // for staff. It says in one sentence who can reach them instead. Attendees

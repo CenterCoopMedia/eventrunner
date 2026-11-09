@@ -27,7 +27,7 @@ function pageResource(page) {
   return { key: `page:${page.id}`, label: page.label.trim(), to: page.path };
 }
 
-export function buildSpeakerResources({ eventConfig, features, getPublicPage, venueMap }) {
+function buildSpeakerResources({ eventConfig, features, getPublicPage, venueMap }) {
   if (typeof getPublicPage !== 'function') return [];
 
   const pages = PAGE_IDS.map((id) => pageResource(getPublicPage(id, features))).filter(Boolean);

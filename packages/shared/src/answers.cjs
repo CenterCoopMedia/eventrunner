@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Client answers → the five Tier B config documents (spec §2.2, §5.1 step b/c).
+ * Client answers → the six config documents init writes (spec §2.2, §5.1 step b/c).
  *
  * Lives in the shared package so the CLI, the browser and a callable run one
  * validator (ADR 0007): an intake form refuses what init would refuse.
@@ -263,8 +263,8 @@ function parseAnswersFile(text) {
  * The new-site features doc includes the public directories, ticket approval,
  * badges, live updates, and change requests. Explicit answers override defaults.
  * Unknown keys are dropped
- * here rather than passed through, so a typo surfaces as a validation
- * error naming the key instead of a silently ignored toggle.
+ * here rather than passed through, and each one comes back as a warning
+ * naming the key, so a typo is never a silently ignored toggle.
  *
  * @param {object} [overrides]
  * @returns {{ features: object, warnings: string[] }}

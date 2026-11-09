@@ -213,7 +213,9 @@
           <li><strong>Settings → Authorized domains</strong> → add the client&#39;s custom domain (the one from <code>EVENT_PUBLIC_URL</code>)
           <strong>and</strong> the Hosting default domain (<code>&lt;EVENT_HOSTING_SITE&gt;.web.app</code>). Sign-in fails silently on
           any domain not on this list — this bites operators who verify the custom domain and forget the
-          default one is still needed for previews and the pre-cutover URL.</li>
+          default one is still needed for previews and the pre-cutover URL. For a custom domain added with
+          <code>scripts/add-web-address.cjs</code> (item 3), the status check adds it to the list itself once Hosting
+          serves it; the default domain is still yours to add.</li>
           </ol>
           <p>There is no Admin SDK read for &quot;is Google sign-in enabled&quot; — nothing in the platform can check
           this for you. Once both steps are done, record it:</p>
@@ -224,12 +226,20 @@
           policy is <em>true about</em> — refreshes the two legal templates&#39; sign-in clause through the normal seed
           path (client edits are still never overwritten). This is what clears the Auth row in <code>--check</code>.</p>
           <h3 id="3-firebase-hosting-custom-domain">3. Firebase Hosting custom domain<a class="heading-anchor" href="#3-firebase-hosting-custom-domain" aria-label="Link to this section">#</a></h3>
-          <p>Firebase Hosting → add the custom domain, complete DNS verification (a TXT record), and wait for
-          certificate issuance before announcing the site. Both steps can take anywhere from minutes to about
-          a day; re-check readiness (§6) rather than assuming it finished. If this client&#39;s domain is a
-          <code>*.eventrunner.org</code> subdomain rather than their own domain, see the wildcard-vs-per-client DNS note
-          in <code>docs/DEPLOY_RUNBOOK.md</code> (issue #66) — the attach mechanics are the same Hosting custom-domain
-          flow either way.</p>
+          <p>For the client&#39;s own domain, add it with the script, not the Firebase console:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_FIREBASE_PROJECT_ID=&lt;id&gt; node scripts/add-web-address.cjs summit.example.org
+          </code></pre>
+          <p>It asks Hosting for the domain, stores the record that
+          <strong>Settings → Web address</strong> reads, and prints the DNS records (including the TXT record for
+          verification) to give the client. See &quot;Custom web address status in the admin&quot; in
+          <code>docs/DEPLOY_RUNBOOK.md</code>. Then wait for certificate issuance before announcing the site. The
+          first status check after Hosting serves the domain adds it to the authorized domains. Both
+          steps can take anywhere from minutes to about a day; re-check readiness (§6) rather than assuming
+          it finished.</p>
+          <p>The script refuses <code>*.eventrunner.org</code>. If this client&#39;s domain is a <code>*.eventrunner.org</code>
+          subdomain rather than their own domain, add it in Firebase Hosting and see the
+          wildcard-vs-per-client DNS note in <code>docs/DEPLOY_RUNBOOK.md</code> (issue #66) — the attach mechanics are
+          the same Hosting custom-domain flow either way.</p>
           <h3 id="4-sender-domain-spfdkimdmarc">4. Sender domain (SPF/DKIM/DMARC)<a class="heading-anchor" href="#4-sender-domain-spfdkimdmarc" aria-label="Link to this section">#</a></h3>
           <p>Emailed one-time codes are this platform&#39;s only sign-in path that depends on mail, and an
           unauthenticated sender domain is exactly the condition that gets those codes quarantined by the

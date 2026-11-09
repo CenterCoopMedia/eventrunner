@@ -425,10 +425,6 @@ async function startWindow({ db, config, channel, schedule, facts, window, versi
   return { started: true };
 }
 
-/**
- * Send what is due now, inside the lease. Never called while the schedule
- * is off or paused.
- */
 /** True for a refusal of the announcement channel, not of one message. */
 function isChannelRefusal(code) {
   return code === 'channel-changed' || Object.hasOwn(composeInternals.CHANNEL_MESSAGES, code);
@@ -451,6 +447,10 @@ async function tellChannelFault({ notifyOperator, code, message, stopped }) {
   });
 }
 
+/**
+ * Send what is due now, inside the lease. Never called while the schedule
+ * is off or paused.
+ */
 async function sendDue({ db, getConfig, provider, emailCore, notifyOperator, now, log, schedule, deadlineMs = null }) {
   const config = await getConfig();
   const timeZone = eventTimeZone(config);

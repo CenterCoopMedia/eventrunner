@@ -30,11 +30,11 @@
  * Seam #3 — **the `users.speakerId` ↔ `speakers.uid` pair is written only
  * by the invite/acceptance transaction and by `deleteSpeaker`.** Both
  * halves are set or cleared in the SAME commit, never independently.
- * `linkSpeakerToUser` / `unlinkSpeakerFromUser` below are that primitive;
- * the invite pipeline (issue #21) calls them rather than writing either
- * document itself, and the admin CRUD in ./profile.cjs rejects `uid` in a
- * payload by name. firestore.rules already makes both documents
- * server-write-only, so there is no client path that can set one half.
+ * `applySpeakerLinkInTx` below is that primitive; the invite pipeline
+ * (issue #21) calls it rather than writing either document itself, and
+ * the admin CRUD in ./profile.cjs rejects `uid` in a payload by name.
+ * firestore.rules already makes both documents server-write-only, so there
+ * is no client path that can set one half.
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
@@ -49,10 +49,10 @@ const SESSION_DRAFTS = 'cmsSchedule_drafts';
 const USERS = 'users';
 
 /**
- * Firestore's per-transaction write ceiling. The unlink spends up to five
- * writes on the speaker itself (user link, projection, record, slug
- * reservation, outstanding invitation), so the session budget is what is
- * left.
+ * Firestore's per-transaction write ceiling. The unlink spends up to six
+ * writes on the speaker itself (user link, projection, record, logistics,
+ * slug reservation, outstanding invitation), so the session budget is what
+ * is left.
  */
 const MAX_TRANSACTION_WRITES = 500;
 const FIXED_WRITES = 6;
@@ -239,39 +239,14 @@ async function applyDeleteSpeaker({ db, speakerId, soft = false, actor, now = Da
 }
 
 /**
- * Set both halves of the `users.speakerId` ↔ `speakers.uid` pair in one
- * commit (seam #3). The invite/acceptance transaction (issue #21) is the
- * intended caller; nothing else may write either field.
- *
- * @param {{ db: object, speakerId: string, uid: string, now?: () => number }} args
- * @returns {Promise<{ ok: true } | { ok: false, status: number, code: string, message: string }>}
- */
-async function linkSpeakerToUser({ db, speakerId, uid, now = Date.now }) {
-  return writeSpeakerLink({ db, speakerId, uid, now });
-}
-
-/**
- * Clear both halves of the pair in one commit. Used when an invite is
- * revoked or an account is unlinked; `deleteSpeaker` does the same work
- * inline because it must happen in the transaction that removes the
- * speaker.
- *
- * @param {{ db: object, speakerId: string, now?: () => number }} args
- */
-async function unlinkSpeakerFromUser({ db, speakerId, now = Date.now }) {
-  return writeSpeakerLink({ db, speakerId, uid: null, now });
-}
-
-/**
  * Write both halves of the `users.speakerId` ↔ `speakers.uid` pair inside
  * the CALLER'S transaction (seam #3), returning the patch the caller must
  * merge onto the speaker document.
  *
- * This is the primitive; `linkSpeakerToUser` below is the standalone
- * one-transaction wrapper around it. The acceptance path (issue #21) needs
- * the in-transaction form specifically: validating the invite in one
- * transaction and writing the pair in another leaves a window where an
- * admin cancel, resend, or removal lands in between — and the pair write
+ * The acceptance path (issue #21) needs the in-transaction form:
+ * validating the invite in one transaction and writing the pair in
+ * another leaves a window where an admin cancel, resend, or removal lands
+ * in between — and the pair write
  * would then commit against a speaker who is no longer invited, leaving an
  * account permanently holding speaker identity (and the attendee access
  * §3.4 grants for `speakerId != null`) for a record the organizer just
@@ -327,9 +302,9 @@ async function applySpeakerLinkInTx({ tx, db, speakerId, speaker, uid, at }) {
     // record (its `uid` would still name this account) or, if we
     // cleared that too, silently revoke a third party's speaker access
     // as a side effect of somebody accepting an invitation. Either is a
-    // data problem an operator has to resolve deliberately, and
-    // unlinkSpeakerFromUser is how they do it — so refusing loses no
-    // capability and keeps the evidence.
+    // data problem an operator has to resolve deliberately: removing or
+    // deleting the other speaker clears its link. Refusing keeps the
+    // evidence.
     const occupant = targetSnap.data()?.speakerId;
     if (typeof occupant === 'string' && occupant && occupant !== speakerId) {
       const err = new Error('LINK_OCCUPIED');
@@ -338,7 +313,7 @@ async function applySpeakerLinkInTx({ tx, db, speakerId, speaker, uid, at }) {
         code: 'link-occupied',
         message:
           `Account "${targetUid}" is already linked to speaker "${occupant}". ` +
-          'Nothing was changed; unlink that speaker first.',
+          'Nothing was changed; remove that speaker first.',
       };
       throw err;
     }
@@ -353,36 +328,6 @@ async function applySpeakerLinkInTx({ tx, db, speakerId, speaker, uid, at }) {
     tx.set(ref, { speakerId: id === targetUid ? speakerId : null, updatedAt: at }, { merge: true });
   });
   return { uid: targetUid };
-}
-
-async function writeSpeakerLink({ db, speakerId, uid, now }) {
-  if (!isValidDocId(speakerId)) {
-    return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
-  }
-  if (uid !== null && !isValidDocId(uid)) {
-    return { ok: false, status: 400, code: 'bad-request', message: 'uid: required' };
-  }
-  const at = new Date(now());
-  const speakerRef = db.collection(SPEAKERS).doc(speakerId);
-
-  try {
-    await db.runTransaction(async (tx) => {
-      const speakerSnap = await tx.get(speakerRef);
-      if (!speakerSnap.exists) {
-        const err = new Error('NOT_FOUND');
-        err.conflict = { status: 404, code: 'not-found', message: `No speaker with id "${speakerId}".` };
-        throw err;
-      }
-      const patch = await applySpeakerLinkInTx({
-        tx, db, speakerId, speaker: speakerSnap.data(), uid, at,
-      });
-      tx.set(speakerRef, { ...patch, updatedAt: at }, { merge: true });
-    });
-  } catch (err) {
-    if (err?.conflict) return { ok: false, ...err.conflict };
-    throw err;
-  }
-  return { ok: true };
 }
 
 /**
@@ -465,8 +410,6 @@ function buildHandlers() {
 module.exports = {
   applyDeleteSpeaker,
   applySpeakerLinkInTx,
-  linkSpeakerToUser,
-  unlinkSpeakerFromUser,
   readLinkedUser,
   createDeleteSpeakerHandler,
   get handlers() {

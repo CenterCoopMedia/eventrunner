@@ -206,7 +206,5 @@ module.exports = {
   assertProviderContract,
   PROVIDER_NAMES,
   WEBHOOK_CAPABLE_PROVIDERS,
-  REQUIRED_METHODS,
-  OPTIONAL_METHODS,
   internals: { loadAdapterFactory },
 };

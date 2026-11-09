@@ -577,9 +577,10 @@ client already past step 3 never needs it again.
   self-fetch is failing: check `EVENT_PUBLIC_URL` and that hosting is actually serving
   `/index.html`.
 - `firebase.json`'s rewrite **order** is load-bearing. `/updates/**` goes to `updatesMeta` first;
-  then the account and staff routes (`/signin`, `/profile`, `/attendees`, `/attendees/**`,
-  `/schedule/mine`, `/speaker/**`, `/ticket/**`, `/admin`, `/admin/**`) are rewritten straight to
-  `/index.html`, because they carry nothing a crawler should index and spending a function
+  then the account and staff routes (`/signin`, `/profile`, `/profile/**`, `/attendees`,
+  `/attendees/**`, `/schedule/mine`, `/speaker/**`, `/ticket/**`, `/dashboard`, `/registration`,
+  `/registration/**`, `/tickets/mine`, `/tickets/status`, `/admin`, `/admin/**`) are rewritten
+  straight to `/index.html`, because they carry nothing a crawler should index and spending a function
   invocation to say so is waste; then the `**` catch-all goes to `routeMeta`. Adding a public route
   needs nothing here — the catch-all already covers it. Adding an authenticated one means adding it
   to that middle block, **above** the catch-all, and to the `headers` block below it. Hosting
@@ -629,6 +630,10 @@ client already past step 3 never needs it again.
   (dispatched from `main`), the attribute condition (§1) or the repository+ref binding (§2) is the
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
   run's log against what the binding names.
+
+### Recover tickets after missed provider webhooks
+
+Staff select **Sync all tickets** in admin **Ticketing**. One `ticketingSync` run lasts at most 540 seconds. It starts no new page after 7 minutes or 50 pages and answers 200 with `truncated: true`, `stoppedReason` (`time-limit`, `page-limit` or `provider-error`) and `nextCursor`. To go on, POST `{ "cursor": "<nextCursor>" }`; the admin page does this with **Continue sync**. The cursor is the provider's page token and is not stored. A cursor the provider refuses answers 400 `bad-cursor`: start again with `{}`. Each ticket write is idempotent, so a repeated page or a new run is safe.
 
 ### Archiving an event with ticket sales
 
@@ -760,13 +765,61 @@ of scope here and tracked there, not in this runbook. The Cloud Run site-publish
 (#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
 ordinary per-client environment with no domain coupling, so nothing in §9 waits on #66.
 
-### Custom web address from the admin
+### Custom web address status in the admin
 
-An operator can add a custom web address on **Settings → Web address** (ADR 0007 §8). The
-`webAddress` function asks Firebase Hosting for the domain, shows the client the records to add,
-and checks every hour (`webAddressCheck`). When the domain is live it adds the domain to the Auth
-authorized domains. The functions runtime account needs two roles on the client project for this,
-once:
+An operator sets up a custom web address. A client admin cannot add or remove one: the `webAddress`
+function refuses `add` and `remove` for every admin tier. **Settings → Web address** (ADR 0007 §8)
+shows the site's current address and, for a stored domain, its status (**Waiting for the
+records**, **Ready to switch**, or **In use**) and **Check now**. A check, and the hourly
+`webAddressCheck`, reads the domain's state in Firebase Hosting. The first time Hosting serves the
+stored domain with a certificate, the check adds that domain to the Auth authorized domains, and
+then the status says **Ready to switch**. A check never authorizes a domain Hosting does not serve,
+or any domain but the stored one. If adding it fails, the record stays as it was and the next check
+tries again.
+
+The page reads the domain from the record `web_address/current`. Without that record the page shows
+only the current address, and **Check now** answers "Contact us to set up your domain first."
+
+To add a domain, run `scripts/add-web-address.cjs` with the client project's operator credentials,
+the same as the removal script. Set `EVENT_HOSTING_SITE` too when the site is not the project id.
+
+```bash
+EVENT_FIREBASE_PROJECT_ID=<GCP_PROJECT_ID> node scripts/add-web-address.cjs summit.example.org --dry-run
+EVENT_FIREBASE_PROJECT_ID=<GCP_PROJECT_ID> node scripts/add-web-address.cjs summit.example.org
+```
+
+`--dry-run` checks the domain and the stored record, and changes nothing. Without it the script:
+
+1. Refuses a domain that is not a plain domain, and `*.web.app`, `*.firebaseapp.com` and
+   `*.eventrunner.org` addresses. It refuses when a different domain is stored (remove that one
+   first), and when a removal did not finish (run the removal again). When the same domain is
+   stored it changes nothing and says so.
+2. Asks Firebase Hosting for the domain. It reuses a domain Hosting already has, and restores one
+   removed in the last 30 days.
+3. Writes `web_address/current` with the status **Waiting for the records**, and prints the DNS
+   records. Lines marked `Remove` are records that conflict with Hosting.
+
+The record is written last. If the script stops part way, nothing is stored: run the same command
+again. Hosting does not add the domain twice. The script does not change the authorized domains:
+the check does that once Hosting serves the domain. The Hosting default domain stays a console
+step (`docs/CLIENT_ONBOARDING.md` §3).
+
+Then:
+
+1. Give the client the printed records. If Hosting had not listed them yet, **Check now** on
+   **Settings → Web address** shows them a few minutes later.
+2. The hourly `webAddressCheck` and **Check now** move the status. It stays **Waiting for the
+   records** until Hosting serves the domain with a certificate, which can take from minutes to
+   about a day after the records are in. The first check after that adds the domain to the
+   authorized domains, and the status shows **Ready to switch**.
+
+The script needs, on the client project: `roles/firebasehosting.admin` (the Hosting domain),
+`roles/datastore.user` (the record) and `roles/serviceusage.serviceUsageConsumer` (its Google calls
+name the project for quota). A project Owner has all three, and so does the deploy service account
+(§2).
+
+The functions runtime account needs two roles on the client project for the status check, once.
+`roles/firebaseauth.admin` lets the check read the authorized domains and add the stored domain:
 
 ```bash
 gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
@@ -785,7 +838,7 @@ is a deploy-time value:
 1. Set `EVENT_PUBLIC_URL` to `https://<domain>` in the client's GitHub Environment (§3), and add
    the same origin to `EVENT_ALLOWED_ORIGINS`.
 2. Deploy from `main`.
-3. Run `node scripts/init-event.cjs --check`. The page then shows **In use**.
+3. Run `node scripts/init-event.cjs --check`. The page shows **In use** after the next check.
 
 The console's provisioner (ADR 0007, P8) will run this deploy for the client.
 
@@ -1359,6 +1412,8 @@ A run that dies before the script starts, for example on a refused identity toke
 
 A new client's Environment is not added to `AUTO_DEPLOY_ENVIRONMENTS`, so a push to `main` does not deploy to it. When the client's event site opens to the public, select **Mark as launched** on its review page. That moves the request from `ready` to `launched` and emails each Owner "Your site is open to the public". Then add the Environment to `AUTO_DEPLOY_ENVIRONMENTS` by hand (section 4).
 
+A new site starts in draft: `config/event.announcedAt` is null. When the client's event goes public, an operator sets **Announced** in admin **Event settings → Announce and archive**. Until then the home page shows no countdown, and registration answers do not lock.
+
 ### 12.3 What the hand-built rehearsal taught
 
 The script does each of these, and sections 1 to 3 are wrong or silent on them. Anyone building a client by hand has to do them too.
@@ -1566,9 +1621,12 @@ It adds provenance only when exactly one redeemed operator-issued link matches t
 draft, organization and original creator. Other old drafts are quarantined. They
 cannot accept an agreement or start provisioning; contact the hosting team for a
 new paid signup link. Acceptance checks that provenance inside its transaction.
+The marker `data_migrations/console-signup-links-2026-11-06` makes later deploys
+skip the scan, and the log shows only counts.
 
-A web-address status check observes Hosting and sign-in authorization. It never
-adds a sign-in domain. The hosting team authorizes a new domain during setup.
+A web-address status check adds the stored domain to the sign-in authorized domains
+only once Hosting serves it, and never while the record is being removed. If a removal
+starts while a check is adding the domain, the check takes it back off.
 To retire a client's stored custom domain, keep ownership of its DNS registration,
 set `EVENT_FIREBASE_PROJECT_ID` (and `EVENT_HOSTING_SITE` if different), then run
 `node scripts/remove-web-address.cjs exact.example.org` with that project's operator
@@ -1608,6 +1666,12 @@ from `notices.rejected` to `notices.declined`. If a pitch already has a
 `notices.declined` record, the old record stays as it is. The code reads both
 spellings, so the step is safe to run before or after any review. The marker
 is `data_migrations/pitch-declined-2026-11-08`, and the log shows only counts.
+
+Then it runs `scripts/migrate-ticket-dates.cjs` once per project. Before a fix,
+the CSV ticket import stored `tickets` `createdAt` and `updatedAt` as numbers.
+The step writes each one as a timestamp for the same moment and changes nothing
+else. Add `--dry-run` to count without writing. The marker is
+`data_migrations/ticket-dates-2026-11-09`, and the log shows only counts.
 
 New client builds and retries dispatch both provisioning and deployment from `main`.
 A previous successful deployment is reusable only when GitHub proves that its commit

@@ -39,9 +39,9 @@ const { isCommerceOrderId } = require('shared/ticketCommerce');
 const {
   internals: { TICKETS },
 } = require('./index.cjs');
+const { ORDERS } = require('./stripeCommerce.cjs');
 
 const USERS = 'users';
-const ORDERS = 'ticket_orders';
 
 /** The ticket status that confers entitlement (§3.3 TicketRecord, §3.4). */
 const VALID = 'valid';
@@ -72,6 +72,32 @@ function affectedUids(before, after) {
     if (typeof uid === 'string' && uid.length > 0) uids.add(uid);
   }
   return [...uids];
+}
+
+/**
+ * Whether the account holds a valid ticket that may approve it without staff.
+ * A free or complimentary Stripe seat does not: anyone could claim one and read
+ * the attendee list. One order can mix paid and free seats, so this reads the
+ * price of the claimed seat, not the order total. Other providers record no
+ * price here, so their valid tickets count, and the admin setting warns about
+ * free tickets. A Stripe seat that cannot be read does not count.
+ *
+ * Reads only, inside the caller's transaction.
+ *
+ * @param {{ db: object, tx: object, uid: string }} deps
+ * @returns {Promise<boolean>}
+ */
+async function holdsPaidTicket({ db, tx, uid }) {
+  const valid = await tx.get(db.collection(TICKETS)
+    .where('claimedByUid', '==', uid).where('status', '==', VALID));
+  for (const ticket of valid.docs) {
+    const { orderId, externalId } = ticket.data() || {};
+    if (!isCommerceOrderId(orderId)) return true;
+    const order = (await tx.get(db.collection(ORDERS).doc(orderId))).data();
+    const seat = order?.seats?.find((entry) => entry?.externalId === externalId);
+    if (order?.lines?.[seat?.lineIndex]?.unitAmount > 0) return true;
+  }
+  return false;
 }
 
 /**
@@ -108,10 +134,10 @@ function affectedUids(before, after) {
  * account is HELD at its current state instead of being revoked.
  * `pending_info` is §3.3's explicit "we do not know yet" bucket (it is also
  * where every unrecognized provider status lands), `revoked` is terminal for
- * this function by the rule above, and the claim path marks an account
- * `ticketed` the moment a ticket is claimed — whatever its status — so
- * revoking on ignorance would strand a brand-new claimant of a
- * not-yet-described ticket in a state only an admin could leave. Revocation
+ * this function by the rule above, and a claimed ticket can become
+ * `pending_info` later, when a sync can no longer describe it. Revoking on
+ * ignorance would strand that holder in a state only an admin could leave
+ * (a claim itself needs a `valid` ticket, registration.cjs). Revocation
  * here waits for evidence (`refunded`/`cancelled`, or no claimed ticket at
  * all), never absence of it.
  *
@@ -120,32 +146,6 @@ function affectedUids(before, after) {
  * @returns {Promise<{ uid: string, action: 'updated'|'unchanged'|'held'|'missing',
  *                     registrationStatus: string|null, approvalSource: string|null }>}
  */
-/**
- * Whether the account holds a valid ticket that may approve it without staff.
- * A free or complimentary Stripe seat does not: anyone could claim one and read
- * the attendee list. One order can mix paid and free seats, so this reads the
- * price of the claimed seat, not the order total. Other providers record no
- * price here, so their valid tickets count, and the admin setting warns about
- * free tickets. A Stripe seat that cannot be read does not count.
- *
- * Reads only, inside the caller's transaction.
- *
- * @param {{ db: object, tx: object, uid: string }} deps
- * @returns {Promise<boolean>}
- */
-async function holdsPaidTicket({ db, tx, uid }) {
-  const valid = await tx.get(db.collection(TICKETS)
-    .where('claimedByUid', '==', uid).where('status', '==', VALID));
-  for (const ticket of valid.docs) {
-    const { orderId, externalId } = ticket.data() || {};
-    if (!isCommerceOrderId(orderId)) return true;
-    const order = (await tx.get(db.collection(ORDERS).doc(orderId))).data();
-    const seat = order?.seats?.find((entry) => entry?.externalId === externalId);
-    if (order?.lines?.[seat?.lineIndex]?.unitAmount > 0) return true;
-  }
-  return false;
-}
-
 async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
   if (typeof uid !== 'string' || uid.length === 0) {
     return { uid: '', action: 'missing', registrationStatus: null, approvalSource: null };

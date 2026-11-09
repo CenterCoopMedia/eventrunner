@@ -63,7 +63,6 @@ test('the public way in and the fee are gone: nothing makes an organization but 
 });
 
 test('the functions run in the region the Hosting rewrites name, whatever the environment says', () => {
-  const firebaseJson = require('../../firebase.json');
   const regions = new Set(firebaseJson.hosting.rewrites.filter((r) => r.function).map((r) => r.function.region));
   assert.deepEqual([...regions], [REGION]);
   assert.equal(require('./handlers.cjs').REGION, REGION);
