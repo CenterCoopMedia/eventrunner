@@ -348,6 +348,9 @@ function TicketList({ call, refreshToken }) {
   const [status, setStatus] = useState('');
   const [tickets, setTickets] = useState(null);
   const [cursor, setCursor] = useState(null);
+  // The filter that produced the list on screen. Load more pages that list,
+  // so it sends this and not the form, which may have been edited since.
+  const [applied, setApplied] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -356,20 +359,24 @@ function TicketList({ call, refreshToken }) {
       setLoading(true);
       setError(null);
       try {
-        const body = {};
-        if (email.trim()) body.email = email.trim();
-        if (status) body.status = status;
-        if (append && cursor) body.cursor = cursor;
+        let filter = applied;
+        if (!append) {
+          filter = {};
+          if (email.trim()) filter.email = email.trim();
+          if (status) filter.status = status;
+        }
+        const body = append && cursor ? { ...filter, cursor } : filter;
         const result = await call('ticketingListTickets', body);
         setTickets((prev) => (append ? [...(prev ?? []), ...result.tickets] : result.tickets));
         setCursor(result.nextCursor);
+        setApplied(filter);
       } catch (err) {
         setError(plannerMessage(err?.message ?? 'The ticket list could not be loaded.'));
       } finally {
         setLoading(false);
       }
     },
-    [call, email, status, cursor],
+    [call, email, status, cursor, applied],
   );
 
   useEffect(() => {

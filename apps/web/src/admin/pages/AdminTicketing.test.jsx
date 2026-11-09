@@ -375,4 +375,25 @@ describe('AdminTicketing', () => {
     await waitFor(() => expect(screen.getByRole('cell', { name: 'Valid' })).toBeInTheDocument());
     expect(screen.queryByText('tkt-1')).not.toBeInTheDocument();
   });
+
+  it('loads more with the filter that produced the list, not the edited form', async () => {
+    render(<AdminTicketing />);
+    await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
+
+    callMock.mockImplementationOnce(() => Promise.resolve({
+      tickets: [{ id: 'tkt-1', email: 'a@example.com', status: 'valid', claimedByUid: null }],
+      nextCursor: 'cursor-1',
+    }));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    const loadMore = await screen.findByRole('button', { name: 'Load more' });
+
+    // Edited but not searched: the next page still belongs to a@example.com.
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'b@example.com' } });
+    callMock.mockImplementationOnce(() => Promise.resolve({ tickets: [], nextCursor: null }));
+    fireEvent.click(loadMore);
+    await flush();
+
+    expect(callMock).toHaveBeenLastCalledWith('ticketingListTickets', { email: 'a@example.com', cursor: 'cursor-1' });
+  });
 });
