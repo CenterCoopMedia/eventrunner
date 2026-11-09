@@ -71,10 +71,18 @@ const {
   validateBadgesConfig,
 } = require('shared/config');
 const { findThemeContrastFailures, resolveLegacyColors } = require('shared/theme');
+const { lifecycleStampErrors } = require('./lifecycleStamps.cjs');
+
+/** The shared event checks, plus the lifecycle stamps this endpoint saves. */
+function validateEventWithStamps(event) {
+  const verdict = validateEventConfig(event);
+  const errors = [...verdict.errors, ...lifecycleStampErrors(event)];
+  return { ...verdict, ok: errors.length === 0, errors };
+}
 
 /** Panel-writable doc ids and their shared-schema validators. */
 const WRITABLE_CONFIG_DOCS = Object.freeze({
-  event: validateEventConfig,
+  event: validateEventWithStamps,
   features: validateFeatures,
   theme: validateTheme,
   badges: validateBadgesConfig,

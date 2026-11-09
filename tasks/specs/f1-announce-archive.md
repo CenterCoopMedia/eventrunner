@@ -12,7 +12,7 @@ An operator can set and clear `config/event.announcedAt` and `config/event.archi
 - The month is 01 to 12, the hour is 00 to 23, the minutes and seconds are 00 to 59. The date is a real calendar date (no 2027-02-30).
 - The admin form writes minute precision (`YYYY-MM-DDTHH:MM`). Stored values with seconds (the demo fixture) stay valid.
 
-## Validation (`validateEventConfig`)
+## Validation (the save endpoint, `functions/src/admin/lifecycleStamps.cjs`)
 
 - `announcedAt`: absent, `null`, or the stored shape. Other values are refused: `announcedAt: must be null or a naive ISO datetime "YYYY-MM-DDTHH:MM(:SS)" with a real date and time`.
 - `archivedAt`: the same rule, same message with its own key.

@@ -15,8 +15,6 @@ const { safeUrlHref } = require('../urlSafety.cjs');
 // domain verification's job, not the schema's. This only refuses values
 // that cannot be a From address at all.
 const { isEmailAddress } = require('../email.cjs');
-// The range-checked naive datetime the lifecycle clock already trusts.
-const { ISO_DATETIME_RE } = require('../time.cjs');
 const {
   VENUE_PLACE_KEYS,
   VENUE_MOVEMENT_KEYS,
@@ -194,45 +192,6 @@ function isValidTimezone(tz) {
     return true;
   } catch {
     return false;
-  }
-}
-
-/**
- * True when the value is a naive event-local datetime with a real date and
- * clock time: "YYYY-MM-DDTHH:MM" with optional ":SS", and no zone. This is
- * the shape getEventPhase (lifecycle.cjs) compares.
- *
- * @param {*} v
- * @returns {boolean}
- */
-function isNaiveLocalDateTime(v) {
-  return typeof v === 'string' && ISO_DATETIME_RE.test(v) && isValidCalendarDate(v.slice(0, 10));
-}
-
-/**
- * THE LIFECYCLE STAMPS (ADR 0001 §2.2, §2.5; audit 07 #1, #6). getEventPhase
- * reads a malformed stamp as null, so a bad announce date would put a public
- * site back in draft without a word. Each stamp is null or a naive local
- * datetime. An archive date needs an announce date, and is not before it:
- * compared at minute precision, as the lifecycle clock compares them.
- *
- * @param {object} event
- * @param {string[]} errors appended to
- */
-function validateLifecycleStamps(event, errors) {
-  const shape = 'must be null or a naive ISO datetime "YYYY-MM-DDTHH:MM(:SS)" with a real date and time';
-  let stampsOk = true;
-  for (const key of ['announcedAt', 'archivedAt']) {
-    if (event[key] != null && !isNaiveLocalDateTime(event[key])) {
-      errors.push(`${key}: ${shape}`);
-      stampsOk = false;
-    }
-  }
-  if (!stampsOk || event.archivedAt == null) return;
-  if (event.announcedAt == null) {
-    errors.push('archivedAt: needs an announce date');
-  } else if (event.archivedAt.slice(0, 16) < event.announcedAt.slice(0, 16)) {
-    errors.push('archivedAt: must not be before announcedAt');
   }
 }
 
@@ -636,7 +595,6 @@ function validateEventConfig(event) {
   }
 
   validateMilestones(event.milestones, errors);
-  validateLifecycleStamps(event, errors);
 
   const reg = event.registration;
   if (reg != null) {

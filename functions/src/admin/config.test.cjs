@@ -1318,7 +1318,7 @@ test('an operator may set, change and clear the stamps', async () => {
   assert.equal(deps.db.docs.get('config/event').archivedAt, null);
 });
 
-test('an operator stamp the shared validator refuses is a 400 naming the field, and nothing is written', async () => {
+test('an operator stamp the save refuses is a 400 naming the field, and nothing is written', async () => {
   const stored = validEvent({ announcedAt: null, archivedAt: null });
   const deps = tieredDeps({ 'config/event': stored });
   const res = makeRes();
