@@ -89,7 +89,7 @@ function cleanLogs(raw) {
 
 /**
  * The report to forward, or a ConsoleError naming the field to fix.
- * @returns {{ category, description, url, surface, site, version, consoleLogs }}
+ * @returns {{ category, description, url, version, consoleLogs }}
  */
 function readReport(body, extraOrigins = []) {
   const category = CATEGORIES.includes(body.category) ? body.category : null;
@@ -124,6 +124,8 @@ async function readBuiltProjects(db) {
   const snap = await db.collection('applications').where('status', 'in', BUILD_BEGAN_STATUSES).get();
   return new Set(snap.docs.flatMap((doc) => {
     const app = doc.data();
+    // Set only on a request an operator approved before ADR 0007's
+    // 2026-11-04 amendment; new requests store null.
     const stored = app.review?.settings?.projectId;
     const name = siteNameOf(app);
     if (stored) return [stored];
@@ -254,4 +256,4 @@ function reportProblemHandler(deps) {
   };
 }
 
-module.exports = { cleanLogs, cleanPageUrl, readReport, redact, reportOriginAllowed, reportProblemHandler, tokenProject, verifyReporter };
+module.exports = { cleanPageUrl, readReport, redact, reportOriginAllowed, reportProblemHandler };

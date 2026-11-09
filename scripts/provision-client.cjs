@@ -1208,7 +1208,9 @@ async function recordFailure(ctx, step, message) {
 }
 
 /**
- * The settings an operator approved, or the console's settings. A retry
+ * The settings an operator approved, or the console's settings. Only a
+ * request approved before ADR 0007's 2026-11-04 amendment removed operator
+ * approval can hold approved settings; new requests store null. A retry
  * keeps the project, region, folder and environment an earlier run of this
  * request chose and saved in `resources`: the project and its data already
  * live there, so a console setting changed since then must not move them.

@@ -7,23 +7,19 @@
  */
 
 const { ConsoleError } = require('./http.cjs');
-const { toIso, toMillis } = require('./access.cjs');
+const { toIso } = require('./access.cjs');
 const { STATUSES, readApplication, requireOperator, reviewedAnswers, siteNameOf } = require('./reviewAccess.cjs');
 const { connectionForReview } = require('./connectionState.cjs');
 const { canRetryBuild, readBuild, readableBuild } = require('./buildRetry.cjs');
+const { readTeam } = require('./organizations.cjs');
 
 const QUEUE_LIMIT = 200;
-const ROLE_ORDER = { owner: 0, editor: 1 };
 
-/** Names of the given organizations, read once each. */
+/** Names of the given organizations, read once each, together. */
 async function organizationNames(db, orgIds) {
-  const names = new Map();
-  for (const orgId of new Set(orgIds)) {
-    if (typeof orgId !== 'string' || !orgId || orgId.includes('/')) continue;
-    const snap = await db.collection('organizations').doc(orgId).get();
-    names.set(orgId, snap.exists ? snap.data().name : '');
-  }
-  return names;
+  const ids = [...new Set(orgIds)].filter((orgId) => typeof orgId === 'string' && orgId && !orgId.includes('/'));
+  const snaps = await Promise.all(ids.map((orgId) => db.collection('organizations').doc(orgId).get()));
+  return new Map(ids.map((orgId, i) => [orgId, snaps[i].exists ? snaps[i].data().name : '']));
 }
 
 async function listApplicationsForReview({ db }, { body, user }) {
@@ -53,23 +49,6 @@ async function listApplicationsForReview({ db }, { body, user }) {
     };
   });
   return { body: { status, applications } };
-}
-
-/** The team as the Team page shows it: members, then invites still open. */
-async function readTeam(db, orgId, at) {
-  const orgRef = db.collection('organizations').doc(orgId);
-  const [memberSnap, inviteSnap] = await Promise.all([
-    orgRef.collection('members').get(),
-    db.collection('invites').where('orgId', '==', orgId).where('status', '==', 'pending').get(),
-  ]);
-  const members = memberSnap.docs
-    .map((doc) => ({ uid: doc.id, email: doc.data().email, role: doc.data().role, joinedAt: toIso(doc.data().joinedAt) }))
-    .sort((a, b) => (ROLE_ORDER[a.role] - ROLE_ORDER[b.role]) || String(a.email).localeCompare(String(b.email)));
-  const invites = inviteSnap.docs
-    .filter((doc) => toMillis(doc.data().expiresAt) > at)
-    .map((doc) => ({ id: doc.id, email: doc.data().email, role: doc.data().role, expiresAt: toIso(doc.data().expiresAt) }))
-    .sort((a, b) => String(a.email).localeCompare(String(b.email)));
-  return { members, invites };
 }
 
 /** History with times as text and, for a team member, the email of who acted. */

@@ -149,7 +149,6 @@ async function withdrawApplication(deps, { body, user }) {
 }
 
 module.exports = {
-  SUBMITS_PER_DAY,
   answersToFreeze,
   notifyOperators,
   notifyOwners,

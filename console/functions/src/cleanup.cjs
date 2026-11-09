@@ -163,4 +163,4 @@ async function runRetention(deps) {
   return { deleted, failed: [...failed] };
 }
 
-module.exports = { RETENTION_DAYS, deleteSpamApplication, isExpired, runRetention };
+module.exports = { deleteSpamApplication, isExpired, runRetention };

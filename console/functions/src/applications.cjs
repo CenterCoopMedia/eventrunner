@@ -32,7 +32,6 @@ const { LAUNCH_OWNERS } = require('./organizations.cjs');
 const { readSignupTerms } = require('./consoleSettings.cjs');
 
 const COLLECTION = 'applications';
-const { STATUSES } = require('./reviewAccess.cjs');
 const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
 const CLOSED = CONSOLE_REQUEST_GROUPS.closed;
 /** The refusal for a change to a site the hosting team archived. */
@@ -210,12 +209,8 @@ async function listApplications({ db, now = Date.now }, { body, user }) {
 module.exports = {
   CLOSED,
   COLLECTION,
-  STATUSES,
   ARCHIVED_MESSAGE,
-  STEP_IDS,
   WITHDRAWABLE,
-  applicationForClient,
-  countOwners,
   getApplication,
   historyEntry,
   listApplications,

@@ -116,7 +116,6 @@ module.exports = {
   normalizeEmail,
   readMember,
   requireMemberOrOperator,
-  requireOrganization,
   requireOwner,
   toIso,
   toMillis,

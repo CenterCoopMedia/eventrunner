@@ -144,4 +144,4 @@ async function runStartBuild(deps, { orgId, appId, eventName, by = 'console' }) 
   return true;
 }
 
-module.exports = { GITHUB_HEADERS, WORKFLOW, appJwt, createStartBuild, installationToken, runStartBuild };
+module.exports = { GITHUB_HEADERS, createStartBuild, installationToken, runStartBuild };

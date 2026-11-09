@@ -270,7 +270,6 @@ async function saveAgreement({ db, now = Date.now }, { body, user }) {
 
 module.exports = {
   APPROVAL_FIELDS,
-  CONSOLE_FIELDS,
   SIGNUPS_CLOSED,
   agreementHash,
   approvalDefaults,

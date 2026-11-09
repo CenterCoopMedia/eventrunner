@@ -220,6 +220,5 @@ module.exports = {
   inviteMessage,
   operatorNoticeMessage,
   statusChangeMessage,
-  ROLE_WORDS,
   STATUS_WORDS,
 };
