@@ -27,31 +27,31 @@ After it merges, check `git merge-base --is-ancestor <top head> origin/main`.
 
 ### PR 1. Defects, rules and data handling
 
-- [ ] Tickets "Load more" sends the applied filter, not the form's (04 #4).
-- [ ] `/updates/:id` claims its tab title (05 #3).
-- [ ] Console: a refused acceptance spends no daily slot (`takeSlotIn`) (08 #5).
-- [ ] `text-status` becomes `text-text-secondary`; `text-body-lg` becomes
+- [x] Tickets "Load more" sends the applied filter, not the form's (04 #4).
+- [x] `/updates/:id` claims its tab title (05 #3).
+- [x] Console: a refused acceptance spends no daily slot (`takeSlotIn`) (08 #5).
+- [x] `text-status` becomes `text-text-secondary`; `text-body-lg` becomes
       `text-lead` (05 #2).
-- [ ] Email log: eight source labels: Invoice, Speaker reminder, Speaker
+- [x] Email log: eight source labels: Invoice, Speaker reminder, Speaker
       profile request, Admin access, Change request notice, Attendee
       approval, Pitch notice, Ticket confirmation (04 #2).
-- [ ] `firebase.json`: `/dashboard`, `/registration`, `/tickets/mine`,
+- [x] `firebase.json`: `/dashboard`, `/registration`, `/tickets/mine`,
       `/tickets/status` join the private block, after a check that each
       needs sign-in or a private token; runbook and deploy tests (07 #2).
-- [ ] `storage.rules`: remove the `exports/` grant (the PDF is streamed) (07 #3).
-- [ ] Daily sweep also clears `client_error_rate_limits` and
+- [x] `storage.rules`: remove the `exports/` grant (the PDF is streamed) (07 #3).
+- [x] Daily sweep also clears `client_error_rate_limits` and
       `feedback_rate_limits`, deletes in batches, longer limit (02 #5, #6).
-- [ ] Attendee delete clears the account's session pitches and its pitch
+- [x] Attendee delete clears the account's session pitches and its pitch
       rate-limit row (`PER_ACCOUNT_STORES`) (03 #6).
-- [ ] Material approve, reject, create, update and delete write an
+- [x] Material approve, reject, create, update and delete write an
       `admin_logs` row (03 #5).
-- [ ] Three readers use `visible === true` (02 #13).
-- [ ] One-time migration, run in each client deploy with a completion
+- [x] Three readers use `visible === true` (02 #13).
+- [x] One-time migration, run in each client deploy with a completion
       marker: numeric ticket dates become timestamps (01 #1).
-- [ ] `migrate-console-signup-links` gets a completion marker. The four
+- [x] `migrate-console-signup-links` gets a completion marker. The four
       one-time jobs stay in the deploys (09 #5, #6).
-- [ ] Schedule and invoice PDFs name EventRunner as Producer and Creator (03 #8).
-- [ ] The classifier selects the unit tier for `apps/web`, rules and
+- [x] Schedule and invoice PDFs name EventRunner as Producer and Creator (03 #8).
+- [x] The classifier selects the unit tier for `apps/web`, rules and
       generator changes; CONTRIBUTING table (09 #2).
 - [ ] Not changed, by decision: the console `applications` read grant (08 #3).
 
