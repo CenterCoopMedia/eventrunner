@@ -65,13 +65,15 @@ test('resolveActor: both admin tiers resolve as isAdmin — materials are staff 
     assert.equal(actor.ok, true);
     assert.equal(actor.isAdmin, true, token);
     assert.equal(actor.speakerId, null);
+    // The audit row of an admin write names the admin's address.
+    assert.equal(actor.email, TOKENS[token].email);
   }
 });
 
 test('resolveActor: a signed-in non-admin carries their speakerId and no admin flag', async () => {
   const db = usersDb({ 'att-1': { speakerId: 'spk-1' } });
   const actor = await resolveActor({ auth, db, getConfig }, req('attendee'));
-  assert.deepEqual(actor, { ok: true, uid: 'att-1', isAdmin: false, speakerId: 'spk-1' });
+  assert.deepEqual(actor, { ok: true, uid: 'att-1', email: null, isAdmin: false, speakerId: 'spk-1' });
 });
 
 test('resolveActor refuses a missing token; resolveActorOptional resolves it to an anonymous actor', async () => {
@@ -80,7 +82,7 @@ test('resolveActor refuses a missing token; resolveActorOptional resolves it to 
   assert.equal(refused.ok, false);
   assert.equal(refused.status, 401);
   const anonymous = await resolveActorOptional({ auth, db, getConfig }, req(null));
-  assert.deepEqual(anonymous, { ok: true, uid: null, isAdmin: false, speakerId: null });
+  assert.deepEqual(anonymous, { ok: true, uid: null, email: null, isAdmin: false, speakerId: null });
 });
 
 test('resolveActor: a failed bootstrap read is a 500 on a write, never "not an admin"', async () => {
@@ -93,11 +95,11 @@ test('resolveActor: a failed bootstrap read is a 500 on a write, never "not an a
 test('resolveActorOptional: a failed bootstrap read reads as not-admin, so an anonymous fetch still works', async () => {
   const db = usersDb({ 'staff-1': { speakerId: null } }, new Error('firestore down'));
   const actor = await resolveActorOptional({ auth, db, getConfig }, req('staff'));
-  assert.deepEqual(actor, { ok: true, uid: 'staff-1', isAdmin: false, speakerId: null });
+  assert.deepEqual(actor, { ok: true, uid: 'staff-1', email: null, isAdmin: false, speakerId: null });
 });
 
 test('resolveActor: an absent bootstrap document admits no admin, whatever the cached copy says', async () => {
   const db = usersDb({}, null);
   const actor = await resolveActor({ auth, db, getConfig }, req('ops'));
-  assert.deepEqual(actor, { ok: true, uid: 'ops-1', isAdmin: false, speakerId: null });
+  assert.deepEqual(actor, { ok: true, uid: 'ops-1', email: null, isAdmin: false, speakerId: null });
 });

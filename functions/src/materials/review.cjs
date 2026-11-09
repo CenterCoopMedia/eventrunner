@@ -15,6 +15,9 @@
  * `session_materials_public`; a rejection (or a move back to pending)
  * removes it. No `materialCount` change — the cap counts all materials
  * regardless of review status, only creation/deletion touches it.
+ *
+ * Each decision writes an `admin_logs` row: an approval releases embargoed
+ * material, so who released it must be on record.
  */
 
 const {
@@ -24,6 +27,7 @@ const {
   methodNotAllowed,
   internal,
 } = require('../core/errors.cjs');
+const { logAdminAction } = require('../cms/store.cjs');
 
 const MATERIALS = 'session_materials';
 const VALID_STATUSES = ['pending', 'approved', 'rejected'];
@@ -44,21 +48,34 @@ class InvalidReviewStatusError extends Error {
 
 /**
  * @param {{ db: object, materialId: string, reviewStatus: string,
- *           now?: () => number }} args
+ *           actor?: { uid: string, email: string }, now?: () => number,
+ *           log?: Pick<Console, 'warn'> }} args
  * @returns {Promise<{ material: object }>}
  */
-async function setMaterialReviewStatus({ db, materialId, reviewStatus, now = Date.now }) {
+async function setMaterialReviewStatus({ db, materialId, reviewStatus, actor, now = Date.now, log = console }) {
   if (!VALID_STATUSES.includes(reviewStatus)) {
     throw new InvalidReviewStatusError(reviewStatus);
   }
   const ref = db.collection(MATERIALS).doc(materialId);
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new MaterialNotFoundError(materialId);
     const next = { reviewStatus, updatedAt: new Date(now()) };
     tx.update(ref, next);
     return { material: { ...snap.data(), ...next } };
   });
+  if (actor) {
+    await logAdminAction({
+      db,
+      action: 'setMaterialReviewStatus',
+      docPath: `${MATERIALS}/${materialId}`,
+      actor,
+      now,
+      details: { sessionId: result.material.sessionId ?? null, reviewStatus },
+      log,
+    });
+  }
+  return result;
 }
 
 /** Deployable export: setMaterialReviewStatus (admin only). */
@@ -93,7 +110,9 @@ function buildHandlers() {
         return badRequest(res, `reviewStatus: must be one of ${VALID_STATUSES.join(', ')}`);
       }
       try {
-        const result = await setMaterialReviewStatus({ db, materialId, reviewStatus });
+        const result = await setMaterialReviewStatus({
+          db, materialId, reviewStatus, actor: { uid: gate.uid, email: gate.email },
+        });
         res.status(200).json(result);
       } catch (err) {
         if (err instanceof MaterialNotFoundError) return notFound(res, 'Material not found.');

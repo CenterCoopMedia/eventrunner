@@ -115,7 +115,7 @@ function seedSession(id, overrides = {}) {
   return { [`cmsSchedule/${id}`]: { title: 'Fixture session', speakerIds: [], ...overrides } };
 }
 
-const ADMIN = { uid: 'admin-1', isAdmin: true, speakerId: null };
+const ADMIN = { uid: 'admin-1', email: 'admin@example.org', isAdmin: true, speakerId: null };
 const speaker = (speakerId, uid = 'speaker-uid') => ({ uid, isAdmin: false, speakerId });
 
 function fakeBucket({ exists = true, size = MAX_MATERIAL_FILE_BYTES } = {}) {
@@ -867,6 +867,65 @@ test('uploadSessionMaterialBytes: rejects invalid filenames and media types befo
     );
     assert.deepEqual(bucket.state.paths, []);
   }
+});
+
+// ------------------------------------------------------------ audit rows
+
+/** The admin_logs rows the fake holds, in write order. */
+function adminLogs(db) {
+  return [...db.docs.entries()].filter(([k]) => k.startsWith('admin_logs/')).map(([, v]) => v);
+}
+
+test('an admin create, update, and delete each write one audit row with no file content', async () => {
+  const db = fakeDb(seedSession('s1'));
+  const { id: linkId } = await addSessionMaterialLink({
+    db, sessionId: 's1', url: 'https://example.org/deck', label: 'Slide deck', actor: ADMIN, now,
+  });
+  const { id: fileId } = await uploadSessionMaterial({
+    db, bucket: fakeBucket(), sessionId: 's1', storagePath: 'session-materials/s1/deck.pdf',
+    filename: 'deck.pdf', actor: ADMIN, now,
+  });
+  await updateSessionMaterial({ db, materialId: linkId, patch: { filename: 'Deck' }, actor: ADMIN, now });
+  await deleteSessionMaterial({ db, materialId: fileId, actor: ADMIN, now });
+
+  const row = (action, materialId) => ({
+    action,
+    docPath: `session_materials/${materialId}`,
+    uid: 'admin-1',
+    email: 'admin@example.org',
+    at: new Date(NOW),
+    details: { sessionId: 's1' },
+  });
+  assert.deepEqual(adminLogs(db), [
+    row('addSessionMaterialLink', linkId),
+    row('uploadSessionMaterial', fileId),
+    row('updateSessionMaterial', linkId),
+    row('deleteSessionMaterial', fileId),
+  ]);
+});
+
+test('a speaker\'s own create, update, and delete write no audit row', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const { id } = await addSessionMaterialLink({
+    db, sessionId: 's1', url: 'https://example.org/deck', label: 'Deck', actor: speaker('spk-1'), now,
+  });
+  await uploadSessionMaterial({
+    db, bucket: fakeBucket(), sessionId: 's1', storagePath: 'session-materials/s1/deck.pdf',
+    filename: 'deck.pdf', actor: speaker('spk-1'), now,
+  });
+  await updateSessionMaterial({ db, materialId: id, patch: { filename: 'Deck 2' }, actor: speaker('spk-1'), now });
+  await deleteSessionMaterial({ db, materialId: id, actor: speaker('spk-1'), now });
+  assert.deepEqual(adminLogs(db), []);
+});
+
+test('a refused admin write leaves no audit row', async () => {
+  const db = fakeDb();
+  await assert.rejects(
+    addSessionMaterialLink({ db, sessionId: 'nope', url: 'https://example.org', label: 'x', actor: ADMIN, now }),
+    SessionNotFoundError,
+  );
+  await assert.rejects(deleteSessionMaterial({ db, materialId: 'nope', actor: ADMIN, now }), MaterialNotFoundError);
+  assert.deepEqual(adminLogs(db), []);
 });
 
 // ------------------------------------------------------------ updateSessionMaterial

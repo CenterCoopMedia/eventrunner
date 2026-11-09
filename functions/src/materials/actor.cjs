@@ -3,7 +3,7 @@
 /**
  * Shared actor resolution for the materials HTTP handlers (store.cjs,
  * review.cjs, access.cjs) — one place that turns a request into
- * `{ uid, isAdmin, speakerId }` so the three write-ACL variants in
+ * `{ uid, email, isAdmin, speakerId }` so the three write-ACL variants in
  * store.cjs (admin-or-speaker-of-session create, admin-or-owning-speaker
  * update/delete) and the embargo predicate in access.cjs share a single
  * notion of "who is asking", the same "one predicate, two checkpoints"
@@ -16,7 +16,8 @@
  * fallback, which needs a `users/{uid}` doc to already exist) so an admin
  * who happens not to be a registered attendee can still manage materials.
  * `speakerId` is read directly off `users/{uid}` — `requireAttendeeAccess`
- * deliberately does not expose it.
+ * deliberately does not expose it. `email` is the verified admin address,
+ * for the audit row of an admin write, and null for everyone else.
  */
 
 const { verifyAuthToken, requireAdmin } = require('../core/auth.cjs');
@@ -24,7 +25,7 @@ const { verifyAuthToken, requireAdmin } = require('../core/auth.cjs');
 /**
  * @param {{ auth: object, db: object, getConfig: () => Promise<object> }} deps
  * @param {object} req
- * @returns {Promise<{ ok: true, uid: string, isAdmin: boolean, speakerId: string|null } |
+ * @returns {Promise<{ ok: true, uid: string, email: string|null, isAdmin: boolean, speakerId: string|null } |
  *                    { ok: false, status: 401|403|500, code: string, message: string }>}
  */
 async function resolveActor({ auth, db, getConfig }, req) {
@@ -46,12 +47,12 @@ async function resolveActor({ auth, db, getConfig }, req) {
  *
  * @param {{ auth: object, db: object, getConfig: () => Promise<object> }} deps
  * @param {object} req
- * @returns {Promise<{ ok: true, uid: string|null, isAdmin: boolean, speakerId: string|null }>}
+ * @returns {Promise<{ ok: true, uid: string|null, email: null|string, isAdmin: boolean, speakerId: string|null }>}
  */
 async function resolveActorOptional({ auth, db, getConfig }, req) {
   const decoded = await verifyAuthToken({ auth }, req);
   if (!decoded?.uid) {
-    return { ok: true, uid: null, isAdmin: false, speakerId: null };
+    return { ok: true, uid: null, email: null, isAdmin: false, speakerId: null };
   }
   return loadActorForUid({ auth, db, getConfig }, req, decoded.uid);
 }
@@ -67,7 +68,7 @@ async function loadActorForUid({ auth, db, getConfig }, req, uid, { strict = fal
   const snap = await db.collection('users').doc(uid).get();
   const speakerId = snap.exists ? snap.data()?.speakerId ?? null : null;
 
-  return { ok: true, uid, isAdmin, speakerId };
+  return { ok: true, uid, email: isAdmin ? adminVerdict.email : null, isAdmin, speakerId };
 }
 
 module.exports = { resolveActor, resolveActorOptional };

@@ -37,6 +37,10 @@ const { randomUUID } = require('node:crypto');
  *     for their own material at any review status (withdrawing a submission
  *     is always allowed, the same way a bookmark owner may always unbookmark).
  *
+ * An admin's create, update, or delete writes an `admin_logs` row naming
+ * the material and its session, never its file or link. A speaker's own
+ * write is not an admin action and writes none.
+ *
  * **The URL-shaped-filename scrub is applied here, at the write path**
  * (`scrubLinkLabel`, packages/shared/src/urlSafety.cjs) — a link material
  * whose trimmed label is empty or URL-shaped is stored with
@@ -63,6 +67,7 @@ const {
   methodNotAllowed,
   internal,
 } = require('../core/errors.cjs');
+const { logAdminAction } = require('../cms/store.cjs');
 
 const SESSIONS = 'cmsSchedule';
 const MATERIALS = 'session_materials';
@@ -205,7 +210,7 @@ function isSpeakerOfSession(sessionData, speakerId) {
  * one transaction.
  *
  * @param {{ db: object, sessionId: string, url: string, label: string,
- *           actor: { uid: string, isAdmin: boolean, speakerId: string|null },
+ *           actor: { uid: string, email?: string|null, isAdmin: boolean, speakerId: string|null },
  *           now?: () => number }} args
  * @returns {Promise<{ id: string, material: object }>}
  */
@@ -237,7 +242,7 @@ async function addSessionMaterialLink({ db, sessionId, url, label, actor, now = 
  * not a secret, because the bytes are always signed-URL gated.
  *
  * @param {{ db: object, bucket: object, sessionId: string, storagePath: string, filename: string,
- *           actor: { uid: string, isAdmin: boolean, speakerId: string|null },
+ *           actor: { uid: string, email?: string|null, isAdmin: boolean, speakerId: string|null },
  *           now?: () => number }} args
  * @returns {Promise<{ id: string, material: object }>}
  */
@@ -454,7 +459,7 @@ async function createMaterial({
   const sessionRef = db.collection(SESSIONS).doc(sessionId);
   const materialRef = db.collection(MATERIALS).doc();
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const sessionSnap = await tx.get(sessionRef);
     const { currentCount } = assertMaterialCreateAllowed({ sessionSnap, sessionId, actor });
 
@@ -476,6 +481,22 @@ async function createMaterial({
     tx.update(sessionRef, { materialCount: currentCount + 1 });
     return { id: materialRef.id, material };
   });
+  const action = type === 'link' ? 'addSessionMaterialLink' : 'uploadSessionMaterial';
+  await logAdminWrite({ db, action, materialId: result.id, sessionId, actor, now });
+  return result;
+}
+
+/** The audit row of an admin's material write. A speaker's own write has none. */
+async function logAdminWrite({ db, action, materialId, sessionId, actor, now }) {
+  if (!actor.isAdmin) return;
+  await logAdminAction({
+    db,
+    action,
+    docPath: `${MATERIALS}/${materialId}`,
+    actor: { uid: actor.uid, email: actor.email },
+    now,
+    details: { sessionId },
+  });
 }
 
 /**
@@ -483,13 +504,13 @@ async function createMaterial({
  * for link materials on every update — the same invariant as create.
  *
  * @param {{ db: object, materialId: string, patch: { filename?: string, url?: string },
- *           actor: { uid: string, isAdmin: boolean, speakerId: string|null },
+ *           actor: { uid: string, email?: string|null, isAdmin: boolean, speakerId: string|null },
  *           now?: () => number }} args
  * @returns {Promise<{ material: object }>}
  */
 async function updateSessionMaterial({ db, materialId, patch, actor, now = Date.now }) {
   const materialRef = db.collection(MATERIALS).doc(materialId);
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const snap = await tx.get(materialRef);
     if (!snap.exists) throw new MaterialNotFoundError(materialId);
     const current = snap.data();
@@ -517,6 +538,10 @@ async function updateSessionMaterial({ db, materialId, patch, actor, now = Date.
     tx.update(materialRef, next);
     return { material: { ...current, ...next } };
   });
+  await logAdminWrite({
+    db, action: 'updateSessionMaterial', materialId, sessionId: result.material.sessionId, actor, now,
+  });
+  return result;
 }
 
 /**
@@ -524,12 +549,13 @@ async function updateSessionMaterial({ db, materialId, patch, actor, now = Date.
  * in the same transaction.
  *
  * @param {{ db: object, materialId: string,
- *           actor: { uid: string, isAdmin: boolean, speakerId: string|null } }} args
+ *           actor: { uid: string, email?: string|null, isAdmin: boolean, speakerId: string|null },
+ *           now?: () => number }} args
  * @returns {Promise<{ sessionId: string }>}
  */
-async function deleteSessionMaterial({ db, materialId, actor }) {
+async function deleteSessionMaterial({ db, materialId, actor, now = Date.now }) {
   const materialRef = db.collection(MATERIALS).doc(materialId);
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const snap = await tx.get(materialRef);
     if (!snap.exists) throw new MaterialNotFoundError(materialId);
     const current = snap.data();
@@ -546,6 +572,10 @@ async function deleteSessionMaterial({ db, materialId, actor }) {
     }
     return { sessionId: current.sessionId };
   });
+  await logAdminWrite({
+    db, action: 'deleteSessionMaterial', materialId, sessionId: result.sessionId, actor, now,
+  });
+  return result;
 }
 
 /**
