@@ -75,9 +75,10 @@ test('every manifest source exists and maps to one unique route', () => {
   }
 });
 
-test('historical plans stay out of the navigation', () => {
+test('historical plans and PR evidence stay out of the navigation', () => {
   for (const page of pages) {
     assert.ok(!page.source.startsWith('docs/plans/'), `plans must not be published: ${page.source}`);
+    assert.ok(!page.source.startsWith('docs/pr-evidence/'), `PR evidence must not be published: ${page.source}`);
   }
 });
 

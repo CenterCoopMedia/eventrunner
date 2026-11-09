@@ -29,6 +29,10 @@ const GENERATED_DOCS_PREFIX = 'docs/docs/';
 // A link into it is checked only when a local build is present; the Pages
 // workflow runs this checker after it builds the demo.
 const BUILT_AT_DEPLOY_DIRS = ['docs/demo'];
+// Kept in the repository but removed before the Pages upload
+// (.github/workflows/pages.yml). A served page links to these files on
+// GitHub instead, as build-pages does for any file the site does not serve.
+const NOT_SERVED_DIRS = ['docs/plans', 'docs/pr-evidence'];
 
 const BASE_PAGE_METADATA = [
   ['doctype', /^<!doctype html>/i],
@@ -205,12 +209,25 @@ function isUnbuiltDeployTarget(candidate, root) {
   });
 }
 
+function notServedDir(candidate, root) {
+  return NOT_SERVED_DIRS.find((dir) => {
+    const relative = path.relative(path.join(root, dir), candidate);
+    return !relative.startsWith('..') && !path.isAbsolute(relative);
+  });
+}
+
 function checkLocalTargets(sourcePath, targets, root, htmlReferences = false, pagesBase = pagesSite().base) {
   const errors = [];
+  const servedPage = htmlReferences && !notServedDir(sourcePath, root);
   for (const target of targets) {
     const resolved = localTargetPath(sourcePath, target, root, pagesBase);
     if (!resolved) continue;
     if (!resolved.error && isUnbuiltDeployTarget(resolved.path, root)) continue;
+    const hidden = servedPage && !resolved.error && notServedDir(resolved.path, root);
+    if (hidden) {
+      errors.push(`${displayPath(root, sourcePath)}: ${target} (Pages does not serve ${hidden}; link to the file on GitHub)`);
+      continue;
+    }
     if (resolved.error) {
       errors.push(`${displayPath(root, sourcePath)}: ${target} (${resolved.error})`);
     } else {
