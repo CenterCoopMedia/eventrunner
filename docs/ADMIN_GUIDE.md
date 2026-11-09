@@ -31,7 +31,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, closing a flagged card payment, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
 | Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, make a card payment link, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
-Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Operators can change the sender name, reply-to address, and social sharing image. Staff can read those values. No admin can change the from address or the mailing address in the email footer. Our team manages those settings on request.
+Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Operators can change the sender name, reply-to address, social sharing image, and the announce and archive dates. Staff can read those values. Staff can read those values. No admin can change the from address or the mailing address in the email footer. Our team manages those settings on request.
 
 An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.
 
@@ -72,6 +72,17 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 6. **Publish.** The live public site restyles with no deploy. This is a config write, not a code change.
 
 **Two things are worth knowing before you start.** A contrast failure stops a publish, not a save — you can leave a draft broken and come back. And nothing you do here reaches attendees until step 6.
+
+## Announce and archive
+
+In **Event settings**, under **Registration and deadlines**, the **Announce and archive** panel shows the phase the site is in now. An operator sets two dates on the event's clock:
+
+- **Announced.** Before this date the site is in draft: the home page shows no countdown, and attendees can change their registration answers at any time. From this date the site follows its dates: registration opens and closes, and the event starts and ends. After registration closes, attendees cannot change their answers.
+- **Archived.** From this date the event reads as archived. Every day is shown as a back issue, live controls go away, and scheduled reminders stop. Set the announce date first. The archive date cannot be before it.
+
+Leave a date empty, or use the clear control beside it, to remove it. Staff see both dates as text.
+
+A new site has no announce date, so it starts in draft. Set **Announced** when the event goes public.
 
 ## Launch early with tickets and pitches only
 

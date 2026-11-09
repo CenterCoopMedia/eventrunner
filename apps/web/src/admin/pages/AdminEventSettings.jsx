@@ -12,21 +12,34 @@
 //     readiness. The form shows that state read-only and never sends it.
 //   • sender.email is set during setup. Every role sees it as text, and
 //     the form never sends it. Only operators edit the name and reply-to.
+//   • announcedAt and archivedAt move the site through its lifecycle
+//     (shared getEventPhase). Only operators edit them; staff read them as
+//     text and the form never sends them for staff.
 //   • Current values come from EventConfigContext, whose onSnapshot listener
 //     also delivers the saved result back — no reload, nothing optimistic.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { senderDomainVerified } from 'shared/readiness';
+import { getEventPhase } from 'shared/config';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useSavedMessage } from '../useSavedMessage.js';
 import {
+  FieldError,
   Panel,
   SaveStatus,
   ServerErrorSummary,
   TextField,
   primaryButtonClass,
 } from '../components/formControls.jsx';
+import EventDateTimeField from '../components/EventDateTimeField.jsx';
+import {
+  describeEventDateTime,
+  isKnownTimeZone,
+  resolveEventDateTime,
+  splitEventDateTime,
+  toStoredInstant,
+} from '../../lib/eventDateTime.js';
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
@@ -59,6 +72,40 @@ import EventTracksEditor, {
 /** Shared empty result, so a render with no errors is not a new Map. */
 const NO_ERRORS = new Map();
 
+/** Each phase getEventPhase returns, in the words this page shows. */
+const PHASE_WORDS = {
+  draft: 'Draft. The site is not announced yet.',
+  announced: 'Announced. Registration is not open yet.',
+  registration_open: 'Registration is open.',
+  registration_closed: 'Registration is closed. The event has not started.',
+  in_progress: 'The event is happening now.',
+  ended: 'The event has ended.',
+  archived: 'Archived.',
+};
+
+/** The zone the date fields use: the event's, or UTC as the field itself falls back. */
+const stampZone = (timeZone) => (isKnownTimeZone(timeZone) ? timeZone : 'UTC');
+
+/**
+ * A stored stamp ("YYYY-MM-DDTHH:MM", event-local) as the instant the date
+ * field takes, or null. A wall clock the clocks pass twice reads as the
+ * first: the stamp is compared as a wall clock, so both name the same
+ * moment for the lifecycle. A wall clock the clocks skip has no instant.
+ */
+function stampToInstant(stamp, timeZone) {
+  if (typeof stamp !== 'string' || stamp.length < 16) return null;
+  const state = resolveEventDateTime(stamp.slice(0, 10), stamp.slice(11, 16), stampZone(timeZone));
+  if (state.status === 'ok') return toStoredInstant(state.instant);
+  if (state.status === 'overlap') return toStoredInstant(state.candidates[0].instant);
+  return null;
+}
+
+/** The instant a date field sent, as the event-local stamp the server stores, or ''. */
+function instantToStamp(instant, timeZone) {
+  const split = splitEventDateTime(instant, stampZone(timeZone));
+  return split ? `${split.date}T${split.time.slice(0, 5)}` : '';
+}
+
 /** Editable slice of config/event, normalized for controlled inputs. */
 function toForm(eventConfig) {
   const c = eventConfig ?? {};
@@ -72,6 +119,8 @@ function toForm(eventConfig) {
   return {
     name: c.name ?? '',
     shortName: c.shortName ?? '',
+    announcedAt: typeof c.announcedAt === 'string' ? c.announcedAt : '',
+    archivedAt: typeof c.archivedAt === 'string' ? c.archivedAt : '',
     tagline: c.tagline ?? '',
     timezone: c.timezone ?? '',
     days: normalizeDays(c.days),
@@ -164,10 +213,15 @@ function goalPayload(value) {
  * false for a staff caller: the sender block is the operator's to change
  * (functions/src/admin/config.cjs), so staff neither edit it nor send it —
  * a save that carried it unchanged would go through, but a save that never
- * carries it cannot be refused for it either.
+ * carries it cannot be refused for it either. `includeLifecycle` is false
+ * for staff for the same reason: the announce and archive dates are the
+ * operator's.
  */
-function toPayload(form, { includeSender = true } = {}) {
+function toPayload(form, { includeSender = true, includeLifecycle = true } = {}) {
   return {
+    ...(includeLifecycle
+      ? { announcedAt: orNull(form.announcedAt), archivedAt: orNull(form.archivedAt) }
+      : {}),
     name: form.name,
     shortName: form.shortName,
     tagline: orNull(form.tagline),
@@ -238,11 +292,14 @@ export default function AdminEventSettings() {
   // refuses only a CHANGE from staff; this is the client's half.
   const { adminTier } = useAuth();
   const canEditSender = adminTier === 'operator';
+  // The announce and archive dates are the operator's too, the same way.
+  const canEditLifecycle = adminTier === 'operator';
+  const payloadOptions = { includeSender: canEditSender, includeLifecycle: canEditLifecycle };
 
   const [form, setForm] = useState(() => toForm(eventConfig));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useSavedMessage(toPayload(form, { includeSender: canEditSender }));
+  const [status, setStatus] = useSavedMessage(toPayload(form, payloadOptions));
   const [liveSessions, setLiveSessions] = useState([]);
   const [draftSessions, setDraftSessions] = useState([]);
   // Whether each session list has delivered a snapshot and is listening.
@@ -326,6 +383,28 @@ export default function AdminEventSettings() {
   // The milestones are checked at submit as well (issue #180): a row just
   // added says nothing until a save is attempted.
   const [milestonesChecked, setMilestonesChecked] = useState(false);
+  // A date field with a part missing, or a time the clocks skip or pass
+  // twice, stops the save. Each field reports its own problem; the problem
+  // is shown once a save is attempted.
+  const [stampProblems, setStampProblems] = useState({});
+  const [showStampErrors, setShowStampErrors] = useState(false);
+  const stampProblem = (key) => (problem) => setStampProblems((previous) => (
+    (previous[key] ?? null) === problem ? previous : { ...previous, [key]: problem }
+  ));
+  // The instant each date field last sent. A wall clock the clocks pass
+  // twice maps back to the first instant, so the field gets back the one it
+  // sent while its stamp is unchanged, and the choice it shows stays put.
+  const sentInstants = useRef({});
+  const stampFieldValue = (key) => {
+    const sent = sentInstants.current[key];
+    return sent && instantToStamp(sent, form.timezone) === form[key]
+      ? sent
+      : stampToInstant(form[key], form.timezone);
+  };
+  const setStamp = (key) => (instant) => {
+    sentInstants.current[key] = instant;
+    setForm((current) => ({ ...current, [key]: instant ? instantToStamp(instant, current.timezone) : '' }));
+  };
   const milestoneErrors = useMemo(
     () => (milestonesChecked ? validateMilestoneRows(form.milestones) : NO_ERRORS),
     [milestonesChecked, form.milestones],
@@ -380,11 +459,14 @@ export default function AdminEventSettings() {
     setMapChecked(true);
     setSocialChecked(true);
     setMilestonesChecked(true);
+    const stampsHeld = canEditLifecycle && Object.values(stampProblems).some(Boolean);
+    setShowStampErrors(stampsHeld);
     if (
       localVenueErrors.size > 0
       || validateVenueMap(form.venue).size > 0
       || validateSocialHandles(form.social.handles).size > 0
       || validateMilestoneRows(form.milestones).size > 0
+      || stampsHeld
     ) {
       setStatus('');
       // A rejection from the SERVER, if one is still standing, goes now.
@@ -405,7 +487,7 @@ export default function AdminEventSettings() {
     const sentLetters = submittedTrackLetters(form.tracks);
     const sentPlaceIds = new Set(form.venue.places.map((place) => String(place.id ?? '').trim()));
     try {
-      await call('updateEventConfig', { event: toPayload(form, { includeSender: canEditSender }) });
+      await call('updateEventConfig', { event: toPayload(form, payloadOptions) });
       setForm((current) => ({
         ...current,
         venue: {
@@ -434,6 +516,13 @@ export default function AdminEventSettings() {
   }
 
   const verified = senderDomainVerified(eventConfig?.sender);
+  // The phase the site is in now, from the saved config: what visitors see.
+  const phase = getEventPhase(eventConfig);
+  const stampWords = (key) => {
+    const instant = stampToInstant(form[key], form.timezone);
+    if (instant) return `${describeEventDateTime(new Date(instant), stampZone(form.timezone))}.`;
+    return form[key] || 'Not set.';
+  };
 
   return (
     // noValidate: the form answers for its own fields (issue #219). Left to
@@ -636,6 +725,67 @@ export default function AdminEventSettings() {
                   hint="The number of approved attendees you are aiming for. Anyone can read it. The overview compares the approved count with it. Leave it empty for no goal."
                   className="font-admin-data"
                 />
+              </div>
+            </Panel>
+            {/* The lifecycle dates (ADR 0001 §2.5, audit 07 #1). Nothing else
+                sets them, and without an announce date the site stays in
+                draft for good. */}
+            <Panel className="admin-settings-card"
+              title="Announce and archive"
+              description="These dates move the site from draft to public, and from public to archived."
+            >
+              <div className="admin-settings-fields">
+                <p className="admin-settings-field--wide text-admin-sm text-admin-ink">
+                  <span className="font-semibold">Phase now:</span> {PHASE_WORDS[phase] ?? phase}
+                </p>
+                {canEditLifecycle ? (
+                  <>
+                    <div className="admin-settings-field--wide">
+                      <EventDateTimeField
+                        label="Announced"
+                        value={stampFieldValue('announcedAt')}
+                        timeZone={form.timezone}
+                        onChange={setStamp('announcedAt')}
+                        onProblemChange={stampProblem('announcedAt')}
+                        showError={showStampErrors || Boolean(errorFor('announcedAt'))}
+                        hint="Before this date the site is in draft: no countdown, and registration answers stay open to change."
+                        summaryPrefix="Announced"
+                        emptySummary="Not set. The site stays in draft."
+                        clearable
+                      />
+                      <FieldError message={errorFor('announcedAt')} />
+                    </div>
+                    <div className="admin-settings-field--wide">
+                      <EventDateTimeField
+                        label="Archived"
+                        value={stampFieldValue('archivedAt')}
+                        timeZone={form.timezone}
+                        onChange={setStamp('archivedAt')}
+                        onProblemChange={stampProblem('archivedAt')}
+                        showError={showStampErrors || Boolean(errorFor('archivedAt'))}
+                        hint="From this date the event reads as archived. Set the announce date first."
+                        summaryPrefix="Archived"
+                        emptySummary="Not set. The event is not archived."
+                        clearable
+                      />
+                      <FieldError message={errorFor('archivedAt')} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-admin-sm font-semibold text-admin-ink">Announced</p>
+                      <p className="text-admin-base text-admin-ink">{stampWords('announcedAt')}</p>
+                    </div>
+                    <div>
+                      <p className="text-admin-sm font-semibold text-admin-ink">Archived</p>
+                      <p className="text-admin-base text-admin-ink">{stampWords('archivedAt')}</p>
+                    </div>
+                    <p className="admin-settings-field--wide text-admin-sm text-admin-ink-secondary">
+                      Our team sets these dates. To change them, contact us.
+                    </p>
+                  </>
+                )}
               </div>
             </Panel>
             <MilestonesEditor

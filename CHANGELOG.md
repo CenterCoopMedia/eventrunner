@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Operators can set the announce and archive dates in admin Event settings, and the page shows
+  the event's current phase. Before this, nothing could set them, and every site stayed in draft:
+  no home countdown, and registration answers never locked. `validateEventConfig` refuses a
+  malformed date, and an archive date with no announce date or before it.
+
 - A client homepage, plus support, privacy and terms pages, for the project site. The former
   landing page is now the project status page at `/project/`. The address for the custom domain
   is `https://eventrunner.org/`, and repository variables set the support name and address.

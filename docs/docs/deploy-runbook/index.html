@@ -1357,6 +1357,7 @@
           </code></pre>
           <p>A run that dies before the script starts, for example on a refused identity token, leaves no record: the request shows a started build and nothing else. Read the workflow&#39;s run list.</p>
           <p>A new client&#39;s Environment is not added to <code>AUTO_DEPLOY_ENVIRONMENTS</code>, so a push to <code>main</code> does not deploy to it. When the client&#39;s event site opens to the public, select <strong>Mark as launched</strong> on its review page. That moves the request from <code>ready</code> to <code>launched</code> and emails each Owner &quot;Your site is open to the public&quot;. Then add the Environment to <code>AUTO_DEPLOY_ENVIRONMENTS</code> by hand (section 4).</p>
+          <p>A new site starts in draft: <code>config/event.announcedAt</code> is null. When the client&#39;s event goes public, an operator sets <strong>Announced</strong> in admin <strong>Event settings → Announce and archive</strong>. Until then the home page shows no countdown, and registration answers do not lock.</p>
           <h3 id="123-what-the-hand-built-rehearsal-taught">12.3 What the hand-built rehearsal taught<a class="heading-anchor" href="#123-what-the-hand-built-rehearsal-taught" aria-label="Link to this section">#</a></h3>
           <p>The script does each of these, and sections 1 to 3 are wrong or silent on them. Anyone building a client by hand has to do them too.</p>
           <ul>

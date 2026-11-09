@@ -68,6 +68,52 @@ test('validateEventConfig: opensAt must precede closesAt; nulls allowed', () => 
   assert.equal(nulls.ok, true);
 });
 
+// THE LIFECYCLE STAMPS (audit 07 #1, #6). getEventPhase reads a malformed
+// stamp as null, so a bad value would put a public site back in draft
+// without a word. The validator refuses it by name instead.
+test('validateEventConfig: announcedAt and archivedAt are null, absent, or a naive local datetime', () => {
+  for (const stamps of [
+    {},
+    { announcedAt: null, archivedAt: null },
+    { announcedAt: '2027-01-15T09:00' },
+    { announcedAt: '2026-01-01T12:00:00', archivedAt: '2026-03-28T00:00:00' },
+    { announcedAt: '2027-01-15T09:00', archivedAt: '2027-07-01T00:00' },
+    { announcedAt: '2024-02-29T23:59', archivedAt: null },
+  ]) {
+    assert.deepEqual(validateEventConfig({ ...VALID_EVENT, ...stamps }), { ok: true, errors: [] }, JSON.stringify(stamps));
+  }
+});
+
+test('validateEventConfig refuses a lifecycle stamp that is not a real date and clock time, by name', () => {
+  for (const value of [
+    'tomorrow', 5, true, {}, '', '2027-01-15', '2027-01-15 09:00', '2027-01-15T09:00Z',
+    '2027-01-15T09:00:00.000Z', '2027-01-15T09:00+01:00', '2027-13-01T09:00', '2027-02-30T09:00',
+    '2027-01-15T25:00', '2027-01-15T24:00', '2027-01-15T09:60', '2027-01-15T09:00:61',
+  ]) {
+    const announced = validateEventConfig({ ...VALID_EVENT, announcedAt: value });
+    assert.equal(announced.ok, false, JSON.stringify(value));
+    assert.ok(announced.errors.some((e) => e.startsWith('announcedAt: must be null or a naive ISO datetime')), JSON.stringify(announced.errors));
+    const archived = validateEventConfig({ ...VALID_EVENT, announcedAt: '2027-01-01T00:00', archivedAt: value });
+    assert.equal(archived.ok, false, JSON.stringify(value));
+    assert.ok(archived.errors.some((e) => e.startsWith('archivedAt: must be null or a naive ISO datetime')), JSON.stringify(archived.errors));
+  }
+});
+
+test('validateEventConfig: archivedAt needs an announce date and must not be before it', () => {
+  for (const announcedAt of [null, undefined]) {
+    const result = validateEventConfig({ ...VALID_EVENT, announcedAt, archivedAt: '2027-07-01T00:00' });
+    assert.deepEqual(result.errors, ['archivedAt: needs an announce date']);
+  }
+  const before = validateEventConfig({ ...VALID_EVENT, announcedAt: '2027-07-01T00:00', archivedAt: '2027-06-30T23:59' });
+  assert.deepEqual(before.errors, ['archivedAt: must not be before announcedAt']);
+  // Minute precision, the way getEventPhase compares: seconds never order them.
+  const sameMinute = validateEventConfig({ ...VALID_EVENT, announcedAt: '2027-07-01T00:00:30', archivedAt: '2027-07-01T00:00' });
+  assert.deepEqual(sameMinute, { ok: true, errors: [] });
+  // A malformed announce date is named once, not again through archivedAt.
+  const malformed = validateEventConfig({ ...VALID_EVENT, announcedAt: 'soon', archivedAt: '2027-07-01T00:00' });
+  assert.equal(malformed.errors.filter((e) => e.startsWith('archivedAt')).length, 0);
+});
+
 // THE REGISTRATION ACTION (M7 issue 8). The destination is the field the
 // manual ticket provider already reads, so these cases are the shapes a
 // deployment actually arrives in: nothing configured, a provider's https

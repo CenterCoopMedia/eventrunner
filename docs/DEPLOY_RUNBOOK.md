@@ -1360,6 +1360,8 @@ A run that dies before the script starts, for example on a refused identity toke
 
 A new client's Environment is not added to `AUTO_DEPLOY_ENVIRONMENTS`, so a push to `main` does not deploy to it. When the client's event site opens to the public, select **Mark as launched** on its review page. That moves the request from `ready` to `launched` and emails each Owner "Your site is open to the public". Then add the Environment to `AUTO_DEPLOY_ENVIRONMENTS` by hand (section 4).
 
+A new site starts in draft: `config/event.announcedAt` is null. When the client's event goes public, an operator sets **Announced** in admin **Event settings → Announce and archive**. Until then the home page shows no countdown, and registration answers do not lock.
+
 ### 12.3 What the hand-built rehearsal taught
 
 The script does each of these, and sections 1 to 3 are wrong or silent on them. Anyone building a client by hand has to do them too.

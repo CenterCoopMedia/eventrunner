@@ -215,7 +215,7 @@
           <ol>
           <li>Settle ticketing first. Pause sales, finish refunds and reconciliation, and wait until the ticket sync queue is empty. The <a href="/eventrunner/docs/deploy-runbook/">deploy runbook</a> section &quot;Archiving an event with ticket sales&quot; gives the order.</li>
           <li>Close the pitch call in <strong>Session pitches</strong>.</li>
-          <li>In <strong>Settings → Event settings</strong>, set the <strong>archive date</strong>. Every day becomes a back issue: the content stays, and bookmarking, reactions and calendar links go away.</li>
+          <li>In <strong>Event settings → Announce and archive</strong>, an operator sets <strong>Archived</strong>. Every day becomes a back issue: the content stays, and bookmarking, reactions and calendar links go away.</li>
           <li>Download the event data package and the spreadsheets first. Then set <code>config/event.historicalDemo</code> to <code>true</code>. Account, feedback and email actions then refuse writes, and so does sign-in with an email code. An admin who signs in with Google can still open the admin panel and run both exports. An admin who signs in only with an email code cannot get back in until an operator sets <code>historicalDemo</code> to <code>false</code> again.</li>
           <li>Remove staff access the client no longer needs on <strong>Access</strong>.</li>
           </ol>
