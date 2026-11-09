@@ -454,6 +454,15 @@ async function applyUpdateSpeaker({ db, bucket = null, speakerId, payload, actor
  * @param {string} speakerId
  * @returns {object}
  */
+/** The queued edits a speaker may see: the self-editable fields only, or null. */
+function ownPendingEdits(pendingEdits) {
+  if (!isPlainObject(pendingEdits)) return null;
+  const own = Object.fromEntries(
+    Object.entries(pendingEdits).filter(([field]) => SELF_EDITABLE_SPEAKER_FIELDS.includes(field)),
+  );
+  return Object.keys(own).length > 0 ? own : null;
+}
+
 function buildOwnSpeakerView(speaker, speakerId) {
   return {
     speakerId,
@@ -478,11 +487,11 @@ function buildOwnSpeakerView(speaker, speakerId) {
       : {},
     status: typeof speaker.status === 'string' ? speaker.status : 'draft',
     // A queued self-service edit awaiting admin review (§4.3, issue #22
-    // review finding P1-1), or null when there is none. Only ever a subset
-    // of SELF_EDITABLE_SPEAKER_FIELDS — see applyUpdateOwnSpeakerProfile.
-    pendingEdits: isPlainObject(speaker.pendingEdits) && Object.keys(speaker.pendingEdits).length > 0
-      ? { ...speaker.pendingEdits }
-      : null,
+    // review finding P1-1), or null when there is none. Cut to
+    // SELF_EDITABLE_SPEAKER_FIELDS here: a staff import
+    // (imports/speakerImport.cjs) also queues fields the speaker cannot
+    // edit, `email` among them, and this view never carries an email.
+    pendingEdits: ownPendingEdits(speaker.pendingEdits),
     // When the speaker last submitted the profile steps (ADR 0008 §3), or
     // null. Written only by speakers/profileSteps.cjs.
     profileSubmittedAt: isoOf(speaker.profileSubmittedAt),

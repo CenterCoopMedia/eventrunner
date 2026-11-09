@@ -581,6 +581,20 @@ test('applyGetOwnSpeakerProfile: the owner sees their own record, minus server-o
   assert.equal('inviteToken' in result.speaker, false);
 });
 
+test('applyGetOwnSpeakerProfile: queued edits carry only the fields a speaker can edit', async () => {
+  // A staff import queues every reconciled field for a published speaker,
+  // the address from the staff file among them. The own view never carries
+  // an email.
+  const world = ownedWorld();
+  world['speakers/rae'] = {
+    ...world['speakers/rae'],
+    pendingEdits: { bio: 'New bio', email: 'assistant@example.org' },
+  };
+  const db = makeSpeakersDb(world);
+  const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false });
+  assert.deepEqual(result.speaker.pendingEdits, { bio: 'New bio' });
+});
+
 test('applyGetOwnSpeakerProfile: a different uid is refused with 403', async () => {
   const db = makeSpeakersDb(ownedWorld());
   const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'rae', uid: OTHER_UID, isAdmin: false });

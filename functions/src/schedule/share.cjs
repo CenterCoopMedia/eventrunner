@@ -194,9 +194,11 @@ function buildHandlers() {
     await handler(req, res);
   };
 
-  const runSync = () => {
+  // getDb runs on an event, never when the handlers are built: loading the
+  // export barrel must not initialize the Admin SDK (core/firestore.cjs).
+  const runSync = (event) => {
     const { getDb } = require('../core/firestore.cjs');
-    return createSyncHandler(getDb());
+    return createSyncHandler(getDb())(event);
   };
 
   function createSyncHandler(db) {
@@ -215,8 +217,8 @@ function buildHandlers() {
   return {
     // A bookmark membership write, or a rename on the account, is the only
     // thing that can change the projection's content.
-    syncScheduleShare: onDocumentWritten({ region, retry: true, document: 'users/{uid}/bookmarks/{sessionId}' }, runSync()),
-    syncScheduleShareOnAccountWrite: onDocumentWritten({ region, retry: true, document: 'users/{uid}' }, runSync()),
+    syncScheduleShare: onDocumentWritten({ region, retry: true, document: 'users/{uid}/bookmarks/{sessionId}' }, runSync),
+    syncScheduleShareOnAccountWrite: onDocumentWritten({ region, retry: true, document: 'users/{uid}' }, runSync),
     setScheduleVisibility: onRequest({ region }, withCors(async (req, res) => {
       await createSetScheduleVisibilityHandler(buildDeps())(req, res);
     })),
