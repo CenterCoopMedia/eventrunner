@@ -67,6 +67,41 @@ describe('WebMCP registration lifecycle', () => {
     expect(unregister).toHaveBeenCalledTimes(1);
   });
 
+  it('replaces the registered tools when a remount brings a different list', async () => {
+    // An effect that re-runs because its tool list changed (an admin tier
+    // change) cleans up and mounts again in one commit, as Strict Mode does.
+    const live = new Set();
+    const modelContext = {
+      registerTool: vi.fn(async (tool) => {
+        live.add(tool.name);
+        return { unregister: () => { live.delete(tool.name); } };
+      }),
+    };
+    // The replacement waits for the old set's teardown: more than two ticks.
+    const drain = () => new Promise((resolve) => { setTimeout(resolve, 0); });
+    const named = (name) => ({ ...definition, name });
+    const stateRef = { current: {} };
+
+    const cleanupEmpty = mountToolSet({ modelContext, setId: 'test', definitions: [], stateRef });
+    cleanupEmpty();
+    const cleanupOperator = mountToolSet({
+      modelContext, setId: 'test', definitions: [named('staff_tool'), named('operator_tool')], stateRef,
+    });
+    await drain();
+    expect([...live].sort()).toEqual(['operator_tool', 'staff_tool']);
+
+    cleanupOperator();
+    const cleanupStaff = mountToolSet({
+      modelContext, setId: 'test', definitions: [named('staff_tool')], stateRef,
+    });
+    await drain();
+    expect([...live]).toEqual(['staff_tool']);
+
+    cleanupStaff();
+    await drain();
+    expect([...live]).toEqual([]);
+  });
+
   it('turns an unsupported mount into a strict no-op', () => {
     const cleanup = mountToolSet({
       modelContext: null,
