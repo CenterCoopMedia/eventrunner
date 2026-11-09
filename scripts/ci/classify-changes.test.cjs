@@ -243,6 +243,8 @@ test('the client console routes to its own suites, never the event site’s brow
   assert.deepEqual(selected(classifyPaths(['console/firebase.json'])), ['build', 'rules']);
   // Its docs are docs, and its package and tool files still fail open.
   assert.equal(classifyPaths(['console/README.md']).mode, 'docs');
+  // check-copy-style.cjs scans it, so a change to it must select the copy gate.
+  assert.deepEqual(selected(classifyPaths(['console/README.md'])), ['docs', 'lint']);
   assert.equal(classifyPaths(['console/web/package.json']).mode, 'full');
   assert.equal(classifyPaths(['console/web/vite.config.js']).mode, 'full');
 });

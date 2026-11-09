@@ -68,7 +68,7 @@ function RequestItem({ request }) {
     word: entry.status === 'new' && index > 0 ? 'Reopened' : statusWord(entry.status),
   }));
   return (
-    <li className="space-y-sm border-t border-border-subtle pt-md first:border-t-0 first:pt-0">
+    <li className="space-y-sm border-t-hairline border-t-rule-hairline pt-md first:border-t-0 first:pt-0">
       <h2 className="font-heading text-h3 font-semibold">
         Request sent {formatted(request.createdAt) ?? ''}
       </h2>

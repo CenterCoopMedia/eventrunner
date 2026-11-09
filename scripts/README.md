@@ -9,8 +9,8 @@ CI and over SSH where a browser prompt is a hang.
 `scripts/lib/firebase-init.cjs` resolves credentials in one order, with no per-script variation:
 
 1. `FIRESTORE_EMULATOR_HOST` — the emulator path; the Admin SDK needs no key.
-2. `GOOGLE_APPLICATION_CREDENTIALS` — a service-account key file (what CI has, from
-   `FIREBASE_SERVICE_ACCOUNT`).
+2. `GOOGLE_APPLICATION_CREDENTIALS` — a credentials file. In CI it is the Workload Identity
+   Federation file that `google-github-actions/auth` writes; there is no `FIREBASE_SERVICE_ACCOUNT` key.
 3. Application-default credentials already on the machine.
 
 The project id always comes from `EVENT_FIREBASE_PROJECT_ID` (Tier A, `.env.example`). No script
@@ -472,7 +472,7 @@ bytes without writing repository files. See [the brand file list](../design/bran
 
 ## Planned
 
-`grant-admin`, `register-ticketing-webhook`, `export-attendees`, `generate-favicons`. Credentials go
+`grant-admin`, `export-attendees`, `generate-favicons`. Credentials go
 through `scripts/lib/firebase-init.cjs` and the Tier A env vars. No hardcoded project IDs.
 
 ## Tests

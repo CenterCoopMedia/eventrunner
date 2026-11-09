@@ -39,6 +39,7 @@ const {
   internals: { TICKETS, isSafeDocId, TICKET_STATUSES },
 } = require('./index.cjs');
 const { upsertTickets } = require('./sync.cjs');
+const { iso } = require('./stripeCommerce.cjs');
 
 const PROVIDER_NAME = 'manual';
 
@@ -281,7 +282,11 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, now = Date.now, 
 
     let counts;
     try {
-      counts = await upsertTickets({ db, tickets: preview.validTickets, providerName: PROVIDER_NAME, now, log });
+      // `now` returns epoch milliseconds (the admin log's clock); the upsert
+      // stores what its clock returns, and a ticket date must be a Date.
+      counts = await upsertTickets({
+        db, tickets: preview.validTickets, providerName: PROVIDER_NAME, now: () => new Date(now()), log,
+      });
     } catch (err) {
       log.error('ticketingImportCsv commit failed', err);
       return internal(res, 'The import could not be committed.');
@@ -373,16 +378,13 @@ function createTicketingListTicketsHandler({ db, auth, getConfig, log = console 
 
     const tickets = snap.docs.map((doc) => ({ id: doc.id, ...rowOf(doc.data()) }));
     const last = snap.docs[snap.docs.length - 1]?.data();
-    const nextCursor = snap.docs.length === limit && last?.createdAt instanceof Date
-      ? last.createdAt.toISOString()
-      : null;
+    const nextCursor = snap.docs.length === limit ? iso(last?.createdAt) : null;
     res.status(200).json({ tickets, nextCursor });
   };
 }
 
 /** One `tickets/{externalId}` doc, shaped for the admin list — timestamps as ISO strings. */
 function rowOf(data = {}) {
-  const iso = (v) => (v instanceof Date ? v.toISOString() : (typeof v === 'string' ? v : null));
   return {
     orderId: data.orderId ?? null,
     email: data.email ?? null,

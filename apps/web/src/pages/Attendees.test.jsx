@@ -311,6 +311,23 @@ describe('Attendees', () => {
       expect(directory.getByText('3Sixty Media')).toBeInTheDocument();
     });
 
+    it('files an accented first letter with its base letter, in one group', () => {
+      // The sort puts Édouard between Eaa and Ezra, and Łucja between La and
+      // Lz. A group per raw first character would cut E and L in two, with
+      // two headings of one id.
+      renderPage();
+      pushProfiles([
+        { id: 'u1', displayName: 'Eaa Jones' },
+        { id: 'u2', displayName: 'Édouard Roy' },
+        { id: 'u3', displayName: 'Ezra Klein' },
+        { id: 'u4', displayName: 'La Monte' },
+        { id: 'u5', displayName: 'Łucja Nowak' },
+        { id: 'u6', displayName: 'Lz Park' },
+      ]);
+      const heads = [...screen.getByRole('article').querySelectorAll('h2')];
+      expect(heads.map((h) => h.id)).toEqual(['attendee-letter-E', 'attendee-letter-L']);
+    });
+
     it('groups follow the list’s own sort, never a second disagreeing rule', () => {
       renderPage();
       pushProfiles([

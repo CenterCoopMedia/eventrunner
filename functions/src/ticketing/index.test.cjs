@@ -122,6 +122,23 @@ test('status reports the registration config readiness.cjs reads, and the queue'
   assert.equal(status.checkedAt, T0.toISOString());
 });
 
+test('status reads the Firestore Timestamps the Admin SDK returns for stored dates', async () => {
+  const stored = (iso) => ({ toMillis: () => Date.parse(iso), toDate: () => new Date(iso) });
+  const db = makeFakeDb({
+    'ticket_sync_queue/ord-1': { orderId: 'ord-1', status: 'pending', readyAt: stored('2026-08-20T09:00:00.000Z') },
+    'ticket_webhook_deliveries/del-1': { deliveryId: 'del-1', receivedAt: stored('2026-08-20T08:00:00.000Z') },
+  });
+  const status = await readTicketingStatus({
+    db,
+    provider: createFakeTicketingProvider({ withRegisterWebhook: true }),
+    getConfig: async () => ({ providers: { ticketing: { webhookRegisteredAt: stored('2026-08-01T00:00:00.000Z') } } }),
+    now: () => T0,
+  });
+  assert.equal(status.lastDeliveryAt, '2026-08-20T08:00:00.000Z');
+  assert.equal(status.queue.oldestReadyAt, '2026-08-20T09:00:00.000Z');
+  assert.equal(status.webhookRegisteredAt, '2026-08-01T00:00:00.000Z');
+});
+
 test('the status queue counts say so when they are capped', async () => {
   const seed = {};
   for (let i = 0; i < internals.STATUS_SCAN_LIMIT + 5; i += 1) {

@@ -178,13 +178,32 @@ test('mediaUpdateMetadata on an asset a theme slot or the social card uses is re
   }
 });
 
+test('mediaUpdateMetadata reads only the two config documents for the staff branding check', async () => {
+  // Only a theme slot or the social card makes an asset the operator's. A
+  // scan of every CMS collection, live and draft, answers nothing more.
+  const db = makeFakeDb(seedRows());
+  const realCollection = db.collection.bind(db);
+  const read = new Set();
+  db.collection = (name) => { read.add(name); return realCollection(name); };
+  const res = fakeRes();
+  await createMediaUpdateMetadataHandler(deps(db, { auth: staffAuth, getConfig: tiered }))(post({ assetId: ASSET_ID, alt: 'x' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual([...read].filter((name) => name.startsWith('cms')), []);
+});
+
 test('mediaUpdateMetadata refuses staff when the usage scan fails, and lets an operator through', async () => {
   const broken = () => {
     const db = makeFakeDb(seedRows());
     const realCollection = db.collection.bind(db);
     db.collection = (name) => {
-      if (name === 'cmsContent') return { async get() { throw new Error('transport failed'); } };
-      return realCollection(name);
+      const collection = realCollection(name);
+      if (name !== 'config') return collection;
+      return {
+        doc(id) {
+          if (id === 'theme') return { async get() { throw new Error('transport failed'); } };
+          return collection.doc(id);
+        },
+      };
     };
     return db;
   };

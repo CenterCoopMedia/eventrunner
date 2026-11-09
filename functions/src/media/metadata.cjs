@@ -89,15 +89,17 @@ function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now,
     if (gate.tier !== 'operator') {
       // A branding asset's words are the operator's too (upload.cjs), and
       // so are a page image's once a theme slot or the social card names
-      // it. The scan is the same one mediaDelete reads, and a scan that
-      // cannot run is not permission to write: staff cannot prove the
-      // asset is not on a branding surface.
+      // it. Only config/theme and config/event can name it so, and the scan
+      // reads those two documents alone: the CMS collections that
+      // mediaDelete also scans answer nothing here. A scan that cannot run
+      // is not permission to write: staff cannot prove the asset is not on
+      // a branding surface.
       if (isBrandingAsset(stored)) return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
       const path = typeof stored.path === 'string' ? stored.path : '';
       let references = [];
       if (path) {
         try {
-          const usage = await scanUsage({ db, paths: [path] });
+          const usage = await scanUsage({ db, paths: [path], collections: [] });
           references = usage[path] ?? [];
         } catch (err) {
           log.error('mediaUpdateMetadata usage scan failed', err);

@@ -192,7 +192,7 @@ function publishRow(doc) {
       0,
     ),
     publishedCount: Object.values(progress).reduce(
-      (total, item) => total + (Number.isInteger(item?.published) ? item.published : 0),
+      (total, item) => total + (Array.isArray(item?.published) ? item.published.length : 0),
       0,
     ),
   };

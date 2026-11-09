@@ -67,7 +67,8 @@ function seed() {
       requestedBy: 'private@example.org',
       error: { token: 'private-token' },
       request: { cmsPages: ['home'] },
-      progress: { cmsPages: { published: 1 } },
+      // The shape cms/store.cjs writes: the ids published so far.
+      progress: { cmsPages: { published: ['home'] } },
     };
   }
   for (let index = 0; index < 22; index += 1) {
@@ -161,6 +162,7 @@ test('publish and system-error diagnostics are bounded and omit raw records', as
   assert.equal(publish.rows.total, 12);
   assert.equal(publish.rows.items.length, 10);
   assert.equal(publish.rows.truncated, 2);
+  assert.ok(publish.rows.items.every((item) => item.publishedCount === 1));
   assert.equal(errors.rows.total, 22);
   assert.equal(errors.rows.items.length, 20);
   assert.equal(errors.rows.truncated, 2);

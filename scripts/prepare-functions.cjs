@@ -88,6 +88,30 @@ function dropSharedEntries(lockPath) {
 }
 
 /**
+ * Point each functions workspace's `shared` entry in the root lockfile at
+ * that directory's own tarball. The tarballs are byte-identical, and some
+ * npm versions resolve both workspaces to one path. The integrity hash is
+ * the same either way, but the lockfile would differ from the committed one
+ * with no change in the shared package.
+ *
+ * @param {{ packages?: Record<string, { resolved?: string }> }} lock
+ * @returns {boolean} true when an entry changed
+ */
+function pinSharedResolved(lock) {
+  let changed = false;
+  for (const dir of FUNCTION_DIRS) {
+    const posixDir = dir.split(path.sep).join('/');
+    const entry = lock.packages?.[`${posixDir}/node_modules/shared`];
+    const own = `file:${posixDir}/vendor/shared.tgz`;
+    if (typeof entry?.resolved !== 'string' || !entry.resolved.endsWith('vendor/shared.tgz')) continue;
+    if (entry.resolved === own) continue;
+    entry.resolved = own;
+    changed = true;
+  }
+  return changed;
+}
+
+/**
  * Copy the packed functions/vendor/shared.tgz into every other functions
  * directory. `--copy` runs only this: a deploy job that downloads the one
  * packed tarball restores the other copies before its root `npm ci`.
@@ -136,6 +160,9 @@ function main() {
     });
   }
   npm(['install', '--package-lock-only']);
+  const rootLockPath = path.join(root, 'package-lock.json');
+  const rootLock = JSON.parse(readFileSync(rootLockPath, 'utf8'));
+  if (pinSharedResolved(rootLock)) writeFileSync(rootLockPath, `${JSON.stringify(rootLock, null, 2)}\n`);
 
   for (const dir of FUNCTION_DIRS) {
     console.log(`prepare-functions: wrote ${path.join(dir, 'vendor', 'shared.tgz')}`);
@@ -147,4 +174,4 @@ if (require.main === module) {
   else main();
 }
 
-module.exports = { npmCommand, main, copyVendored, FUNCTION_DIRS };
+module.exports = { npmCommand, main, copyVendored, pinSharedResolved, FUNCTION_DIRS };

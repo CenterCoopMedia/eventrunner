@@ -9,7 +9,7 @@ spec: [docs/adr/0001-event-platform-v1.md](../../docs/adr/0001-event-platform-v1
 - **No hardcoded event string or hex color.** Event identity comes from the
   generated snapshot / `config/event`; colors come from `config/theme`
   custom properties — the ESLint hex sweep (spec §7.6) enforces this with a
-  three-path allowlist, one of which is the generated theme file itself.
+  five-path allowlist, one of which is the generated theme file itself.
 - Every UI surface follows
   [docs/interface-guidelines.md](../../docs/interface-guidelines.md) — the
   foundational interface, accessibility, and writing rules for this repo.
@@ -21,7 +21,7 @@ the committed **synthetic snapshot** in `src/generated/`:
 
 | File | Feeds |
 | --- | --- |
-| `eventConfig.js` | event identity, dates, features, badges |
+| `eventConfig.js` | event identity, dates, features, theme, launch |
 | `theme.css` | `:root` custom properties — brand/semantic colors as space-separated RGB triples, font stacks, radius, texture |
 | `siteContent.js` | published CMS blocks/sections |
 | `pagesData.js` | pages-as-data, routed at each page's own root-level `path` |
@@ -97,7 +97,7 @@ EVENT_FIREBASE_PROJECT_ID=demo-run-of-show \
 EVENT_EMAIL_PROVIDER=console \
 EVENT_ALLOWED_ORIGINS=http://127.0.0.1:5173 \
 FUNCTIONS_EMULATOR=true \
-npx firebase emulators:start --only functions,firestore,auth --project demo-run-of-show
+npx firebase emulators:start --only functions,firestore,auth,storage --project demo-run-of-show
 
 # 2. In another shell, run Vite against them.
 cd apps/web
@@ -134,6 +134,11 @@ log to drive the sign-in flow end to end without any real inbox; see below.
 | `VITE_USE_EMULATORS` | `'true'` connects Auth/Firestore/Storage to local emulators (dev only) |
 | `GENERATED_DIR` | Points the `@generated` alias at an out-of-tree deploy-time snapshot instead of the committed `src/generated` (spec §8.6) |
 | `VITE_DEMO_MODE` | `'1'` builds the static, read-only GitHub Pages demo (see "Demo mode" below). Never set by a client build. |
+| `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA v3 site key for App Check. Empty: App Check is off |
+| `VITE_APP_CHECK_DEBUG_TOKEN` | App Check debug token, used only in dev |
+| `VITE_ENABLE_CLIENT_ERROR_REPORTING` | `'true'` or `'false'` turns client error reporting on or off. Default: on in a production build, off in dev |
+| `VITE_CONSOLE_ORIGIN` | Where the admin **Report a problem** dialog sends the report (default `https://console.eventrunner.org`) |
+| `VITE_BUILD_ID` | The version that a problem report carries |
 
 CI supplies dummy `VITE_FIREBASE_*` values so `npm run build -w apps/web`
 stays credential-free (spec §8.1) — see the root `README`/CI workflow.
@@ -155,7 +160,8 @@ curated in `scripts/lib/demo-event.cjs`; no private client data belongs here.
 click-through demo in `docs/demo/` (build output, not committed), which
 `.github/workflows/pages.yml` builds and serves from GitHub Pages
 at `/eventrunner/demo/`. It is this same app with one env var set, read in
-exactly one place — `src/lib/demoMode.js` — and consumed at five points:
+`src/lib/demoMode.js` (and also in `src/pages/specimen/specimenRoute.js` and
+`generatedDir.js`). The main points that use it:
 
 | Where | In demo mode |
 | --- | --- |
@@ -163,7 +169,7 @@ exactly one place — `src/lib/demoMode.js` — and consumed at five points:
 | `src/firebase.js` | `disableNetwork(db)` before any listener attaches; App Check never initialized |
 | `src/lib/contentSource.js` | the CMS/speaker subscriptions are not attached at all |
 | `src/lib/mediaSource.js` | `assetUrl()` resolves bundled `branding/*` placeholders, everything else is absent |
-| `src/components/SignInPanel.jsx`, `src/pages/Login.jsx`, `src/components/DemoBanner.jsx` | sign-in replaced with a "disabled in this demo" notice; standing demo banner |
+| `src/components/SignInPanel.jsx`, `src/components/DemoBanner.jsx` | sign-in replaced with a "disabled in this demo" notice; standing demo banner |
 | `src/App.jsx` | the `/specimen` route is registered (see below) |
 
 Two of those are worth the detail:
@@ -224,9 +230,8 @@ opening six pages.
 
 ## Fonts (spec §7.4)
 
-Three open-license variable font sets are self-hosted under
-`public/fonts/` (`source-serif-4-latin.woff2`, `source-sans-3-latin.woff2`,
-`caveat-latin.woff2` — all SIL OFL 1.1; see `public/fonts/README.md`). No
+Open-license font sets are self-hosted under `public/fonts/`. The families
+and their licences are listed in `public/fonts/README.md`. No
 font CDN is ever requested at runtime — `theme.css` and the generated
 `@font-face` rules point at these local files with system-stack fallbacks.
 
@@ -269,7 +274,7 @@ and static demos skip the lookup. The rest of the shell still renders from its s
 commerce availability and financial state require current server responses.
 
 `ticketingCommerce.js` sends App Check and bearer credentials where appropriate, requests
-private responses with `no-store`, restricts payment handoffs to hosted Stripe Checkout,
+private responses with `no-store`, accepts a payment handoff only as an `https` URL with no credentials and no port,
 and stores only account-scoped request/order identifiers for recovery. The browser never
 submits a price, currency, Stripe Price ID, entitlement, or claimed user ID as purchase
 authority. Unknown responses retry a saved attempt; owner-scoped order recovery also works

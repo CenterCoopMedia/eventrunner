@@ -300,3 +300,11 @@ Rules written after user corrections. Read at session start.
 - Before importing a shared module into code that loads with the first page,
   run `node scripts/build-demo.cjs --check`. For a short list, keep a local copy
   and add a test that it equals the shared one.
+
+## 2026-11-09: subagents run on Opus at medium effort
+
+- A full-repository audit started ten read-only agents with no model given,
+  so they ran on the session model (Fable). Joe said: do not use Fable for
+  subagents; Opus at medium effort only. Pass `model: "opus"` and
+  `effort: "medium"` on every Agent call. Fable directs and does not delegate
+  to itself.

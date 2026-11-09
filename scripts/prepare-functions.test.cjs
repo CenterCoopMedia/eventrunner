@@ -17,7 +17,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const { npmCommand } = require('./prepare-functions.cjs');
+const { npmCommand, pinSharedResolved } = require('./prepare-functions.cjs');
 
 test('on win32, npm is invoked via the bundled npm-cli.js, never a bare "npm"', () => {
   const { command, args } = npmCommand(['pack', './packages/shared'], {
@@ -39,4 +39,23 @@ test('on non-Windows platforms, npm is invoked directly with no shell', () => {
   });
   assert.equal(command, 'npm');
   assert.deepEqual(args, ['install', '--package-lock-only']);
+});
+
+test('the root lockfile names each functions directory\'s own tarball', () => {
+  // The two tarballs are byte-identical, so some npm versions resolve both
+  // workspaces to one of them. The lockfile then differs from the committed
+  // one though nothing changed, and local CI refuses the dirty worktree.
+  const entry = (resolved) => ({ version: '0.1.0', resolved, integrity: 'sha512-x' });
+  const lock = {
+    packages: {
+      'functions/node_modules/shared': entry('file:console/functions/vendor/shared.tgz'),
+      'console/functions/node_modules/shared': entry('file:console/functions/vendor/shared.tgz'),
+      'node_modules/other': entry('https://registry.npmjs.org/other/-/other-1.0.0.tgz'),
+    },
+  };
+  assert.equal(pinSharedResolved(lock), true);
+  assert.equal(lock.packages['functions/node_modules/shared'].resolved, 'file:functions/vendor/shared.tgz');
+  assert.equal(lock.packages['console/functions/node_modules/shared'].resolved, 'file:console/functions/vendor/shared.tgz');
+  assert.match(lock.packages['node_modules/other'].resolved, /^https:/);
+  assert.equal(pinSharedResolved(lock), false); // already right: nothing to write
 });

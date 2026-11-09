@@ -66,16 +66,21 @@ function text(value) {
  * `#` is a real group and not a failure: a name beginning with a digit, a
  * symbol, or a script this alphabet does not cover still has to appear
  * somewhere a reader can find it, and dropping it into "A" would file it
- * under a letter it does not start with. The comparison is the same
- * `localeCompare` the sort uses, so the groups follow the order the list is
- * already in rather than a second, disagreeing rule.
+ * under a letter it does not start with. An accent is dropped (É files under
+ * E), because the list's `localeCompare` sort puts Édouard between Eaa and
+ * Ezra: the raw character would cut the E group in two.
  *
  * @param {string} displayName
  * @returns {string}
  */
 export function indexLetter(displayName) {
   const first = (displayName ?? '').trim().slice(0, 1).toLocaleUpperCase();
-  return /\p{Letter}/u.test(first) ? first : '#';
+  if (!/\p{Letter}/u.test(first)) return '#';
+  return first.normalize('NFD').replace(/\p{Mark}/gu, '') || first;
+}
+
+function sameBaseLetter(a, b) {
+  return a === b || (a !== '#' && b !== '#' && a.localeCompare(b, undefined, { sensitivity: 'base' }) === 0);
 }
 
 /**
@@ -93,7 +98,9 @@ export function groupByLetter(sorted) {
   for (const profile of sorted) {
     const letter = indexLetter(profile.displayName);
     const last = groups[groups.length - 1];
-    if (last && last.letter === letter) last.members.push(profile);
+    // A letter with no accent to drop (Ł, Ø) still sorts with its base letter,
+    // so the sort's own base comparison decides where a group ends.
+    if (last && sameBaseLetter(last.letter, letter)) last.members.push(profile);
     else groups.push({ letter, members: [profile] });
   }
   return groups;

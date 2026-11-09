@@ -219,7 +219,7 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
     venue_address: formatVenueAddress(event.venue),
     venue_map_url: event.venue?.mapUrl || '',
     site_url: site,
-    login_url: site ? `${site}/login` : '',
+    login_url: site ? `${site}/signin` : '',
     schedule_url: site ? `${site}/schedule` : '',
     support_email: event.legal?.supportEmail || '',
     social_links_text: buildSocialLinksText(event.social),

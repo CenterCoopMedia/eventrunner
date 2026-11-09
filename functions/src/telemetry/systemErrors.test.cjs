@@ -188,6 +188,25 @@ test('two distinct docs with the same kind+message share a dedupeKey (defense ag
   assert.equal(notifyOperator.calls[0].dedupeKey, notifyOperator.calls[1].dedupeKey);
 });
 
+// --- buildNotifyDeps ------------------------------------------------------------
+
+test('buildNotifyDeps: does not build the mail provider when the notifier never sends email', () => {
+  // The handlers bind the mail provider's secrets only for the "email"
+  // notifier. With "none" or "webhook" the provider's key is absent, and
+  // building the provider throws; both handlers then failed on every call.
+  const saved = { ...process.env };
+  process.env.EVENT_EMAIL_PROVIDER = 'postmark';
+  process.env.EVENT_OPERATOR_NOTIFIER = 'none';
+  delete process.env.EMAIL_PROVIDER_API_KEY;
+  try {
+    const deps = internals.buildNotifyDeps();
+    assert.equal(typeof deps.notifyOperator, 'function');
+  } finally {
+    for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
+    Object.assign(process.env, saved);
+  }
+});
+
 // --- notifierSecretNames (Codex review finding, P1) -----------------------------
 //
 // createOperatorNotifier's email sink needs the configured EmailProvider's

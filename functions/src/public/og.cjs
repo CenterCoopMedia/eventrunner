@@ -264,9 +264,17 @@ function buildOgHtml({ template, meta }) {
 /** Update id from the request: `/updates/:id` path, or `?id=`. */
 function requestedUpdateId(req) {
   const pathMatch = typeof req.path === 'string' ? req.path.match(/\/updates\/([^/?#]+)/) : null;
-  if (pathMatch) return decodeURIComponent(pathMatch[1]);
-  const queryId = req.query?.id;
-  return typeof queryId === 'string' && queryId ? queryId : null;
+  let id = req.query?.id;
+  if (pathMatch) {
+    try {
+      id = decodeURIComponent(pathMatch[1]);
+    } catch {
+      return null; // a malformed escape
+    }
+  }
+  // An id that cannot be a document id (a slash, a dot segment) is no update:
+  // the handler then serves the event-level tags, as for a missing document.
+  return isValidDocId(id) ? id : null;
 }
 
 // -------------------------------------------------------------------- http

@@ -157,7 +157,9 @@ export function downloadIcs(filename, icsText) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Deferred, as saveBlobAs (lib/materialsSource.js) does: revoking at once
+  // can race the browser's own read of the blob URL in some engines.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /**

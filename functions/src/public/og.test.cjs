@@ -284,6 +284,13 @@ test('requestedUpdateId: reads /updates/:id from the path or ?id= from the query
   assert.equal(requestedUpdateId({ path: '/' }), null);
 });
 
+test('requestedUpdateId: an id that cannot be a document id reads as no id', () => {
+  assert.equal(requestedUpdateId({ path: '/updates/a%2Fb' }), null); // a slash is a path, not an id
+  assert.equal(requestedUpdateId({ path: '/updates/%E0%A4%A' }), null); // a bad escape
+  assert.equal(requestedUpdateId({ path: '/updates/..' }), null);
+  assert.equal(requestedUpdateId({ path: '/updates', query: { id: 'a/b' } }), null);
+});
+
 // ---------------------------------------------------------------- handler
 
 function fakeRes() {
@@ -349,6 +356,20 @@ test('createUpdatesMetaHandler: missing-doc fallback serves event-level meta, no
   await handler({ method: 'GET', path: '/updates/does-not-exist', query: {} }, res);
   assert.equal(res.statusCode, 200);
   assert.ok(res.sent.includes(EVENT.name));
+});
+
+test('createUpdatesMetaHandler: an unusable id serves event-level meta, not a 500', async () => {
+  const handler = createUpdatesMetaHandler({
+    db: makeFakeDb(),
+    getConfig: async () => enabledConfig(),
+    fetchTemplateFn,
+  });
+  for (const path of ['/updates/a%2Fb', '/updates/%E0%A4%A', '/updates/..']) {
+    const res = fakeRes();
+    await handler({ method: 'GET', path, query: {} }, res);
+    assert.equal(res.statusCode, 200, path);
+    assert.ok(res.sent.includes(EVENT.name), path);
+  }
 });
 
 test('createUpdatesMetaHandler: a hidden (unpublished) update falls back too, never leaking a draft', async () => {

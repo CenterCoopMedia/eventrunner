@@ -115,3 +115,13 @@ test('sameProjection: only the projected fields matter, never updatedAt', () => 
 test('the visibility list is the closed list the rules read', () => {
   assert.deepEqual([...VISIBILITIES], ['private', 'attendees_only', 'public']);
 });
+
+test('building the handlers does not initialize the Admin SDK', () => {
+  // core/firestore.cjs is lazy so that loading the export barrel (deploy
+  // analysis, the emulator) creates no app. The triggers must be too.
+  const { getApps } = require('firebase-admin/app');
+  const before = getApps().length;
+  const { handlers } = require('./share.cjs');
+  assert.equal(typeof handlers.syncScheduleShare, 'function');
+  assert.equal(getApps().length, before);
+});

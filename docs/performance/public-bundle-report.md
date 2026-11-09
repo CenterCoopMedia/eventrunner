@@ -138,4 +138,4 @@ The NC Local style added about 5,400 raw bytes, which took the demo to 168,006 r
 - The initial graph can use at most 1,080,000 raw bytes and 292,000 gzip bytes.
 - The stylesheets `index.html` names can use at most 190,000 raw bytes and 28,000 gzip bytes.
 - Each deferred chunk can use at most 180,000 raw bytes and 50,000 gzip bytes.
-- CI checks the normal build and the committed demo build.
+- CI checks the normal build and a fresh demo build.

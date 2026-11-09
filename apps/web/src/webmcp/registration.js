@@ -25,9 +25,21 @@ async function unregister(modelContext, name, registration) {
   }
 }
 
+/** Unregister every tool a record registered, after its registration settles. */
+async function unregisterAll(modelContext, record) {
+  await record.registrationTask;
+  await Promise.allSettled(
+    record.registrations.map(({ name, registration }) =>
+      unregister(modelContext, name, registration),
+    ),
+  );
+}
+
 /**
  * Register one named set once per model-context instance. Concurrent mounts
- * share it, and every execute callback reads the newest state ref.
+ * of the same tool list share it, and every execute callback reads the
+ * newest state ref. A mount that brings a different list replaces the set:
+ * the old tools are unregistered first, then the new ones are registered.
  */
 export function mountToolSet({ modelContext, setId, definitions, stateRef }) {
   if (!modelContext || typeof modelContext.registerTool !== 'function') {
@@ -40,26 +52,38 @@ export function mountToolSet({ modelContext, setId, definitions, stateRef }) {
     mountedSets.set(modelContext, sets);
   }
 
+  const key = definitions.map((definition) => definition.name).join('\n');
   let record = sets.get(setId);
-  if (record) {
+  if (record && record.key === key) {
     record.mounts += 1;
     record.stateRef = stateRef;
   } else {
+    // An effect that re-runs with a new tool list cleans up and mounts again
+    // in one commit, exactly as a Strict Mode remount does. Reusing the old
+    // record there would keep the old list registered, so retire it instead.
+    const previous = record;
+    if (previous) previous.retired = true;
     record = {
+      key,
       mounts: 1,
       stateRef,
       registrations: [],
       registrationTask: null,
+      retired: false,
     };
-    record.registrationTask = Promise.allSettled(
-      definitions.map(async (definition) => {
-        const registration = await modelContext.registerTool({
-          ...definition,
-          execute: async (input) => definition.execute(input, record.stateRef.current),
-        });
-        record.registrations.push({ name: definition.name, registration });
-      }),
-    );
+    const current = record;
+    current.registrationTask = (async () => {
+      if (previous) await unregisterAll(modelContext, previous);
+      await Promise.allSettled(
+        definitions.map(async (definition) => {
+          const registration = await modelContext.registerTool({
+            ...definition,
+            execute: async (input) => definition.execute(input, current.stateRef.current),
+          });
+          current.registrations.push({ name: definition.name, registration });
+        }),
+      );
+    })();
     sets.set(setId, record);
   }
 
@@ -73,17 +97,14 @@ export function mountToolSet({ modelContext, setId, definitions, stateRef }) {
     // that remount can reuse the pending registrations instead of creating
     // a duplicate set.
     queueMicrotask(async () => {
-      if (record.mounts > 0) return;
+      // A retired record's tools are unregistered by the record that replaced it.
+      if (record.mounts > 0 || record.retired) return;
       try {
         await record.registrationTask;
-        if (record.mounts > 0) return;
-        await Promise.all(
-          record.registrations.map(({ name, registration }) =>
-            unregister(modelContext, name, registration),
-          ),
-        );
+        if (record.mounts > 0 || record.retired) return;
+        await unregisterAll(modelContext, record);
       } finally {
-        if (record.mounts === 0) sets.delete(setId);
+        if (record.mounts === 0 && sets.get(setId) === record) sets.delete(setId);
         if (sets.size === 0) mountedSets.delete(modelContext);
       }
     });
