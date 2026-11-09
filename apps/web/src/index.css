@@ -2519,7 +2519,6 @@
     text-wrap: pretty;
     color: rgb(var(--color-text-secondary-rgb));
   }
-  .event-hero__action { margin-block-start: var(--space-lg); gap: var(--space-md); }
   /* An action label is CMS text. One with no space in it wraps inside its
      button, which keeps its touch-target height, instead of pushing the
      button past the copy column onto the photograph. */

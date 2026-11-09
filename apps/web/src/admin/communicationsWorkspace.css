@@ -100,21 +100,6 @@
   stroke-linejoin: round;
 }
 
-.admin-email-workspace__steps {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-xs);
-  margin-top: var(--space-xs);
-  color: rgb(var(--admin-ink-secondary-rgb));
-  font-size: var(--admin-text-sm);
-}
-
-.admin-email-workspace__steps li + li::before {
-  content: '\2192';
-  margin-inline-end: var(--space-xs);
-}
-
 @container announcement-editor (min-width: 26rem) {
   .admin-email-workspace__link-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
