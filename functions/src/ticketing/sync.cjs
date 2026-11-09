@@ -49,10 +49,10 @@ const PAYMENT_RECHECK_LIMIT = 48;
 const MAX_SYNC_PAGES = 50;
 
 /**
- * Time after which a full sync starts no new page. `ticketingSync` runs
- * for at most 540 seconds. The 2 minutes left give the last page time to
- * finish: a Stripe page reconciles up to 25 orders, each with several
- * Stripe reads. The run then answers with what it did.
+ * Time after which a full sync starts no new page, and the Stripe
+ * provider starts no new order. `ticketingSync` runs for at most 540
+ * seconds. The 2 minutes left give the last page or order time to
+ * finish. The run then answers with what it did.
  */
 const SYNC_TIME_BUDGET_MS = 7 * 60 * 1000;
 const SYNC_TIMEOUT_SECONDS = 540;
@@ -385,21 +385,32 @@ async function drainTicketSyncQueue({
  * part way leaves no ticket half written, and a retried page writes the
  * same values again. Counts are per ticket and per run.
  *
+ * A provider that commits while it lists (Stripe) also gets the deadline
+ * as `shouldStop`. It can stop inside a page (`stoppedEarly`), and on an
+ * error it reports what it committed (`partialProgress`), so neither case
+ * loses counts or restarts the page from its start.
+ *
  * @param {{ db: object, provider: object, since?: string, cursor?: string,
  *           now?: () => Date, log?: object }} deps
  */
 async function runFullSync({ db, provider, since, cursor, now = () => new Date(), log = console }) {
   const totals = { created: 0, updated: 0, skipped: 0, pages: 0, truncated: false, nextCursor: null };
   const startedAt = now().getTime();
+  const shouldStop = () => now().getTime() - startedAt >= SYNC_TIME_BUDGET_MS;
   let pageToken = cursor || undefined;
+  // True while the provider lists. A listing that fails has written
+  // nothing, unless the provider commits while it lists.
+  let listing = false;
   try {
     for (let page = 0; page < MAX_SYNC_PAGES; page += 1) {
-      if (page > 0 && now().getTime() - startedAt >= SYNC_TIME_BUDGET_MS) {
+      if (page > 0 && shouldStop()) {
         log.warn(`ticketing: full sync stopped at its time budget after ${totals.pages} pages`);
         return { ...totals, truncated: true, stoppedReason: 'time-limit', nextCursor: pageToken };
       }
       if (!await writesAllowed(db)) return { ...totals, skippedReason: 'read-only-demo' };
-      const result = await provider.listTickets({ since, pageToken });
+      listing = true;
+      const result = await provider.listTickets({ since, pageToken, shouldStop });
+      listing = false;
       if (!await writesAllowed(db)) return { ...totals, skippedReason: 'read-only-demo' };
       if (provider.ownsTicketPersistence) {
         // The provider committed these tickets itself while it listed them.
@@ -415,16 +426,31 @@ async function runFullSync({ db, provider, since, cursor, now = () => new Date()
       }
       totals.pages += 1;
       pageToken = result?.nextPageToken || null;
+      if (result?.stoppedEarly && pageToken) {
+        log.warn(`ticketing: full sync stopped at its time budget inside page ${totals.pages}`);
+        return { ...totals, truncated: true, stoppedReason: 'time-limit', nextCursor: pageToken };
+      }
       if (!pageToken) return totals;
     }
   } catch (err) {
     // A token the provider refuses cannot be retried: the caller says so.
     if (err?.code === 'invalid-page-token' && pageToken) throw err;
-    // Nothing saved and nothing to resume: the caller answers 502.
-    if (!pageToken && totals.created + totals.updated + totals.skipped === 0) throw err;
+    // The provider committed part of the page before it failed. Count it,
+    // and resume at the order that failed, not at the start of the page.
+    const partial = err?.partialProgress;
+    if (partial) {
+      totals.updated += Array.isArray(partial.tickets) ? partial.tickets.length : 0;
+      if (partial.nextPageToken) pageToken = partial.nextPageToken;
+    }
+    // Nothing counted and nothing to resume: the caller answers 502. It
+    // says no tickets changed only when that is known.
+    if (!pageToken && totals.created + totals.updated + totals.skipped === 0) {
+      const nothingSaved = partial ? partial.outcomeKnown === true : listing && !provider.ownsTicketPersistence;
+      throw Object.assign(new Error('The full sync failed before it saved a ticket it could count.', { cause: err }), { nothingSaved });
+    }
     // Otherwise the run stopped part way. The cursor points at the page
-    // that failed, so the next run retries it (a Stripe order that was
-    // still reconciling, a rate limit, a failed write).
+    // or order that failed, so the next run retries it (a Stripe order
+    // that was still reconciling, a rate limit, a failed write).
     log.error('ticketing: full sync stopped on an error', err);
     return { ...totals, truncated: true, stoppedReason: 'provider-error', nextCursor: pageToken || null };
   }
@@ -443,6 +469,10 @@ function readCursor(value) {
 }
 
 const BAD_CURSOR_MESSAGE = 'The sync cannot continue from this point. Start the sync again from the beginning.';
+const NOTHING_SAVED_MESSAGE = 'The ticketing provider could not be read. No tickets changed. Try again in a few minutes.';
+// A failed write, or a provider that commits while it lists, can leave
+// tickets saved that the run could not count. Each write is idempotent.
+const UNKNOWN_OUTCOME_MESSAGE = 'The sync stopped on an error. Some tickets may be saved. Run the sync again. It does not make duplicate tickets.';
 
 /**
  * Admin-gated HTTP handler for `ticketingSync`.
@@ -483,7 +513,7 @@ function createTicketingSyncHandler({ db, provider, auth, getConfig, now, log = 
       res.status(502).json({
         error: {
           code: 'provider-error',
-          message: 'The ticketing provider could not be read. No tickets changed. Try again in a few minutes.',
+          message: err?.nothingSaved === true ? NOTHING_SAVED_MESSAGE : UNKNOWN_OUTCOME_MESSAGE,
         },
       });
     }

@@ -657,3 +657,102 @@ test('a provider failure during a full sync is a 502, not a stack trace', async 
   assert.equal(res.body.error.code, 'provider-error');
   assert.equal(res.body.error.message, 'The ticketing provider could not be read. No tickets changed. Try again in a few minutes.');
 });
+
+// The Stripe provider commits each order itself while it lists a page.
+const { createStripeProvider } = require('./providers/stripe.cjs');
+const STRIPE_ENV = { EVENT_TICKETING_PROVIDER: 'stripe', EVENT_TICKETING_EVENT_ID: 'conference-1',
+  EVENT_STRIPE_ACCOUNT_ID: 'acct_fixture', EVENT_STRIPE_MODE: 'test' };
+const STRIPE_ORDER = { attemptId: 'att_fixture', eventId: 'conference-1', provider: 'stripe',
+  stripeAccountId: 'acct_fixture', livemode: false, stripeSessionId: 'cs_test_fixture' };
+const UNKNOWN_OUTCOME = 'The sync stopped on an error. Some tickets may be saved. Run the sync again. It does not make duplicate tickets.';
+
+function stripeSyncFixture(reconcile, ids = ['ord_a', 'ord_b', 'ord_c']) {
+  const db = makeFakeDb(Object.fromEntries(ids.map((id) => [`ticket_orders/${id}`, { ...STRIPE_ORDER, id }])));
+  const provider = createStripeProvider({ env: STRIPE_ENV, db, stripeClient: {} });
+  const started = [];
+  provider.reconcileOrder = async (orderId) => {
+    started.push(orderId);
+    return reconcile(orderId);
+  };
+  return { db, provider, started };
+}
+const reconciled = (orderId) => ({ complete: true, tickets: [{ externalId: `t_${orderId}` }] });
+
+test('a Stripe page that passes the time budget stops before the next order and resumes at it', async () => {
+  let clock = T0.getTime();
+  // Each order takes four minutes: ord_a ends at 4, ord_b at 8, past the 7-minute budget.
+  const { db, provider, started } = stripeSyncFixture((orderId) => { clock += 4 * 60 * 1000; return reconciled(orderId); });
+  const now = () => new Date(clock);
+
+  const first = await runFullSync({ db, provider, now, log: QUIET });
+  assert.equal(first.truncated, true);
+  assert.equal(first.stoppedReason, 'time-limit');
+  assert.equal(first.updated, 2);
+  assert.equal(first.nextCursor, 'ord_b');
+
+  const rest = await runFullSync({ db, provider, cursor: first.nextCursor, now, log: QUIET });
+  assert.equal(rest.truncated, false);
+  assert.equal(rest.updated, 1);
+  assert.deepEqual(started, ['ord_a', 'ord_b', 'ord_c']);
+});
+
+test('a Stripe order that fails part way through a fresh first page keeps the counts and resumes at the failed order', async () => {
+  const { db, provider, started } = stripeSyncFixture((orderId) => {
+    if (orderId === 'ord_b' && started.length === 2) return { complete: false, retryWithoutAttempt: true, tickets: [] };
+    return reconciled(orderId);
+  });
+  const handler = createTicketingSyncHandler({ db, provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+
+  const res = await syncAs(handler);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.truncated, true);
+  assert.equal(res.body.stoppedReason, 'provider-error');
+  assert.equal(res.body.updated, 1);
+  assert.equal(res.body.nextCursor, 'ord_a');
+
+  const resumed = await syncAs(handler, { cursor: res.body.nextCursor });
+  assert.equal(resumed.body.truncated, false);
+  assert.equal(resumed.body.updated, 2);
+  assert.deepEqual(started, ['ord_a', 'ord_b', 'ord_b', 'ord_c']);
+});
+
+test('a Stripe order that fails on a later page adds the committed orders to the totals', async () => {
+  const ids = Array.from({ length: 27 }, (_, i) => `ord_${String(i).padStart(2, '0')}`);
+  const { db, provider } = stripeSyncFixture((orderId) => {
+    if (orderId === 'ord_26') throw new Error('Stripe reconciliation is temporarily unavailable.');
+    return reconciled(orderId);
+  }, ids);
+
+  const totals = await runFullSync({ db, provider, now: () => T0, log: QUIET });
+  assert.equal(totals.pages, 1);
+  assert.equal(totals.updated, 26);
+  assert.equal(totals.stoppedReason, 'provider-error');
+  assert.equal(totals.nextCursor, 'ord_25');
+});
+
+test('a fresh sync whose first Stripe order fails does not claim that no tickets changed', async () => {
+  const { db, provider } = stripeSyncFixture(() => { throw new Error('Stripe reconciliation is temporarily unavailable.'); });
+  const handler = createTicketingSyncHandler({ db, provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+  const res = await syncAs(handler);
+  assert.equal(res.statusCode, 502);
+  assert.equal(res.body.error.code, 'provider-error');
+  assert.equal(res.body.error.message, UNKNOWN_OUTCOME);
+});
+
+test('a fresh sync whose first Stripe order is still reconciling says no tickets changed', async () => {
+  const { db, provider } = stripeSyncFixture(() => ({ complete: false, retryWithoutAttempt: true, tickets: [] }));
+  const handler = createTicketingSyncHandler({ db, provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+  const res = await syncAs(handler);
+  assert.equal(res.statusCode, 502);
+  assert.equal(res.body.error.message, 'The ticketing provider could not be read. No tickets changed. Try again in a few minutes.');
+});
+
+test('a fresh sync whose first ticket write fails does not claim that no tickets changed', async () => {
+  const db = makeFakeDb();
+  const provider = createFakeTicketingProvider({ pages: [{ tickets: [fakeTicket({ externalId: 'a' })], nextPageToken: null }] });
+  db.runTransaction = async () => { throw new Error('deadline exceeded'); };
+  const handler = createTicketingSyncHandler({ db, provider, auth: ADMIN_AUTH, getConfig: ADMIN_CONFIG, log: QUIET });
+  const res = await syncAs(handler);
+  assert.equal(res.statusCode, 502);
+  assert.equal(res.body.error.message, UNKNOWN_OUTCOME);
+});

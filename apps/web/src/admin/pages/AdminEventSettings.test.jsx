@@ -66,6 +66,10 @@ function sentEvent() {
   return call?.[1].event;
 }
 
+function sentEvents() {
+  return callMock.mock.calls.filter(([name]) => name === 'updateEventConfig').map(([, body]) => body.event);
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-11-09T15:00:00Z'));
@@ -91,7 +95,7 @@ describe('AdminEventSettings: announce and archive', () => {
     expect(within(panel()).queryByText(/Our team sets these dates/)).toBeNull();
   });
 
-  it('sends an entered announce date as an event-local stamp, and an empty archive date as null', async () => {
+  it('sends an entered announce date as an event-local stamp, and leaves the untouched archive date out', async () => {
     render(<AdminEventSettings />);
     const announced = dateTimeInputs('Announced');
     fireEvent.change(announced.date, { target: { value: '2026-11-01' } });
@@ -99,7 +103,7 @@ describe('AdminEventSettings: announce and archive', () => {
     save();
     await waitFor(() => expect(sentEvent()).toBeTruthy());
     expect(sentEvent().announcedAt).toBe('2026-11-01T09:30');
-    expect(sentEvent().archivedAt).toBeNull();
+    expect('archivedAt' in sentEvent()).toBe(false);
     expect(await screen.findByText('Saved. The site picks the change up live.')).toBeTruthy();
   });
 
@@ -114,9 +118,40 @@ describe('AdminEventSettings: announce and archive', () => {
     fireEvent.click(within(archived.group).getByRole('button', { name: 'Clear archived' }));
     save();
     await waitFor(() => expect(sentEvent()).toBeTruthy());
-    // The announce date was not edited, so its stored bytes go back as they are.
-    expect(sentEvent().announcedAt).toBe('2026-10-01T09:00:00');
+    // The announce date was not edited, so the save leaves it to the server.
+    expect('announcedAt' in sentEvent()).toBe(false);
     expect(sentEvent().archivedAt).toBeNull();
+  });
+
+  it('leaves both dates out of an operator save that did not touch them, so a change made elsewhere stays', async () => {
+    eventConfig = storedEvent({ announcedAt: '2026-10-01T09:00' });
+    render(<AdminEventSettings />);
+    // Another operator archives the event while this page is open. The
+    // form adopted the live config once and does not show the change.
+    eventConfig = storedEvent({ announcedAt: '2026-10-01T09:00', archivedAt: '2026-11-05T00:00' });
+    fireEvent.change(screen.getByLabelText(/^Short name/), { target: { value: 'EX28' } });
+    save();
+    await waitFor(() => expect(sentEvent()).toBeTruthy());
+    expect(sentEvent().shortName).toBe('EX28');
+    expect('announcedAt' in sentEvent()).toBe(false);
+    expect('archivedAt' in sentEvent()).toBe(false);
+  });
+
+  it('measures the next save against the dates the last save sent', async () => {
+    render(<AdminEventSettings />);
+    const announced = dateTimeInputs('Announced');
+    fireEvent.change(announced.date, { target: { value: '2026-11-01' } });
+    fireEvent.change(announced.time, { target: { value: '09:30' } });
+    save();
+    expect(await screen.findByText('Saved. The site picks the change up live.')).toBeTruthy();
+    save();
+    await waitFor(() => expect(sentEvents()).toHaveLength(2));
+    expect('announcedAt' in sentEvents()[1]).toBe(false);
+    fireEvent.click(within(dateTimeInputs('Announced').group).getByRole('button', { name: 'Clear announced' }));
+    save();
+    await waitFor(() => expect(sentEvents()).toHaveLength(3));
+    expect(sentEvents()[2].announcedAt).toBeNull();
+    expect('archivedAt' in sentEvents()[2]).toBe(false);
   });
 
   it('keeps the chosen one of a time the clocks pass twice, and sends the wall clock', async () => {
