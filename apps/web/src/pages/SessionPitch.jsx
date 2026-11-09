@@ -151,7 +151,7 @@ export default function SessionPitch() {
   const header = (
     <header className="max-w-prose space-y-sm">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Pitch a session</h1>
-      <p className="text-body-lg text-text-secondary">Share an idea for {event.shortName}. Tell the organizers what people will learn and how you will involve them.</p>
+      <p className="text-lead text-text-secondary">Share an idea for {event.shortName}. Tell the organizers what people will learn and how you will involve them.</p>
       <section className="space-y-xs border-t-hairline border-rule-hairline pt-sm" aria-labelledby="pitch-call-heading">
         <h2 id="pitch-call-heading" className="sr-only">Call for sessions</h2>
         <p role="status" className="font-semibold">{IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Checking your connection…' : !settings ? 'Checking submissions…' : open ? 'Submissions are open' : 'Submissions are closed'}</p>
