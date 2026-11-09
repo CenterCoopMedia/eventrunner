@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { checkEnvironment, validateReceipt } = require('./run-local.cjs');
+const { CHECKS, checkEnvironment, validateReceipt } = require('./run-local.cjs');
 
 const current = { base: 'a'.repeat(40), head: 'b'.repeat(40), tree: 'c'.repeat(40) };
 const jobs = { unit: true, build: true };
@@ -33,4 +33,16 @@ test('dummy build config does not enter web unit tests', () => {
   const inherited = { PATH: '/opt/node/bin' };
   assert.equal(checkEnvironment('build', inherited).VITE_FIREBASE_PROJECT_ID, 'ci-dummy');
   assert.deepEqual(checkEnvironment('unitWeb', inherited), { ...inherited, CI: 'true' });
+});
+
+test('the local checks cover what the hosted jobs they replace run, the console suites among them', () => {
+  // A trusted local result skips every hosted tier, so a suite missing here
+  // runs nowhere for that pull request.
+  const scripts = require('../../package.json').scripts;
+  const hostedGlobs = [...scripts.test.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  const [unit] = CHECKS.unit;
+  assert.deepEqual(unit.filter((arg) => arg.includes('*')), hostedGlobs);
+  const commands = (job) => CHECKS[job].map((command) => command.join(' '));
+  assert.ok(commands('unitWeb').includes('npm run test:console'));
+  assert.ok(commands('build').includes('npm run build:console'));
 });

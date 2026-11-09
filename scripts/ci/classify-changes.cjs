@@ -42,6 +42,7 @@ const COPY_CHECKED_DOC_FILES = new Set([
   'docs/DEPLOY_RUNBOOK.md',
   'docs/POSTMARK_PROVISIONING.md',
   'docs/EVENTBRITE_VERIFICATION.md',
+  'console/README.md',
 ]);
 
 const ALWAYS_FULL_PATHS = new Set([
