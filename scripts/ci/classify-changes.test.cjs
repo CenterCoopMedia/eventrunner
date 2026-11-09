@@ -14,7 +14,7 @@ function selected(result) {
 test('docs-only changes select documentation checks and the copy gate', () => {
   const result = classifyPaths([
     'README.md',
-    'docs/ADMIN_GUIDE.md',
+    'docs/DEPLOY_RUNBOOK.md',
     'docs/handbook/faq.md',
     'CONTRIBUTING.md',
   ]);
@@ -29,6 +29,15 @@ test('docs-only changes select documentation checks and the copy gate', () => {
   assert.equal(result.jobs.e2e, false);
 });
 
+test('a document a unit test reads also selects the unit tier', () => {
+  // functions/src/users/records.test.cjs reads the admin guide, and
+  // scripts/lib/tokens.test.cjs reads the font licence table.
+  const guide = classifyPaths(['docs/ADMIN_GUIDE.md']);
+  assert.equal(guide.mode, 'docs');
+  assert.deepEqual(selected(guide), ['docs', 'lint', 'unit']);
+  assert.deepEqual(selected(classifyPaths(['apps/web/public/fonts/README.md'])), ['docs', 'unit']);
+});
+
 test('demo generator and committed Pages output select demo checks without emulator suites', () => {
   const generator = classifyPaths([
     'scripts/build-demo.cjs',
@@ -37,7 +46,8 @@ test('demo generator and committed Pages output select demo checks without emula
   const output = classifyPaths(['docs/demo/index.html']);
 
   assert.equal(generator.mode, 'demo');
-  assert.deepEqual(selected(generator), ['demo', 'lint', 'audit']);
+  // scripts/** tests that npm test runs read the generators, so unit runs too.
+  assert.deepEqual(selected(generator), ['demo', 'lint', 'audit', 'unit']);
   assert.equal(generator.jobs.rules, false);
   assert.equal(generator.jobs.e2e, false);
 
@@ -54,7 +64,7 @@ test('Pages generator paths select documentation checks and lint', () => {
   ]) {
     const result = classifyPaths([path]);
     assert.equal(result.mode, 'docs', path);
-    assert.deepEqual(selected(result), ['docs', 'lint', 'audit'], path);
+    assert.deepEqual(selected(result), ['docs', 'lint', 'audit', 'unit'], path);
   }
 
   assert.deepEqual(selected(classifyPaths(['docs/docs/index.html'])), ['docs']);
@@ -64,7 +74,7 @@ test('the Pages site address selects both the documentation and the demo checks'
   for (const path of ['scripts/lib/pages-site.cjs', 'scripts/lib/pages-site.test.cjs']) {
     const result = classifyPaths([path]);
     assert.equal(result.mode, 'mixed', path);
-    assert.deepEqual(selected(result), ['docs', 'demo', 'lint', 'audit'], path);
+    assert.deepEqual(selected(result), ['docs', 'demo', 'lint', 'audit', 'unit'], path);
     assert.equal(result.jobs.e2e, false, path);
   }
 });
@@ -75,8 +85,8 @@ test('application and backend changes select their relevant suites', () => {
   const shared = classifyPaths(['packages/shared/src/registration.cjs']);
 
   assert.equal(app.mode, 'app');
-  assert.deepEqual(selected(app), ['demo', 'lint', 'audit', 'unitWeb', 'build', 'hygiene', 'e2e']);
-  assert.equal(app.jobs.unit, false);
+  // npm test files read apps/web (seed and route checks, the bundle budget).
+  assert.deepEqual(selected(app), ['demo', 'lint', 'audit', 'unit', 'unitWeb', 'build', 'hygiene', 'e2e']);
   assert.equal(app.jobs.rules, false);
 
   assert.equal(backend.mode, 'backend');
@@ -111,6 +121,7 @@ test('PR change collection uses the merge base and retains both sides of renames
     'demo',
     'lint',
     'audit',
+    'unit',
     'unitWeb',
     'build',
     'hygiene',
@@ -181,6 +192,7 @@ test('mixed changes take the union of their tiers', () => {
     'demo',
     'lint',
     'audit',
+    'unit',
     'unitWeb',
     'build',
     'hygiene',
@@ -194,6 +206,14 @@ test('unknown paths fail open to the full matrix', () => {
 
   assert.equal(result.mode, 'full');
   assert.deepEqual(selected(result), JOB_NAMES);
+});
+
+test('a rules file also selects the unit tier, because unit tests read it', () => {
+  for (const path of ['firestore.rules', 'storage.rules']) {
+    const result = classifyPaths([path]);
+    assert.equal(result.mode, 'rules', path);
+    assert.deepEqual(selected(result), ['unit', 'rules', 'e2e'], path);
+  }
 });
 
 test('a rules test file selects the rules suite and lint, not the full matrix', () => {

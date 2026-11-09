@@ -191,14 +191,14 @@ HTML has drifted from a fresh render — the same freshness rule
 
 | Changed paths | Selected tier |
 |---|---|
-| Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links, generated Pages HTML markup, and `docs/docs/**` freshness. `README.md`, `console/README.md`, `docs/index.html`, `docs/handbook/**` and five guides in `docs/` also select lint, because `npm run check:copy` reads them |
-| Documentation generators (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks, lint, and the dependency audit policy |
-| `scripts/build-demo.cjs` or `scripts/build-demo.test.cjs` | Lint, the dependency audit policy, demo generator tests, and demo build hygiene: two identical builds and the demo bundle budget |
-| The Pages site address (`scripts/lib/pages-site.cjs` and its test) | Documentation checks, lint, the dependency audit policy, and demo build hygiene |
-| `apps/web/**` | Lint, the dependency audit policy, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E |
+| Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links, generated Pages HTML markup, and `docs/docs/**` freshness. `README.md`, `console/README.md`, `docs/index.html`, `docs/handbook/**` and five guides in `docs/` also select lint, because `npm run check:copy` reads them. `docs/ADMIN_GUIDE.md` and `apps/web/public/fonts/README.md` also select shared/functions unit tests, because a unit test reads each |
+| Documentation generators (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks, lint, the dependency audit policy, and shared/functions unit tests |
+| `scripts/build-demo.cjs` or `scripts/build-demo.test.cjs` | Lint, the dependency audit policy, shared/functions unit tests, demo generator tests, and demo build hygiene: two identical builds and the demo bundle budget |
+| The Pages site address (`scripts/lib/pages-site.cjs` and its test) | Documentation checks, lint, the dependency audit policy, shared/functions unit tests, and demo build hygiene |
+| `apps/web/**` | Lint, the dependency audit policy, shared/functions unit tests (some read `apps/web`), web unit tests, web build, generated-content hygiene, demo hygiene, and E2E |
 | `functions/**` | Lint, the dependency audit policy, shared/functions unit tests, rules emulators, and E2E |
 | `packages/shared/**` | Lint, the dependency audit policy, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
-| `firestore.rules` or `storage.rules` | Rules emulators and E2E |
+| `firestore.rules` or `storage.rules` | Shared/functions unit tests (some read the rules), rules emulators, and E2E |
 | `tests/*.rules.test.js` | Lint and rules emulators |
 | Workflows, tool configuration, package manifests or locks, Firebase configuration, `e2e/**`, `publisher/**`, other scripts, or an unrecognized path | Full matrix: documentation checks, lint, the dependency audit policy, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
 
