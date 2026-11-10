@@ -173,11 +173,13 @@ film has one voice:
 - a **tick** when a control is pressed: Publish, the dark-mode switch, Send;
 - a **whoosh** when something travels, loudest where the move is fastest.
 
-Sounds with a pitch are in the key. Each sound is panned to where its event is
-on screen, inside ±0.6 so the two cuts agree. A sound starts on the frame of
-its event: the forty check-in pops and the fourteen delivery bells use the
-same formulas as the picture. Each exposure dip of the picture is a quick
-low-pass dip in the music.
+Sounds with a pitch are in the key, and the score records each pitch it plays
+so the test can check them all. Each sound is panned to where its event is on
+screen, inside ±0.6 so the two cuts agree. A sound starts on the frame of its
+event: the forty check-in pops and the fourteen delivery bells use the same
+formulas as the picture. A hit that shares its moment with a drum sits on the
+beat with the drum, which is within half a frame of the cue. Each exposure dip
+of the picture is a quick low-pass dip in the music.
 
 Some events have a sound made only for them: a pen for the badge outline, a
 printer for the ticket, torn paper for the stub, a different texture for each
@@ -190,25 +192,31 @@ keeps harmonics above 200 Hz, so a phone speaker can play it. The music dips a
 little under loud effects. The master is a gentle compressor, a soft clip and
 a look-ahead limiter, then FFmpeg sets −16 LUFS.
 
-Measured on the mastered WAV: −15.8 LUFS integrated, loudness range 5.9 LU,
-true peak −3.2 dBTP.
+A phone plays the sum of the two channels, so the low end must be in phase.
+Three things keep it there: pad notes below A3 are the same on both sides, the
+hall returns nothing below 180 Hz, and the master removes the difference
+between the channels below 150 Hz.
+
+Measured on the mastered WAV: −15.9 LUFS integrated, loudness range 5.8 LU,
+true peak −3.9 dBTP.
 
 | Part | Loudness |
 | --- | --- |
-| Open | −20.0 LUFS |
+| Open | −20.2 LUFS |
 | Plan (the drop) | −14.8 LUFS |
-| Shape | −15.3 LUFS |
-| Dark-mode bar | −19.9 LUFS |
+| Shape | −15.4 LUFS |
+| Dark-mode bar | −20.0 LUFS |
 | Gather, first half | −19.2 LUFS |
 | Gather, second half | −14.7 LUFS |
-| One site, open bars | −18.8 LUFS |
+| One site, open bars | −18.6 LUFS |
 | The build | −15.0 LUFS |
-| Montage (the peak) | −13.1 LUFS |
-| Title | −16.8 LUFS |
+| Montage (the peak) | −13.2 LUFS |
+| Title | −17.7 LUFS |
 
 In the drop the energy falls evenly from 63 Hz to 8 kHz, about 1 to 3 dB an
-octave, which is the slope of a finished dance record. Left and right agree
-below 120 Hz, and the whole mix stays compatible with mono.
+octave, which is the slope of a finished dance record. In every two-bar span, left and right agree below 120 Hz (correlation 0.89 for
+the last chord, 0.99 or more everywhere else), and the whole mix stays
+compatible with mono.
 
 Nobody has listened to this score. The numbers show that the mix has the
 planned shape and a balanced spectrum; they do not show that it is good. A

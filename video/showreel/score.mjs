@@ -13,7 +13,7 @@
 //
 // Every sample is calculated here and in audio-kit.mjs. No recording, sample
 // pack, loop or borrowed melody is used.
-import {RATE, TAU, hz, lerp, smooth, random, saw, pulse, sine, filter, biquad, render, reversed, bus, place, placeStereo, plate, echo, compress, limit} from './audio-kit.mjs';
+import {RATE, TAU, hz as pitch, clamp, lerp, smooth, random, saw, pulse, sine, filter, biquad, render, reversed, bus, place as put, placeStereo, plate, echo, compress, limit} from './audio-kit.mjs';
 
 // Voicings, as MIDI notes. `root` is the bass note.
 export const CHORDS = {
@@ -28,7 +28,7 @@ export const PROGRESSION = ['Fm', 'E', 'D', 'E', 'Cm', 'Fm', 'D', 'E', 'Fm', 'Fm
 // The six style changes climb: one chord every two beats, top line E F# A B C# E.
 export const CLIMB = [
   {root: 38, notes: [54, 57, 61, 64]}, {root: 40, notes: [56, 59, 61, 66]}, {root: 42, notes: [57, 61, 64, 69]},
-  {root: 45, notes: [61, 64, 69, 71]}, {root: 47, notes: [62, 66, 69, 73]}, {root: 49, notes: [64, 68, 71, 76]},
+  {root: 44, notes: [59, 64, 68, 71]}, {root: 47, notes: [62, 66, 69, 73]}, {root: 49, notes: [64, 68, 71, 76]},
 ];
 // The hook: [sixteenth, note, length in sixteenths] for one bar on each chord.
 // Every bar opens with the 3 + 3 + 2 figure.
@@ -57,6 +57,10 @@ export function compose(clock, {stems = false} = {}) {
   const room = bus(count), hall = bus(count), taps = bus(count);
   const events = [], mark = (kind, frame) => events.push({kind, frame});
   const title = B(80), cut = S(clock.silence[0]);
+  // A sound that starts in the last 10 ms before the breath would be only a blip, so it is left out.
+  const place = (target, data, at, gain, pan) => { if (at < cut - 480 || at >= cut) put(target, data, at, gain, pan); };
+  // Every pitch that plays is recorded, so the test can check the key of calculated notes too.
+  const played = new Set(), hz = note => { played.add(Math.round(note)); return pitch(note); };
 
   // Sends: a short plate for drums and effects, a long hall, and a tempo echo.
   const voice = (target, data, at, gain, pan = 0, sends = {}) => {
@@ -130,7 +134,7 @@ export function compose(clock, {stems = false} = {}) {
   // Fills. Bar 2 into the drop, bar 6, bar 14, and the long roll of bars 17 and 18.
   for (let i = 0; i < 8; i++) voice(drums, i % 2 ? SN2 : SN, B(6 + i / 4), .12 + i * .035, (i - 3.5) * .08, {room: .15});
   for (let i = 0; i < 4; i++) voice(drums, SN, B(23 + i / 4), .16 + i * .04, 0, {room: .15});
-  for (let i = 0; i < 4; i++) voice(drums, tom(57 - i * 3), B(55 + i / 4), .3, -.5 + i * .33, {room: .2});
+  for (let i = 0; i < 4; i++) voice(drums, tom([57, 54, 52, 49][i]), B(55 + i / 4), .3, -.5 + i * .33, {room: .2});
   for (let i = 0; i < 4; i++) voice(drums, SN, B(64 + i), .2 + i * .02, 0, {room: .18});
   for (let i = 0; i < 4; i++) voice(drums, SN, B(68 + i / 2), .22 + i * .02, 0, {room: .18});
   for (let i = 0; i < 8; i++) voice(drums, i % 2 ? SN2 : SN, B(70 + i / 4), .3 + i * .03, 0, {room: .16});
@@ -150,7 +154,7 @@ export function compose(clock, {stems = false} = {}) {
     const s = 4 * (bar - 1), root = rootOf(bar);
     if (bar >= 7 && bar <= 9) continue;
     if (bar === 10) { place(bass, bassNote(30, 3.6 * beat, .2), B(s), .8); continue; }
-    if (bar === 15 || bar === 16) { place(bass, bassNote(root - 12 < 28 ? root : root - 12, 3.7 * beat, .15), B(s), .78); continue; }
+    if (bar === 15 || bar === 16) { place(bass, bassNote(root, 3.7 * beat, .15), B(s), .78); continue; }
     if (bar === 11 || bar === 12) { for (const [st, iv, len] of [[0, 0, 3], [6, 12, 1.2], [10, 0, 1.6], [14, 7, 1]]) place(bass, bassNote(root + iv, len * step, .5), B(s + st / 4), .78); continue; }
     if (bar === 17 || bar === 18) { for (let i = 0; i < 8; i++) place(bass, bassNote(root + (i % 2 ? 12 : 0), .42 * beat, .5 + i * .05 + (bar - 17) * .3), B(s + i / 2), .74); continue; }
     for (const [st, iv, len] of line) place(bass, bassNote(root + iv, len * step, bar >= 19 ? 1.2 : .8), B(s + st / 4), .82);
@@ -167,8 +171,10 @@ export function compose(clock, {stems = false} = {}) {
       const env = Math.min(1, t / .003) * Math.exp(-t / .55) * (t < len ? 1 : Math.exp(-(t - len) / .07));
       return (fm * .7 + lp.run(a(f * 1.003)) * .42) * env; }); };
   const padChord = (notes, len, cutoff) => {
-    // Seven saws a note, spread left and right. Returns a stereo pair.
-    const sides = [0, 1].map(side => { const voices = notes.flatMap(n => [-.11, -.05, 0, .06, .12].map(d => ({osc: saw(rnd()), f: hz(n) * 2 ** ((d + (side ? .02 : -.02)) / 12)}))), lp = filter(), norm = 1 / Math.sqrt(voices.length);
+    // Five saws a note, spread left and right. Returns a stereo pair. Notes below A3 are
+    // the same on both sides, so the low end of a wide chord stays in phase.
+    const spread = [-.11, -.05, 0, .06, .12], low = notes.filter(n => n < 57).flatMap(n => spread.map(d => ({phase: rnd(), f: hz(n) * 2 ** (d / 12)})));
+    const sides = [0, 1].map(side => { const voices = [...low.map(v => ({osc: saw(v.phase), f: v.f})), ...notes.filter(n => n >= 57).flatMap(n => spread.map(d => ({osc: saw(rnd()), f: hz(n) * 2 ** ((d + (side ? .02 : -.02)) / 12)})))], lp = filter(), norm = 1 / Math.sqrt(voices.length);
       return render(len, (t, i) => { if ((i & 31) === 0) lp.set(cutoff(t), .8); let m = 0; for (const v of voices) m += v.osc(v.f);
         return lp.run(m * norm) * smooth(t / .35) * smooth((len - t) / .5); }); });
     return sides; };
@@ -219,7 +225,7 @@ export function compose(clock, {stems = false} = {}) {
   hook(3, 'D', .7); hook(4, 'E', .75); hook(5, 'Cm', .85); hook(6, 'Fm', .9);
   hook(13, 'Cm', .9, .2, true); hook(14, 'Fm', 1, .2, true);
   hook(19, 'D', 1.25, .23, true); hook(20, 'E', 1.3, .23, true);
-  for (const bar of [19, 20]) HOOK[PROGRESSION[bar - 1]].forEach(([st, note, len]) => voice(lead, leadNote(note + 12, len * step * .9, 1.1), B(4 * (bar - 1) + st / 4), .07, .3, {hall: .3}));
+  for (const bar of [19, 20]) HOOK[PROGRESSION[bar - 1]].forEach(([st, note, len]) => voice(lead, leadNote(note + 12, len * step * .9, 1.1), B(4 * (bar - 1) + (st + swing(st) * .5) / 4), .07, .3, {hall: .3}));
   // Gather opens with a bouncing pluck on the chord tones.
   for (const bar of [11, 12]) { const notes = CHORDS[PROGRESSION[bar - 1]].notes; for (let i = 0; i < 16; i++) if (i % 4 !== 3) voice(lead, pluck(notes[[0, 2, 1, 3, 2, 1][i % 6]] + 12, .08, .5 + (i % 4) * .12), B(4 * (bar - 1) + (i + swing(i)) / 4), .12, i % 2 ? .45 : -.45, {echo: .45, room: .2}); }
   // The open bars of the stack remember the hook at half speed, as bells.
@@ -229,12 +235,13 @@ export function compose(clock, {stems = false} = {}) {
 
   // ------------------------------------------------------ sound design
   // Pans follow where an event is on screen, kept inside +-0.6 so both cuts agree.
-  const sfx = (data, frame, gain, pan = 0, sends = {room: .18}, offset = 0) => voice(fx, data, S(frame) + Math.round(offset * RATE), gain, pan, sends);
+  const inside = v => clamp(v, -.6, .6);
+  const sfx = (data, frame, gain, pan = 0, sends = {room: .18}, offset = 0) => voice(fx, data, S(frame) + Math.round(offset * RATE), gain, Array.isArray(pan) ? pan.map(inside) : inside(pan), sends);
   const pop = (note, len = .09) => { let ph = 0; const f = hz(note); return render(len, t => { ph += TAU * f * (.55 + .45 * (1 - Math.exp(-t / .012))) / RATE; return Math.sin(ph) * Math.min(1, t / .002) * Math.exp(-t / (len * .3)); }); };
   const tick = (freq = 2200, len = .03, body = .4) => { const bp = filter().set(freq, 2.5); return render(len, t => { bp.run(noise()); return bp.band * 1.5 * Math.exp(-t / .004) + Math.sin(TAU * freq * .22 * t) * body * Math.exp(-t / .012); }); };
   const wood = (note, len = .16) => { let ph = 0; const f = hz(note), bp = filter().set(1500, 1.2); return render(len, t => { ph += TAU * f * (1 + .2 * Math.exp(-t / .005)) / RATE; bp.run(noise());
     return (Math.sin(ph) * Math.exp(-t / .055) + .3 * Math.sin(ph * 3.94) * Math.exp(-t / .02)) * Math.min(1, t / .001) + bp.band * .3 * Math.exp(-t / .004); }); };
-  const thud = (freq = 90, len = .24, dust = .5) => { const lp = filter().set(700); return render(len, t => (Math.sin(TAU * freq * t * (1 + .35 * Math.exp(-t / .012))) * Math.exp(-t / .06) + lp.run(noise()) * dust * Math.exp(-t / .03)) * Math.min(1, t / .001)); };
+  const thud = (note = 42, len = .24, dust = .5) => { const freq = hz(note), lp = filter().set(700); return render(len, t => (Math.sin(TAU * freq * t * (1 + .35 * Math.exp(-t / .012))) * Math.exp(-t / .06) + lp.run(noise()) * dust * Math.exp(-t / .03)) * Math.min(1, t / .001)); };
   // A whoosh is noise through a band-pass that sweeps, with air above it. `shape` 0 to 1 is where it is loudest.
   const whoosh = (len, f0, f1, shape = .5, q = 1.4) => { const bp = filter(), hp = filter().set(5000); return render(len, (t, i) => { const x = t / len;
     if ((i & 15) === 0) bp.set(f0 * (f1 / f0) ** x, q);
@@ -260,10 +267,10 @@ export function compose(clock, {stems = false} = {}) {
   [[o.eyes[0], 78, -.08], [o.eyes[1], 76, .08]].forEach(([frame, note, pan]) => { sfx(pop(note - 12, .11), frame, .5, pan); sfx(bell(note, .9, .6), frame, .13, pan, {hall: .4, echo: .25}); });
   mark('open.eyes', o.eyes[0]); mark('open.eyes', o.eyes[1]);
   sfx(chirp(hz(69), hz(73), .16), o.smile, .2, 0); sfx(bell(73, .9, .6), o.smile, .13, 0, {hall: .6, echo: .25}, .12); sfx(whoosh(.2, 900, 3200, .6, 2), o.smile, .16, [-.15, .15]); mark('open.smile', o.smile);
-  sfx(scribble(.4), o.badge, .22, [-.25, .25]); sfx(thud(82, .22, .3), o.badge, .5, 0, {room: .2}, .28); sfx(tick(3300, .05, .1), o.badge, .4, .05, {room: .3}, .23); sfx(bell(76, 1, .6), o.badge, .13, 0, {hall: .6, echo: .25}, .3); mark('open.badge', o.badge);
-  sfx(whoosh(.18, 2600, 700, .3, 1.6), o.lanyard, .34, [-.3, .1]); sfx(whoosh(.18, 2400, 650, .3, 1.6), o.lanyard, .3, [.3, -.1], {room: .2}, .03); sfx(thud(74, .28, .5), o.lanyard, .55, 0, {room: .25}, .15); sfx(pop(57, .1), o.lanyard, .3, 0, {room: .2}, .15); mark('open.lanyard', o.lanyard);
+  sfx(scribble(.4), o.badge, .22, [-.25, .25]); sfx(thud(40, .22, .3), o.badge, .5, 0, {room: .2}, .28); sfx(tick(3300, .05, .1), o.badge, .4, .05, {room: .3}, .23); sfx(bell(76, 1, .6), o.badge, .13, 0, {hall: .6, echo: .25}, .3); mark('open.badge', o.badge);
+  sfx(whoosh(.18, 2600, 700, .3, 1.6), o.lanyard, .34, [-.3, .1]); sfx(whoosh(.18, 2400, 650, .3, 1.6), o.lanyard, .3, [.3, -.1], {room: .2}, .03); sfx(thud(38, .28, .5), o.lanyard, .55, 0, {room: .25}, .15); sfx(pop(57, .1), o.lanyard, .3, 0, {room: .2}, .15); mark('open.lanyard', o.lanyard);
   // The crouch: a spring is wound. The riser carries it to the drop.
-  sfx(chirp(330, 150, .2), o.windup, .22, 0); sfx(thud(64, .2, .2), o.windup, .34, 0); sfx(tick(1800, .03, .3), o.windup + 14, .2, 0);
+  sfx(chirp(330, 150, .2), o.windup, .22, 0); sfx(thud(37, .2, .2), o.windup, .34, 0); sfx(tick(1800, .03, .3), o.windup + 14, .2, 0);
   { const len = (B(8) - S(o.windup)) / RATE; sfx(riser(len, 1), o.windup, .36, 0, {room: .2, hall: .2}); }
   mark('open.windup', o.windup);
   sfx(chirp(380, 2600, .14), o.dash, .2, [-.2, .6]); sfx(whoosh((B(8) - S(o.dash)) / RATE + .1, 500, 5200, .62, 1.2), o.dash - 2, .5, [-.5, .7]); mark('open.dash', o.dash);
@@ -274,16 +281,16 @@ export function compose(clock, {stems = false} = {}) {
   pl.cards.forEach((frame, i) => { sfx(wood([57, 59, 61, 64][i] + 12, .14), frame, .32, .3, {room: .25}); sfx(whoosh(.32, 700, 2400, .35, 1.8), frame, .12, .3); mark('plan.cards', frame); });
   sfx(whoosh(.36, 260, 1500, .5, 1.1), pl.push, .34, [.4, 0]); mark('plan.push', pl.push);
   pl.speakers.forEach((frame, k) => { sfx(whoosh(.5, 1800, 600, .75, 1.6), frame - 6, .2, [.7, .3]); sfx(pop([76, 78][k], .1), frame + 9, .42, .45, {room: .25, echo: .2}); mark('plan.speakers', frame); });
-  [0, 2, 3].forEach(index => sfx(pop(66 + index * 2, .07), pl.speakers[1] + 16 + index * 3, .18, .45));
+  [[0, 66], [2, 69], [3, 73]].forEach(([index, note]) => sfx(pop(note, .07), pl.speakers[1] + 16 + index * 3, .18, .45));
   sfx(whoosh(.34, 1500, 300, .4, 1.1), pl.lift - 4, .3, [0, .35]); sfx(chirp(600, 1300, .09), pl.lift, .16, .3); for (let k = 0; k < 5; k++) sfx(tick(2600 + k * 160, .02, .2), pl.lift + 5 + k * 1.5, .16, .05); mark('plan.lift', pl.lift);
-  sfx(whoosh(.5, 500, 1300, .5, 1.3), pl.lift + 12, .13, .3); sfx(wood(45, .2), pl.drop, .5, .3, {room: .25}); sfx(thud(70, .2, .3), pl.drop, .36, .3); mark('plan.drop', pl.drop);
+  sfx(whoosh(.5, 500, 1300, .5, 1.3), pl.lift + 12, .13, .3); sfx(wood(45, .2), pl.drop, .5, .3, {room: .25}); sfx(thud(37, .2, .3), pl.drop, .36, .3); mark('plan.drop', pl.drop);
   sfx(tick(1500, .03, .7), pl.publish, .4, .55); sfx(tick(2300, .025, .4), pl.publish + 3, .3, .55); [[76, 0], [81, .11]].forEach(([n, d]) => sfx(bell(n, 1.3, 1), pl.publish + 3, .2, .45, {hall: .5, echo: .3}, d));
   for (let i = 0; i < 5; i++) sfx(whoosh(.5, 3000, 7000, .5, 3), pl.publish + i * 2, .05, [-.1, .6]); mark('plan.publish', pl.publish);
   sfx(riser((B(24) - S(pl.wipe)) / RATE, .8), pl.wipe, .26, 0, {room: .2}); sfx(whoosh(.5, 600, 4200, .7, 1.1), pl.wipe + 9, .5, [.6, -.6]); mark('plan.wipe', pl.wipe);
 
   // Shape. Each wipe has its own texture, under the chord that marks it.
   const wipes = [
-    frame => sfx(thud(96, .2, .4), frame, .3, .3),
+    frame => sfx(thud(42, .2, .4), frame, .3, .3),
     frame => { for (let k = 0; k < 10; k++) sfx(tick(1900 + k * 130, .02, .1), frame + k * .55, .16, lerp(.0, .6, k / 9)); },
     frame => { sfx(chirp(260, 1500, .26), frame, .16, .5); sfx(whoosh(.3, 500, 3000, .7, 1.6), frame, .16, .5); },
     frame => sfx(whoosh(.3, 3800, 900, .35, 2.2), frame, .3, [-.1, .6]),
@@ -297,9 +304,9 @@ export function compose(clock, {stems = false} = {}) {
   sfx(whoosh((B(40) - S(sh.exit)) / RATE, 300, 5200, .72, 1.1), sh.exit, .46, [0, 0]); mark('shape.exit', sh.exit);
 
   // Gather.
-  sfx(printer(.4), ga.ticket, .2, .25); sfx(thud(120, .12, .6), ga.ticket + 12, .3, .3); mark('gather.ticket', ga.ticket);
+  sfx(printer(.4), ga.ticket, .2, .25); sfx(thud(47, .12, .6), ga.ticket + 12, .3, .3); mark('gather.ticket', ga.ticket);
   ga.steps.forEach((frame, i) => { sfx(wood([62, 64, 66, 69, 71][i] + 12, .14), frame, .26, lerp(-.1, .5, i / 4), {room: .25, echo: .15}); mark('gather.steps', frame); });
-  sfx(thud(105, .16, .9), ga.steps[4] + 2, .4, .45); sfx(bell(83, .8, 1), ga.steps[4] + 2, .1, .45, {hall: .5});
+  sfx(thud(45, .16, .9), ga.steps[4] + 2, .4, .45); sfx(bell(83, .8, 1), ga.steps[4] + 2, .1, .45, {hall: .5});
   sfx(tear(.24), ga.tear, .34, [.3, .5]); sfx(whoosh(.4, 1400, 500, .3, 1.5), ga.tear + 4, .16, [.5, .1]); mark('gather.tear', ga.tear);
   // Check-in: one small tick for each of the forty badges, at the frame it is checked. Pitch and position follow the grid.
   for (let row = 0; row < 5; row++) for (let col = 0; col < 8; col++) {
@@ -324,7 +331,7 @@ export function compose(clock, {stems = false} = {}) {
   sfx(sparkle(.5, 14), st.explode + 12, .07, .2, {hall: .4});
   st.callouts.forEach((frame, i) => { sfx(whoosh(.12, 2200, 4200, .6, 3), frame, .12, [.2, .6]); sfx(wood([57, 59, 61, 64, 66][i] + 12, .12), frame + 3, .24, .6, {room: .25, echo: .2}); mark('stack.callouts', frame); });
   sfx(chirp(700, 180, .3), st.compress[0] - 5, .16, .2);
-  st.compress.forEach((frame, i) => { sfx(wood([45, 47, 49, 52][i], .22), frame, .5, .2, {room: .3}); sfx(thud(60 + i * 8, .2, .5), frame, .4, .2); sfx(tick(2800, .04, .1), frame + 3, .16, .2, {room: .4}); mark('stack.compress', frame); });
+  st.compress.forEach((frame, i) => { sfx(wood([45, 47, 49, 52][i], .22), frame, .5, .2, {room: .3}); sfx(thud([35, 37, 40, 42][i], .2, .5), frame, .4, .2); sfx(tick(2800, .04, .1), frame + 3, .16, .2, {room: .4}); mark('stack.compress', frame); });
   voice(drums, impact(.9), B(68), .66, 0, {hall: .25}); sfx(whoosh(.36, 400, 2600, .4, 1.2), st.merge - 1, .3, [.2, .3]); mark('stack.merge', st.merge);
   { const len = (B(72) - B(68)) / RATE; place(fx, riser(len, 1.15), B(68), .4, 0); place(room, riser(len, 1), B(68), .08, 0); } mark('stack.riser', st.riser[0]);
   [[81, 0], [85, .09], [88, .18]].forEach(([n, d]) => sfx(bell(n, 1.2, 1), st.line, .14, .4, {hall: .55, echo: .3}, d)); mark('stack.line', st.line);
@@ -345,14 +352,14 @@ export function compose(clock, {stems = false} = {}) {
   for (const b of [drums, bass, chords, lead, pad, fx, room, hall, taps]) for (const ch of [b.left, b.right]) { for (let i = cut - 200; i < cut; i++) ch[i] *= (cut - i) / 200; ch.fill(0, cut); }
 
   // Title: the first A major chord of the piece.
-  voice(drums, impact(2.2), title, .92, 0, {hall: .4}); voice(drums, CR2, title, .3, 0, {hall: .4}); place(drums, K, title, .9);
-  { const pair = padChord([45, 52, ...CHORDS.A.notes], 7.3, t => 700 + 2800 * Math.exp(-t / 1.8)); for (const side of pair) for (let i = 0; i < side.length; i++) side[i] *= Math.exp(-i / RATE / 2.6); placeStereo(pad, pair, title, .4); placeStereo(hall, pair, title, .2); }
-  CHORDS.A.notes.forEach((n, j) => voice(chords, stab(n, 3.5, .9), title + j * 420, .16, (j - 2) * .25, {hall: .5}));
+  voice(drums, impact(2.2), title, .8, 0, {hall: .4}); voice(drums, CR2, title, .3, 0, {hall: .4}); place(drums, K, title, .85);
+  { const pair = padChord([45, 52, ...CHORDS.A.notes], 7.3, t => 700 + 2800 * Math.exp(-t / 1.8)); for (const side of pair) for (let i = 0; i < side.length; i++) side[i] *= Math.exp(-i / RATE / 2.6); placeStereo(pad, pair, title, .47); placeStereo(hall, pair, title, .24); }
+  CHORDS.A.notes.forEach((n, j) => voice(chords, stab(n, 3.5, .9), title + j * 420, .185, (j - 2) * .25, {hall: .5}));
   place(bass, bassNote(33, 3.6, .3), title, .75);
   sfx(sparkle(1.4, 30), ti.impact, .12, 0, {hall: .5}); mark('title.impact', ti.impact);
   // He runs on the spot: quick soft steps, left and right.
-  for (let k = 0; k < 5; k++) sfx(thud(150, .05, 1.2), ti.impact + 3 + k * 5.6, .1, k % 2 ? .12 : -.12);
-  sfx(thud(72, .3, .8), ti.land, .62, -.3, {room: .3}); sfx(whoosh(.3, 2400, 600, .12, 1), ti.land, .3, [-.4, -.1]); sfx(sparkle(1.1, 16), ti.land, .1, -.3, {hall: .4}); mark('title.land', ti.land);
+  for (let k = 0; k < 5; k++) sfx(thud(50, .05, 1.2), ti.impact + 3 + k * 5.6, .1, k % 2 ? .12 : -.12);
+  sfx(thud(38, .3, .8), ti.land, .62, -.3, {room: .3}); sfx(whoosh(.3, 2400, 600, .12, 1), ti.land, .3, [-.4, -.1]); sfx(sparkle(1.1, 16), ti.land, .1, -.3, {hall: .4}); mark('title.land', ti.land);
   [0, 4].forEach((d, row) => { sfx(whoosh(.36, 900, 3600, .6, 1.8), ti.wordmark + 2 + d, .2, [-.2, .4]); sfx(bell([76, 81][row], 1.6, .8), ti.wordmark + 2 + d, .15, .1, {hall: .6, echo: .3}); }); mark('title.wordmark', ti.wordmark);
   // The tagline is uncovered letter by letter under a rising run of the home chord.
   [57, 61, 64, 69, 73, 76, 81, 85].forEach((n, k) => voice(lead, pluck(n + 12, .1, .7), S(ti.tagline) + k * Math.round(step * RATE), .1, lerp(-.4, .4, k / 7), {hall: .5, echo: .3}));
@@ -367,8 +374,10 @@ export function compose(clock, {stems = false} = {}) {
   const roomWet = plate(room, {decay: .42, damping: .35, predelay: .008, clearAt: title});
   // The hall is shorter while the band plays, and long for the last chord.
   const hallWet = plate(hall, {decay: i => (i < title ? .6 : .84), damping: .28, predelay: .025, clearAt: title});
+  // The hall returns nothing below 180 Hz. Its two sides are not in phase, and low reverb is mud.
+  for (const side of [hallWet.left, hallWet.right]) { const hp = biquad('highpass', 180); for (let i = 0; i < count; i++) side[i] = hp(side[i]); }
   const tapsWet = echo(taps, B(.75), {feedback: .36, clearAt: title});
-  for (const ch of [roomWet, hallWet, tapsWet]) for (const side of [ch.left, ch.right]) side.fill(0, cut, title);
+  for (const ch of [roomWet, hallWet, tapsWet]) for (const side of [ch.left, ch.right]) { for (let i = cut - 200; i < cut; i++) side[i] *= (cut - i) / 200; side.fill(0, cut, title); }
 
   // The exposure dips of the picture close a low-pass on the music for the same frames.
   const sc = clock.scenes, wall = sh.wall - Math.round(clock.beatFrames);
@@ -389,7 +398,7 @@ export function compose(clock, {stems = false} = {}) {
   compress(drums, {threshold: -14, ratio: 3, attack: .006, release: .09, makeup: 2});
 
   // Bass is mono. Effects sit in front of the music; the music dips a little under the loud ones.
-  const mix = bus(count), hpL = biquad('highpass', 30), hpR = biquad('highpass', 30), airL = biquad('highshelf', 7000, 3), airR = biquad('highshelf', 7000, 3), mudL = biquad('peak', 280, -1.5, 1), mudR = biquad('peak', 280, -1.5, 1);
+  const mix = bus(count), hpL = biquad('highpass', 30), hpR = biquad('highpass', 30), sideA = biquad('highpass', 150), sideB = biquad('highpass', 150), airL = biquad('highshelf', 7000, 3), airR = biquad('highshelf', 7000, 3), mudL = biquad('peak', 280, -1.5, 1), mudR = biquad('peak', 280, -1.5, 1);
   // The arrangement has a shape: the montage is the loudest part, the open bars the quietest.
   const LEVELS = [[1, -1], [3, 0], [7, -.4], [10, -1.5], [11, -2.2], [13, -.2], [15, -2], [17, -1.4], [19, 2.2], [21, 1]];
   const contour = bar => {
@@ -404,8 +413,11 @@ export function compose(clock, {stems = false} = {}) {
     const fxLevel = Math.max(Math.abs(fx.left[i]), Math.abs(fx.right[i])); key = fxLevel > key ? fxLevel : key * fall;
     const under = 1 - .28 * Math.min(1, key * 3.2), low = (bass.left[i] + bass.right[i]) * .5 * (.25 + .75 * pump[i]) * TRIM.bass;
     if ((i & 255) === 0) shape = contour(i / RATE / beat / 4 + 1);
-    const l = (music.left[i] * under + drums.left[i] * TRIM.drums + low) * shape + fx.left[i] * TRIM.fx + roomWet.left[i] * .9;
-    const r = (music.right[i] * under + drums.right[i] * TRIM.drums + low) * shape + fx.right[i] * TRIM.fx + roomWet.right[i] * .9;
+    const left = (music.left[i] * under + drums.left[i] * TRIM.drums + low) * shape + fx.left[i] * TRIM.fx + roomWet.left[i] * .9;
+    const right = (music.right[i] * under + drums.right[i] * TRIM.drums + low) * shape + fx.right[i] * TRIM.fx + roomWet.right[i] * .9;
+    // Wide pads and the hall put low notes out of phase, and a phone plays the sum. Below
+    // 150 Hz the two channels are made the same: the difference signal is high-passed.
+    const mid = (left + right) * .5, side = sideB(sideA((left - right) * .5)), l = mid + side, r = mid - side;
     mix.left[i] = airL(mudL(hpL(l))) * TRIM.master; mix.right[i] = airR(mudR(hpR(r))) * TRIM.master;
   }
   compress(mix, {threshold: -12, ratio: 1.6, attack: .03, release: .2, makeup: 0});
@@ -415,6 +427,8 @@ export function compose(clock, {stems = false} = {}) {
   const last = S(clock.duration - 3), fadeFrom = S(clock.duration - 45);
   for (let i = 0; i < count; i++) {
     let g = Math.min(1, i / 1600);
+    // The last 5 ms before the breath fade out here too: the filters above still ring after the buses stop.
+    if (i >= cut - 240 && i < cut) g *= (cut - i) / 240;
     if (i >= cut && i < title) g = 0;
     if (i >= fadeFrom) g *= smooth((last - i) / (last - fadeFrom));
     if (i >= last) g = 0;
@@ -422,7 +436,7 @@ export function compose(clock, {stems = false} = {}) {
   }
   for (let i = 0; i < count; i++) if (!Number.isFinite(mix.left[i] + mix.right[i])) throw new Error(`The score is not finite at sample ${i}`);
   events.sort((a, b) => a.frame - b.frame || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
-  return {left: mix.left, right: mix.right, count, events, ...(stems ? {stems: {drums, bass, chords, lead, pad, fx, music}} : {})};
+  return {left: mix.left, right: mix.right, count, events, notes: [...played].sort((a, b) => a - b), ...(stems ? {stems: {drums, bass, chords, lead, pad, fx, music}} : {})};
 }
 
 // The picture's integer hash (kit.ts), so sounds land on the frames the picture uses.
