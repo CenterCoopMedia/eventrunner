@@ -296,6 +296,16 @@ async function fullySeeded(overrides = {}) {
     'session_pitches/p-bo-1': { title: 'Keep me', uid: 'uid-bo', email: 'bo@example.com', status: 'new' },
     [`session_pitch_rate_limits/${rateLimitIdFor('uid-ada')}`]: { requests: [T0.getTime()], updatedAt: T0 },
     [`session_pitch_rate_limits/${rateLimitIdFor('uid-bo')}`]: { requests: [T0.getTime()], updatedAt: T0 },
+    // The attendee feed (issue #506). Ada's root and her reply to Bo go with
+    // her. Bo's root, Bo's reply under Ada's root, and a tombstone with no
+    // author stay. Each sent one report; Bo's report of Ada's post stays.
+    'social_posts/sp-ada-root': { state: 'active', authorUid: 'uid-ada', text: 'Who is at the data desk?', createdAt: T0, parentPostId: null },
+    'social_posts/sp-ada-reply': { state: 'active', authorUid: 'uid-ada', text: 'Me too.', createdAt: T0, parentPostId: 'sp-bo-root' },
+    'social_posts/sp-bo-root': { state: 'active', authorUid: 'uid-bo', text: 'Lunch at noon.', createdAt: T0, parentPostId: null },
+    'social_posts/sp-bo-reply': { state: 'active', authorUid: 'uid-bo', text: 'At the desk.', createdAt: T0, parentPostId: 'sp-ada-root' },
+    'social_posts/sp-gone': { state: 'removed', parentPostId: null, createdAt: T0, removedAt: T0 },
+    'social_reports/sr-ada-1': { postId: 'sp-bo-root', reporterUid: 'uid-ada', createdAt: T0 },
+    'social_reports/sr-bo-1': { postId: 'sp-ada-root', reporterUid: 'uid-bo', createdAt: T0 },
   });
   await db.collection('users/uid-ada/bookmarks').doc('s1').set({ bookmarkedAt: T0 });
   await db.collection('users/uid-ada/bookmarks').doc('s2').set({ bookmarkedAt: T0 });
@@ -338,6 +348,8 @@ function assertUntouched(d) {
   assert.ok(db.read('organization_edit_requests', 'beacon-fund'));
   assert.ok(db.read('session_pitches', 'p-ada-1'));
   assert.ok(db.read('session_pitch_rate_limits', rateLimitIdFor('uid-ada')));
+  assert.ok(db.read('social_posts', 'sp-ada-root'));
+  assert.ok(db.read('social_reports', 'sr-ada-1'));
   assert.deepEqual(adminLogs(db), []);
 }
 
@@ -357,6 +369,9 @@ function assertNeighbourKept({ db, auth, bucket }) {
   assert.ok(db.read('ticket_answers', 't-bo'));
   assert.ok(db.read('session_pitches', 'p-bo-1'));
   assert.ok(db.read('session_pitch_rate_limits', rateLimitIdFor('uid-bo')));
+  assert.ok(db.read('social_posts', 'sp-bo-root'));
+  assert.ok(db.read('social_posts', 'sp-bo-reply'));
+  assert.ok(db.read('social_reports', 'sr-bo-1'));
 }
 
 test('the per-account store list is one named constant the delete reads', () => {
@@ -366,6 +381,7 @@ test('the per-account store list is one named constant the delete reads', () => 
       'users_public', 'schedule_shares', 'organization_representatives', 'tickets', 'bookmarks',
       'sessionNotes', 'profile-photos', 'profile_photo_uploads', 'change_requests', 'change_request_rate_limits',
       'organization_edit_requests', 'ticket_answers', 'session_pitch_rate_limits', 'session_pitches',
+      'social_posts', 'social_reports',
     ],
   );
   assert.ok(Object.isFrozen(PER_ACCOUNT_STORES));
@@ -385,9 +401,13 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
     uid: 'uid-ada',
     removed: {
       tickets: 1, bookmarks: 2, notes: 1, photos: 2, photoUploads: 1, changeRequests: 2, changeRequestLimits: 1, organizationEdits: 1,
-      registrationAnswers: 1, sessionPitches: 2, sessionPitchLimits: 1,
+      registrationAnswers: 1, sessionPitches: 2, sessionPitchLimits: 1, socialPosts: 2, socialReports: 1,
     },
   });
+  // Feed: Ada's active rows and her report go. Bo's rows, Bo's reply under
+  // Ada's removed root, the authorless tombstone, and Bo's report stay.
+  assert.deepEqual(db.ids('social_posts').sort(), ['sp-bo-reply', 'sp-bo-root', 'sp-gone']);
+  assert.deepEqual(db.ids('social_reports'), ['sr-bo-1']);
   assert.equal(db.read('ticket_answers', 't-ada'), undefined);
   assert.deepEqual(db.ids('session_pitches'), ['p-bo-1']);
   // The window goes; a fence holding only the delete time takes its place.
@@ -724,6 +744,7 @@ test('the sweep clears more than one page of every store, a page at a time', asy
   assert.deepEqual(res.body.removed, {
     tickets: 0, bookmarks: 250, notes: 450, photos: 501, photoUploads: 0, changeRequests: 450, changeRequestLimits: 0,
     organizationEdits: 0, registrationAnswers: 0, sessionPitches: 0, sessionPitchLimits: 0,
+    socialPosts: 0, socialReports: 0,
   });
   assert.deepEqual(db.ids('change_requests'), []);
   assert.deepEqual(db.ids('users/uid-ada/bookmarks'), []);

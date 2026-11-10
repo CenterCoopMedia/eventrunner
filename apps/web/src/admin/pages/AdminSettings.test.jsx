@@ -1129,7 +1129,7 @@ describe('feature flags', () => {
     for (const heading of ['Public content', 'Attendees and access', 'Session tools', 'Feedback and browser tools']) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
     }
-    expect(screen.getByText('1 of 20 features on. Changes take effect after you save.')).toBeInTheDocument();
+    expect(screen.getByText('1 of 21 features on. Changes take effect after you save.')).toBeInTheDocument();
 
     const schedule = screen.getByRole('switch', { name: 'Public schedule' });
     fireEvent.click(screen.getByText('Show the public schedule.'));

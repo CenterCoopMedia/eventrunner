@@ -77,6 +77,10 @@ const ADMIN_READABLE = [
   { path: "session_confirmations/sess-tier__spk-tier", tier: "admin" },
   // A speaker-only live update (issue #200): both tiers read every audience.
   { path: "live_updates/lu-tier", tier: "admin" },
+  // The attendee feed (issue #506): staff read posts and reports with the
+  // flags off. The feed's own block below covers attendee reads.
+  { path: "social_posts/sp-tier", tier: "admin" },
+  { path: "social_reports/sr-tier", tier: "admin" },
 ];
 
 /**
@@ -239,6 +243,14 @@ beforeAll(async () => {
       pinned: false,
       postedAt: new Date(),
     });
+    await setDoc(doc(db, "social_posts/sp-tier"), {
+      state: "active",
+      authorUid: "attendee-1",
+      text: "Tier fixture.",
+      createdAt: new Date(),
+      parentPostId: null,
+    });
+    await setDoc(doc(db, "social_reports/sr-tier"), { postId: "sp-tier", reporterUid: "attendee-1", createdAt: new Date() });
     await setDoc(doc(db, "session_pitch_settings/notices"), {
       receiptMode: "automatic",
       templates: {},
@@ -2467,5 +2479,147 @@ describe("event data export: sources and audit rows (issue 329)", () => {
     }
     await assertSucceeds(getDoc(doc(admin(), "admin_logs/export-package-1")));
     await assertFails(getDoc(doc(staff(), "admin_logs/export-package-1")));
+  });
+});
+
+// The private attendee feed (issue #506). Attendees read posts only with
+// BOTH socialFeed and attendeeDirectory true and a current account grant
+// (approved, or linked to a speaker). Staff and operators read posts and
+// reports with either flag off: the cleanup exception. Reports are
+// staff-only, and no client writes either store. The handler side is in
+// tests/social-feed.rules.test.js.
+describe("the attendee feed and its reports (issue 506)", () => {
+  const FEATURE_STATES = [
+    { name: "no features document", data: null, open: false },
+    { name: "neither flag", data: {}, open: false },
+    { name: "the directory only", data: { attendeeDirectory: true }, open: false },
+    { name: "the feed only", data: { socialFeed: true, attendeeDirectory: false }, open: false },
+    { name: "a string flag", data: { socialFeed: "true", attendeeDirectory: true }, open: false },
+    { name: "both flags", data: { socialFeed: true, attendeeDirectory: true }, open: true },
+  ];
+
+  async function setFeatures(data) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const ref = doc(ctx.firestore(), "config/features");
+      if (data === null) await deleteDoc(ref);
+      else await setDoc(ref, data);
+    });
+  }
+
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const [uid, registrationStatus] of [["ticketed-sf", "ticketed"], ["revoked-sf", "revoked"]]) {
+        await setDoc(doc(db, `users/${uid}`), { uid, email: `${uid}@example.com`, registrationStatus, speakerId: null, role: "attendee" });
+      }
+      const created = new Date("2026-11-01T12:00:00.000Z");
+      await setDoc(doc(db, "social_posts/sf-root"), { state: "active", authorUid: "speaker-1", text: "Root.", createdAt: created, parentPostId: null });
+      await setDoc(doc(db, "social_posts/sf-reply"), { state: "active", authorUid: "approved-1", text: "Reply.", createdAt: created, parentPostId: "sf-root" });
+      await setDoc(doc(db, "social_posts/sf-gone"), { state: "removed", parentPostId: null, createdAt: created, removedAt: created });
+      await setDoc(doc(db, "social_reports/sf-report"), { postId: "sf-root", reporterUid: "approved-1", createdAt: created });
+    });
+  });
+
+  afterAll(async () => {
+    await setFeatures({ attendeeDirectory: true, publicAttendeeProfiles: false });
+  });
+
+  for (const { name, data, open } of FEATURE_STATES) {
+    it(`posts with ${name}: approved attendees and speakers ${open ? "read" : "are refused"}; staff and operators always read`, async () => {
+      await setFeatures(data);
+      for (const reader of [attendee("approved-1"), attendee("speaker-1")]) {
+        const read = getDoc(doc(reader, "social_posts/sf-root"));
+        const list = getDocs(collection(reader, "social_posts"));
+        if (open) {
+          await assertSucceeds(read);
+          await assertSucceeds(list);
+        } else {
+          await assertFails(read);
+          await assertFails(list);
+        }
+      }
+      for (const reader of [staff(), admin()]) {
+        await assertSucceeds(getDoc(doc(reader, "social_posts/sf-root")));
+        await assertSucceeds(getDocs(collection(reader, "social_posts")));
+      }
+    });
+
+    it(`posts with ${name}: pending, ticketed, revoked, account-less and anonymous readers are refused`, async () => {
+      await setFeatures(data);
+      // "sf-no-account" has no users document. nonAdmin() is not used here:
+      // an earlier suite seeds users/attendee-1 as approved.
+      for (const reader of [attendee("pending-1"), attendee("ticketed-sf"), attendee("revoked-sf"), attendee("sf-no-account"), anon()]) {
+        await assertFails(getDoc(doc(reader, "social_posts/sf-root")));
+        await assertFails(getDocs(collection(reader, "social_posts")));
+      }
+    });
+  }
+
+  it("a public profile grants no feed access: an anonymous visitor is refused with public profiles on", async () => {
+    await setFeatures({ socialFeed: true, attendeeDirectory: true, publicAttendeeProfiles: true });
+    await assertSucceeds(getDoc(doc(anon(), "users_public/public-profile")));
+    await assertFails(getDoc(doc(anon(), "social_posts/sf-root")));
+    await assertFails(getDocs(collection(anon(), "social_posts")));
+  });
+
+  it("an expired staff grant still on the list reads neither posts nor reports", async () => {
+    await setFeatures({});
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "config/bootstrap"), {
+        adminEmails: [ADMIN_EMAIL],
+        staffEmails: [STAFF_EMAIL],
+        staffExpiry: { [STAFF_EMAIL]: new Date(Date.now() - 60 * 60 * 1000) },
+      });
+    });
+    try {
+      await assertFails(getDoc(doc(staff(), "social_posts/sf-root")));
+      await assertFails(getDoc(doc(staff(), "social_reports/sf-report")));
+    } finally {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "config/bootstrap"), { adminEmails: [ADMIN_EMAIL], staffEmails: [STAFF_EMAIL] });
+      });
+    }
+  });
+
+  it("the active-root query returns roots only: no replies, no tombstones", async () => {
+    await setFeatures({ socialFeed: true, attendeeDirectory: true });
+    const roots = await assertSucceeds(getDocs(query(
+      collection(attendee("approved-1"), "social_posts"),
+      where("state", "==", "active"),
+      where("parentPostId", "==", null),
+    )));
+    const ids = roots.docs.map((d) => d.id);
+    expect(ids).toContain("sf-root");
+    expect(ids).not.toContain("sf-reply");
+    expect(ids).not.toContain("sf-gone");
+    expect(roots.docs.every((d) => d.data().state === "active" && d.data().parentPostId === null)).toBe(true);
+  });
+
+  it("reports: staff and operators read and list them with the flags off; the reporter, the author and everyone else cannot, flags on", async () => {
+    await setFeatures({});
+    for (const reader of [staff(), admin()]) {
+      await assertSucceeds(getDoc(doc(reader, "social_reports/sf-report")));
+      await assertSucceeds(getDocs(collection(reader, "social_reports")));
+    }
+    await setFeatures({ socialFeed: true, attendeeDirectory: true });
+    // approved-1 sent the report; speaker-1 wrote the post.
+    for (const reader of [attendee("approved-1"), attendee("speaker-1"), attendee("pending-1"), nonAdmin(), anon()]) {
+      await assertFails(getDoc(doc(reader, "social_reports/sf-report")));
+      await assertFails(getDocs(collection(reader, "social_reports")));
+      await assertFails(getDocs(query(collection(reader, "social_reports"), where("reporterUid", "==", "approved-1"))));
+    }
+  });
+
+  it("no client writes a post or a report, admin of either tier included", async () => {
+    await setFeatures({ socialFeed: true, attendeeDirectory: true });
+    const forgedPost = { state: "active", authorUid: "approved-1", text: "Forged.", createdAt: new Date(), parentPostId: null };
+    const forgedReport = { postId: "sf-root", reporterUid: "approved-1", createdAt: new Date() };
+    for (const writer of [admin(), staff(), attendee("approved-1"), attendee("speaker-1"), anon()]) {
+      await assertFails(setDoc(doc(writer, "social_posts/forged"), forgedPost));
+      await assertFails(updateDoc(doc(writer, "social_posts/sf-root"), { state: "removed" }));
+      await assertFails(deleteDoc(doc(writer, "social_posts/sf-root")));
+      await assertFails(setDoc(doc(writer, "social_reports/forged"), forgedReport));
+      await assertFails(deleteDoc(doc(writer, "social_reports/sf-report")));
+    }
   });
 });

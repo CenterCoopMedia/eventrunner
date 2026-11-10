@@ -35,8 +35,9 @@
  *      is out of the directory.
  *   2. The sweep deletes the sign-in, the saved sessions (lowering each
  *      session's count), the private notes, the profile photo files, the
- *      change requests the account sent with their rate-limit window, and
- *      the session pitches it sent with theirs. The pitch rate-limit row is
+ *      change requests the account sent with their rate-limit window, the
+ *      session pitches it sent with theirs, and its active attendee feed
+ *      posts and the feed reports it sent. The pitch rate-limit row is
  *      replaced by a fence first, which the pitch transaction refuses on.
  *      These can outgrow one transaction's 500-write ceiling, which would
  *      strand an account that could never be deleted, so they run after
@@ -103,6 +104,13 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
  *                       deleted, and a fence alone is not account data.
  *   kind 'owned'      — every `{collection}` document whose `{field}` is the
  *                       uid. The documents are deleted.
+ *   kind 'activeOwned' — every `{collection}` document whose `{field}` is the
+ *                       uid and whose `{stateField}` is `{activeState}`. Each
+ *                       page is read again in a transaction and a row is
+ *                       deleted only if it still matches both, so a row
+ *                       another writer changed after the page was read (a
+ *                       moderation tombstone, which has no owner field) is
+ *                       left as it is.
  *   kind 'claim'      — every `{collection}` document whose `{field}` is the
  *                       uid. The document stays; the claim fields are set
  *                       to null, the shape ticketing/sync.cjs creates.
@@ -162,6 +170,19 @@ const PER_ACCOUNT_STORES = Object.freeze([
     fence: pitchFenceField, key: 'sessionPitchLimits',
   },
   { phase: 'sweep', kind: 'owned', collection: 'session_pitches', field: 'uid', key: 'sessionPitches' },
+  // The attendee feed (issue #506, social/feed.cjs). The account's active
+  // posts and replies go; a removed post is a tombstone with no author and
+  // no text, so it is not account data and stays, and other authors'
+  // replies stay. A staff removal can tombstone a row after this sweep read
+  // its page, so each row is checked again in the transaction that deletes
+  // it. The reports the account sent go too. A report reads users/{uid} in
+  // its transaction, and the directory phase deletes that document first,
+  // so no report lands after this sweep through the account grant.
+  {
+    phase: 'sweep', kind: 'activeOwned', collection: 'social_posts', field: 'authorUid',
+    stateField: 'state', activeState: 'active', key: 'socialPosts',
+  },
+  { phase: 'sweep', kind: 'owned', collection: 'social_reports', field: 'reporterUid', key: 'socialReports' },
 ]);
 
 /** The id of a 'doc' store's document for the account. */
@@ -182,6 +203,7 @@ const SUBCOLLECTION_CHUNK = 400;
 const FILES_CHUNK = 500;
 const CLAIMS_CHUNK = 400;
 const OWNED_CHUNK = 400;
+const ACTIVE_OWNED_CHUNK = 400;
 
 const DIRECTORY_STORES = PER_ACCOUNT_STORES.filter((store) => store.phase === 'directory');
 /** What every sweep clears: the sweep stores, and the claims again. */
@@ -539,6 +561,38 @@ async function sweepOwned({ db, uid, store }) {
   }
 }
 
+/** The documents an 'activeOwned' store holds by the account in the active state, as a query. */
+function activeOwnedBy(db, uid, store) {
+  return ownedBy(db, uid, store).where(store.stateField, '==', store.activeState);
+}
+
+/**
+ * Delete an 'activeOwned' store's documents, a page at a time. The page
+ * query only finds candidates: one transaction per page reads each row
+ * again and deletes it only while it still has the owner and the active
+ * state. A row that changed in between no longer matches the query either,
+ * so the loop still ends.
+ */
+async function sweepActiveOwned({ db, uid, store }) {
+  let removed = 0;
+  for (;;) {
+    const page = (await activeOwnedBy(db, uid, store).limit(ACTIVE_OWNED_CHUNK).get()).docs;
+    if (page.length === 0) return removed;
+    removed += await db.runTransaction(async (tx) => {
+      const refs = page.map((doc) => doc.ref);
+      const snaps = await tx.getAll(...refs);
+      let count = 0;
+      snaps.forEach((snap, index) => {
+        const data = snap.exists ? snap.data() : null;
+        if (data?.[store.field] !== uid || data?.[store.stateField] !== store.activeState) return;
+        tx.delete(refs[index]);
+        count += 1;
+      });
+      return count;
+    });
+  }
+}
+
 /** Whether a 'doc' store's snapshot holds account data, not only a fence. */
 function holdsAccountData(store, snap) {
   return snap.exists && !(store.fence && snap.data()?.[store.fence]);
@@ -567,6 +621,7 @@ const SWEEPERS = Object.freeze({
   subcollection: sweepSubcollection,
   files: sweepFiles,
   owned: sweepOwned,
+  activeOwned: sweepActiveOwned,
   doc: sweepDoc,
 });
 
@@ -575,6 +630,7 @@ async function holdsAnything({ db, getBucket, uid, store }) {
   if (store.kind === 'claim') return !(await claimsOn(db, uid, store).limit(1).get()).empty;
   if (store.kind === 'files') return (await pageOfFiles(getBucket(), store.prefix, uid, 1)).length > 0;
   if (store.kind === 'owned') return !(await ownedBy(db, uid, store).limit(1).get()).empty;
+  if (store.kind === 'activeOwned') return !(await activeOwnedBy(db, uid, store).limit(1).get()).empty;
   if (store.kind === 'doc') return holdsAccountData(store, await db.collection(store.collection).doc(docIdOf(store, uid)).get());
   return (await pageOfMembers(db, uid, store.subcollection, 1)).length > 0;
 }

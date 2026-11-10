@@ -25,6 +25,7 @@ export const FEATURE_CHOICES = {
   webmcpPublic: { label: 'Public browser tools', hint: 'Expose bounded public read-only site tools in supported browsers.' },
   webmcpAdmin: { label: 'Admin browser tools', hint: 'Expose authenticated read-only admin diagnostics in supported browsers.' },
   changeRequests: { label: 'Change requests', hint: 'Let signed-in visitors and staff send change requests.' },
+  socialFeed: { label: 'Attendee feed', hint: 'Let approved attendees and speakers read and report feed posts. The attendee directory must also be on.' },
 };
 
 /**
