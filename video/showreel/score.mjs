@@ -39,6 +39,12 @@ export const HOOK = {
   Fm: [[0, 69, 3], [3, 73, 3], [6, 76, 2], [8, 78, 8]],
 };
 export const SCALE = [69, 71, 73, 76, 78, 81, 83, 85, 88];
+/** The harmony voice under a hook note: the nearest tone of the bar's chord, a minor third or more below it. */
+export const under = (note, name) => {
+  const tones = new Set([CHORDS[name].root, ...CHORDS[name].notes].map(n => n % 12));
+  let n = note - 3; while (!tones.has(n % 12)) n--;
+  return n;
+};
 
 // Balance of the buses in the mix. Found by measurement: see the section table in the README.
 const TRIM = {drums: 1, bass: .7, chords: 2.1, lead: 2.3, pad: .9, fx: 1.25, wet: 1.35, master: .74};
@@ -207,7 +213,7 @@ export function compose(clock, {stems = false} = {}) {
     voice(lead, leadNote(note, len * step * .92, power), at, gain, 0, {hall: .22, echo: .3});
     // Two quieter takes, left and right, make the line wide without moving it off centre.
     for (const side of [-1, 1]) voice(lead, leadNote(note + side * .07, len * step * .92, power * .85), at + 180 + side * 90, gain * .42, side * .75, {hall: .15});
-    if (harmony) voice(lead, leadNote(note - (name === 'Cm' ? 4 : 3), len * step * .92, power * .7), at, gain * .45, -.3, {hall: .2});
+    if (harmony) voice(lead, leadNote(under(note, name), len * step * .92, power * .7), at, gain * .45, -.3, {hall: .2});
   });
   // The drop states the hook, the second half of Gather answers it, the montage plays it at full power.
   hook(3, 'D', .7); hook(4, 'E', .75); hook(5, 'Cm', .85); hook(6, 'Fm', .9);
