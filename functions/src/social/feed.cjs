@@ -207,8 +207,8 @@ function createCreateSocialPostHandler({ db, auth, now = Date.now, log = console
     let result;
     try {
       result = await storePost({ db, uid: decoded.uid, submission, now });
-    } catch {
-      log.error('createSocialPost failed');
+    } catch (err) {
+      log.error('createSocialPost failed', { code: err?.code ?? 'unknown' });
       return internal(res, 'The post could not be saved. Try again with the same submission key.');
     }
     const { outcome, postId } = result;

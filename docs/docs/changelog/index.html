@@ -141,8 +141,8 @@
           text-free report per post and reporter. <code>removeSocialPost</code> (staff) replaces a post with a
           content-free placeholder and writes one audit row in the same transaction; staff can still read
           and remove with the flags off. An account delete removes the account&#39;s active posts and its
-          reports, and keeps a placeholder that staff wrote during the delete. There is no attendee screen
-          or post creation yet.</li>
+          reports, and keeps a placeholder that staff wrote during the delete. Backend post/reply creation (#510)
+          requires a current approved/speaker account and both flags; retries are idempotent and removed IDs stay closed. The composer is #511.</li>
           <li>Admin Ticketing has a <strong>Sync all tickets</strong> action (Eventbrite and Stripe), with <strong>Continue sync</strong>
           for a run that stops early, and a <strong>Create account</strong> action on an unclaimed ticket. <code>ticketingSync</code>
           has a 540-second limit, stops before it, reports what it saved, and resumes from a returned

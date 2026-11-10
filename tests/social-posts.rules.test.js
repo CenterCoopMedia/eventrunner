@@ -187,9 +187,11 @@ describe('submission identity and terminal removal', () => {
     const results = await Promise.all([create(), create('approved', payload({ text: ' Lunch at noon. ' })), create()]);
     expect(results.map((res) => res.statusCode).sort()).toEqual([200, 200, 201]);
     expect(new Set(results.map((res) => res.body.postId))).toEqual(new Set([idFor('approved')]));
-    const before = await data(idFor('approved'));
+    const snapshot = await db.collection('social_posts').doc(idFor('approved')).get();
+    const before = snapshot.data();
     expect((await create()).statusCode).toBe(200);
     expect(await data(idFor('approved'))).toEqual(before);
+    expect((await db.collection('social_posts').doc(idFor('approved')).get()).updateTime.isEqual(snapshot.updateTime)).toBe(true);
     expect((await create('speaker')).statusCode).toBe(201);
     expect(idFor('speaker')).not.toBe(idFor('approved'));
     expect((await create('approved', payload({ text: 'Different.' }))).statusCode).toBe(409);
@@ -218,6 +220,21 @@ describe('submission identity and terminal removal', () => {
     await db.collection('users').doc(TOKENS.approved.uid).update({ registrationStatus: 'revoked' });
     expect((await create()).statusCode).toBe(403);
     expect(await data(created.body.postId)).toEqual(tombstone);
+  });
+
+  it('refuses an active replay after either flag is disabled or the account grant is revoked/deleted', async () => {
+    expect((await create()).statusCode).toBe(201);
+    const before = await data(idFor('approved'));
+    for (const flag of ['socialFeed', 'attendeeDirectory']) {
+      await changeFlags({ ...FEED_ON, [flag]: false });
+      expect((await create()).statusCode).toBe(404);
+    }
+    await changeFlags(FEED_ON);
+    await db.collection('users').doc(TOKENS.approved.uid).update({ registrationStatus: 'revoked' });
+    expect((await create()).statusCode).toBe(403);
+    await db.collection('users').doc(TOKENS.approved.uid).delete();
+    expect((await create()).statusCode).toBe(403);
+    expect(await data(idFor('approved'))).toEqual(before);
   });
 });
 
