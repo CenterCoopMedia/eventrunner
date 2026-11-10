@@ -406,7 +406,7 @@ describe('the admin shell', () => {
       'sessions', 'pitches', 'speakers', 'organizations',
       'attendees', 'ticketing', 'invoices', 'badges',
       'announcements', 'reminders', 'live-updates', 'email-log',
-      'import', 'feedback', 'change-requests', 'data-export',
+      'import', 'feedback', 'feed-moderation', 'change-requests', 'data-export',
       'settings',
     ]);
   });

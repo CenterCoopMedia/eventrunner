@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useAdminApi } from '../adminApi.js';
-import { REPORT_LIMIT, subscribeModerationPost, subscribeSocialReports } from '../socialModerationSource.js';
+import { REPORT_LIMIT, loadModerationPost, loadSocialReports } from '../socialModerationSource.js';
 import { toDate } from '../versionHistory.js';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import { DestructiveConfirm, Notice, Panel, SaveStatus, rowMetaClass, secondaryButtonClass } from '../components/formControls.jsx';
 
-function ReportedPost({ postId, reports, call }) {
+function ReportedPost({ postId, reports, call, onAccessDenied }) {
   const [post, setPost] = useState(undefined);
   const [readError, setReadError] = useState(false);
   const [error, setError] = useState(null);
@@ -19,20 +19,21 @@ function ReportedPost({ postId, reports, call }) {
   useEffect(() => {
     let live = true;
     mounted.current = true;
-    const stop = subscribeModerationPost(postId, (next) => {
+    loadModerationPost(postId).then((next) => {
       if (!live) return;
-      // Removal is terminal. Neither an old snapshot nor a delayed HTTP
+      // Removal is terminal. Neither an old read nor a delayed HTTP
       // answer may put text back after this tab observes the tombstone.
       if (next?.state === 'removed') removed.current = true;
       setPost(removed.current ? { state: 'removed' } : next);
       setReadError(false);
-    }, () => {
+    }, (err) => {
       if (!live) return;
       setPost(undefined);
       setReadError(true);
+      if (err?.code === 'permission-denied' || err?.code === 'unauthenticated') onAccessDenied();
     });
-    return () => { live = false; mounted.current = false; stop(); };
-  }, [postId]);
+    return () => { live = false; mounted.current = false; };
+  }, [postId, onAccessDenied]);
 
   async function remove() {
     if (busy) return;
@@ -50,8 +51,7 @@ function ReportedPost({ postId, reports, call }) {
     } catch (err) {
       if (!mounted.current) return;
       if (err.status === 401 || err.status === 403) {
-        setPost(undefined);
-        setReadError(true);
+        onAccessDenied();
       }
       setError(`The removal did not complete. ${err.message} You can try again.`);
     } finally {
@@ -71,7 +71,7 @@ function ReportedPost({ postId, reports, call }) {
           <span className={rowMetaClass}>{reports.length} {reports.length === 1 ? 'report' : 'reports'} in this list</span>
           {received ? <time dateTime={received.toISOString()} className={rowMetaClass}>{received.toLocaleString()}</time> : null}
         </div>
-        {readError ? <Notice tone="error" message="We could not read this post. Checking access and retrying." /> : post === undefined ? (
+        {readError ? <Notice tone="error" message="We could not read this post. Refresh reports to try again." /> : post === undefined ? (
           <AdminLoadingState label="Loading reported post…" />
         ) : post === null ? (
           <p className="text-admin-sm text-admin-ink-secondary">This post is no longer available.</p>
@@ -104,21 +104,32 @@ function ReportedPost({ postId, reports, call }) {
 function ModerationReports({ cursor, onOlder, onNewest }) {
   const call = useAdminApi();
   const [reports, setReports] = useState(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState(null);
+  const denied = useRef(false);
+  const denyAccess = useCallback(() => {
+    // A denial invalidates every private row and any outstanding reads.
+    denied.current = true;
+    setReports(null);
+    setError('Your staff access could not be confirmed. Reload the page or sign in again.');
+  }, []);
   useEffect(() => {
     let live = true;
-    const stop = subscribeSocialReports(cursor, (next) => {
-      if (!live) return;
+    loadSocialReports(cursor).then((next) => {
+      if (!live || denied.current) return;
       setReports(next);
-      setError(false);
-    }, () => {
+      setError(null);
+    }, (err) => {
       if (!live) return;
+      if (err?.code === 'permission-denied' || err?.code === 'unauthenticated') {
+        denyAccess();
+        return;
+      }
       // A revoked live grant must not leave a private docket on screen.
       setReports(null);
-      setError(true);
+      if (!denied.current) setError('We could not read the reports. Refresh reports to try again.');
     });
-    return () => { live = false; stop(); };
-  }, [cursor]);
+    return () => { live = false; };
+  }, [cursor, denyAccess]);
 
   const grouped = new Map();
   for (const report of reports ?? []) {
@@ -129,19 +140,19 @@ function ModerationReports({ cursor, onOlder, onNewest }) {
     <div className="flex flex-col gap-md">
       <AdminPageHeader title="Feed moderation" description="Review private attendee reports and remove reported posts. Cleanup stays available when the attendee feed or directory is off." />
       <p className="text-admin-sm text-admin-ink-secondary">Showing up to {REPORT_LIMIT} {cursor ? 'older' : 'most recent'} reports, grouped by post. Reporter identities are not shown.</p>
-      {error ? <Notice tone="error" message="We could not read the reports. Checking access and retrying." /> : reports === null ? (
+      {error ? <Notice tone="error" message={error} /> : reports === null ? (
         <AdminLoadingState label="Loading private reports…" />
       ) : reports.length === 0 ? (
         <AdminEmptyState title="No reported posts" description="Attendee reports will appear here for staff review." />
       ) : (
         <Panel flush>
           <ul aria-label="Reported posts">
-            {[...grouped].map(([postId, entries]) => <ReportedPost key={postId} postId={postId} reports={entries} call={call} />)}
+            {[...grouped].map(([postId, entries]) => <ReportedPost key={postId} postId={postId} reports={entries} call={call} onAccessDenied={denyAccess} />)}
           </ul>
         </Panel>
       )}
       <div className="flex flex-wrap gap-sm">
-        {cursor ? <button type="button" className={secondaryButtonClass} onClick={onNewest}>Newest reports</button> : null}
+        <button type="button" className={secondaryButtonClass} onClick={onNewest}>{cursor ? 'Newest reports' : 'Refresh reports'}</button>
         {reports?.length === REPORT_LIMIT ? <button type="button" className={secondaryButtonClass} onClick={() => onOlder(reports.at(-1))}>Older reports</button> : null}
       </div>
     </div>
@@ -158,6 +169,6 @@ function ModerationDocket() {
 export default function AdminFeedModeration() {
   const { user, adminStatus, adminTier } = useAuth();
   if (!user || adminStatus !== 'admin') return null;
-  // A new identity gets a new subscription and empty state before paint.
+  // A new identity gets fresh reads and empty state before paint.
   return <ModerationDocket key={`${user.uid}:${adminTier}`} />;
 }

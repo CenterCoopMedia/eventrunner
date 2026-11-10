@@ -143,7 +143,7 @@ test.describe.serial('private feed moderation', () => {
     expect(JSON.stringify(logs.docs[0].data())).not.toContain(attendeeUid);
     await staff.setViewportSize({ width: 390, height: 844 });
     await expect(row.getByText('Removed', { exact: true })).toBeVisible();
-    expect(await staff.locator('body').evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(await staff.locator('html').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await staff.screenshot({ path: 'test-results/admin-visual-evidence/feed-moderation-phone.png', animations: 'disabled' });
     await staff.goto('/admin/features');
     await expect(staff.getByRole('heading', { name: 'This section needs operator access' })).toBeVisible();
@@ -191,12 +191,22 @@ test.describe.serial('private feed moderation', () => {
     expect(denied.status).toBe(403);
     await staff.goto('/admin/feed-moderation');
     await expect(staff.getByText(`Fictional ${revokedId}`, { exact: true })).toBeVisible();
-    await db.doc('config/bootstrap').set(bootstrap);
-    const revoked = await callFunction('removeSocialPost', { postId: revokedId }, staffToken);
-    expect(revoked.status).toBe(403);
+    // Revoke after the click, before the real HTTP boundary decides.
+    await staff.route('**/removeSocialPost', async (route) => {
+      await db.doc('config/bootstrap').set(bootstrap);
+      await route.continue();
+    });
+    const row = staff.getByRole('listitem').filter({ hasText: `Post ${revokedId}` });
+    const response = staff.waitForResponse((entry) => entry.url().endsWith('/removeSocialPost') && entry.request().method() === 'POST');
+    await row.getByRole('button', { name: 'Remove post', exact: true }).click();
+    await row.getByRole('button', { name: 'Remove this post', exact: true }).click();
+    expect((await response).status()).toBe(403);
     expect((await reportRead(staffToken)).status).toBe(403);
     expect((await db.doc(`social_posts/${revokedId}`).get()).data().state).toBe('active');
     expect((await db.collection('admin_logs').where('docPath', '==', `social_posts/${revokedId}`).get()).size).toBe(0);
+    await expect(staff.getByRole('list', { name: 'Reported posts' })).toHaveCount(0);
+    await staff.getByRole('button', { name: 'Refresh reports', exact: true }).click();
+    await expect(staff.getByRole('alert')).toContainText('Your staff access could not be confirmed.');
     await expect(staff.getByRole('list', { name: 'Reported posts' })).toHaveCount(0);
   });
 });
