@@ -329,15 +329,8 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Nine links above the base's sixteen (the Overview, issue #179, the
-    // Email log, issue #183, Change requests, issue #188, Organizations,
-    // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
-    // issue #195, Unpublished changes, issue #196, and Announcements,
-    // issue #199), Import records, Data export, issue #329, Invoices, issue
-    // #208, Scheduled reminders, issue #518, Set up your event, ADR 0007,
-    // Registration form, ADR 0008 §4, and Web address, ADR 0007 §8, every
-    // one a word. No icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(33);
+    // Every docket destination has a text label and its own link.
+    expect(nav.querySelectorAll('a')).toHaveLength(34);
     expect(screen.getByRole('link', { name: 'Scheduled reminders' })).toHaveAttribute('href', '/admin/reminders');
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
