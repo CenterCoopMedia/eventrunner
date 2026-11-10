@@ -342,3 +342,7 @@ Rules written after user corrections. Read at session start.
   has the four rules.
 - Measure early with a downscaled copy (640 by 360 gives the same counts in
   25 seconds) and only run the native screen on a candidate.
+- Screen the whole film, never a clip (2026-11-10). The screen keeps history
+  across frames. A clip of frames 1090 to 1270 passed with 4 transitions; the
+  same frames in the full film had 7 and failed the native screen. A check on
+  a part is a diagnostic only. The gate is the full film.
