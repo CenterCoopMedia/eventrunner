@@ -19,24 +19,31 @@ import { subscribeWithRetry } from './retrySubscription.js';
  * the session. Returns the unsubscribe function, which also cancels any
  * pending retry.
  *
- * `onGone` (optional) is told when the document is missing or its listener
- * has failed, so a consumer that must fail closed (the private attendee
- * feed, issue #788) can stop trusting the last values it saw. The next
- * snapshot of an existing document calls onNext again.
+ * `onStatus` (optional) is told whether the values are current:
+ * 'confirmed' for a snapshot the server returned, 'cached' for one served
+ * from the local cache, and 'gone' when the document is missing or its
+ * listener has failed. A consumer that must fail closed (the private
+ * attendee feed, issue #788) trusts only 'confirmed'. With onStatus the
+ * listener asks for metadata changes, because the SDK reports a cached
+ * answer that the server merely confirms only to such a listener.
  */
-export function subscribeConfigDoc(docId, onNext, onGone) {
+export function subscribeConfigDoc(docId, onNext, onStatus) {
+  const next = (snapshot) => {
+    if (snapshot.exists()) {
+      onNext(snapshot.data());
+      onStatus?.(snapshot.metadata?.fromCache === false ? 'confirmed' : 'cached');
+    } else {
+      onStatus?.('gone');
+    }
+  };
+  const ref = doc(db, 'config', docId);
   return subscribeWithRetry(
     (onError) =>
-      onSnapshot(
-        doc(db, 'config', docId),
-        (snapshot) => {
-          if (snapshot.exists()) onNext(snapshot.data());
-          else onGone?.();
-        },
-        onError,
-      ),
+      onStatus
+        ? onSnapshot(ref, { includeMetadataChanges: true }, next, onError)
+        : onSnapshot(ref, next, onError),
     (error) => {
-      onGone?.();
+      onStatus?.('gone');
       // Fail soft: the generated snapshot (or last-known overlay) keeps
       // rendering. The SDK has already torn this listener down, so
       // subscribeWithRetry schedules a fresh one rather than staying

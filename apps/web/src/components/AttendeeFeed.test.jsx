@@ -57,8 +57,8 @@ function pathOf(target) {
   return String(target?.path);
 }
 
-function docSnap(id, data) {
-  return { id, exists: () => data != null, data: () => data };
+function docSnap(id, data, { fromCache = false } = {}) {
+  return { id, exists: () => data != null, data: () => data, metadata: { fromCache } };
 }
 
 function listenersFor(path) {
@@ -69,10 +69,10 @@ function activeFeedListeners() {
   return listenersFor('social_posts').filter((entry) => entry.active);
 }
 
-function pushDoc(path, data) {
+function pushDoc(path, data, options) {
   const entry = listenersFor(path).filter((item) => item.active).at(-1);
   if (!entry) throw new Error(`no live listener for ${path}`);
-  act(() => entry.next(docSnap(path.split('/').at(-1), data)));
+  act(() => entry.next(docSnap(path.split('/').at(-1), data, options)));
 }
 
 function pushPosts(entry, posts, { fromCache = false } = {}) {
@@ -199,6 +199,20 @@ describe('when the feed asks for posts', () => {
     renderFeed();
     await openFeedAs(makeUser('ada'), APPROVED, features);
     expect(listenersFor('social_posts')).toHaveLength(0);
+  });
+
+  it('asks nothing while config/features is only a cached answer, and opens once the server confirms it', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'), APPROVED, FEED_ON);
+    expect(activeFeedListeners()).toHaveLength(1);
+    // A listener retry answers from the cache first.
+    pushDoc('config/features', FEED_ON, { fromCache: true });
+    await act(async () => {});
+    expect(activeFeedListeners()).toHaveLength(0);
+    expect(listenersFor('config/features').at(-1).options).toEqual({ includeMetadataChanges: true });
+    pushDoc('config/features', FEED_ON);
+    await act(async () => {});
+    expect(activeFeedListeners()).toHaveLength(1);
   });
 
   it('asks nothing for a signed-out visitor or a pending account', async () => {
@@ -380,11 +394,14 @@ describe('account transitions', () => {
 describe('what the feed shows', () => {
   it('names authors only from server reads of readable projections, never reads users, and drops replies and tombstones', async () => {
     projections.set('pub', { displayName: 'Pat Public', profileVisibility: 'public' });
+    // A private projection this reader may read (as staff, or as its owner).
+    projections.set('hidden', { displayName: 'Hidden Name', profileVisibility: 'private' });
     renderFeed();
     await openFeedAs(makeUser('ada'));
     pushPosts(activeFeedListeners()[0], [
       post('p1', 'pub', 'From a public profile'),
       post('p2', 'priv', 'From a private profile'),
+      post('p3', 'hidden', 'From a readable private profile'),
       post('r1', 'pub', 'A reply', { parentPostId: 'p1' }),
       { id: 'gone', state: 'removed', parentPostId: null, createdAt: new Date() },
     ]);
@@ -392,13 +409,17 @@ describe('what the feed shows', () => {
     const link = await screen.findByRole('link', { name: 'Pat Public' });
     expect(link).toHaveAttribute('href', '/attendees/pub');
     const privateItem = screen.getByText('From a private profile').closest('li');
-    await waitFor(() => expect(getDocFromServer).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getDocFromServer).toHaveBeenCalledTimes(3));
     expect(within(privateItem).getByText('An attendee')).toBeInTheDocument();
     expect(within(privateItem).queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByText('A reply')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    const readablePrivate = screen.getByText('From a readable private profile').closest('li');
+    expect(within(readablePrivate).getByText('An attendee')).toBeInTheDocument();
+    expect(within(readablePrivate).queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hidden Name')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
     expect(vi.mocked(getDocFromServer).mock.calls.map(([target]) => pathOf(target)).sort())
-      .toEqual(['users_public/priv', 'users_public/pub']);
+      .toEqual(['users_public/hidden', 'users_public/priv', 'users_public/pub']);
     // Server reads only: a cached projection may belong to a previous reader.
     expect(getDoc).not.toHaveBeenCalled();
   });

@@ -68,10 +68,11 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // A client build never enables this state or exposes its setter.
   const [demoTheme, setDemoTheme] = useState(null);
 
-  // Which docs are missing or failing right now. The overlay keeps its last
-  // values (fail soft for every other consumer); a consumer that must fail
-  // closed reads `available` instead.
-  const [gone, setGone] = useState({ event: false, features: false, theme: false, badges: false });
+  // Whether each doc's values are server-confirmed right now: 'confirmed',
+  // 'cached', 'gone', or null before any answer. The overlay keeps its last
+  // values either way (fail soft for every other consumer); a consumer that
+  // must fail closed reads `available` instead.
+  const [status, setStatus] = useState({ event: null, features: null, theme: null, badges: null });
 
   useEffect(() => {
     const unsubscribers = CONFIG_DOC_IDS.map((docId) =>
@@ -79,10 +80,9 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
         docId,
         (data) => {
           setOverlay((prev) => ({ ...prev, [docId]: data }));
-          setGone((prev) => (prev[docId] ? { ...prev, [docId]: false } : prev));
         },
-        () => {
-          setGone((prev) => (prev[docId] ? prev : { ...prev, [docId]: true }));
+        (next) => {
+          setStatus((prev) => (prev[docId] === next ? prev : { ...prev, [docId]: next }));
         },
       ),
     );
@@ -163,23 +163,23 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
         theme: overlay.theme ? 'live' : 'snapshot',
         badges: overlay.badges ? 'live' : 'snapshot',
       },
-      // Whether each doc is live AND still present and listening. `sources`
-      // stays 'live' after a doc is deleted or its listener fails, because
-      // the last values keep rendering; this says they are no longer
-      // current. The private attendee feed (issue #788) requires
+      // Whether each doc is live AND its current values were confirmed by
+      // the server. `sources` stays 'live' after a doc is deleted, its
+      // listener fails, or a retry answers from the cache, because the last
+      // values keep rendering; this says they are not confirmed. The private attendee feed (issue #788) requires
       // available.features, so a deleted or failing config/features closes
       // it.
       available: {
-        event: Boolean(overlay.event) && !gone.event,
-        features: Boolean(overlay.features) && !gone.features,
-        theme: Boolean(overlay.theme) && !gone.theme,
-        badges: Boolean(overlay.badges) && !gone.badges,
+        event: Boolean(overlay.event) && status.event === 'confirmed',
+        features: Boolean(overlay.features) && status.features === 'confirmed',
+        theme: Boolean(overlay.theme) && status.theme === 'confirmed',
+        badges: Boolean(overlay.badges) && status.badges === 'confirmed',
       },
       // DemoBanner uses this setter to compare the shipped presets without a
       // Firestore write. It is null in every client build.
       setDemoTheme: demoMode ? setDemoTheme : null,
     };
-  }, [demoMode, effectiveDemoTheme, overlay, gone]);
+  }, [demoMode, effectiveDemoTheme, overlay, status]);
 
   // THE document the rendering of the theme resolves from: the live one,
   // or the snapshot when there is none (appliedThemeDoc below, once its

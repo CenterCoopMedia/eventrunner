@@ -52,24 +52,32 @@ describe('subscribeConfigDoc', () => {
     expect(onNext).not.toHaveBeenCalled();
   });
 
-  it('tells onGone about a missing doc and a failed listener, and not about a live doc', () => {
+  it('reports confirmed, cached and gone to onStatus, listening for metadata changes', () => {
+    let capturedOptions;
     let capturedSuccess;
     let capturedError;
-    onSnapshotMock.mockImplementation((_ref, onSuccess, onError) => {
+    onSnapshotMock.mockImplementation((_ref, options, onSuccess, onError) => {
+      capturedOptions = options;
       capturedSuccess = onSuccess;
       capturedError = onError;
       return vi.fn();
     });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const onGone = vi.fn();
-    subscribeConfigDoc('features', vi.fn(), onGone);
-    capturedSuccess({ exists: () => true, data: () => ({ socialFeed: true }) });
-    expect(onGone).not.toHaveBeenCalled();
-    capturedSuccess({ exists: () => false });
-    expect(onGone).toHaveBeenCalledTimes(1);
+    const onNext = vi.fn();
+    const onStatus = vi.fn();
+    subscribeConfigDoc('features', onNext, onStatus);
+    expect(capturedOptions).toEqual({ includeMetadataChanges: true });
+    capturedSuccess({ exists: () => true, data: () => ({ socialFeed: true }), metadata: { fromCache: true } });
+    expect(onStatus).toHaveBeenLastCalledWith('cached');
+    capturedSuccess({ exists: () => true, data: () => ({ socialFeed: true }), metadata: { fromCache: false } });
+    expect(onStatus).toHaveBeenLastCalledWith('confirmed');
+    expect(onNext).toHaveBeenCalledTimes(2);
+    capturedSuccess({ exists: () => false, metadata: { fromCache: false } });
+    expect(onStatus).toHaveBeenLastCalledWith('gone');
     capturedError(new Error('offline'));
-    expect(onGone).toHaveBeenCalledTimes(2);
+    expect(onStatus).toHaveBeenLastCalledWith('gone');
+    expect(onStatus).toHaveBeenCalledTimes(4);
     warn.mockRestore();
   });
 

@@ -140,7 +140,8 @@ export async function fetchOlderPage(after) {
 
 /**
  * The display name on one author's users_public projection, read from the
- * server under the current sign-in, or null. A private, missing or
+ * server under the current sign-in, or null. A private (even one this
+ * reader may read, as staff or as its owner), missing or
  * unreadable profile, an offline read, or a malformed name is null, and
  * the feed shows its neutral fallback. Never a cache answer: a cached
  * projection may have been readable only to a previous reader.
@@ -152,7 +153,11 @@ export async function fetchAuthorName(uid) {
   try {
     const snapshot = await getDocFromServer(doc(db, 'users_public', uid));
     if (!snapshot.exists()) return null;
-    const name = snapshot.data()?.displayName;
+    // Staff and the author may read a private projection; the feed still
+    // names only a profile its owner chose to show.
+    const data = snapshot.data();
+    if (data?.profileVisibility !== 'public' && data?.profileVisibility !== 'attendees_only') return null;
+    const name = data.displayName;
     return typeof name === 'string' && name.trim() ? name.trim() : null;
   } catch {
     return null;
