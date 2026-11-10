@@ -317,3 +317,28 @@ Rules written after user corrections. Read at session start.
   later branch from the tip of the one before it and base its pull request
   on that branch. The earlier stack rules in this file still hold (base on
   the tip, regenerate on the tip, merge top down, check the ancestor).
+
+## 2026-11-10: read every lesson before the first agent call
+
+- A session searched this file for "video" and did not read the 2026-11-09
+  entry, so its Agent calls gave a model and no `effort`. Joe repeated both
+  rules in the session: no Fable subagents, and stacked pull requests when
+  possible. Read this whole file before the first Agent call, not a search
+  of it, and pass `model: "opus"` and `effort: "medium"` every time.
+
+## 2026-11-10: run `video/flash.py` on the first rough cut, not the last
+
+- The first full cut of the showreel teaser failed the flash screen in most
+  scenes: 54 transitions in one second against a limit of 6, and 43% of the
+  picture over the per-pixel limit in the montage. The screen counts a
+  bright shape that travels as a rise at its front and a fall at its back on
+  every frame, so camera moves over white type, expanding rings, whip pans
+  over light panels and sliding wordmarks all fail. Two frames a second of
+  bright on dark is enough.
+- Design for it from the storyboard: travel dim and arrive bright, uncover
+  type where it stays, cut or dip for a camera move, and keep rings, rays
+  and trails at or below 30% opacity. A fast move costs less than a slow
+  one, because rise and fall then pair once. `video/showreel/README.md`
+  has the four rules.
+- Measure early with a downscaled copy (640 by 360 gives the same counts in
+  25 seconds) and only run the native screen on a candidate.

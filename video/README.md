@@ -11,6 +11,9 @@ and the 20-second Boardwalk-inspired study. Tutorials retain literal captures.
 The private client concept lives outside this repository and cannot be exported
 by the public preview builder.
 
+A separate [showreel teaser](showreel/README.md) is kept in `showreel/`. It has
+its own clock, score and renderer, and it is not part of the public set.
+
 ## Rebuild from the committed captures
 
 Use Node 22, FFmpeg/ffprobe, Python 3 with NumPy, and Playwright Chromium.
