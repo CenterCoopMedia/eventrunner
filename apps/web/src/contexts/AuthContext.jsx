@@ -220,6 +220,23 @@ export function AuthProvider({ children }) {
   // private attendee feed (issue #788) opens on a staff grant only then.
   const adminConfirmed = isAdmin && ownVerdict?.confirmed === true;
 
+  // A cached admin answer is never replaced by the probe effect alone, so
+  // a staff reader who opened the app offline would wait on the feed
+  // forever. Ask the server again when the browser reconnects, and every
+  // 30 s as a backstop, until it confirms. The cached verdict stays in
+  // place meanwhile; nothing that needs confirmation opens on it.
+  const awaitingServerVerdict = isAdmin && !adminConfirmed;
+  useEffect(() => {
+    if (!awaitingServerVerdict) return undefined;
+    const retry = () => setProbeRun((run) => run + 1);
+    window.addEventListener('online', retry);
+    const timer = window.setInterval(retry, 30_000);
+    return () => {
+      window.removeEventListener('online', retry);
+      window.clearInterval(timer);
+    };
+  }, [awaitingServerVerdict]);
+
   const signInWithGoogle = useCallback(
     () => signInWithPopup(auth, new GoogleAuthProvider()),
     [],

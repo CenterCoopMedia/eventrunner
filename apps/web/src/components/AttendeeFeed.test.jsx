@@ -328,6 +328,20 @@ describe('account transitions', () => {
     expect(screen.getByRole('status', { name: /Loading the attendee feed/ })).toBeInTheDocument();
   });
 
+  it('a staff reader whose probe answered from the cache opens the feed once the browser reconnects', async () => {
+    admins.add('staffer');
+    cachedProbes.add('staffer');
+    renderFeed();
+    await openFeedAs(makeUser('staffer'), PENDING);
+    expect(listenersFor('social_posts')).toHaveLength(0);
+    expect(screen.getByRole('status', { name: /Loading the attendee feed/ })).toBeInTheDocument();
+
+    cachedProbes.delete('staffer');
+    await act(async () => { window.dispatchEvent(new Event('online')); });
+    await act(async () => {});
+    expect(activeFeedListeners()).toHaveLength(1);
+  });
+
   it('a cached approved account document opens nothing until the server confirms the grant', async () => {
     renderFeed();
     publishAuth(makeUser('ada'));
