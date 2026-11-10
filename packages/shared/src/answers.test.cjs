@@ -66,3 +66,10 @@ test('new sites enable features that need no setup and keep explicit off values'
   }
   assert.equal(buildFeatures().features.updates, false);
 });
+
+// Issue #506: a new site starts with the attendee feed off, and an explicit
+// answer is kept.
+test('new sites start with the attendee feed off', () => {
+  assert.equal(buildFeatures().features.socialFeed, false);
+  assert.equal(buildFeatures({ socialFeed: true }).features.socialFeed, true);
+});

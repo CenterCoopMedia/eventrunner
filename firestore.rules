@@ -627,6 +627,38 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // The private attendee feed (issue #506, functions/src/social/feed.cjs).
+    //
+    // An attendee reads posts only while config/features has BOTH
+    // socialFeed and attendeeDirectory set to true, and only with a current
+    // account grant: approved, or linked to a speaker. A missing or
+    // half-seeded features document is off. A public profile, or the
+    // directory flag alone, grants nothing here.
+    //
+    // Staff and operators read posts and reports with either flag off: the
+    // cleanup exception, so staff can still inspect and remove content after
+    // the feature is turned off. It grants no attendee access.
+    //
+    // Reports are staff-only. The reporter and the post's author cannot
+    // read or list them. No client writes either store, admins included:
+    // reportSocialPost and removeSocialPost are the only writers.
+    function socialFeedOpen() {
+      return exists(/databases/$(database)/documents/config/features)
+        && get(/databases/$(database)/documents/config/features).data.get('socialFeed', false) == true
+        && get(/databases/$(database)/documents/config/features).data.get('attendeeDirectory', false) == true;
+    }
+
+    match /social_posts/{postId} {
+      allow read: if isAdmin();
+      allow read: if socialFeedOpen() && requesterIsApprovedAttendee();
+      allow write: if false;
+    }
+
+    match /social_reports/{reportId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Change request email settings (issue #330): whether the
     // acknowledgement and the outcome email go. Either tier reads them, so
     // staff see what a status change sends; only

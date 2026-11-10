@@ -152,6 +152,9 @@ const KNOWN_FEATURE_KEYS = [
   'webmcpPublic',
   'webmcpAdmin',
   'changeRequests',
+  // The private attendee feed (issue #506). Attendee reads and reports also
+  // need attendeeDirectory; off by default like every non-core flag.
+  'socialFeed',
 ];
 
 /** @param {*} v @returns {boolean} */

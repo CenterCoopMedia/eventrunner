@@ -127,6 +127,7 @@ export const features = {
   webmcpPublic: false,
   webmcpAdmin: false,
   changeRequests: false,
+  socialFeed: false,
 };
 
 export const theme = {

@@ -33,7 +33,7 @@ const FEATURE_GROUPS = [
   {
     title: 'Attendees and access',
     description: 'Profiles, badges, and how ticket holders are approved.',
-    keys: ['attendeeDirectory', 'publicAttendeeProfiles', 'badges', 'customBadges', 'autoApproveTicketHolders'],
+    keys: ['attendeeDirectory', 'socialFeed', 'publicAttendeeProfiles', 'badges', 'customBadges', 'autoApproveTicketHolders'],
   },
   {
     title: 'Session tools',

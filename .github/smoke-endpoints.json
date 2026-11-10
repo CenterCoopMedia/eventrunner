@@ -105,6 +105,8 @@
     "saveChangeRequestOutcome",
     "deleteChangeRequest",
     "listMyChangeRequests",
+    "reportSocialPost",
+    "removeSocialPost",
     "saveChangeRequestNoticeSettings",
     "retryChangeRequestNotice",
     "addSessionMaterialLink",

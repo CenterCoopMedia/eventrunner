@@ -30,6 +30,7 @@ const announcementMessages = require('./src/announcements/messages.cjs');
 const announcementSuppression = require('./src/announcements/suppression.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
 const adminChangeRequests = require('./src/admin/changeRequests.cjs');
+const socialFeed = require('./src/social/feed.cjs');
 const adminAccess = require('./src/admin/access.cjs');
 const adminEventStats = require('./src/admin/eventStats.cjs');
 const webMcpDiagnostics = require('./src/admin/webMcpDiagnostics.cjs');
@@ -108,6 +109,7 @@ module.exports = {
   ...announcementSuppression.handlers,
   ...adminFeedback.handlers,
   ...adminChangeRequests.handlers,
+  ...socialFeed.handlers,
   ...adminAccess.handlers,
   ...adminEventStats.handlers,
   ...webMcpDiagnostics.handlers,

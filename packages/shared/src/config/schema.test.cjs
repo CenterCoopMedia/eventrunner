@@ -1039,6 +1039,16 @@ test('validateFeatures: changeRequests is a known boolean flag', () => {
   assert.ok(bad.errors.some((e) => e.includes('features.changeRequests: must be a boolean')));
 });
 
+// Issue #506: the attendee feed flag is a known boolean key. Before it, the
+// validator refused { socialFeed: true } as an unknown key.
+test('validateFeatures: socialFeed is a known boolean flag', () => {
+  assert.equal(validateFeatures({ socialFeed: true }).ok, true);
+  assert.equal(validateFeatures({ socialFeed: false }).ok, true);
+  const bad = validateFeatures({ socialFeed: 'true' });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.includes('features.socialFeed: must be a boolean')));
+});
+
 test('historicalDemo is an optional boolean in deployed event configuration', () => {
   for (const historicalDemo of [true, false, undefined]) {
     assert.equal(validateEventConfig({ ...VALID_EVENT, historicalDemo }).ok, true);

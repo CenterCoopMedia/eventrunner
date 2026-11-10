@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The backend for a private attendee feed (#506), behind a new `socialFeed` flag that is off by
+  default. Attendee reads and reports need both `socialFeed` and `attendeeDirectory`, and a current
+  approved or speaker account, or a current staff grant. `reportSocialPost` stores one private,
+  text-free report per post and reporter. `removeSocialPost` (staff) replaces a post with a
+  content-free placeholder and writes one audit row in the same transaction; staff can still read
+  and remove with the flags off. An account delete removes the account's active posts and its
+  reports, and keeps a placeholder that staff wrote during the delete. There is no attendee screen
+  or post creation yet.
 - Admin Ticketing has a **Sync all tickets** action (Eventbrite and Stripe), with **Continue sync**
   for a run that stops early, and a **Create account** action on an unclaimed ticket. `ticketingSync`
   has a 540-second limit, stops before it, reports what it saved, and resumes from a returned
