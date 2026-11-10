@@ -310,6 +310,11 @@ describe('account transitions', () => {
     ['access revocation', () => pushDoc('users/ada', { uid: 'ada', registrationStatus: 'revoked', speakerId: null })],
     ['the feed flag turning off', () => pushDoc('config/features', { attendeeDirectory: true, socialFeed: false })],
     ['the directory flag turning off', () => pushDoc('config/features', { attendeeDirectory: false, socialFeed: true })],
+    ['config/features being deleted', () => pushDoc('config/features', null)],
+    ['the config/features listener failing', () => {
+      const entry = listenersFor('config/features').filter((item) => item.active).at(-1);
+      act(() => entry.error(Object.assign(new Error('offline'), { code: 'unavailable' })));
+    }],
   ])('%s hides the feed and cancels its listener', async (_name, change) => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
@@ -401,6 +406,31 @@ describe('reporting a post', () => {
       expect(init.headers.Authorization).toBe('Bearer token-ada');
       expect(JSON.parse(init.body)).toEqual({ postId: 'p1' });
     }
+  });
+
+  it('does not bring back a report abandoned when access closed', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners()[0], [post('p1', 'cy', 'Report me later')]);
+    const pending = deferred();
+    vi.mocked(fetch).mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole('button', { name: 'Report post' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send report' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    pushDoc('config/features', { attendeeDirectory: true, socialFeed: false });
+    await act(async () => pending.resolve({ ok: false, status: 500, json: async () => ({}) }));
+    pushDoc('config/features', FEED_ON);
+    await act(async () => {});
+    pushPosts(activeFeedListeners()[0], [post('p1', 'cy', 'Report me later')]);
+
+    const button = screen.getByRole('button', { name: 'Report post' });
+    expect(button).toBeEnabled();
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 201, json: async () => ({ postId: 'p1', reported: true }) });
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: 'Send report' }));
+    expect(await screen.findByText('Reported. Staff will review this post.')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('sends nothing when the reader cancels', async () => {

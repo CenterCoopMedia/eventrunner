@@ -18,18 +18,25 @@ import { subscribeWithRetry } from './retrySubscription.js';
  * transient error doesn't permanently freeze runtime config for the rest of
  * the session. Returns the unsubscribe function, which also cancels any
  * pending retry.
+ *
+ * `onGone` (optional) is told when the document is missing or its listener
+ * has failed, so a consumer that must fail closed (the private attendee
+ * feed, issue #788) can stop trusting the last values it saw. The next
+ * snapshot of an existing document calls onNext again.
  */
-export function subscribeConfigDoc(docId, onNext) {
+export function subscribeConfigDoc(docId, onNext, onGone) {
   return subscribeWithRetry(
     (onError) =>
       onSnapshot(
         doc(db, 'config', docId),
         (snapshot) => {
           if (snapshot.exists()) onNext(snapshot.data());
+          else onGone?.();
         },
         onError,
       ),
     (error) => {
+      onGone?.();
       // Fail soft: the generated snapshot (or last-known overlay) keeps
       // rendering. The SDK has already torn this listener down, so
       // subscribeWithRetry schedules a fresh one rather than staying

@@ -4,9 +4,10 @@
 // WHO SEES IT. Nothing is requested until all of these hold for the
 // current render:
 //
-//   - config/features itself is live (`sources.features === 'live'`): the
-//     generated snapshot, or a sibling config document that arrived first,
-//     never opens the feed;
+//   - config/features itself is live (`sources.features === 'live'`) and
+//     still present and listening (`available.features`): the generated
+//     snapshot, a sibling config document that arrived first, or the last
+//     values of a deleted or failing document never open the feed;
 //   - `socialFeed === true` and `attendeeDirectory === true` (a missing,
 //     malformed, or false flag is off);
 //   - the signed-in account holds a current grant: its own account document
@@ -19,8 +20,11 @@
 // ask, so a closed or unknown state costs nothing and leaks nothing.
 //
 // WHOSE DATA. Posts, author names, the page count, and report state are
-// stored WITH the key they were read for: the reader's uid while the feed
-// is open, null otherwise. A render shows only state whose key matches its
+// stored WITH the key they were read for: the reader's uid and an access
+// session number while the feed is open, null otherwise. The session
+// number moves on each time access closes, so state left by a closed
+// session (a report still in flight, say) never returns when the same
+// reader's access opens again. A render shows only state whose key matches its
 // own, so an account switch, a sign-out, a revoked grant, or a flag turned
 // off hides the previous reader's feed in that same render, before any
 // cleanup effect runs. The verdicts the key is built from are bound to
@@ -73,9 +77,9 @@ const AUTHOR_FALLBACK = 'An attendee';
  *   denied: signed in, the feature is on, and there is no grant;
  *   open: ask for the feed.
  */
-export function feedAccess({ demo = IS_DEMO, sources, features, uid, profile, profileStatus, adminStatus }) {
+export function feedAccess({ demo = IS_DEMO, sources, available, features, uid, profile, profileStatus, adminStatus }) {
   if (demo || !uid) return 'closed';
-  if (sources?.features !== 'live') return 'closed';
+  if (sources?.features !== 'live' || available?.features !== true) return 'closed';
   if (features?.socialFeed !== true || features?.attendeeDirectory !== true) return 'closed';
   const accountGrant = profile != null
     && (profile.registrationStatus === 'approved'
@@ -106,12 +110,16 @@ function own(state, key, fallback) {
 function FeedPost({ post, author, report, onReport, onConfirm, onCancel }) {
   const headId = useId();
   const confirmRef = useRef(null);
+  const doneRef = useRef(null);
   const phase = report?.phase ?? 'idle';
   const name = projectionName(author);
   const posted = toDate(post.createdAt);
 
   useEffect(() => {
+    // Keep focus in the post: on the send button when the question opens,
+    // and on the confirmation once the buttons are gone.
     if (phase === 'confirm') confirmRef.current?.focus();
+    if (phase === 'done') doneRef.current?.focus();
   }, [phase]);
 
   return (
@@ -134,7 +142,7 @@ function FeedPost({ post, author, report, onReport, onConfirm, onCancel }) {
         ) : null}
       </div>
       {/* A text child: React escapes it, so a post can never become markup. */}
-      <p className="mt-2xs max-w-prose whitespace-pre-wrap break-words text-body text-text-primary">
+      <p className="mt-2xs max-w-prose whitespace-pre-wrap text-body [overflow-wrap:anywhere] text-text-primary">
         {post.text}
       </p>
       <div className="mt-2xs">
@@ -182,7 +190,7 @@ function FeedPost({ post, author, report, onReport, onConfirm, onCancel }) {
           </div>
         ) : null}
         {phase === 'done' ? (
-          <p role="status" className="text-caption text-text-secondary">
+          <p ref={doneRef} tabIndex={-1} role="status" className="text-caption text-text-secondary">
             Reported. Staff will review this post.
           </p>
         ) : null}
@@ -192,12 +200,20 @@ function FeedPost({ post, author, report, onReport, onConfirm, onCancel }) {
 }
 
 export default function AttendeeFeed() {
-  const { features, sources } = useEventConfig();
+  const { features, sources, available } = useEventConfig();
   const { user, adminStatus } = useAuth();
   const { uid, profile, status: profileStatus } = useProfile();
 
-  const access = feedAccess({ sources, features, uid, profile, profileStatus, adminStatus });
-  const feedKey = access === 'open' ? uid : null;
+  const access = feedAccess({ sources, available, features, uid, profile, profileStatus, adminStatus });
+  const open = access === 'open';
+  // Moves on after every closed spell; see "WHOSE DATA" above.
+  const [session, setSession] = useState(0);
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (wasOpen.current && !open) setSession((n) => n + 1);
+    wasOpen.current = open;
+  }, [open]);
+  const feedKey = open ? `${uid}\u0000${session}` : null;
 
   const [pages, setPages] = useState({ key: null, value: 1 });
   const [snapshot, setSnapshot] = useState({ key: null, value: { posts: null, failed: false, denied: false } });

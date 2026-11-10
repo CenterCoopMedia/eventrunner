@@ -52,6 +52,27 @@ describe('subscribeConfigDoc', () => {
     expect(onNext).not.toHaveBeenCalled();
   });
 
+  it('tells onGone about a missing doc and a failed listener, and not about a live doc', () => {
+    let capturedSuccess;
+    let capturedError;
+    onSnapshotMock.mockImplementation((_ref, onSuccess, onError) => {
+      capturedSuccess = onSuccess;
+      capturedError = onError;
+      return vi.fn();
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const onGone = vi.fn();
+    subscribeConfigDoc('features', vi.fn(), onGone);
+    capturedSuccess({ exists: () => true, data: () => ({ socialFeed: true }) });
+    expect(onGone).not.toHaveBeenCalled();
+    capturedSuccess({ exists: () => false });
+    expect(onGone).toHaveBeenCalledTimes(1);
+    capturedError(new Error('offline'));
+    expect(onGone).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
   it('re-attaches a fresh listener after a delay when the listener errors', () => {
     let capturedError;
     let attachCount = 0;
