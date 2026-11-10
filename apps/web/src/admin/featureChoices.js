@@ -29,17 +29,6 @@ export const FEATURE_CHOICES = {
 };
 
 /**
- * Flags the Features page does not show yet. The attendee feed (#205) is
- * hidden until its full feature is accepted: the attendee feed and report
- * flow (#788), the staff moderation screen (#789), and post creation and
- * replies (#510, #511). Until then no client admin can turn it on from the
- * admin site. The page still sends the stored value of a hidden flag
- * unchanged on every save, because config/features is a whole-document
- * replace (spec §2.2), so saving other features never changes it.
- */
-export const UNRELEASED_FEATURE_KEYS = Object.freeze(['socialFeed']);
-
-/**
  * The Features page label for a key, or the key itself for one this list
  * does not know yet.
  *

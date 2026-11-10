@@ -4,8 +4,9 @@
 // (spec §2.2), so this form always sends every known key — the key list comes
 // from the shared schema (KNOWN_FEATURE_KEYS), which is the same list the
 // server validates against, so a new flag appears here the moment it is added
-// there. A flag in UNRELEASED_FEATURE_KEYS (featureChoices.js) has no
-// switch here; its stored value is still sent back unchanged.
+// there. Until SOCIAL_FEED_RELEASED (#507 acceptance), the attendee feed has
+// no switch here, so no client admin can turn on the unfinished feed; its
+// stored value is still sent back unchanged.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -21,7 +22,8 @@ import {
 } from '../components/formControls.jsx';
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 import { contentError } from '../contentError.js';
-import { FEATURE_CHOICES, UNRELEASED_FEATURE_KEYS } from '../featureChoices.js';
+import { FEATURE_CHOICES } from '../featureChoices.js';
+import { SOCIAL_FEED_RELEASED } from '../socialFeedRelease.js';
 import '../components/featureSwitch.css';
 
 
@@ -61,8 +63,8 @@ export function featureGroupsFor(featureKeys) {
   ].filter((group) => group.keys.length > 0);
 }
 
-/** The flags this page offers: every schema key except the unreleased ones. */
-const VISIBLE_KEYS = KNOWN_FEATURE_KEYS.filter((key) => !UNRELEASED_FEATURE_KEYS.includes(key));
+/** The flags this page offers: every schema key, less the feed until it is released. */
+const VISIBLE_KEYS = KNOWN_FEATURE_KEYS.filter((key) => SOCIAL_FEED_RELEASED || key !== 'socialFeed');
 const VISIBLE_GROUPS = featureGroupsFor(VISIBLE_KEYS);
 
 function FeatureChoice({ featureKey, checked, onChange, error }) {

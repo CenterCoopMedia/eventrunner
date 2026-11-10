@@ -175,7 +175,7 @@ const rootFeed = (firestore, size = 20) => getDocs(query(
   limit(size),
 ));
 
-describe('the attendee root feed query (#788)', () => {
+describe('the attendee root feed query (issue 788)', () => {
   it('returns only active root posts to an approved attendee, a speaker, staff and an operator', async () => {
     for (const token of ['approved', 'speaker', 'staff', 'operator']) {
       const snap = await assertSucceeds(rootFeed(client(token)));
