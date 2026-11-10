@@ -16,7 +16,9 @@
 // push a loaded one out of view, and history is never cut off. The rules
 // (firestore.rules, social_posts) are the boundary: an attendee query
 // succeeds only while both flags are on and the reader holds a current
-// grant. A removed post is a tombstone with `state: 'removed'` and never
+// grant. Only server-confirmed snapshots reach the feed (`fromCache` is
+// false), so a cached result can never be shown to a different reader. A
+// removed post is a tombstone with `state: 'removed'` and never
 // matches; an active reply has a parent id and never matches either.
 //
 // REPORTS. reportSocialPost takes `{ postId }` and nothing else. The server
@@ -93,6 +95,10 @@ export function subscribeRootFeed({ through }, onNext, onFail) {
       onSnapshot(
         target,
         (snapshot) => {
+          // Only what the server returned under the current sign-in. A
+          // cache answer was authorized for whoever read it before, and
+          // after an account switch while offline that was another reader.
+          if (snapshot.metadata?.fromCache !== false) return;
           onNext(
             snapshot.docs.map((d) => toFeedPost(d.id, d.data())).filter(Boolean),
             { last: snapshot.docs.at(-1) ?? null, size: snapshot.docs.length },

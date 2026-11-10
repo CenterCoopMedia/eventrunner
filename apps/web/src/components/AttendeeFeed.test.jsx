@@ -75,10 +75,10 @@ function pushDoc(path, data) {
   act(() => entry.next(docSnap(path.split('/').at(-1), data)));
 }
 
-function pushPosts(entry, posts) {
+function pushPosts(entry, posts, { fromCache = false } = {}) {
   const docs = posts.map((item) => ({ id: item.id, data: () => item }));
-  entry.lastDocs = docs;
-  act(() => entry.next({ docs }));
+  if (!fromCache) entry.lastDocs = docs;
+  act(() => entry.next({ docs, metadata: { fromCache } }));
 }
 
 function post(id, authorUid, text, extra = {}) {
@@ -289,6 +289,26 @@ describe('account transitions', () => {
     expect(screen.getByText('Shared post')).toBeInTheDocument();
     expect(screen.queryByText(/Reported\./)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Report post' })).toBeInTheDocument();
+  });
+
+  it('offline switch: a cache-only answer for B shows none of A’s posts, and only a server answer is shown', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners()[0], [post('p1', 'ada', 'Only for Ada')]);
+    expect(screen.getByText('Only for Ada')).toBeInTheDocument();
+
+    // Offline, an empty cached probe can read as "admin" for B.
+    admins.add('bo');
+    publishAuth(makeUser('bo'));
+    pushDoc('users/bo', { uid: 'bo', ...PENDING });
+    await act(async () => {});
+    const feedB = activeFeedListeners()[0];
+    pushPosts(feedB, [post('p1', 'ada', 'Only for Ada')], { fromCache: true });
+    expect(screen.queryByText('Only for Ada')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /Loading the attendee feed/ })).toBeInTheDocument();
+
+    pushPosts(feedB, [post('p2', 'cy', 'Server answer for Bo')]);
+    expect(screen.getByText('Server answer for Bo')).toBeInTheDocument();
   });
 
   it('a staff verdict for A cannot authorize B while B’s probe is in flight', async () => {
