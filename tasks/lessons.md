@@ -320,12 +320,11 @@ Rules written after user corrections. Read at session start.
 
 ## 2026-11-10: read every lesson before the first agent call
 
-- The showreel session searched this file for "video" and did not read the
-  2026-11-09 entry. Two Opus agents (score, review) then ran with no
-  `effort` given. Joe repeated both rules in the session: no Fable
-  subagents, and stacked pull requests when possible. Read this whole file
-  before the first Agent call, not a search of it, and pass
-  `model: "opus"` and `effort: "medium"` every time.
+- A session searched this file for "video" and did not read the 2026-11-09
+  entry, so its Agent calls gave a model and no `effort`. Joe repeated both
+  rules in the session: no Fable subagents, and stacked pull requests when
+  possible. Read this whole file before the first Agent call, not a search
+  of it, and pass `model: "opus"` and `effort: "medium"` every time.
 
 ## 2026-11-10: run `video/flash.py` on the first rough cut, not the last
 
