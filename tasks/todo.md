@@ -12,14 +12,16 @@ The three parts are a stack (owner: stacked pull requests when possible):
 | PR | Branch | Base | Who writes |
 |---|---|---|---|
 | 1 | `jawn/youthful-meitner-ts84kk` | `main` | Director: design pass on the landscape cut |
-| 2 | `jawn/youthful-meitner-ts84kk-2-vertical` | PR 1 branch | Builder V1 (Opus, medium effort): format-driven layouts and the vertical cut |
-| 3 | `jawn/youthful-meitner-ts84kk-3-sound` | PR 2 branch | Director: new score and sound design |
+| 2 | `jawn/youthful-meitner-ts84kk-2-sound` | PR 1 branch | Director: new score and sound design |
+| 3 | `jawn/youthful-meitner-ts84kk-3-vertical` | PR 2 branch | Builder V1 (Opus, medium effort): format-driven layouts and the vertical cut |
 
-Roster: V1 works in the main checkout on `video/showreel/*.ts`, `data.mjs`,
-`render.mjs` and `video/tests/showreel.test.mjs`. The director stays out of
-those files while V1 runs and works only on `score.mjs`, `make-score.mjs`,
-a new `audio-kit.mjs` and `video/tests/showreel-score.test.mjs`. V1 writes
-its report to `tasks/reports/showreel-v1.md`.
+The sound was ready first, so it is the second part and the vertical cut the
+third. Roster: V1 works in the main checkout on `video/showreel/*.ts`,
+`data.mjs`, `render.mjs`, the showreel README and
+`video/tests/showreel.test.mjs`. The director stays out of those files while
+V1 runs and works only on `score.mjs`, `make-score.mjs`, `audio-kit.mjs` and
+`video/tests/showreel-score.test.mjs`. V1 writes its report to
+`tasks/reports/showreel-v1.md`.
 
 ### PR 1. Design pass (landscape)
 
@@ -35,7 +37,7 @@ its report to `tasks/reports/showreel-v1.md`.
 - [x] One colour for each product part, shared by the stack and the montage.
 - [ ] Flash screen passes at native size.
 
-### PR 2. Native vertical cut
+### PR 3. Native vertical cut
 
 - [ ] One `LAYOUT` table for each scene, chosen by format. Landscape frames
       stay identical to PR 1 (reference frames in the scratchpad).
@@ -43,11 +45,12 @@ its report to `tasks/reports/showreel-v1.md`.
       a phone page picture, a three-column wall, downward paths.
 - [ ] Essential content inside y 250 to 1540. Flash screen passes.
 
-### PR 3. Sound
+### PR 2. Sound
 
-- [ ] New composition on the same cues, with a hook and real arrangement.
-- [ ] Designed sound for every picture event, placed by screen position.
-- [ ] Master to -16 LUFS; measurements and spectrogram reviewed.
+- [x] New composition on the same cues, with a hook and real arrangement.
+- [x] Designed sound for every picture event, placed by screen position.
+- [x] Master to -16 LUFS; measurements and spectrogram reviewed.
+- [ ] A person listens on headphones, laptop speakers and a phone.
 
 ## Plan for review: audit follow-up (2026-11-09)
 

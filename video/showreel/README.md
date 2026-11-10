@@ -67,7 +67,7 @@ interface. It makes no claim about numbers, clients or results.
 - `scene-*.ts`: one file for each scene. [`stage.ts`](stage.ts) orders them and sets the shutter.
 - [`main.ts`](main.ts): font gate, then a 180-degree shutter of 8 samples a frame (16 in fast moves, 1 when still) averaged with equal weight, halation, vignette and seeded grain.
 - [`shared.ts`](shared.ts): the flat ground, the narrator's type, the part colours, and the `SOFT` opacity limit described below.
-- [`score.mjs`](score.mjs): the composition in E major. Every sample is calculated from oscillators, seeded noise and filters. No instrument bank, loop, or borrowed melody.
+- [`score.mjs`](score.mjs) and [`audio-kit.mjs`](audio-kit.mjs): the music, the sound design and the mix. See "Sound" below.
 
 ## Design rules
 
@@ -131,12 +131,96 @@ scenes. The motion now follows four rules:
 
 Run the screen again after any change to motion, colour or timing.
 
+## Sound
+
+One WAV serves both cuts, because both use the same clock. Everything is
+calculated in [`score.mjs`](score.mjs) with the tools in
+[`audio-kit.mjs`](audio-kit.mjs): band-limited oscillators, seeded noise,
+filters, a plate reverb, an echo, a compressor and a limiter. There is no
+recording, sample pack, loop or borrowed melody.
+
+### Music
+
+Filter house at 128 BPM in A major. The harmony is one loop, a chord a bar:
+D maj9, E 6/9, C♯ m7, F♯ m9. A scene is four bars, so each scene is one turn
+of the loop. The loop never rests on A, the home chord. A arrives once, on the
+title, after 37 seconds.
+
+The hook is four bars. Each bar opens with the same 3 + 3 + 2 figure, and the
+bass plays that figure too.
+
+| Bars | Scene | What plays |
+| --- | --- | --- |
+| 1–2 | Open | No drums. The four parts of the badge play the first four notes of the hook. A riser and a snare fill lead to the drop. |
+| 3–6 | Plan | The drop: kick on every beat, claps, hats, the bass line, off-beat chord stabs that open their filter bar by bar, and the hook. |
+| 7–9 | Shape | One chord for each style change, two beats apart. The six chords climb (top line E, F♯, A, B, C♯, E). |
+| 10 | Shape | Dark mode: the band goes under a low-pass filter, with one kick and a held bass note. |
+| 11–12 | Gather | Lighter: a bouncing pluck, a shaker, two kicks a bar. |
+| 13–14 | Gather | The full groove returns and the hook plays its second half, with a harmony. |
+| 15–16 | One site | Open bars: a wide pad, and the hook at half speed as bells. |
+| 17–18 | One site | The build: snare from quarters to sixteenths, stabs from eighths to sixteenths, a climbing pluck line and a riser. |
+| 19–20 | Montage | The peak: the hook with an octave above it, and a tuned drum that climbs with each band. Everything stops at beat 79.5. |
+| 21–24 | Title | The A chord, held. "Plan. Shape. Gather." are C♯, E and A: the chord of home, one note a word. |
+
+### Sound design
+
+Each picture event has a sound of its own, built from one small family so the
+film has one voice:
+
+- a **knock** (a tuned wooden bar) when something is placed: a session card, a checkout step, a closing plate;
+- a **pop** when something appears: an eye, a docked speaker, each of the forty badges at check-in;
+- a **bell** when something is confirmed: published, saved to the phone, delivered;
+- a **tick** when a control is pressed: Publish, the dark-mode switch, Send;
+- a **whoosh** when something travels, loudest where the move is fastest.
+
+Sounds with a pitch are in the key. Each sound is panned to where its event is
+on screen, inside ±0.6 so the two cuts agree. A sound starts on the frame of
+its event: the forty check-in pops and the fourteen delivery bells use the
+same formulas as the picture. Each exposure dip of the picture is a quick
+low-pass dip in the music.
+
+Some events have a sound made only for them: a pen for the badge outline, a
+printer for the ticket, torn paper for the stub, a different texture for each
+of the six wipes, and a fold that pulls the sound down into the silence.
+
+### Mix
+
+Music ducks under each kick (the pump of house music). The bass is mono and
+keeps harmonics above 200 Hz, so a phone speaker can play it. The music dips a
+little under loud effects. The master is a gentle compressor, a soft clip and
+a look-ahead limiter, then FFmpeg sets −16 LUFS.
+
+Measured on the mastered WAV: −15.8 LUFS integrated, loudness range 5.9 LU,
+true peak −3.2 dBTP.
+
+| Part | Loudness |
+| --- | --- |
+| Open | −20.0 LUFS |
+| Plan (the drop) | −14.8 LUFS |
+| Shape | −15.3 LUFS |
+| Dark-mode bar | −19.9 LUFS |
+| Gather, first half | −19.2 LUFS |
+| Gather, second half | −14.7 LUFS |
+| One site, open bars | −18.8 LUFS |
+| The build | −15.0 LUFS |
+| Montage (the peak) | −13.1 LUFS |
+| Title | −16.8 LUFS |
+
+In the drop the energy falls evenly from 63 Hz to 8 kHz, about 1 to 3 dB an
+octave, which is the slope of a finished dance record. Left and right agree
+below 120 Hz, and the whole mix stays compatible with mono.
+
+Nobody has listened to this score. The numbers show that the mix has the
+planned shape and a balanced spectrum; they do not show that it is good. A
+person must listen on headphones, laptop speakers and a phone before release.
+
 ## Checks and their limits
 
 `npm --prefix video run check` runs `tests/showreel.test.mjs` (clock, cue order,
 fixture-only content, contrast, the rig against the mark, the run cycle) and
 `tests/showreel-score.test.mjs` (length, determinism, headroom, exact silences,
-a sound for each cue, section energy).
+a sound for each cue, every note in the key, the shape of the arrangement, a
+mono low end, and the signal tools).
 
 The flash screen, loudness numbers, contact sheets and spectrogram are
 measurements. Nobody has listened to the score or watched the film at speed on

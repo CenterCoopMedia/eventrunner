@@ -342,3 +342,20 @@ Rules written after user corrections. Read at session start.
   has the four rules.
 - Measure early with a downscaled copy (640 by 360 gives the same counts in
   25 seconds) and only run the native screen on a candidate.
+
+## 2026-11-10: the anti-slop list is a lens, and "sound" means sound design too
+
+- Joe attached his list of signs that a site was generated, and I started to
+  remove each item as a rule. He stopped me: the list is a holistic way to
+  avoid the generated smell, not a deny list. For any design work, ask of
+  each element "what is its reason in this product?" Keep what has one (mono
+  type for times, a stamp on a ticket), remove what is there by habit (a
+  numbered label above every headline, a chip with a dot, a glow), and look
+  for the one idea that ties the piece together. A grep for the items is a
+  check, not the method.
+- "Better music" from Joe also means better sound design: every picture
+  event gets a designed sound in one family, in the key, at its place on the
+  screen and on its exact frame. A score with thin effects is half the job.
+- Give phones a bass line they can play. A sub-only bass and kick vanish on
+  a phone speaker, and the vertical cut is for phones: keep harmonics above
+  200 Hz in both.
