@@ -35,7 +35,7 @@ V1 runs and works only on `score.mjs`, `make-score.mjs`, `audio-kit.mjs` and
 - [x] Flat ground: no glow and no dot grid.
 - [x] Montage is a run sheet of eight ruled bands, not a card grid.
 - [x] One colour for each product part, shared by the stack and the montage.
-- [ ] Flash screen passes at native size.
+- [x] Flash screen passes at native size (6 transitions in the worst second; the limit is 6).
 
 ### PR 3. Native vertical cut
 

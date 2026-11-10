@@ -8,6 +8,8 @@ export type Pose = {
   lean: number;
   /** Run cycle position in strides, and how much of the cycle replaces the rest pose. */
   run: number; runAmount: number;
+  /** How much the body rises on each stride. 0 holds a large figure still: a bright outline that bobs is a flicker. */
+  bob: number;
   /** Vertical squash about the feet; 1 is none. */
   squash: number;
   blink: number; arm: number;
@@ -19,7 +21,7 @@ export type Pose = {
   /** Opacity of legs and arm. Fast limbs are drawn soft, as a smear. */
   limbAlpha: number;
 };
-export const REST: Pose = {lean: .16, run: 0, runAmount: 0, squash: 1, blink: 0, arm: 0, lanyard: 1, swing: 0, bars: 1, barStretch: 1, eyes: [1, 1], smile: 1, outline: 1, fill: 1, band: 1, clip: 1, limbs: 1, limbAlpha: 1};
+export const REST: Pose = {lean: .16, run: 0, runAmount: 0, bob: 1, squash: 1, blink: 0, arm: 0, lanyard: 1, swing: 0, bars: 1, barStretch: 1, eyes: [1, 1], smile: 1, outline: 1, fill: 1, band: 1, clip: 1, limbs: 1, limbAlpha: 1};
 export type Inks = {ink: RGB; accent: RGB; surface: RGB};
 
 // Knee, ankle and toe as offsets from the hip. FORWARD and KICK are the two
@@ -68,7 +70,7 @@ export function badger(c: C, pose: Pose, inks: Inks, alpha = 1) {
     }
   }
   c.translate(40, 72); c.scale(1 / Math.sqrt(pose.squash), pose.squash); c.translate(-40, -72);
-  c.translate(0, -.6 * pose.runAmount * Math.abs(Math.sin(TAU * pose.run)));
+  c.translate(0, -.6 * pose.runAmount * pose.bob * Math.abs(Math.sin(TAU * pose.run)));
   c.transform(1, 0, -pose.lean, 1, 50 * pose.lean, 0);
 
   if (pose.lanyard > 0) {
