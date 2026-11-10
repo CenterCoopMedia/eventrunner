@@ -29,6 +29,7 @@ test.describe.serial('private feed moderation', () => {
   const postId = `moderation-${stamp}`;
   const repeatedId = `moderation-repeat-${stamp}`;
   const revokedId = `moderation-revoked-${stamp}`;
+  const missingId = `moderation-missing-${stamp}`;
   const text = `Fictional report target ${stamp}.`;
   let db;
   let features;
@@ -90,7 +91,7 @@ test.describe.serial('private feed moderation', () => {
     syntheticDb();
     if (features) await db.doc('config/features').set(features);
     if (bootstrap) await db.doc('config/bootstrap').set(bootstrap);
-    for (const id of [postId, repeatedId, revokedId]) {
+    for (const id of [postId, repeatedId, revokedId, missingId]) {
       await db.doc(`social_posts/${id}`).delete();
       const logs = await db.collection('admin_logs').where('docPath', '==', `social_posts/${id}`).get();
       await Promise.all(logs.docs.map((entry) => entry.ref.delete()));
@@ -160,6 +161,30 @@ test.describe.serial('private feed moderation', () => {
     await staff.getByRole('button', { name: 'Newest reports', exact: true }).click();
     await expect(list.getByRole('listitem')).toHaveCount(3);
     await expect(staff.getByText('Removed', { exact: true })).toBeVisible();
+  });
+
+  test('a target deleted after loading clears its retained text on the real 404 response', async () => {
+    syntheticDb();
+    const reportId = `moderation-missing-report-${stamp}`;
+    reportIds.push(reportId);
+    await db.doc(`social_posts/${missingId}`).set({
+      state: 'active', authorUid: attendeeUid, text: 'Fictional post before account cleanup.',
+      createdAt: new Date(), parentPostId: null,
+    });
+    await db.doc(`social_reports/${reportId}`).set({ postId: missingId, reporterUid: attendeeUid, createdAt: new Date() });
+    await staff.goto('/admin/feed-moderation');
+    const row = staff.getByRole('listitem').filter({ hasText: `Post ${missingId}` });
+    await expect(row.getByText('Fictional post before account cleanup.', { exact: true })).toBeVisible();
+    await db.doc(`social_posts/${missingId}`).delete();
+    const response = staff.waitForResponse((entry) => entry.url().endsWith('/removeSocialPost') && entry.request().method() === 'POST');
+    await row.getByRole('button', { name: 'Remove post', exact: true }).click();
+    await row.getByRole('button', { name: 'Remove this post', exact: true }).click();
+    expect((await response).status()).toBe(404);
+    await expect(row.getByText('This post is no longer available.', { exact: true })).toBeVisible();
+    await expect(row.getByText('Fictional post before account cleanup.', { exact: true })).toHaveCount(0);
+    await expect(row.getByRole('button', { name: /remove/i })).toHaveCount(0);
+    await expect(row.getByRole('heading', { name: `Post ${missingId}`, exact: true })).toBeFocused();
+    expect((await db.collection('admin_logs').where('docPath', '==', `social_posts/${missingId}`).get()).size).toBe(0);
   });
 
   test('an operator can clean up with flags off; a concurrent already-removed response keeps no text', async ({ page }) => {

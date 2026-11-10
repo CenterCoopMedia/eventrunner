@@ -52,8 +52,12 @@ function ReportedPost({ postId, reports, call, onAccessDenied }) {
       if (!mounted.current) return;
       if (err.status === 401 || err.status === 403) {
         onAccessDenied();
+      } else if (err.status === 404) {
+        setPost(null);
+        heading.current?.focus();
+      } else {
+        setError(`The removal did not complete. ${err.message} You can try again.`);
       }
-      setError(`The removal did not complete. ${err.message} You can try again.`);
     } finally {
       if (mounted.current) setBusy(false);
     }
