@@ -12,7 +12,7 @@ The three parts are a stack (owner: stacked pull requests when possible):
 | PR | Branch | Base | Who writes |
 |---|---|---|---|
 | 1 | `jawn/youthful-meitner-ts84kk` | `main` | Director: design pass on the landscape cut |
-| 2 | `jawn/youthful-meitner-ts84kk-2-vertical` | PR 1 branch | Builder V1 (Opus, medium effort): format-driven layouts and the vertical cut |
+| 2 | `jawn/youthful-meitner-ts84kk-2-vertical` | PR 1 branch | Builder V1: format-driven layouts and the vertical cut |
 | 3 | `jawn/youthful-meitner-ts84kk-3-sound` | PR 2 branch | Director: new score and sound design |
 
 Roster: V1 works in the main checkout on `video/showreel/*.ts`, `data.mjs`,
