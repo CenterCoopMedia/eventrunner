@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getDoc, getDocs, onSnapshot } from 'firebase/firestore';
+import { getDoc, getDocs, getDocsFromServer, onSnapshot } from 'firebase/firestore';
 import { auth } from '../firebase.js';
 
 // The build snapshot turns the feed ON, so every "no request" case below
@@ -149,11 +149,12 @@ beforeEach(() => {
     listeners.push(entry);
     return () => { entry.active = false; };
   });
+  vi.mocked(getDocsFromServer).mockReset().mockImplementation(async () => {
+    const page = olderPages.shift();
+    if (page instanceof Error) throw page;
+    return { docs: (page ?? []).map((item) => ({ id: item.id, data: () => item })) };
+  });
   vi.mocked(getDocs).mockImplementation(async (target) => {
-    if (pathOf(target) === 'social_posts') {
-      const page = olderPages.shift() ?? [];
-      return { docs: page.map((item) => ({ id: item.id, data: () => item })) };
-    }
     const uid = auth.currentUser?.uid;
     if (probeGates.has(uid)) await probeGates.get(uid).promise;
     if (admins.has(uid)) return { docs: [] };
@@ -403,7 +404,8 @@ describe('older posts', () => {
       const oldest = previous.lastDocs.at(-1);
       fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
       await act(async () => {});
-      const request = vi.mocked(getDocs).mock.calls.filter(([target]) => pathOf(target) === 'social_posts').at(-1)[0];
+      const request = vi.mocked(getDocsFromServer).mock.calls.at(-1)[0];
+      expect(pathOf(request)).toBe('social_posts');
       expect(request.clauses.slice(0, 3)).toEqual([
         { where: ['state', '==', 'active'] },
         { where: ['parentPostId', '==', null] },
@@ -430,6 +432,38 @@ describe('older posts', () => {
     pushPosts(activeFeedListeners()[0], [...shown, post('last', 'ada', 'The very first post')]);
     expect(screen.getByText('The very first post')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show older posts' })).not.toBeInTheDocument();
+  });
+
+  it('keeps "Show older posts" after a failed server fetch, so a retry can page on', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners()[0], Array.from({ length: 20 }, (_, i) => post(`n${i}`, 'ada', `Newest ${i}`)));
+    olderPages.push(Object.assign(new Error('offline'), { code: 'unavailable' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Older posts could not be loaded. Try again.');
+    olderPages.push([post('o1', 'ada', 'An older post')]);
+    fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
+    await act(async () => {});
+    expect(getDocsFromServer).toHaveBeenCalledTimes(2);
+    expect(activeFeedListeners()[0].target.clauses[3].endAt[0].id).toBe('o1');
+  });
+
+  it('pages on from the retained cursor when every loaded post was removed', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners()[0], Array.from({ length: 20 }, (_, i) => post(`n${i}`, 'ada', `Newest ${i}`)));
+    olderPages.push(Array.from({ length: 20 }, (_, i) => post(`o${i}`, 'ada', `Older ${i}`)));
+    fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
+    await act(async () => {});
+    const ranged = activeFeedListeners()[0];
+    const cursor = ranged.target.clauses[3].endAt[0];
+    // An account cleanup removed every post in the loaded range.
+    pushPosts(ranged, []);
+    expect(screen.queryByRole('heading', { name: 'No posts yet' })).not.toBeInTheDocument();
+    olderPages.push([post('x1', 'bo', 'Still here')]);
+    fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
+    await act(async () => {});
+    expect(vi.mocked(getDocsFromServer).mock.calls.at(-1)[0].clauses[3].startAfter[0]).toBe(cursor);
   });
 });
 
@@ -495,7 +529,7 @@ describe('reporting a post', () => {
     pushPosts(activeFeedListeners()[0], [post('p1', 'cy', 'Keep me')]);
     fireEvent.click(screen.getByRole('button', { name: 'Report post' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.getByRole('button', { name: 'Report post' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Report post' })).toHaveFocus();
     expect(fetch).not.toHaveBeenCalled();
   });
 });

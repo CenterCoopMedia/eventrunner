@@ -26,7 +26,7 @@
 import {
   collection,
   endAt,
-  getDocs,
+  getDocsFromServer,
   limit,
   onSnapshot,
   orderBy,
@@ -111,12 +111,14 @@ export function subscribeRootFeed({ through }, onNext, onFail) {
  * Find the next older page after `after`. Only its size and its oldest
  * document are used: the listener re-attaches through that document.
  *
- * @param {object} after the oldest loaded document
+ * @param {object} after the oldest loaded document, or the retained cursor
  * @returns {Promise<{ ok: true, last: object|null, size: number } | { ok: false }>}
  */
 export async function fetchOlderPage(after) {
   try {
-    const snapshot = await getDocs(rootPosts(startAfter(after), limit(FEED_PAGE_SIZE)));
+    // From the server only: an offline cache answer can be empty while
+    // older posts exist, and an empty page ends pagination.
+    const snapshot = await getDocsFromServer(rootPosts(startAfter(after), limit(FEED_PAGE_SIZE)));
     return { ok: true, last: snapshot.docs.at(-1) ?? null, size: snapshot.docs.length };
   } catch (error) {
     console.warn('older attendee feed posts failed to load.', error);

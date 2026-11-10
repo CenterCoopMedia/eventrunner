@@ -113,6 +113,8 @@ function FeedPost({ post, author, report, onReport, onConfirm, onCancel }) {
   const headId = useId();
   const confirmRef = useRef(null);
   const doneRef = useRef(null);
+  const triggerRef = useRef(null);
+  const asked = useRef(false);
   const phase = report?.phase ?? 'idle';
   const name = projectionName(author);
   const posted = toDate(post.createdAt);
@@ -120,8 +122,11 @@ function FeedPost({ post, author, report, onReport, onConfirm, onCancel }) {
   useEffect(() => {
     // Keep focus in the post: on the send button when the question opens,
     // and on the confirmation once the buttons are gone.
+    // A cancel returns focus to the Report button it came from.
     if (phase === 'confirm') confirmRef.current?.focus();
     if (phase === 'done') doneRef.current?.focus();
+    if (phase === 'idle' && asked.current) triggerRef.current?.focus();
+    asked.current = phase === 'confirm' || phase === 'failed';
   }, [phase]);
 
   return (
@@ -150,6 +155,7 @@ function FeedPost({ post, author, report, onReport, onConfirm, onCancel }) {
       <div className="mt-2xs">
         {phase === 'idle' ? (
           <button
+            ref={triggerRef}
             type="button"
             className={`${textControlStateClass} touch-target inline-flex items-center font-data text-caption font-medium text-text-secondary underline underline-offset-4`}
             aria-describedby={headId}
@@ -297,7 +303,9 @@ export default function AttendeeFeed() {
   // re-attaches through the new oldest post, so every loaded post stays live.
   async function loadOlder() {
     const key = feedKey;
-    const after = feed.last;
+    // An empty loaded range (every post in it removed) pages on from the
+    // retained cursor.
+    const after = feed.last ?? through;
     if (key === null || !after || loaded.loading) return;
     const base = { ...loaded, loading: false, failed: false };
     setOlder({ key, value: { ...base, loading: true } });
@@ -348,7 +356,7 @@ export default function AttendeeFeed() {
     );
   } else if (posts === null) {
     body = <LoadingState shape="rows" label="Loading the attendee feed…" />;
-  } else if (posts.length === 0) {
+  } else if (posts.length === 0 && !(through !== null && loaded.more)) {
     body = <EmptyState title="No posts yet" description="Posts from attendees appear here." />;
   } else {
     const more = through === null ? feed.size >= FEED_PAGE_SIZE : loaded.more;
