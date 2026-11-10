@@ -62,7 +62,9 @@ const report = (postId, token = 'speaker', deps) => call(createReportSocialPostH
 const deleteAccount = (deps) => call(createDeleteAttendeeHandler, 'operator', { uid: TOKENS.approved.uid }, deps);
 const data = async (postId) => (await db.collection('social_posts').doc(postId).get()).data();
 const idFor = (token, key = 'intent_1') => createHash('sha256').update(`${TOKENS[token].uid}\0${key}`).digest('hex');
-const client = (name) => testEnv.authenticatedContext(TOKENS[name].uid, TOKENS[name]).firestore();
+const client = (name) => testEnv.authenticatedContext(TOKENS[name].uid, {
+  email: TOKENS[name].email, email_verified: true,
+}).firestore();
 
 // Hold a real database operation before it starts its transaction, while a
 // competing real operation commits. No reads, locks, writes or retries are
