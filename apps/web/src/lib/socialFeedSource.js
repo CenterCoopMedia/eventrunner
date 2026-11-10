@@ -27,7 +27,9 @@
 // every failure comes back as `{ ok: false, error }` for the feed to state.
 import {
   collection,
+  doc,
   endAt,
+  getDocFromServer,
   getDocsFromServer,
   limit,
   onSnapshot,
@@ -133,6 +135,27 @@ export async function fetchOlderPage(after) {
   } catch (error) {
     console.warn('older attendee feed posts failed to load.', error);
     return { ok: false };
+  }
+}
+
+/**
+ * The display name on one author's users_public projection, read from the
+ * server under the current sign-in, or null. A private, missing or
+ * unreadable profile, an offline read, or a malformed name is null, and
+ * the feed shows its neutral fallback. Never a cache answer: a cached
+ * projection may have been readable only to a previous reader.
+ *
+ * @param {string} uid
+ * @returns {Promise<string|null>}
+ */
+export async function fetchAuthorName(uid) {
+  try {
+    const snapshot = await getDocFromServer(doc(db, 'users_public', uid));
+    if (!snapshot.exists()) return null;
+    const name = snapshot.data()?.displayName;
+    return typeof name === 'string' && name.trim() ? name.trim() : null;
+  } catch {
+    return null;
   }
 }
 

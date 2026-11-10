@@ -33,7 +33,8 @@
 // callback or a report that completes after its key is gone is dropped.
 //
 // AUTHORS. A name comes only from the author's users_public projection,
-// read one author at a time (lib/profileSource.js fetchPublicProfile). A
+// read from the server one author at a time (lib/socialFeedSource.js
+// fetchAuthorName), never from the cache. A
 // private, missing, or unreadable profile resolves null and shows a
 // neutral, unlinked "An attendee"; it never fails the feed and never reads
 // `users`.
@@ -49,9 +50,9 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
-import { fetchPublicProfile } from '../lib/profileSource.js';
 import {
   FEED_PAGE_SIZE,
+  fetchAuthorName,
   fetchOlderPage,
   reportSocialPost,
   subscribeRootFeed,
@@ -280,9 +281,9 @@ export default function AttendeeFeed() {
       const authorUid = post.authorUid;
       if (!authorUid || asked.has(authorUid)) continue;
       asked.add(authorUid);
-      fetchPublicProfile(authorUid).then((projection) => {
+      fetchAuthorName(authorUid).then((name) => {
         if (activeKey.current !== feedKey) return;
-        const entry = projection ? { displayName: projectionName(projection) } : null;
+        const entry = name ? { displayName: name } : null;
         setAuthors((prev) => ({
           key: feedKey,
           value: { ...(prev.key === feedKey ? prev.value : {}), [authorUid]: entry },

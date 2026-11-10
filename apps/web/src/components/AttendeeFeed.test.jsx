@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getDoc, getDocs, getDocsFromServer, onSnapshot } from 'firebase/firestore';
+import { getDoc, getDocFromServer, getDocs, getDocsFromServer, onSnapshot } from 'firebase/firestore';
 import { auth } from '../firebase.js';
 
 // The build snapshot turns the feed ON, so every "no request" case below
@@ -162,7 +162,8 @@ beforeEach(() => {
     if (admins.has(uid)) return { docs: [] };
     throw Object.assign(new Error(`denied ${pathOf(target)}`), { code: 'permission-denied' });
   });
-  vi.mocked(getDoc).mockImplementation(async (target) => {
+  vi.mocked(getDoc).mockReset();
+  vi.mocked(getDocFromServer).mockReset().mockImplementation(async (target) => {
     const path = pathOf(target);
     const [collectionName, id] = path.split('/');
     if (collectionName === 'users_public' && projections.has(id)) return docSnap(id, projections.get(id));
@@ -377,7 +378,7 @@ describe('account transitions', () => {
 });
 
 describe('what the feed shows', () => {
-  it('names authors only from readable projections, never reads users, and drops replies and tombstones', async () => {
+  it('names authors only from server reads of readable projections, never reads users, and drops replies and tombstones', async () => {
     projections.set('pub', { displayName: 'Pat Public', profileVisibility: 'public' });
     renderFeed();
     await openFeedAs(makeUser('ada'));
@@ -391,13 +392,15 @@ describe('what the feed shows', () => {
     const link = await screen.findByRole('link', { name: 'Pat Public' });
     expect(link).toHaveAttribute('href', '/attendees/pub');
     const privateItem = screen.getByText('From a private profile').closest('li');
-    await waitFor(() => expect(getDoc).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getDocFromServer).toHaveBeenCalledTimes(2));
     expect(within(privateItem).getByText('An attendee')).toBeInTheDocument();
     expect(within(privateItem).queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByText('A reply')).not.toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    expect(vi.mocked(getDoc).mock.calls.map(([target]) => pathOf(target)).sort())
+    expect(vi.mocked(getDocFromServer).mock.calls.map(([target]) => pathOf(target)).sort())
       .toEqual(['users_public/priv', 'users_public/pub']);
+    // Server reads only: a cached projection may belong to a previous reader.
+    expect(getDoc).not.toHaveBeenCalled();
   });
 
   it('renders post text as text', async () => {
