@@ -45,20 +45,28 @@ const USERS_PUBLIC = 'users_public';
  * rather than an error. A listener error fails soft the same way and
  * re-attaches after a delay (subscribeWithRetry).
  *
+ * `onConfirmed` (optional) is told, after each snapshot, whether the server
+ * confirmed it (true) or it came from the local cache (false). With it the
+ * listener asks for metadata changes, so a cached answer the server merely
+ * confirms is reported. The private attendee feed (issue #788) opens only
+ * on a server-confirmed grant.
+ *
  * @param {string} uid
  * @param {(profile: object | null) => void} onNext
+ * @param {(confirmed: boolean) => void} [onConfirmed]
  * @returns {() => void} unsubscribe
  */
-export function subscribeOwnProfile(uid, onNext) {
+export function subscribeOwnProfile(uid, onNext, onConfirmed) {
+  const ref = doc(db, USERS, uid);
+  const next = (snapshot) => {
+    onNext(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
+    onConfirmed?.(snapshot.metadata?.fromCache === false);
+  };
   return subscribeWithRetry(
     (onError) =>
-      onSnapshot(
-        doc(db, USERS, uid),
-        (snapshot) => {
-          onNext(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
-        },
-        onError,
-      ),
+      onConfirmed
+        ? onSnapshot(ref, { includeMetadataChanges: true }, next, onError)
+        : onSnapshot(ref, next, onError),
     (error) => {
       console.warn('own profile subscription failed; retrying.', error);
     },

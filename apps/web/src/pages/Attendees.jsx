@@ -40,6 +40,7 @@ import { subscribeDirectory } from '../lib/profileSource.js';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import { collectOrganizations, directorySearchText, matchesDirectoryFilters } from '../lib/directoryView.js';
+import AttendeeFeed from '../components/AttendeeFeed.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
@@ -239,6 +240,11 @@ export default function Attendees() {
             registration is approved.
           </p>
         ) : null}
+
+        {/* The private feed (issue #788). It renders nothing, and asks for
+            nothing, unless the feature is live and this reader has a
+            current grant; the directory below is unchanged either way. */}
+        <AttendeeFeed />
 
         {loading ? (
           <div className="mt-lg">

@@ -1117,7 +1117,7 @@ describe('feature flags', () => {
     await renderAt('/admin/features');
     await pushConfig('features', { schedule: true });
 
-    for (const key of KNOWN_FEATURE_KEYS) {
+    for (const key of KNOWN_FEATURE_KEYS.filter((name) => name !== 'socialFeed')) {
       const inputs = document.querySelectorAll(`input[name="${key}"]`);
       expect(inputs).toHaveLength(1);
       expect(inputs[0]).toHaveAccessibleName();
@@ -1129,7 +1129,7 @@ describe('feature flags', () => {
     for (const heading of ['Public content', 'Attendees and access', 'Session tools', 'Feedback and browser tools']) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
     }
-    expect(screen.getByText('1 of 21 features on. Changes take effect after you save.')).toBeInTheDocument();
+    expect(screen.getByText('1 of 20 features on. Changes take effect after you save.')).toBeInTheDocument();
 
     const schedule = screen.getByRole('switch', { name: 'Public schedule' });
     fireEvent.click(screen.getByText('Show the public schedule.'));
@@ -1160,6 +1160,25 @@ describe('feature flags', () => {
     expect(payload.badges).toBe(false);
     expect(Object.keys(payload).sort()).toEqual([...KNOWN_FEATURE_KEYS].sort());
     expect(Object.values(payload).every((v) => typeof v === 'boolean')).toBe(true);
+  });
+
+  // Joe, November 10, 2026: no client admin can turn on the unfinished
+  // attendee feed (#205) until #788, #789, #510 and #511 are accepted.
+  it.each([false, true])('offers no Attendee feed switch and saves the stored socialFeed value (%s) unchanged', async (stored) => {
+    await renderAt('/admin/features');
+    await pushConfig('features', { schedule: true, attendeeDirectory: true, socialFeed: stored });
+
+    expect(document.querySelector('input[name="socialFeed"]')).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Attendee feed' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Attendee feed')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Other features' })).not.toBeInTheDocument();
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Speaker directory' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).features.socialFeed).toBe(stored);
+    expect(bodyOf(0).features.speakers).toBe(true);
   });
 
   it('names the offending flag when the server rejects one', async () => {
