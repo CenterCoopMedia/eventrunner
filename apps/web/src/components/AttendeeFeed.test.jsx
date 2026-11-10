@@ -46,6 +46,8 @@ let listeners;
 let admins;
 /** A per-uid gate that holds that user's admin probes open. */
 let probeGates;
+/** UIDs whose admin probes answer from the offline cache. */
+let cachedProbes;
 /** users_public projections by uid; a missing uid is unreadable. */
 let projections;
 /** Pages the older-posts fetch returns, in order. */
@@ -135,6 +137,7 @@ beforeEach(() => {
   listeners = [];
   admins = new Set();
   probeGates = new Map();
+  cachedProbes = new Set();
   projections = new Map();
   olderPages = [];
   renders = [];
@@ -159,7 +162,7 @@ beforeEach(() => {
   vi.mocked(getDocs).mockImplementation(async (target) => {
     const uid = auth.currentUser?.uid;
     if (probeGates.has(uid)) await probeGates.get(uid).promise;
-    if (admins.has(uid)) return { docs: [] };
+    if (admins.has(uid)) return { docs: [], metadata: { fromCache: cachedProbes.has(uid) } };
     throw Object.assign(new Error(`denied ${pathOf(target)}`), { code: 'permission-denied' });
   });
   vi.mocked(getDoc).mockReset();
@@ -308,24 +311,35 @@ describe('account transitions', () => {
     expect(screen.getByRole('button', { name: 'Report post' })).toBeInTheDocument();
   });
 
-  it('offline switch: a cache-only answer for B shows none of A’s posts, and only a server answer is shown', async () => {
+  it('offline switch: a cached admin probe for B opens nothing, and B never sees A’s posts', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
     pushPosts(activeFeedListeners()[0], [post('p1', 'ada', 'Only for Ada')]);
     expect(screen.getByText('Only for Ada')).toBeInTheDocument();
 
-    // Offline, an empty cached probe can read as "admin" for B.
+    // Offline, an empty cached probe reads as "admin" for B.
     admins.add('bo');
+    cachedProbes.add('bo');
     publishAuth(makeUser('bo'));
     pushDoc('users/bo', { uid: 'bo', ...PENDING });
     await act(async () => {});
-    const feedB = activeFeedListeners()[0];
-    pushPosts(feedB, [post('p1', 'ada', 'Only for Ada')], { fromCache: true });
+    expect(activeFeedListeners()).toHaveLength(0);
     expect(screen.queryByText('Only for Ada')).not.toBeInTheDocument();
     expect(screen.getByRole('status', { name: /Loading the attendee feed/ })).toBeInTheDocument();
+  });
 
-    pushPosts(feedB, [post('p2', 'cy', 'Server answer for Bo')]);
-    expect(screen.getByText('Server answer for Bo')).toBeInTheDocument();
+  it('a cached approved account document opens nothing until the server confirms the grant', async () => {
+    renderFeed();
+    publishAuth(makeUser('ada'));
+    pushDoc('config/features', FEED_ON);
+    // Approved at an earlier sign-in, revoked since: the cache still says approved.
+    pushDoc('users/ada', { uid: 'ada', ...APPROVED }, { fromCache: true });
+    await act(async () => {});
+    expect(listenersFor('social_posts')).toHaveLength(0);
+    pushDoc('users/ada', { uid: 'ada', registrationStatus: 'revoked', speakerId: null });
+    await act(async () => {});
+    expect(listenersFor('social_posts')).toHaveLength(0);
+    expect(screen.getByText(/opens for you once your registration is approved/)).toBeInTheDocument();
   });
 
   it('listens for metadata changes, so an unchanged cached answer confirmed by the server is shown', async () => {
@@ -491,6 +505,22 @@ describe('older posts', () => {
     pushPosts(activeFeedListeners()[0], [...shown, post('last', 'ada', 'The very first post')]);
     expect(screen.getByText('The very first post')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show older posts' })).not.toBeInTheDocument();
+  });
+
+  it('pages from the fetched cursor when clicked again before the new listener answers', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners()[0], Array.from({ length: 20 }, (_, i) => post(`n${i}`, 'ada', `Newest ${i}`)));
+    olderPages.push(Array.from({ length: 20 }, (_, i) => post(`o${i}`, 'ada', `Older ${i}`)));
+    fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
+    await act(async () => {});
+    const cursor = activeFeedListeners()[0].target.clauses[3].endAt[0];
+    expect(cursor.id).toBe('o19');
+    // The new listener has not answered yet; the old range is still shown.
+    olderPages.push([post('z1', 'ada', 'Oldest')]);
+    fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
+    await act(async () => {});
+    expect(vi.mocked(getDocsFromServer).mock.calls.at(-1)[0].clauses[3].startAfter[0]).toBe(cursor);
   });
 
   it('keeps "Show older posts" after a failed server fetch, so a retry can page on', async () => {

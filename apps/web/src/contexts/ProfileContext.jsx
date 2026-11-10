@@ -15,6 +15,8 @@
 //                    this flag only decides which directory query the client
 //                    asks for (a wrong guess fails the query, it does not
 //                    leak a profile).
+//   profileConfirmed  whether the server confirmed `profile`, rather than
+//                    the local cache.
 //   needsProfileSetup  true once the account exists but has no display name
 //                    or visibility choice yet — what routes the first
 //                    sign-in into the profile flow.
@@ -34,7 +36,7 @@ import { saveOwnProfile, subscribeOwnProfile } from '../lib/profileSource.js';
 
 const ProfileContext = createContext(null);
 
-const EMPTY_ACCOUNT = Object.freeze({ uid: null, profile: null, seeded: false });
+const EMPTY_ACCOUNT = Object.freeze({ uid: null, profile: null, seeded: false, confirmed: false });
 
 export function ProfileProvider({ children }) {
   const { user, isAdmin } = useAuth();
@@ -50,11 +52,18 @@ export function ProfileProvider({ children }) {
     setAccount(EMPTY_ACCOUNT);
     if (!uid) return undefined;
     let current = true;
-    const unsubscribe = subscribeOwnProfile(uid, (next) => {
-      // A callback that lands after this subscription ended must not
-      // overwrite the next account's document.
-      if (current) setAccount({ uid, profile: next, seeded: next != null });
-    });
+    const unsubscribe = subscribeOwnProfile(
+      uid,
+      (next) => {
+        // A callback that lands after this subscription ended must not
+        // overwrite the next account's document. A new document is not
+        // confirmed until the server says so.
+        if (current) setAccount({ uid, profile: next, seeded: next != null, confirmed: false });
+      },
+      (confirmed) => {
+        if (current) setAccount((prev) => (prev.uid === uid && prev.confirmed !== confirmed ? { ...prev, confirmed } : prev));
+      },
+    );
     return () => {
       current = false;
       unsubscribe();
@@ -64,6 +73,7 @@ export function ProfileProvider({ children }) {
   const own = uid && account.uid === uid ? account : EMPTY_ACCOUNT;
   const profile = own.profile;
   const seeded = own.seeded;
+  const profileConfirmed = own.confirmed;
 
   const saveProfile = useCallback(
     (fields) => {
@@ -87,9 +97,12 @@ export function ProfileProvider({ children }) {
         profile ? { ...profile, role: isAdmin ? 'admin' : profile.role } : null,
       ) || (Boolean(uid) && isAdmin),
       needsProfileSetup: status === 'ready' && !isProfileComplete(profile),
+      // Whether the server confirmed `profile` (not a local cache answer).
+      // The private attendee feed opens only on a confirmed grant.
+      profileConfirmed,
       saveProfile,
     };
-  }, [uid, profile, seeded, isAdmin, saveProfile]);
+  }, [uid, profile, seeded, profileConfirmed, isAdmin, saveProfile]);
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 }

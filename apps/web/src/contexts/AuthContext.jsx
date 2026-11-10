@@ -160,7 +160,7 @@ export function AuthProvider({ children }) {
   // transient failure must not make an operator staff for the session, so
   // it is left unknown, the rail says so and offers a retry, and no section
   // is refused on a guess (the server decides regardless).
-  const [verdict, setVerdict] = useState({ user: null, status: 'unknown', tier: null });
+  const [verdict, setVerdict] = useState({ user: null, status: 'unknown', tier: null, confirmed: false });
   const [loading, setLoading] = useState(true);
   // Bumped by refreshAdminStatus: the probes run again for the same user,
   // keeping the current verdict until the new one lands. The Access page
@@ -184,7 +184,9 @@ export function AuthProvider({ children }) {
     let cancelled = false;
     const probe = (name) =>
       getDocs(query(collection(db, name), limit(1))).then(
-        () => 'ok',
+        // A cache answer still counts for the admin shell, as before; it is
+        // recorded so a consumer that needs the server's word can tell.
+        (snapshot) => (snapshot?.metadata?.fromCache === false ? 'ok' : 'ok-cached'),
         (err) => (err?.code === 'permission-denied' ? 'denied' : 'error'),
       );
     (async () => {
@@ -193,10 +195,12 @@ export function AuthProvider({ children }) {
         probe('admin_logs'),
       ]);
       if (cancelled) return;
-      const isAnyAdmin = drafts === 'ok';
+      const isAnyAdmin = drafts === 'ok' || drafts === 'ok-cached';
       let tier = null;
-      if (isAnyAdmin) tier = logs === 'ok' ? 'operator' : logs === 'denied' ? 'staff' : 'unknown';
-      setVerdict({ user, status: isAnyAdmin ? 'admin' : 'denied', tier });
+      if (isAnyAdmin) {
+        tier = logs === 'ok' || logs === 'ok-cached' ? 'operator' : logs === 'denied' ? 'staff' : 'unknown';
+      }
+      setVerdict({ user, status: isAnyAdmin ? 'admin' : 'denied', tier, confirmed: drafts === 'ok' });
     })();
     return () => {
       cancelled = true;
@@ -212,6 +216,9 @@ export function AuthProvider({ children }) {
   const adminTier = ownVerdict?.status === 'admin' ? ownVerdict.tier : null;
   const isAdmin = adminStatus === 'admin';
   const isOperator = adminTier === 'operator';
+  // An admin verdict the server returned, not a local cache answer. The
+  // private attendee feed (issue #788) opens on a staff grant only then.
+  const adminConfirmed = isAdmin && ownVerdict?.confirmed === true;
 
   const signInWithGoogle = useCallback(
     () => signInWithPopup(auth, new GoogleAuthProvider()),
@@ -264,6 +271,7 @@ export function AuthProvider({ children }) {
       isOperator,
       adminStatus,
       adminTier,
+      adminConfirmed,
       loading,
       refreshAdminStatus,
       signInWithGoogle,
@@ -272,6 +280,7 @@ export function AuthProvider({ children }) {
       signOut,
     }),
     [
+      adminConfirmed,
       user,
       isAdmin,
       isOperator,

@@ -10,11 +10,12 @@
 //     values of a deleted or failing document never open the feed;
 //   - `socialFeed === true` and `attendeeDirectory === true` (a missing,
 //     malformed, or false flag is off);
-//   - the signed-in account holds a current grant: its own account document
-//     says approved or speaker (the rules' requesterIsApprovedAttendee), or
-//     the admin probe answered "admin" for this same user (an independent
-//     current staff or operator grant in config/bootstrap). A public profile
-//     or a stored `role` grants nothing.
+//   - the signed-in account holds a current grant, confirmed by the server
+//     (never a local cache answer): its own account document says approved
+//     or speaker (the rules' requesterIsApprovedAttendee), or the admin
+//     probe answered "admin" for this same user (an independent current
+//     staff or operator grant in config/bootstrap). A public profile or a
+//     stored `role` grants nothing.
 //
 // The Firestore rules are the boundary. This gate only decides whether to
 // ask, so a closed or unknown state costs nothing and leaks nothing.
@@ -69,7 +70,7 @@ import {
 
 const AUTHOR_FALLBACK = 'An attendee';
 const NO_OLDER = Object.freeze({ through: null, more: false, loading: false, failed: false });
-const NO_FEED = Object.freeze({ posts: null, last: null, size: 0, failed: false, denied: false });
+const NO_FEED = Object.freeze({ posts: null, last: null, size: 0, range: null, failed: false, denied: false });
 
 /**
  * Whether this reader may ask for the feed now.
@@ -80,15 +81,21 @@ const NO_FEED = Object.freeze({ posts: null, last: null, size: 0, failed: false,
  *   denied: signed in, the feature is on, and there is no grant;
  *   open: ask for the feed.
  */
-export function feedAccess({ demo = IS_DEMO, sources, available, features, uid, profile, profileStatus, adminStatus }) {
+export function feedAccess({
+  demo = IS_DEMO, sources, available, features, uid,
+  profile, profileStatus, profileConfirmed, adminStatus, adminConfirmed,
+}) {
   if (demo || !uid) return 'closed';
   if (sources?.features !== 'live' || available?.features !== true) return 'closed';
   if (features?.socialFeed !== true || features?.attendeeDirectory !== true) return 'closed';
-  const accountGrant = profile != null
+  // A grant counts only once the server confirmed it: a cached account
+  // document or admin probe can predate a revocation.
+  const accountGrant = profileConfirmed === true && profile != null
     && (profile.registrationStatus === 'approved'
       || (profile.speakerId !== undefined && profile.speakerId !== null));
-  if (accountGrant || adminStatus === 'admin') return 'open';
-  if (profileStatus !== 'ready' || adminStatus !== 'denied') return 'checking';
+  const staffGrant = adminStatus === 'admin' && adminConfirmed === true;
+  if (accountGrant || staffGrant) return 'open';
+  if (profileStatus !== 'ready' || profileConfirmed !== true || adminStatus !== 'denied') return 'checking';
   return 'denied';
 }
 
@@ -210,10 +217,12 @@ function FeedPost({ post, author, report, onReport, onConfirm, onCancel }) {
 
 export default function AttendeeFeed() {
   const { features, sources, available } = useEventConfig();
-  const { user, adminStatus } = useAuth();
-  const { uid, profile, status: profileStatus } = useProfile();
+  const { user, adminStatus, adminConfirmed } = useAuth();
+  const { uid, profile, status: profileStatus, profileConfirmed } = useProfile();
 
-  const access = feedAccess({ sources, available, features, uid, profile, profileStatus, adminStatus });
+  const access = feedAccess({
+    sources, available, features, uid, profile, profileStatus, profileConfirmed, adminStatus, adminConfirmed,
+  });
   const open = access === 'open';
   // Moves on after every closed spell; see "WHOSE DATA" above.
   const [session, setSession] = useState(0);
@@ -253,7 +262,9 @@ export default function AttendeeFeed() {
     const unsubscribe = subscribeRootFeed(
       { through },
       (posts, page) => {
-        if (current) setSnapshot({ key: feedKey, value: { posts, last: page.last, size: page.size, failed: false, denied: false } });
+        if (current) {
+          setSnapshot({ key: feedKey, value: { posts, last: page.last, size: page.size, range: through, failed: false, denied: false } });
+        }
       },
       (error) => {
         if (!current) return;
@@ -306,7 +317,10 @@ export default function AttendeeFeed() {
     const key = feedKey;
     // An empty loaded range (every post in it removed) pages on from the
     // retained cursor.
-    const after = feed.last ?? through;
+    // The listener's own oldest document only once it reports the current
+    // range: right after a fetch the old range's snapshot is still shown,
+    // and paging from it would fetch the same page again.
+    const after = (feed.range === through ? feed.last : null) ?? through;
     if (key === null || !after || loaded.loading) return;
     const base = { ...loaded, loading: false, failed: false };
     setOlder({ key, value: { ...base, loading: true } });
