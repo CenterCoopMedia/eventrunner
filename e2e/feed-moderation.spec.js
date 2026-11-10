@@ -102,6 +102,8 @@ test.describe.serial('private feed moderation', () => {
   test('staff reach the docket with both flags off, cancel by keyboard, and retain the post after a network failure', async () => {
     await staff.goto('/admin/feed-moderation');
     await expect(staff.getByRole('heading', { level: 1, name: 'Feed moderation' })).toBeVisible();
+    const endTour = staff.getByRole('button', { name: 'End tour', exact: true });
+    if (await endTour.isVisible()) await endTour.click();
     await expect(staff.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Feed moderation', exact: true })).toBeVisible();
     const row = staff.getByRole('listitem').filter({ hasText: `Post ${postId}` });
     await expect(row.getByText(text, { exact: true })).toBeVisible();
@@ -149,13 +151,14 @@ test.describe.serial('private feed moderation', () => {
 
   test('bounded report pages reach older reports even when timestamps tie', async () => {
     await staff.goto('/admin/feed-moderation');
+    const list = staff.getByRole('list', { name: 'Reported posts' });
     await expect(staff.getByRole('button', { name: 'Older reports', exact: true })).toBeVisible();
     await staff.getByRole('button', { name: 'Older reports', exact: true }).click();
     await expect(staff.getByText('4 reports in this list', { exact: true })).toBeVisible();
-    await expect(staff.getByRole('listitem')).toHaveCount(1);
+    await expect(list.getByRole('listitem')).toHaveCount(1);
     await expect(staff.getByRole('button', { name: 'Older reports', exact: true })).toHaveCount(0);
     await staff.getByRole('button', { name: 'Newest reports', exact: true }).click();
-    await expect(staff.getByRole('listitem')).toHaveCount(3);
+    await expect(list.getByRole('listitem')).toHaveCount(3);
     await expect(staff.getByText('Removed', { exact: true })).toBeVisible();
   });
 
