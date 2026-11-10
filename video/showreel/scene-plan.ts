@@ -1,9 +1,11 @@
 // Plan. The rules fill with sessions, speakers dock on a session, one start time
 // changes and the list makes room, and the draft is published.
-import {type C, type Project, type RGB, W, H, camera, spring, prog, outCubic, inOutCubic, inOutQuint, outExpo, clamp, lerp, rgb, mix, line, text, kinetic, fillBox, strokeBox, ring, disc, shadowed, quadPoints, along, width} from './kit.ts';
-import {type Scene, ground, RAIL_Y, RAIL_X0, RAIL_X1, rule, word, folio, phrase, sample, initials, SOFT} from './shared.ts';
+import {type C, type Project, type RGB, W, H, camera, spring, prog, outCubic, inOutCubic, inOutQuint, outExpo, clamp, lerp, rgb, mix, line, text, kinetic, fillBox, strokeBox, ring, shadowed, quadPoints, along} from './kit.ts';
+import {type Scene, ground, RAIL_Y, RAIL_X0, RAIL_X1, rule, word, phrase, sample, initials, SOFT} from './shared.ts';
 
 const PUBLISH = {x: RAIL_X1 - 190, y: 66, w: 190, h: 58};
+// Corners follow the product's own radius token, not a soft card look.
+const RADIUS = 4;
 
 export function plan(p: Project): Scene {
   const q = p.clock.cues.plan, D = p.brand.dark, [start, end] = [p.clock.scenes[1].start, p.clock.scenes[1].end];
@@ -49,16 +51,14 @@ export function plan(p: Project): Scene {
     // New cards rise out of the rule below them.
     if (rise < 1) { c.beginPath(); c.rect(0, RAIL_Y[index], W, RAIL_Y[index + 1] - RAIL_Y[index]); c.clip(); y += (1 - rise) * 170; }
     c.translate(x + CARD_W / 2, y + CARD_H / 2); c.rotate(tilt); c.scale(scale, scale); c.translate(-CARD_W / 2, -CARD_H / 2);
-    shadowed(c, 12 + 50 * lift, 6 + 26 * lift, .28 + .3 * lift, () => fillBox(c, 0, 0, CARD_W, CARD_H, 12, rgb(tint(.05 + .1 * focus + .08 * lift))));
+    shadowed(c, 12 + 50 * lift, 6 + 26 * lift, .28 + .3 * lift, () => fillBox(c, 0, 0, CARD_W, CARD_H, RADIUS, rgb(tint(.05 + .1 * focus + .08 * lift))));
     c.globalAlpha = lit;
-    fillBox(c, 0, 18, 6, CARD_H - 36, 3, rgb(index % 2 ? D.accent : D.primary));
-    if (focus > 0) strokeBox(c, 0, 0, CARD_W, CARD_H, 12, rgb(D.primary, focus), 3);
+    if (focus > 0) strokeBox(c, 0, 0, CARD_W, CARD_H, RADIUS, rgb(D.primary, focus), 3);
     const changed = moved && f >= q.lift + 5;
-    digits(c, changed ? NEW_TIME : s.time, changed ? s.time : null, 36, 72, f, changed ? q.lift + 5 : enter + 8);
-    text(c, `to ${s.end}`, 36, 108, {family: 'Mono', weight: 400, size: 20, color: rgb(D.inkMuted, moved ? 1 - prog(f, q.lift + 3, q.lift + 8) : 1)});
+    digits(c, changed ? NEW_TIME : s.time, changed ? s.time : null, 36, 88, f, changed ? q.lift + 5 : enter + 8);
     const reveal = outCubic(prog(f, enter + 8, enter + 17));
     text(c, s.title, 196 + (1 - reveal) * 24, 70, {size: 38, weight: 700, color: rgb(D.ink, reveal)});
-    text(c, s.room, 196 + (1 - reveal) * 36, 110, {size: 24, weight: 400, color: rgb(D.inkMuted, reveal)});
+    text(c, s.room, 196 + (1 - reveal) * 36, 112, {size: 27, weight: 400, color: rgb(D.inkMuted, reveal)});
     // Speakers: the focused session receives its two on cue, the rest follow.
     s.speakerIds.forEach((id, k) => {
       const person = speakers.find(sp => sp.id === id)!;
@@ -83,10 +83,10 @@ export function plan(p: Project): Scene {
     const t = inOutCubic(prog(f, from, to)), [x, y] = along(path, t), shrink = prog(f, to - 6, to);
     const w = 330 * (1 - shrink) + 54 * shrink, h = 76 * (1 - shrink) + 54 * shrink;
     c.save(); c.translate(x, y); c.rotate((1 - t) * (k ? -.25 : .25));
-    shadowed(c, 30, 14, .4, () => fillBox(c, -h / 2, -h / 2, w, h, h / 2, rgb(tint(.3))));
+    shadowed(c, 30, 14, .4, () => fillBox(c, -h / 2, -h / 2, w, h, lerp(RADIUS, h / 2, shrink), rgb(tint(.3))));
     initials(c, person.name, 0, 0, 27, tint(.3), D.ink, SOFT + .2);
     text(c, person.name, 42, -4, {size: 26, weight: 700, color: rgb(D.ink, (SOFT + .2) * (1 - shrink * 2))});
-    text(c, person.role, 42, 22, {size: 19, weight: 400, color: rgb(D.inkMuted, (SOFT + .2) * (1 - shrink * 2))});
+    text(c, person.role, 42, 24, {size: 22, weight: 400, color: rgb(D.inkMuted, (SOFT + .2) * (1 - shrink * 2))});
     c.restore();
   }
 
@@ -95,7 +95,7 @@ export function plan(p: Project): Scene {
     const push = spring(f, q.push, 2.8, .92) - spring(f, q.lift - 4, 2.8, .92);
     const cx = lerp(W / 2, 1290, push), cy = lerp(H / 2, slot(1) + CARD_H / 2 + 10, push);
     const zoom = lerp(1, 1.4, push);
-    ground(c, D, cx, cy, zoom, [W * .7, H * .4]);
+    ground(c, D);
     c.save(); camera(c, cx, cy, zoom);
 
     // Rules arrive spanning the frame and draw back to the list.
@@ -108,21 +108,17 @@ export function plan(p: Project): Scene {
       if (live > 0 && live < 1) line(c, Math.max(RAIL_X0, head - 260), y, head, y, rgb(D.primary, 1 - live), 3);
     });
 
-    folio(c, p.copy.day, RAIL_X0, 104, D.inkMuted, f, start + 8);
+    // The day heading of the list, as plain text.
+    text(c, p.copy.day, RAIL_X0, 108, {size: 30, weight: 600, color: rgb(D.inkMuted, prog(f, start + 8, start + 16))});
     // Record state and the publish control.
     const state = outCubic(prog(f, q.lift + 8, q.lift + 18));
     if (state > 0) {
       const {x, y, w, h} = PUBLISH, down = Math.max(0, 1 - Math.abs(f - q.publish - 1.5) / 3);
-      const isLive = f >= q.publish + 3, label = isLive ? 'Live' : 'Draft · 1 change';
-      const chipW = width(c, label, {family: 'Mono', weight: 500, size: 21}) + 62;
-      const flip = isLive ? spring(f, q.publish + 3, 3, .5) : 1;
-      c.save(); c.translate(x - 28 - chipW / 2, y + h / 2); c.scale(1, flip); c.globalAlpha = state;
-      strokeBox(c, -chipW / 2, -22, chipW, 44, 22, rgb(isLive ? D.primary : D.inkMuted), 2);
-      disc(c, -chipW / 2 + 24, 0, 6, rgb(isLive ? D.primary : D.inkMuted));
-      text(c, label, -chipW / 2 + 42, 1, {family: 'Mono', weight: 500, size: 21, baseline: 'middle', color: rgb(isLive ? D.primary : D.inkMuted)});
-      c.restore();
+      // Record state in words, as the admin shows it: no chip and no dot.
+      const isLive = f >= q.publish + 3, shown = isLive ? prog(f, q.publish + 3, q.publish + 9) : 1;
+      text(c, isLive ? 'Live' : 'Draft, 1 change', x - 28, y + h / 2 + 2, {size: 28, weight: 600, align: 'right', baseline: 'middle', color: rgb(isLive ? D.primary : D.inkMuted, state * shown)});
       c.save(); c.translate(x + w / 2, y + h / 2); c.scale(1 - .08 * down, 1 - .08 * down); c.globalAlpha = state;
-      fillBox(c, -w / 2, -h / 2, w, h, 10, rgb(mix(D.primary, D.ink, .5 * down)));
+      fillBox(c, -w / 2, -h / 2, w, h, RADIUS, rgb(mix(D.primary, D.ink, .5 * down)));
       text(c, 'Publish', 0, 2, {size: 26, weight: 700, align: 'center', baseline: 'middle', color: rgb(D.surface)});
       c.restore();
       for (const delay of [0, 7]) {
@@ -135,7 +131,6 @@ export function plan(p: Project): Scene {
     card(c, MOVED, f);
     flyingSpeaker(c, 0, f); flyingSpeaker(c, 1, f);
 
-    folio(c, '01 — Schedule', 120, 262, D.primary, f, start + 4);
     word(c, 'Plan.', 108, 470, 250, D.ink, f, q.word);
     // Two captions, each on screen for about three seconds.
     phrase(c, 'Build the schedule.', 120, 568, {size: 44, color: D.inkMuted}, f, q.word + 12, q.lift - 6);

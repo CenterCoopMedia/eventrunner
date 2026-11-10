@@ -42,7 +42,7 @@ frames; every cue is a whole frame.
 | 7–10 | 338–562 | Shape | The style picker changes the site through six styles, each with a different wipe. The dark mode sweeps in, then all twelve looks show as a wall. |
 | 11–14 | 563–787 | Gather | A ticket is bought in five steps and torn. Its main part becomes the first badge at check-in. Sessions are saved to a phone. One announcement goes to everyone registered. |
 | 15–18 | 788–1012 | One site | Five parts float as an exploded stack and are named. On the build they close one at a time, turn to face the viewer and become the published page. |
-| 19–20 | 1013–1124 | Montage | Panels light up on seven beats until eight fill the frame. On the eighth beat they fold into a point. Half a beat of silence. |
+| 19–20 | 1013–1124 | Montage | A run sheet: eight ruled colour bands, one for each part of the product, are lit from the top on seven beats. On the eighth beat they fold into a point. Half a beat of silence. |
 | 21–24 | 1125–1349 | Title | On the chord Badger is large and running on the spot. The landing cuts to the official lockup, and the name is uncovered beside the mark. "Make room for your event." and "Plan. Shape. Gather." follow. The layout is at rest from frame 1252; after that only one blink at frame 1294 and the grain move. |
 
 ## What the picture claims, and where it comes from
@@ -66,8 +66,33 @@ interface. It makes no claim about numbers, clients or results.
 - [`page.ts`](page.ts): one event page drawn for each style and mode from preset values, drawn once and shared.
 - `scene-*.ts`: one file for each scene. [`stage.ts`](stage.ts) orders them and sets the shutter.
 - [`main.ts`](main.ts): font gate, then a 180-degree shutter of 8 samples a frame (16 in fast moves, 1 when still) averaged with equal weight, halation, vignette and seeded grain.
-- [`shared.ts`](shared.ts): the dark ground, the narrator's type, and the `SOFT` opacity limit described below.
+- [`shared.ts`](shared.ts): the flat ground, the narrator's type, the part colours, and the `SOFT` opacity limit described below.
 - [`score.mjs`](score.mjs): the composition in E major. Every sample is calculated from oscillators, seeded noise and filters. No instrument bank, loop, or borrowed melody.
+
+## Design rules
+
+The owner's list of generated-looking design signs is used as a lens, not as a
+deny list. Each element must have a reason in this product. The second pass
+made these choices:
+
+- **No label above a headline.** The scene words stand alone. Nothing is
+  numbered 01, 02, 03.
+- **State in words.** "Draft, 1 change" and "Live" are text, as the admin
+  schedule shows record state. There is no chip and no status dot.
+- **No decoration on an edge.** Cards, the ticket and the style picker have no
+  coloured side bar.
+- **Mono type is for data.** Times and step numbers use IBM Plex Mono, as the
+  product does. Captions and notes are Source Sans at 26 px or more.
+- **Product corners.** Cards and buttons use the 4 px radius token.
+- **A flat ground.** No glow, no gradient and no dot grid. Depth comes from
+  motion blur, shadow under lifted cards and grain.
+- **One motif.** The speed lines of the opening become the rules of the
+  schedule, and the montage is a run sheet of eight ruled bands, not a grid
+  of cards.
+- **Colour has a meaning.** Each part of the product has one preset colour in
+  both the stack and the montage (`PARTS` in [`shared.ts`](shared.ts)).
+
+A test holds the first four rules.
 
 ## Where this piece departs from the public-set plan
 

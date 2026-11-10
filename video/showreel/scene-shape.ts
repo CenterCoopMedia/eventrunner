@@ -1,7 +1,7 @@
 // Shape. The style picker changes the whole site: six styles, each wiped in a
 // different way, then the dark mode, then all twelve looks at once.
 import {type C, type Project, W, H, spring, prog, outCubic, outExpo, inOutQuint, inQuint, clamp, lerp, rgb, mix, text, fillBox, strokeBox, disc, line, shadowed, BLACK} from './kit.ts';
-import {type Scene, ground, word, folio, sample, streaks, SOFT} from './shared.ts';
+import {type Scene, ground, word, sample, streaks, SOFT} from './shared.ts';
 
 const WIN = {x: 700, y: 150, w: 1120, h: 630};
 export const wallStart = (p: Project) => p.clock.cues.shape.wall - Math.round(p.clock.beatFrames);
@@ -48,21 +48,20 @@ export function shape(p: Project, cache: HTMLCanvasElement[]): Scene {
   return {from: enter, to: end, draw(c: C, f: number) {
     const arrive = inOutQuint(prog(f, enter, q.styles[0])), leave = inQuint(prog(f, q.exit + 5, end));
     c.translate(W * (1 - arrive), -H * leave);
-    ground(c, D, W / 2 + (1 - arrive) * 900, H / 2 + leave * 900, 1, [W * .68, H * .45]);
+    ground(c, D);
 
     const wall = outCubic(prog(f, grid, grid + 7));
     const narrator = grid - 4;
     // Narrator column: the picker.
-    folio(c, '02 — Style', 120, 262, D.primary, f, enter + 10, narrator);
     word(c, 'Shape.', 108, 470, 196, D.ink, f, q.styles[0] - 3, narrator);
     const listFade = outCubic(prog(f, q.styles[0] + 2, q.styles[0] + 14)) * (1 - prog(f, narrator, narrator + 6));
     if (listFade > 0) {
       let position = 0;
       for (let i = 1; i < 6; i++) position += spring(f, q.styles[i], 2.8, .6);
-      fillBox(c, 120, 548 + position * 54 - 22, 6, 40, 3, rgb(D.primary, listFade));
       styles.forEach((style, i) => {
         const active = clamp(1 - Math.abs(position - i));
-        text(c, style.label, 146 + active * 10, 560 + i * 54, {size: 36, weight: 600, color: rgb(mix(D.inkMuted, D.ink, active), listFade * lerp(.72, 1, active))});
+        // The chosen style is set in full ink; no marker bar.
+        text(c, style.label, 120, 560 + i * 54, {size: 38, weight: 600, color: rgb(mix(D.inkMuted, D.ink, active), listFade * lerp(.72, 1, active))});
       });
     }
 
@@ -75,10 +74,10 @@ export function shape(p: Project, cache: HTMLCanvasElement[]): Scene {
       const t = tile(i), distance = 3 - (i % 4) + 2 - Math.floor(i / 4), pop = outCubic(prog(f, grid + 6 + distance, grid + 12 + distance));
       if (pop <= 0) continue;
       c.save(); c.translate(t.x + t.w / 2, t.y + t.h / 2); c.scale(lerp(.9, 1, pop), lerp(.9, 1, pop)); c.globalAlpha = pop;
-      pageIn(c, {x: -t.w / 2, y: -t.h / 2, w: t.w, h: t.h}, i, 8, f, false); c.restore();
+      pageIn(c, {x: -t.w / 2, y: -t.h / 2, w: t.w, h: t.h}, i, 4, f, false); c.restore();
     }
     c.save(); c.translate(rect.x + rect.w / 2, rect.y + rect.h / 2); c.scale(1 + kick, 1 + kick);
-    pageIn(c, {x: -rect.w / 2, y: -rect.h / 2, w: rect.w, h: rect.h}, 11, lerp(14, 8, wall), f, true); c.restore();
+    pageIn(c, {x: -rect.w / 2, y: -rect.h / 2, w: rect.w, h: rect.h}, 11, lerp(6, 4, wall), f, true); c.restore();
 
     // Under the window: the mode switch and the heading face in use.
     const under = outCubic(prog(f, q.styles[0] + 4, q.styles[0] + 14)) * (1 - prog(f, narrator, narrator + 5));
@@ -97,10 +96,10 @@ export function shape(p: Project, cache: HTMLCanvasElement[]): Scene {
       const since = f - q.styles[index];
       c.save(); c.beginPath(); c.rect(WIN.x + 400, sy - 30, WIN.w - 400, 56); c.clip();
       const roll = outCubic(clamp(since / 8));
-      if (index > 0 && roll < 1) text(c, `HEADINGS · ${styles[index - 1].face.toUpperCase()}`, WIN.x + WIN.w, sy + 8 - roll * 50, {family: 'Mono', weight: 500, size: 23, tracking: 2.6, align: 'right', color: rgb(D.inkMuted)});
-      text(c, `HEADINGS · ${styles[index].face.toUpperCase()}`, WIN.x + WIN.w, sy + 8 + (1 - roll) * 50, {family: 'Mono', weight: 500, size: 23, tracking: 2.6, align: 'right', color: rgb(D.inkMuted)});
+      if (index > 0 && roll < 1) text(c, `Headings: ${styles[index - 1].face}`, WIN.x + WIN.w, sy + 9 - roll * 50, {size: 28, weight: 600, align: 'right', color: rgb(D.inkMuted)});
+      text(c, `Headings: ${styles[index].face}`, WIN.x + WIN.w, sy + 9 + (1 - roll) * 50, {size: 28, weight: 600, align: 'right', color: rgb(D.inkMuted)});
       c.restore(); c.globalAlpha = 1;
-      strokeBox(c, WIN.x - 1, WIN.y - 1, WIN.w + 2, WIN.h + 2, 15, rgb(D.ink, .1 * under), 2);
+      strokeBox(c, WIN.x - 1, WIN.y - 1, WIN.w + 2, WIN.h + 2, 7, rgb(D.ink, .1 * under), 2);
     }
     word(c, 'Light and dark.', W / 2, 1010, 104, D.ink, f, grid + 6, Infinity, 'center', .7);
     sample(c, p.copy.sample, D.inkMuted, arrive * (1 - prog(f, grid - 4, grid)));

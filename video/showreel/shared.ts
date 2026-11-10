@@ -1,6 +1,6 @@
 // Pieces every scene uses: the dark ground, the narrator's type, and the layout
 // values two neighbouring scenes must agree on.
-import {type C, type Palette, type RGB, W, H, rgb, mix, text, kinetic, prog, outCubic, clamp, lerp, disc, hash, TAU} from './kit.ts';
+import {type C, type Palette, type RGB, W, H, rgb, mix, text, kinetic, prog, outCubic, disc, hash} from './kit.ts';
 
 export type Scene = {from: number; to: number; draw: (c: C, f: number) => void};
 
@@ -10,18 +10,19 @@ export const RAIL_X0 = 700, RAIL_X1 = 1800;
 
 export const rule = (p: Palette, amount = .2): RGB => mix(p.surface, p.ink, amount);
 
-/** Dark brand ground with a dot grid that moves with the camera, for depth. */
-export function ground(c: C, p: Palette, cx = W / 2, cy = H / 2, zoom = 1, glowAt: [number, number] = [W * .62, H * .42], glow = 1) {
+/** The dark brand ground: one flat colour. No glow and no pattern. */
+export function ground(c: C, p: Palette) {
   c.fillStyle = rgb(p.surface); c.fillRect(0, 0, W, H);
-  const g = c.createRadialGradient(glowAt[0], glowAt[1], 0, glowAt[0], glowAt[1], W * .62);
-  g.addColorStop(0, rgb(p.primary, .13 * glow)); g.addColorStop(.5, rgb(p.primary, .04 * glow)); g.addColorStop(1, rgb(p.primary, 0));
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-  // Far layer: the grid moves at 35% of the camera, so near things pass it.
-  const depth = .35, step = 64 * lerp(1, zoom, depth), ox = W / 2 - cx * depth * lerp(1, zoom, depth), oy = H / 2 - cy * depth * lerp(1, zoom, depth);
-  c.fillStyle = rgb(p.ink, .075);
-  const x0 = ((ox % step) + step) % step, y0 = ((oy % step) + step) % step;
-  for (let y = y0 - step; y < H + step; y += step) for (let x = x0 - step; x < W + step; x += step) { c.beginPath(); c.arc(x, y, 1.6, 0, TAU); c.fill(); }
 }
+
+/**
+ * One colour for each part of the product, from the style presets. The stack
+ * and the montage use the same list, so a part keeps its colour.
+ */
+export const PARTS: [string, number, 'primary' | 'accent' | 'highlight' | 'ink'][] = [
+  ['Pages', 0, 'primary'], ['Schedule', 4, 'primary'], ['Speakers', 3, 'primary'], ['Tickets', 5, 'primary'],
+  ['Check-in', 2, 'highlight'], ['Email', 4, 'accent'], ['Sponsors', 3, 'accent'], ['Styles', 0, 'ink'],
+];
 
 /**
  * Opacity limit for anything bright that travels: rings, rays, trails, streaks.
@@ -47,15 +48,6 @@ export function word(c: C, value: string, x: number, y: number, size: number, co
   });
 }
 
-/** Small mono chapter label, typed on one character per frame. */
-export function folio(c: C, value: string, x: number, y: number, color: RGB, f: number, start: number, leave = Infinity, size = 24) {
-  // Whole characters, counted from the whole frame: no half-drawn glyph in the shutter.
-  const shown = Math.floor(clamp((Math.floor(f) - start) * 1.4, 0, value.length));
-  const alpha = 1 - prog(f, leave, leave + 6);
-  if (shown <= 0 || alpha <= 0) return;
-  text(c, value.slice(0, shown).toUpperCase(), x, y, {family: 'Mono', weight: 500, size, tracking: size * .12, color: rgb(color, alpha)});
-}
-
 /** Line of narrator copy: words fade up in turn. */
 export function phrase(c: C, value: string, x: number, y: number, o: {size: number; color: RGB; weight?: number; family?: string; align?: CanvasTextAlign}, f: number, start: number, leave = Infinity, stagger = 2.2) {
   const words = value.split(' ');
@@ -74,10 +66,10 @@ export function phrase(c: C, value: string, x: number, y: number, o: {size: numb
   c.restore();
 }
 
-/** The standing note that the event shown is invented. */
+/** The standing note that the event shown is invented, at a size a person can read. */
 export function sample(c: C, label: string, color: RGB, alpha: number) {
   if (alpha <= 0) return;
-  text(c, label.toUpperCase(), 120, 1012, {family: 'Mono', weight: 400, size: 19, tracking: 2.2, color: rgb(color, .85 * alpha)});
+  text(c, label, 120, 1014, {family: 'Source', weight: 400, size: 26, color: rgb(color, alpha)});
 }
 
 /** Circle with initials. The films show no faces. */

@@ -1,8 +1,8 @@
 // Gather. One object becomes the next: a ticket bought in steps, torn into a
 // badge that joins everyone at check-in, sessions saved to a phone, and one
 // announcement sent to everyone registered.
-import {type C, type Project, type Point, W, H, spring, prog, outCubic, inCubic, inOutCubic, inQuint, outExpo, clamp, lerp, rgb, mix, text, fillBox, strokeBox, disc, ring, line, shadowed, quadPoints, along, trace, hash} from './kit.ts';
-import {type Scene, ground, word, folio, phrase, sample, streaks, SOFT} from './shared.ts';
+import {type C, type Project, type Point, H, spring, prog, outCubic, inCubic, inOutCubic, inQuint, outExpo, clamp, lerp, rgb, mix, text, fillBox, strokeBox, disc, ring, line, shadowed, quadPoints, along, trace, hash} from './kit.ts';
+import {type Scene, ground, word, phrase, sample, streaks, SOFT} from './shared.ts';
 import {face} from './badger.ts';
 
 const SX = 1250, SY = 500;
@@ -34,18 +34,17 @@ export function gather(p: Project): Scene {
     if (land < 1) { c.beginPath(); c.rect(SX - 420, SY - 260, 860 * land, 520); c.clip(); }
     c.translate(lerp(SX - stub / 2, bx, m), lerp(SY - 30, by, m)); c.rotate(lerp(-.06, 0, m));
     const mw = lerp(w - stub, CELL * .76, m), mh = lerp(h, CELL * .76, m);
-    shadowed(c, 50, 24, .45 * (1 - m), () => fillBox(c, -mw / 2, -mh / 2, mw, mh, lerp(18, 14, m), rgb(mix(D.ink, D.surface, dark))));
+    shadowed(c, 50, 24, .45 * (1 - m), () => fillBox(c, -mw / 2, -mh / 2, mw, mh, lerp(8, 14, m), rgb(mix(D.ink, D.surface, dark))));
     if (dark < 1) {
       const a = 1 - dark;
-      fillBox(c, -mw / 2, -mh / 2, 14, mh, 0, rgb(D.primary, a));
-      text(c, 'ADMIT ONE', -mw / 2 + 44, -mh / 2 + 58, {family: 'Mono', weight: 500, size: 21, tracking: 3, color: rgb(D.surfaceAlt, .7 * a)});
-      text(c, 'General admission', -mw / 2 + 44, -mh / 2 + 122, {family: 'Bricolage', weight: 800, size: 44, tracking: -1, color: rgb(D.surface, a)});
-      text(c, e.name, -mw / 2 + 44, -mh / 2 + 176, {size: 28, weight: 700, color: rgb(D.surface, a)});
-      text(c, `${e.dates} · ${e.venue}`, -mw / 2 + 44, -mh / 2 + 216, {size: 23, weight: 400, color: rgb(D.surfaceAlt, .8 * a)});
+      // Plain ticket: the ticket type, then the event, then when and where.
+      text(c, 'General admission', -mw / 2 + 40, -mh / 2 + 96, {family: 'Bricolage', weight: 800, size: 46, tracking: -1, color: rgb(D.surface, a)});
+      text(c, e.name, -mw / 2 + 40, -mh / 2 + 160, {size: 30, weight: 700, color: rgb(D.surface, a)});
+      text(c, `${e.dates} · ${e.venue}`, -mw / 2 + 40, -mh / 2 + 206, {size: 26, weight: 400, color: rgb(D.surfaceAlt, a)});
       if (paid > 0) {
         c.save(); c.translate(mw / 2 - 74, -mh / 2 + 48); c.rotate(-.1); c.scale(paid, paid);
-        strokeBox(c, -52, -22, 104, 44, 8, rgb(D.surface, a), 3);
-        text(c, 'PAID', 0, 2, {family: 'Mono', weight: 500, size: 22, tracking: 3, align: 'center', baseline: 'middle', color: rgb(D.surface, a)}); c.restore();
+        strokeBox(c, -50, -24, 100, 48, 4, rgb(D.surface, a), 3);
+        text(c, 'Paid', 0, 2, {size: 28, weight: 700, align: 'center', baseline: 'middle', color: rgb(D.surface, a)}); c.restore();
       }
     }
     // The stub is joined at a perforation until the tear, then falls away.
@@ -53,7 +52,7 @@ export function gather(p: Project): Scene {
     c.save(); c.translate(mw / 2 + stub / 2 + gone * 190, gone * gone * 1500); c.rotate(gone * 2.6);
     if (dark < 1) {
       const a = 1 - dark;
-      fillBox(c, -stub / 2, -h / 2, stub, h, 18, rgb(D.ink, a));
+      fillBox(c, -stub / 2, -h / 2, stub, h, 8, rgb(D.ink, a));
       text(c, '1 ×', 0, 12, {family: 'Bricolage', weight: 800, size: 56, align: 'center', color: rgb(D.surface, a)});
       for (let i = 0; i < 9 && fall < 0; i++) disc(c, -stub / 2, -h / 2 + 30 + i * 26.5, 6, rgb(D.surface));
     }
@@ -104,7 +103,7 @@ export function gather(p: Project): Scene {
     if (fade > 0) {
       fillBox(c, GX, bar, 826, 8, 4, rgb(mix(D.surface, D.ink, .2), fade));
       fillBox(c, GX, bar, 826 * count / total, 8, 4, rgb(D.primary, fade));
-      text(c, `CHECKED IN ${String(count).padStart(2, '0')} / ${total}`, GX, bar + 48, {family: 'Mono', weight: 500, size: 22, tracking: 2.6, color: rgb(D.inkMuted, fade)});
+      text(c, `${count} of ${total} checked in`, GX, bar + 52, {size: 28, weight: 600, color: rgb(D.inkMuted, fade)});
     }
   }
 
@@ -123,7 +122,7 @@ export function gather(p: Project): Scene {
       const grow = outCubic(prog(f, appear + i * 2, appear + 8 + i * 2)), y = rowY(i), x = rx - away * 260;
       const filled = outCubic(prog(f, q.bookmarks[i], q.bookmarks[i] + 5)), pop = spring(f, q.bookmarks[i], 3.2, .4);
       c.save(); c.translate(x + RW / 2, y + RH / 2); c.scale(clamp(grow, 0, 1.2), 1); c.translate(-RW / 2, -RH / 2);
-      fillBox(c, 0, 0, RW, RH, 12, rgb(mix(D.surfaceAlt, D.primary, .05 + .12 * filled)));
+      fillBox(c, 0, 0, RW, RH, 4, rgb(mix(D.surfaceAlt, D.primary, .05 + .12 * filled)));
       const shown = prog(f, appear + 7 + i * 2, appear + 13 + i * 2);
       text(c, s.time, 28, 56, {family: 'Mono', weight: 500, size: 26, color: rgb(D.ink, shown)});
       text(c, s.title, 130, 56, {size: 25, weight: 700, color: rgb(D.ink, shown)});
@@ -138,14 +137,14 @@ export function gather(p: Project): Scene {
     text(c, 'My schedule', px + 24, py + 76, {size: 25, weight: 700, color: rgb(D.ink)});
     saved.forEach((s, i) => {
       const y = slotY(i) + (py - PHONE.y), landed = spring(f, q.arrivals[i], 3, .5);
-      strokeBox(c, px + 18, y, PHONE.w - 36, 76, 10, rgb(mix(D.surface, D.ink, .2)), 2);
+      strokeBox(c, px + 18, y, PHONE.w - 36, 76, 4, rgb(mix(D.surface, D.ink, .2)), 2);
       if (landed > 0) {
         // The slot is filled the moment the copy arrives; only its type fades up.
-        fillBox(c, px + 18, y, PHONE.w - 36, 76, 10, rgb(mix(D.surfaceAlt, D.primary, .28)));
+        fillBox(c, px + 18, y, PHONE.w - 36, 76, 4, rgb(mix(D.surfaceAlt, D.primary, .28)));
         text(c, s.time, px + 32, y + 30, {family: 'Mono', weight: 500, size: 18, color: rgb(D.ink, clamp(landed))});
         text(c, s.title.length > 19 ? `${s.title.slice(0, 18)}…` : s.title, px + 32, y + 58, {size: 19, weight: 700, color: rgb(D.ink, clamp(landed))});
         const ping = prog(f, q.arrivals[i], q.arrivals[i] + 12);
-        if (ping > 0 && ping < 1) strokeBox(c, px + 18 - 14 * ping, y - 14 * ping, PHONE.w - 36 + 28 * ping, 76 + 28 * ping, 10 + 14 * ping, rgb(D.primary, SOFT * (1 - ping)), 3);
+        if (ping > 0 && ping < 1) strokeBox(c, px + 18 - 14 * ping, y - 14 * ping, PHONE.w - 36 + 28 * ping, 76 + 28 * ping, 4 + 14 * ping, rgb(D.primary, SOFT * (1 - ping)), 3);
       }
       // The copy leaves the session, which stays where it is.
       const t = prog(f, q.bookmarks[i] + 2, q.arrivals[i]);
@@ -153,7 +152,7 @@ export function gather(p: Project): Scene {
         const from: Point = [rx + RW / 2, rowY(i) + RH / 2], to: Point = [px + PHONE.w / 2, y + 38];
         const [x2, y2] = along(quadPoints(from, [lerp(from[0], to[0], .5), Math.min(from[1], to[1]) - 190], to), inOutCubic(t));
         const w = lerp(RW, PHONE.w - 36, inOutCubic(t)), h = lerp(RH, 76, inOutCubic(t));
-        shadowed(c, 30, 14, .4, () => fillBox(c, x2 - w / 2, y2 - h / 2, w, h, 12, rgb(mix(D.surfaceAlt, D.primary, .28), .96)));
+        shadowed(c, 30, 14, .4, () => fillBox(c, x2 - w / 2, y2 - h / 2, w, h, 4, rgb(mix(D.surfaceAlt, D.primary, .28), .96)));
       }
     });
     c.restore();
@@ -189,13 +188,12 @@ export function gather(p: Project): Scene {
         c.beginPath(); c.moveTo(13, 0); c.lineTo(-13, -10); c.lineTo(-6, 0); c.lineTo(-13, 10); c.closePath(); c.fillStyle = rgb(D.ink, .55); c.fill(); c.restore();
       }
     });
-    shadowed(c, 50, 24, .45, () => fillBox(c, cx, cy, cw, ch, 16, rgb(D.surfaceAlt)));
-    text(c, 'ANNOUNCEMENT', cx + 32, cy + 50, {family: 'Mono', weight: 500, size: 20, tracking: 2.6, color: rgb(D.primary)});
-    text(c, 'Doors open at 08:30.', cx + 32, cy + 104, {family: 'Bricolage', weight: 800, size: 40, tracking: -.8, color: rgb(D.ink)});
-    text(c, 'To: registered attendees', cx + 32, cy + 146, {size: 23, weight: 400, color: rgb(D.inkMuted)});
+    shadowed(c, 50, 24, .45, () => fillBox(c, cx, cy, cw, ch, 6, rgb(D.surfaceAlt)));
+    text(c, 'Doors open at 08:30.', cx + 32, cy + 78, {family: 'Bricolage', weight: 800, size: 40, tracking: -.8, color: rgb(D.ink)});
+    text(c, 'To: registered attendees', cx + 32, cy + 126, {size: 27, weight: 400, color: rgb(D.inkMuted)});
     const sent = f >= q.send + 3;
     c.save(); c.translate(cx + cw - 80, cy + ch - 52); c.scale(1 - .1 * press, 1 - .1 * press);
-    fillBox(c, -56, -24, 112, 48, 10, rgb(mix(D.primary, D.ink, .5 * press)));
+    fillBox(c, -56, -24, 112, 48, 4, rgb(mix(D.primary, D.ink, .5 * press)));
     text(c, sent ? 'Sent' : 'Send', 0, 2, {size: 24, weight: 700, align: 'center', baseline: 'middle', color: rgb(D.surface)}); c.restore();
     c.restore();
   }
@@ -203,12 +201,11 @@ export function gather(p: Project): Scene {
   return {from: enter, to: end, draw(c: C, f: number) {
     const arrive = outCubic(prog(f, enter, start - 1)), leave = inQuint(prog(f, end - 11, end));
     c.translate(0, H * (1 - arrive) * 1.0);
-    ground(c, D, W / 2, H / 2 - (1 - arrive) * 900, 1 + leave * .5, [W * .64, H * .46]);
+    ground(c, D);
     c.save(); c.translate(SX, SY); c.scale(1 + leave * .9, 1 + leave * .9); c.translate(-SX, -SY); c.globalAlpha = 1 - leave;
     stepper(c, f); ticket(c, f); checkIn(c, f); saving(c, f); announce(c, f);
     c.restore();
     c.globalAlpha = 1 - leave;
-    folio(c, '03 — Registration', 120, 262, D.primary, f, start - 2);
     word(c, 'Gather.', 108, 470, 176, D.ink, f, q.ticket);
     const lines: [string, number, number][] = [['Register in clear steps.', q.ticket + 10, q.tear - 6], ['Check people in.', q.tear, q.bookmarks[0] - 8], ['Attendees save sessions.', q.bookmarks[0] - 2, q.send - 8], ['Announce to everyone registered.', q.send - 2, Infinity]];
     for (const [value, from, out] of lines) phrase(c, value, 120, 568, {size: 40, color: D.inkMuted}, f, from, out);
