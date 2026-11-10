@@ -94,6 +94,10 @@ export function subscribeRootFeed({ through }, onNext, onFail) {
     (onError) =>
       onSnapshot(
         target,
+        // Without metadata changes the SDK emits nothing when a cached
+        // answer is merely confirmed by the server, and the feed would
+        // wait on the dropped cache snapshot forever.
+        { includeMetadataChanges: true },
         (snapshot) => {
           // Only what the server returned under the current sign-in. A
           // cache answer was authorized for whoever read it before, and

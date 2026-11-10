@@ -144,8 +144,10 @@ beforeEach(() => {
     listener(auth.currentUser);
     return () => {};
   });
-  vi.mocked(onSnapshot).mockImplementation((target, next, error) => {
-    const entry = { path: pathOf(target), target, next, error, active: true };
+  vi.mocked(onSnapshot).mockImplementation((target, ...rest) => {
+    const options = typeof rest[0] === 'function' ? {} : rest.shift();
+    const [next, error] = rest;
+    const entry = { path: pathOf(target), target, options, next, error, active: true };
     listeners.push(entry);
     return () => { entry.active = false; };
   });
@@ -309,6 +311,19 @@ describe('account transitions', () => {
 
     pushPosts(feedB, [post('p2', 'cy', 'Server answer for Bo')]);
     expect(screen.getByText('Server answer for Bo')).toBeInTheDocument();
+  });
+
+  it('listens for metadata changes, so an unchanged cached answer confirmed by the server is shown', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const feed = activeFeedListeners()[0];
+    // The SDK emits a cache-to-server change with identical documents only
+    // to a listener that asked for metadata changes.
+    expect(feed.options).toEqual({ includeMetadataChanges: true });
+    pushPosts(feed, [post('p1', 'cy', 'Same post')], { fromCache: true });
+    expect(screen.queryByText('Same post')).not.toBeInTheDocument();
+    pushPosts(feed, [post('p1', 'cy', 'Same post')]);
+    expect(screen.getByText('Same post')).toBeInTheDocument();
   });
 
   it('a staff verdict for A cannot authorize B while B’s probe is in flight', async () => {
