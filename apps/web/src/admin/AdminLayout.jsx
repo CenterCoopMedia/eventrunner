@@ -85,6 +85,7 @@ import {
   writeRailCollapsed,
 } from './layoutPreference.js';
 import { markTourDone, readTourDone } from './tourState.js';
+import { SOCIAL_FEED_RELEASED } from './socialFeedRelease.js';
 
 /** Every docket item is an ABSOLUTE path. A relative `to` resolves against
  * the current LOCATION inside this nested `<Routes>`, so on /admin/branding
@@ -300,7 +301,8 @@ export const TIER_SCOPE = Object.freeze({
 export function docketForTier(held) {
   return DOCKET.map((group) => ({
     ...group,
-    items: group.items.filter((item) => tierReaches(held, item.tier)),
+    items: group.items.filter((item) =>
+      (SOCIAL_FEED_RELEASED || item.to !== 'feed-moderation') && tierReaches(held, item.tier)),
   })).filter((group) => group.items.length > 0);
 }
 

@@ -934,7 +934,7 @@ The system does not promise a reply time, and no email names one. Decide your ow
 
 ## Feed moderation
 
-Open **Feed moderation** under **Operations**, or go to `/admin/feed-moderation`. Staff and operators can review private reports and remove reported posts even when the attendee feed, attendee directory, or both are off. Attendees cannot read this report list or remove posts. A current staff or operator grant is required; a profile role alone grants no access.
+Open `/admin/feed-moderation` directly for cleanup. Staff and operators can review private reports and remove reported posts even when the attendee feed, attendee directory, or both are off. Attendees cannot read this report list or remove posts. A current staff or operator grant is required; a profile role alone grants no access.
 
 The list shows up to 50 reports at a time, newest first, grouped by post. **Refresh reports** reads the newest reports again. **Older reports** opens the next page; **Newest reports** returns to the beginning. Each row shows the reported post and how many reports for it appear on that page. Reporter identities are not displayed. Removed or unavailable posts keep a plain status in the list. Each refresh checks current access; an access denial clears the whole list.
 

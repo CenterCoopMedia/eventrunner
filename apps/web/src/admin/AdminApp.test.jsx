@@ -270,7 +270,7 @@ describe('admin route gating', () => {
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
     openEveryGroup();
     const navigation = within(screen.getByRole('navigation', { name: 'Admin sections' }));
-    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Timeline', 'Media', 'Materials', 'Version history', 'Unpublished changes', 'Speakers', 'Attendees', 'Badges', 'Scheduled reminders', 'Live updates', 'Ticketing', 'Invoices', 'Import records', 'Feedback', 'Feed moderation', 'Email log', 'Change requests', 'Event', 'Data export']) {
+    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Timeline', 'Media', 'Materials', 'Version history', 'Unpublished changes', 'Speakers', 'Attendees', 'Badges', 'Scheduled reminders', 'Live updates', 'Ticketing', 'Invoices', 'Import records', 'Feedback', 'Email log', 'Change requests', 'Event', 'Data export']) {
       expect(navigation.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Registration form', 'Features', 'Branding', 'Access', 'System errors']) {

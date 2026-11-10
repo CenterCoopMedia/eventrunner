@@ -319,7 +319,7 @@ describe('the admin shell', () => {
     // The Overview is the first link on the rail.
     expect(nav.querySelector('a')).toHaveTextContent('Overview');
     expect(nav.querySelector('a')).toHaveAttribute('href', '/admin/overview');
-    for (const group of DOCKET) {
+    for (const group of docketForTier('operator')) {
       for (const item of group.items) {
         // Absolute, so a section reached from another section is not a dead
         // route: a relative `to` resolves against the current location here.
@@ -330,7 +330,7 @@ describe('the admin shell', () => {
       }
     }
     // Every docket destination has a text label and its own link.
-    expect(nav.querySelectorAll('a')).toHaveLength(34);
+    expect(nav.querySelectorAll('a')).toHaveLength(33);
     expect(screen.getByRole('link', { name: 'Scheduled reminders' })).toHaveAttribute('href', '/admin/reminders');
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
@@ -508,8 +508,18 @@ describe('the admin shell', () => {
     ]);
     expect(staffDocket[0].items.map((item) => item.to)).toEqual(['overview', 'setup']);
     expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
-    expect(docketForTier('operator')).toEqual(DOCKET);
+    expect(docketForTier('operator')).toEqual(DOCKET.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.to !== 'feed-moderation'),
+    })));
     expect(docketForTier(null)).toEqual([]);
+  });
+
+  it('hides Feed moderation from the unreleased docket while retaining its staff route', async () => {
+    await renderAdmin();
+    openEveryGroup();
+    expect(screen.queryByRole('link', { name: 'Feed moderation', exact: true })).toBeNull();
+    expect(sectionTier('/admin/feed-moderation')).toBe('staff');
   });
 
   // The pending-changes banner (issue #196) sits above the stone, never

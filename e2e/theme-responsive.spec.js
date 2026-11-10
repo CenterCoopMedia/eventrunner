@@ -346,10 +346,9 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   await expect(docket.getByRole('button', { name: 'Program', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await openAdminGroups(page);
   const links = docket.getByRole('navigation', { name: 'Admin sections' }).getByRole('link');
-  // The operator docket includes staff cleanup (#789). Its module imports
-  // CSS and JSX, so the spec cannot read it; AdminLayout.test.jsx pins the
-  // same number of destinations.
-  await expect(links).toHaveCount(34);
+  // The cleanup route is direct-only until full feed release (#507).
+  // AdminLayout.test.jsx pins the same number of visible destinations.
+  await expect(links).toHaveCount(33);
   await expect(docket.getByRole('link', { name: 'Session pitches', exact: true })).toBeVisible();
   await expect(docket.getByText(ADMIN_EMAIL)).toBeVisible();
   await expect(docket.getByRole('button', { name: 'Sign out' })).toBeVisible();

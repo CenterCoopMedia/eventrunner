@@ -105,7 +105,7 @@ test.describe.serial('private feed moderation', () => {
     await expect(staff.getByRole('heading', { level: 1, name: 'Feed moderation' })).toBeVisible();
     const endTour = staff.getByRole('button', { name: 'End tour', exact: true });
     if (await endTour.isVisible()) await endTour.click();
-    await expect(staff.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Feed moderation', exact: true })).toBeVisible();
+    await expect(staff.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Feed moderation', exact: true })).toHaveCount(0);
     const row = staff.getByRole('listitem').filter({ hasText: `Post ${postId}` });
     await expect(row.getByText(text, { exact: true })).toBeVisible();
     await expect(row).not.toContainText(attendeeUid);
