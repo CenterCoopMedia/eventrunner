@@ -1,10 +1,12 @@
 'use strict';
 
 /**
- * The private attendee feed: its store, the report action, and staff
- * removal (issue #506, the backend half of #205). Creating posts and
- * replies is #510; this slice reads and moderates rows seeded by a test or
- * by that later endpoint.
+ * The private attendee feed: creation, reports and staff removal.
+ *
+ *   createSocialPost  POST { text, submissionKey, parentPostId? } — a
+ *                     current approved/speaker account, with both flags on.
+ *                     201 creates, 200 replays, 409 conflicts, and 410
+ *                     (post-removed) is terminal after moderation.
  *
  *   reportSocialPost  POST { postId } — a current approved attendee,
  *                     speaker, or staff/operator. Stores one private report
@@ -19,8 +21,8 @@
  *   removed  { state: 'removed', parentPostId, createdAt, removedAt }
  *
  * `parentPostId` is null for a root post. A removed row keeps no text and
- * no author: the tombstone closes the id, so a delayed create retry under
- * #510 cannot write the text back. No account email, access need, report
+ * no author: the tombstone closes the id, so a delayed create retry
+ * cannot write the text back. No account email, access need, report
  * or moderation note is ever stored on a post.
  *
  * `social_reports/{reportIdFor(postId, reporterUid)}` holds only
@@ -74,6 +76,9 @@ const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
+const {
+  MAX_SOCIAL_REQUEST_BYTES, socialRequestBytes, readSocialPost,
+} = require('shared/socialPost');
 
 const POSTS = 'social_posts';
 const REPORTS = 'social_reports';
@@ -148,6 +153,72 @@ function readPostId(body) {
 function verifiedEmail(decoded) {
   if (decoded?.email_verified !== true || typeof decoded.email !== 'string') return '';
   return decoded.email.trim().toLowerCase();
+}
+
+/** The pitch pattern: a submission key belongs to exactly one UID. */
+function postIdFor(uid, submissionKey) {
+  return crypto.createHash('sha256').update(`${uid}\0${submissionKey}`, 'utf8').digest('hex');
+}
+
+/**
+ * Authorization precedes every replay. Reading the account and flags in the
+ * write transaction orders creation against account removal and flag-off.
+ * Reading the parent orders a new reply against root removal. A replay of
+ * an existing reply writes nothing, even if its root has since been removed.
+ */
+async function storePost({ db, uid, submission, now }) {
+  const { text, parentPostId, submissionKey } = submission;
+  const postId = postIdFor(uid, submissionKey);
+  const postRef = db.collection(POSTS).doc(postId);
+  const parentRef = parentPostId === null ? null : db.collection(POSTS).doc(parentPostId);
+  const outcome = await db.runTransaction(async (tx) => {
+    const [features, account, target, parent] = await tx.getAll(
+      db.collection('config').doc('features'), db.collection('users').doc(uid), postRef,
+      ...(parentRef ? [parentRef] : []),
+    );
+    if (!feedOpen(features.exists ? features.data() : null)) return 'closed';
+    // Bootstrap staff access never grants composition access.
+    if (!accountGrant(account.exists ? account.data() : null)) return 'forbidden';
+    if (target.exists) {
+      const stored = target.data();
+      if (stored.state === REMOVED) return 'removed';
+      return stored.state === ACTIVE && stored.authorUid === uid
+        && stored.text === text && stored.parentPostId === parentPostId ? 'replayed' : 'conflict';
+    }
+    if (parentRef && (!parent.exists || parent.data().state !== ACTIVE
+        || parent.data().parentPostId !== null)) return 'no-root';
+    tx.create(postRef, { state: ACTIVE, authorUid: uid, text, parentPostId, createdAt: new Date(clockMs(now)) });
+    return 'stored';
+  });
+  return { outcome, postId };
+}
+
+function createCreateSocialPostHandler({ db, auth, now = Date.now, log = console }) {
+  return async function createSocialPost(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    if ((req.rawBody?.length ?? 0) > MAX_SOCIAL_REQUEST_BYTES
+        || socialRequestBytes(req.body) > MAX_SOCIAL_REQUEST_BYTES) {
+      return sendError(res, 413, 'payload-too-large', 'The request is too large.');
+    }
+    const submission = readSocialPost(req.body);
+    if (!submission.ok) return badRequest(res, submission.message);
+    const decoded = await verifyAuthToken({ auth }, req);
+    if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Sign in to post.');
+    let result;
+    try {
+      result = await storePost({ db, uid: decoded.uid, submission, now });
+    } catch {
+      log.error('createSocialPost failed');
+      return internal(res, 'The post could not be saved. Try again with the same submission key.');
+    }
+    const { outcome, postId } = result;
+    if (outcome === 'closed') return notFound(res, FEED_CLOSED_MESSAGE);
+    if (outcome === 'forbidden') return sendError(res, 403, 'forbidden', 'An approved or speaker account is required to post.');
+    if (outcome === 'no-root') return notFound(res, 'The original post is not available for replies.');
+    if (outcome === 'conflict') return sendError(res, 409, 'submission-conflict', 'This submission key was already used for another post.');
+    if (outcome === 'removed') return sendError(res, 410, 'post-removed', 'This post was removed and cannot be submitted again.');
+    res.status(outcome === 'stored' ? 201 : 200).json({ postId, state: ACTIVE });
+  };
 }
 
 /**
@@ -263,7 +334,7 @@ function createRemoveSocialPostHandler({ db, auth, getConfig, now = Date.now, lo
   };
 }
 
-/** Deployable exports: reportSocialPost, removeSocialPost. */
+/** Deployable social endpoints. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
@@ -290,12 +361,14 @@ function buildHandlers() {
   }));
 
   return {
+    createSocialPost: expose(createCreateSocialPostHandler),
     reportSocialPost: expose(createReportSocialPostHandler),
     removeSocialPost: expose(createRemoveSocialPostHandler),
   };
 }
 
 module.exports = {
+  createCreateSocialPostHandler,
   createReportSocialPostHandler,
   createRemoveSocialPostHandler,
   get handlers() {
@@ -308,6 +381,7 @@ module.exports = {
     feedOpen,
     accountGrant,
     reportIdFor,
+    postIdFor,
     tombstoneOf,
   },
 };
