@@ -34,21 +34,36 @@ import { saveOwnProfile, subscribeOwnProfile } from '../lib/profileSource.js';
 
 const ProfileContext = createContext(null);
 
+const EMPTY_ACCOUNT = Object.freeze({ uid: null, profile: null, seeded: false });
+
 export function ProfileProvider({ children }) {
   const { user, isAdmin } = useAuth();
   const uid = user?.uid ?? null;
-  const [profile, setProfile] = useState(null);
-  const [seeded, setSeeded] = useState(false);
+  // The account document, kept WITH the uid it was read for. `profile` and
+  // every verdict below are derived from it in render, so an account switch
+  // hides the previous account's document in the very render that brings
+  // the new uid, before the effect below has run (issue #788). A
+  // document for any other uid reads as "not seeded yet".
+  const [account, setAccount] = useState(EMPTY_ACCOUNT);
 
   useEffect(() => {
-    setProfile(null);
-    setSeeded(false);
+    setAccount(EMPTY_ACCOUNT);
     if (!uid) return undefined;
-    return subscribeOwnProfile(uid, (next) => {
-      setProfile(next);
-      setSeeded(next != null);
+    let current = true;
+    const unsubscribe = subscribeOwnProfile(uid, (next) => {
+      // A callback that lands after this subscription ended must not
+      // overwrite the next account's document.
+      if (current) setAccount({ uid, profile: next, seeded: next != null });
     });
+    return () => {
+      current = false;
+      unsubscribe();
+    };
   }, [uid]);
+
+  const own = uid && account.uid === uid ? account : EMPTY_ACCOUNT;
+  const profile = own.profile;
+  const seeded = own.seeded;
 
   const saveProfile = useCallback(
     (fields) => {

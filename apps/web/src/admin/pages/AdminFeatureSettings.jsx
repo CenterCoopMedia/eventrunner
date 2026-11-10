@@ -4,7 +4,8 @@
 // (spec §2.2), so this form always sends every known key — the key list comes
 // from the shared schema (KNOWN_FEATURE_KEYS), which is the same list the
 // server validates against, so a new flag appears here the moment it is added
-// there.
+// there. A flag in UNRELEASED_FEATURE_KEYS (featureChoices.js) has no
+// switch here; its stored value is still sent back unchanged.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -20,7 +21,7 @@ import {
 } from '../components/formControls.jsx';
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 import { contentError } from '../contentError.js';
-import { FEATURE_CHOICES } from '../featureChoices.js';
+import { FEATURE_CHOICES, UNRELEASED_FEATURE_KEYS } from '../featureChoices.js';
 import '../components/featureSwitch.css';
 
 
@@ -60,7 +61,9 @@ export function featureGroupsFor(featureKeys) {
   ].filter((group) => group.keys.length > 0);
 }
 
-const VISIBLE_GROUPS = featureGroupsFor(KNOWN_FEATURE_KEYS);
+/** The flags this page offers: every schema key except the unreleased ones. */
+const VISIBLE_KEYS = KNOWN_FEATURE_KEYS.filter((key) => !UNRELEASED_FEATURE_KEYS.includes(key));
+const VISIBLE_GROUPS = featureGroupsFor(VISIBLE_KEYS);
 
 function FeatureChoice({ featureKey, checked, onChange, error }) {
   const id = useId();
@@ -176,7 +179,7 @@ export default function AdminFeatureSettings() {
       {status ? <SaveStatus message={status} /> : null}
 
       <p className="text-admin-sm text-admin-ink-secondary">
-        {KNOWN_FEATURE_KEYS.filter((key) => form[key]).length} of {KNOWN_FEATURE_KEYS.length} features on.
+        {VISIBLE_KEYS.filter((key) => form[key]).length} of {VISIBLE_KEYS.length} features on.
         {' '}Changes take effect after you save.
       </p>
 

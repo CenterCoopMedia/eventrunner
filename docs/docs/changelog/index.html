@@ -129,6 +129,12 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The attendee side of the private feed (#788). When the feed is on, an approved attendee, a
+          speaker, or current staff sees the newest posts on the Attendees page and can report one; a report
+          sends only the post id. Nothing is requested until the live features document turns on both
+          <code>socialFeed</code> and <code>attendeeDirectory</code> for a reader with a current grant, and an account switch
+          hides the previous account&#39;s feed at once. The admin Features page does not show the <strong>Attendee
+          feed</strong> switch until the whole feature is accepted, so <code>socialFeed</code> stays off on every site.</li>
           <li>The backend for a private attendee feed (#506), behind a new <code>socialFeed</code> flag that is off by
           default. Attendee reads and reports need both <code>socialFeed</code> and <code>attendeeDirectory</code>, and a current
           approved or speaker account, or a current staff grant. <code>reportSocialPost</code> stores one private,
