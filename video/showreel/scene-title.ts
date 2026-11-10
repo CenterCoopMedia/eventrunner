@@ -47,9 +47,11 @@ export function title(p: Project): Scene {
     streaks(c, D.ink, running * prog(f, q.impact, q.impact + 5), 71, f);
 
     // He runs on the spot: the body holds still and bright, the legs are a soft smear.
+    // The body does not bob and the limbs stay at SOFT. At this size both count as
+    // transitions for the flash screen, and the landing cut is under a second away.
     const pose: Pose = {
       ...REST,
-      runAmount: running, run: (f - q.impact) / 30 * 2.6, limbAlpha: running ? SOFT + .1 : 1,
+      runAmount: running, bob: 0, run: (f - q.impact) / 30 * 2.6, limbAlpha: running ? SOFT : 1,
       lean: running ? .26 : .16,
       squash: 1 - .14 * Math.max(0, 1 - Math.abs(f - q.land - 1.5) / 3),
       barStretch: 1 + 4 * running,

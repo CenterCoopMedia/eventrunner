@@ -129,7 +129,12 @@ scenes. The motion now follows four rules:
 4. **Decoration is soft.** Rings, rays, trails and streaks stay at or below
    `SOFT`, which keeps their change under the screen's threshold.
 
-Run the screen again after any change to motion, colour or timing.
+Run the screen again after any change to motion, colour or timing. Screen the
+whole film, not a clip: the screen keeps history, and a clip of the title
+passed with 4 transitions while the same frames in the full film had 7. The
+cause was Badger at title size. His body rose 4 px on each stride and his legs
+were above `SOFT`, and both count at that size, so he now holds still with
+limbs at `SOFT`.
 
 ## Checks and their limits
 

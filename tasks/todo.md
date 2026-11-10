@@ -33,7 +33,7 @@ its report to `tasks/reports/showreel-v1.md`.
 - [x] Flat ground: no glow and no dot grid.
 - [x] Montage is a run sheet of eight ruled bands, not a card grid.
 - [x] One colour for each product part, shared by the stack and the montage.
-- [ ] Flash screen passes at native size.
+- [x] Flash screen passes at native size (6 transitions in the worst second; the limit is 6).
 
 ### PR 2. Native vertical cut
 
