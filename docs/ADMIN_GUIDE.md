@@ -932,6 +932,16 @@ Each row lists the emails of that request and their state: **Sent**, **Not sent*
 
 The system does not promise a reply time, and no email names one. Decide your own targets as policy, for example "acknowledge within two working days, and record an outcome within ten". Write them where your team and your visitors can read them, such as a page on the site. Use the **Open** filter to find requests that wait for a reply.
 
+## Feed moderation
+
+Open **Feed moderation** under **Operations**, or go to `/admin/feed-moderation`. Staff and operators can review private reports and remove reported posts even when the attendee feed, attendee directory, or both are off. Attendees cannot read this report list or remove posts. A current staff or operator grant is required; a profile role alone grants no access.
+
+The list shows up to 50 reports at a time, newest first, grouped by post. **Older reports** opens the next page; **Newest reports** returns to the beginning. Each row shows the reported post and how many reports for it appear on that page. Reporter identities are not displayed. Removed or unavailable posts keep a plain status in the list.
+
+Choose **Remove post**, read the consequence, then choose **Remove this post**. **Keep it** or Escape cancels. Removal permanently clears the post text and author, leaving only a removed marker and its timestamps and thread link. The server records who removed it and when in the admin log, in the same transaction, without copying the removed text or author. Repeating a removal adds no second audit record. If removal fails, the post stays as it was; the row explains the failure and offers another try. A post already removed elsewhere also loses its text in this tab.
+
+The attendee feed remains off by default. Assign staff moderation before an operator opts an event in. This cleanup screen does not enable the feature. Features stays operator-only.
+
 ## Materials
 
 Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. One file can be at most 9 MiB. Prefer a real label ("Slides") over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin's direct read, so every action here goes through Cloud Functions. Staff and operators both use this page.

@@ -193,6 +193,7 @@ export const DOCKET = Object.freeze([
     items: [
       { to: 'import', label: 'Import records', tier: 'staff' },
       { to: 'feedback', label: 'Feedback', tier: 'staff' },
+      { to: 'feed-moderation', label: 'Feed moderation', tier: 'staff' },
       { to: 'change-requests', label: 'Change requests', tier: 'staff' },
       { to: 'data-export', label: 'Data export', tier: 'staff' },
     ],
