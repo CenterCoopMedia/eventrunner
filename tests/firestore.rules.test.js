@@ -2546,7 +2546,9 @@ describe("the attendee feed and its reports (issue 506)", () => {
 
     it(`posts with ${name}: pending, ticketed, revoked, account-less and anonymous readers are refused`, async () => {
       await setFeatures(data);
-      for (const reader of [attendee("pending-1"), attendee("ticketed-sf"), attendee("revoked-sf"), nonAdmin(), anon()]) {
+      // "sf-no-account" has no users document. nonAdmin() is not used here:
+      // an earlier suite seeds users/attendee-1 as approved.
+      for (const reader of [attendee("pending-1"), attendee("ticketed-sf"), attendee("revoked-sf"), attendee("sf-no-account"), anon()]) {
         await assertFails(getDoc(doc(reader, "social_posts/sf-root")));
         await assertFails(getDocs(collection(reader, "social_posts")));
       }
