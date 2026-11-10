@@ -48,6 +48,8 @@ let admins;
 let probeGates;
 /** users_public projections by uid; a missing uid is unreadable. */
 let projections;
+/** Pages the older-posts fetch returns, in order. */
+let olderPages;
 
 function pathOf(target) {
   if (Array.isArray(target?.path)) return target.path.join('/');
@@ -74,7 +76,9 @@ function pushDoc(path, data) {
 }
 
 function pushPosts(entry, posts) {
-  act(() => entry.next({ docs: posts.map((post) => ({ id: post.id, data: () => post })) }));
+  const docs = posts.map((item) => ({ id: item.id, data: () => item }));
+  entry.lastDocs = docs;
+  act(() => entry.next({ docs }));
 }
 
 function post(id, authorUid, text, extra = {}) {
@@ -132,6 +136,7 @@ beforeEach(() => {
   admins = new Set();
   probeGates = new Map();
   projections = new Map();
+  olderPages = [];
   renders = [];
   auth.currentUser = null;
   vi.mocked(onAuthStateChanged).mockImplementation((_auth, listener) => {
@@ -145,6 +150,10 @@ beforeEach(() => {
     return () => { entry.active = false; };
   });
   vi.mocked(getDocs).mockImplementation(async (target) => {
+    if (pathOf(target) === 'social_posts') {
+      const page = olderPages.shift() ?? [];
+      return { docs: page.map((item) => ({ id: item.id, data: () => item })) };
+    }
     const uid = auth.currentUser?.uid;
     if (probeGates.has(uid)) await probeGates.get(uid).promise;
     if (admins.has(uid)) return { docs: [] };
@@ -374,6 +383,53 @@ describe('what the feed shows', () => {
     expect(screen.getByRole('heading', { name: 'The feed is unavailable right now' })).toBeInTheDocument();
     act(() => feed.error(Object.assign(new Error('no'), { code: 'permission-denied' })));
     expect(screen.getByText(/opens for you once your registration is approved/)).toBeInTheDocument();
+  });
+});
+
+describe('older posts', () => {
+  it('pages past the newest posts with a bounded cursor fetch, keeps every loaded post live, and is not capped', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const newest = Array.from({ length: 20 }, (_, i) => post(`n${i}`, 'ada', `Newest ${i}`));
+    const head = activeFeedListeners()[0];
+    pushPosts(head, newest);
+
+    // Each older page is the next 20 after the oldest loaded post.
+    let previous = head;
+    let shown = newest;
+    for (let round = 0; round < 6; round += 1) {
+      const page = Array.from({ length: 20 }, (_, i) => post(`o${round}-${i}`, 'ada', `Older ${round}-${i}`));
+      olderPages.push(page);
+      const oldest = previous.lastDocs.at(-1);
+      fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
+      await act(async () => {});
+      const request = vi.mocked(getDocs).mock.calls.filter(([target]) => pathOf(target) === 'social_posts').at(-1)[0];
+      expect(request.clauses.slice(0, 3)).toEqual([
+        { where: ['state', '==', 'active'] },
+        { where: ['parentPostId', '==', null] },
+        { orderBy: ['createdAt', 'desc'] },
+      ]);
+      expect(request.clauses[3].startAfter[0]).toBe(oldest);
+      expect(request.clauses[4]).toEqual({ limit: 20 });
+
+      const live = activeFeedListeners();
+      expect(live).toHaveLength(1);
+      expect(previous.active).toBe(false);
+      expect(live[0].target.clauses[3].endAt[0].id).toBe(`o${round}-19`);
+      shown = [...shown, ...page];
+      pushPosts(live[0], shown);
+      previous = live[0];
+    }
+    // 140 posts: past any fixed cap.
+    expect(screen.getByText('Older 5-19')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Report post' })).toHaveLength(140);
+
+    olderPages.push([post('last', 'ada', 'The very first post')]);
+    fireEvent.click(screen.getByRole('button', { name: 'Show older posts' }));
+    await act(async () => {});
+    pushPosts(activeFeedListeners()[0], [...shown, post('last', 'ada', 'The very first post')]);
+    expect(screen.getByText('The very first post')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show older posts' })).not.toBeInTheDocument();
   });
 });
 

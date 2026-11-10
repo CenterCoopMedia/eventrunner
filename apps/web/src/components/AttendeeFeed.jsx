@@ -19,14 +19,14 @@
 // The Firestore rules are the boundary. This gate only decides whether to
 // ask, so a closed or unknown state costs nothing and leaks nothing.
 //
-// WHOSE DATA. Posts, author names, the page count, and report state are
-// stored WITH the key they were read for: the reader's uid and an access
-// session number while the feed is open, null otherwise. The session
-// number moves on each time access closes, so state left by a closed
-// session (a report still in flight, say) never returns when the same
-// reader's access opens again. A render shows only state whose key matches its
-// own, so an account switch, a sign-out, a revoked grant, or a flag turned
-// off hides the previous reader's feed in that same render, before any
+// WHOSE DATA. Posts, author names, how far back the feed is loaded, and
+// report state are stored WITH the key they were read for: the reader's
+// uid and an access session number while the feed is open, null otherwise.
+// The session number moves on each time access closes, so state left by a
+// closed session (a report still in flight, say) never returns when the
+// same reader's access opens again. A render shows only state whose key
+// matches its own, so an account switch, a sign-out, a revoked grant, or a
+// flag turned off hides the previous reader's feed in that same render, before any
 // cleanup effect runs. The verdicts the key is built from are bound to
 // their account at the source (AuthContext, ProfileContext), so a stale
 // verdict for account A cannot open the feed for account B. A listener
@@ -51,8 +51,8 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { fetchPublicProfile } from '../lib/profileSource.js';
 import {
-  FEED_MAX_POSTS,
   FEED_PAGE_SIZE,
+  fetchOlderPage,
   reportSocialPost,
   subscribeRootFeed,
 } from '../lib/socialFeedSource.js';
@@ -67,6 +67,8 @@ import {
 } from './controlClasses.js';
 
 const AUTHOR_FALLBACK = 'An attendee';
+const NO_OLDER = Object.freeze({ through: null, more: false, loading: false, failed: false });
+const NO_FEED = Object.freeze({ posts: null, last: null, size: 0, failed: false, denied: false });
 
 /**
  * Whether this reader may ask for the feed now.
@@ -215,14 +217,17 @@ export default function AttendeeFeed() {
   }, [open]);
   const feedKey = open ? `${uid}\u0000${session}` : null;
 
-  const [pages, setPages] = useState({ key: null, value: 1 });
-  const [snapshot, setSnapshot] = useState({ key: null, value: { posts: null, failed: false, denied: false } });
+  // How far back the feed is loaded: `through` is the oldest loaded document
+  // (null = the newest page only), `more` whether the last older fetch was
+  // a full page, `loading` and `failed` the state of "Show older posts".
+  const [older, setOlder] = useState({ key: null, value: NO_OLDER });
+  const [snapshot, setSnapshot] = useState({ key: null, value: NO_FEED });
   const [authors, setAuthors] = useState({ key: null, value: {} });
   const [reports, setReports] = useState({ key: null, value: {} });
 
-  const pageCount = own(pages, feedKey, 1);
-  const max = Math.min(pageCount * FEED_PAGE_SIZE, FEED_MAX_POSTS);
-  const feed = own(snapshot, feedKey, { posts: null, failed: false, denied: false });
+  const loaded = own(older, feedKey, NO_OLDER);
+  const through = loaded.through;
+  const feed = own(snapshot, feedKey, NO_FEED);
   const authorMap = own(authors, feedKey, {});
   const reportMap = own(reports, feedKey, {});
 
@@ -239,15 +244,15 @@ export default function AttendeeFeed() {
     if (feedKey === null) return undefined;
     let current = true;
     const unsubscribe = subscribeRootFeed(
-      { max },
-      (posts) => {
-        if (current) setSnapshot({ key: feedKey, value: { posts, failed: false, denied: false } });
+      { through },
+      (posts, page) => {
+        if (current) setSnapshot({ key: feedKey, value: { posts, last: page.last, size: page.size, failed: false, denied: false } });
       },
       (error) => {
         if (!current) return;
         setSnapshot({
           key: feedKey,
-          value: { posts: null, failed: true, denied: error?.code === 'permission-denied' },
+          value: { ...NO_FEED, failed: true, denied: error?.code === 'permission-denied' },
         });
       },
     );
@@ -255,7 +260,7 @@ export default function AttendeeFeed() {
       current = false;
       unsubscribe();
     };
-  }, [feedKey, max]);
+  }, [feedKey, through]);
 
   // Author names: one best-effort read per author, once per reader.
   const posts = feed.posts;
@@ -286,6 +291,25 @@ export default function AttendeeFeed() {
       const base = prev.key === key ? prev.value : {};
       return { key, value: { ...base, [postId]: next } };
     });
+  }
+
+  // One bounded fetch past the oldest loaded post; the listener then
+  // re-attaches through the new oldest post, so every loaded post stays live.
+  async function loadOlder() {
+    const key = feedKey;
+    const after = feed.last;
+    if (key === null || !after || loaded.loading) return;
+    const base = { ...loaded, loading: false, failed: false };
+    setOlder({ key, value: { ...base, loading: true } });
+    const result = await fetchOlderPage(after);
+    if (activeKey.current !== key) return;
+    if (!result.ok) {
+      setOlder({ key, value: { ...base, failed: true } });
+    } else if (!result.last) {
+      setOlder({ key, value: { ...base, through: through ?? after, more: false } });
+    } else {
+      setOlder({ key, value: { through: result.last, more: result.size >= FEED_PAGE_SIZE, loading: false, failed: false } });
+    }
   }
 
   async function sendReport(postId) {
@@ -327,7 +351,7 @@ export default function AttendeeFeed() {
   } else if (posts.length === 0) {
     body = <EmptyState title="No posts yet" description="Posts from attendees appear here." />;
   } else {
-    const more = posts.length >= max && max < FEED_MAX_POSTS;
+    const more = through === null ? feed.size >= FEED_PAGE_SIZE : loaded.more;
     body = (
       <>
         <ul>
@@ -343,18 +367,21 @@ export default function AttendeeFeed() {
             />
           ))}
         </ul>
+        {loaded.failed ? (
+          <p role="alert" className="mt-sm text-caption text-danger">
+            Older posts could not be loaded. Try again.
+          </p>
+        ) : null}
         {more ? (
           <button
             type="button"
             className={`${quietActionClass} mt-sm`}
-            onClick={() => setPages({ key: feedKey, value: pageCount + 1 })}
+            disabled={loaded.loading}
+            aria-busy={loaded.loading || undefined}
+            onClick={loadOlder}
           >
-            Show older posts
+            {loaded.loading ? 'Loading older posts…' : 'Show older posts'}
           </button>
-        ) : posts.length >= FEED_MAX_POSTS ? (
-          <p className="mt-sm text-caption text-text-secondary">
-            Showing the newest {FEED_MAX_POSTS} posts.
-          </p>
         ) : null}
       </>
     );

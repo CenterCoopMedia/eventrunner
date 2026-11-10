@@ -2,15 +2,22 @@
 // functions/src/social/feed.cjs). The one seam between the feed UI and
 // Firebase: the component imports this module and holds no Firestore type.
 //
-// READS. The root feed is one bounded live query: active root posts only
-// (`state == 'active'`, `parentPostId == null`), newest first by the
-// server's `createdAt`. Firestore breaks a `createdAt` tie by document id,
-// so the order is stable and a larger limit only adds older posts after the
-// ones already shown. The rules (firestore.rules, social_posts) are the
-// boundary: an attendee query succeeds only while both flags are on and the
-// reader holds a current grant. A removed post is a tombstone with
-// `state: 'removed'` and never matches this query; an active reply has a
-// parent id and never matches it either.
+// READS. The feed is newest first by the server's `createdAt`, and
+// Firestore breaks a tie by document id, so the order is total and stable.
+// Every request is bounded:
+//
+//   - the live listener starts as the newest FEED_PAGE_SIZE active root
+//     posts (`limit`);
+//   - "Show older posts" fetches the next FEED_PAGE_SIZE after the oldest
+//     loaded post (`startAfter` that document, `limit`), and the listener
+//     then re-attaches through the new oldest post (`endAt` that document).
+//
+// So every loaded post stays live (a removal drops it), a new post cannot
+// push a loaded one out of view, and history is never cut off. The rules
+// (firestore.rules, social_posts) are the boundary: an attendee query
+// succeeds only while both flags are on and the reader holds a current
+// grant. A removed post is a tombstone with `state: 'removed'` and never
+// matches; an active reply has a parent id and never matches either.
 //
 // REPORTS. reportSocialPost takes `{ postId }` and nothing else. The server
 // decides access and idempotency on every call: a repeated report returns
@@ -18,10 +25,13 @@
 // every failure comes back as `{ ok: false, error }` for the feed to state.
 import {
   collection,
+  endAt,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
   query,
+  startAfter,
   where,
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
@@ -33,8 +43,6 @@ const POSTS = 'social_posts';
 
 /** The newest posts shown at first, and the step "Show older posts" adds. */
 export const FEED_PAGE_SIZE = 20;
-/** The most posts one reader's query asks for. */
-export const FEED_MAX_POSTS = 100;
 
 /**
  * A post row as the feed renders it, or null for anything that is not an
@@ -56,29 +64,39 @@ export function toFeedPost(id, data) {
   };
 }
 
-/**
- * Subscribe to the newest active root posts.
- *
- * @param {{ max: number }} options how many posts to ask for
- * @param {(posts: Array<object>) => void} onNext
- * @param {(error: unknown) => void} [onFail] called on every listener error
- * @returns {() => void} unsubscribe; it also cancels a pending retry
- */
-export function subscribeRootFeed({ max }, onNext, onFail) {
-  const size = Math.min(Math.max(1, Math.floor(max) || FEED_PAGE_SIZE), FEED_MAX_POSTS);
-  const target = query(
+/** Active root posts, newest first; the clauses every feed read shares. */
+function rootPosts(...bounds) {
+  return query(
     collection(db, POSTS),
     where('state', '==', 'active'),
     where('parentPostId', '==', null),
     orderBy('createdAt', 'desc'),
-    limit(size),
+    ...bounds,
   );
+}
+
+/**
+ * Subscribe to the loaded part of the feed: the newest FEED_PAGE_SIZE
+ * posts, or, once older posts are loaded, every post down to and including
+ * `through`.
+ *
+ * @param {{ through: object|null }} options a document from fetchOlderPage
+ * @param {(posts: Array<object>, page: { last: object|null, size: number }) => void} onNext
+ *   `last` is the oldest document, the cursor for the next older page
+ * @param {(error: unknown) => void} [onFail] called on every listener error
+ * @returns {() => void} unsubscribe; it also cancels a pending retry
+ */
+export function subscribeRootFeed({ through }, onNext, onFail) {
+  const target = through ? rootPosts(endAt(through)) : rootPosts(limit(FEED_PAGE_SIZE));
   return subscribeWithRetry(
     (onError) =>
       onSnapshot(
         target,
         (snapshot) => {
-          onNext(snapshot.docs.map((d) => toFeedPost(d.id, d.data())).filter(Boolean));
+          onNext(
+            snapshot.docs.map((d) => toFeedPost(d.id, d.data())).filter(Boolean),
+            { last: snapshot.docs.at(-1) ?? null, size: snapshot.docs.length },
+          );
         },
         onError,
       ),
@@ -87,6 +105,23 @@ export function subscribeRootFeed({ max }, onNext, onFail) {
       onFail?.(error);
     },
   );
+}
+
+/**
+ * Find the next older page after `after`. Only its size and its oldest
+ * document are used: the listener re-attaches through that document.
+ *
+ * @param {object} after the oldest loaded document
+ * @returns {Promise<{ ok: true, last: object|null, size: number } | { ok: false }>}
+ */
+export async function fetchOlderPage(after) {
+  try {
+    const snapshot = await getDocs(rootPosts(startAfter(after), limit(FEED_PAGE_SIZE)));
+    return { ok: true, last: snapshot.docs.at(-1) ?? null, size: snapshot.docs.length };
+  } catch (error) {
+    console.warn('older attendee feed posts failed to load.', error);
+    return { ok: false };
+  }
 }
 
 /**

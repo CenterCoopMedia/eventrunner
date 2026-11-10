@@ -79,6 +79,9 @@ vi.mock('firebase/firestore', () => {
     }),
     where: vi.fn((...args) => ({ where: args })),
     orderBy: vi.fn((...args) => ({ orderBy: args })),
+    // Query cursors (the attendee feed pages with them, issue #788).
+    startAfter: vi.fn((...args) => ({ startAfter: args })),
+    endAt: vi.fn((...args) => ({ endAt: args })),
   };
 });
 
