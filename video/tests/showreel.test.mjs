@@ -106,6 +106,18 @@ test('everything shown comes from the fictional fixture', async () => {
   }
 });
 
+test('the picture has no numbered eyebrow, tracked micro-label or chip', () => {
+  // Design rules of the second pass. Mono type is for times and step numbers only.
+  const dir = path.join(REPO, 'video/showreel');
+  for (const file of fs.readdirSync(dir).filter(name => name.endsWith('.ts') && name !== 'timeline.ts')) {
+    const source = fs.readFileSync(path.join(dir, file), 'utf8');
+    assert.ok(!/`0\$\{/.test(source), `${file} does not number a label with a leading zero`);
+    assert.ok(!/padStart\(2, '0'\)/.test(source), `${file} does not pad a count with a zero`);
+    assert.ok(!/family: 'Mono'[^}]*tracking/.test(source), `${file} has no tracked mono label`);
+    assert.ok(!/ — /.test(source.replace(/\/\/.*$/gm, '')), `${file} draws no "number, dash, label" eyebrow`);
+  }
+});
+
 test('the standing label, day and site address are read, not typed', async () => {
   const {copy, experience} = await project();
   assert.equal(copy.sample, `${experience.name} · Sample event`);
@@ -119,8 +131,7 @@ test('the standing label, day and site address are read, not typed', async () =>
 test('text colours keep at least 4.5:1', () => {
   const all = styles(), D = all[0].dark;
   for (const key of ['ink', 'inkMuted', 'primary']) assert.ok(contrast(D[key], D.surface) >= 4.5, `brand ${key} on the dark ground`);
-  // The standing sample label is drawn at 85% and inactive picker items at 72%.
-  assert.ok(contrast(mix(D.surface, D.inkMuted, .85), D.surface) >= 4.5);
+  // Inactive picker items are drawn at 72%; the sample label is full muted ink.
   assert.ok(contrast(mix(D.surface, D.inkMuted, .72), D.surface) >= 4.5);
   for (const style of all) {
     for (const key of ['primary', 'accent', 'highlight']) assert.ok(contrast(style.dark.surface, style.dark[key]) >= 4.5, `${style.id} dark surface on ${key} panel`);

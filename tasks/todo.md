@@ -1,5 +1,54 @@
 # Session task list
 
+## Showreel teaser, second pass (2026-11-10)
+
+Owner request, 2026-11-10: better music and better sound design on the same
+clock, a holistic pass against generated-looking design (the owner's list is a
+lens, not a deny list), and a native 1080 by 1920 cut built for phones, not a
+crop. Animation timing and structure stay as merged in #790.
+
+The three parts are a stack (owner: stacked pull requests when possible):
+
+| PR | Branch | Base | Who writes |
+|---|---|---|---|
+| 1 | `jawn/youthful-meitner-ts84kk` | `main` | Director: design pass on the landscape cut |
+| 2 | `jawn/youthful-meitner-ts84kk-2-vertical` | PR 1 branch | Builder V1 (Opus, medium effort): format-driven layouts and the vertical cut |
+| 3 | `jawn/youthful-meitner-ts84kk-3-sound` | PR 2 branch | Director: new score and sound design |
+
+Roster: V1 works in the main checkout on `video/showreel/*.ts`, `data.mjs`,
+`render.mjs` and `video/tests/showreel.test.mjs`. The director stays out of
+those files while V1 runs and works only on `score.mjs`, `make-score.mjs`,
+a new `audio-kit.mjs` and `video/tests/showreel-score.test.mjs`. V1 writes
+its report to `tasks/reports/showreel-v1.md`.
+
+### PR 1. Design pass (landscape)
+
+- [x] Remove numbered eyebrows above the scene words, stack labels and montage.
+- [x] Record state in words ("Draft, 1 change", "Live"), no chip and no dot.
+- [x] No coloured left edge on cards, the ticket or the picker.
+- [x] Mono type only for times. Captions and notes in Source Sans at a
+      readable size; the sample-event note is 26 px.
+- [x] Corner radius from the product token (4 px), not soft cards.
+- [x] Page picture: headline first, then when and where as a plain line.
+- [x] Flat ground: no glow and no dot grid.
+- [x] Montage is a run sheet of eight ruled bands, not a card grid.
+- [x] One colour for each product part, shared by the stack and the montage.
+- [ ] Flash screen passes at native size.
+
+### PR 2. Native vertical cut
+
+- [ ] One `LAYOUT` table for each scene, chosen by format. Landscape frames
+      stay identical to PR 1 (reference frames in the scratchpad).
+- [ ] Vertical layouts composed for 1080 by 1920: stacked narrator and stage,
+      a phone page picture, a three-column wall, downward paths.
+- [ ] Essential content inside y 250 to 1540. Flash screen passes.
+
+### PR 3. Sound
+
+- [ ] New composition on the same cues, with a hook and real arrangement.
+- [ ] Designed sound for every picture event, placed by screen position.
+- [ ] Master to -16 LUFS; measurements and spectrogram reviewed.
+
 ## Plan for review: audit follow-up (2026-11-09)
 
 Source: `docs/plans/2026-11-09-project-audit/README.md` ("For the owner to
