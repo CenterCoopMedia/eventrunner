@@ -860,6 +860,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Both Auth lifecycle triggers run as the compute service account, with per-secret
+  access prepared before deployment. Automated deploys set
+  `EVENT_COMPUTE_SERVICE_ACCOUNT`; manual deploys must set it in the target
+  Functions env file. The deploy identity keeps App Engine actAs for Firebase's
+  permission check (#805).
 - Function deployments accept retry upgrades through targeted deploys while
   retaining safeguards against deletion, trigger changes and selector collisions.
 
