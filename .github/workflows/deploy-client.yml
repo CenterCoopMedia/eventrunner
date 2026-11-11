@@ -112,8 +112,12 @@ jobs:
           # in one workflow run (deploy.yml's matrix), and v4 artifacts are
           # immutable and must be unique within a run — an unqualified name
           # here would collide on the second client's upload.
-          name: shared-tgz-${{ inputs.client }}
-          path: functions/vendor/shared.tgz
+          name: shared-workspace-${{ inputs.client }}
+          # Keep the generated archive and its npm integrity metadata together.
+          path: |
+            functions/vendor/shared.tgz
+            **/package-lock.json
+            !**/node_modules/**
           retention-days: 1
 
   validate-env:
@@ -182,8 +186,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: shared-tgz-${{ inputs.client }}
-          path: functions/vendor
+          name: shared-workspace-${{ inputs.client }}
+          path: .
       - name: Copy the shared tarball to every functions vendor folder
         # The root npm ci installs every workspace, and each one that
         # vendors the shared package needs its own copy.
@@ -223,8 +227,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: shared-tgz-${{ inputs.client }}
-          path: functions/vendor
+          name: shared-workspace-${{ inputs.client }}
+          path: .
       - name: Copy the shared tarball to every functions vendor folder
         # The root npm ci installs every workspace, and each one that
         # vendors the shared package needs its own copy.
@@ -348,8 +352,8 @@ jobs:
           # publisher/Dockerfile runs `npm ci` over the whole workspace, and
           # functions/package.json depends on this tarball by path — without
           # it the install cannot resolve the tree.
-          name: shared-tgz-${{ inputs.client }}
-          path: functions/vendor
+          name: shared-workspace-${{ inputs.client }}
+          path: .
       - name: Copy the shared tarball to every functions vendor folder
         # The root npm ci installs every workspace, and each one that
         # vendors the shared package needs its own copy.
@@ -579,8 +583,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: shared-tgz-${{ inputs.client }}
-          path: functions/vendor
+          name: shared-workspace-${{ inputs.client }}
+          path: .
       - name: Copy the shared tarball to every functions vendor folder
         # The root npm ci installs every workspace, and each one that
         # vendors the shared package needs its own copy.
@@ -618,8 +622,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: shared-tgz-${{ inputs.client }}
-          path: functions/vendor
+          name: shared-workspace-${{ inputs.client }}
+          path: .
       - name: Copy the shared tarball to every functions vendor folder
         # The root npm ci installs every workspace, and each one that
         # vendors the shared package needs its own copy.
@@ -705,8 +709,8 @@ jobs:
           path: apps/web/dist
       - uses: actions/download-artifact@v4
         with:
-          name: shared-tgz-${{ inputs.client }}
-          path: functions/vendor
+          name: shared-workspace-${{ inputs.client }}
+          path: .
       - name: Copy the shared tarball to every functions vendor folder
         # npm ci finds it only in a warm npm cache otherwise.
         run: node scripts/prepare-functions.cjs --copy
@@ -792,8 +796,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: shared-tgz-${{ inputs.client }}
-          path: functions/vendor
+          name: shared-workspace-${{ inputs.client }}
+          path: .
       - name: Copy the shared tarball to every functions vendor folder
         # The root npm ci installs every workspace, and each one that
         # vendors the shared package needs its own copy.
