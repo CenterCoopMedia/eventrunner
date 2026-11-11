@@ -47,7 +47,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import {
@@ -141,26 +140,33 @@ async function postJson(name, body) {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  // 'unknown' until the probe below answers for the current user: `loading`
-  // covers the auth handshake only, and it goes false the moment
+  // The probes' answer, kept WITH the user object it was probed for. The
+  // exposed adminStatus is derived in render from this pair: a verdict for
+  // any other user (a different account, or a refreshed credential for the
+  // same UID) reads as 'unknown' in the very render that brings the new
+  // user, before any passive effect could reset it. A gate that read the old
+  // verdict for one render would let a staff answer for account A authorize
+  // account B (issue #788).
+  //
+  // adminStatus is 'unknown' until the probe answers for the current user:
+  // `loading` covers the auth handshake only, and it goes false the moment
   // onAuthStateChanged fires — while the probe is still in flight. A gate
   // that read isAdmin at that instant would show "not an admin" to an admin
   // for a tick, so the tri-state is exposed alongside the boolean.
-  const [adminStatus, setAdminStatus] = useState('unknown'); // 'unknown'|'admin'|'denied'
-  // null until adminStatus is 'admin'; then 'operator' or 'staff' — or
-  // 'unknown' when the tier probe failed for a reason other than
-  // permission-denied. Only a permission-denied answer proves staff; a
+  //
+  // adminTier is null until adminStatus is 'admin'; then 'operator' or
+  // 'staff' — or 'unknown' when the tier probe failed for a reason other
+  // than permission-denied. Only a permission-denied answer proves staff; a
   // transient failure must not make an operator staff for the session, so
   // it is left unknown, the rail says so and offers a retry, and no section
   // is refused on a guess (the server decides regardless).
-  const [adminTier, setAdminTier] = useState(null);
+  const [verdict, setVerdict] = useState({ user: null, status: 'unknown', tier: null, confirmed: false });
   const [loading, setLoading] = useState(true);
   // Bumped by refreshAdminStatus: the probes run again for the same user,
   // keeping the current verdict until the new one lands. The Access page
   // asks for this after an operator changes their OWN standing, so the rail
   // and the route refusal follow at once rather than on the next sign-in.
   const [probeRun, setProbeRun] = useState(0);
-  const probedUserRef = useRef(null);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (nextUser) => {
@@ -174,24 +180,13 @@ export function AuthProvider({ children }) {
   // means "not an admin", and on the second "an admin, but not an
   // operator"; any other failure of the second leaves the tier unknown.
   useEffect(() => {
-    if (!user) {
-      probedUserRef.current = null;
-      setAdminStatus('denied');
-      setAdminTier(null);
-      return undefined;
-    }
+    if (!user) return undefined;
     let cancelled = false;
-    if (probedUserRef.current !== user) {
-      // A new user means the previous answer no longer applies; go back to
-      // 'unknown' so consumers wait rather than reusing a stale verdict. A
-      // re-probe for the same user keeps the current verdict meanwhile.
-      probedUserRef.current = user;
-      setAdminStatus('unknown');
-      setAdminTier(null);
-    }
     const probe = (name) =>
       getDocs(query(collection(db, name), limit(1))).then(
-        () => 'ok',
+        // A cache answer still counts for the admin shell, as before; it is
+        // recorded so a consumer that needs the server's word can tell.
+        (snapshot) => (snapshot?.metadata?.fromCache === false ? 'ok' : 'ok-cached'),
         (err) => (err?.code === 'permission-denied' ? 'denied' : 'error'),
       );
     (async () => {
@@ -200,11 +195,12 @@ export function AuthProvider({ children }) {
         probe('admin_logs'),
       ]);
       if (cancelled) return;
-      const isAnyAdmin = drafts === 'ok';
+      const isAnyAdmin = drafts === 'ok' || drafts === 'ok-cached';
       let tier = null;
-      if (isAnyAdmin) tier = logs === 'ok' ? 'operator' : logs === 'denied' ? 'staff' : 'unknown';
-      setAdminTier(tier);
-      setAdminStatus(isAnyAdmin ? 'admin' : 'denied');
+      if (isAnyAdmin) {
+        tier = logs === 'ok' || logs === 'ok-cached' ? 'operator' : logs === 'denied' ? 'staff' : 'unknown';
+      }
+      setVerdict({ user, status: isAnyAdmin ? 'admin' : 'denied', tier, confirmed: drafts === 'ok' });
     })();
     return () => {
       cancelled = true;
@@ -215,8 +211,31 @@ export function AuthProvider({ children }) {
     setProbeRun((run) => run + 1);
   }, []);
 
+  const ownVerdict = user && verdict.user === user ? verdict : null;
+  const adminStatus = !user ? 'denied' : ownVerdict ? ownVerdict.status : 'unknown';
+  const adminTier = ownVerdict?.status === 'admin' ? ownVerdict.tier : null;
   const isAdmin = adminStatus === 'admin';
   const isOperator = adminTier === 'operator';
+  // An admin verdict the server returned, not a local cache answer. The
+  // private attendee feed (issue #788) opens on a staff grant only then.
+  const adminConfirmed = isAdmin && ownVerdict?.confirmed === true;
+
+  // A cached admin answer is never replaced by the probe effect alone, so
+  // a staff reader who opened the app offline would wait on the feed
+  // forever. Ask the server again when the browser reconnects, and every
+  // 30 s as a backstop, until it confirms. The cached verdict stays in
+  // place meanwhile; nothing that needs confirmation opens on it.
+  const awaitingServerVerdict = isAdmin && !adminConfirmed;
+  useEffect(() => {
+    if (!awaitingServerVerdict) return undefined;
+    const retry = () => setProbeRun((run) => run + 1);
+    window.addEventListener('online', retry);
+    const timer = window.setInterval(retry, 30_000);
+    return () => {
+      window.removeEventListener('online', retry);
+      window.clearInterval(timer);
+    };
+  }, [awaitingServerVerdict]);
 
   const signInWithGoogle = useCallback(
     () => signInWithPopup(auth, new GoogleAuthProvider()),
@@ -269,6 +288,7 @@ export function AuthProvider({ children }) {
       isOperator,
       adminStatus,
       adminTier,
+      adminConfirmed,
       loading,
       refreshAdminStatus,
       signInWithGoogle,
@@ -277,6 +297,7 @@ export function AuthProvider({ children }) {
       signOut,
     }),
     [
+      adminConfirmed,
       user,
       isAdmin,
       isOperator,

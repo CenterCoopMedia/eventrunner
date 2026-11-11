@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The attendee side of the private feed (#788). When the feed is on, an approved attendee, a
+  speaker, or current staff sees the newest posts on the Attendees page and can report one; a report
+  sends only the post id. Nothing is requested until the live features document turns on both
+  `socialFeed` and `attendeeDirectory` for a reader with a current grant, and an account switch
+  hides the previous account's feed at once. The admin Features page does not show the **Attendee
+  feed** switch until the whole feature is accepted, so `socialFeed` stays off on every site.
 - The backend for a private attendee feed (#506), behind a new `socialFeed` flag that is off by
   default. Attendee reads and reports need both `socialFeed` and `attendeeDirectory`, and a current
   approved or speaker account, or a current staff grant. `reportSocialPost` stores one private,

@@ -12,7 +12,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { deleteApp, initializeApp } from 'firebase-admin/app';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import {
+  collection, doc, getDoc, getDocs, limit, orderBy, query, where,
+} from 'firebase/firestore';
 
 const require = createRequire(import.meta.url);
 const {
@@ -160,6 +162,46 @@ beforeEach(async () => {
 afterAll(async () => {
   await testEnv?.cleanup();
   if (adminApp) await deleteApp(adminApp);
+});
+
+// The attendee feed's own query (issue #788, apps/web/src/lib/socialFeedSource.js),
+// asked exactly as the browser asks it. Expected rows come from the #506
+// October 19 amendment: active roots only, never a reply or a tombstone.
+const rootFeed = (firestore, size = 20) => getDocs(query(
+  collection(firestore, 'social_posts'),
+  where('state', '==', 'active'),
+  where('parentPostId', '==', null),
+  orderBy('createdAt', 'desc'),
+  limit(size),
+));
+
+describe('the attendee root feed query (issue 788)', () => {
+  it('returns only active root posts to an approved attendee, a speaker, staff and an operator', async () => {
+    for (const token of ['approved', 'speaker', 'staff', 'operator']) {
+      const snap = await assertSucceeds(rootFeed(client(token)));
+      expect(snap.docs.map((d) => d.id).sort(), token).toEqual(['root-ada', 'root-bo']);
+    }
+  });
+
+  it('honours the bound', async () => {
+    const snap = await assertSucceeds(rootFeed(client('approved'), 1));
+    expect(snap.size).toBe(1);
+  });
+
+  it('refuses a signed-out, pending, ticketed or revoked reader, an expired staff grant, and a stored admin role', async () => {
+    await assertFails(rootFeed(testEnv.unauthenticatedContext().firestore()));
+    for (const token of ['pending', 'ticketed', 'revoked', 'expired', 'former']) {
+      await assertFails(rootFeed(client(token)));
+    }
+  });
+
+  it('refuses an approved attendee when either flag is off, missing or malformed', async () => {
+    for (const state of [null, {}, { socialFeed: true }, { attendeeDirectory: true },
+      { socialFeed: 'true', attendeeDirectory: true }, { socialFeed: true, attendeeDirectory: false }]) {
+      await features(state);
+      await assertFails(rootFeed(client('approved')));
+    }
+  });
 });
 
 describe('who may report a post', () => {

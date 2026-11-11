@@ -26,6 +26,10 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({ getPage: () => null, getSectionBlocks: () => [] }),
 }));
 
+// The feed has its own boundary tests (components/AttendeeFeed.test.jsx);
+// this file covers the directory, which the feed leaves unchanged.
+vi.mock('../components/AttendeeFeed.jsx', () => ({ default: () => null }));
+
 const { default: Attendees, visibleDirectorySnapshot } = await import('./Attendees.jsx');
 
 function renderPage() {

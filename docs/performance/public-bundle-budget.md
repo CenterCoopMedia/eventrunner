@@ -23,9 +23,22 @@ node scripts/ci/bundle-budget.cjs --dist docs/demo
 
 The committed limits are:
 
-- 1,080,000 raw bytes and 292,000 gzip bytes for the initial graph.
+- 1,080,000 raw bytes and 293,550 gzip bytes for the initial graph.
 - 190,000 raw bytes and 28,000 gzip bytes for the stylesheets `index.html` names, which block first paint.
 - 180,000 raw bytes and 50,000 gzip bytes for each deferred chunk.
+
+### 2026-11-10: initial gzip limit 292,000 to 293,550 (#788)
+
+The attendee feed (#788) reads only server-confirmed data and pages with a stable cursor. Both came from fixes in its independent review. The feed route is lazy, but the Firestore SDK is in the initial chunk, so the four new SDK exports count there: `getDocFromServer`, `getDocsFromServer`, `startAfter` and `endAt`. The server-confirmation flags in the shared auth, profile and event config contexts also load with the first page.
+
+Measured with `node scripts/build-demo.cjs --check`:
+
+| Build | Initial raw bytes | Initial gzip bytes |
+| --- | ---: | ---: |
+| Demo, `main` at `51062a24` | 975,052 | 291,921 |
+| Demo, with #788 | 979,318 | 293,051 |
+
+The four SDK exports add about 670 gzip bytes and the context changes about 460. Without the SDK exports, the demo is still over the old limit, and main had only 79 bytes left. The new gzip limit is the measured value plus about 500 bytes. The raw limit is unchanged.
 
 See [the current bundle report](public-bundle-report.md) for measured results.
 
