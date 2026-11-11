@@ -128,6 +128,21 @@ async function requireConnectable({ db, now = Date.now }, get, { appId, data, pr
   }
 }
 
+/**
+ * Each live Stripe site's payment webhook is a platform Connect endpoint,
+ * which receives every connected account's events. Until a shared receiver
+ * routes events by account (eventrunner issue 835), only one live Stripe
+ * account may be connected, so no client's payments reach another client's
+ * site. The same request may reconnect its own account.
+ */
+async function requireOnlyLiveStripe(tx, db, appId, accountId) {
+  const held = await tx.get(db.collection(ACCOUNT_COLLECTION));
+  const other = held.docs.find((doc) => doc.id !== appId && doc.data()?.stripe?.accountId && doc.data().stripe.accountId !== accountId);
+  if (other) {
+    throw new ConsoleError(409, 'locked', 'Event Runner can connect one live Stripe account for now. Email info@eventrunner.org and we will set up yours.');
+  }
+}
+
 /** The reply after a change: the state for the page, and the tickets step's errors. */
 function connectionsReply({ connectionsAvailable: available, consoleTestMode: testMode }, data, connections) {
   const reconnect = RETRY_STATUSES.includes(data.status);
@@ -303,6 +318,7 @@ async function completeConnection(deps, { body, user }) {
       await requireConnectable(deps, (r) => tx.get(r), { appId, data, provider });
       const changing = changingState(data, provider, at, changeId);
       const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
+      if (provider === 'stripe' && answer.details?.livemode === true) await requireOnlyLiveStripe(tx, db, appId, answer.accountId);
       previous = previousOf(data, accounts, provider);
       const same = previous.account?.accountId === answer.accountId;
       const keepEvent = provider === 'eventbrite' ? { event: same ? previous.connection?.event ?? null : null } : {};

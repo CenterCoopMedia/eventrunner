@@ -399,8 +399,12 @@ async function ticketAccess(ctx) {
   if (!PROVIDERS.includes(choice)) return null;
   // The deployed copy owns the installed webhook; a console reconnect may
   // already hold a different account while a failed build waits for retry.
-  const token = await ctx.deps.clientSecrets(ctx.resources.projectId).readSecret('TICKETING_API_TOKEN')
-    || await ctx.deps.consoleSecrets.readSecret(connectionSecretId(ctx.appId, choice));
+  // A live Stripe site's endpoint is on CCM's platform account: Stripe refuses
+  // webhook endpoint calls made with a Connect OAuth token (see provision-client).
+  const token = choice === 'stripe' && !ctx.build?.testMode
+    ? await ctx.deps.consoleSecrets.readSecret('CONSOLE_STRIPE_SECRET_KEY')
+    : await ctx.deps.clientSecrets(ctx.resources.projectId).readSecret('TICKETING_API_TOKEN')
+      || await ctx.deps.consoleSecrets.readSecret(connectionSecretId(ctx.appId, choice));
   if (!token) {
     // A build that never reached tickets cannot have registered a webhook.
     if (ctx.build.stripeEndpointId || ctx.build.steps?.some((s) => ['tickets', 'seed'].includes(s.id) && s.state === 'done')) throw new Error('ticket-webhooks: the account token is missing');

@@ -54,7 +54,7 @@ function setup(options = {}) {
     'organizations/o1': { name: 'Keep this organization' },
     ...options.seed,
   });
-  const secrets = makeFakeSecrets({ 'connection-stripe-a1': 'stripe-fixture', 'connection-eventbrite-a1': 'eventbrite-fixture', unrelated: 'keep' });
+  const secrets = makeFakeSecrets({ 'connection-stripe-a1': 'stripe-fixture', 'connection-eventbrite-a1': 'eventbrite-fixture', unrelated: 'keep', CONSOLE_STRIPE_SECRET_KEY: 'platform-fixture' });
   const clientSecrets = makeFakeSecrets({ TICKETING_API_TOKEN: 'client-fixture', EMAIL_PROVIDER_API_KEY: 'mail-fixture' });
   const state = {
     clock: NOW, project: { name: 'projects/123', projectId: PROJECT, parent: 'folders/123456', state: 'ACTIVE', labels: { 'eventrunner-request': createHash('sha256').update('a1').digest('hex').slice(0, 32) } },
@@ -169,7 +169,7 @@ function setup(options = {}) {
       }
       if (url.host === 'api.stripe.com') {
         if (p === '/v1/webhook_endpoints') {
-          assert.equal(init.headers.Authorization, 'Bearer client-fixture', 'use the deployed token before a pending console reconnect');
+          assert.equal(init.headers.Authorization, options.build?.testMode ? 'Bearer client-fixture' : 'Bearer platform-fixture', 'a live site uses the platform key; a test site its deployed token');
           const offset = url.searchParams.has('starting_after') ? state.endpoints.findIndex((h) => h.id === url.searchParams.get('starting_after')) + 1 : 0;
           const data = options.paginate ? state.endpoints.slice(offset, offset + 1) : state.endpoints;
           return answer({ data, has_more: options.paginate && offset + data.length < state.endpoints.length });
@@ -230,7 +230,7 @@ test('archive disables Hosting, preserves resources, and sets a seven-day deadli
   assert.equal(s.db.read('console_builds/a1').decommission.state, 'done');
   assert.equal(mutations(s).length, 1);
   assert.equal(s.state.buckets.size, 1);
-  assert.equal(s.secrets.store.size, 3);
+  assert.equal(s.secrets.store.size, 4);
   const writes = s.db.writes.length;
   s.state.clock += 1000;
   assert.equal(await s.run('archive'), 0);

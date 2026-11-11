@@ -658,9 +658,22 @@ test('moving a token to a client site leaves the row that keeps the connection',
 });
 
 test('connecting a different account keeps the old one when another request uses it', async () => {
+  // Two live Stripe accounts cannot both be connected (next test), so this runs in test mode.
   const { stripe, deps } = sharing();
+  stripe.answer = { ...stripeAnswer(), details: { livemode: false } };
   await complete(deps, { state: await start(deps) });
   assert.deepEqual(stripe.revoked, []);
+});
+
+test('a second live Stripe account is refused while another request holds one, and the new account is let go', async () => {
+  const { stripe, secrets, deps } = sharing();
+  await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
+    assert.equal(err.status, 409);
+    assert.match(err.message, /one live Stripe account/);
+    return true;
+  });
+  assert.equal(secrets.store.get('connection-stripe-a1'), undefined);
+  assert.deepEqual(stripe.revoked, ['acct_new']);
 });
 
 test('a half-made connection, a late refusal and a failed write all keep an account another request uses', async () => {
