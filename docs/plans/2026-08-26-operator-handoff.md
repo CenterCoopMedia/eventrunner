@@ -139,7 +139,7 @@ instructions for the authorized domain; account and Server capacity are checked 
    operator records.**
    **Success check:** the `runofshow.net` zone's DNS → Records page loads.
 
-2. **[AGENT] Add the DKIM TXT record.** Postmark (from Workstream C step 1) shows a host like
+2. **[AGENT] Add the DKIM TXT record.** Postmark (from `docs/POSTMARK_PROVISIONING.md` §4a) shows a host like
    `pm._domainkey.runofshow.net` and a value like `k=rsa; p=<long base64 string>`. In Cloudflare:
    DNS → Records → Add record → Type `TXT`, Name = just the subdomain part Postmark gave (e.g.
    `pm._domainkey` — Cloudflare appends the zone automatically), Content = the `p=...` value exactly
@@ -332,12 +332,10 @@ pointer into `docs/POSTMARK_PROVISIONING.md`.
    named for the demo, e.g. `demo`) — see `docs/CLIENT_ONBOARDING.md` §1 for the same steps read as
    an onboarding checklist rather than raw IAM commands. Two deviations from a normal client, both
    from issue #35's scope:
-   - `EVENT_EMAIL_PROVIDER = console` or `none`, `EVENT_TICKETING_PROVIDER = none` (or `manual` if
-     showing the Ticketing tab in the walkthrough matters), `EVENT_OPERATOR_NOTIFIER = none`. This
-     means the demo needs **no provider secrets** — it deploys credential-free. **If Workstream C
-     (Postmark) is done by the time this runs**, a dedicated Postmark message stream for the demo is
-     an option instead of `console`, so a prospect can see a real OTP email — not required, just an
-     upgrade path issue #35 explicitly allows; don't block this workstream on C to get it.
+   - `EVENT_EMAIL_PROVIDER = console`, `EVENT_TICKETING_PROVIDER = none` (or `manual` if showing
+     the Ticketing tab matters), `EVENT_OPERATOR_NOTIFIER = none`. The historical demo uses no
+     provider secrets and keeps its persisted read-only policy. Postmark delivery acceptance
+     belongs to a separately approved writable rehearsal or client under Workstream C.
    - `EVENT_PUBLIC_URL` is just the `.web.app` Hosting URL — no custom domain to provision for a
      demo.
    Keep it on manual `workflow_dispatch` (do not add to `AUTO_DEPLOY_ENVIRONMENTS` yet — that's step
@@ -442,8 +440,7 @@ against reality. It needs no relationship to Workstream E beyond both being M5 o
 
 2. **[AGENT] Register the webhook against a dev deployment.** Not the demo project from Workstream
    E (that one's `EVENT_TICKETING_PROVIDER` is `none`) — use an existing dev/staging client
-   deployment (e.g. the same `runofshow-dev` environment Workstream C provisions Postmark against,
-   if that naming is still in use) with `EVENT_TICKETING_PROVIDER=eventbrite` and this sandbox
+   deployment approved for the sandbox test, with `EVENT_TICKETING_PROVIDER=eventbrite` and this sandbox
    event's id and token set (`docs/CLIENT_ONBOARDING.md` §3 item 5's `eventbrite` row):
    ```sh
    EVENT_TICKETING_PROVIDER=eventbrite EVENT_TICKETING_EVENT_ID=<sandbox event id> \

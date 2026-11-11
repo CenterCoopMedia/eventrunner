@@ -268,12 +268,17 @@ Postmark tests the address when a webhook is saved and refuses it unless the fun
 so the function must be deployed first. That applies to these manual steps too.
 
 1. Use the deployment's existing `EMAIL_WEBHOOK_BASIC_AUTH`. The normal provisioner creates and
-   stores a unique random `user:pass` pair when it is missing. An authorized manual setup uses
-   the approved private credential route to generate and store the pair without displaying it.
-   A credential rotation also requires updating this deployment's webhook auth fields.
+   stores a unique random `user:pass` pair when it is missing. For an authorized manual setup
+   with no existing pair, create a record in the operator's existing password manager: Username
+   is this deployment's project ID; Password is a generated random 40-character password. Keep
+   the record private. Values may be entered in private credential fields, but must stay out of
+   terminal output, logs, screenshots and command arguments. A rotation also requires updating
+   this deployment's webhook auth fields.
 
-2. Store it as the `EMAIL_WEBHOOK_BASIC_AUTH` GitHub Environment secret for `<CLIENT_ENV>`
-   (`docs/DEPLOY_RUNBOOK.md` §3), then in Secret Manager the same way as step 3 above.
+2. For a new manual setup, store the complete `username:password` pair as `EMAIL_WEBHOOK_BASIC_AUTH` in
+   the GitHub Environment `<CLIENT_ENV>` and the target project's Secret Manager. Use each
+   service's private secret-value field, taking both parts from the same password-manager record.
+   Apply the runtime accessor binding from §3. Record the store names, not the value.
 3. Before registering anything, confirm which stream sends actually use: check this deployment's
    `config/providers.email.messageStream` (Tier B) — if it's unset, sends use the Server's default
    `Outbound` stream; if it's set, they use that named stream instead (§2.4). Register the webhook
@@ -287,7 +292,7 @@ so the function must be deployed first. That applies to these manual steps too.
    https://<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook
    ```
 
-   Enter `user` and `pass` in the webhook's HTTP auth username and password fields. Use the region
+   Enter the username and password from that stored pair in the webhook's HTTP auth fields. Use the region
    and project id that deployment's GitHub Environment variables actually name
    (`EVENT_FIREBASE_REGION`, `EVENT_FIREBASE_PROJECT_ID`) — copy those from the environment rather
    than guessing.
@@ -381,8 +386,9 @@ approved store names and runtime bindings without displaying their values. Use t
 per-secret compute-account grants and the normal deployment inventory for runtime metadata.
 
 `EMAIL_ACCOUNT_API_KEY` remains in operator-controlled storage. No deployed function binds it,
-and it must not be in a client's GitHub Environment or Secret Manager. Fetch credentials only at
-use time through the approved operator route; keep values out of command arguments, URLs and logs.
+and it must not be in a client's GitHub Environment or Secret Manager. Fetch credentials from
+§3's operator-controlled store only when needed for an authorized action; keep values out of
+command arguments, URLs and logs. Manual webhook credential entry follows §5.
 
 ### 7.3. Verify the sender, streams and authenticated webhooks
 
