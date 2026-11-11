@@ -20,7 +20,7 @@ const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/deploy-clien
 const rootPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 
 test('full and partial deploys derive the Auth compute runtime from the target project number', () => {
-  const blocks = [...workflow.matchAll(/name: Write the functions runtime env for this project\n[\s\S]*?        run: \|\n((?:          .*\n)+)/g)];
+  const blocks = [...workflow.matchAll(/name: Write the functions runtime env for this project\n[\s\S]*? {8}run: \|\n((?: {10}.*\n)+)/g)];
   assert.equal(blocks.length, 2, 'both runtime env writers are covered');
   for (const [, block] of blocks) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'runtime-env-'));

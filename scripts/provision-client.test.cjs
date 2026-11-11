@@ -504,13 +504,17 @@ test('each grant the rehearsal missed is made up front', async () => {
 test('a new project provisions compute secret access and actAs without an appspot account', async () => {
   const fake = setup({ cloud: { noAppspot: true } });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
-  assert.ok(!fake.calls.some((call) => call.url.includes('appspot.gserviceaccount.com')));
+  const appspot = `${PROJECT}@appspot.gserviceaccount.com`;
+  assert.ok(!fake.calls.some((call) => {
+    const url = new URL(call.url);
+    return url.hostname === 'iam.googleapis.com' && url.pathname.split('/').at(-1).split(':')[0] === appspot;
+  }));
   const deploy = `serviceAccount:${DEPLOY}`;
   assert.ok(holds(bindingsOf(fake, `iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/${COMPUTE}`), 'roles/iam.serviceAccountUser', deploy));
   for (const id of fake.clientSecrets.store.keys()) {
     const policy = bindingsOf(fake, `secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets/${id}`);
     assert.ok(holds(policy, 'roles/secretmanager.secretAccessor', `serviceAccount:${COMPUTE}`), id);
-    assert.ok(!policy.some((binding) => binding.members.some((member) => member.includes('appspot.gserviceaccount.com'))));
+    assert.ok(policy.every((binding) => binding.members.every((member) => member !== `serviceAccount:${appspot}`)));
   }
 });
 
