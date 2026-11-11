@@ -1097,6 +1097,8 @@ async function stepSeed(ctx) {
     }
     const file = await writeAnswers({ ...answers, providers: {
       email: { announcementStream: ANNOUNCEMENT_STREAM },
+      // The host specified this work inbox for platform alerts on every site.
+      // Site Owners are resolved from the current bootstrap access list.
       notifier: { operatorEmail: 'amditisj@montclair.edu' },
     } });
     const args = [
