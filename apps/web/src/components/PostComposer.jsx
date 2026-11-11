@@ -66,8 +66,12 @@ export default function PostComposer({ user, parentPostId = null, onPosted, onRo
   const [refusal, setRefusal] = useState({ field: null, message: null, focus: 0 });
   const [status, setStatus] = useState('');
 
-  useEffect(() => () => {
-    alive.current = false;
+  useEffect(() => {
+    // Set on every setup: Strict Mode runs setup, cleanup, setup.
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
   }, []);
 
   useEffect(() => {

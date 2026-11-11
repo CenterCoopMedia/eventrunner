@@ -21,14 +21,39 @@ import { primaryActionClass, secondaryActionClass, textControlStateClass } from 
 const AUTHOR_FALLBACK = 'An attendee';
 const ABSOLUTE_HTTP = /^https?:\/\//i;
 // Sentence punctuation after a URL belongs to the sentence, not the link.
-const TRAILING_PUNCTUATION = /[.,;:!?)\]}'"]+$/;
+const SENTENCE_END = new Set(['.', ',', ';', ':', '!', '?', "'", '"']);
+const CLOSERS = { ')': '(', ']': '[', '}': '{' };
 const linkClass = `${textControlStateClass} text-text-primary underline underline-offset-4`;
 
 /** Firestore Timestamp, Date, or epoch millis; anything else is null. */
-export function toDate(value) {
+function toDate(value) {
   if (!value) return null;
   const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
   return date instanceof Date && Number.isFinite(date.getTime()) ? date : null;
+}
+
+function count(text, char) {
+  return text.split(char).length - 1;
+}
+
+/**
+ * The URL part of a token and the sentence punctuation after it. A closing
+ * bracket stays in the URL while it closes one the URL opened, as in
+ * `https://en.wikipedia.org/wiki/Function_(mathematics)`.
+ */
+function splitTrailing(token) {
+  let end = token.length;
+  while (end > 0) {
+    const char = token[end - 1];
+    const opener = CLOSERS[char];
+    const body = token.slice(0, end);
+    if (SENTENCE_END.has(char) || (opener && count(body, char) > count(body, opener))) {
+      end -= 1;
+      continue;
+    }
+    break;
+  }
+  return [token.slice(0, end), token.slice(end)];
 }
 
 /**
@@ -37,13 +62,12 @@ export function toDate(value) {
  * @param {string} text
  * @returns {Array<{ text: string, href?: string }>}
  */
-export function postTextParts(text) {
+function postTextParts(text) {
   const parts = [];
   for (const token of String(text).split(/(\s+)/)) {
     if (!token) continue;
     if (ABSOLUTE_HTTP.test(token)) {
-      const tail = token.match(TRAILING_PUNCTUATION)?.[0] ?? '';
-      const candidate = tail ? token.slice(0, -tail.length) : token;
+      const [candidate, tail] = splitTrailing(token);
       const href = safeUrlHref(candidate);
       if (href) {
         parts.push({ text: candidate, href });
@@ -89,11 +113,8 @@ export function RemovedEntry({ children }) {
  * @param {{ displayName: string }|null|undefined} props.author
  * @param {{ phase: string, error?: string }|undefined} props.report
  * @param {string} [props.threadHref] where "View replies" goes; omitted inside a thread
- * @param {'li'|'div'} [props.as]
  */
-export default function SocialPostEntry({
-  post, author, report, threadHref, onReport, onConfirm, onCancel, as: Element = 'li',
-}) {
+export default function SocialPostEntry({ post, author, report, threadHref, onReport, onConfirm, onCancel }) {
   const headId = useId();
   const confirmRef = useRef(null);
   const doneRef = useRef(null);
@@ -114,7 +135,7 @@ export default function SocialPostEntry({
   }, [phase]);
 
   return (
-    <Element className="border-t-hairline border-t-rule-hairline py-sm">
+    <li className="border-t-hairline border-t-rule-hairline py-sm">
       <div id={headId} className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
         {name && post.authorUid ? (
           <Link
@@ -193,6 +214,6 @@ export default function SocialPostEntry({
           </p>
         ) : null}
       </div>
-    </Element>
+    </li>
   );
 }

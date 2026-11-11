@@ -13,6 +13,10 @@
 // sign-out, a revoked grant, or a flag turned off hides them in the same
 // render, and a late callback for an old key is dropped.
 //
+// FAILURES. A listener error that is not a refusal keeps the last thread
+// on screen with a notice while the listener retries, so the reply form and
+// its draft stay mounted. A refusal (permission-denied) clears the thread.
+//
 // REMOVAL. A removed or missing root shows "Original post removed". Its
 // replies stay readable and reportable, and the reply composer is gone. A
 // removed reply is a placeholder with no text and no author.
@@ -25,21 +29,21 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import { primaryActionClass, quietActionClass, textControlStateClass } from '../components/controlClasses.js';
 import { own, useAuthorNames, useSocialAccess, useSocialReports } from '../hooks/useSocialFeed.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
-import {
-  THREAD_PAGE_SIZE,
-  fetchMoreReplies,
-  isPostId,
-  subscribeReplies,
-  subscribeThreadRoot,
-} from '../lib/socialThreadSource.js';
+import { THREAD_PAGE_SIZE, isPostId, subscribeReplies, subscribeThreadRoot } from '../lib/socialThreadSource.js';
 import NotFound from './NotFound.jsx';
 
 const PostComposer = lazy(() => import('../components/PostComposer.jsx'));
 
 // `root`: undefined while loading, null when missing or removed.
 const NO_ROOT = Object.freeze({ root: undefined, failed: false, denied: false });
-const NO_REPLIES = Object.freeze({ entries: null, last: null, size: 0, range: null, failed: false, denied: false });
-const NO_MORE = Object.freeze({ through: null, more: false, loading: false, failed: false });
+// `pages`: the page count the shown entries were read for.
+const NO_REPLIES = Object.freeze({ entries: null, size: 0, pages: 0, failed: false, denied: false });
+
+/** The previous value for `key` with a failure marked, or a fresh failed value. */
+function failedState(prev, key, empty, error) {
+  const base = prev.key === key ? prev.value : empty;
+  return { key, value: { ...base, failed: true, denied: error?.code === 'permission-denied' } };
+}
 
 const backLinkClass =
   `${textControlStateClass} touch-target inline-flex items-center font-data text-caption font-medium text-text-primary underline underline-offset-4`;
@@ -65,14 +69,13 @@ export default function AttendeeThread() {
 
   const [rootState, setRootState] = useState({ key: null, value: NO_ROOT });
   const [replyState, setReplyState] = useState({ key: null, value: NO_REPLIES });
-  const [moreState, setMoreState] = useState({ key: null, value: NO_MORE });
+  const [pageState, setPageState] = useState({ key: null, value: 1 });
   // The server refused a reply because the root is gone; the root listener
   // confirms it soon after, but the composer closes now.
   const [rootGone, setRootGone] = useState({ key: null, value: false });
   const root = own(rootState, feedKey, NO_ROOT);
   const thread = own(replyState, feedKey, NO_REPLIES);
-  const loaded = own(moreState, feedKey, NO_MORE);
-  const through = loaded.through;
+  const pages = own(pageState, feedKey, 1);
 
   useDocumentTitle(access === 'closed' ? null : 'Attendee feed');
 
@@ -85,9 +88,7 @@ export default function AttendeeThread() {
         if (current) setRootState({ key: feedKey, value: { root: entry, failed: false, denied: false } });
       },
       (error) => {
-        if (current) {
-          setRootState({ key: feedKey, value: { ...NO_ROOT, failed: true, denied: error?.code === 'permission-denied' } });
-        }
+        if (current) setRootState((prev) => failedState(prev, feedKey, NO_ROOT, error));
       },
     );
     return () => {
@@ -100,53 +101,24 @@ export default function AttendeeThread() {
     if (feedKey === null) return undefined;
     let current = true;
     const unsubscribe = subscribeReplies(
-      { rootId: postId, through },
-      (entries, page) => {
-        if (current) {
-          setReplyState({ key: feedKey, value: { entries, last: page.last, size: page.size, range: through, failed: false, denied: false } });
-        }
+      { rootId: postId, pages },
+      (entries, size) => {
+        if (current) setReplyState({ key: feedKey, value: { entries, size, pages, failed: false, denied: false } });
       },
       (error) => {
-        if (current) {
-          setReplyState({ key: feedKey, value: { ...NO_REPLIES, failed: true, denied: error?.code === 'permission-denied' } });
-        }
+        if (current) setReplyState((prev) => failedState(prev, feedKey, NO_REPLIES, error));
       },
     );
     return () => {
       current = false;
       unsubscribe();
     };
-  }, [feedKey, postId, through]);
+  }, [feedKey, postId, pages]);
 
   const entries = thread.entries;
   const visible = root.root ? [root.root, ...(entries ?? [])] : entries;
   const authorMap = useAuthorNames(feedKey, activeKey, visible);
   const reports = useSocialReports(feedKey, activeKey, user);
-
-  // One bounded fetch past the newest loaded reply; the listener then
-  // re-attaches through the new newest reply (lib/socialThreadSource.js).
-  async function loadMore() {
-    const key = feedKey;
-    const after = (thread.range === through ? thread.last : null) ?? through;
-    if (key === null || !after || loaded.loading) return;
-    const base = { ...loaded, loading: false, failed: false };
-    setMoreState({ key, value: { ...base, loading: true } });
-    const result = await fetchMoreReplies(postId, after);
-    if (activeKey.current !== key) return;
-    if (!result.ok) {
-      setMoreState({ key, value: { ...base, failed: true } });
-    } else if (!result.last) {
-      setMoreState({ key, value: { ...base, through: through ?? after, more: false } });
-    } else {
-      setMoreState({ key, value: { through: result.last, more: result.size >= THREAD_PAGE_SIZE, loading: false, failed: false } });
-    }
-  }
-
-  function replyPosted() {
-    // Every reply up to `through` is live. A new reply sorts after it, so
-    // offer the next page instead of losing it.
-    if (through !== null) setMoreState({ key: feedKey, value: { ...loaded, more: true } });
-  }
 
   if (access === 'closed') {
     return <NotFound />;
@@ -170,7 +142,7 @@ export default function AttendeeThread() {
         action={<Link to="/attendees" className={primaryActionClass}>Go to the attendee feed</Link>}
       />
     );
-  } else if (root.failed || thread.failed) {
+  } else if ((root.root === undefined && root.failed) || (entries === null && thread.failed)) {
     content = (
       <EmptyState
         title="The thread is unavailable right now"
@@ -181,7 +153,9 @@ export default function AttendeeThread() {
     content = <LoadingState shape="rows" label="Loading the thread…" />;
   } else {
     const rootActive = root.root !== null && !own(rootGone, feedKey, false);
-    const more = through === null ? thread.size >= THREAD_PAGE_SIZE : loaded.more;
+    // Full for the pages it was read for: there may be more.
+    const more = thread.size >= thread.pages * THREAD_PAGE_SIZE;
+    const loading = thread.pages !== pages;
     const entryProps = (entry) => ({
       post: entry,
       author: entry.authorUid ? authorMap[entry.authorUid] : null,
@@ -192,6 +166,11 @@ export default function AttendeeThread() {
     });
     content = (
       <>
+        {root.failed || thread.failed ? (
+          <p role="status" className="mb-sm text-caption text-text-secondary">
+            The thread stopped updating. The page keeps trying in the background.
+          </p>
+        ) : null}
         <ul aria-label="Original post">
           {root.root ? (
             <SocialPostEntry {...entryProps(root.root)} />
@@ -201,7 +180,7 @@ export default function AttendeeThread() {
         </ul>
         <section aria-labelledby="thread-replies-title" className="mt-lg">
           <SectionHead id="thread-replies-title" title="Replies" level={2} rule="hairline" />
-          {entries.length === 0 && !(through !== null && loaded.more) ? (
+          {entries.length === 0 ? (
             <p className="mt-sm text-body text-text-secondary">
               {rootActive ? 'No replies yet.' : 'There are no replies.'}
             </p>
@@ -216,20 +195,15 @@ export default function AttendeeThread() {
               )}
             </ul>
           )}
-          {loaded.failed ? (
-            <p role="alert" className="mt-sm text-caption text-danger">
-              More replies could not be loaded. Try again.
-            </p>
-          ) : null}
-          {more ? (
+          {more || loading ? (
             <button
               type="button"
               className={`${quietActionClass} mt-sm`}
-              disabled={loaded.loading}
-              aria-busy={loaded.loading || undefined}
-              onClick={loadMore}
+              disabled={loading}
+              aria-busy={loading || undefined}
+              onClick={() => setPageState({ key: feedKey, value: pages + 1 })}
             >
-              {loaded.loading ? 'Loading more replies…' : 'Show more replies'}
+              {loading ? 'Loading more replies…' : 'Show more replies'}
             </button>
           ) : null}
           <div className="mt-md">
@@ -243,7 +217,6 @@ export default function AttendeeThread() {
                   key={feedKey}
                   user={user}
                   parentPostId={postId}
-                  onPosted={replyPosted}
                   onRootGone={() => setRootGone({ key: feedKey, value: true })}
                 />
               </Suspense>

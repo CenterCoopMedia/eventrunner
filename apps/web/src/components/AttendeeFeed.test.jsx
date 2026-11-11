@@ -7,6 +7,7 @@
 // fallback; a report that sends only the post id, once per click.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getDoc, getDocFromServer, getDocs, getDocsFromServer, onSnapshot } from 'firebase/firestore';
@@ -28,6 +29,7 @@ const { AuthProvider, useAuth } = await import('../contexts/AuthContext.jsx');
 const { ProfileProvider, useProfile } = await import('../contexts/ProfileContext.jsx');
 const { default: AttendeeFeed } = await import('./AttendeeFeed.jsx');
 const { default: AttendeeThread } = await import('../pages/AttendeeThread.jsx');
+const { default: PostComposer } = await import('./PostComposer.jsx');
 
 const FEED_ON = { attendeeDirectory: true, socialFeed: true };
 const APPROVED = { registrationStatus: 'approved', speakerId: null };
@@ -788,6 +790,19 @@ describe('the post composer', () => {
     expect(second.submissionKey).not.toBe(first.submissionKey);
   });
 
+  it('completes a send under Strict Mode, which runs effect setup twice', async () => {
+    render(
+      <StrictMode>
+        <PostComposer user={makeUser('ada')} />
+      </StrictMode>,
+    );
+    type(screen.getByRole('textbox', { name: 'Write a post' }), 'Strict');
+    vi.mocked(fetch).mockResolvedValueOnce(answer(201, { postId: 'n', state: 'active' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    expect(await screen.findByText('Posted. Your post is at the top of the feed.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Post' })).toBeEnabled();
+  });
+
   it('discards a draft only on request', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
@@ -837,6 +852,18 @@ describe('post text', () => {
     expect(item).toHaveTextContent('. Not javascript:alert(1) or https:example.org or <b>bold</b>');
     expect(item.querySelector('b')).toBeNull();
   });
+
+  it('keeps balanced brackets in a URL and leaves an unbalanced closer to the sentence', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners()[0], [
+      post('p1', 'cy', 'Read https://en.wikipedia.org/wiki/Function_(mathematics). (Or https://example.org/a).'),
+    ]);
+    expect(screen.getByRole('link', { name: 'https://en.wikipedia.org/wiki/Function_(mathematics) (opens in a new tab)' }))
+      .toHaveAttribute('href', 'https://en.wikipedia.org/wiki/Function_(mathematics)');
+    expect(screen.getByRole('link', { name: 'https://example.org/a (opens in a new tab)' }))
+      .toHaveAttribute('href', 'https://example.org/a');
+  });
 });
 
 describe('the thread page', () => {
@@ -881,6 +908,37 @@ describe('the thread page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Post reply' }));
     expect(await screen.findByText('Reply posted.')).toBeInTheDocument();
     expect(createBodies()[0]).toEqual({ text: 'My reply', parentPostId: 'root1', submissionKey: createBodies()[0].submissionKey });
+  });
+
+  it('pages by a bounded count, and a later reply still arrives after the last page', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    const replies = (n) => Array.from({ length: n }, (_, i) => post(`r${String(i).padStart(3, '0')}`, 'cy', `Reply ${i}`, { parentPostId: 'root1' }));
+    pushPosts(replyListener(), replies(50));
+    fireEvent.click(screen.getByRole('button', { name: 'Show more replies' }));
+    expect(replyListener().target.clauses.at(-1)).toEqual({ limit: 100 });
+    expect(screen.getByText('Reply 49')).toBeInTheDocument();
+    pushPosts(replyListener(), replies(51));
+    expect(screen.getByText('Reply 50')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show more replies' })).not.toBeInTheDocument();
+    // Another attendee replies after the end was reached.
+    pushPosts(replyListener(), replies(52));
+    expect(screen.getByText('Reply 51')).toBeInTheDocument();
+  });
+
+  it('keeps the thread and the reply draft through a recoverable listener failure', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(replyListener(), []);
+    const field = await screen.findByRole('textbox', { name: 'Your reply' });
+    type(field, 'Unsent reply');
+    act(() => replyListener().error(Object.assign(new Error('offline'), { code: 'unavailable' })));
+    expect(screen.getByText('The thread stopped updating. The page keeps trying in the background.')).toBeInTheDocument();
+    expect(screen.getByText('Root text')).toBeInTheDocument();
+    expect(field).toBeInTheDocument();
+    expect(field).toHaveValue('Unsent reply');
   });
 
   it('a removed root shows "Original post removed", keeps replies readable and reportable, and closes replies', async () => {
