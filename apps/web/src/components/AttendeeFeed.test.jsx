@@ -941,6 +941,21 @@ describe('the thread page', () => {
     expect(field).toHaveValue('Unsent reply');
   });
 
+  it('a refusal clears the thread and stays a refusal through a later recoverable failure', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(replyListener(), [post('r1', 'cy', 'A reply', { parentPostId: 'root1' })]);
+    const replies = replyListener();
+    act(() => replies.error(Object.assign(new Error('refused'), { code: 'permission-denied' })));
+    expect(screen.queryByText('A reply')).not.toBeInTheDocument();
+    expect(screen.queryByText('Root text')).not.toBeInTheDocument();
+    act(() => replies.error(Object.assign(new Error('offline'), { code: 'unavailable' })));
+    expect(screen.queryByText('A reply')).not.toBeInTheDocument();
+    expect(screen.queryByText('Root text')).not.toBeInTheDocument();
+    expect(screen.getByText(/The attendee feed is open to approved attendees and speakers/)).toBeInTheDocument();
+  });
+
   it('a removed root shows "Original post removed", keeps replies readable and reportable, and closes replies', async () => {
     renderThread();
     await openFeedAs(makeUser('ada'));

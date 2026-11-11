@@ -39,10 +39,15 @@ const NO_ROOT = Object.freeze({ root: undefined, failed: false, denied: false })
 // `pages`: the page count the shown entries were read for.
 const NO_REPLIES = Object.freeze({ entries: null, size: 0, pages: 0, failed: false, denied: false });
 
-/** The previous value for `key` with a failure marked, or a fresh failed value. */
+/**
+ * The state after a listener error. A refusal clears what was shown and
+ * stays a refusal until a server-confirmed snapshot replaces it; any other
+ * error keeps the previous value for `key` with the failure marked.
+ */
 function failedState(prev, key, empty, error) {
+  if (error?.code === 'permission-denied') return { key, value: { ...empty, failed: true, denied: true } };
   const base = prev.key === key ? prev.value : empty;
-  return { key, value: { ...base, failed: true, denied: error?.code === 'permission-denied' } };
+  return { key, value: { ...base, failed: true } };
 }
 
 const backLinkClass =
