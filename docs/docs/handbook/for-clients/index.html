@@ -113,45 +113,48 @@
       </details>
       <main class="docs-main" id="main">
         <article class="prose">
-          <h1>For clients</h1>
+          <h1>For event organizers</h1>
           <nav class="contents" aria-labelledby="contents-title">
             <p class="contents-title" id="contents-title">On this page</p>
             <ul>
-              <li><a href="#what-you-are-buying">What you are buying</a></li>
-              <li><a href="#what-v1-includes">What v1 includes</a></li>
+              <li><a href="#what-we-handle">What we handle</a></li>
+              <li><a href="#what-your-team-handles">What your team handles</a></li>
               <li><a href="#what-you-will-need-to-give-us">What you will need to give us</a></li>
               <li><a href="#set-up-your-event">Set up your event</a></li>
               <li><a href="#how-to-start">How to start</a></li>
             </ul>
           </nav>
-          <p>You are an organization that wants an event site. CCM deploys one Firebase project per event and operates it. Your staff run the admin. You do not fork the repo.</p>
-          <h2 id="what-you-are-buying">What you are buying<a class="heading-anchor" href="#what-you-are-buying" aria-label="Link to this section">#</a></h2>
-          <p>The code is <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>. Anyone can read it. CCM&#39;s service is:</p>
-          <ol>
-          <li>A managed deployment for your event</li>
-          <li>Setup and onboarding (sender domain, tickets, first admin)</li>
-          <li>Support while the event is live</li>
-          </ol>
-          <p>The <strong>Event Runner</strong> name is CCM&#39;s. Apache-2.0 does not give anyone else the right to sell hosting under that name.</p>
-          <h2 id="what-v1-includes">What v1 includes<a class="heading-anchor" href="#what-v1-includes" aria-label="Link to this section">#</a></h2>
-          <p>Schedule, speakers, attendees, a block CMS, emailed login codes, announcement email to your registered attendees or speakers, session materials, a media library, Stripe, Eventbrite, or spreadsheet tickets, sponsor invoices, and your colors and fonts.</p>
-          <p>Confirmation emails, speaker mail, and event announcements go through one agreed email provider (Postmark) from a sender address on your domain. Announcements use their own broadcast stream, apart from login codes and receipts. Every announcement has a one-click unsubscribe link, and the site does not send announcements to anyone who used it.</p>
-          <p>What v1 does not include is in the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">triage record</a>: video generation, social feeds, speaker chat. Announcement email reaches your event&#39;s attendees and speakers only; it is not a newsletter or marketing list tool.</p>
+          <p>Event Runner gives your event its own website. The Center for Cooperative Media sets it up and hosts it. Your team runs the content from an admin panel, without a developer.</p>
+          <h2 id="what-we-handle">What we handle<a class="heading-anchor" href="#what-we-handle" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Setting up and hosting your site</li>
+          <li>Connecting your sign-in email and your ticketing account</li>
+          <li>Adding your first admins</li>
+          <li>Help while your event is live</li>
+          </ul>
+          <h2 id="what-your-team-handles">What your team handles<a class="heading-anchor" href="#what-your-team-handles" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>The schedule, speakers, and pages</li>
+          <li>Event updates and announcements to your attendees and speakers</li>
+          <li>Your logos, colors, and site style</li>
+          <li>Ticket sales and refunds, through your own Stripe or Eventbrite account, a spreadsheet, or no tickets at all</li>
+          </ul>
+          <p>Announcements reach only your event&#39;s attendees and speakers. Each one has an unsubscribe link. It is not a newsletter or marketing tool.</p>
           <h2 id="what-you-will-need-to-give-us">What you will need to give us<a class="heading-anchor" href="#what-you-will-need-to-give-us" aria-label="Link to this section">#</a></h2>
           <ul>
-          <li>Event name, dates, timezone, venue</li>
-          <li>The public URL you want</li>
-          <li>Who the first admins are</li>
-          <li>Whether tickets are Stripe, Eventbrite, a spreadsheet, or none of these</li>
-          <li>A sender address on <strong>your</strong> domain (for login codes). We will ask you to add SPF, DKIM, and a DMARC policy. Without that, emailed codes get quarantined.</li>
+          <li>Event name, dates, time zone, and venue</li>
+          <li>The web address you want for the site</li>
+          <li>The names and emails of your first admins</li>
+          <li>How you sell tickets: Stripe, Eventbrite, a spreadsheet, or none</li>
+          <li>An email address on your own domain to send sign-in codes from. We will help you add the email records your domain needs, so the codes do not land in junk folders.</li>
           </ul>
           <h2 id="set-up-your-event">Set up your event<a class="heading-anchor" href="#set-up-your-event" aria-label="Link to this section">#</a></h2>
-          <p>Your first operator signs in to the admin panel and opens <strong>Set up your event</strong>. The numbered steps and progress count include your tasks and tasks you share with the Event Runner team. These include a second operator, your logos, event email, and the legal review of the privacy policy and terms.</p>
-          <p><strong>Hosting status</strong> is a separate, read-only area. It shows checks managed by the Event Runner team, including Google sign-in, as <strong>Ready</strong> or <strong>Awaiting Event Runner setup</strong>. These checks do not reduce your task completion count. You do not need to turn on Google sign-in yourself.</p>
-          <p>Finishing your tasks does not mean the site is ready to share. Every setup task and hosting check must be ready first. Use <strong>Check again</strong> to refresh the results. If a check fails, the page warns you that it is showing the last results.</p>
-          <p>Never send a provider key or password through the site or in a public thread. The hosting team asks for them directly.</p>
+          <p>Your first admin signs in to the admin panel and opens <strong>Set up your event</strong>. The numbered steps include your tasks and tasks you share with the Event Runner team, such as a second admin, your logos, event email, and a review of the privacy policy and terms.</p>
+          <p><strong>Hosting status</strong> is a separate, read-only area. It shows the checks the Event Runner team manages as <strong>Ready</strong> or <strong>Awaiting Event Runner setup</strong>. You do not need to turn on Google sign-in yourself.</p>
+          <p>Your site is ready to share when every setup task and hosting check is ready. Use <strong>Check again</strong> to refresh the results.</p>
+          <p>Never send a password or account key through the site or in a public post. The Event Runner team asks for them directly.</p>
           <h2 id="how-to-start">How to start<a class="heading-anchor" href="#how-to-start" aria-label="Link to this section">#</a></h2>
-          <p>Open a <a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general">General</a> thread or email info@eventrunner.org. Do not send an attendee list to GitHub.</p>
+          <p>Email info@eventrunner.org or open a <a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general">General discussion</a>. Do not post an attendee list in public.</p>
         </article>
         <div class="source-note"><a href="/eventrunner/support/">Ask for help</a><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/handbook/for-clients.md">Improve this guide on GitHub</a></div>
         <nav class="page-nav" aria-label="Documentation pages">

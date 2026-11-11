@@ -1,8 +1,8 @@
-# save schedule — descriptive transcript
+# Save a schedule: descriptive transcript
 
 No narration. Quiet original synthesized music accompanies the actions. Every instruction appears on screen. The site contains fictional sample data. Browser chrome shows the actual local capture address.
 
-## landscape
+## Landscape
 
 **0:00–0:05. “Save your personal schedule.”** “Sign in with an approved registration.”
 
@@ -45,7 +45,7 @@ Listening to your community appears in the personal schedule. Reloading the page
 The Event Runner mark and “Make room for your event.” settle and remain still.
 
 
-## vertical
+## Vertical
 
 **0:00–0:05. “Save your personal schedule.”** “Sign in with an approved registration.”
 

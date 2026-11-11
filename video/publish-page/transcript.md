@@ -1,8 +1,8 @@
-# publish page — descriptive transcript
+# Publish a page: descriptive transcript
 
 No narration. Quiet original synthesized music accompanies the actions. Every instruction appears on screen. The site contains fictional sample data. Browser chrome shows the actual local capture address.
 
-## landscape
+## Landscape
 
 **0:00–0:05. “Publish a page update.”** “Start signed in as event staff.”
 
@@ -45,7 +45,7 @@ The exact published headline remains visible.
 The official Event Runner mark and “Make room for your event.” settle and remain still.
 
 
-## vertical
+## Vertical
 
 **0:00–0:05. “Publish a page update.”** “Start signed in as event staff.”
 

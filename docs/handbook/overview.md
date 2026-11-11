@@ -16,11 +16,7 @@ Your site uses your event's identity. Choose a site style, add your logos, and s
 
 ## Explore before you start
 
-The [static visitor preview](https://centercoopmedia.github.io/eventrunner/demo/) shows an NC Local past-event example. It uses a selected historical program with eight named sessions and 25 public speakers from the March 27, 2026 NC News & Information Summit. It is not an official NC Local site or the full event program.
-
-The preview is read-only and has no admin panel. Sign-in, registration, email actions, and calendar exports are disabled. You can compare the six site styles in light and dark mode. The [specimen book](https://centercoopmedia.github.io/eventrunner/demo/#/specimen) shows the controls and page elements in each style.
-
-The separate [hosted admin/client demo](https://eventrunner-demo.web.app/) includes an [admin panel](https://eventrunner-demo.web.app/admin). Admin access requires an authorized account. Opening the link does not grant access, and the hosted demo's content and release can differ from the static preview.
+The [static visitor preview](https://centercoopmedia.github.io/eventrunner/demo/) shows a selected historical program from an NC Local event, with eight named sessions and 25 public speakers; it has no admin panel, and sign-in and registration are disabled. The separate [hosted admin/client demo](https://eventrunner-demo.web.app/) includes an [admin panel](https://eventrunner-demo.web.app/admin), and admin access requires an authorized account.
 
 ## Get help with your event
 

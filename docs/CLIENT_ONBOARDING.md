@@ -10,6 +10,26 @@ below.
 **Done when:** `node scripts/init-event.cjs --check` exits 0 and the client's first two admins can
 sign in and edit content.
 
+## Service model and scope
+
+CCM deploys and operates one Firebase project per client event. The client's staff run the admin
+panel; the client does not fork the repository.
+
+- **Licensing.** The code is [Apache-2.0](../LICENSE). CCM's service is the managed deployment,
+  setup and onboarding (sender domain, tickets, first admin), and support while the event is live.
+  The **Event Runner** name is CCM's; Apache-2.0 does not give anyone else the right to sell hosting
+  under that name.
+- **What v1 includes.** Schedule, speakers, attendees, the block CMS, emailed login codes,
+  announcement email to registered attendees or speakers, session materials, a media library,
+  Stripe, Eventbrite, or spreadsheet tickets, sponsor invoices, and the client's colors and fonts.
+  What v1 does not include is in the
+  [triage record](plans/2026-08-16-event-platform-v1-triage.md): video generation, social feeds,
+  speaker chat.
+- **Email.** Confirmation emails, speaker mail, and announcements go through Postmark from a sender
+  address on the client's domain. Announcements use their own broadcast stream, apart from login
+  codes and receipts, and suppress anyone who used the one-click unsubscribe link. The client adds
+  SPF, DKIM, and a DMARC policy for the sender domain; without them, emailed codes get quarantined.
+
 ## 0. Prerequisites
 
 Before you start provisioning:
@@ -400,8 +420,8 @@ before, an admin records it in **Past attendance** on that person's record in th
 Once the site is live, point the client at the two handbook pages instead of re-explaining their
 content here:
 
-- [`docs/handbook/for-clients.md`](handbook/for-clients.md) — what they bought, what v1 does and
-  doesn't include, and how to reach support.
+- [`docs/handbook/for-clients.md`](handbook/for-clients.md) — what CCM handles, what their team
+  handles, and how to reach support.
 - [`docs/handbook/for-event-staff.md`](handbook/for-event-staff.md) — the narrative walkthrough of
   what staff can change without a developer: pages, schedule, speakers, attendees, live updates,
   theme, badges. Pair it with [`docs/ADMIN_GUIDE.md`](ADMIN_GUIDE.md) for the task-by-task reference

@@ -1,8 +1,8 @@
-# change style — descriptive transcript
+# Change site style: descriptive transcript
 
 No narration. Quiet original synthesized music accompanies the actions. Every instruction appears on screen. The site contains fictional sample data. Browser chrome shows the actual local capture address.
 
-## landscape
+## Landscape
 
 **0:00–0:06. “Change your site style.”** “Start signed in as an operator.”
 
@@ -69,7 +69,7 @@ The published site style remains visible.
 The Event Runner mark and “Make room for your event.” settle and remain still.
 
 
-## vertical
+## Vertical
 
 **0:00–0:06. “Change your site style.”** “Start signed in as an operator.”
 
