@@ -90,18 +90,22 @@ export function own(state, key, fallback) {
 /**
  * The current reader's access and the key its data is stored under.
  *
- * @returns {{ access: string, compose: boolean, feedKey: string|null, uid: string|null,
+ * @returns {{ access: string, resolving: boolean, compose: boolean, feedKey: string|null, uid: string|null,
  *             user: object|null, activeKey: { current: string|null } }}
  *   `activeKey` is the key async work may still write for.
  */
 export function useSocialAccess() {
-  const { features, sources, available } = useEventConfig();
-  const { user, adminStatus, adminConfirmed } = useAuth();
+  const { features, sources, available, featuresStatus } = useEventConfig();
+  const { user, adminStatus, adminConfirmed, loading } = useAuth();
   const { uid, profile, status: profileStatus, profileConfirmed } = useProfile();
   const input = {
     sources, available, features, uid, profile, profileStatus, profileConfirmed, adminStatus, adminConfirmed,
   };
   const access = feedAccess(input);
+  const featuresClosed = featuresStatus === 'gone'
+    || (featuresStatus === 'confirmed' && (features?.socialFeed !== true || features?.attendeeDirectory !== true));
+  const resolving = !IS_DEMO && !featuresClosed
+    && (loading || (Boolean(uid) && featuresStatus !== 'confirmed'));
   const open = access === 'open';
   // Moves on after every closed spell; see "WHOSE DATA" above.
   const [session, setSession] = useState(0);
@@ -117,7 +121,7 @@ export function useSocialAccess() {
   useEffect(() => {
     activeKey.current = feedKey;
   }, [feedKey]);
-  return { access, compose: open && composeAccess(input), feedKey, uid, user, activeKey };
+  return { access, resolving, compose: open && composeAccess(input), feedKey, uid, user, activeKey };
 }
 
 /**

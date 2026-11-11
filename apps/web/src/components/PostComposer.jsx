@@ -51,9 +51,9 @@ export function draftError(text, parentPostId) {
  * @param {{ uid: string, getIdToken: () => Promise<string> }} props.user
  * @param {string|null} [props.parentPostId] null for a root post
  * @param {(postId: string) => void} [props.onPosted]
- * @param {() => void} [props.onRootGone] the server says the root is no longer active
+ * @param {() => void} [props.onUnavailable] the server refused the feed or parent root
  */
-export default function PostComposer({ user, parentPostId = null, onPosted, onRootGone }) {
+export default function PostComposer({ user, parentPostId = null, onPosted, onUnavailable }) {
   const reply = parentPostId !== null;
   const formRef = useRef(null);
   const messageRef = useRef(null);
@@ -108,7 +108,7 @@ export default function PostComposer({ user, parentPostId = null, onPosted, onRo
       return;
     }
     if (result.kind === 'removed' || result.kind === 'conflict') keys.current.reset();
-    if (result.kind === 'no-root') onRootGone?.();
+    if (result.kind === 'closed') onUnavailable?.();
     if (result.kind === 'invalid') refuse(result.error, null);
     else refuse(null, result.error);
   }

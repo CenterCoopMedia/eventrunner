@@ -51,10 +51,10 @@ export default function AttendeeFeed() {
       },
       (error) => {
         if (!current) return;
-        setSnapshot({
+        setSnapshot((prev) => ({
           key: feedKey,
-          value: { ...NO_FEED, failed: true, denied: error?.code === 'permission-denied' },
-        });
+          value: { ...NO_FEED, failed: true, denied: error?.code === 'permission-denied' || own(prev, feedKey, NO_FEED).denied },
+        }));
       },
     );
     return () => {
@@ -155,7 +155,7 @@ export default function AttendeeFeed() {
   return (
     <section aria-labelledby="attendee-feed-title" className="mt-lg">
       <SectionHead id="attendee-feed-title" title="Attendee feed" level={2} rule="hairline" />
-      {compose && feedKey !== null ? (
+      {compose && !feed.denied && feedKey !== null ? (
         <div className="mt-sm">
           <Suspense fallback={<LoadingState label="Loading the post form…" />}>
             <PostComposer key={feedKey} user={user} />

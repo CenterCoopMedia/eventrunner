@@ -496,6 +496,30 @@ describe('what the feed shows', () => {
     act(() => feed.error(Object.assign(new Error('no'), { code: 'permission-denied' })));
     expect(screen.getByText(/opens for you once your registration is approved/)).toBeInTheDocument();
   });
+
+  it('drops the composer, draft and late send on a feed refusal until a confirmed feed answer', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const feed = activeFeedListeners()[0];
+    pushPosts(feed, []);
+    const pending = deferred();
+    vi.mocked(fetch).mockReturnValueOnce(pending.promise);
+    const field = await screen.findByRole('textbox', { name: 'Write a post' });
+    type(field, 'Private draft');
+    fireEvent.click(screen.getByRole('button', { name: 'Post', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    act(() => feed.error(Object.assign(new Error('refused'), { code: 'permission-denied' })));
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Private draft')).not.toBeInTheDocument();
+    act(() => feed.error(Object.assign(new Error('offline'), { code: 'unavailable' })));
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    await act(async () => pending.resolve(answer(201, { postId: 'late', state: 'active' })));
+    expect(screen.queryByText('Posted. Your post is at the top of the feed.')).not.toBeInTheDocument();
+
+    pushPosts(feed, []);
+    expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('');
+  });
 });
 
 describe('older posts', () => {
@@ -867,6 +891,55 @@ describe('post text', () => {
 });
 
 describe('the thread page', () => {
+  it('shows neutral loading through auth and config startup without private reads', async () => {
+    vi.mocked(onAuthStateChanged).mockImplementation((_auth, listener) => {
+      authListener = listener;
+      return () => {};
+    });
+    renderThread();
+    expect(screen.getByRole('status', { name: 'Loading…' })).toBeInTheDocument();
+    expect(screen.queryByText('Not found page')).not.toBeInTheDocument();
+    expect(listenersFor('social_posts')).toHaveLength(0);
+    expect(listenersFor('social_posts/root1')).toHaveLength(0);
+
+    publishAuth(makeUser('ada'));
+    pushDoc('users/ada', { uid: 'ada', ...APPROVED });
+    pushDoc('config/features', FEED_ON, { fromCache: true });
+    await act(async () => {});
+    expect(screen.getByRole('status', { name: 'Loading…' })).toBeInTheDocument();
+    expect(screen.queryByText('Not found page')).not.toBeInTheDocument();
+    expect(listenersFor('social_posts')).toHaveLength(0);
+    expect(listenersFor('social_posts/root1')).toHaveLength(0);
+
+    pushDoc('config/features', FEED_ON);
+    expect(listenersFor('social_posts/root1')).toHaveLength(1);
+    expect(replyListener()).toBeDefined();
+  });
+
+  it.each(['disabled', 'missing', 'failed'])('keeps %s feature startup at not-found even before auth resolves', (state) => {
+    vi.mocked(onAuthStateChanged).mockImplementation((_auth, listener) => {
+      authListener = listener;
+      return () => {};
+    });
+    renderThread();
+    if (state === 'failed') {
+      act(() => listenersFor('config/features').at(-1).error(Object.assign(new Error('offline'), { code: 'unavailable' })));
+    } else {
+      pushDoc('config/features', state === 'missing' ? null : { attendeeDirectory: true, socialFeed: false });
+    }
+    expect(screen.getByText('Not found page')).toBeInTheDocument();
+    expect(listenersFor('social_posts')).toHaveLength(0);
+    expect(listenersFor('social_posts/root1')).toHaveLength(0);
+  });
+
+  it('keeps a signed-out thread at not-found even with both features on', () => {
+    renderThread();
+    pushDoc('config/features', FEED_ON);
+    expect(screen.getByText('Not found page')).toBeInTheDocument();
+    expect(listenersFor('social_posts')).toHaveLength(0);
+    expect(listenersFor('social_posts/root1')).toHaveLength(0);
+  });
+
   it('is the not-found page while the feed is closed, and asks for nothing', async () => {
     renderThread();
     await openFeedAs(makeUser('ada'), APPROVED, { attendeeDirectory: true, socialFeed: false });
@@ -977,17 +1050,25 @@ describe('the thread page', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('closes the reply form when the server says the root is gone, and keeps the text out of the page', async () => {
+  it('clears a cached root and closes replies after an ambiguous server refusal until the root is confirmed', async () => {
     renderThread();
     await openFeedAs(makeUser('ada'));
     pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
     pushPosts(replyListener(), []);
+    const root = listenersFor('social_posts/root1').at(-1);
+    act(() => root.error(Object.assign(new Error('offline'), { code: 'unavailable' })));
     const field = await screen.findByRole('textbox', { name: 'Your reply' });
     type(field, 'Too late');
     vi.mocked(fetch).mockResolvedValueOnce(answer(404, { error: { code: 'not-found', message: 'x' } }));
     fireEvent.click(screen.getByRole('button', { name: 'Post reply' }));
-    expect(await screen.findByText('Replies are closed because the original post was removed.')).toBeInTheDocument();
+    expect(await screen.findByText('Replies are closed right now.')).toBeInTheDocument();
+    expect(screen.getByText('Original post unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Root text')).not.toBeInTheDocument();
+    expect(screen.queryByText('Original post removed')).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    pushDoc('social_posts/root1', null);
+    expect(screen.getByText('Original post removed')).toBeInTheDocument();
+    expect(screen.getByText('Replies are closed because the original post was removed.')).toBeInTheDocument();
   });
 
   it('a staff grant alone reads and reports but cannot reply', async () => {

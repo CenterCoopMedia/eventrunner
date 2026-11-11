@@ -4,9 +4,9 @@
 //
 // GATE. The page asks for nothing until hooks/useSocialFeed.js opens the
 // feed for the current reader, exactly as the feed on /attendees does. A
-// deep link is not a way around it: with the feature off or unresolved the
-// page is the ordinary "not found" page, and it never names or titles the
-// post. Post text never reaches the document title or other metadata.
+// deep link is not a way around it: startup shows a neutral loading state,
+// and a confirmed-off feature or signed-out reader gets the ordinary
+// "not found" page. Neither state reads or names the post.
 //
 // WHOSE DATA. Root, replies, how far they are loaded, author names and
 // reports are stored with the reader's key, so an account switch, a
@@ -64,7 +64,7 @@ function BackToFeed() {
 export default function AttendeeThread() {
   const { postId: rawId } = useParams();
   const postId = isPostId(rawId) ? rawId : null;
-  const { access, compose, feedKey: readerKey, user } = useSocialAccess();
+  const { access, resolving, compose, feedKey: readerKey, user } = useSocialAccess();
   // The thread is part of the key: a different post is a different thread.
   const feedKey = readerKey !== null && postId !== null ? `${readerKey}\u0000${postId}` : null;
   const activeKey = useRef(feedKey);
@@ -75,9 +75,6 @@ export default function AttendeeThread() {
   const [rootState, setRootState] = useState({ key: null, value: NO_ROOT });
   const [replyState, setReplyState] = useState({ key: null, value: NO_REPLIES });
   const [pageState, setPageState] = useState({ key: null, value: 1 });
-  // The server refused a reply because the root is gone; the root listener
-  // confirms it soon after, but the composer closes now.
-  const [rootGone, setRootGone] = useState({ key: null, value: false });
   const root = own(rootState, feedKey, NO_ROOT);
   const thread = own(replyState, feedKey, NO_REPLIES);
   const pages = own(pageState, feedKey, 1);
@@ -126,6 +123,7 @@ export default function AttendeeThread() {
   const reports = useSocialReports(feedKey, activeKey, user);
 
   if (access === 'closed') {
+    if (resolving) return <LoadingState shape="rows" label="Loading…" />;
     return <NotFound />;
   }
 
@@ -157,7 +155,7 @@ export default function AttendeeThread() {
   } else if (root.root === undefined || entries === null) {
     content = <LoadingState shape="rows" label="Loading the thread…" />;
   } else {
-    const rootActive = root.root !== null && !own(rootGone, feedKey, false);
+    const rootActive = root.root !== null;
     // Full for the pages it was read for: there may be more.
     const more = thread.size >= thread.pages * THREAD_PAGE_SIZE;
     const loading = thread.pages !== pages;
@@ -180,7 +178,7 @@ export default function AttendeeThread() {
           {root.root ? (
             <SocialPostEntry {...entryProps(root.root)} />
           ) : (
-            <RemovedEntry>Original post removed</RemovedEntry>
+            <RemovedEntry>{root.failed ? 'Original post unavailable' : 'Original post removed'}</RemovedEntry>
           )}
         </ul>
         <section aria-labelledby="thread-replies-title" className="mt-lg">
@@ -214,7 +212,7 @@ export default function AttendeeThread() {
           <div className="mt-md">
             {!rootActive ? (
               <p className="max-w-prose text-body text-text-secondary">
-                Replies are closed because the original post was removed.
+                {root.failed ? 'Replies are closed right now.' : 'Replies are closed because the original post was removed.'}
               </p>
             ) : compose ? (
               <Suspense fallback={<LoadingState label="Loading the reply form…" />}>
@@ -222,7 +220,7 @@ export default function AttendeeThread() {
                   key={feedKey}
                   user={user}
                   parentPostId={postId}
-                  onRootGone={() => setRootGone({ key: feedKey, value: true })}
+                  onUnavailable={() => setRootState((prev) => ({ key: feedKey, value: { ...own(prev, feedKey, NO_ROOT), root: null, failed: true } }))}
                 />
               </Suspense>
             ) : (

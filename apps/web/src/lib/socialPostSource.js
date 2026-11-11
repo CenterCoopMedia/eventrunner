@@ -23,7 +23,7 @@ const RETRY_MESSAGE =
  *           parentPostId: string|null, submissionKey: string,
  *           env?: object, fetchImpl?: typeof fetch }} input
  * @returns {Promise<{ ok: true, postId: string }
- *   | { ok: false, kind: 'invalid'|'auth'|'forbidden'|'closed'|'no-root'|'conflict'|'removed'|'retry', error: string }>}
+ *   | { ok: false, kind: 'invalid'|'auth'|'forbidden'|'closed'|'conflict'|'removed'|'retry', error: string }>}
  */
 export async function createSocialPost({ user, text, parentPostId, submissionKey, env = import.meta.env, fetchImpl }) {
   if (IS_DEMO) return { ok: false, kind: 'closed', error: 'Posting is off in this read-only demo.' };
@@ -75,7 +75,7 @@ export async function createSocialPost({ user, text, parentPostId, submissionKey
       return { ok: false, kind: 'forbidden', error: 'Posting is open to approved attendees and speakers.' };
     case 404:
       return parentPostId !== null
-        ? { ok: false, kind: 'no-root', error: 'The original post was removed, so replies are closed. Your text was not sent.' }
+        ? { ok: false, kind: 'closed', error: 'Replies are closed right now. Your text was not sent.' }
         : { ok: false, kind: 'closed', error: 'The attendee feed is closed right now. Your text was not sent.' };
     case 409:
       if (code === 'submission-conflict') {
