@@ -513,9 +513,11 @@
           <h2 id="attendees">Attendees<a class="heading-anchor" href="#attendees" aria-label="Link to this section">#</a></h2>
           <p>The full attendee list with registration status and a search/filter. What action is available depends on the current status:</p>
           <ul>
-          <li><strong>Pending / ticketed</strong> → Approve</li>
+          <li><strong>Pending</strong> → Approve</li>
+          <li><strong>Ticketed</strong> → Approve or Revoke access</li>
           <li><strong>Approved</strong> → Revoke. Approving again is available only when the original approval came from a ticket; re-approving records the approval as an admin decision so a later revoke behaves correctly.</li>
-          <li><strong>Revoked</strong> → Approve. That is the only way out of revoked.</li>
+          <li><strong>Ticket access ended</strong> → Approve or Revoke access. This means no valid claimed ticket remains. A new valid claimed ticket restores ticket access, under the current automatic-approval policy. Select Revoke access to keep the account blocked after another purchase.</li>
+          <li><strong>Revoked</strong> → Approve. An explicit organizer revocation stays blocked until an organizer approves the account again.</li>
           </ul>
           <p>Approve and revoke always go through the server endpoints. Every registration field involved is server-owned and not editable directly, even for the account&#39;s own owner.</p>
           <p><strong>Export the list.</strong> The button in the title band reads <strong>Export 42 attendees</strong>, where the number is the rows on screen after your search and status filter. It saves a CSV file with one row per account, in the order the page lists them. The file has nine columns, and nothing else leaves the site:</p>

@@ -54,6 +54,17 @@ const getConfig = async () => ({
   features: {},
 });
 
+test('a new claim restores only a revocation caused by entitlement loss', async () => {
+  for (const [reason, expected] of [['entitlement_lost', 'ticketed'], ['admin_revocation', 'revoked'], [null, 'revoked']]) {
+    const db = makeFakeDb({
+      'users/uid-ada': { registrationStatus: 'revoked', revocationReason: reason },
+      'tickets/one': { status: 'valid', claimedByUid: 'uid-ada' },
+    });
+    await applyTicketClaimToUser({ db, uid: 'uid-ada' });
+    assert.equal(db.read('users', 'uid-ada').registrationStatus, expected);
+  }
+});
+
 function seededDb(extra = {}) {
   return makeFakeDb({
     'users/uid-ada': { uid: 'uid-ada', registrationStatus: 'pending', approvalSource: null },

@@ -17,6 +17,7 @@ const { createEmailSink } = require('./sinks/email.cjs');
 
 const DEDUPE_WINDOW_MS = 5 * 60 * 1000;
 const SINK_NAMES = new Set(['webhook', 'email', 'none']);
+const CLIENT_KINDS = new Set(['ticket-order', 'approval-required']);
 
 /** dedupeKey -> last-attempt ms; per container, pruned on every check. */
 const dedupeSeen = new Map();
@@ -100,8 +101,16 @@ function createOperatorNotifier({
         return await sink.deliver(payload);
       }
       const sink = createEmailSink({ sendEmail });
-      const operatorEmail = config?.providers?.notifier?.operatorEmail;
-      return await sink.deliver(payload, { operatorEmail });
+      const { operatorEmail } = config?.providers?.notifier || {};
+      const ownerEmails = config?.bootstrap?.adminEmails || [];
+      const recipients = [...new Set([
+        operatorEmail,
+        ...(CLIENT_KINDS.has(event.kind) && Array.isArray(ownerEmails) ? ownerEmails : []),
+      ].filter((email) => typeof email === 'string' && email.trim()).map((email) => email.trim().toLowerCase()))];
+      if (!recipients.length) return await sink.deliver(payload);
+      const outcomes = await Promise.all(recipients.map((email) => sink.deliver(payload, { operatorEmail: email })));
+      return { delivered: outcomes.every((result) => result.delivered), sink: name,
+        ...(outcomes.some((result) => !result.delivered) ? { error: 'email send failed' } : {}) };
     } catch (err) {
       // A notifier failure is logged and swallowed (spec §3.2).
       log.warn('operator notify failed', err);

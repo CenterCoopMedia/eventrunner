@@ -205,7 +205,7 @@ function createTicketingWebhookHandler({ db, provider, now = () => new Date(), l
       // A throw is ambiguous — a malformed body and an unreachable key
       // store look the same from here. 500 so the provider retries; the
       // dedup claim makes that retry free.
-      log.error('ticketing: verifyWebhook threw', provider.name === 'stripe' ? { code: 'stripe-verification-unavailable' } : err);
+      log.error('ticketing: verifyWebhook threw', provider.name === 'stripe' ? require('./stripeErrors.cjs').stripeErrorDetails(err) : err);
       res.status(500).json({ error: { code: 'internal', message: 'Delivery could not be processed.' } });
       return;
     }

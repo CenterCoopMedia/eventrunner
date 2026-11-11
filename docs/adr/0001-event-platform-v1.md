@@ -897,6 +897,7 @@ server gate cannot diverge (today `canBookmarkSessions()` in `UserProfileContext
 | `approved` | `ticketed` | automatic approval disabled for a ticket-derived grant (`auto_approval_disabled`) |
 | `approved` \| `ticketed` | `revoked` | admin revocation, or **no valid claimed ticket remains** (see below) |
 | `revoked` | `approved` | admin re-approval |
+| `revoked` | `ticketed` | a valid claimed ticket returns, only when `revocationReason` is `entitlement_lost` (`ticket_restored`) |
 
 **Revocation recomputes entitlement over the whole set, never reacts to one ticket.** A user can
 hold several claimed tickets — a group order, a replacement issued after a change, an add-on for a
@@ -916,13 +917,20 @@ volunteer, or a press pass made a decision the ticketing provider knows nothing 
 elsewhere in the order must not silently reverse it. `users/{uid}.approvalSource` ∈
 `'admin' | 'ticket'` records which source granted access and is written at the moment of approval —
 `'admin'` for `approveUser`, `'ticket'` for the `autoApproveTicketHolders` path. An admin revocation
-is explicit and separate: it clears `approvalSource` and sets `revoked` directly, so it is never
-undone by a later ticket sync.
+is explicit and separate: it clears `approvalSource`, sets `revoked` and records
+`revocationReason: 'admin_revocation'`, so a later ticket sync never undoes it.
+
+Automatic loss records `revocationReason: 'entitlement_lost'`. A later valid claimed ticket
+returns that account to `ticketed`; the current automatic-approval policy can then approve it.
+Other revocations, including those without a recorded reason, require admin re-approval.
+The Attendees page labels automatic loss **Ticket access ended** and offers **Revoke access**
+to make the block explicit before another purchase. Granting ticket access clears the reason.
+The reason is server-owned, like registration status and approval source.
 
 Ticket claim and entitlement grant transactions read `config/features` directly, so a policy
 change forces a concurrent grant to retry. When automatic approval is disabled, the retrying
 `onApprovalPolicyWritten` trigger reconciles ticket-derived approvals using current policy for
-each account. Valid tickets remain valid; explicit admin approvals and terminal revocations
+each account. Valid tickets remain valid; explicit admin approvals and explicit or unclassified revocations
 are preserved. Deploy this trigger with the grant changes. If automatic approval is already
 disabled at deployment, save `config/features` once afterward to reconcile existing grants.
 

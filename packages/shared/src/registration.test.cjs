@@ -28,6 +28,7 @@ test('every allowed transition in the spec table', () => {
     ['ticketed', 'revoked', 'admin_revocation'],
     ['ticketed', 'revoked', 'entitlement_lost'],
     ['revoked', 'approved', 'admin_reapproval'],
+    ['revoked', 'ticketed', 'ticket_restored'],
   ];
   for (const [from, to, trigger] of allowed) {
     assert.equal(isValidTransition(from, to, trigger), true, `${from} -> ${to} (${trigger})`);

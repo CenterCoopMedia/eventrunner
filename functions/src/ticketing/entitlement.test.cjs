@@ -209,6 +209,36 @@ test('revoked is terminal for recomputation — a later valid ticket does not un
   assert.equal(db.read('users', 'uid-ada').registrationStatus, 'revoked');
 });
 
+test('refund then rebuy restores ticket access; an explicit revocation still wins', async () => {
+  const db = makeFakeDb({
+    'users/uid-ada': user({ registrationStatus: 'approved', approvalSource: 'ticket' }),
+    'tickets/tkt-1': ticket({ status: 'refunded' }),
+  });
+  await recompute(db, autoApproveOn);
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'revoked');
+  assert.equal(db.read('users', 'uid-ada').revocationReason, 'entitlement_lost');
+  await db.collection('tickets').doc('tkt-2').set(ticket({ externalId: 'tkt-2' }));
+  await recompute(db, autoApproveOn);
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'approved');
+  assert.equal(db.read('users', 'uid-ada').approvalSource, 'ticket');
+  assert.equal(db.read('users', 'uid-ada').revocationReason, null);
+  await db.collection('users').doc('uid-ada').set({ registrationStatus: 'revoked', approvalSource: null, revocationReason: 'admin_revocation' }, { merge: true });
+  await recompute(db, autoApproveOn);
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'revoked');
+});
+
+test('a claim awaiting manual approval alerts even if the claim handler updated the account first', async () => {
+  const db = makeFakeDb({ 'users/uid-ada': user({ registrationStatus: 'ticketed' }), 'tickets/tkt-1': ticket() });
+  const events = [];
+  const handler = createOnTicketWritten({ db, notifyOperator: async (event) => events.push(event) });
+  await handler({ before: ticket({ claimedByUid: null }), after: ticket() });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].kind, 'approval-required');
+  events.length = 0;
+  await handler({ before: ticket(), after: ticket() });
+  assert.equal(events.length, 0);
+});
+
 test('a pending_info ticket HOLDS the account rather than revoking on ignorance', async () => {
   const db = makeFakeDb({
     'users/uid-ada': user({ registrationStatus: 'ticketed' }),

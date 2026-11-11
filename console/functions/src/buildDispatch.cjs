@@ -129,6 +129,11 @@ async function runStartBuild(deps, { orgId, appId, eventName, by = 'console' }) 
   const { db, startBuild, now, log } = deps;
   const ref = db.collection('applications').doc(appId);
   try {
+    // Stops automatic dispatch during a known onboarding incident (#810).
+    // Main CI catches source defects; this operator setting covers rollout.
+    // Clear buildsPaused when the incident is repaired; absent means enabled.
+    const settings = await db.collection('console_config').doc('settings').get();
+    if (settings.data()?.buildsPaused === true) throw new Error('New builds are paused. Retry after the operator resumes builds.');
     await startBuild({ orgId, appId });
   } catch (err) {
     log.error('console build start: the build did not start', appId, err);

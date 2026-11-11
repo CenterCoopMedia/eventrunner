@@ -989,6 +989,7 @@
           <tr><td><code>approved</code></td><td><code>ticketed</code></td><td>automatic approval disabled for a ticket-derived grant (<code>auto_approval_disabled</code>)</td></tr>
           <tr><td><code>approved</code> | <code>ticketed</code></td><td><code>revoked</code></td><td>admin revocation, or <strong>no valid claimed ticket remains</strong> (see below)</td></tr>
           <tr><td><code>revoked</code></td><td><code>approved</code></td><td>admin re-approval</td></tr>
+          <tr><td><code>revoked</code></td><td><code>ticketed</code></td><td>a valid claimed ticket returns, only when <code>revocationReason</code> is <code>entitlement_lost</code> (<code>ticket_restored</code>)</td></tr>
           </tbody>
           </table>
           </div>
@@ -1007,12 +1008,18 @@
           elsewhere in the order must not silently reverse it. <code>users/{uid}.approvalSource</code> ∈
           <code>&#39;admin&#39; | &#39;ticket&#39;</code> records which source granted access and is written at the moment of approval —
           <code>&#39;admin&#39;</code> for <code>approveUser</code>, <code>&#39;ticket&#39;</code> for the <code>autoApproveTicketHolders</code> path. An admin revocation
-          is explicit and separate: it clears <code>approvalSource</code> and sets <code>revoked</code> directly, so it is never
-          undone by a later ticket sync.</p>
+          is explicit and separate: it clears <code>approvalSource</code>, sets <code>revoked</code> and records
+          <code>revocationReason: &#39;admin_revocation&#39;</code>, so a later ticket sync never undoes it.</p>
+          <p>Automatic loss records <code>revocationReason: &#39;entitlement_lost&#39;</code>. A later valid claimed ticket
+          returns that account to <code>ticketed</code>; the current automatic-approval policy can then approve it.
+          Other revocations, including those without a recorded reason, require admin re-approval.
+          The Attendees page labels automatic loss <strong>Ticket access ended</strong> and offers <strong>Revoke access</strong>
+          to make the block explicit before another purchase. Granting ticket access clears the reason.
+          The reason is server-owned, like registration status and approval source.</p>
           <p>Ticket claim and entitlement grant transactions read <code>config/features</code> directly, so a policy
           change forces a concurrent grant to retry. When automatic approval is disabled, the retrying
           <code>onApprovalPolicyWritten</code> trigger reconciles ticket-derived approvals using current policy for
-          each account. Valid tickets remain valid; explicit admin approvals and terminal revocations
+          each account. Valid tickets remain valid; explicit admin approvals and explicit or unclassified revocations
           are preserved. Deploy this trigger with the grant changes. If automatic approval is already
           disabled at deployment, save <code>config/features</code> once afterward to reconcile existing grants.</p>
           <p><code>hasAttendeeAccess(profile, config)</code> returns true for <code>approved</code>, for <code>profile.speakerId != null</code>,

@@ -180,7 +180,7 @@ async function finishException({ db, orderId, leaseId, exception, now }) {
   });
 }
 
-async function reconcileStripeOrder({ db, provider, orderId, now = () => new Date() }) {
+async function reconcileStripeOrder({ db, provider, orderId, now = () => new Date(), log = console }) {
   if (!db || !safeId(orderId)) throw new Error('An internal order identifier and database are required.');
   const ref = db.collection(ORDERS).doc(orderId);
   const leaseId = randomUUID();
@@ -301,6 +301,7 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
       return { orderId, externalEventId: provider.externalEventId, complete: true,
         tickets: await readTickets(db, order), exception };
     }
+    log.error('Stripe reconciliation failed', require('./stripeErrors.cjs').stripeErrorDetails(err));
     await db.runTransaction(async (tx) => {
       if (!await writesAllowed(db, tx)) return;
       const snap = await tx.get(ref);
