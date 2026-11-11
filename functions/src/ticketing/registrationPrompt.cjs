@@ -61,10 +61,10 @@ const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoW
 const TICKETS = require('./index.cjs').internals.TICKETS;
 const USERS = 'users';
 
-/** First word of a display name, or ''. Never guessed from the email local part (matches users/lifecycle.cjs). */
+/** First word of a display name, or 'there'. Never guessed from the email local part (matches users/lifecycle.cjs). */
 function firstNameOf(displayName) {
   const trimmed = typeof displayName === 'string' ? displayName.trim() : '';
-  if (!trimmed) return '';
+  if (!trimmed) return 'there';
   return trimmed.split(/\s+/)[0];
 }
 
@@ -155,6 +155,9 @@ async function sendRegistrationPrompt({
   if (trigger === 'account_created') {
     const { listedAdminTier, loadBootstrap } = require('../core/auth.cjs');
     if (listedAdminTier(await loadBootstrap({ db }), userDoc.email)) return { sent: false, reason: 'site-team' };
+    // A coming-soon site has not opened registration: no ticket prompt yet.
+    const { isComingSoon } = require('../cms/launch.cjs');
+    if (await isComingSoon({ db, log })) return { sent: false, reason: 'coming-soon' };
   }
 
   const claimed = await hasClaimedTicket({ db, uid });

@@ -12,7 +12,7 @@ const { createStripeProvider } = require('./providers/stripe.cjs');
 const {
   sendRegistrationPrompt,
   createOnUserRegistrationPromptCreated,
-  internals: { buildContext, hasClaimedTicket },
+  internals: { buildContext, hasClaimedTicket, firstNameOf },
 } = require('./registrationPrompt.cjs');
 
 const QUIET = { warn() {}, error() {}, info() {} };
@@ -424,4 +424,21 @@ test('a historical-demo refusal at the final mail boundary is an intentional non
   });
   assert.deepEqual(await handler({ uid: 'uid-ada' }), { sent: false, reason: 'read-only-demo' });
   assert.deepEqual(db.writes, []);
+});
+
+test('a coming-soon site sends no ticket prompt on a first sign-in', async () => {
+  const db = makeFakeDb({ 'users/uid-ada': user(), 'config/launch': { comingSoon: true } });
+  const getConfig = async () => baseConfig({ event: { registration: { externalUrl: 'https://example.org/x' } } });
+  const calls = [];
+  const result = await sendRegistrationPrompt({
+    db, provider: manual(db, getConfig), sendEmail: makeSendEmail(calls), getConfig,
+    uid: 'uid-ada', now: () => T0, log: QUIET,
+  });
+  assert.equal(result.reason, 'coming-soon');
+  assert.equal(calls.length, 0);
+});
+
+test('an account with no name is greeted as "there" in the ticket prompt', () => {
+  assert.equal(firstNameOf(''), 'there');
+  assert.equal(firstNameOf('  Ada Lovelace '), 'Ada');
 });

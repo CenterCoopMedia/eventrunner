@@ -100,6 +100,9 @@ async function sendWelcomeEmail({ db, sendEmail, getConfig, uid, email, displayN
     // Whoever runs the site is not welcomed to it: an Owner or an Editor
     // gets no welcome, as with the ticket prompt (ticketing/registrationPrompt.cjs).
     if (listedAdminTier(await loadBootstrap({ db }), email)) return { sent: false, reason: 'site-team' };
+    // A coming-soon site has not opened: no welcome until the first publish.
+    const { isComingSoon } = require('../cms/launch.cjs');
+    if (await isComingSoon({ db, log })) return { sent: false, reason: 'coming-soon' };
     const config = await getConfig();
     const site = String(config?.tierA?.publicUrl || '').trim().replace(/\/+$/, '');
     // login_url is the required token; without a site address it is empty.
