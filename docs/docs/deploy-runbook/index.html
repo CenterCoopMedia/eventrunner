@@ -399,8 +399,11 @@
           (§2, above) only needs to <em>reference</em> the secret while deploying; the function&#39;s runtime identity is
           what actually reads the secret&#39;s value on every invocation, and it is a separate principal that
           <code>${DEPLOY_SA_EMAIL}</code>&#39;s own <code>secretmanager.secretAccessor</code> grant does not cover. Cloud Functions v2
-          runs as the project&#39;s default compute service account unless a function explicitly sets
-          <code>serviceAccount</code> (this repo&#39;s functions do not), so:</p>
+          runs as the project&#39;s default compute service account. Both v1 Auth triggers explicitly use
+          that same account through the <code>EVENT_COMPUTE_SERVICE_ACCOUNT</code> SDK parameter. The deployment
+          workflow writes this nonsecret value into <code>functions/.env.&lt;project-id&gt;</code> from the project&#39;s real
+          number before full and partial deploys. For a manual deployment, set it to the same runtime email
+          shown below in that env file before running Firebase. No App Engine runtime is required.</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">PROJECT_NUMBER=$(gcloud projects describe &lt;GCP_PROJECT_ID&gt; --format=&quot;value(projectNumber)&quot;)
           RUNTIME_SA_EMAIL=&quot;${PROJECT_NUMBER}-compute@developer.gserviceaccount.com&quot;
 
@@ -1406,7 +1409,7 @@
           <ul>
           <li>A provider conditioned on one environment cannot be shared, so each client project has its own pool (<code>github-actions</code>, provider <code>github</code>), in place of section 1&#39;s shared one.</li>
           <li>The deploy account also needs the custom role <code>eventrunnerDeployInvoker</code>, with <code>cloudfunctions.functions.setIamPolicy</code>, <code>firebaseextensions.instances.list</code>, <code>firebasestorage.defaultBucket.get</code>, <code>resourcemanager.projects.getIamPolicy</code> and <code>run.services.setIamPolicy</code>.</li>
-          <li>The deploy account needs <code>roles/iam.serviceAccountUser</code> on both the compute and the appspot service accounts, granted on each account and not on the project.</li>
+          <li>The deploy account needs <code>roles/iam.serviceAccountUser</code> on the compute runtime account, granted on that account.</li>
           <li>The storage service agent may not exist. Create it (<code>gcloud beta services identity create --service=storage.googleapis.com</code>), then grant it <code>roles/pubsub.publisher</code>. A new agent can take minutes to be accepted.</li>
           <li>The deploy account cannot make these grants, so an owner makes them first: the pubsub agent gets <code>roles/iam.serviceAccountTokenCreator</code>, and the compute account gets <code>roles/run.invoker</code> and <code>roles/eventarc.eventReceiver</code>. The compute account also gets <code>roles/iam.serviceAccountTokenCreator</code> on itself for <code>createCustomToken</code>. That last one is unconfirmed, and granted anyway.</li>
           <li><code>cloudbilling.googleapis.com</code> must be on, and the deploy account cannot turn it on. <code>gcloud services enable</code> takes at most 20 at a time (<code>SU_MAX_BATCH_SIZE_EXCEEDED</code>).</li>

@@ -293,16 +293,19 @@ function buildHandlers() {
   // onUserCreated uses create() and treats ALREADY_EXISTS as success, its
   // welcome email has a send-once key and never throws, and onUserDeleted's
   // deletes are idempotent.
-  const retryOnFailure = { failurePolicy: true };
+  const { defineSecret, defineString } = require('firebase-functions/params');
+  const runtimeOptions = {
+    failurePolicy: true,
+    serviceAccount: defineString('EVENT_COMPUTE_SERVICE_ACCOUNT'),
+  };
   // onUserCreated sends the welcome email, so it binds the provider's send
   // secrets.
-  const { defineSecret } = require('firebase-functions/params');
   const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
   const sendSecrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
 
   return {
     onUserCreated: functionsV1
-      .runWith({ ...retryOnFailure, secrets: sendSecrets })
+      .runWith({ ...runtimeOptions, secrets: sendSecrets })
       .region(region)
       .auth.user()
       .onCreate(async (authUser) => {
@@ -324,7 +327,7 @@ function buildHandlers() {
         });
       }),
     onUserDeleted: functionsV1
-      .runWith(retryOnFailure)
+      .runWith(runtimeOptions)
       .region(region)
       .auth.user()
       .onDelete(async (authUser) => {

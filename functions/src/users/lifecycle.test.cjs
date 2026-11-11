@@ -431,21 +431,27 @@ test('a config read that fails, or a refused send, leaves the account written an
   assert.equal(errors.length, 1);
 });
 
-test('only onUserCreated binds the send secrets, and building the handlers builds no email provider', () => {
-  const saved = { provider: process.env.EVENT_EMAIL_PROVIDER, project: process.env.GCLOUD_PROJECT };
+test('Auth handlers use the compute runtime, and only onUserCreated binds send secrets without building a provider', () => {
+  const saved = { provider: process.env.EVENT_EMAIL_PROVIDER, project: process.env.GCLOUD_PROJECT, runtime: process.env.EVENT_COMPUTE_SERVICE_ACCOUNT };
   // A postmark deployment: getEmailProvider would throw here with no API key,
   // so a handler built eagerly would fail this test.
   process.env.EVENT_EMAIL_PROVIDER = 'postmark';
   // v1 functions read their endpoint lazily and need a project id.
   process.env.GCLOUD_PROJECT = saved.project || 'demo-run-of-show';
+  process.env.EVENT_COMPUTE_SERVICE_ACCOUNT = '555000111-compute@developer.gserviceaccount.com';
   try {
     const { handlers } = require('./lifecycle.cjs');
     const secretsOf = (fn) => (fn.__endpoint?.secretEnvironmentVariables ?? []).map((s) => s.key);
     assert.deepEqual(secretsOf(handlers.onUserCreated), ['EMAIL_PROVIDER_API_KEY']);
     assert.equal(handlers.onUserCreated.__endpoint.eventTrigger.retry, true);
     assert.deepEqual(secretsOf(handlers.onUserDeleted), []);
+    for (const fn of [handlers.onUserCreated, handlers.onUserDeleted]) {
+      assert.equal(fn.__endpoint.platform, 'gcfv1');
+      assert.equal(fn.__endpoint.serviceAccountEmail.value(), '555000111-compute@developer.gserviceaccount.com');
+      assert.equal(fn.__endpoint.eventTrigger.retry, true);
+    }
   } finally {
-    for (const [key, name] of [['provider', 'EVENT_EMAIL_PROVIDER'], ['project', 'GCLOUD_PROJECT']]) {
+    for (const [key, name] of [['provider', 'EVENT_EMAIL_PROVIDER'], ['project', 'GCLOUD_PROJECT'], ['runtime', 'EVENT_COMPUTE_SERVICE_ACCOUNT']]) {
       if (saved[key] === undefined) delete process.env[name];
       else process.env[name] = saved[key];
     }
