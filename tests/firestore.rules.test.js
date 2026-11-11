@@ -2614,10 +2614,13 @@ describe("the attendee feed and its reports (issue 506)", () => {
     await setFeatures({ socialFeed: true, attendeeDirectory: true });
     const forgedPost = { state: "active", authorUid: "approved-1", text: "Forged.", createdAt: new Date(), parentPostId: null };
     const forgedReport = { postId: "sf-root", reporterUid: "approved-1", createdAt: new Date() };
-    for (const writer of [admin(), staff(), attendee("approved-1"), attendee("speaker-1"), anon()]) {
+    for (const writer of [admin(), staff(), attendee("approved-1"), attendee("speaker-1"), attendee("pending-1"), attendee("ticketed-sf"), attendee("revoked-sf"), attendee("sf-no-account"), anon()]) {
       await assertFails(setDoc(doc(writer, "social_posts/forged"), forgedPost));
+      await assertFails(setDoc(doc(writer, "social_posts/forged-reply"), { ...forgedPost, parentPostId: "sf-root" }));
       await assertFails(updateDoc(doc(writer, "social_posts/sf-root"), { state: "removed" }));
       await assertFails(deleteDoc(doc(writer, "social_posts/sf-root")));
+      await assertFails(updateDoc(doc(writer, "social_posts/sf-reply"), { text: "Forged reply." }));
+      await assertFails(deleteDoc(doc(writer, "social_posts/sf-reply")));
       await assertFails(setDoc(doc(writer, "social_reports/forged"), forgedReport));
       await assertFails(deleteDoc(doc(writer, "social_reports/sf-report")));
     }

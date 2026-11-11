@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The post composer and thread view of the private feed (#511). An approved attendee or a speaker
+  writes a post on the Attendees page and replies on the post's thread page
+  (`/attendees/posts/:postId`); a staff grant alone reads, reports and removes but cannot post. A
+  retry after a lost answer stores one post, a removed post is never sent again on its own, and an
+  account switch drops the draft and the thread at once. A removed root shows **Original post
+  removed** and keeps its replies. The feature stays off: `socialFeed` defaults to false and its
+  switch stays hidden.
 - The attendee side of the private feed (#788). When the feed is on, an approved attendee, a
   speaker, or current staff sees the newest posts on the Attendees page and can report one; a report
   sends only the post id. Nothing is requested until the live features document turns on both
@@ -21,8 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text-free report per post and reporter. `removeSocialPost` (staff) replaces a post with a
   content-free placeholder and writes one audit row in the same transaction; staff can still read
   and remove with the flags off. An account delete removes the account's active posts and its
-  reports, and keeps a placeholder that staff wrote during the delete. There is no attendee screen
-  or post creation yet.
+  reports, and keeps a placeholder that staff wrote during the delete. Backend post/reply creation (#510)
+  requires a current approved/speaker account and both flags; retries are idempotent and removed IDs stay closed. The composer is #511.
 - Admin Ticketing has a **Sync all tickets** action (Eventbrite and Stripe), with **Continue sync**
   for a run that stops early, and a **Create account** action on an unclaimed ticket. `ticketingSync`
   has a 540-second limit, stops before it, reports what it saved, and resumes from a returned

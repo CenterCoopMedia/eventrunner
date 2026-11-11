@@ -75,6 +75,7 @@ const Profile = lazyPage(() => import('./pages/Profile.jsx'));
 const OrganizationProfile = lazyPage(() => import('./pages/OrganizationProfile.jsx'));
 const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
 const AttendeeProfile = lazyPage(() => import('./pages/AttendeeProfile.jsx'));
+const AttendeeThread = lazyPage(() => import('./pages/AttendeeThread.jsx'));
 const Dashboard = lazyPage(() => import('./pages/Dashboard.jsx'));
 const SpeakerDashboard = lazyPage(() => import('./pages/SpeakerDashboard.jsx'));
 
@@ -163,6 +164,9 @@ export function AppRoutes() {
         <Route path="dashboard" element={<DeferredPage component={Dashboard} label="dashboard" />} />
         <Route path="attendees" element={<DeferredPage component={Attendees} shape="directory" label="attendees" />} />
         <Route path="attendees/:uid" element={<DeferredPage component={AttendeeProfile} label="attendee" />} />
+        {/* A thread of the private feed (issue #511). The page itself is
+            the gate: with the feed closed it renders NotFound. */}
+        <Route path="attendees/posts/:postId" element={<DeferredPage component={AttendeeThread} label="thread" />} />
         {SpecimenPage ? (
           <Route
             path={SPECIMEN_PATH}

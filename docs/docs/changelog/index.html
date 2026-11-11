@@ -129,6 +129,13 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The post composer and thread view of the private feed (#511). An approved attendee or a speaker
+          writes a post on the Attendees page and replies on the post&#39;s thread page
+          (<code>/attendees/posts/:postId</code>); a staff grant alone reads, reports and removes but cannot post. A
+          retry after a lost answer stores one post, a removed post is never sent again on its own, and an
+          account switch drops the draft and the thread at once. A removed root shows <strong>Original post
+          removed</strong> and keeps its replies. The feature stays off: <code>socialFeed</code> defaults to false and its
+          switch stays hidden.</li>
           <li>The attendee side of the private feed (#788). When the feed is on, an approved attendee, a
           speaker, or current staff sees the newest posts on the Attendees page and can report one; a report
           sends only the post id. Nothing is requested until the live features document turns on both
@@ -141,8 +148,8 @@
           text-free report per post and reporter. <code>removeSocialPost</code> (staff) replaces a post with a
           content-free placeholder and writes one audit row in the same transaction; staff can still read
           and remove with the flags off. An account delete removes the account&#39;s active posts and its
-          reports, and keeps a placeholder that staff wrote during the delete. There is no attendee screen
-          or post creation yet.</li>
+          reports, and keeps a placeholder that staff wrote during the delete. Backend post/reply creation (#510)
+          requires a current approved/speaker account and both flags; retries are idempotent and removed IDs stay closed. The composer is #511.</li>
           <li>Admin Ticketing has a <strong>Sync all tickets</strong> action (Eventbrite and Stripe), with <strong>Continue sync</strong>
           for a run that stops early, and a <strong>Create account</strong> action on an unclaimed ticket. <code>ticketingSync</code>
           has a 540-second limit, stops before it, reports what it saved, and resumes from a returned
