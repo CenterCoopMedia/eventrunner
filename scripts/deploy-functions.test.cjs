@@ -286,12 +286,14 @@ test('a failed local function discovery stops before any deploy', async () => {
     bootstrap: false,
     completeInventory: [deployed('existingHttp')],
     discover: async () => {
-      throw new Error('functions source did not load');
+      throw Object.assign(new Error('functions source did not load'), { code: 'FUNCTIONS_ANALYSIS_FAILED' });
     },
   });
   assert.equal(code, 1);
   assert.deepEqual(calls, []);
-  assert.match(errors[0], /could not read the local functions: functions source did not load/);
+  assert.match(errors[0], /could not read the local functions:/);
+  assert.match(errors[0], /"phase":"pre-deploy-discovery"/);
+  assert.match(errors[0], /"code":"FUNCTIONS_ANALYSIS_FAILED"/);
 });
 
 test('a failed inventory read on an ordinary deploy stops before any deploy', async () => {
@@ -681,26 +683,60 @@ test('local discovery fails closed when the functions source does not load', asy
   );
 });
 
+test('script-owned discovery config errors retain fixed reasons in both discovery phases', async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'functions-config-'));
+  try {
+    for (const [reason, config] of [
+      ['FUNCTIONS_CONFIG_CODEBASE', [{ source: 'functions', codebase: 'default' }, { source: 'other-functions', codebase: 'other' }]],
+      ['FUNCTIONS_CONFIG_SOURCE', { source: 'functions', codebase: 'default', prefix: 'nested' }],
+    ]) {
+      fs.writeFileSync(path.join(projectDir, 'firebase.json'), JSON.stringify({ functions: config }));
+      let failure;
+      await assert.rejects(discoverLocalFunctions(PROJECT, { projectDir, getDelegate: async () => ({}) }), (error) => {
+        failure = error;
+        return error.code === reason;
+      });
+      for (const bootstrap of [false, true]) {
+        const { code, calls, errors } = await runDeploy({ bootstrap, discover: async () => { throw failure; } });
+        assert.equal(code, 1);
+        assert.equal(calls.length, bootstrap ? 1 : 0);
+        assert.match(errors[0], new RegExp(`"phase":"${bootstrap ? 'post' : 'pre'}-deploy-discovery"`));
+        assert.match(errors[0], new RegExp(`"code":"${reason}"`));
+      }
+    }
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
 test('analysis failures retain only safe SDK body, stderr and debug-tail details in both discovery phases', async () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'functions-analysis-'));
   try {
     fs.writeFileSync(path.join(projectDir, 'firebase.json'), JSON.stringify({ functions: { source: 'functions', codebase: 'default' } }));
     fs.mkdirSync(path.join(projectDir, 'functions'));
     fs.writeFileSync(path.join(projectDir, 'functions', 'index.js'), 'module.exports = {};\n');
-    fs.writeFileSync(path.join(projectDir, 'firebase-debug.log'), `${'ReferenceError: fixture-credential-placeholder\n'.repeat(30)}Authorization: Bearer fixture-credential-placeholder\n`);
-    let failure;
-    await assert.rejects(discoverLocalFunctions(PROJECT, {
+    const logFile = path.join(projectDir, 'firebase-debug.log');
+    let writeFreshLog = true;
+    const options = {
       projectDir,
       loadFirebaseConfig: async () => ({ projectId: PROJECT }),
       getDelegate: async () => ({
         validate: async () => {}, build: async () => {},
         discoverBuild: async () => {
+          if (writeFreshLog) {
+            fs.writeFileSync(logFile, `${'ReferenceError: fixture-credential-placeholder\n'.repeat(30)}Authorization: Bearer fixture-credential-placeholder\n`);
+            // Avoid filesystem timestamp granularity obscuring the new write.
+            const nextTick = new Date(Date.now() + 1000);
+            fs.utimesSync(logFile, nextTick, nextTick);
+          }
           firebaseLogger.debug('Got response code 400; body TypeError: fixture-credential-placeholder');
           firebaseLogger.error('Error: MODULE_NOT_FOUND fixture-credential-placeholder\n    at /workspace/functions/index.js:17:3');
           throw new FirebaseError('Functions codebase could not be analyzed successfully. fixture-credential-placeholder');
         },
       }),
-    }), (error) => { failure = error; return error.code === 'FUNCTIONS_ANALYSIS_FAILED'; });
+    };
+    let failure;
+    await assert.rejects(discoverLocalFunctions(PROJECT, options), (error) => { failure = error; return error.code === 'FUNCTIONS_ANALYSIS_FAILED'; });
     for (const bootstrap of [false, true]) {
       const { code, calls, errors } = await runDeploy({ bootstrap, discover: async () => { throw failure; } });
       assert.equal(code, 1);
@@ -716,6 +752,14 @@ test('analysis failures retain only safe SDK body, stderr and debug-tail details
       const payload = JSON.parse(errors[0].slice(errors[0].indexOf('{')));
       assert.ok(payload.analysis.length <= 8);
     }
+    writeFreshLog = false;
+    fs.utimesSync(logFile, new Date(0), new Date(0));
+    await assert.rejects(discoverLocalFunctions(PROJECT, options), (error) => { failure = error; return error.code === 'FUNCTIONS_ANALYSIS_FAILED'; });
+    const stale = await runDeploy({ bootstrap: false, discover: async () => { throw failure; } });
+    assert.equal(stale.code, 1);
+    assert.equal(stale.calls.length, 0);
+    assert.match(stale.errors[0], /"httpStatus":400/);
+    assert.doesNotMatch(stale.errors[0], /firebase-debug\.log|ReferenceError|fixture-credential-placeholder/);
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
   }

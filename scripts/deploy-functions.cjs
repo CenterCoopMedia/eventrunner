@@ -69,6 +69,7 @@ const DIAGNOSTIC_ERROR_CODES = new Set([
   'INVENTORY_NO_AVAILABILITY', 'INVENTORY_UNREACHABLE_REGIONS', 'INVENTORY_BAD_ENDPOINTS',
   'FUNCTIONS_ANALYSIS_FAILED', 'FUNCTIONS_NO_RUNTIME', 'FUNCTIONS_BAD_ENDPOINTS',
   'FUNCTIONS_RETRY_VALUE', 'FUNCTIONS_RETRY_REGIONS',
+  'FUNCTIONS_CONFIG_CODEBASE', 'FUNCTIONS_CONFIG_SOURCE',
   'MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND', 'ERR_PACKAGE_PATH_NOT_EXPORTED',
   'ERR_REQUIRE_ESM', 'ERR_REQUIRE_ASYNC_MODULE', 'ENOENT', 'EACCES',
 ]);
@@ -146,11 +147,12 @@ function sdkDiagnostic(message, projectDir = PROJECT_DIR) {
   return Object.keys(detail).length ? detail : null;
 }
 
-function debugLogDiagnostics(projectDir) {
+function debugLogDiagnostics(projectDir, discoveryStartedAt) {
   let descriptor;
   try {
     const file = path.join(projectDir, 'firebase-debug.log');
-    if (!fs.lstatSync(file).isFile()) return [];
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.mtimeMs < discoveryStartedAt) return [];
     descriptor = fs.openSync(file, 'r');
     const size = fs.fstatSync(descriptor).size;
     const buffer = Buffer.alloc(Math.min(size, 32768));
@@ -191,10 +193,10 @@ function readFunctionsConfig(projectDir) {
   const firebaseJson = JSON.parse(fs.readFileSync(path.join(projectDir, 'firebase.json'), 'utf8'));
   const config = functionsProjectConfig.normalizeAndValidate(firebaseJson.functions);
   if (config.length !== 1 || config[0].codebase !== functionsProjectConfig.DEFAULT_CODEBASE) {
-    throw new Error('firebase.json must define exactly one functions codebase named "default"');
+    throw Object.assign(new Error('firebase.json must define exactly one functions codebase named "default"'), { code: 'FUNCTIONS_CONFIG_CODEBASE' });
   }
   if (!config[0].source || config[0].prefix) {
-    throw new Error('the functions codebase must have a local source and no prefix');
+    throw Object.assign(new Error('the functions codebase must have a local source and no prefix'), { code: 'FUNCTIONS_CONFIG_SOURCE' });
   }
   return config;
 }
@@ -238,6 +240,7 @@ async function discoverLocalFunctions(projectId, {
       if (diagnostics.length > 8) diagnostics.shift();
     }
   };
+  const discoveryStartedAt = Date.now();
   firebaseLogger.on('data', record);
   let discovered;
   try {
@@ -248,7 +251,7 @@ async function discoverLocalFunctions(projectId, {
   } catch (cause) {
     throw Object.assign(new Error('Failed to generate manifest from function source', { cause }), {
       code: 'FUNCTIONS_ANALYSIS_FAILED',
-      analysisDiagnostics: [...debugLogDiagnostics(projectDir), ...diagnostics].slice(-8),
+      analysisDiagnostics: [...debugLogDiagnostics(projectDir, discoveryStartedAt), ...diagnostics].slice(-8),
     });
   } finally {
     firebaseLogger.off('data', record);
