@@ -1143,7 +1143,7 @@ async function stepSeed(ctx) {
   return summary(notes);
 }
 
-/** ADR §6.9: the Owners' link, then `ready`. The record keeps a retry from emailing twice. */
+/** ADR §6.9: attempt the Owner notices, then `ready`. Record the attempt to avoid duplicates. */
 async function stepReady(ctx) {
   const notes = [];
   if (!ctx.ownersEmailedAt) {
@@ -1155,10 +1155,9 @@ async function stepReady(ctx) {
       adminLink: `https://${ctx.domain}/admin`,
       note: 'Automatic ticket approval is off. Review ticket holders in Attendees, or enable Automatic ticket approval in Settings after you review the access policy.',
     });
-    if (!sent) throw new Error('we could not email every Owner');
     ctx.ownersEmailedAt = new Date(ctx.deps.now());
     await ctx.recordRef.update({ ownersEmailedAt: ctx.ownersEmailedAt });
-    notes.push('emailed the Owners');
+    notes.push(sent ? 'emailed the Owners' : 'some Owner emails could not be sent');
   }
   if (!(await moveStatus(ctx, 'building', 'ready'))) throw new Error('the request is no longer building');
   notes.push('the site is ready');
