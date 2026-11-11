@@ -44,6 +44,7 @@ const { senderAddress, toInitAnswers } = require('../console/functions/src/check
 const { siteAddress } = require('../console/functions/src/siteNames.cjs');
 const { internals: { WEBHOOK_EVENTS } } = require('../functions/src/ticketing/providers/stripe.cjs');
 const { internals: { stampVerification } } = require('./verify-sender-domain.cjs');
+const { internals: { stampWebhookRegistration } } = require('./register-ticketing-webhook.cjs');
 
 const CRM = 'https://cloudresourcemanager.googleapis.com/v3';
 const BILLING = 'https://cloudbilling.googleapis.com/v1';
@@ -60,6 +61,7 @@ const ARTIFACTS = 'https://artifactregistry.googleapis.com/v1';
 const CLOUDFLARE = 'https://api.cloudflare.com/client/v4';
 const POSTMARK = 'https://api.postmarkapp.com';
 const STRIPE = 'https://api.stripe.com/v1';
+const PLATFORM_STRIPE_SECRET = 'CONSOLE_STRIPE_SECRET_KEY';
 const EVENTBRITE = 'https://www.eventbriteapi.com/v3';
 const GITHUB = 'https://api.github.com';
 
@@ -804,31 +806,62 @@ async function testToken(ctx, choice, token, connection) {
   }
 }
 
+/**
+ * Stripe refuses webhook endpoint calls made with a Connect OAuth token
+ * (403 oauth_not_supported), so a live Connect build manages the endpoint on
+ * CCM's platform account with `connect=true`. That endpoint receives events
+ * for every connected account; the site's Stripe provider drops events whose
+ * `account` is not its own. A test build keeps the direct test key.
+ */
+async function stripeWebhookAuth(ctx, token, connection) {
+  if (connection?.livemode === false) return { key: token, connect: false };
+  const key = await ctx.deps.consoleSecrets.readSecret(PLATFORM_STRIPE_SECRET);
+  if (!key) throw new Error(`the platform Stripe key (${PLATFORM_STRIPE_SECRET}) is missing from the console project`);
+  return { key, connect: true };
+}
+
 /** Stripe gives a signing secret only on create, so a lost one means a new endpoint. */
-async function stripeEndpoint(ctx, token, notes) {
-  const headers = { Authorization: `Bearer ${token}` };
+async function stripeEndpoint(ctx, token, notes, connection) {
+  const auth = await stripeWebhookAuth(ctx, token, connection);
+  const headers = { Authorization: `Bearer ${auth.key}` };
   const url = functionUrl(ctx, 'ticketingWebhook');
   const listed = await call(ctx, 'read the payment webhooks', `${STRIPE}/webhook_endpoints?limit=100`, { headers, quiet: true });
   const existing = (listed.data || []).filter((endpoint) => endpoint.url === url);
+  // A platform Connect endpoint receives every connected account's events, so a
+  // second live site's endpoint would send one client's payments to another
+  // client's project. Until a shared receiver routes events by account
+  // (#835), only one live Connect site may have an endpoint.
+  const other = auth.connect && (listed.data || []).find((endpoint) => endpoint.url !== url && /\/ticketingWebhook$/.test(endpoint.url || ''));
+  if (other) {
+    throw new Error(`another live site already has a platform payment webhook (${other.id}); a second live Stripe site needs the shared receiver first (issue 835)`);
+  }
   const secret = await ctx.clientSecrets.readSecret(WEBHOOK_SECRET);
   // Stripe shows a signing secret once, so only the endpoint recorded with it is known to match.
   const good = secret && existing.find((endpoint) => (
     endpoint.id === ctx.stripeEndpointId && endpoint.status === 'enabled' && WEBHOOK_EVENTS.every((type) => endpoint.enabled_events?.includes(type))
   ));
+  const owner = auth.connect ? 'platform' : 'account';
   if (good) {
     await putClientSecret(ctx, WEBHOOK_SECRET, secret);
+    if (ctx.stripeEndpointOwner !== owner) {
+      ctx.stripeEndpointOwner = owner;
+      await ctx.recordRef.update({ stripeEndpointOwner: owner });
+    }
     return;
   }
   for (const endpoint of existing) {
     await call(ctx, 'remove the payment webhook', `${STRIPE}/webhook_endpoints/${endpoint.id}`, { method: 'DELETE', headers, quiet: true });
   }
   const form = new URLSearchParams({ url });
+  if (auth.connect) form.set('connect', 'true');
   for (const type of WEBHOOK_EVENTS) form.append('enabled_events[]', type);
   const created = await call(ctx, 'create the payment webhook', `${STRIPE}/webhook_endpoints`, { method: 'POST', headers, form, quiet: true });
   if (!created.secret) throw new Error('create the payment webhook: the answer held no signing secret');
   await putClientSecret(ctx, WEBHOOK_SECRET, created.secret);
   ctx.stripeEndpointId = created.id;
-  await ctx.recordRef.update({ stripeEndpointId: created.id });
+  ctx.stripeEndpointOwner = owner;
+  // Cleanup must use the credential that owns the endpoint.
+  await ctx.recordRef.update({ stripeEndpointId: created.id, stripeEndpointOwner: owner });
   notes.push('created the payment webhook');
 }
 
@@ -886,7 +919,7 @@ async function stepTickets(ctx) {
   ctx.ticketVars = ticketing(ctx, choice, connection);
   ctx.ticketOrganization = connection.eventOrganizationId || null;
   if (choice === 'stripe') {
-    await stripeEndpoint(ctx, token, notes);
+    await stripeEndpoint(ctx, token, notes, connection);
   } else if (!(await clientSecrets.readSecret(WEBHOOK_SECRET))) {
     await putClientSecret(ctx, WEBHOOK_SECRET, randomBytes(32).toString('hex'));
     notes.push('made the ticket webhook secret');
@@ -1128,7 +1161,13 @@ async function stepSeed(ctx) {
       await providers.set({ ticketing: reset }, { merge: true });
       ticketing = reset;
     }
-    if (!ticketing.webhookRegisteredAt) {
+    if (!ticketing.webhookRegisteredAt && provider === 'stripe') {
+      // The tickets step made and checked the Stripe endpoint; the client's
+      // Connect token cannot list it, so the register script is not used.
+      if (!ctx.stripeEndpointId) throw new Error('the payment webhook was not recorded by the tickets step');
+      await stampWebhookRegistration({ db, webhookId: ctx.stripeEndpointId, now: ctx.deps.now });
+      notes.push('registered the ticket webhook');
+    } else if (!ticketing.webhookRegisteredAt) {
       const { code } = await runCommand('node', ['scripts/register-ticketing-webhook.cjs'], {
         env: childEnv(ctx, {
           TICKETING_API_TOKEN: await ctx.clientSecrets.readSecret(TOKEN_SECRET),
@@ -1318,6 +1357,7 @@ async function provision({ appId, testMode = false, deps }) {
     ticketsKey: previous.exists ? previous.data().ticketsKey || null : null,
     ticketsChangedAt: previous.exists ? previous.data().ticketsChangedAt || null : null,
     stripeEndpointId: previous.exists ? previous.data().stripeEndpointId || null : null,
+    stripeEndpointOwner: previous.exists ? previous.data().stripeEndpointOwner || null : null,
     resources: previous.exists ? previous.data().resources || {} : {},
   };
   // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
@@ -1339,6 +1379,7 @@ async function provision({ appId, testMode = false, deps }) {
       ticketsKey: ctx.ticketsKey,
       ticketsChangedAt: ctx.ticketsChangedAt,
       stripeEndpointId: ctx.stripeEndpointId,
+      stripeEndpointOwner: ctx.stripeEndpointOwner,
       environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
       resources: ctx.resources,
     });
