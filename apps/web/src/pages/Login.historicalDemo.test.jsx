@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
@@ -86,10 +86,20 @@ describe('/signin read-only demo gate', () => {
     },
   );
 
-  it.each([{}, { historicalDemo: false }])('keeps normal client sign-in available: %j', (eventConfig) => {
+  it.each([{ auth: { googleProviderEnabled: true } }, { historicalDemo: false, auth: { googleProviderEnabled: true } }])('offers both enabled sign-in methods: %j', (eventConfig) => {
     renderSignIn({ eventConfig });
     expect(screen.getByRole('textbox', { name: 'Email address' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Google/ })).toBeInTheDocument();
     expect(screen.queryByText('Sign-in is disabled in this demo')).not.toBeInTheDocument();
+  });
+
+  it.each([{}, { auth: { googleProviderEnabled: false } }])('offers emailed codes while Google setup is incomplete: %j', async (eventConfig) => {
+    sendOtpCode.mockResolvedValueOnce({ challengeId: 'fresh-client-code', expiresInMinutes: 10 });
+    renderSignIn({ eventConfig });
+    expect(screen.queryByRole('button', { name: /Google/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), { target: { value: 'owner@example.test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
+    expect(await screen.findByRole('textbox', { name: 'Six-digit code' })).toBeInTheDocument();
+    expect(sendOtpCode).toHaveBeenCalledWith('owner@example.test');
   });
 });

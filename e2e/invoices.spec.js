@@ -47,6 +47,10 @@ async function clearInvoices() {
   const db = adminDb();
   const left = await db.collection('invoices').get();
   await Promise.all(left.docs.map((doc) => doc.ref.delete()));
+  // The serial suite reuses invoice IDs after a failed attempt. Clear its
+  // audit rows too, while retaining audit records from other features.
+  const audit = await db.collection('admin_logs').get();
+  await Promise.all(audit.docs.filter((doc) => typeof doc.data().invoiceId === 'string').map((doc) => doc.ref.delete()));
   await db.collection('invoice_counters').doc('current').delete();
 }
 
@@ -60,7 +64,8 @@ function pdfText(bytes) {
     const start = match.index + match[0].length;
     const end = raw.indexOf('endstream', start);
     try {
-      chunks.push(inflateSync(Buffer.from(raw.slice(start, end).replace(/\r?\n$/, ''), 'latin1')).toString('latin1'));
+      // pdf-lib adds one LF. A preceding CR can be compressed data.
+      chunks.push(inflateSync(Buffer.from(raw.slice(start, end).replace(/\n$/, ''), 'latin1')).toString('latin1'));
     } catch {
       // Not a zlib stream.
     }

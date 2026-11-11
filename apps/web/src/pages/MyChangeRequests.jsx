@@ -156,7 +156,7 @@ export default function MyChangeRequests() {
     return (
       <article className="space-y-md">
         {heading}
-        <p>Sign in with Google or an emailed code to see your change requests.</p>
+        <p>Sign in with an emailed code to see your change requests.</p>
         <Link to="/signin" className={secondaryActionClass}>Open sign-in</Link>
       </article>
     );

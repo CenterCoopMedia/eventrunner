@@ -652,7 +652,7 @@ export default function Tickets() {
       ) : !user.emailVerified ? (
         <section className="space-y-sm">
           <SectionHead title="Verify your email before buying tickets" />
-          <p>Sign in with Google or an emailed code for the address that will own this order.</p>
+          <p>Sign in with an emailed code for the address that will own this order.</p>
           <button type="button" className={secondaryActionClass} onClick={() => signOut()}>Sign out to verify your email</button>
         </section>
       ) : !attempt ? renderPurchase() : null}

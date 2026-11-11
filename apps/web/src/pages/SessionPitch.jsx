@@ -229,7 +229,7 @@ export default function SessionPitch() {
               <h3 id="pitch-identity-heading" className="font-heading text-h3 font-semibold">Your sign-in</h3>
               {loading ? <p role="status">Checking your sign-in…</p>
                 : email ? <><p className="break-all text-caption text-text-secondary">Submitting as {email}</p><button type="button" className={secondaryButtonClass} onClick={signOut}>Use another account</button></>
-                  : <><p className="text-caption text-text-secondary">{user ? 'We need to confirm your email. Sign out, then sign in with Google or an email code.' : 'Sign in with Google or an emailed code to submit. Your answers stay here.'}</p>{user ? <button type="button" className={secondaryButtonClass} onClick={signOut}>Sign out</button> : <SignInPanel />}</>}
+                  : <><p className="text-caption text-text-secondary">{user ? 'We need to confirm your email. Sign out, then sign in with an emailed code.' : 'Sign in to submit. Your answers stay here.'}</p>{user ? <button type="button" className={secondaryButtonClass} onClick={signOut}>Sign out</button> : <SignInPanel />}</>}
             </section>
           ) : null}
           <StepPager

@@ -76,7 +76,7 @@ export default function TicketClaim() {
             ? 'Sign in to claim your ticket'
             : reauthenticate === identity
               ? 'Your sign-in could not be verified. Sign in again before claiming your ticket.'
-              : 'Verify your email before claiming your ticket. Sign in with Google or an emailed code below.'}
+              : 'Verify your email before claiming your ticket. Sign in with an emailed code below.'}
         </p>
         <SignInPanel key={identity || 'signed-out'} initialEmail={user?.email || ''} onSignedIn={() => setReauthenticate(null)} />
       </article>

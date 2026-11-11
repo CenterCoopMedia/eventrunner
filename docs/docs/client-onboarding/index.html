@@ -207,15 +207,18 @@
           <h3 id="12-firebase-auth-manual-console-steps">1–2. Firebase Auth (manual console steps)<a class="heading-anchor" href="#12-firebase-auth-manual-console-steps" aria-label="Link to this section">#</a></h3>
           <p>Firebase Console → Authentication:</p>
           <ol>
-          <li><strong>Sign-in method</strong> → enable <strong>Google</strong>. Set the project support email and the public-facing app
+          <li><p><strong>Sign-in method</strong> → enable <strong>Google</strong>. Set the project support email and the public-facing app
           name — both appear in the Google consent dialog. Emailed one-time codes work without this;
-          Google sign-in specifically does not.</li>
-          <li><strong>Settings → Authorized domains</strong> → add the client&#39;s custom domain (the one from <code>EVENT_PUBLIC_URL</code>)
+          Google sign-in specifically does not.</p>
+          <p>Until Google setup is recorded with <code>--attest-auth</code>, the sign-in form offers emailed codes.
+          Recording the setup makes the Google option available too. The historical demo&#39;s admin sign-in
+          remains Google-only.</p></li>
+          <li><p><strong>Settings → Authorized domains</strong> → add the client&#39;s custom domain (the one from <code>EVENT_PUBLIC_URL</code>)
           <strong>and</strong> the Hosting default domain (<code>&lt;EVENT_HOSTING_SITE&gt;.web.app</code>). Sign-in fails silently on
           any domain not on this list — this bites operators who verify the custom domain and forget the
           default one is still needed for previews and the pre-cutover URL. For a custom domain added with
           <code>scripts/add-web-address.cjs</code> (item 3), the status check adds it to the list itself once Hosting
-          serves it; the default domain is still yours to add.</li>
+          serves it; the default domain is still yours to add.</p></li>
           </ol>
           <p>There is no Admin SDK read for &quot;is Google sign-in enabled&quot; — nothing in the platform can check
           this for you. Once both steps are done, record it:</p>

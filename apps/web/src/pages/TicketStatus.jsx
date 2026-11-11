@@ -100,7 +100,7 @@ export default function TicketStatus() {
   if (demo) return <article className="space-y-md">{heading}<p>This event demo does not create orders or take payments.</p></article>;
   if (authLoading) return <p role="status">Checking your sign-in…</p>;
   if (!user) return <article className="space-y-md">{heading}<h2 className="font-heading text-h2">Sign in to view your order</h2><p>Use the purchaser’s verified email. Your order number and return link do not give other people access to your order.</p><SignInPanel /></article>;
-  if (!user.emailVerified) return <article className="space-y-md">{heading}<p>A verified email is required to view an order. Sign in using Google or an emailed code.</p><Link to="/signin" className={secondaryActionClass}>Open sign-in</Link></article>;
+  if (!user.emailVerified) return <article className="space-y-md">{heading}<p>A verified email is required to view an order. Sign in with an emailed code.</p><Link to="/signin" className={secondaryActionClass}>Open sign-in</Link></article>;
   if (!(orderId || requestId)) return <article className="space-y-md">{heading}<p>Open the order link from your confirmation, or view tickets assigned to your account.</p><Link to="/tickets/mine" className={secondaryActionClass}>View your tickets</Link></article>;
 
   function startAnother() {
