@@ -920,6 +920,15 @@ test('a retry after the token moved finds it in the client project', async () =>
   assert.equal(fake.clientSecrets.store.get('TICKETING_API_TOKEN'), STRIPE_TOKEN);
 });
 
+test('a retry after the endpoint was made keeps its platform ownership on the record', async () => {
+  const fake = setup({ cloud: { deployFailures: 3 } });
+  await provision({ appId: 'a1', deps: fake.deps });
+  assert.equal(fake.db.read('console_builds/a1').stripeEndpointOwner, 'platform');
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.endpoints.length, 1, 'the retry reuses the endpoint');
+  assert.equal(fake.db.read('console_builds/a1').stripeEndpointOwner, 'platform');
+});
+
 test('a signing secret that did not save is not paired with the new account\'s endpoint', async () => {
   const fake = setup();
   const stored = () => fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET');

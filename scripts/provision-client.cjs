@@ -840,8 +840,13 @@ async function stripeEndpoint(ctx, token, notes, connection) {
   const good = secret && existing.find((endpoint) => (
     endpoint.id === ctx.stripeEndpointId && endpoint.status === 'enabled' && WEBHOOK_EVENTS.every((type) => endpoint.enabled_events?.includes(type))
   ));
+  const owner = auth.connect ? 'platform' : 'account';
   if (good) {
     await putClientSecret(ctx, WEBHOOK_SECRET, secret);
+    if (ctx.stripeEndpointOwner !== owner) {
+      ctx.stripeEndpointOwner = owner;
+      await ctx.recordRef.update({ stripeEndpointOwner: owner });
+    }
     return;
   }
   for (const endpoint of existing) {
@@ -854,8 +859,9 @@ async function stripeEndpoint(ctx, token, notes, connection) {
   if (!created.secret) throw new Error('create the payment webhook: the answer held no signing secret');
   await putClientSecret(ctx, WEBHOOK_SECRET, created.secret);
   ctx.stripeEndpointId = created.id;
+  ctx.stripeEndpointOwner = owner;
   // Cleanup must use the credential that owns the endpoint.
-  await ctx.recordRef.update({ stripeEndpointId: created.id, stripeEndpointOwner: auth.connect ? 'platform' : 'account' });
+  await ctx.recordRef.update({ stripeEndpointId: created.id, stripeEndpointOwner: owner });
   notes.push('created the payment webhook');
 }
 
@@ -1351,6 +1357,7 @@ async function provision({ appId, testMode = false, deps }) {
     ticketsKey: previous.exists ? previous.data().ticketsKey || null : null,
     ticketsChangedAt: previous.exists ? previous.data().ticketsChangedAt || null : null,
     stripeEndpointId: previous.exists ? previous.data().stripeEndpointId || null : null,
+    stripeEndpointOwner: previous.exists ? previous.data().stripeEndpointOwner || null : null,
     resources: previous.exists ? previous.data().resources || {} : {},
   };
   // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
@@ -1372,6 +1379,7 @@ async function provision({ appId, testMode = false, deps }) {
       ticketsKey: ctx.ticketsKey,
       ticketsChangedAt: ctx.ticketsChangedAt,
       stripeEndpointId: ctx.stripeEndpointId,
+      stripeEndpointOwner: ctx.stripeEndpointOwner,
       environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
       resources: ctx.resources,
     });
