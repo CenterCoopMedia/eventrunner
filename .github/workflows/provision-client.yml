@@ -39,6 +39,7 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
+  EVENT_SUPPORT_ADMIN_EMAILS: ${{ vars.EVENT_SUPPORT_ADMIN_EMAILS || 'jamditis@gmail.com,amditisjunk@gmail.com' }}
 
 jobs:
   guard:

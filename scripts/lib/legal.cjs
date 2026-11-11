@@ -121,6 +121,7 @@ function buildPrivacyBlocks(ctx) {
       blockType: 'richtext',
       value: clause(
         `We share personal information with the service providers that run this site: ${processors.join(', ')}. ` +
+        'If the Center for Cooperative Media (CCM) hosts this site, authorized CCM staff and its support account have full operator access to site content, attendee records and settings to provide support and diagnose problems. ' +
         'We do not sell personal information.',
       ),
     },

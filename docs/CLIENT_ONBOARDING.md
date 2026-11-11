@@ -214,6 +214,10 @@ after debugging a cryptic failure.
 
 ### 7. First operator, then a second
 
+Console-built sites also include CCM's configured support accounts as full operators. The builder reads `EVENT_SUPPORT_ADMIN_EMAILS`, merges those addresses into `config/bootstrap.adminEmails`, and identifies them through `config/bootstrap.supportAdminEmails`. The default list is set once in `provision-client.yml`; a repository or Environment variable can override it. A build retry preserves client operators and adds the configured support accounts again. No support sign-in email is sent by provisioning.
+
+Explain that CCM support can access site content, attendee records and settings for diagnosis and support. **Settings → Access** labels these accounts **CCM support**. Clients can change or remove them under the existing last-operator rule. Give another organizer operator access so the client team can manage access independently.
+
 The first operator (from `--admin` above, or `config/bootstrap.adminEmails`) signs in and confirms
 the admin panel loads. Point them at **Set up your event** on the rail: it shows every row of
 `--check` (§4) as a step, says which steps are theirs, and links to the screen for each. Then, from **admin Settings → Access**, grant a second operator — do not

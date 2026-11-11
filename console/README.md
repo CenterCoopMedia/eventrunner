@@ -74,6 +74,7 @@ A member record repeats its own uid. Firestore cannot query a collection group b
 ## Roles
 
 - **Owner**: runs the event site and manages the team. In the event admin, an Owner is an operator.
+- **CCM support**: the builder merges `EVENT_SUPPORT_ADMIN_EMAILS` into the site's operator list. These accounts are labeled in Access, have full operator permissions, and use the same change/removal rules as other operators. A build retry adds the configured support accounts again and preserves client operators.
 - **Editor**: edits the event content. In the event admin, an Editor is staff.
 - **Operator**: a CCM person named in `console_config/operators`. An operator can read every organization and team, and reviews requests. An operator does not change a client's team.
 

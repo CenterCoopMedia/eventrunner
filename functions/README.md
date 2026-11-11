@@ -31,6 +31,8 @@ Admin identity is the server-only `config/bootstrap` document, which carries two
 
 An address on either list is an admin. An address on both is an operator. Both lists are stored lowercase, because `firestore.rules` matches them against the lowercased token email.
 
+The builder merges `EVENT_SUPPORT_ADMIN_EMAILS` into `adminEmails` and records their identities in `supportAdminEmails`. This server-only metadata adds `support: true` to matching listed accounts in `listAdminAccess`; it grants no access by itself. The Access page labels those rows **CCM support**. Normal change, removal and last-operator rules apply. A provisioning retry restores the configured support operators and preserves client operators and unrelated bootstrap fields.
+
 **One gate, one option.** Every admin endpoint calls `requireAdmin(deps, req, { tier })` from `src/core/auth.cjs` and states its tier at that call, nowhere else:
 
 ```js
