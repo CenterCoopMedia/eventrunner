@@ -1,6 +1,8 @@
 // The public videos page, docs/videos/index.html. preview-page.mjs writes it
 // after each verified export; the markup matches the hand-written marketing
 // pages (shared header, footer, styles.css and site.js).
+import{createRequire}from'node:module';
+const{themeColorTags}=createRequire(import.meta.url)('../scripts/build-pages.cjs');
 export const titles={'general-trailer':'Introduction','publish-page':'Publish a page update','save-schedule':'Save your personal schedule','change-style':'Change your site style'};
 export const sectionIds={'general-trailer':'introduction','publish-page':'publish-page','save-schedule':'save-schedule','change-style':'change-style'};
 export const escape=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
@@ -62,9 +64,7 @@ export function videosPage(sections){return`<!DOCTYPE html>
   <meta name="twitter:description" content="${description}">
   <meta name="twitter:image" content="${url}social-preview.png">
   <meta name="twitter:image:alt" content="${imageAlt}">
-  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
-  <link rel="preload" href="../fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+${themeColorTags().map(tag=>`  ${tag}\n`).join('')}  <link rel="preload" href="../fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../tokens.css">
   <link rel="stylesheet" href="../styles.css">

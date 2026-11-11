@@ -58,7 +58,6 @@
   });
 
   example.querySelector('.example-controls').hidden = false;
-  example.querySelector('.example-caption').textContent = 'Interactive example · Your choices reset when you leave.';
   feedback.textContent = 'A fictional event. Try saving a session.';
   example.classList.add('is-interactive');
   render();
