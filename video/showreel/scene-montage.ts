@@ -2,7 +2,7 @@
 // Here the whole product is one run sheet: eight ruled bands, lit from the top
 // on the beat, then folded into a point. Bands appear where they stay; on a
 // fast cut list that is what keeps bright areas from flashing.
-import {type C, type Format, type Project, type RGB, W, H, prog, outCubic, inCubic, outExpo, lerp, rgb, text, fillBox, strokeBox, disc, quadPoints, along, trace} from './kit.ts';
+import {type C, type Format, type Project, type RGB, W, H, prog, outCubic, inCubic, outExpo, lerp, rgb, text, fillBox, strokeBox, disc, line, quadPoints, along, trace} from './kit.ts';
 import {type Scene, ground, PARTS} from './shared.ts';
 
 /**
@@ -69,8 +69,13 @@ export function montage(p: Project): Scene {
   return {from: start, to: end, draw(c: C, f: number) {
     ground(c, D);
     for (let i = 0; i < PARTS.length; i++) band(c, i, f);
-    // After the fold, one point of light waits through the silence.
-    const dot = prog(f, q.implode - 2, q.implode);
-    if (dot > 0) disc(c, W / 2, H / 2, 9 * dot, rgb(D.ink));
+    // After the fold, one point of light is left for the half beat before the title.
+    // It must not wait: a still picture there looked like a freeze. The point opens
+    // into a rule that runs to both edges, the motif the film began with, and the
+    // title cuts in as it arrives. A thin line is a small area, so the flash screen
+    // does not count it.
+    const dot = prog(f, q.implode - 2, q.implode), run = prog(f, q.implode, end) ** 1.4;
+    if (run > 0) line(c, W / 2 - W / 2 * run, H / 2, W / 2 + W / 2 * run, H / 2, rgb(D.ink), 4 - 1.5 * run);
+    if (dot > 0) disc(c, W / 2, H / 2, 9 * dot * (1 - .6 * run), rgb(D.ink));
   }};
 }

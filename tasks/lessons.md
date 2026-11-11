@@ -363,3 +363,18 @@ Rules written after user corrections. Read at session start.
 - Give phones a bass line they can play. A sub-only bass and kick vanish on
   a phone speaker, and the vertical cut is for phones: keep harmonics above
   200 Hz in both.
+
+## 2026-11-11: a change too small to read as a choice reads as a fault
+
+- Joe watched and listened to every version. He had two notes: a flicker at
+  the start of the vertical cut, and a very small pause and silence before
+  the title in both cuts.
+- The pause was by design: seven frames of digital silence over one still
+  dot. The flicker was a cut from zoom 1.2 to 1.12 in the vertical opening,
+  which the flash limit had forced. No measurement flagged either one.
+- Rule: a rest, a hold or a cut must be large enough to read as a decision.
+  Under about half a second, do not stop the picture or the sound; fill the
+  gap with a lead-in. Do not cut between framings that differ by less than
+  about 20 percent; hold the camera.
+- A person must watch at speed before I call a film finished. Numbers and
+  still frames cannot show a freeze or a jitter.

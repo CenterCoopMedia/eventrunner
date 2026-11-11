@@ -30,17 +30,19 @@ test('the mix is finite and leaves headroom for the encoder', () => {
   assert.ok(peak > .4, `peak ${peak}`);
 });
 
-test('the breath before the title and the last three frames are digital silence', () => {
-  const zero = (from, to) => { for (let i = from; i < to; i++) if (score.left[i] !== 0 || score.right[i] !== 0) return i; return -1; };
-  const [a, b] = timeline.silence;
-  assert.equal(zero(sample(a), sample(b)), -1);
-  assert.equal(zero(sample(timeline.duration - 3), score.count), -1);
-  assert.ok(level(mix, sample(b), sample(b) + RATE / 10) > -30, 'the title chord follows the breath');
-});
-
-test('the sound fades into the breath, with no step', () => {
-  const cut = sample(timeline.silence[0]);
-  for (const side of [score.left, score.right]) assert.ok(Math.abs(side[cut - 1]) < .005, `last sample before the silence is ${side[cut - 1]}`);
+test('the band stops for the half beat before the title, and a lead-in carries it', () => {
+  // Joe heard the first version of this half beat, digital silence over a still picture, as a freeze.
+  const [a, b] = timeline.silence.map(sample), half = (a + b) >> 1;
+  for (const name of ['drums', 'bass', 'chords', 'lead', 'pad']) assert.ok(level(score.stems[name], a, b) < -90, `${name} is silent in the half beat`);
+  assert.ok(level(mix, a, b) > -40, `the half beat is not a hole: ${level(mix, a, b)} dB`);
+  assert.ok(level(mix, half, b) > level(mix, a, half) + 3, 'the lead-in rises to the title');
+  assert.ok(level(mix, a, b) < level(mix, b, b + RATE / 10) - 6, 'the title chord is louder than the lead-in');
+  // No step where the band stops, and digital silence only at the very end.
+  for (const side of [score.left, score.right]) {
+    let usual = 0; for (let i = a + 1; i < a + RATE / 20; i++) usual = Math.max(usual, Math.abs(side[i] - side[i - 1]));
+    assert.ok(Math.abs(side[a] - side[a - 1]) <= usual, `step of ${side[a] - side[a - 1]} where the band stops; the sound after it changes by ${usual} at most`);
+  }
+  for (let i = sample(timeline.duration - 3); i < score.count; i++) assert.ok(score.left[i] === 0 && score.right[i] === 0, 'the last three frames are digital silence');
 });
 
 test('every picture cue has a sound on its frame', () => {

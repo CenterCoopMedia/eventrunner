@@ -13,8 +13,9 @@ import {type Scene, ground, LAYOUT as SHARED, streaks, rule, SOFT} from './share
 export const LAYOUT: Record<Format, {origin: Point; keys: [number, number, number][]}> = {
   landscape: {origin: [720, 300], keys: [[918, 558, 4.4], [954, 558, 3.7], [954, 579, 3.0], [954, 579, 3.0], [960, 528, 1.32], [960, 540, 1]]},
   // The mark's centre sits at (540, 880). The wide framing stays a little close,
-  // so the figure still fills the narrow frame while he crouches.
-  vertical: {origin: [300, 640], keys: [[498, 898, 4.4], [534, 898, 3.7], [534, 919, 3.0], [534, 919, 3.0], [540, 870, 1.2], [540, 880, 1.12]]},
+  // so the figure still fills the narrow frame. The last two framings are the same:
+  // a cut from zoom 1.2 to 1.12 is too small to read as a cut, and looked like a flicker.
+  vertical: {origin: [300, 640], keys: [[498, 898, 4.4], [534, 898, 3.7], [534, 919, 3.0], [534, 919, 3.0], [540, 880, 1.12], [540, 880, 1.12]]},
 };
 
 export function open(p: Project): Scene {

@@ -60,7 +60,7 @@ frames; every cue is a whole frame.
 | 7–10 | 338–562 | Shape | The style picker changes the site through six styles, each with a different wipe. The dark mode sweeps in, then all twelve looks show as a wall. |
 | 11–14 | 563–787 | Gather | A ticket is bought in five steps and torn. Its main part becomes the first badge at check-in. Sessions are saved to a phone. One announcement goes to everyone registered. |
 | 15–18 | 788–1012 | One site | Five parts float as an exploded stack and are named. On the build they close one at a time, turn to face the viewer and become the published page. |
-| 19–20 | 1013–1124 | Montage | A run sheet: eight ruled colour bands, one for each part of the product, are lit from the top on seven beats. On the eighth beat they fold into a point. Half a beat of silence. |
+| 19–20 | 1013–1124 | Montage | A run sheet: eight ruled colour bands, one for each part of the product, are lit from the top on seven beats. On the eighth beat they fold into a point. For the last half beat the point opens into a rule that runs to both edges and a reverse cymbal rises to the title: the band stops, but the picture and the sound do not. |
 | 21–24 | 1125–1349 | Title | On the chord Badger is large and running on the spot. The landing cuts to the official lockup, and the name is uncovered beside the mark. "Make room for your event." and "Plan. Shape. Gather." follow. The layout is at rest from frame 1252; after that only one blink at frame 1294 and the grain move. |
 
 ## Two formats
@@ -83,7 +83,8 @@ of a site, so their small type is smaller than that.
 
 - **Open.** The same rig and cuts, with the mark's centre at (540, 880). The
   close framings are the landscape ones moved to that centre. The whole figure
-  is at a zoom of 1.2 and the crouch at 1.12. The five trailing lines land on the
+  is at a zoom of 1.12 and the camera holds there for the crouch: a cut from 1.2
+  to 1.12 is too small to read as a cut and looked like a flicker. The five trailing lines land on the
   vertical rules: y 700 to 1500, x 60 to 1020.
 - **Plan.** "Plan." with two captions above a header row: the day on the left,
   the record state and Publish on the right. Four cards 960 wide sit between
@@ -235,7 +236,7 @@ bass plays that figure too.
 | 13–14 | Gather | The full groove returns and the hook plays its second half, with a harmony. |
 | 15–16 | One site | Open bars: a wide pad, and the hook at half speed as bells. |
 | 17–18 | One site | The build: snare from quarters to sixteenths, stabs from eighths to sixteenths, a climbing pluck line and a riser. |
-| 19–20 | Montage | The peak: the hook with an octave above it, and a tuned drum that climbs with each band. Everything stops at beat 79.5. |
+| 19–20 | Montage | The peak: the hook with an octave above it, and a tuned drum that climbs with each band. The band stops at beat 79.5; the reverb, a reverse cymbal and a rising sweep carry the half beat to the title. |
 | 21–24 | Title | The A chord, held. "Plan. Shape. Gather." are C♯, E and A: the chord of home, one note a word. |
 
 ### Sound design
@@ -259,7 +260,11 @@ of the picture is a quick low-pass dip in the music.
 
 Some events have a sound made only for them: a pen for the badge outline, a
 printer for the ticket, torn paper for the stub, a different texture for each
-of the six wipes, and a fold that pulls the sound down into the silence.
+of the six wipes, and a fold that pulls the sound down before the title.
+
+The first version had half a beat of digital silence over a still picture
+before the title. Seven frames is too short to read as a rest; it read as a
+freeze. A stop that short needs a lead-in.
 
 ### Mix
 
@@ -302,7 +307,7 @@ person must listen on headphones, laptop speakers and a phone before release.
 
 `npm --prefix video run check` runs `tests/showreel.test.mjs` (clock, cue order,
 fixture-only content, contrast, the rig against the mark, the run cycle) and
-`tests/showreel-score.test.mjs` (length, determinism, headroom, exact silences,
+`tests/showreel-score.test.mjs` (length, determinism, headroom, the lead-in to the title, silence at the end,
 a sound for each cue, every note in the key, the shape of the arrangement, a
 mono low end, and the signal tools).
 

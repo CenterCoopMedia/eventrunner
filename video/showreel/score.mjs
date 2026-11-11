@@ -348,8 +348,12 @@ export function compose(clock, {stems = false} = {}) {
   { const len = (cut - B(79)) / RATE - .01; let ph = 0; const bp = filter(); place(fx, render(len, (t, i) => { const x = t / len; if ((i & 15) === 0) bp.set(5200 * (160 / 5200) ** x, 1.5); bp.run(noise()); ph += TAU * (520 * (55 / 520) ** x) / RATE; return (bp.band * 1.6 + Math.sin(ph) * .5) * Math.sin(Math.PI * Math.min(1, x * 1.15)) ** .8; }), B(79), .5, 0); }
   mark('montage.panels', mo.panels[7]); mark('montage.implode', mo.implode);
 
-  // Everything stops for the breath before the title.
+  // The band stops for the half beat before the title. The reverb tails ring on.
   for (const b of [drums, bass, chords, lead, pad, fx, room, hall, taps]) for (const ch of [b.left, b.right]) { for (let i = cut - 200; i < cut; i++) ch[i] *= (cut - i) / 200; ch.fill(0, cut); }
+
+  // A reversed cymbal and a rising sweep fill that half beat and end on the chord. With
+  // digital silence here, over a still picture, the half beat sounded like a fault.
+  { const len = (title - cut) / RATE, rise = swell(CR2, len); for (let i = 0; i < 480; i++) rise[i] *= i / 480; voice(fx, rise, cut, .34, 0, {hall: .3}); voice(fx, whoosh(len, 500, 6500, .97, 1.2), cut, .3, [-.3, .3]); }
 
   // Title: the first A major chord of the piece.
   voice(drums, impact(2.2), title, .8, 0, {hall: .4}); voice(drums, CR2, title, .3, 0, {hall: .4}); place(drums, K, title, .85);
@@ -377,7 +381,6 @@ export function compose(clock, {stems = false} = {}) {
   // The hall returns nothing below 180 Hz. Its two sides are not in phase, and low reverb is mud.
   for (const side of [hallWet.left, hallWet.right]) { const hp = biquad('highpass', 180); for (let i = 0; i < count; i++) side[i] = hp(side[i]); }
   const tapsWet = echo(taps, B(.75), {feedback: .36, clearAt: title});
-  for (const ch of [roomWet, hallWet, tapsWet]) for (const side of [ch.left, ch.right]) { for (let i = cut - 200; i < cut; i++) side[i] *= (cut - i) / 200; side.fill(0, cut, title); }
 
   // The exposure dips of the picture close a low-pass on the music for the same frames.
   const sc = clock.scenes, wall = sh.wall - Math.round(clock.beatFrames);
@@ -423,13 +426,10 @@ export function compose(clock, {stems = false} = {}) {
   compress(mix, {threshold: -12, ratio: 1.6, attack: .03, release: .2, makeup: 0});
   for (let i = 0; i < count; i++) { mix.left[i] = Math.tanh(mix.left[i] * 1.05) / 1.05; mix.right[i] = Math.tanh(mix.right[i] * 1.05) / 1.05; }
   limit(mix, .86);
-  // Exact silence in the breath and in the last three frames, and a fade to it at the end.
+  // Exact silence in the last three frames, and a fade to it at the end.
   const last = S(clock.duration - 3), fadeFrom = S(clock.duration - 45);
   for (let i = 0; i < count; i++) {
     let g = Math.min(1, i / 1600);
-    // The last 5 ms before the breath fade out here too: the filters above still ring after the buses stop.
-    if (i >= cut - 240 && i < cut) g *= (cut - i) / 240;
-    if (i >= cut && i < title) g = 0;
     if (i >= fadeFrom) g *= smooth((last - i) / (last - fadeFrom));
     if (i >= last) g = 0;
     mix.left[i] *= g; mix.right[i] *= g;
