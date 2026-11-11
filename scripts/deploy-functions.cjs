@@ -35,6 +35,7 @@ const functionsRuntimes = require('firebase-tools/lib/deploy/functions/runtimes/
 const functionsEnv = require('firebase-tools/lib/functions/env.js');
 const functionsProjectConfig = require('firebase-tools/lib/functions/projectConfig.js');
 const { getFirebaseConfig } = require('firebase-tools/lib/functionsConfig.js');
+const firebaseLogger = require('firebase-tools/lib/logger.js').logger;
 const {
   endpointMatchesFilter,
   parseFunctionSelector,
@@ -59,6 +60,112 @@ function reportFailure(label, result, error) {
   return detail ? `${label}: ${detail}` : `${label} (exit ${result.status ?? 'unknown'})`;
 }
 
+const DIAGNOSTIC_ERROR_TYPES = new Set(['Error', 'FirebaseError', 'FetchError', 'AbortError', 'TypeError', 'SyntaxError', 'ReferenceError', 'RangeError']);
+const DIAGNOSTIC_ERROR_CODES = new Set([
+  'ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN',
+  'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'EPROTO', 'ABORT_ERR',
+  'ERR_STREAM_PREMATURE_CLOSE', 'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT',
+  'INVENTORY_NO_AVAILABILITY', 'INVENTORY_UNREACHABLE_REGIONS', 'INVENTORY_BAD_ENDPOINTS',
+  'FUNCTIONS_ANALYSIS_FAILED', 'FUNCTIONS_NO_RUNTIME', 'FUNCTIONS_BAD_ENDPOINTS',
+  'FUNCTIONS_RETRY_VALUE', 'FUNCTIONS_RETRY_REGIONS',
+  'FUNCTIONS_CONFIG_CODEBASE', 'FUNCTIONS_CONFIG_SOURCE',
+  'MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND', 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+  'ERR_REQUIRE_ESM', 'ERR_REQUIRE_ASYNC_MODULE', 'ENOENT', 'EACCES',
+]);
+
+function diagnosticLocations(message, projectDir) {
+  const locations = [];
+  const pattern = /(?:^|[\s(/\\])((?:(?:functions|scripts)[/\\]|node_modules[/\\](?:firebase-functions|firebase-tools)[/\\]lib[/\\])[A-Za-z0-9_./\\-]+\.(?:cjs|js)):(\d+)(?::(\d+))?/g;
+  for (const match of message.matchAll(pattern)) {
+    const file = match[1].replaceAll('\\', '/');
+    if (file.split('/').includes('..') || !fs.existsSync(path.join(projectDir, file))) continue;
+    locations.push(`${file}:${match[2]}${match[3] ? `:${match[3]}` : ''}`);
+    if (locations.length === 3) break;
+  }
+  return locations;
+}
+
+function diagnosticDetail(error, projectDir = PROJECT_DIR) {
+  const detail = {};
+  if (DIAGNOSTIC_ERROR_TYPES.has(error.name)) detail.type = error.name;
+  // FirebaseError defaults this field to 500 even without an HTTP response.
+  if (Number.isInteger(error.status) && error.status >= 100 && error.status <= 599) detail.sdkStatus = error.status;
+  if (Number.isInteger(error.httpStatus) && error.httpStatus >= 100 && error.httpStatus <= 599) detail.httpStatus = error.httpStatus;
+  if (DIAGNOSTIC_ERROR_CODES.has(error.code)) detail.code = error.code;
+  if (['FUNCTIONS_RETRY_VALUE', 'FUNCTIONS_RETRY_REGIONS'].includes(error.code)
+      && typeof error.functionId === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,62}$/.test(error.functionId)) {
+    detail.function = error.functionId;
+  }
+  if (error.code === 'INVENTORY_UNREACHABLE_REGIONS' && Array.isArray(error.regions)) {
+    detail.regions = error.regions.slice(0, 20).filter((region) => typeof region === 'string' && /^[a-z]+(?:-[a-z]+)+\d{1,2}$/.test(region));
+  }
+  if (Array.isArray(error.locations)) {
+    const text = error.locations.slice(0, 3).filter((entry) => typeof entry === 'string').map((entry) => entry.slice(0, 256)).join('\n');
+    const locations = diagnosticLocations(text, projectDir);
+    if (locations.length) detail.locations = locations;
+  }
+  return detail;
+}
+
+function diagnosticFailure(label, phase, error) {
+  const pending = [error];
+  const seen = new Set();
+  const causes = [];
+  // Firebase wraps transport failures in original; Node errors can use cause.
+  // Only fixed diagnostic fields are safe: messages and context can hold tokens or URLs.
+  for (let index = 0; index < pending.length && index < 4; index += 1) {
+    const current = pending[index];
+    if (!current || typeof current !== 'object' || seen.has(current)) continue;
+    seen.add(current);
+    const detail = diagnosticDetail(current);
+    if (Object.keys(detail).length > 0) causes.push(detail);
+    for (const cause of [current.original, current.cause]) {
+      if (cause && typeof cause === 'object' && !seen.has(cause)) pending.push(cause);
+    }
+  }
+  const analysis = Array.isArray(error?.analysisDiagnostics)
+    ? error.analysisDiagnostics.slice(-8).map((entry) => {
+      const detail = diagnosticDetail({ name: entry?.type, code: entry?.code, status: entry?.sdkStatus,
+        httpStatus: entry?.httpStatus, locations: entry?.locations });
+      if (Object.keys(detail).length && ['sdk', 'firebase-debug.log'].includes(entry?.source)) detail.source = entry.source;
+      return detail;
+    }).filter((entry) => Object.keys(entry).length > 0)
+    : [];
+  return `${label}: ${JSON.stringify({ phase, causes, ...(analysis.length ? { analysis } : {}) })}`;
+}
+
+/** Arbitrary SDK text can contain credentials. Emit only fixed classifications. */
+function sdkDiagnostic(message, projectDir = PROJECT_DIR) {
+  if (typeof message !== 'string') return null;
+  const text = message.slice(-8192);
+  const type = [...DIAGNOSTIC_ERROR_TYPES].find((name) => new RegExp(`\\b${name}:`).test(text));
+  const code = [...DIAGNOSTIC_ERROR_CODES].find((name) => new RegExp(`\\b${name}\\b`).test(text));
+  const status = message.match(/Got response code ([1-5]\d\d); body /);
+  const detail = diagnosticDetail({ name: type, code, httpStatus: status ? Number(status[1]) : undefined,
+    locations: diagnosticLocations(text, projectDir) }, projectDir);
+  return Object.keys(detail).length ? detail : null;
+}
+
+function debugLogDiagnostics(projectDir, discoveryStartedAt) {
+  let descriptor;
+  try {
+    const file = path.join(projectDir, 'firebase-debug.log');
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.mtimeMs < discoveryStartedAt) return [];
+    descriptor = fs.openSync(file, 'r');
+    const size = fs.fstatSync(descriptor).size;
+    const buffer = Buffer.alloc(Math.min(size, 32768));
+    fs.readSync(descriptor, buffer, 0, buffer.length, size - buffer.length);
+    return buffer.toString('utf8').split('\n').slice(-20).map((line) => sdkDiagnostic(line, projectDir)).filter(Boolean)
+      .slice(-8).map((detail) => ({ ...detail, source: 'firebase-debug.log' }));
+  } catch {
+    return [];
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
+  }
+}
+
 async function readCompleteInventory(projectId, {
   authenticate = requireAuth,
   loadBackend = functionsBackend.existingBackend,
@@ -69,15 +176,15 @@ async function readCompleteInventory(projectId, {
   const backend = await loadBackend(context);
   const availability = context.unreachableRegions;
   if (!availability || ['gcfV1', 'gcfV2', 'run'].some((key) => !Array.isArray(availability[key]))) {
-    throw new Error('Functions inventory did not report regional availability');
+    throw Object.assign(new Error('Functions inventory did not report regional availability'), { code: 'INVENTORY_NO_AVAILABILITY' });
   }
   const unreachable = Object.values(availability).flat();
   if (unreachable.length > 0) {
-    throw new Error(`Functions inventory is incomplete; unreachable region(s): ${unreachable.join(', ')}`);
+    throw Object.assign(new Error(`Functions inventory is incomplete; unreachable region(s): ${unreachable.join(', ')}`), { code: 'INVENTORY_UNREACHABLE_REGIONS', regions: unreachable });
   }
   const endpoints = allEndpoints(backend);
   if (!Array.isArray(endpoints)) {
-    throw new Error('Functions inventory returned an invalid endpoint list');
+    throw Object.assign(new Error('Functions inventory returned an invalid endpoint list'), { code: 'INVENTORY_BAD_ENDPOINTS' });
   }
   return endpoints;
 }
@@ -86,10 +193,10 @@ function readFunctionsConfig(projectDir) {
   const firebaseJson = JSON.parse(fs.readFileSync(path.join(projectDir, 'firebase.json'), 'utf8'));
   const config = functionsProjectConfig.normalizeAndValidate(firebaseJson.functions);
   if (config.length !== 1 || config[0].codebase !== functionsProjectConfig.DEFAULT_CODEBASE) {
-    throw new Error('firebase.json must define exactly one functions codebase named "default"');
+    throw Object.assign(new Error('firebase.json must define exactly one functions codebase named "default"'), { code: 'FUNCTIONS_CONFIG_CODEBASE' });
   }
   if (!config[0].source || config[0].prefix) {
-    throw new Error('the functions codebase must have a local source and no prefix');
+    throw Object.assign(new Error('the functions codebase must have a local source and no prefix'), { code: 'FUNCTIONS_CONFIG_SOURCE' });
   }
   return config;
 }
@@ -121,25 +228,45 @@ async function discoverLocalFunctions(projectId, {
     projectDir,
     runtime: codebase.runtime,
   });
-  if (!delegate) throw new Error('no functions runtime was found for the functions source');
+  if (!delegate) throw Object.assign(new Error('no functions runtime was found for the functions source'), { code: 'FUNCTIONS_NO_RUNTIME' });
   await delegate.validate();
   await delegate.build();
   const firebaseConfig = await loadFirebaseConfig();
-  const discovered = await delegate.discoverBuild({ firebase: firebaseConfig }, {
-    ...functionsEnv.loadFirebaseEnvs(firebaseConfig, projectId),
-    GOOGLE_CLOUD_QUOTA_PROJECT: projectId,
-  });
+  const diagnostics = [];
+  const record = (entry) => {
+    const detail = sdkDiagnostic(entry?.message, projectDir);
+    if (detail) {
+      diagnostics.push({ ...detail, source: 'sdk' });
+      if (diagnostics.length > 8) diagnostics.shift();
+    }
+  };
+  const discoveryStartedAt = Date.now();
+  firebaseLogger.on('data', record);
+  let discovered;
+  try {
+    discovered = await delegate.discoverBuild({ firebase: firebaseConfig }, {
+      ...functionsEnv.loadFirebaseEnvs(firebaseConfig, projectId),
+      GOOGLE_CLOUD_QUOTA_PROJECT: projectId,
+    });
+  } catch (cause) {
+    throw Object.assign(new Error('Failed to generate manifest from function source', { cause }), {
+      code: 'FUNCTIONS_ANALYSIS_FAILED',
+      analysisDiagnostics: [...debugLogDiagnostics(projectDir, discoveryStartedAt), ...diagnostics].slice(-8),
+    });
+  } finally {
+    firebaseLogger.off('data', record);
+  }
   if (!discovered || typeof discovered.endpoints !== 'object' || discovered.endpoints === null) {
-    throw new Error('functions discovery returned no endpoint list');
+    throw Object.assign(new Error('functions discovery returned no endpoint list'), { code: 'FUNCTIONS_BAD_ENDPOINTS' });
   }
 
   return Object.entries(discovered.endpoints).map(([id, endpoint]) => {
     const retry = functionsBuild.isEventTriggered(endpoint) ? endpoint.eventTrigger.retry ?? false : false;
     if (typeof retry !== 'boolean') {
-      throw new Error(`${id} has a retry setting that is not a literal true or false`);
+      throw Object.assign(new Error(`${id} has a retry setting that is not a literal true or false`), { code: 'FUNCTIONS_RETRY_VALUE', functionId: id });
     }
     const regions = literalRegions(endpoint);
-    if (retry && !regions) throw new Error(`${id} has no literal deploy region`);
+    if (retry && !regions) throw Object.assign(new Error(`${id} has no literal deploy region`), { code: 'FUNCTIONS_RETRY_REGIONS', functionId: id });
     return {
       id, retry, regions, platform: endpoint.platform,
       eventTrigger: functionsBuild.isEventTriggered(endpoint) ? endpoint.eventTrigger : null,
@@ -255,7 +382,7 @@ async function main({
   try {
     inventory = await verifyCompleteInventory(projectId);
   } catch (error) {
-    log.error(reportFailure('deploy-functions: could not verify a complete functions inventory', {}, error));
+    log.error(diagnosticFailure('deploy-functions: could not verify a complete functions inventory', 'pre-deploy-inventory', error));
     return 1;
   }
 
@@ -270,7 +397,7 @@ async function main({
     try {
       localFunctions = await discoverFunctions(projectId);
     } catch (error) {
-      log.error(reportFailure('deploy-functions: could not read the local functions', {}, error));
+      log.error(diagnosticFailure('deploy-functions: could not read the local functions', 'pre-deploy-discovery', error));
       return 1;
     }
     let plan;
@@ -303,11 +430,13 @@ async function main({
   }
 
   let deployed;
+  let verificationPhase = 'post-deploy-discovery';
   try {
     localFunctions ??= await discoverFunctions(projectId);
+    verificationPhase = 'post-deploy-inventory';
     deployed = await verifyCompleteInventory(projectId);
   } catch (error) {
-    log.error(reportFailure('deploy-functions: could not verify the deployed functions', {}, error));
+    log.error(diagnosticFailure('deploy-functions: could not verify the deployed functions', verificationPhase, error));
     return 1;
   }
   const absent = absentFunctions(deployed, localFunctions);

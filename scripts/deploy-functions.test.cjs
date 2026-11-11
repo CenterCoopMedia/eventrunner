@@ -4,6 +4,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+const { FirebaseError } = require('firebase-tools/lib/error.js');
+const firebaseLogger = require('firebase-tools/lib/logger.js').logger;
 
 const { getEndpointFilters } = require('firebase-tools/lib/deploy/functions/functionsDeployHelper.js');
 const { promptForFailurePolicies } = require('firebase-tools/lib/deploy/functions/prompts.js');
@@ -282,12 +286,14 @@ test('a failed local function discovery stops before any deploy', async () => {
     bootstrap: false,
     completeInventory: [deployed('existingHttp')],
     discover: async () => {
-      throw new Error('functions source did not load');
+      throw Object.assign(new Error('functions source did not load'), { code: 'FUNCTIONS_ANALYSIS_FAILED' });
     },
   });
   assert.equal(code, 1);
   assert.deepEqual(calls, []);
-  assert.match(errors[0], /could not read the local functions: functions source did not load/);
+  assert.match(errors[0], /could not read the local functions:/);
+  assert.match(errors[0], /"phase":"pre-deploy-discovery"/);
+  assert.match(errors[0], /"code":"FUNCTIONS_ANALYSIS_FAILED"/);
 });
 
 test('a failed inventory read on an ordinary deploy stops before any deploy', async () => {
@@ -298,13 +304,16 @@ test('a failed inventory read on an ordinary deploy stops before any deploy', as
     log: { log() {}, error: (message) => errors.push(message) },
     run: (...args) => calls.push(args),
     verifyCompleteInventory: async () => {
-      throw new Error('unreachable region');
+      throw Object.assign(new Error('unreachable region'), { code: 'INVENTORY_UNREACHABLE_REGIONS', regions: [REGION] });
     },
     discoverFunctions: async () => [local('newRetry', true)],
   });
   assert.equal(code, 1);
   assert.equal(calls.length, 0);
-  assert.match(errors[0], /could not verify a complete functions inventory: unreachable region/);
+  assert.match(errors[0], /could not verify a complete functions inventory:/);
+  assert.match(errors[0], /"phase":"pre-deploy-inventory"/);
+  assert.match(errors[0], /"code":"INVENTORY_UNREACHABLE_REGIONS"/);
+  assert.match(errors[0], /"regions":\["us-central1"\]/);
 });
 
 test('force never reaches a bare functions deploy outside the empty bootstrap', async () => {
@@ -409,11 +418,110 @@ test('a failed inventory read after the deploy fails closed', async () => {
     bootstrap: false,
     completeInventory: [deployed('existingHttp')],
     localFunctions: [local('existingHttp', false)],
-    deployedInventory: new Error('unreachable region(s): us-east1'),
+    deployedInventory: Object.assign(new Error('unreachable region(s): us-east1'), { code: 'INVENTORY_UNREACHABLE_REGIONS', regions: ['us-east1'] }),
   });
   assert.equal(code, 1);
   assert.equal(calls.length, 1);
-  assert.match(errors[0], /could not verify the deployed functions: unreachable region/);
+  assert.match(errors[0], /could not verify the deployed functions:/);
+  assert.match(errors[0], /"phase":"post-deploy-inventory"/);
+  assert.match(errors[0], /"code":"INVENTORY_UNREACHABLE_REGIONS"/);
+  assert.match(errors[0], /"regions":\["us-east1"\]/);
+});
+
+test('post-deploy diagnostics retain pinned Firebase status and nested transport code without secret data', async () => {
+  const transport = Object.assign(new Error('secret transport URL https://example.test/?token=private'), {
+    code: 'ECONNRESET', request: { headers: { authorization: 'private bearer token' } },
+  });
+  const original = new FirebaseError('secret response body', { status: 503, original: transport });
+  const error = new FirebaseError('Failed to list functions for demo-project', { status: 503, original });
+  error.context = { response: { body: 'private response' }, signedUrl: 'https://example.test/?signature=private' };
+  const { calls, code, errors } = await runDeploy({
+    bootstrap: false, completeInventory: [deployed('existingHttp')],
+    localFunctions: [local('existingHttp', false)], deployedInventory: error,
+  });
+  assert.equal(code, 1);
+  assert.deepEqual(calls.map((call) => call.args), [FULL_DEPLOY]);
+  assert.match(errors[0], /"phase":"post-deploy-inventory"/);
+  assert.match(errors[0], /"sdkStatus":503/);
+  assert.doesNotMatch(errors[0], /"httpStatus"/);
+  assert.match(errors[0], /"code":"ECONNRESET"/);
+  assert.doesNotMatch(errors[0], /private|secret|https:|authorization|signedUrl|response body/);
+});
+
+test('inventory diagnostics bound cyclic cause chains and refuse unknown string fields', async () => {
+  const error = Object.assign(new Error('private outer message'), { name: 'private type', code: 'private code' });
+  const cause = Object.assign(new Error('private inner message'), { code: 'ETIMEDOUT' });
+  error.cause = cause;
+  cause.original = error;
+  const { code, errors } = await runDeploy({ bootstrap: false, deployedInventory: error });
+  assert.equal(code, 1);
+  assert.match(errors[0], /"code":"ETIMEDOUT"/);
+  assert.doesNotMatch(errors[0], /private/);
+  assert.ok(errors[0].length < 600);
+});
+
+test('a default Firebase status is SDK metadata rather than proof of an HTTP response', async () => {
+  const error = new FirebaseError('untrusted wrapper message', {
+    original: Object.assign(new Error('untrusted transport message'), { code: 'ECONNRESET' }),
+  });
+  const { errors } = await runDeploy({ bootstrap: false, deployedInventory: error });
+  assert.match(errors[0], /"sdkStatus":500/);
+  assert.match(errors[0], /"code":"ECONNRESET"/);
+  assert.doesNotMatch(errors[0], /"httpStatus"|untrusted/);
+});
+
+test('inventory diagnostics stop at four wrappers instead of logging arbitrary depth', async () => {
+  let error = Object.assign(new Error('private deepest message'), { code: 'ECONNRESET' });
+  for (let index = 0; index < 4; index += 1) error = new FirebaseError('private wrapper', { original: error });
+  const { code, errors } = await runDeploy({ bootstrap: false, deployedInventory: error });
+  assert.equal(code, 1);
+  assert.doesNotMatch(errors[0], /ECONNRESET|private/);
+  assert.equal((errors[0].match(/"type":"FirebaseError"/g) || []).length, 4);
+});
+
+test('a post-deploy local discovery failure is distinguished from the inventory read', async () => {
+  const { code, calls, errors } = await runDeploy({
+    bootstrap: true,
+    discover: async () => { throw new Error('private discovery details'); },
+  });
+  assert.equal(code, 1);
+  assert.equal(calls.length, 1);
+  assert.match(errors[0], /"phase":"post-deploy-discovery"/);
+  assert.doesNotMatch(errors[0], /private/);
+});
+
+test('each inventory structural failure retains its fixed reason before and after deployment', async () => {
+  const available = { gcfV1: [], gcfV2: [], run: [] };
+  for (const [reason, availability, endpoints] of [
+    ['INVENTORY_NO_AVAILABILITY', undefined, []],
+    ['INVENTORY_UNREACHABLE_REGIONS', { ...available, gcfV2: ['us-east1', 'https://example.test/private'] }, []],
+    ['INVENTORY_BAD_ENDPOINTS', available, {}],
+  ]) {
+    const check = () => readCompleteInventory(PROJECT, {
+      authenticate: async () => {},
+      loadBackend: async (context) => { context.unreachableRegions = availability; return {}; },
+      allEndpoints: () => endpoints,
+    });
+    let failure;
+    await assert.rejects(check, (error) => { failure = error; return error.code === reason; });
+    const preErrors = [];
+    const preCode = await main({
+      env: { EVENT_FIREBASE_PROJECT_ID: PROJECT, EVENT_BOOTSTRAP: 'false' },
+      verifyCompleteInventory: check,
+      log: { log() {}, error: (message) => preErrors.push(message) },
+      run: () => assert.fail('an inventory refusal must not deploy'),
+    });
+    const post = await runDeploy({ bootstrap: false, deployedInventory: failure });
+    assert.equal(preCode, 1);
+    assert.equal(post.code, 1);
+    assert.equal(post.calls.length, 1);
+    for (const [phase, message] of [['pre-deploy-inventory', preErrors[0]], ['post-deploy-inventory', post.errors[0]]]) {
+      assert.match(message, new RegExp(`"phase":"${phase}"`));
+      assert.match(message, new RegExp(`"code":"${reason}"`));
+      assert.doesNotMatch(message, /private|https:/);
+      if (reason === 'INVENTORY_UNREACHABLE_REGIONS') assert.match(message, /"regions":\["us-east1"\]/);
+    }
+  }
 });
 
 test('a failed full deploy reports its own exit code before any inventory check', async () => {
@@ -476,12 +584,14 @@ test('a failed complete inventory check stops before deployment', async () => {
     log: { log() {}, error: (message) => errors.push(message) },
     run: (...args) => calls.push(args),
     verifyCompleteInventory: async () => {
-      throw new Error('unreachable region');
+      throw Object.assign(new Error('unreachable region'), { code: 'INVENTORY_UNREACHABLE_REGIONS', regions: [REGION] });
     },
   });
   assert.equal(code, 1);
   assert.equal(calls.length, 0);
-  assert.match(errors[0], /could not verify a complete functions inventory: unreachable region/);
+  assert.match(errors[0], /could not verify a complete functions inventory:/);
+  assert.match(errors[0], /"phase":"pre-deploy-inventory"/);
+  assert.match(errors[0], /"code":"INVENTORY_UNREACHABLE_REGIONS"/);
 });
 
 const delegateFor = (endpoints) => async () => ({
@@ -530,6 +640,26 @@ test('local discovery fails closed on a retry flag or region it cannot read', as
   );
 });
 
+test('both local discovery phases preserve fixed validation reasons and the function identifier', async () => {
+  for (const [reason, endpoint] of [
+    ['FUNCTIONS_RETRY_VALUE', { platform: 'gcfv2', region: [REGION], eventTrigger: eventTrigger('{{ params.RETRY }}') }],
+    ['FUNCTIONS_RETRY_REGIONS', { platform: 'gcfv2', eventTrigger: eventTrigger(true) }],
+  ]) {
+    let failure;
+    await assert.rejects(discoverLocalFunctions(PROJECT, discoveryOptions({ onRetry: endpoint })), (error) => {
+      failure = error;
+      return error.code === reason;
+    });
+    for (const bootstrap of [false, true]) {
+      const { code, errors } = await runDeploy({ bootstrap, discover: async () => { throw failure; } });
+      assert.equal(code, 1);
+      assert.match(errors[0], new RegExp(`"phase":"${bootstrap ? 'post' : 'pre'}-deploy-discovery"`));
+      assert.match(errors[0], new RegExp(`"code":"${reason}"`));
+      assert.match(errors[0], /"function":"onRetry"/);
+    }
+  }
+});
+
 test('local discovery fails closed when the functions source does not load', async () => {
   await assert.rejects(
     discoverLocalFunctions(PROJECT, {
@@ -551,6 +681,88 @@ test('local discovery fails closed when the functions source does not load', asy
     }),
     /no functions runtime/,
   );
+});
+
+test('script-owned discovery config errors retain fixed reasons in both discovery phases', async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'functions-config-'));
+  try {
+    for (const [reason, config] of [
+      ['FUNCTIONS_CONFIG_CODEBASE', [{ source: 'functions', codebase: 'default' }, { source: 'other-functions', codebase: 'other' }]],
+      ['FUNCTIONS_CONFIG_SOURCE', { source: 'functions', codebase: 'default', prefix: 'nested' }],
+    ]) {
+      fs.writeFileSync(path.join(projectDir, 'firebase.json'), JSON.stringify({ functions: config }));
+      let failure;
+      await assert.rejects(discoverLocalFunctions(PROJECT, { projectDir, getDelegate: async () => ({}) }), (error) => {
+        failure = error;
+        return error.code === reason;
+      });
+      for (const bootstrap of [false, true]) {
+        const { code, calls, errors } = await runDeploy({ bootstrap, discover: async () => { throw failure; } });
+        assert.equal(code, 1);
+        assert.equal(calls.length, bootstrap ? 1 : 0);
+        assert.match(errors[0], new RegExp(`"phase":"${bootstrap ? 'post' : 'pre'}-deploy-discovery"`));
+        assert.match(errors[0], new RegExp(`"code":"${reason}"`));
+      }
+    }
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});
+
+test('analysis failures retain only safe SDK body, stderr and debug-tail details in both discovery phases', async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'functions-analysis-'));
+  try {
+    fs.writeFileSync(path.join(projectDir, 'firebase.json'), JSON.stringify({ functions: { source: 'functions', codebase: 'default' } }));
+    fs.mkdirSync(path.join(projectDir, 'functions'));
+    fs.writeFileSync(path.join(projectDir, 'functions', 'index.js'), 'module.exports = {};\n');
+    const logFile = path.join(projectDir, 'firebase-debug.log');
+    let writeFreshLog = true;
+    const options = {
+      projectDir,
+      loadFirebaseConfig: async () => ({ projectId: PROJECT }),
+      getDelegate: async () => ({
+        validate: async () => {}, build: async () => {},
+        discoverBuild: async () => {
+          if (writeFreshLog) {
+            fs.writeFileSync(logFile, `${'ReferenceError: fixture-credential-placeholder\n'.repeat(30)}Authorization: Bearer fixture-credential-placeholder\n`);
+            // Avoid filesystem timestamp granularity obscuring the new write.
+            const nextTick = new Date(Date.now() + 1000);
+            fs.utimesSync(logFile, nextTick, nextTick);
+          }
+          firebaseLogger.debug('Got response code 400; body TypeError: fixture-credential-placeholder');
+          firebaseLogger.error('Error: MODULE_NOT_FOUND fixture-credential-placeholder\n    at /workspace/functions/index.js:17:3');
+          throw new FirebaseError('Functions codebase could not be analyzed successfully. fixture-credential-placeholder');
+        },
+      }),
+    };
+    let failure;
+    await assert.rejects(discoverLocalFunctions(PROJECT, options), (error) => { failure = error; return error.code === 'FUNCTIONS_ANALYSIS_FAILED'; });
+    for (const bootstrap of [false, true]) {
+      const { code, calls, errors } = await runDeploy({ bootstrap, discover: async () => { throw failure; } });
+      assert.equal(code, 1);
+      assert.equal(calls.length, bootstrap ? 1 : 0);
+      assert.match(errors[0], new RegExp(`"phase":"${bootstrap ? 'post' : 'pre'}-deploy-discovery"`));
+      assert.match(errors[0], /"httpStatus":400/);
+      assert.match(errors[0], /"type":"TypeError"/);
+      assert.match(errors[0], /"code":"MODULE_NOT_FOUND"/);
+      assert.match(errors[0], /functions\/index.js:17:3/);
+      assert.match(errors[0], /"source":"firebase-debug.log"/);
+      assert.match(errors[0], /"source":"sdk"/);
+      assert.doesNotMatch(errors[0], /fixture-credential-placeholder|Authorization|Bearer|https:|\/workspace/);
+      const payload = JSON.parse(errors[0].slice(errors[0].indexOf('{')));
+      assert.ok(payload.analysis.length <= 8);
+    }
+    writeFreshLog = false;
+    fs.utimesSync(logFile, new Date(0), new Date(0));
+    await assert.rejects(discoverLocalFunctions(PROJECT, options), (error) => { failure = error; return error.code === 'FUNCTIONS_ANALYSIS_FAILED'; });
+    const stale = await runDeploy({ bootstrap: false, discover: async () => { throw failure; } });
+    assert.equal(stale.code, 1);
+    assert.equal(stale.calls.length, 0);
+    assert.match(stale.errors[0], /"httpStatus":400/);
+    assert.doesNotMatch(stale.errors[0], /firebase-debug\.log|ReferenceError|fixture-credential-placeholder/);
+  } finally {
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
 });
 
 test('the real functions source reports onTicketOrderConfirmation as a retry function', async () => {
