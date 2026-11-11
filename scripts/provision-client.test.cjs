@@ -716,6 +716,17 @@ test('a Stripe endpoint whose signing secret is lost is replaced', async () => {
   assert.equal(fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET'), 'whsec_fixture');
 });
 
+test('a second live Stripe site is refused while another site holds a platform Connect endpoint', async () => {
+  // A platform Connect endpoint receives every connected account's events, so two would cross clients.
+  const other = { id: 'we_other', url: 'https://us-central1-er-other.cloudfunctions.net/ticketingWebhook', status: 'enabled', enabled_events: [] };
+  const fake = setup({ cloud: { endpoints: [other] } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  const record = fake.db.read('console_builds/a1');
+  assert.equal(record.failedStep, 'tickets');
+  assert.match(record.error, /shared receiver/);
+  assert.deepEqual(fake.state.endpoints.map((e) => e.id), ['we_other']);
+});
+
 function eventbriteRequest() {
   const frozen = { ...application().frozen, tickets: { choice: 'eventbrite' } };
   return {

@@ -827,6 +827,14 @@ async function stripeEndpoint(ctx, token, notes, connection) {
   const url = functionUrl(ctx, 'ticketingWebhook');
   const listed = await call(ctx, 'read the payment webhooks', `${STRIPE}/webhook_endpoints?limit=100`, { headers, quiet: true });
   const existing = (listed.data || []).filter((endpoint) => endpoint.url === url);
+  // A platform Connect endpoint receives every connected account's events, so a
+  // second live site's endpoint would send one client's payments to another
+  // client's project. Until a shared receiver routes events by account
+  // (#835), only one live Connect site may have an endpoint.
+  const other = auth.connect && (listed.data || []).find((endpoint) => endpoint.url !== url && /\/ticketingWebhook$/.test(endpoint.url || ''));
+  if (other) {
+    throw new Error(`another live site already has a platform payment webhook (${other.id}); a second live Stripe site needs the shared receiver first (#835)`);
+  }
   const secret = await ctx.clientSecrets.readSecret(WEBHOOK_SECRET);
   // Stripe shows a signing secret once, so only the endpoint recorded with it is known to match.
   const good = secret && existing.find((endpoint) => (
