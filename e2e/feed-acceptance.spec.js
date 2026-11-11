@@ -1,5 +1,5 @@
-// #507 switch-on acceptance. Fictional emulator data only. Composer and
-// thread-view UI steps belong to #511; seed through #510's real endpoint.
+// #507 switch-on acceptance, including #511's composer and thread view.
+// Fictional emulator data only; posts and replies use the attendee UI.
 import { test, expect } from '@playwright/test';
 import {
   ADMIN_EMAIL, PROJECT_ID, adminAuth, adminDb, callFunction, ensureUser, idTokenFor, signIn,
@@ -23,6 +23,7 @@ test.describe.serial('attendee feed switch-on acceptance', () => {
   const reportedText = `Fictional reported post ${stamp}.`;
   const accountText = `Fictional account cleanup post ${stamp}.`;
   const replyText = `Fictional account cleanup reply ${stamp}.`;
+  const survivorText = `Fictional surviving reply ${stamp}.`;
   const cleanupText = `Fictional flag-off cleanup post ${stamp}.`;
   const posts = [];
   const identities = [];
@@ -33,6 +34,7 @@ test.describe.serial('attendee feed switch-on acceptance', () => {
   let operator;
   let reader;
   let staff;
+  let author;
   let staffUid;
   let readerUid;
   let authorUid;
@@ -41,17 +43,26 @@ test.describe.serial('attendee feed switch-on acceptance', () => {
   let reportedId;
   let accountId;
   let replyId;
+  let survivorId;
   let cleanupId;
   let removedPost;
 
-  async function createPost(token, key, text, parentPostId = null) {
-    const result = await callFunction('createSocialPost', {
-      text, parentPostId, submissionKey: `acceptance-${stamp}-${key}`,
-    }, token);
-    expect(result.status).toBe(201);
-    expect(result.body).toEqual({ postId: expect.any(String), state: 'active' });
-    posts.push(result.body.postId);
-    return result.body.postId;
+  async function composePost(page, text, parentPostId = null) {
+    const field = page.getByRole('textbox', { name: parentPostId ? 'Your reply' : 'Write a post', exact: true });
+    await field.fill(text);
+    const response = page.waitForResponse((entry) => entry.url().endsWith('/createSocialPost') && entry.request().method() === 'POST');
+    await page.getByRole('button', { name: parentPostId ? 'Post reply' : 'Post', exact: true }).click();
+    const result = await response;
+    expect(result.status()).toBe(201);
+    const body = await result.json();
+    expect(body).toEqual({ postId: expect.any(String), state: 'active' });
+    posts.push(body.postId);
+    await expect(field).toHaveValue('');
+    await expect(page.getByText(text, { exact: true })).toBeVisible();
+    expect((await db.doc(`social_posts/${body.postId}`).get()).data()).toMatchObject({
+      text, parentPostId, state: 'active',
+    });
+    return body.postId;
   }
 
   async function saveFlags(enabled) {
@@ -120,7 +131,7 @@ test.describe.serial('attendee feed switch-on acceptance', () => {
     }
     authorToken = await idTokenFor(authorUid);
     readerToken = await idTokenFor(readerUid);
-    for (let index = 0; index < 3; index += 1) contexts.push(await browser.newContext());
+    for (let index = 0; index < 4; index += 1) contexts.push(await browser.newContext());
     // Only this operator context sees the future switch. Never change the
     // source constant, other specs, or a production build for acceptance.
     await contexts[0].route('**/src/admin/socialFeedRelease.js*', async (route) => {
@@ -129,10 +140,11 @@ test.describe.serial('attendee feed switch-on acceptance', () => {
       expect(source).toContain('SOCIAL_FEED_RELEASED = false');
       await route.fulfill({ response, body: source.replace('SOCIAL_FEED_RELEASED = false', 'SOCIAL_FEED_RELEASED = true') });
     });
-    [operator, reader, staff] = await Promise.all(contexts.map((context) => context.newPage()));
+    [operator, reader, staff, author] = await Promise.all(contexts.map((context) => context.newPage()));
     await signIn(operator, ADMIN_EMAIL);
     await signIn(reader, readerEmail);
     await signIn(staff, staffEmail);
+    await signIn(author, authorEmail);
   });
 
   test.afterAll(async () => {
@@ -161,15 +173,30 @@ test.describe.serial('attendee feed switch-on acceptance', () => {
     }
   });
 
-  test('operator switches on both flags; attendee reads endpoint-created posts and reports one', async () => {
+  test('operator switches on both flags; approved attendees compose posts', async () => {
     await saveFlags(true);
-    reportedId = await createPost(authorToken, 'reported', reportedText);
-    accountId = await createPost(authorToken, 'account', accountText);
-    replyId = await createPost(authorToken, 'reply', replyText, accountId);
-    cleanupId = await createPost(readerToken, 'cleanup', cleanupText);
+    await author.goto('/attendees');
+    reportedId = await composePost(author, reportedText);
+    accountId = await composePost(author, accountText);
+    await reader.goto('/attendees');
+    cleanupId = await composePost(reader, cleanupText);
     const authorReport = await callFunction('reportSocialPost', { postId: cleanupId }, authorToken);
     expect(authorReport.status).toBe(201);
-    await reader.goto('/attendees');
+  });
+
+  test('attendees open a thread and compose replies; the reader reports a root from the feed', async () => {
+    for (const [page, text] of [[author, replyText], [reader, survivorText]]) {
+      const row = page.getByRole('region', { name: 'Attendee feed', exact: true })
+        .getByRole('listitem').filter({ hasText: accountText });
+      await row.getByRole('link', { name: 'View replies', exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`/attendees/posts/${accountId}$`));
+      await expect(page.getByRole('heading', { name: 'Thread', exact: true, level: 1 })).toBeVisible();
+      const id = await composePost(page, text, accountId);
+      if (page === author) replyId = id;
+      else survivorId = id;
+    }
+    await expect(reader.getByText(replyText, { exact: true })).toBeVisible();
+    await reader.getByRole('link', { name: 'Back to the attendee feed', exact: true }).click();
     await expect(reader.getByText(accountText, { exact: true })).toBeVisible();
     await expect(reader.getByText(replyText, { exact: true })).toHaveCount(0);
     await reportInFeed(reportedText);
@@ -202,12 +229,26 @@ test.describe.serial('attendee feed switch-on acceptance', () => {
     expect((await db.doc(`social_posts/${reportedId}`).get()).data()).toEqual(removedPost);
     expect((await db.doc(`social_posts/${cleanupId}`).get()).data()).toMatchObject({ state: 'active', authorUid: readerUid });
     await expect(reader.getByText(accountText, { exact: true })).toHaveCount(0);
+    await reader.goto(`/attendees/posts/${accountId}`);
+    await expect(reader.getByText('Original post removed', { exact: true })).toBeVisible();
+    await expect(reader.getByText(survivorText, { exact: true })).toBeVisible();
+    await expect(reader.getByText(replyText, { exact: true })).toHaveCount(0);
+    await expect(reader.getByRole('textbox', { name: 'Your reply', exact: true })).toHaveCount(0);
+    expect((await db.doc(`social_posts/${survivorId}`).get()).data()).toMatchObject({
+      state: 'active', authorUid: readerUid, parentPostId: accountId,
+    });
+    await reader.getByRole('link', { name: 'Back to the attendee feed', exact: true }).click();
     await reportInFeed(cleanupText);
   });
 
   test('operator turns both flags off; attendee loses the feed and staff still removes a reported post', async () => {
     await saveFlags(false);
     await expect(reader.getByRole('region', { name: 'Attendee feed', exact: true })).toHaveCount(0);
+    await expect(reader.getByRole('textbox', { name: 'Write a post', exact: true })).toHaveCount(0);
+    await reader.goto(`/attendees/posts/${accountId}`);
+    await expect(reader.getByRole('heading', { name: 'Page not found', level: 1 })).toBeVisible();
+    await expect(reader.getByRole('textbox', { name: 'Your reply', exact: true })).toHaveCount(0);
+    await expect(reader.getByText(survivorText, { exact: true })).toHaveCount(0);
     expect((await callFunction('createSocialPost', {
       text: 'Fictional closed-feed post.', submissionKey: `acceptance-${stamp}-closed`,
     }, readerToken)).status).toBe(404);

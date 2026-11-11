@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The post composer and thread view of the private feed (#511). An approved attendee or a speaker
+  writes a post on the Attendees page and replies on the post's thread page
+  (`/attendees/posts/:postId`); a staff grant alone reads, reports and removes but cannot post. A
+  retry after a lost answer stores one post, a removed post is never sent again on its own, and an
+  account switch drops the draft and the thread at once. A removed root shows **Original post
+  removed** and keeps its replies. The feature stays off: `socialFeed` defaults to false and its
+  switch stays hidden.
 - The attendee side of the private feed (#788). When the feed is on, an approved attendee, a
   speaker, or current staff sees the newest posts on the Attendees page and can report one; a report
   sends only the post id. Nothing is requested until the live features document turns on both

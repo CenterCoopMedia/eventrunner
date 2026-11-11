@@ -68,6 +68,7 @@ export default defineConfig({
       'shared/theme',
       'shared/presetRemaps',
       'shared/urlSafety',
+      'shared/socialPost',
       'shared/venue',
       'shared/update',
       'shared/seed',
