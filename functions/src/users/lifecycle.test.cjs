@@ -502,3 +502,11 @@ test('an Owner or an Editor on config/bootstrap gets no welcome email, and the a
   assert.equal(db.docs.get('users/editor').registrationStatus, 'pending');
   assert.deepEqual(mail.calls.map((m) => m.to), ['rae@example.org']);
 });
+
+test('a coming-soon site sends no welcome email', async () => {
+  const mail = fakeSend();
+  await createOnUserCreated({
+    db: fakeDb({ 'config/launch': { comingSoon: true } }), now: () => NOW, sendEmail: mail.send, getConfig: welcomeConfig,
+  })({ uid: 'u1', email: 'rae@example.org' });
+  assert.equal(mail.calls.length, 0);
+});
