@@ -18,8 +18,8 @@
  * reclaiming that prefix.
  *
  * `profile` and `attendees` are the account and directory routes (issue
- * #17): /profile, /attendees, and /attendees/:uid are statically mounted,
- * so a generic page may not claim either segment.
+ * #17): /profile, /attendees, /attendees/:uid and /attendees/posts/:postId
+ * are statically mounted, so a generic page may not claim either segment.
  *
  * `admin` is the authenticated admin area: App.jsx mounts `admin/*` above
  * the public layout, so a generic page may not claim the segment.

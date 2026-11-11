@@ -7,7 +7,7 @@
 // fallback; a report that sends only the post id, once per click.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getDoc, getDocFromServer, getDocs, getDocsFromServer, onSnapshot } from 'firebase/firestore';
 import { auth } from '../firebase.js';
@@ -19,10 +19,15 @@ vi.mock('@generated/eventConfig.js', async (importOriginal) => {
   return { ...original, features: { ...original.features, attendeeDirectory: true, socialFeed: true } };
 });
 
+// The thread page's closed state is the ordinary not-found page; its own
+// tests cover it, and it needs the content provider this harness omits.
+vi.mock('../pages/NotFound.jsx', () => ({ default: () => <p>Not found page</p> }));
+
 const { EventConfigProvider } = await import('../contexts/EventConfigContext.jsx');
 const { AuthProvider, useAuth } = await import('../contexts/AuthContext.jsx');
 const { ProfileProvider, useProfile } = await import('../contexts/ProfileContext.jsx');
 const { default: AttendeeFeed } = await import('./AttendeeFeed.jsx');
+const { default: AttendeeThread } = await import('../pages/AttendeeThread.jsx');
 
 const FEED_ON = { attendeeDirectory: true, socialFeed: true };
 const APPROVED = { registrationStatus: 'approved', speakerId: null };
@@ -116,6 +121,22 @@ function renderFeed() {
           <MemoryRouter>
             <Recorder />
             <AttendeeFeed />
+          </MemoryRouter>
+        </ProfileProvider>
+      </AuthProvider>
+    </EventConfigProvider>,
+  );
+}
+
+function renderThread(postId = 'root1') {
+  return render(
+    <EventConfigProvider>
+      <AuthProvider>
+        <ProfileProvider>
+          <MemoryRouter initialEntries={[`/attendees/posts/${postId}`]}>
+            <Routes>
+              <Route path="/attendees/posts/:postId" element={<AttendeeThread />} />
+            </Routes>
           </MemoryRouter>
         </ProfileProvider>
       </AuthProvider>
@@ -439,11 +460,12 @@ describe('what the feed shows', () => {
     const privateItem = screen.getByText('From a private profile').closest('li');
     await waitFor(() => expect(getDocFromServer).toHaveBeenCalledTimes(3));
     expect(within(privateItem).getByText('An attendee')).toBeInTheDocument();
-    expect(within(privateItem).queryByRole('link')).not.toBeInTheDocument();
+    // No profile link: the one link is the thread's.
+    expect(within(privateItem).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/attendees/posts/p2']);
     expect(screen.queryByText('A reply')).not.toBeInTheDocument();
     const readablePrivate = screen.getByText('From a readable private profile').closest('li');
     expect(within(readablePrivate).getByText('An attendee')).toBeInTheDocument();
-    expect(within(readablePrivate).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(readablePrivate).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/attendees/posts/p3']);
     expect(screen.queryByText('Hidden Name')).not.toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
     expect(vi.mocked(getDocFromServer).mock.calls.map(([target]) => pathOf(target)).sort())
@@ -634,5 +656,306 @@ describe('reporting a post', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('button', { name: 'Report post' })).toHaveFocus();
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+// --- Composer and thread (issue #511) ---------------------------------------
+
+function createBodies() {
+  return vi.mocked(fetch).mock.calls
+    .filter(([url]) => String(url).endsWith('/createSocialPost'))
+    .map(([, init]) => JSON.parse(init.body));
+}
+
+function answer(status, body) {
+  return { ok: status < 300, status, json: async () => body };
+}
+
+function replyListener(rootId = 'root1') {
+  return activeFeedListeners().find((entry) => entry.target.clauses?.[0]?.where?.[2] === rootId);
+}
+
+function type(field, value) {
+  fireEvent.change(field, { target: { value } });
+}
+
+describe('the post composer', () => {
+  it('opens for an approved attendee and a speaker, never for a staff grant alone or a pending account', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    expect(await screen.findByRole('textbox', { name: 'Write a post' })).toBeInTheDocument();
+
+    await openFeedAs(makeUser('spk'), { registrationStatus: 'pending', speakerId: 'speaker-1' });
+    expect(await screen.findByRole('textbox', { name: 'Write a post' })).toBeInTheDocument();
+
+    publishAuth(makeUser('bo'));
+    pushDoc('users/bo', { uid: 'bo', ...PENDING });
+    await act(async () => {});
+    expect(screen.queryByRole('textbox', { name: 'Write a post' })).not.toBeInTheDocument();
+
+    admins.add('staffer');
+    publishAuth(makeUser('staffer'));
+    pushDoc('users/staffer', null);
+    await act(async () => {});
+    pushPosts(activeFeedListeners()[0], [post('p1', 'cy', 'Staff can read this')]);
+    await act(async () => {});
+    expect(screen.getByText('Staff can read this')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Write a post' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading the post form…')).not.toBeInTheDocument();
+  });
+
+  it('refuses blank and over-limit text in the form, keeps the draft, and moves focus to the field', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const field = await screen.findByRole('textbox', { name: 'Write a post' });
+    type(field, '   ');
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    expect(await screen.findByText('Write something before you send.')).toBeInTheDocument();
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveFocus();
+
+    const long = 'x'.repeat(2001);
+    type(field, long);
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    expect(await screen.findByText('Shorten the text to 2,000 characters or fewer. It has 2,001.')).toBeInTheDocument();
+    expect(field).toHaveValue(long);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('retries a dropped answer under the same key, posts once, and takes a new key for new text', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const field = await screen.findByRole('textbox', { name: 'Write a post' });
+    type(field, '  Hello <b>all</b>  ');
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('network'));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/was not confirmed/);
+    expect(alert).toHaveFocus();
+    expect(field).toHaveValue('  Hello <b>all</b>  ');
+
+    vi.mocked(fetch).mockResolvedValueOnce(answer(201, { postId: 'new1', state: 'active' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    expect(await screen.findByText('Posted. Your post is at the top of the feed.')).toBeInTheDocument();
+    expect(field).toHaveValue('');
+
+    const [first, second] = createBodies();
+    expect(first).toEqual({ text: 'Hello <b>all</b>', submissionKey: first.submissionKey });
+    expect(first.submissionKey).toMatch(/^[A-Za-z0-9_-]{8,128}$/);
+    expect(second).toEqual(first);
+    expect(vi.mocked(fetch).mock.calls[0][1].headers.Authorization).toBe('Bearer token-ada');
+
+    type(field, 'Hello <b>all</b>');
+    vi.mocked(fetch).mockResolvedValueOnce(answer(201, { postId: 'new2', state: 'active' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() => expect(createBodies()).toHaveLength(3));
+    expect(createBodies()[2].submissionKey).not.toBe(first.submissionKey);
+  });
+
+  it('sends once while a request runs', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const field = await screen.findByRole('textbox', { name: 'Write a post' });
+    type(field, 'Once');
+    const pending = deferred();
+    vi.mocked(fetch).mockReturnValueOnce(pending.promise);
+    const button = screen.getByRole('button', { name: 'Post' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent('Sending…');
+    await act(async () => pending.resolve(answer(201, { postId: 'n', state: 'active' })));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(button).toBeEnabled();
+  });
+
+  it('a removed answer drops the key, keeps the text, explains it, and never resends on its own', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const field = await screen.findByRole('textbox', { name: 'Write a post' });
+    type(field, 'Again');
+    vi.mocked(fetch).mockResolvedValueOnce(answer(410, { error: { code: 'post-removed', message: 'gone' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Event staff removed the post you sent earlier/);
+    await act(async () => {});
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(field).toHaveValue('Again');
+
+    vi.mocked(fetch).mockResolvedValueOnce(answer(201, { postId: 'n', state: 'active' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() => expect(createBodies()).toHaveLength(2));
+    const [first, second] = createBodies();
+    expect(second.submissionKey).not.toBe(first.submissionKey);
+  });
+
+  it('discards a draft only on request', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const field = await screen.findByRole('textbox', { name: 'Write a post' });
+    type(field, 'Never mind');
+    fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+    expect(field).toHaveValue('');
+    expect(field).toHaveFocus();
+    expect(screen.getByText('Draft discarded.')).toBeInTheDocument();
+  });
+
+  it('approved A to approved B: A’s draft is gone in the switch render and A’s late answer is ignored', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const field = await screen.findByRole('textbox', { name: 'Write a post' });
+    type(field, 'Ada draft');
+    const pending = deferred();
+    vi.mocked(fetch).mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+    publishAuth(makeUser('cy'));
+    expect(screen.queryByDisplayValue('Ada draft')).not.toBeInTheDocument();
+    pushDoc('users/cy', { uid: 'cy', ...APPROVED });
+    await act(async () => {});
+    const fieldB = await screen.findByRole('textbox', { name: 'Write a post' });
+    await act(async () => pending.resolve(answer(201, { postId: 'n', state: 'active' })));
+    expect(fieldB).toHaveValue('');
+    expect(screen.queryByText(/Posted\./)).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Ada draft')).not.toBeInTheDocument();
+  });
+});
+
+describe('post text', () => {
+  it('links only canonical absolute http(s) tokens, through the new-tab link, and leaves the rest as text', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners()[0], [
+      post('p1', 'cy', 'See HTTPS://Example.ORG/a?b=1. Not javascript:alert(1) or https:example.org or <b>bold</b>'),
+    ]);
+    const link = screen.getByRole('link', { name: 'HTTPS://Example.ORG/a?b=1 (opens in a new tab)' });
+    expect(link).toHaveAttribute('href', 'https://example.org/a?b=1');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noreferrer');
+    const item = link.closest('li');
+    expect(within(item).getAllByRole('link').map((a) => a.getAttribute('href')))
+      .toEqual(['https://example.org/a?b=1', '/attendees/posts/p1']);
+    expect(item).toHaveTextContent('. Not javascript:alert(1) or https:example.org or <b>bold</b>');
+    expect(item.querySelector('b')).toBeNull();
+  });
+});
+
+describe('the thread page', () => {
+  it('is the not-found page while the feed is closed, and asks for nothing', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'), APPROVED, { attendeeDirectory: true, socialFeed: false });
+    expect(screen.getByText('Not found page')).toBeInTheDocument();
+    expect(listenersFor('social_posts')).toHaveLength(0);
+    expect(listenersFor('social_posts/root1')).toHaveLength(0);
+  });
+
+  it('reads the live root and a bounded page of replies, oldest first', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    const [root] = listenersFor('social_posts/root1');
+    expect(root.options).toEqual({ includeMetadataChanges: true });
+    expect(replyListener().target.clauses).toEqual([
+      { where: ['parentPostId', '==', 'root1'] },
+      { orderBy: ['createdAt', 'asc'] },
+      { limit: 50 },
+    ]);
+  });
+
+  it('an active thread: Report on every entry, removed replies as placeholders, and a reply that names its parent', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(replyListener(), [
+      post('r1', 'cy', 'First reply', { parentPostId: 'root1' }),
+      { id: 'r2', state: 'removed', parentPostId: 'root1', createdAt: new Date() },
+    ]);
+    expect(screen.getByText('Root text')).toBeInTheDocument();
+    expect(screen.getByText('First reply')).toBeInTheDocument();
+    expect(screen.getByText('Reply removed')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Report post' })).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Back to the attendee feed' })).toHaveAttribute('href', '/attendees');
+    expect(document.title).not.toMatch(/Root text/);
+
+    const field = await screen.findByRole('textbox', { name: 'Your reply' });
+    type(field, 'My reply');
+    vi.mocked(fetch).mockResolvedValueOnce(answer(201, { postId: 'r3', state: 'active' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post reply' }));
+    expect(await screen.findByText('Reply posted.')).toBeInTheDocument();
+    expect(createBodies()[0]).toEqual({ text: 'My reply', parentPostId: 'root1', submissionKey: createBodies()[0].submissionKey });
+  });
+
+  it('a removed root shows "Original post removed", keeps replies readable and reportable, and closes replies', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', { state: 'removed', parentPostId: null, createdAt: new Date() });
+    pushPosts(replyListener(), [post('r1', 'cy', 'Still here', { parentPostId: 'root1' })]);
+    expect(screen.getByText('Original post removed')).toBeInTheDocument();
+    expect(screen.getByText('Still here')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Report post' })).toHaveLength(1);
+    expect(screen.getByText('Replies are closed because the original post was removed.')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('a missing root reads the same as a removed one', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', null);
+    pushPosts(replyListener(), []);
+    expect(screen.getByText('Original post removed')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('closes the reply form when the server says the root is gone, and keeps the text out of the page', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(replyListener(), []);
+    const field = await screen.findByRole('textbox', { name: 'Your reply' });
+    type(field, 'Too late');
+    vi.mocked(fetch).mockResolvedValueOnce(answer(404, { error: { code: 'not-found', message: 'x' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post reply' }));
+    expect(await screen.findByText('Replies are closed because the original post was removed.')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('a staff grant alone reads and reports but cannot reply', async () => {
+    admins.add('staffer');
+    renderThread();
+    publishAuth(makeUser('staffer'));
+    pushDoc('users/staffer', null);
+    pushDoc('config/features', FEED_ON);
+    await act(async () => {});
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(replyListener(), []);
+    expect(screen.getByRole('button', { name: 'Report post' })).toBeInTheDocument();
+    expect(screen.getByText('Replies are open to approved attendees and speakers.')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('approved A to approved B: A’s thread is gone in the switch render and A’s late callbacks are dropped', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    const rootA = listenersFor('social_posts/root1').at(-1);
+    const repliesA = replyListener();
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(repliesA, [post('r1', 'cy', 'A reply', { parentPostId: 'root1' })]);
+    const field = await screen.findByRole('textbox', { name: 'Your reply' });
+    type(field, 'Ada reply draft');
+
+    publishAuth(makeUser('bo'));
+    expect(screen.queryByText('Root text')).not.toBeInTheDocument();
+    expect(screen.queryByText('A reply')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Ada reply draft')).not.toBeInTheDocument();
+    expect(rootA.active).toBe(false);
+    expect(repliesA.active).toBe(false);
+
+    act(() => rootA.next(docSnap('root1', post('root1', 'cy', 'Root text'))));
+    pushPosts(repliesA, [post('r1', 'cy', 'A reply', { parentPostId: 'root1' })]);
+    pushDoc('users/bo', { uid: 'bo', ...APPROVED });
+    await act(async () => {});
+    expect(screen.queryByText('Root text')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /Loading the thread/ })).toBeInTheDocument();
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(replyListener(), []);
+    expect(await screen.findByRole('textbox', { name: 'Your reply' })).toHaveValue('');
   });
 });

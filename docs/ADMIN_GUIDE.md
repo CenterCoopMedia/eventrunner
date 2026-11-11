@@ -952,6 +952,12 @@ Choose **Remove post**, read the consequence, then choose **Remove this post**. 
 
 **Account removal.** In **Attendees**, open the attendee record, choose **Delete account**, and confirm **Delete this account**. The account's active posts and replies and the reports it submitted are cleared, including when both feature switches are off. Already removed posts keep their metadata-only markers, and other authors' replies remain. Reports submitted by other accounts may still point to an unavailable post; moderation shows that status. If account cleanup is incomplete, follow the page's retry instruction. This cleanup screen does not enable the feed.
 
+**Posts and replies.** When the feed is on, an approved attendee or a speaker can write a post at the top of the feed and reply in a post's thread (**View replies**, at `/attendees/posts/` and the post's id). A staff or operator grant alone lets a person read, report and remove, but not post or reply. A post is plain text of up to 2,000 characters. Links that start with `http://` or `https://` open in a new tab; nothing else becomes a link. There is one level of replies. The feed, its threads and the thread links follow the same switch: with the feed off, a thread link shows the ordinary page-not-found screen and no post text.
+
+**Removing a post that has replies.** Remove a root post or a reply on its own; nothing cascades. A removed reply shows **Reply removed**. A removed root shows **Original post removed**: its replies stay readable and reportable, and the thread takes no new replies. Neither placeholder keeps the text or the author.
+
+**Account cleanup.** Deleting an account removes that person's active posts and replies. Other people's replies under a deleted root stay, under **Original post removed**.
+
 ## Materials
 
 Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. One file can be at most 9 MiB. Prefer a real label ("Slides") over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin's direct read, so every action here goes through Cloud Functions. Staff and operators both use this page.
