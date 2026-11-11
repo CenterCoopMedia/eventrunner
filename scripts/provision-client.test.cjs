@@ -491,7 +491,7 @@ test('each grant the rehearsal missed is made up front', async () => {
   assert.ok(holds(project, `projects/${PROJECT}/roles/eventrunnerDeployInvoker`, deploy), 'the invoker role');
   assert.ok(fake.state.role.includedPermissions.includes('run.services.setIamPolicy'));
   assert.ok(holds(bindingsOf(fake, `${iam}/${COMPUTE}`), 'roles/iam.serviceAccountUser', deploy), 'act as compute');
-  assert.ok(holds(bindingsOf(fake, `${iam}/${PROJECT}@appspot.gserviceaccount.com`), 'roles/iam.serviceAccountUser', deploy), 'act as appspot');
+  assert.ok(holds(bindingsOf(fake, `${iam}/${PROJECT}@appspot.gserviceaccount.com`), 'roles/iam.serviceAccountUser', deploy), 'appspot actAs for the Firebase deploy preflight');
 
   assert.ok(fake.state.identities.some((service) => service === 'storage.googleapis.com'), 'the storage agent is made first');
   assert.ok(holds(project, 'roles/pubsub.publisher', `serviceAccount:service-${NUMBER}@gs-project-accounts.iam.gserviceaccount.com`));
@@ -501,11 +501,22 @@ test('each grant the rehearsal missed is made up front', async () => {
   assert.ok(holds(bindingsOf(fake, `${iam}/${COMPUTE}`), 'roles/iam.serviceAccountTokenCreator', `serviceAccount:${COMPUTE}`), 'compute signs as itself');
 });
 
-test('a project with no appspot account still builds, and says so', async () => {
+test('a new project provisions compute secret access and actAs without an appspot account', async () => {
   const fake = setup({ cloud: { noAppspot: true } });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
-  const step = fake.db.read('console_builds/a1').steps.find((s) => s.id === 'deploy-identity');
-  assert.match(step.detail, /no appspot account/);
+  const appspot = `${PROJECT}@appspot.gserviceaccount.com`;
+  assert.ok(!fake.calls.some((call) => {
+    const url = new URL(call.url);
+    const [account, action] = url.pathname.split('/').at(-1).split(':');
+    return url.hostname === 'iam.googleapis.com' && account === appspot && action === 'setIamPolicy';
+  }));
+  const deploy = `serviceAccount:${DEPLOY}`;
+  assert.ok(holds(bindingsOf(fake, `iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/${COMPUTE}`), 'roles/iam.serviceAccountUser', deploy));
+  for (const id of fake.clientSecrets.store.keys()) {
+    const policy = bindingsOf(fake, `secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets/${id}`);
+    assert.ok(holds(policy, 'roles/secretmanager.secretAccessor', `serviceAccount:${COMPUTE}`), id);
+    assert.ok(policy.every((binding) => binding.members.every((member) => member !== `serviceAccount:${appspot}`)));
+  }
 });
 
 test('a new agent that IAM does not know yet is tried again, then the grant lands', async () => {

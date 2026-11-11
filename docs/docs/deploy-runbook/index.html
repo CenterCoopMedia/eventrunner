@@ -399,8 +399,11 @@
           (§2, above) only needs to <em>reference</em> the secret while deploying; the function&#39;s runtime identity is
           what actually reads the secret&#39;s value on every invocation, and it is a separate principal that
           <code>${DEPLOY_SA_EMAIL}</code>&#39;s own <code>secretmanager.secretAccessor</code> grant does not cover. Cloud Functions v2
-          runs as the project&#39;s default compute service account unless a function explicitly sets
-          <code>serviceAccount</code> (this repo&#39;s functions do not), so:</p>
+          runs as the project&#39;s default compute service account. Both v1 Auth triggers explicitly use
+          that same account through the <code>EVENT_COMPUTE_SERVICE_ACCOUNT</code> SDK parameter. The deployment
+          workflow writes this nonsecret value into <code>functions/.env.&lt;project-id&gt;</code> from the project&#39;s real
+          number before full and partial deploys. For a manual deployment, set it to the same runtime email
+          shown below in that env file before running Firebase. No App Engine runtime is required.</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">PROJECT_NUMBER=$(gcloud projects describe &lt;GCP_PROJECT_ID&gt; --format=&quot;value(projectNumber)&quot;)
           RUNTIME_SA_EMAIL=&quot;${PROJECT_NUMBER}-compute@developer.gserviceaccount.com&quot;
 
@@ -1223,7 +1226,7 @@
           </code></pre></li>
           <li><p>The Artifact Registry repository <code>gcf-artifacts</code> in <code>us-central1</code>, with the cleanup policy <code>firebase-functions-cleanup</code> (delete images older than 86400 seconds).</p></li>
           <li><p>For the Pub/Sub service agent, <code>roles/iam.serviceAccountTokenCreator</code>. For the functions&#39; runtime account, <code>roles/run.invoker</code>, <code>roles/eventarc.eventReceiver</code>, <code>roles/datastore.user</code>, and <code>roles/iam.serviceAccountTokenCreator</code> on itself, so emailed sign-in can make tokens.</p></li>
-          <li><p>For the deploy account, the role list in §2 without <code>roles/storage.admin</code>, plus <code>roles/secretmanager.viewer</code>, the custom role <code>eventrunnerDeployInvoker</code>, and <code>roles/iam.serviceAccountUser</code> on the compute and App Engine default accounts.</p></li>
+          <li><p>For the deploy account, the role list in §2 without <code>roles/storage.admin</code>, plus <code>roles/secretmanager.viewer</code>, the custom role <code>eventrunnerDeployInvoker</code>, and <code>roles/iam.serviceAccountUser</code> on the compute runtime account and the App Engine default account when it exists. Firebase CLI&#39;s <code>checkServiceAccountIam</code> requires App Engine <code>actAs</code> before every Functions deploy, even when all functions run as compute. This grant does not give the App Engine account secret access.</p></li>
           </ul>
           <p>To deploy by hand instead, run from the repository root with the console project&#39;s public web settings:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npm run prepare:functions &amp;&amp; npm ci

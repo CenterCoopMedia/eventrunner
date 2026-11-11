@@ -243,6 +243,7 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
       - name: Write the functions runtime env for this project
         # Cloud Functions v2 bakes in `functions/.env.<project-id>` at
         # deploy time (spec §2.1 Tier A). Secrets (EMAIL_PROVIDER_API_KEY
@@ -269,8 +270,10 @@ jobs:
           EVENT_AIRTABLE_ENABLED: ${{ vars.EVENT_AIRTABLE_ENABLED }}
         run: |
           set -euo pipefail
+          project_number="$(gcloud projects describe "$EVENT_FIREBASE_PROJECT_ID" --format='value(projectNumber)')"
           {
             echo "EVENT_FIREBASE_PROJECT_ID=$EVENT_FIREBASE_PROJECT_ID"
+            echo "EVENT_COMPUTE_SERVICE_ACCOUNT=${project_number}-compute@developer.gserviceaccount.com"
             echo "EVENT_SLUG=$EVENT_SLUG"
             echo "EVENT_FIREBASE_REGION=${EVENT_FIREBASE_REGION:-us-central1}"
             echo "EVENT_PUBLIC_URL=$EVENT_PUBLIC_URL"
@@ -812,6 +815,7 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
       - name: Write the functions runtime env for this project
         # Same shape as the `functions` job's env file (spec §2.1 Tier A) —
         # a `firebase deploy --only functions:<name>` still bakes
@@ -837,8 +841,10 @@ jobs:
           EVENT_AIRTABLE_ENABLED: ${{ vars.EVENT_AIRTABLE_ENABLED }}
         run: |
           set -euo pipefail
+          project_number="$(gcloud projects describe "$EVENT_FIREBASE_PROJECT_ID" --format='value(projectNumber)')"
           {
             echo "EVENT_FIREBASE_PROJECT_ID=$EVENT_FIREBASE_PROJECT_ID"
+            echo "EVENT_COMPUTE_SERVICE_ACCOUNT=${project_number}-compute@developer.gserviceaccount.com"
             echo "EVENT_SLUG=$EVENT_SLUG"
             echo "EVENT_FIREBASE_REGION=${EVENT_FIREBASE_REGION:-us-central1}"
             echo "EVENT_PUBLIC_URL=$EVENT_PUBLIC_URL"

@@ -1006,6 +1006,11 @@
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Both Auth lifecycle triggers run as the compute service account, with per-secret
+          access prepared before deployment. Automated deploys set
+          <code>EVENT_COMPUTE_SERVICE_ACCOUNT</code>; manual deploys must set it in the target
+          Functions env file. The deploy identity keeps App Engine actAs for Firebase&#39;s
+          permission check (#805).</li>
           <li>Function deployments accept retry upgrades through targeted deploys while
           retaining safeguards against deletion, trigger changes and selector collisions.</li>
           </ul>

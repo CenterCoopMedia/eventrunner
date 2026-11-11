@@ -486,9 +486,10 @@ async function stepDeployIdentity(ctx) {
   });
   if (added > 0) notes.push(`added ${added} project roles`);
 
-  // Deploying a function acts as its runtime account, which is one of these two.
+  // Both function generations use the compute runtime account.
   const actAs = [{ role: 'roles/iam.serviceAccountUser', member: deployMember }];
   if (await grant(ctx, 'act as the compute account', accountResource(ctx, compute), actAs)) notes.push('let deploy act as the compute account');
+  // firebase-tools checkServiceAccountIam also requires appspot actAs before every Functions deploy.
   const appspot = `${projectId}@appspot.gserviceaccount.com`;
   if (await google(ctx, 'read the appspot account', accountResource(ctx, appspot), { allow: [404] })) {
     if (await grant(ctx, 'act as the appspot account', accountResource(ctx, appspot), actAs)) notes.push('let deploy act as the appspot account');

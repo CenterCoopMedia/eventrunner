@@ -292,8 +292,11 @@ deploy service account.** These are two different identities with two different 
 (§2, above) only needs to *reference* the secret while deploying; the function's runtime identity is
 what actually reads the secret's value on every invocation, and it is a separate principal that
 `${DEPLOY_SA_EMAIL}`'s own `secretmanager.secretAccessor` grant does not cover. Cloud Functions v2
-runs as the project's default compute service account unless a function explicitly sets
-`serviceAccount` (this repo's functions do not), so:
+runs as the project's default compute service account. Both v1 Auth triggers explicitly use
+that same account through the `EVENT_COMPUTE_SERVICE_ACCOUNT` SDK parameter. The deployment
+workflow writes this nonsecret value into `functions/.env.<project-id>` from the project's real
+number before full and partial deploys. For a manual deployment, set it to the same runtime email
+shown below in that env file before running Firebase. No App Engine runtime is required.
 
 ```sh
 PROJECT_NUMBER=$(gcloud projects describe <GCP_PROJECT_ID> --format="value(projectNumber)")
@@ -1235,7 +1238,7 @@ Set these up as the project owner before the first deploy, because the deploy ac
   ```
 - The Artifact Registry repository `gcf-artifacts` in `us-central1`, with the cleanup policy `firebase-functions-cleanup` (delete images older than 86400 seconds).
 - For the Pub/Sub service agent, `roles/iam.serviceAccountTokenCreator`. For the functions' runtime account, `roles/run.invoker`, `roles/eventarc.eventReceiver`, `roles/datastore.user`, and `roles/iam.serviceAccountTokenCreator` on itself, so emailed sign-in can make tokens.
-- For the deploy account, the role list in §2 without `roles/storage.admin`, plus `roles/secretmanager.viewer`, the custom role `eventrunnerDeployInvoker`, and `roles/iam.serviceAccountUser` on the compute and App Engine default accounts.
+- For the deploy account, the role list in §2 without `roles/storage.admin`, plus `roles/secretmanager.viewer`, the custom role `eventrunnerDeployInvoker`, and `roles/iam.serviceAccountUser` on the compute runtime account and the App Engine default account when it exists. Firebase CLI's `checkServiceAccountIam` requires App Engine `actAs` before every Functions deploy, even when all functions run as compute. This grant does not give the App Engine account secret access.
 
 To deploy by hand instead, run from the repository root with the console project's public web settings:
 
