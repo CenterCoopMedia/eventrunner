@@ -402,8 +402,9 @@ npx firebase deploy --only functions:<id>[,functions:<id>...] \
 The script checks the complete inventory after this targeted deploy. Every targeted handler must
 exist with retry enabled before the normal full deploy runs without `--force`. If Firebase exits 0
 without finishing a targeted create or retry-policy change, the quota recovery below runs first.
-The handlers then exist with retry enabled, so Firebase does not ask again. Firebase continues to stop for function deletion, unsafe trigger
-migration, and other protected changes. The script refuses the targeted deploy, and deploys
+The handlers then exist with retry enabled, so Firebase does not ask again. Firebase continues
+to stop for function deletion, unsafe trigger migration, and other protected changes. The script
+refuses the targeted deploy, and deploys
 nothing, in these cases:
 
 - A Function with the same id exists outside the declared target regions.
@@ -440,15 +441,15 @@ Functions, if it has not yet, and reads the complete inventory again. Each local
 there, with the same id, in each of its regions. A missing Function enters bounded quota recovery.
 A region that is not literal, an incomplete inventory, or a discovery failure stops immediately.
 `firebase-tools` 15.22.4 can exit 0 when a create gets a quota error, before the create is done,
-and it then prints no summary. Fresh-client run43091008410 left17 Functions absent this way
+and it then prints no summary. Fresh-client run 43091008410 left 17 Functions absent this way
 (#827). Inventory verification prevents that incomplete result from counting as success.
 
-**Quota errors (HTTP 429).** A large deploy can exceed Cloud Functions write quotas: v1 allows80
-requests per100 seconds per project, and v2 allows60 per60 seconds per region. The log shows
+**Quota errors (HTTP 429).** A large deploy can exceed Cloud Functions write quotas: v1 allows 80
+requests per 100 seconds per project, and v2 allows 60 per 60 seconds per region. The log shows
 `Quota Exceeded` and `failed to update function` or `failed to create function` lines. Firebase CLI
 normally retries these. If it exits 0 with missing Functions or inactive targeted retry policies,
-the helper waits105 seconds, reads a fresh complete inventory, and starts another guarded Firebase
-process. It makes at most3 attempts with2 waits. Each attempt recalculates whether any force is
+the helper waits 105 seconds, reads a fresh complete inventory, and starts another guarded Firebase
+process. It makes at most 3 attempts with 2 waits. Each attempt recalculates whether any force is
 safe; unchanged Functions are skipped. See [Google's quota limits](https://docs.cloud.google.com/functions/quotas).
 
 Exhaustion fails the step with the missing Function names, `retry policy change(s) are not active`

@@ -867,7 +867,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Function deploys recover from a successful Firebase exit that leaves quota-limited creates
-  unfinished. Three guarded attempts use fresh complete inventories and wait105 seconds between
+  unfinished. Three guarded attempts use fresh complete inventories and wait 105 seconds between
   attempts. Partial bootstraps cannot reuse full-deploy force; other errors still stop (#827).
 - Email event dates use readable calendar dates, such as March 12, 2027,
   and keep the configured day regardless of the server's timezone (#818).
