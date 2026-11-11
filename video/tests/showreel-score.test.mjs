@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import {compose, CHORDS, CLIMB, HOOK, SCALE, PROGRESSION} from '../showreel/score.mjs';
+import {compose, CHORDS, CLIMB, HOOK, SCALE, PROGRESSION, under} from '../showreel/score.mjs';
 import {RATE, bus, place, plate, limit, level, filter, random, saw, render} from '../showreel/audio-kit.mjs';
 
 const {timeline} = await import(new URL('../showreel/timeline.ts', import.meta.url));
@@ -38,6 +38,11 @@ test('the breath before the title and the last three frames are digital silence'
   assert.ok(level(mix, sample(b), sample(b) + RATE / 10) > -30, 'the title chord follows the breath');
 });
 
+test('the sound fades into the breath, with no step', () => {
+  const cut = sample(timeline.silence[0]);
+  for (const side of [score.left, score.right]) assert.ok(Math.abs(side[cut - 1]) < .005, `last sample before the silence is ${side[cut - 1]}`);
+});
+
 test('every picture cue has a sound on its frame', () => {
   const expected = [];
   // A range is announced at its start.
@@ -55,6 +60,18 @@ test('every note is in A major, and the home chord waits for the title', () => {
   const key = new Set([9, 11, 1, 2, 4, 6, 8]);
   const notes = [...Object.values(CHORDS).flatMap(c => [c.root, ...c.notes]), ...CLIMB.flatMap(c => [c.root, ...c.notes]), ...Object.values(HOOK).flat().map(([, note]) => note), ...SCALE];
   for (const note of notes) assert.ok(key.has(note % 12), `note ${note} is in the key`);
+  // The harmony voice is calculated from the hook, so it is checked note by note:
+  // a tone of the bar's chord, three to five semitones under the melody.
+  for (const [name, bar] of Object.entries(HOOK)) for (const [, note] of bar) {
+    const low = under(note, name), chord = [CHORDS[name].root, ...CHORDS[name].notes].map(n => n % 12);
+    assert.ok(key.has(low % 12) && chord.includes(low % 12), `the harmony under ${note} on ${name} is a chord tone in the key`);
+    assert.ok(note - low >= 3 && note - low <= 5, `the harmony under ${note} on ${name} is a third or a fourth below`);
+  }
+  // Every pitch the score calculated while it played, not only the tables above.
+  assert.ok(score.notes.length > 20);
+  for (const note of score.notes) assert.ok(key.has(note % 12), `played note ${note} is in the key`);
+  // The style changes replace bars 7 to 9, so they must not rest on A either.
+  assert.ok(CLIMB.every(chord => chord.root % 12 !== 9), 'no style-change chord has A in the bass');
   assert.equal(PROGRESSION.length, timeline.bars);
   assert.ok(PROGRESSION.slice(0, 20).every(name => name !== 'A'), 'no bar before the title rests on A');
   assert.deepEqual(PROGRESSION.slice(20), ['A', 'A', 'A', 'A']);
@@ -88,6 +105,14 @@ test('the low end is mono and the mix has width without losing mono', () => {
     lowLR += a * b; lowLL += a * a; lowRR += b * b; lr += l * r; ll += l * l; rr += r * r;
   }
   assert.ok(lowLR / Math.sqrt(lowLL * lowRR) > .97, 'below 120 Hz the two channels agree');
+  // The same in every two-bar span: wide pads and the hall must not put the low end out of phase.
+  for (let bar = 1; bar < timeline.bars; bar += 2) {
+    // Two filters in series for each channel: a steep slope, so the wide middle of the mix is not measured here.
+    const low = [0, 1, 2, 3].map(() => filter().set(120)); let ab = 0, aa = 0, bb = 0;
+    for (let i = barSample(bar); i < Math.min(score.count, barSample(bar + 2)); i++) { const x = low[1].run(low[0].run(score.left[i])), y = low[3].run(low[2].run(score.right[i])); ab += x * y; aa += x * x; bb += y * y; }
+    // 0.85 is a loss of about 0.3 dB when a phone sums the channels. The last chord has little below 120 Hz, so it is the lowest.
+    if (aa + bb > 1e-3) assert.ok(ab / Math.sqrt(aa * bb) > .85, `bars ${bar} and ${bar + 1}: low-end correlation ${ab / Math.sqrt(aa * bb)}`);
+  }
   const correlation = lr / Math.sqrt(ll * rr);
   assert.ok(correlation > .6 && correlation < .97, `correlation ${correlation}`);
 });

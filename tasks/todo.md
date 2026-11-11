@@ -13,7 +13,7 @@ The three parts are a stack (owner: stacked pull requests when possible):
 |---|---|---|---|
 | 1 | `jawn/youthful-meitner-ts84kk` | `main` | Director: design pass on the landscape cut |
 | 2 | `jawn/youthful-meitner-ts84kk-2-sound` | PR 1 branch | Director: new score and sound design |
-| 3 | `jawn/youthful-meitner-ts84kk-3-vertical` | PR 2 branch | Builder V1 (Opus, medium effort): format-driven layouts and the vertical cut |
+| 3 | `jawn/youthful-meitner-ts84kk-3-vertical` | PR 2 branch | Builder V1: format-driven layouts and the vertical cut |
 
 The sound was ready first, so it is the second part and the vertical cut the
 third. Roster: V1 works in the main checkout on `video/showreel/*.ts`,
@@ -35,7 +35,7 @@ V1 runs and works only on `score.mjs`, `make-score.mjs`, `audio-kit.mjs` and
 - [x] Flat ground: no glow and no dot grid.
 - [x] Montage is a run sheet of eight ruled bands, not a card grid.
 - [x] One colour for each product part, shared by the stack and the montage.
-- [ ] Flash screen passes at native size.
+- [x] Flash screen passes at native size (6 transitions in the worst second; the limit is 6).
 
 ### PR 3. Native vertical cut
 
