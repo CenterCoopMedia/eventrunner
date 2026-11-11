@@ -833,7 +833,7 @@ async function stripeEndpoint(ctx, token, notes, connection) {
   // (#835), only one live Connect site may have an endpoint.
   const other = auth.connect && (listed.data || []).find((endpoint) => endpoint.url !== url && /\/ticketingWebhook$/.test(endpoint.url || ''));
   if (other) {
-    throw new Error(`another live site already has a platform payment webhook (${other.id}); a second live Stripe site needs the shared receiver first (#835)`);
+    throw new Error(`another live site already has a platform payment webhook (${other.id}); a second live Stripe site needs the shared receiver first (issue 835)`);
   }
   const secret = await ctx.clientSecrets.readSecret(WEBHOOK_SECRET);
   // Stripe shows a signing secret once, so only the endpoint recorded with it is known to match.
