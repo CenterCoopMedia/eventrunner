@@ -932,7 +932,17 @@ Each row lists the emails of that request and their state: **Sent**, **Not sent*
 
 The system does not promise a reply time, and no email names one. Decide your own targets as policy, for example "acknowledge within two working days, and record an outcome within ten". Write them where your team and your visitors can read them, such as a page on the site. Use the **Open** filter to find requests that wait for a reply.
 
-## Feed moderation
+## Attendee feed and moderation
+
+The attendee feed is a private conversation area on the **Attendees** page. It lists active top-level posts, newest first; **Show older posts** loads more. A public attendee profile does not make feed posts public. Reading and reporting require sign-in, both the attendee directory and feed enabled, and either an approved registration, a linked speaker account, or current staff/operator access. A pending, ticketed or revoked account has no feed access unless it has one of those independent grants. Posting and replying require an approved or linked speaker account; staff access alone does not let someone post. Posts are plain text, limited to 2,000 text units (an emoji may count as two).
+
+**Current availability.** The attendee feed is off by default, and its feature switch and moderation menu entry remain hidden in this release. The post composer and thread view are still being completed. Do not activate the feed for an event before those controls and the combined acceptance smoke pass. The creation endpoint exists, but this release does not offer an attendee composer.
+
+**Prepare before switch-on.** Name the staff who will check reports during the event, agree how often they will check and who covers absences, and give them current staff or operator access. Publish the event's conduct rules and a contact route for urgent concerns. Walk through reporting, removal and account cleanup in a test event before admitting attendees. Reports are a private queue to check; reporting does not automatically hide a post or notify staff.
+
+**Operator switch-on, after release.** In **Features**, under **Attendees and access**, turn on **Attendee directory** and **Attendee feed**, then **Save**. Features is operator-only. Both live settings must be on; a missing setting stays off. Check the Attendees page with an approved test account and confirm the assigned staff can open moderation. To pause reading, posting and reporting, turn off **Attendee feed** and save. Turning off the directory also closes the feed. Neither switch deletes stored posts or prevents staff cleanup.
+
+**Report a post.** Choose **Report post**, then **Send report** to confirm, or **Cancel** to keep reading. **Reported. Staff will review this post.** confirms success. If sending fails, the row explains the problem and offers **Try again**. A retry cannot create another report from the same account on the same post. Other attendees see neither report counts nor reporter identities. An author whose directory profile is unavailable is shown without a profile name or link.
 
 Open `/admin/feed-moderation` directly for cleanup. Staff and operators can review private reports and remove reported posts even when the attendee feed, attendee directory, or both are off. Attendees cannot read this report list or remove posts. A current staff or operator grant is required; a profile role alone grants no access.
 
@@ -940,7 +950,7 @@ The list shows up to 50 reports at a time, newest first, grouped by post. **Refr
 
 Choose **Remove post**, read the consequence, then choose **Remove this post**. **Keep it** or Escape cancels. Removal permanently clears the post text and author, leaving only a removed marker and its timestamps and thread link. The server records who removed it and when in the admin log, in the same transaction, without copying the removed text or author. Repeating a removal adds no second audit record. If removal fails, the post stays as it was; the row explains the failure and offers another try. A post already removed elsewhere also loses its text in this tab.
 
-The attendee feed remains off by default. Assign staff moderation before an operator opts an event in. This cleanup screen does not enable the feature. Features stays operator-only.
+**Account removal.** In **Attendees**, open the attendee record, choose **Delete account**, and confirm **Delete this account**. The account's active posts and replies and the reports it submitted are cleared, including when both feature switches are off. Already removed posts keep their metadata-only markers, and other authors' replies remain. Reports submitted by other accounts may still point to an unavailable post; moderation shows that status. If account cleanup is incomplete, follow the page's retry instruction. This cleanup screen does not enable the feed.
 
 ## Materials
 
