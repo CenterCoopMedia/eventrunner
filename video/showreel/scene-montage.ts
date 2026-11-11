@@ -2,10 +2,23 @@
 // Here the whole product is one run sheet: eight ruled bands, lit from the top
 // on the beat, then folded into a point. Bands appear where they stay; on a
 // fast cut list that is what keeps bright areas from flashing.
-import {type C, type Project, type RGB, W, H, prog, outCubic, inCubic, outExpo, lerp, rgb, text, fillBox, strokeBox, disc, quadPoints, along, trace} from './kit.ts';
+import {type C, type Format, type Project, type RGB, W, H, prog, outCubic, inCubic, outExpo, lerp, rgb, text, fillBox, strokeBox, disc, quadPoints, along, trace} from './kit.ts';
 import {type Scene, ground, PARTS} from './shared.ts';
 
+/**
+ * Frame-dependent positions, as fractions of a band's height where they scale
+ * with it. A band is an eighth of the frame height. The label is set at `x`,
+ * `size` high, with its baseline `base` below the band's centre. The drawing is
+ * `right` from the right edge and `pad` shorter than the band.
+ */
+export const LAYOUT: Record<Format, {label: {x: number; size: number; base: number}; art: {right: number; pad: number}}> = {
+  landscape: {label: {x: 120, size: .62, base: .2}, art: {right: 120, pad: 28}},
+  // Bands are 240 high on a phone, so the label keeps about the landscape size and the drawing grows.
+  vertical: {label: {x: 60, size: .42, base: .15}, art: {right: 60, pad: 40}},
+};
+
 export function montage(p: Project): Scene {
+  const L = LAYOUT[p.format];
   const q = p.clock.cues.montage, D = p.brand.dark, [start, end] = [p.clock.scenes[5].start, p.clock.scenes[5].end];
   const BAND = H / PARTS.length;
   // The last two bands share the seventh beat; the eighth beat starts the fold.
@@ -47,9 +60,9 @@ export function montage(p: Project): Scene {
     c.translate(0, y + h / 2); c.scale(1, h / BAND);
     const label = style.id === 'zine' ? name.toUpperCase() : name;
     c.save(); c.beginPath(); c.rect(0, -BAND / 2, W * outCubic(prog(f, at + 2, at + 10)), BAND); c.clip();
-    text(c, label, 120, BAND * .2, {family: style.font, weight: style.weight, size: BAND * .62, tracking: -1, color: rgb(ink)}); c.restore();
-    const scale = (BAND - 28) / 150;
-    c.translate(W - 120 - 200 * scale, -75 * scale); c.scale(scale, scale); art[i](c, f - at - 2, ink, fill);
+    text(c, label, L.label.x, BAND * L.label.base, {family: style.font, weight: style.weight, size: BAND * L.label.size, tracking: -1, color: rgb(ink)}); c.restore();
+    const scale = (BAND - L.art.pad) / 150;
+    c.translate(W - L.art.right - 200 * scale, -75 * scale); c.scale(scale, scale); art[i](c, f - at - 2, ink, fill);
     c.restore();
   }
 

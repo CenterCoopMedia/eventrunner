@@ -3,13 +3,22 @@
 import type {Timeline} from './timeline.ts';
 import type {Experience} from '../types.ts';
 
-export const W = 1920, H = 1080;
+/** The film is cut in two formats. Each scene composes itself again for the frame. */
+export type Format = 'landscape' | 'vertical';
+export const FRAME: Record<Format, {w: number; h: number}> = {landscape: {w: 1920, h: 1080}, vertical: {w: 1080, h: 1920}};
+/** The current format and its frame size. `setFormat` changes them before anything is built. */
+export let FORMAT: Format = 'landscape';
+export let W = 1920, H = 1080;
+export function setFormat(format: Format) {
+  if (!FRAME[format]) throw new Error(`Unknown format: ${format}`);
+  FORMAT = format; W = FRAME[format].w; H = FRAME[format].h;
+}
 export type C = CanvasRenderingContext2D;
 export type RGB = number[];
 export type Point = [number, number];
 export type Palette = {surface: RGB; surfaceAlt: RGB; ink: RGB; inkMuted: RGB; primary: RGB; accent: RGB; highlight: RGB};
 export type Style = {id: string; label: string; font: string; weight: number; face: string; radius: string; light: Palette; dark: Palette};
-export type Project = {clock: Timeline; experience: Experience & {subtitle: string}; copy: {sample: string; day: string; days: number; site: string}; styles: Style[]; brand: {light: Palette; dark: Palette}};
+export type Project = {format: Format; clock: Timeline; experience: Experience & {subtitle: string}; copy: {sample: string; day: string; days: number; site: string}; styles: Style[]; brand: {light: Palette; dark: Palette}};
 
 export const TAU = Math.PI * 2;
 export const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));

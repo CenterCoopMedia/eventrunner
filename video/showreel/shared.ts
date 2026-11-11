@@ -1,12 +1,19 @@
 // Pieces every scene uses: the dark ground, the narrator's type, and the layout
 // values two neighbouring scenes must agree on.
-import {type C, type Palette, type RGB, W, H, rgb, mix, text, kinetic, prog, outCubic, disc, hash} from './kit.ts';
+import {type C, type Format, type Palette, type RGB, FORMAT, W, H, rgb, mix, text, kinetic, prog, outCubic, disc, hash} from './kit.ts';
 
 export type Scene = {from: number; to: number; draw: (c: C, f: number) => void};
 
-// The opening speed lines come to rest as the rules of the schedule.
-export const RAIL_Y = [160, 338, 516, 694, 872];
-export const RAIL_X0 = 700, RAIL_X1 = 1800;
+/**
+ * Layout values two neighbouring scenes must agree on, for each format. The
+ * opening speed lines come to rest as the rules of the schedule (`railY`, from
+ * `railX0` to `railX1`). `sample` is the left end of the standing note's baseline.
+ */
+export const LAYOUT: Record<Format, {railY: number[]; railX0: number; railX1: number; sample: {x: number; y: number}}> = {
+  landscape: {railY: [160, 338, 516, 694, 872], railX0: 700, railX1: 1800, sample: {x: 120, y: 1014}},
+  // On a phone the rules run the width of the safe area, under the scene word.
+  vertical: {railY: [700, 900, 1100, 1300, 1500], railX0: 60, railX1: 1020, sample: {x: 60, y: 1536}},
+};
 
 export const rule = (p: Palette, amount = .2): RGB => mix(p.surface, p.ink, amount);
 
@@ -69,7 +76,7 @@ export function phrase(c: C, value: string, x: number, y: number, o: {size: numb
 /** The standing note that the event shown is invented, at a size a person can read. */
 export function sample(c: C, label: string, color: RGB, alpha: number) {
   if (alpha <= 0) return;
-  text(c, label, 120, 1014, {family: 'Source', weight: 400, size: 26, color: rgb(color, alpha)});
+  text(c, label, LAYOUT[FORMAT].sample.x, LAYOUT[FORMAT].sample.y, {family: 'Source', weight: 400, size: 26, color: rgb(color, alpha)});
 }
 
 /** Circle with initials. The films show no faces. */

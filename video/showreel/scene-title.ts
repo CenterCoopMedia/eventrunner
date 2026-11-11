@@ -1,14 +1,38 @@
 // Title. On the chord Badger is large and running on the spot. The landing
 // cuts to the official lockup and the name is uncovered beside the mark.
-import {type C, type Project, W, spring, prog, outCubic, outExpo, clamp, rgb, text, ring, line, hash, TAU, setFont} from './kit.ts';
+import {type C, type Format, type Project, W, spring, prog, outCubic, outExpo, clamp, rgb, text, ring, line, hash, TAU, setFont} from './kit.ts';
 import {badger, REST, type Pose} from './badger.ts';
 import {type Scene, ground, word, streaks, SOFT} from './shared.ts';
 
-// Geometry of design/brand/badger-lockup.svg, enlarged by SCALE.
-const SCALE = 1.75, MARK = 3 * SCALE, TEXT_X = 248 * SCALE, BASE = [133 * SCALE, 214 * SCALE], SIZE = 92 * SCALE, TOP = 112;
+type Line = {text: string; x: number; y: number; delay: number};
+/**
+ * Frame-dependent positions. The lockup keeps the geometry of
+ * design/brand/badger-lockup.svg, enlarged by `scale`, with its top at `top`.
+ * `hero` is Badger's centre and scale before the landing. The tagline is set in
+ * `lines`; each line starts `delay` frames after the tagline cue.
+ */
+export const LAYOUT: Record<Format, {
+  scale: number; top: number; hero: {x: number; y: number; size: number};
+  tagline: {size: number; lines: Line[]}; words: {y: number; rule: number}; url: {x: number; y: number};
+}> = {
+  landscape: {
+    scale: 1.75, top: 112, hero: {x: 960, y: 470, size: 7.6},
+    tagline: {size: 96, lines: [{text: 'Make room for your event.', x: 960, y: 726, delay: 0}]}, words: {y: 826, rule: 846}, url: {x: 960, y: 940},
+  },
+  // A stacked end card: the lockup about 830 wide, the tagline in two lines.
+  // The second line goes on where the first one stops, one letter a frame.
+  vertical: {
+    scale: 1.53, top: 520, hero: {x: 540, y: 860, size: 7.6},
+    tagline: {size: 108, lines: [{text: 'Make room', x: 540, y: 1090, delay: 0}, {text: 'for your event.', x: 540, y: 1200, delay: 10}]},
+    words: {y: 1300, rule: 1320}, url: {x: 540, y: 1400},
+  },
+};
 
 export function title(p: Project): Scene {
   const q = p.clock.cues.title, D = p.brand.dark, start = p.clock.scenes[6].start;
+  const L = LAYOUT[p.format], SCALE = L.scale, TOP = L.top;
+  // Geometry of design/brand/badger-lockup.svg, enlarged by SCALE.
+  const MARK = 3 * SCALE, TEXT_X = 248 * SCALE, BASE = [133 * SCALE, 214 * SCALE], SIZE = 92 * SCALE;
   const inks = {ink: D.ink, accent: D.primary, surface: D.surface};
   const WORDS = ['Plan.', 'Shape.', 'Gather.'];
   const confetti = Array.from({length: 22}, (_, i) => ({
@@ -26,8 +50,8 @@ export function title(p: Project): Scene {
     const running = f < q.land ? 1 : 0;
     const mx = left + 40 * MARK, my = TOP + 8 * SCALE + 40 * MARK;
     // Before the landing Badger is large at the centre; the landing is a cut to the lockup.
-    const HERO = 7.6, hx = W / 2 - 40 * HERO, hy = 470 - 40 * HERO;
-    const [ox, oy] = running ? [W / 2, 470] : [mx, my];
+    const HERO = L.hero.size, hx = L.hero.x - 40 * HERO, hy = L.hero.y - 40 * HERO;
+    const [ox, oy] = running ? [L.hero.x, L.hero.y] : [mx, my];
     const burst = outExpo(prog(f, q.impact, q.impact + 22));
     ground(c, D);
 
@@ -47,9 +71,11 @@ export function title(p: Project): Scene {
     streaks(c, D.ink, running * prog(f, q.impact, q.impact + 5), 71, f);
 
     // He runs on the spot: the body holds still and bright, the legs are a soft smear.
+    // The body does not bob and the limbs stay at SOFT. At this size both count as
+    // transitions for the flash screen, and the landing cut is under a second away.
     const pose: Pose = {
       ...REST,
-      runAmount: running, run: (f - q.impact) / 30 * 2.6, limbAlpha: running ? SOFT + .1 : 1,
+      runAmount: running, bob: 0, run: (f - q.impact) / 30 * 2.6, limbAlpha: running ? SOFT : 1,
       lean: running ? .26 : .16,
       squash: 1 - .14 * Math.max(0, 1 - Math.abs(f - q.land - 1.5) / 3),
       barStretch: 1 + 4 * running,
@@ -85,20 +111,20 @@ export function title(p: Project): Scene {
       c.save(); c.beginPath(); c.rect(left + TEXT_X - 10, TOP + BASE[row] - SIZE, (W - left - TEXT_X) * shown, SIZE * 1.4); c.clip();
       text(c, value, left + TEXT_X, TOP + BASE[row], {family: 'Source', weight: 700, size: SIZE, color: rgb(D.ink)}); c.restore();
     });
-    word(c, 'Make room for your event.', W / 2, 726, 96, D.ink, f, q.tagline, Infinity, 'center', 1);
+    for (const line of L.tagline.lines) word(c, line.text, line.x, line.y, L.tagline.size, D.ink, f, q.tagline + line.delay, Infinity, 'center', 1);
     // Three words, one on each of the last three notes.
     setFont(c, {family: 'Source', weight: 700, size: 54});
     const gap = 48, widths = WORDS.map(value => c.measureText(value).width), total = widths.reduce((a, b) => a + b, 0) + gap * 2;
     let x = (W - total) / 2;
     WORDS.forEach((value, i) => {
       const s = spring(f, q.words[i], 3, .5);
-      if (s > 0) text(c, value, x, 826 + (1 - s) * 34, {family: 'Source', weight: 700, size: 54, color: rgb(D.primary, clamp(s * 1.5))});
+      if (s > 0) text(c, value, x, L.words.y + (1 - s) * 34, {family: 'Source', weight: 700, size: 54, color: rgb(D.primary, clamp(s * 1.5))});
       const ping = prog(f, q.words[i], q.words[i] + 12);
-      if (ping > 0 && ping < 1) line(c, x, 846, x + widths[i] * outCubic(ping), 846, rgb(D.primary, 1 - ping), 3);
+      if (ping > 0 && ping < 1) line(c, x, L.words.rule, x + widths[i] * outCubic(ping), L.words.rule, rgb(D.primary, 1 - ping), 3);
       x += widths[i] + gap;
     });
     // Typed in whole characters on whole frames, complete before the picture settles.
     const url = p.copy.site, typed = Math.floor(clamp((Math.floor(f) - q.url + 1) * 2.5, 0, url.length));
-    if (typed > 0) text(c, url.slice(0, typed), W / 2, 940, {size: 40, weight: 600, align: 'center', color: rgb(D.inkMuted)});
+    if (typed > 0) text(c, url.slice(0, typed), L.url.x, L.url.y, {size: 40, weight: 600, align: 'center', color: rgb(D.inkMuted)});
   }};
 }

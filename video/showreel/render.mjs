@@ -4,6 +4,7 @@
 //   node video/showreel/render.mjs --stills 0,56,112  PNG stills in video/out/showreel-stills
 //   node video/showreel/render.mjs --sheet 9          contact sheets, every ninth frame
 //   node video/showreel/render.mjs --check-mark       compare the rig at rest with the official mark
+//   node video/showreel/render.mjs --format vertical  the 1080 by 1920 cut; outputs are named showreel-vertical*
 // --workers N sets the number of browsers that render in parallel (default 3).
 // --silent encodes without the score. VIDEO_CHROMIUM names a Chromium binary
 // when the pinned Playwright has none.
@@ -21,9 +22,23 @@ import {REPO, FONTS, project as readProject, markSvg} from './data.mjs';
 const SELF = fileURLToPath(import.meta.url), HERE = path.dirname(SELF);
 const OUT = path.resolve(HERE, '../out');
 const CACHE = path.resolve(HERE, '../.cache/showreel');
-const WIDTH = 1920, HEIGHT = 1080;
 const args = process.argv.slice(2);
 const value = key => (args.includes(key) ? args[args.indexOf(key) + 1] : null);
+// Landscape keeps the names it always had. Vertical outputs carry the format in
+// their names, so the two cuts never overwrite each other.
+const FORMATS = {
+  landscape: {width: 1920, height: 1080, name: 'showreel', stills: 'showreel-stills', tile: '480:270'},
+  vertical: {width: 1080, height: 1920, name: 'showreel-vertical', stills: 'showreel-stills-vertical', tile: '270:480'},
+};
+// A missing value must not fall back to landscape without a word.
+const FORMAT = args.includes('--format') ? value('--format') : 'landscape';
+if (!FORMATS[FORMAT]) throw new Error(`--format takes ${Object.keys(FORMATS).join(' or ')}`);
+const {width: WIDTH, height: HEIGHT, name: NAME} = FORMATS[FORMAT];
+// Frame folders: landscape keeps its bare key, vertical has a prefix. A render
+// removes stale folders of its own format only.
+export const cachePrefix = format => (format === 'landscape' ? '' : `${format}-`);
+export const ownsFolder = (format, folder) => (cachePrefix(format) ? folder.startsWith(cachePrefix(format)) : !Object.keys(FORMATS).some(other => folder.startsWith(`${other}-`)));
+const PREFIX = cachePrefix(FORMAT), sameFormat = folder => ownsFolder(FORMAT, folder);
 const sha256 = data => crypto.createHash('sha256').update(data).digest('hex');
 
 async function bundle() {
@@ -102,7 +117,7 @@ function currentScore(clock) {
 
 async function main() {
   fs.mkdirSync(OUT, {recursive: true});
-  const code = await bundle(), data = await readProject(), {clock} = data, errors = [];
+  const code = await bundle(), data = await readProject(FORMAT), {clock} = data, errors = [];
   const failOnPageErrors = () => { if (errors.length) throw new Error(`Render page reported ${errors.length} errors`); };
   const sound = !args.includes('--silent');
   const reel = await open(code, data, errors);
@@ -117,7 +132,7 @@ async function main() {
       return;
     }
     if (args.includes('--stills')) {
-      const dir = path.join(OUT, 'showreel-stills'); fs.mkdirSync(dir, {recursive: true});
+      const dir = path.join(OUT, FORMATS[FORMAT].stills); fs.mkdirSync(dir, {recursive: true});
       for (const frame of value('--stills').split(',').map(Number)) {
         fs.writeFileSync(path.join(dir, `${String(frame).padStart(4, '0')}.png`), await reel.png(frame));
       }
@@ -133,10 +148,11 @@ async function main() {
     const wav = step === 1 && sound ? currentScore(clock) : null;
 
     // One folder for each set of inputs; a frame is named by its number, so any
-    // range or sheet reuses it. Folders for other inputs are removed.
-    const key = inputKey(code, data), frames = path.join(CACHE, key);
+    // range or sheet reuses it. Folders for other inputs of the same format are
+    // removed. The key covers the data, and the data holds the format.
+    const key = `${PREFIX}${inputKey(code, data)}`, frames = path.join(CACHE, key);
     fs.mkdirSync(frames, {recursive: true});
-    for (const other of fs.readdirSync(CACHE)) if (other !== key) fs.rmSync(path.join(CACHE, other), {recursive: true, force: true});
+    for (const other of fs.readdirSync(CACHE)) if (other !== key && sameFormat(other)) fs.rmSync(path.join(CACHE, other), {recursive: true, force: true});
     const file = frame => path.join(frames, `${String(frame).padStart(6, '0')}.png`);
     const list = [];
     for (let frame = start; frame <= end; frame += step) list.push(frame);
@@ -166,16 +182,17 @@ async function main() {
     }
 
     if (step > 1) {
-      for (const old of fs.readdirSync(OUT)) if (/^showreel-sheet-\d+\.jpg$/.test(old)) fs.unlinkSync(path.join(OUT, old));
+      const sheet = new RegExp(`^${NAME}-sheet-\\d+\\.jpg$`);
+      for (const old of fs.readdirSync(OUT)) if (sheet.test(old)) fs.unlinkSync(path.join(OUT, old));
       const index = path.join(frames, 'sheet.ffconcat');
       fs.writeFileSync(index, `ffconcat version 1.0\n${list.map(frame => `file '${file(frame)}'\nduration ${1 / 30}`).join('\n')}\n`);
       // Each tile prints its source frame number.
       const label = `drawtext=text='%{eif\\:n*${step}+${start}\\:d}':x=8:y=8:fontsize=22:fontcolor=white:box=1:boxcolor=black@0.6`;
-      await ffmpeg(['-f', 'concat', '-safe', '0', '-i', index, '-vf', `scale=480:270,${label},tile=5x6`, '-fps_mode', 'passthrough', '-q:v', '3', path.join(OUT, 'showreel-sheet-%02d.jpg')]);
+      await ffmpeg(['-f', 'concat', '-safe', '0', '-i', index, '-vf', `scale=${FORMATS[FORMAT].tile},${label},tile=5x6`, '-fps_mode', 'passthrough', '-q:v', '3', path.join(OUT, `${NAME}-sheet-%02d.jpg`)]);
       console.log('Sheets in', OUT);
       return;
     }
-    const final = path.join(OUT, `showreel${partial}.mp4`);
+    const final = path.join(OUT, `${NAME}${partial}.mp4`);
     const encode = ['-framerate', '30', '-start_number', String(start), '-i', path.join(frames, '%06d.png')];
     if (wav) encode.push('-ss', String(start / 30), '-i', wav);
     // Convert with the BT.709 matrix the file is tagged with.
