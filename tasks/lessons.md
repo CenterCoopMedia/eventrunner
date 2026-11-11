@@ -346,3 +346,35 @@ Rules written after user corrections. Read at session start.
   across frames. A clip of frames 1090 to 1270 passed with 4 transitions; the
   same frames in the full film had 7 and failed the native screen. A check on
   a part is a diagnostic only. The gate is the full film.
+
+## 2026-11-10: the anti-slop list is a lens, and "sound" means sound design too
+
+- Joe attached his list of signs that a site was generated, and I started to
+  remove each item as a rule. He stopped me: the list is a holistic way to
+  avoid the generated smell, not a deny list. For any design work, ask of
+  each element "what is its reason in this product?" Keep what has one (mono
+  type for times, a stamp on a ticket), remove what is there by habit (a
+  numbered label above every headline, a chip with a dot, a glow), and look
+  for the one idea that ties the piece together. A grep for the items is a
+  check, not the method.
+- "Better music" from Joe also means better sound design: every picture
+  event gets a designed sound in one family, in the key, at its place on the
+  screen and on its exact frame. A score with thin effects is half the job.
+- Give phones a bass line they can play. A sub-only bass and kick vanish on
+  a phone speaker, and the vertical cut is for phones: keep harmonics above
+  200 Hz in both.
+
+## 2026-11-11: a change too small to read as a choice reads as a fault
+
+- Joe watched and listened to every version. He had two notes: a flicker at
+  the start of the vertical cut, and a very small pause and silence before
+  the title in both cuts.
+- The pause was by design: seven frames of digital silence over one still
+  dot. The flicker was a cut from zoom 1.2 to 1.12 in the vertical opening,
+  which the flash limit had forced. No measurement flagged either one.
+- Rule: a rest, a hold or a cut must be large enough to read as a decision.
+  Under about half a second, do not stop the picture or the sound; fill the
+  gap with a lead-in. Do not cut between framings that differ by less than
+  about 20 percent; hold the camera.
+- A person must watch at speed before I call a film finished. Numbers and
+  still frames cannot show a freeze or a jitter.

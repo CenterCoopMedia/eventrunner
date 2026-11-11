@@ -1,23 +1,30 @@
 // Browser entry point. Exposes a frame seek that resolves only after fonts are
 // ready, so type is never measured with a fallback face.
-import {W, H, type Project, hash, rgb, BLACK} from './kit.ts';
+import {W, H, type Project, hash, rgb, BLACK, setFormat} from './kit.ts';
 import {badger, REST} from './badger.ts';
 import {createStage, type Stage} from './stage.ts';
 
 declare global { interface Window { __REEL: {load: (project: Project) => Promise<void>; seek: (frame: number) => Promise<number>; markDifference: () => Promise<number>}; } }
 
+// The page that render.mjs writes sizes this canvas for the format.
 const canvas = document.querySelector('canvas')!;
 const out = canvas.getContext('2d', {alpha: false})!;
 const layer = (w = W, h = H) => { const el = document.createElement('canvas'); el.width = w; el.height = h; return el; };
-// One sample buffer and five shutter buffers for the whole render.
-const sample = layer(), sampleContext = sample.getContext('2d', {alpha: false})!;
-// Level k holds the mean of 2^k samples. Two equal levels merge at 50%, so
-// every sample has the same weight; a running average on 8-bit pixels would
-// round the late samples away.
-const levels = Array.from({length: 5}, () => { const el = layer(); return {el, context: el.getContext('2d', {alpha: false})!, full: false}; });
-const glow = layer(W / 4, H / 4), glowContext = glow.getContext('2d', {alpha: false})!;
+type Level = {el: HTMLCanvasElement; context: CanvasRenderingContext2D; full: boolean};
+// The buffers take the frame size, so they are made in load, after setFormat.
+let sample: HTMLCanvasElement, sampleContext: CanvasRenderingContext2D, levels: Level[], glow: HTMLCanvasElement, glowContext: CanvasRenderingContext2D;
 const grain = layer(512, 512);
 let project: Project, stage: Stage;
+
+function buffers() {
+  // One sample buffer and five shutter buffers for the whole render.
+  sample = layer(); sampleContext = sample.getContext('2d', {alpha: false})!;
+  // Level k holds the mean of 2^k samples. Two equal levels merge at 50%, so
+  // every sample has the same weight; a running average on 8-bit pixels would
+  // round the late samples away.
+  levels = Array.from({length: 5}, () => { const el = layer(); return {el, context: el.getContext('2d', {alpha: false})!, full: false}; });
+  glow = layer(W / 4, H / 4); glowContext = glow.getContext('2d', {alpha: false})!;
+}
 
 function makeGrain(seed: number) {
   const g = grain.getContext('2d')!, image = g.createImageData(512, 512);
@@ -30,6 +37,10 @@ function makeGrain(seed: number) {
 
 async function load(next: Project) {
   project = next;
+  // The format sets the frame size before any buffer, page or scene is made.
+  setFormat(project.format);
+  if (canvas.width !== W || canvas.height !== H) throw new Error(`The page canvas is ${canvas.width} by ${canvas.height}, not ${W} by ${H}`);
+  buffers();
   const faces = ['800 40px Bricolage', '700 40px Bricolage', '400 40px Source', '600 40px Source', '700 40px Source', '400 40px Mono', '500 40px Mono',
     ...project.styles.map(style => `${style.weight} 40px ${style.font}`)];
   const loaded = await Promise.all(faces.map(face => document.fonts.load(face)));
@@ -58,7 +69,8 @@ function seek(frame: number) {
   glowContext.filter = 'blur(7px)'; glowContext.drawImage(shutter, 0, 0, W / 4, H / 4); glowContext.filter = 'none';
   out.globalCompositeOperation = 'screen'; out.globalAlpha = .16; out.drawImage(glow, 0, 0, W, H);
   out.globalCompositeOperation = 'source-over'; out.globalAlpha = 1;
-  const vignette = out.createRadialGradient(W / 2, H / 2, H * .45, W / 2, H / 2, H * 1.08);
+  // The vignette follows the short side, so a tall frame darkens its corners as much.
+  const side = Math.min(W, H), vignette = out.createRadialGradient(W / 2, H / 2, side * .45, W / 2, H / 2, side * 1.08);
   vignette.addColorStop(0, rgb(BLACK, 0)); vignette.addColorStop(1, rgb(BLACK, .34));
   out.fillStyle = vignette; out.fillRect(0, 0, W, H);
   // Seeded grain after blur, moved to a new offset on every frame.

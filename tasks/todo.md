@@ -12,14 +12,16 @@ The three parts are a stack (owner: stacked pull requests when possible):
 | PR | Branch | Base | Who writes |
 |---|---|---|---|
 | 1 | `jawn/youthful-meitner-ts84kk` | `main` | Director: design pass on the landscape cut |
-| 2 | `jawn/youthful-meitner-ts84kk-2-vertical` | PR 1 branch | Builder V1: format-driven layouts and the vertical cut |
-| 3 | `jawn/youthful-meitner-ts84kk-3-sound` | PR 2 branch | Director: new score and sound design |
+| 2 | `jawn/youthful-meitner-ts84kk-2-sound` | PR 1 branch | Director: new score and sound design |
+| 3 | `jawn/youthful-meitner-ts84kk-3-vertical` | PR 2 branch | Builder V1: format-driven layouts and the vertical cut |
 
-Roster: V1 works in the main checkout on `video/showreel/*.ts`, `data.mjs`,
-`render.mjs` and `video/tests/showreel.test.mjs`. The director stays out of
-those files while V1 runs and works only on `score.mjs`, `make-score.mjs`,
-a new `audio-kit.mjs` and `video/tests/showreel-score.test.mjs`. V1 writes
-its report to `tasks/reports/showreel-v1.md`.
+The sound was ready first, so it is the second part and the vertical cut the
+third. Roster: V1 works in the main checkout on `video/showreel/*.ts`,
+`data.mjs`, `render.mjs`, the showreel README and
+`video/tests/showreel.test.mjs`. The director stays out of those files while
+V1 runs and works only on `score.mjs`, `make-score.mjs`, `audio-kit.mjs` and
+`video/tests/showreel-score.test.mjs`. V1 writes its report to
+`tasks/reports/showreel-v1.md`.
 
 ### PR 1. Design pass (landscape)
 
@@ -35,19 +37,41 @@ its report to `tasks/reports/showreel-v1.md`.
 - [x] One colour for each product part, shared by the stack and the montage.
 - [x] Flash screen passes at native size (6 transitions in the worst second; the limit is 6).
 
-### PR 2. Native vertical cut
+### PR 3. Native vertical cut
 
-- [ ] One `LAYOUT` table for each scene, chosen by format. Landscape frames
-      stay identical to PR 1 (reference frames in the scratchpad).
-- [ ] Vertical layouts composed for 1080 by 1920: stacked narrator and stage,
-      a phone page picture, a three-column wall, downward paths.
-- [ ] Essential content inside y 250 to 1540. Flash screen passes.
+- [x] One `LAYOUT` table for each scene, chosen by format. Landscape frames
+      stay identical to PR 1: 93 frames compared, 0 differ, and a recorded
+      copy of the landscape tables is in the tests.
+- [x] Vertical layouts composed for 1080 by 1920: stacked narrator and stage,
+      a phone page picture, a wall of eight large tiles, downward paths.
+- [x] Essential content inside y 250 to 1540 (a test holds the named boxes).
+      The first and last montage labels are outside it, by design of the
+      eight full-height bands.
+- [x] Flash screen passes at native size on both final films: 6 transitions
+      in the worst second for each (the limit is 6), no hazard frames.
 
-### PR 3. Sound
+### PR 2. Sound
 
-- [ ] New composition on the same cues, with a hook and real arrangement.
-- [ ] Designed sound for every picture event, placed by screen position.
-- [ ] Master to -16 LUFS; measurements and spectrogram reviewed.
+- [x] New composition on the same cues, with a hook and real arrangement.
+- [x] Designed sound for every picture event, placed by screen position.
+- [x] Master to -16 LUFS; measurements and spectrogram reviewed.
+- [ ] A person listens on headphones, laptop speakers and a phone.
+
+### Review (2026-11-10)
+
+- All three parts are open as a stack: #793 (design), #795 (sound), #799
+  (vertical). Merge from the top down.
+- Independent reviews found real defects, now fixed: a harmony voice and some
+  effect notes outside the key, a home chord in bar 8, a low end that was out
+  of phase at the title, a step into the silence, and a stale landscape
+  number in the vertical Gather scene.
+- The title failed the native flash screen after the design pass. My check
+  had used a clip, which is not valid. Badger now holds still at title size.
+- Not done by a machine: nobody has listened to the score or watched either
+  film at speed. The flash margin is zero on both films.
+- Weak spots the owner may want changed: small type on the vertical wall
+  tiles, an empty band under the Shape window in the vertical cut, and a
+  title that is 4.5 LU quieter than the montage.
 
 ## Plan for review: audit follow-up (2026-11-09)
 

@@ -45,7 +45,9 @@ export function styles() {
   });
 }
 
-export async function project() {
+/** Everything the page needs. `format` picks the landscape or the vertical composition. */
+export async function project(format = 'landscape') {
+  if (!['landscape', 'vertical'].includes(format)) throw new Error(`Unknown format: ${format}`);
   const {timeline} = await import('./timeline.ts');
   const all = styles();
   const {fixture, answers} = createRequire(import.meta.url)('../capture/fixture.cjs');
@@ -56,7 +58,7 @@ export async function project() {
   const site = fs.readFileSync(path.join(REPO, 'design/brand/social-preview.svg'), 'utf8').match(/>\s*(eventrunner\.org)\s*</)?.[1];
   if (!site) throw new Error('design/brand/social-preview.svg no longer prints the site address');
   const copy = {sample: `${experience.name} · Sample event`, day: `${first.label} · ${date}`, days: answers.event.days.length, site};
-  return {clock: timeline, experience: {...experience, subtitle}, copy, styles: all, brand: {light: all[0].light, dark: all[0].dark}};
+  return {format, clock: timeline, experience: {...experience, subtitle}, copy, styles: all, brand: {light: all[0].light, dark: all[0].dark}};
 }
 
 export const markSvg = () => fs.readFileSync(path.join(REPO, 'design/brand/badger-mark.svg'), 'utf8');

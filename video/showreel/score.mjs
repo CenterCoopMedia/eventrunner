@@ -1,334 +1,447 @@
-// Original showreel teaser score in E major. Every sample is calculated from
-// oscillators, seeded noise and recursive filters; no instrument bank or loop.
-import {RATE} from '../synth.mjs';
-const TAU=Math.PI*2,clamp=x=>x<0?0:x>1?1:x,smooth=x=>{x=clamp(x);return x*x*(3-2*x);},hz=n=>440*2**((n-69)/12);
+// The showreel score and its sound design, second version.
+//
+// Music: filter house at 128 BPM in A major. The harmony is the loop
+// D maj9, E 6/9, C# m7, F# m9 (IV, V, iii, vi), one chord a bar, so each scene
+// is one turn of it. The loop never lands on A, the home chord, until the
+// title: 37 seconds of leaning forward, then one arrival. The opening builds
+// the badge on the first four notes of the hook, the drop states the hook, and
+// the last three words of the film are the A major chord, one note a word.
+//
+// Sound design: every picture event has a designed sound placed where the
+// event is on screen, tuned to the key when it has a pitch. The exposure dips
+// of the picture are filter dips in the music.
+//
+// Every sample is calculated here and in audio-kit.mjs. No recording, sample
+// pack, loop or borrowed melody is used.
+import {RATE, TAU, hz as pitch, clamp, lerp, smooth, random, saw, pulse, sine, filter, biquad, render, reversed, bus, place as put, placeStereo, plate, echo, compress, limit} from './audio-kit.mjs';
 
-// Voicings (MIDI). Bass roots sit in octave 1 for a round sub.
-const CHORDS={
- 'Emaj9':{root:28,notes:[52,56,59,63,66]},
- 'C#m9':{root:37,notes:[49,52,56,59,63]},
- 'Amaj9':{root:33,notes:[45,52,56,59,61]},
- 'B6/9':{root:35,notes:[47,54,56,61,63]},
- 'G#m7':{root:32,notes:[44,54,59,63]},
- 'F#m11':{root:30,notes:[42,52,57,59,61]},
- 'E6/9':{root:28,notes:[40,47,54,56,61,64]},
+// Voicings, as MIDI notes. `root` is the bass note.
+export const CHORDS = {
+  D: {root: 38, notes: [54, 57, 61, 64]},
+  E: {root: 40, notes: [56, 59, 61, 66]},
+  Cm: {root: 37, notes: [56, 59, 64, 68]},
+  Fm: {root: 42, notes: [57, 61, 64, 68]},
+  A: {root: 33, notes: [57, 59, 61, 64, 69]},
 };
-export const PROGRESSION=['Emaj9','Amaj9','Emaj9','C#m9','Amaj9','B6/9','Amaj9','B6/9','C#m9','B6/9','Emaj9','G#m7','Amaj9','B6/9','C#m9','Amaj9','F#m11','B6/9','Amaj9','B6/9','E6/9','E6/9','E6/9','E6/9'];
-// Six style stabs climb through inversions: top line G#4 A4 B4 C#5 E5 G#5.
-const STABS=[[57,61,64,68],[61,64,68,69],[63,66,68,71],[66,68,71,73],[68,71,73,76],[71,75,76,80]];
+/** One chord for each of the 24 bars. Bars 7 to 10 are replaced by CLIMB. */
+export const PROGRESSION = ['Fm', 'E', 'D', 'E', 'Cm', 'Fm', 'D', 'E', 'Fm', 'Fm', 'D', 'E', 'Cm', 'Fm', 'D', 'E', 'Fm', 'E', 'D', 'E', 'A', 'A', 'A', 'A'];
+// The six style changes climb: one chord every two beats, top line E F# A B C# E.
+export const CLIMB = [
+  {root: 38, notes: [54, 57, 61, 64]}, {root: 40, notes: [56, 59, 61, 66]}, {root: 42, notes: [57, 61, 64, 69]},
+  {root: 44, notes: [59, 64, 68, 71]}, {root: 47, notes: [62, 66, 69, 73]}, {root: 49, notes: [64, 68, 71, 76]},
+];
+// The hook: [sixteenth, note, length in sixteenths] for one bar on each chord.
+// Every bar opens with the 3 + 3 + 2 figure.
+export const HOOK = {
+  D: [[0, 78, 3], [3, 76, 3], [6, 73, 2], [8, 76, 6], [14, 73, 2]],
+  E: [[0, 71, 3], [3, 73, 3], [6, 76, 2], [8, 78, 4], [12, 80, 2], [14, 76, 2]],
+  Cm: [[0, 80, 3], [3, 76, 3], [6, 73, 2], [8, 71, 4], [12, 73, 4]],
+  Fm: [[0, 69, 3], [3, 73, 3], [6, 76, 2], [8, 78, 8]],
+};
+export const SCALE = [69, 71, 73, 76, 78, 81, 83, 85, 88];
+/** The harmony voice under a hook note: the nearest tone of the bar's chord, a minor third or more below it. */
+export const under = (note, name) => {
+  const tones = new Set([CHORDS[name].root, ...CHORDS[name].notes].map(n => n % 12));
+  let n = note - 3; while (!tones.has(n % 12)) n--;
+  return n;
+};
 
-export function compose(clock,{stems=false}={}){
- const count=Math.round(clock.duration/clock.fps*RATE),fps=clock.fps,beat=60/clock.bpm,c=clock.cues;
- const S=frame=>Math.round(frame/fps*RATE),B=b=>Math.round(b*beat*RATE);
- const bus=gain=>({left:new Float64Array(count),right:new Float64Array(count),gain});
- // Bus gains are applied at placement, so room and echo sends are post-gain.
- const music=bus(1.55),drums=bus(.62),bass=bus(.58),fx=bus(.9),room=bus(1),echo=bus(1);
- let seed=clock.seed>>>0;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/2147483648-1;};
- const events=[],mark=(kind,frame)=>events.push({kind,frame});
+// Balance of the buses in the mix. Found by measurement: see the section table in the README.
+const TRIM = {drums: 1, bass: .7, chords: 2.1, lead: 2.3, pad: .9, fx: 1.25, wet: 1.35, master: .74};
 
- function place(target,data,start,gain=1,pan=0,send=0,delay=0){
-  const g=gain*target.gain,from=Math.max(0,-start),to=Math.min(data.length,count-start),moving=Array.isArray(pan);
-  let gl=0,gr=0;
-  const setPan=p=>{const a=clamp((p+1)/2)*Math.PI/2;gl=Math.cos(a)*g;gr=Math.sin(a)*g;};
-  if(!moving)setPan(pan);
-  for(let i=from;i<to;i++){
-   if(moving&&(i&63)===0)setPan(pan[0]+(pan[1]-pan[0])*i/data.length);
-   const v=data[i],j=start+i,l=v*gl,r=v*gr;target.left[j]+=l;target.right[j]+=r;
-   if(send){room.left[j]+=l*send;room.right[j]+=r*send;}
-   if(delay){echo.left[j]+=l*delay;echo.right[j]+=r*delay;}
+export function compose(clock, {stems = false} = {}) {
+  const count = Math.round(clock.duration / clock.fps * RATE), beat = 60 / clock.bpm, q = clock.cues;
+  const B = b => Math.round(b * beat * RATE), S = frame => Math.round(frame / clock.fps * RATE), step = beat / 4;
+  const rnd = random(clock.seed), noise = () => rnd() * 2 - 1;
+  const drums = bus(count), bass = bus(count), chords = bus(count), lead = bus(count), pad = bus(count), fx = bus(count);
+  const room = bus(count), hall = bus(count), taps = bus(count);
+  const events = [], mark = (kind, frame) => events.push({kind, frame});
+  const title = B(80), cut = S(clock.silence[0]);
+  // A sound that starts in the last 10 ms before the breath would be only a blip, so it is left out.
+  const place = (target, data, at, gain, pan) => { if (at < cut - 480 || at >= cut) put(target, data, at, gain, pan); };
+  // Every pitch that plays is recorded, so the test can check the key of calculated notes too.
+  const played = new Set(), hz = note => { played.add(Math.round(note)); return pitch(note); };
+
+  // Sends: a short plate for drums and effects, a long hall, and a tempo echo.
+  const voice = (target, data, at, gain, pan = 0, sends = {}) => {
+    place(target, data, at, gain, pan);
+    if (sends.room) place(room, data, at, gain * sends.room, pan);
+    if (sends.hall) place(hall, data, at, gain * sends.hall, pan);
+    if (sends.echo) place(taps, data, at, gain * sends.echo, pan);
+  };
+
+  // ---------------------------------------------------------------- drums
+  const kick = (weight = 1) => { let ph = 0; const hp = filter().set(1800); return render(.42, t => {
+    // Tuned to F#1, the bass note of the home minor chord.
+    ph += TAU * (46.25 + 115 * Math.exp(-t / .032) + 260 * Math.exp(-t / .005)) / RATE;
+    hp.run(noise());
+    const body = Math.sin(ph) * Math.min(1, t / .0015) * Math.exp(-t / (.17 * weight)), click = hp.high * .22 * Math.exp(-t / .004);
+    return Math.tanh((body + click) * 1.7) / 1.25; }); };
+  const clap = () => { const bp = filter().set(1500, 1.1), bp2 = filter().set(3400, 1.4); return render(.36, t => {
+    let env = 0; for (const o of [0, .011, .021]) if (t >= o) env += .8 * Math.exp(-(t - o) / .004);
+    if (t >= .031) env += Math.exp(-(t - .031) / .075);
+    const n = noise(); bp.run(n); bp2.run(n); return (bp.band * 1.2 + bp2.band * .7) * env; }); };
+  const snare = (tone = 190) => { const hp = filter().set(1600), lp = filter().set(7500); return render(.26, t => {
+    hp.run(noise()); const n = lp.run(hp.high);
+    return (Math.sin(TAU * tone * t) * .6 + Math.sin(TAU * tone * 1.78 * t) * .25) * Math.exp(-t / .045) + n * Math.exp(-t / .09); }); };
+  const hat = (decay = .03) => {
+    // Six detuned squares, as a metal source, mixed with noise and high-passed.
+    const osc = [2, 3, 4.16, 5.43, 6.79, 8.21].map(() => pulse(.5, rnd())), ratios = [2, 3, 4.16, 5.43, 6.79, 8.21], hp = filter().set(7800, .9), bp = filter().set(10200, 1.6);
+    return render(decay * 6, t => { let m = 0; for (let i = 0; i < 6; i++) m += osc[i](ratios[i] * 270);
+      hp.run(m / 6 * .7 + noise() * .5); bp.run(hp.high); return (hp.high * .5 + bp.band) * Math.exp(-t / decay) * Math.min(1, t / .0008); }); };
+  const shaker = () => { const bp = filter().set(6200, .9); return render(.09, t => { bp.run(noise()); return bp.band * Math.min(1, t / .008) * Math.exp(-t / .03); }); };
+  const tom = note => { let ph = 0; const f = hz(note); return render(.34, t => { ph += TAU * f * (1 + .6 * Math.exp(-t / .028)) / RATE;
+    return (Math.sin(ph) + .2 * Math.sin(ph * 1.59)) * Math.exp(-t / .13) * Math.min(1, t / .002) + noise() * .1 * Math.exp(-t / .01); }); };
+  const crash = (len = 1.8) => { const osc = [3.1, 4.7, 5.9, 7.3, 9.1].map(() => pulse(.5, rnd())), hp = filter().set(4200, .7), lp = filter(); return render(len, (t, i) => {
+    if ((i & 63) === 0) lp.set(11000 - 5000 * t / len, .6);
+    let m = 0; [3.1, 4.7, 5.9, 7.3, 9.1].forEach((r, k) => { m += osc[k](r * 410); });
+    hp.run(m / 5 * .5 + noise() * .8); return lp.run(hp.high) * Math.exp(-t / (len * .32)) * Math.min(1, t / .002); }); };
+  const impact = (size = 1) => { let ph = 0; const lp = filter(); return render(1.3 * size + .5, (t, i) => {
+    if ((i & 15) === 0) lp.set(220 + 3200 * Math.exp(-t / .05), .7);
+    ph += TAU * (34 + 80 * Math.exp(-t / .08)) / RATE;
+    return Math.tanh((Math.sin(ph) * Math.exp(-t / (.5 * size)) * Math.min(1, t / .002) + lp.run(noise()) * .7 * Math.exp(-t / (.18 * size))) * 1.4) / 1.2; }); };
+
+  const K = kick(), KS = kick(.7), CL = [clap(), clap(), clap()], SN = snare(), SN2 = snare(236), HC = [hat(.022), hat(.03), hat(.026)], HO = hat(.12), SH = shaker(), CR = crash(), CR2 = crash(2.6);
+  // The pump: music ducks under each kick and swells back, the breathing of house music.
+  const pump = new Float32Array(count).fill(1);
+  const duck = (at, depth) => { const n = Math.round(.42 * beat * RATE); for (let i = 0; i < n && at + i < count; i++) { const v = 1 - depth * (1 - smooth(i / n)) * Math.min(1, i / 96); if (v < pump[at + i]) pump[at + i] = v; } };
+  const swing = s => (s % 2 ? .1 : 0);
+  // Which bars carry which layers.
+  const full = bar => (bar >= 3 && bar <= 9) || bar === 13 || bar === 14 || bar >= 19;
+  for (let bar = 3; bar <= 20; bar++) {
+    const s = 4 * (bar - 1), peak = bar >= 19, light = bar === 11 || bar === 12, open = bar === 15 || bar === 16, build = bar === 17 || bar === 18, thin = bar === 10;
+    let kicks = full(bar) ? [0, 1, 2, 3] : [];
+    if (thin) kicks = [0];
+    if (light) kicks = [0, 2.5];
+    if (bar === 17) kicks = [0, 1, 2, 3];
+    if (bar === 18) kicks = [0, .5, 1, 1.5, 2, 2.5, 3, 3.5];
+    if (bar === 6 || bar === 14) kicks = [0, 1, 2, 3, 3.5];
+    for (const k of kicks) { const soft = light || build; place(drums, soft ? KS : K, B(s + k), soft ? .62 : .9 + (peak ? .06 : 0)); duck(B(s + k), soft ? .35 : .62); }
+    if (full(bar) || light) for (const k of [1, 3]) { if (light && k === 1) continue; voice(drums, CL[(bar + k) % 3], B(s + k), peak ? .8 : .68, 0, {room: .22}); }
+    if (bar >= 7 && bar <= 9 || peak) for (const k of [1, 3]) place(drums, SN, B(s + k), .16);
+    // Hats: sixteenths with an accent on the off-beat and a little swing.
+    if (full(bar) || light) for (let i = 0; i < 16; i++) {
+      const accent = [.34, .16, .62, .2][i % 4] * (light ? .6 : 1) * (peak ? 1.12 : 1);
+      place(drums, HC[i % 3], B(s + (i + swing(i)) / 4), accent * (.46 + rnd() * .05), i % 2 ? .22 : -.12);
+    }
+    if ((bar >= 5 && bar <= 9) || bar === 14 || peak) for (const k of [.5, 1.5, 2.5, 3.5]) place(drums, HO, B(s + k), .18, .15);
+    else if (bar === 3 || bar === 4 || bar === 13) place(drums, HO, B(s + 3.5), .12, .15);
+    if (bar >= 13 && bar <= 14 || peak || light) for (let i = 0; i < 16; i++) place(drums, SH, B(s + (i + swing(i)) / 4), (i % 4 === 2 ? .2 : .1) * (.9 + rnd() * .2), -.35);
+    // Tuned hand percussion: a quiet syncopated answer to the kick.
+    if (full(bar) && !peak) for (const [k, note] of [[.75, 57], [1.75, 61], [2.75, 57], [3.25, 64]]) place(drums, tom(note), B(s + k), .1, k > 2 ? .4 : -.4);
+    if (open) for (const k of [0, 2.5]) { place(drums, KS, B(s + k), .5); duck(B(s + k), .3); }
   }
- }
- // Topology-preserving state-variable filter; coefficients are cached.
- function filter(){
-  let s1=0,s2=0,lf=-1,lq=-1,g=0,k=0,a1=0,a2=0,a3=0;
-  const f={band:0,high:0,run(x,fc,q=.707){
-   if(fc!==lf||q!==lq){lf=fc;lq=q;g=Math.tan(Math.PI*Math.max(10,Math.min(fc,RATE*.46))/RATE);k=1/q;a1=1/(1+g*(g+k));a2=g*a1;a3=g*a2;}
-   const v3=x-s2,v1=a1*s1+a2*v3,v2=s2+a2*s1+a3*v3;s1=2*v1-s1;s2=2*v2-s2;f.band=v1;f.high=x-k*v1-v2;return v2;
-  }};
-  return f;
- }
- function saw(phase=0){
-  return freq=>{const dt=freq/RATE;phase+=dt;if(phase>=1)phase-=1;let v=2*phase-1;
-   if(phase<dt){const t=phase/dt;v-=t+t-t*t-1;}else if(phase>1-dt){const t=(phase-1)/dt;v-=t*t+t+t+1;}return v;};
- }
- function render(seconds,fn){
-  const n=Math.max(2,Math.round(seconds*RATE)),d=new Float64Array(n),fade=RATE*.004;
-  for(let i=0;i<n;i++)d[i]=fn(i/RATE)*smooth((n-1-i)/fade);
-  return d;
- }
+  // Fills. Bar 2 into the drop, bar 6, bar 14, and the long roll of bars 17 and 18.
+  for (let i = 0; i < 8; i++) voice(drums, i % 2 ? SN2 : SN, B(6 + i / 4), .12 + i * .035, (i - 3.5) * .08, {room: .15});
+  for (let i = 0; i < 4; i++) voice(drums, SN, B(23 + i / 4), .16 + i * .04, 0, {room: .15});
+  for (let i = 0; i < 4; i++) voice(drums, tom([57, 54, 52, 49][i]), B(55 + i / 4), .3, -.5 + i * .33, {room: .2});
+  for (let i = 0; i < 4; i++) voice(drums, SN, B(64 + i), .2 + i * .02, 0, {room: .18});
+  for (let i = 0; i < 4; i++) voice(drums, SN, B(68 + i / 2), .22 + i * .02, 0, {room: .18});
+  for (let i = 0; i < 8; i++) voice(drums, i % 2 ? SN2 : SN, B(70 + i / 4), .3 + i * .03, 0, {room: .16});
+  for (const [b, c, g] of [[8, CR, .3], [24, CR, .22], [40, CR, .16], [52, CR, .2], [56, CR2, .24], [72, CR2, .3]]) voice(drums, c, B(b), g, .1, {hall: .3});
 
- // Drums.
- const kick=({f0=47,sweep=125,tau=.03,decay=.15,len=.45,click=.12,drive=1.8}={})=>{let ph=0,lp=0;return render(len,t=>{
-  ph+=TAU*(f0+sweep*Math.exp(-t/tau))/RATE;lp+=.3*(random()-lp);
-  const x=Math.sin(ph)*smooth(t/.0015)*(t<.012?1:Math.exp(-(t-.012)/decay))+lp*click*Math.exp(-t/.003);
-  return Math.tanh(x*drive)/Math.tanh(drive);});};
- const clap=()=>{const bp=filter();return render(.32,t=>{
-  let env=0;for(const o of [0,.009,.018,.027])if(t>=o)env+=Math.exp(-(t-o)/.0035);
-  if(t>.03)env+=.55*Math.exp(-(t-.03)/.08);
-  bp.run(random(),1350,.9);return bp.band*env*2.2;});};
- const snare=(f=190)=>{const hp=filter(),lp=filter();return render(.3,t=>{
-  hp.run(random(),1700);const n=lp.run(hp.high,6500);
-  return((Math.sin(TAU*f*t)*.55*Math.exp(-t/.05)+Math.sin(TAU*f*1.71*t)*.2*Math.exp(-t/.03))+n*1.1*Math.exp(-t/.11))*smooth(t/.001);});};
- const hat=(decay=.032)=>{const hp=filter(),lp=filter();return render(decay*5,t=>{
-  hp.run(random(),7200);return lp.run(hp.high,10500,.6)*Math.exp(-t/decay)*smooth(t/.0008);});};
- const tom=f=>{let ph=0;return render(.42,t=>{ph+=TAU*f*(1+.55*Math.exp(-t/.03))/RATE;
-  return(Math.sin(ph)+.15*Math.sin(ph*1.5))*Math.exp(-t/.16)*smooth(t/.0015)+random()*.08*Math.exp(-t/.008);});};
- const impact=(size=1)=>{let ph=0;const lp=filter();return render(1.1*size+.6,t=>{
-  ph+=TAU*(36+95*Math.exp(-t/.07))/RATE;
-  const boom=Math.sin(ph)*Math.exp(-t/(.42*size))*smooth(t/.002);
-  const crack=lp.run(random(),260+3800*Math.exp(-t/.045),.7)*Math.exp(-t/(.16*size))*.85;
-  const knock=Math.sin(TAU*112*t)*Math.exp(-t/.07)*.35;
-  return Math.tanh((boom+crack+knock)*1.5)/1.2;});};
-
- // Tonal instruments.
- const bassNote=(note,len)=>{const f=hz(note),sw=saw(),lp=filter();let ph=0;return render(len,t=>{
-  ph+=TAU*f/RATE;const top=lp.run(sw(f),f*2.6+420*Math.exp(-t/.07),.8);
-  const x=(Math.sin(ph)+.32*top)*smooth(t/.004)*Math.exp(-t/1.6)*smooth((len-t)/.03);
-  return Math.tanh(x*1.3)/1.1;});};
- const pluck=(note,len,bright=1)=>{const f=hz(note),a=saw((random()+1)/2),b=saw((random()+1)/2),lp=filter();return render(len+.22,t=>{
-  const fc=Math.min(5200,f*(1.1+bright*9*Math.exp(-t/.075))+180);
-  const x=lp.run((a(f*1.004)+b(f*.996))*.5,fc,.85);
-  return x*smooth(t/.0015)*Math.exp(-t/.3)*(t<len?1:Math.exp(-(t-len)/.06));});};
- const keys=(note,len,vel=.7,ring=2.4)=>{const f=hz(note);return render(len+.5,t=>{
-  const p=TAU*f*t,index=(.35+vel*.9)*Math.exp(-t/.16);
-  const x=Math.sin(p+index*Math.sin(p))*Math.exp(-t/ring)+.14*Math.sin(p*2.003)*Math.exp(-t/.9)+.025*Math.sin(p*6.98)*Math.exp(-t/.04);
-  return Math.tanh(x*1.2)/1.2*smooth(t/.004)*(t<len?1:Math.exp(-(t-len)/.18));});};
- const bell=(note,len=1.2,{index=.9,ratio=3.5,decay=.45,cut=5000}={})=>{const f=hz(note),lp=filter();return render(len,t=>{
-  const p=TAU*f*t;
-  const x=(Math.sin(p+index*Math.exp(-t/.22)*Math.sin(p*ratio))*Math.exp(-t/decay)+.18*Math.sin(p*2.01)*Math.exp(-t/(decay*.4)))*smooth(t/.002);
-  return lp.run(x,cut,.6);});};
- function pad(notes,len,{attack=.3,release=.6,cutoff=()=>1800,q=.8}={}){
-  const sides=[];
-  for(let side=0;side<2;side++){
-   const osc=[],freq=[];
-   for(const n of notes)for(const d of [-.0058,0,.0052]){osc.push(saw((random()+1)/2));freq.push(hz(n)*(1+d+(side?.0011:-.0011)));}
-   const lp=filter(),norm=1/Math.sqrt(osc.length);let k=0,fc=0;
-   sides.push(render(len,t=>{let s=0;for(let j=0;j<osc.length;j++)s+=osc[j](freq[j]);if((k++&31)===0)fc=cutoff(t);
-    return lp.run(s*norm,fc,q)*smooth(t/attack)*smooth((len-t)/release);}));
+  // ----------------------------------------------------------------- bass
+  const bassNote = (note, len, bright = 1) => { const f = hz(note), a = saw(rnd()), b = pulse(.38, rnd()), lp = filter(); let ph = 0; return render(len + .03, (t, i) => {
+    // The filter rests at 520 Hz, not at the fundamental: a phone has no sub, and must still hear the line.
+    if ((i & 15) === 0) lp.set(520 + (900 + 1700 * bright) * Math.exp(-t / .09), 1.4);
+    ph += TAU * f / RATE;
+    const tone = lp.run(a(f) * .6 + b(f) * .45), env = Math.min(1, t / .004) * (t < len ? 1 : Math.exp(-(t - len) / .02));
+    return Math.tanh((tone * 1.1 + Math.sin(ph) * .6) * 1.6) / 1.3 * env * Math.exp(-t / 1.4); }); };
+  // Root, octave and fifth, on the 3 + 3 + 2 of the hook, with the fifth as a pickup into the next bar.
+  const line = [[0, 0, 2.4], [3, 0, 2.2], [6, 12, 1.4], [8, 0, 1.8], [10, 12, .9], [11, 7, .9], [12, 0, 1.6], [14, 12, .9]];
+  const rootOf = bar => CHORDS[PROGRESSION[bar - 1]].root;
+  for (let bar = 3; bar <= 20; bar++) {
+    const s = 4 * (bar - 1), root = rootOf(bar);
+    if (bar >= 7 && bar <= 9) continue;
+    if (bar === 10) { place(bass, bassNote(30, 3.6 * beat, .2), B(s), .8); continue; }
+    if (bar === 15 || bar === 16) { place(bass, bassNote(root, 3.7 * beat, .15), B(s), .78); continue; }
+    if (bar === 11 || bar === 12) { for (const [st, iv, len] of [[0, 0, 3], [6, 12, 1.2], [10, 0, 1.6], [14, 7, 1]]) place(bass, bassNote(root + iv, len * step, .5), B(s + st / 4), .78); continue; }
+    if (bar === 17 || bar === 18) { for (let i = 0; i < 8; i++) place(bass, bassNote(root + (i % 2 ? 12 : 0), .42 * beat, .5 + i * .05 + (bar - 17) * .3), B(s + i / 2), .74); continue; }
+    for (const [st, iv, len] of line) place(bass, bassNote(root + iv, len * step, bar >= 19 ? 1.2 : .8), B(s + st / 4), .82);
+    place(bass, bassNote(root + 7, .8 * step, .9), B(s + 15 / 4), .7);
   }
-  return sides;
- }
- const placePad=(sides,start,gain,width=.75,send=.3)=>{place(music,sides[0],start,gain,-width,send);place(music,sides[1],start,gain,width,send);};
+  CLIMB.forEach((chord, i) => { const b = 24 + i * 2; for (const [st, iv, len] of [[0, 0, 2.4], [3, 12, 1], [4, 0, 1.6], [6, 12, 1.2]]) place(bass, bassNote(chord.root + iv, len * step, .9 + i * .08), B(b + st / 4), .82); });
 
- // Effects.
- const blip=(f0,len=.14,f1=f0)=>{let ph=0;return render(len,t=>{ph+=TAU*f0*(f1/f0)**Math.min(1,t/(len*.6))/RATE;
-  return Math.sin(ph)*smooth(t/.003)*Math.exp(-t/(len/3.2));});};
- const tick=(f,len=.06,noise=.5)=>{const bp=filter();return render(len,t=>{bp.run(random(),f*2,1.4);
-  return Math.sin(TAU*f*t)*Math.exp(-t/.012)*smooth(t/.0008)+bp.band*noise*Math.exp(-t/.003);});};
- const wood=f=>{const bp=filter();let ph=0;return render(.18,t=>{ph+=TAU*f*(1+.25*Math.exp(-t/.006))/RATE;bp.run(random(),1200,1.2);
-  return(Math.sin(ph)*Math.exp(-t/.06)+.35*Math.sin(ph*2.57)*Math.exp(-t/.03)+.12*Math.sin(ph*4.1)*Math.exp(-t/.015))*smooth(t/.001)+bp.band*.25*Math.exp(-t/.004);});};
- const thud=(f=105,len=.22)=>{const lp=filter();return render(len,t=>{
-  return(Math.sin(TAU*f*t*(1+.3*Math.exp(-t/.01)))*Math.exp(-t/.055)+lp.run(random(),850)*.6*Math.exp(-t/.035))*smooth(t/.001);});};
- const whoosh=(len,f0,f1,shape='bell',q=1.3)=>{const bp=filter();return render(len,t=>{const x=t/len;
-  bp.run(random(),f0*(f1/f0)**x,q);
-  // Every shape is already audible at its first frame.
-  const env=smooth(t/.008)*(shape==='rise'?.25*(1-x)+x**2.2:shape==='fall'?(1-x)**2:.35*(1-x)+.65*Math.sin(Math.PI*x)**2);
-  return bp.band*env*2;});};
- const air=(len,cut=1400)=>{const lp=filter(),hp=filter();return render(len,t=>{hp.run(lp.run(random(),cut,.6),180);return hp.high*Math.sin(Math.PI*t/len)**2;});};
- const riser=(len,f0,f1)=>{const bp=filter(),lp=filter(),sw=saw();return render(len,t=>{const x=t/len;
-  bp.run(random(),f0*(f1/f0)**x,2.2);
-  const tone=lp.run(sw(hz(47)*2**(2*x)),900+2400*x,.9);
-  return(bp.band*1.6+tone*.22)*x**2*smooth((len-t)/.004);});};
- const rip=len=>{const bp=filter();let gate=1,k=0;return render(len,t=>{if(k++%90===0)gate=.25+.75*Math.abs(random());
-  bp.run(random(),2600-1200*t/len,1.5);return bp.band*gate*smooth(t/.004)*Math.exp(-t/(len*.45))*2.4;});};
- const pop=f=>blip(f*1.8,.07,f);
- const swell=(notes,len,peakAt=.35)=>{const lp=filter(),osc=notes.map(()=>saw((random()+1)/2));return render(len,t=>{
-  let s=0;notes.forEach((n,j)=>{s+=osc[j](hz(n));});const x=t/len,env=.3*(1-x)+.7*(x<peakAt?(x/peakAt)**1.5:(1-(x-peakAt)/(1-peakAt))**2);
-  return lp.run(s/notes.length+random()*.15,600+2600*env,.7)*env*smooth(t/.015);});};
- const reverse=(notes,len)=>{const lp=filter(),osc=notes.map(()=>saw((random()+1)/2));return render(len,t=>{
-  let s=0;notes.forEach((n,j)=>{s+=osc[j](hz(n));});const x=t/len;
-  return lp.run(s/notes.length+random()*.3,500+4500*x*x,.8)*x**3*smooth((len-t)/.006);});};
+  // --------------------------------------------------- chords, pad, lead
+  const stab = (note, len, bright) => {
+    // Electric piano by frequency modulation, with a soft saw under it for width.
+    const f = hz(note), a = saw(rnd()), lp = filter(); return render(len + .35, (t, i) => {
+      if ((i & 15) === 0) lp.set(900 + 5600 * bright * (.3 + .7 * Math.exp(-t / .2)), .9);
+      const p = TAU * f * t, fm = Math.sin(p + (2.7 * bright + .6) * Math.exp(-t / .13) * Math.sin(p)) + .12 * Math.sin(p * 14.01) * Math.exp(-t / .03);
+      const env = Math.min(1, t / .003) * Math.exp(-t / .55) * (t < len ? 1 : Math.exp(-(t - len) / .07));
+      return (fm * .7 + lp.run(a(f * 1.003)) * .42) * env; }); };
+  const padChord = (notes, len, cutoff) => {
+    // Five saws a note, spread left and right. Returns a stereo pair. Notes below A3 are
+    // the same on both sides, so the low end of a wide chord stays in phase.
+    const spread = [-.11, -.05, 0, .06, .12], low = notes.filter(n => n < 57).flatMap(n => spread.map(d => ({phase: rnd(), f: hz(n) * 2 ** (d / 12)})));
+    const sides = [0, 1].map(side => { const voices = [...low.map(v => ({osc: saw(v.phase), f: v.f})), ...notes.filter(n => n >= 57).flatMap(n => spread.map(d => ({osc: saw(rnd()), f: hz(n) * 2 ** ((d + (side ? .02 : -.02)) / 12)})))], lp = filter(), norm = 1 / Math.sqrt(voices.length);
+      return render(len, (t, i) => { if ((i & 31) === 0) lp.set(cutoff(t), .8); let m = 0; for (const v of voices) m += v.osc(v.f);
+        return lp.run(m * norm) * smooth(t / .35) * smooth((len - t) / .5); }); });
+    return sides; };
+  const leadNote = (note, len, power = 1) => {
+    const f = hz(note), a = saw(rnd()), b = saw(rnd()), sub = pulse(.5, rnd()), lp = filter(); return render(len + .3, (t, i) => {
+      if ((i & 15) === 0) lp.set(900 + 4200 * power * Math.exp(-t / .14) + 1400 * power, 2.2);
+      // Vibrato comes in on held notes only.
+      const bend = 2 ** (.11 * smooth((t - .2) / .25) * Math.sin(TAU * 5.6 * t) / 12);
+      const tone = lp.run((a(f * 1.004 * bend) + b(f * .996 * bend)) * .5 + sub(f * .5 * bend) * .22);
+      return Math.tanh(tone * 1.4) * Math.min(1, t / .005) * (.62 + .38 * Math.exp(-t / .2)) * (t < len ? 1 : Math.exp(-(t - len) / .09)); }); };
+  const pluck = (note, len = .12, bright = 1) => { const f = hz(note), a = saw(rnd()), b = pulse(.3, rnd()), lp = filter(); return render(len + .25, (t, i) => {
+    if ((i & 15) === 0) lp.set(300 + 6000 * bright * Math.exp(-t / .05), 1.6);
+    return lp.run(a(f) * .6 + b(f * 1.005) * .4) * Math.min(1, t / .002) * Math.exp(-t / .19) * (t < len ? 1 : Math.exp(-(t - len) / .05)); }); };
+  const bell = (note, len = 1.1, glow = 1) => { const f = hz(note), lp = filter().set(5200 * glow + 1500, .6); return render(len, t => {
+    const p = TAU * f * t;
+    return lp.run(Math.sin(p + 1.1 * glow * Math.exp(-t / .25) * Math.sin(p * 3.5)) * Math.exp(-t / (len * .32)) + .2 * Math.sin(p * 2.0) * Math.exp(-t / (len * .15))) * Math.min(1, t / .002); }); };
 
- // Arrangement on the exact beat grid (one beat is exactly 22,500 samples).
- const K=kick(),KL=kick({decay:.1,drive:1.4,click:.06}),KH=kick({f0:44,sweep:160,decay:.2,drive:2.2,click:.18});
- const CL=[clap(),clap(),clap()],SN=snare(),SN2=snare(230),HAT=[hat(),hat(.026),hat(),hat(.022)],OH=hat(.11);
- const hit=(data,b,gain,pan=0,send=0)=>place(drums,data,B(b),gain,pan,send);
- const pump=new Float64Array(count).fill(1);
- const duckAt=(b,depth=.32)=>{const s=B(b),n=Math.round(.22*RATE);for(let i=0;i<n&&s+i<count;i++){const v=1-depth*smooth(i/192)*(1-smooth(i/n));if(v<pump[s+i])pump[s+i]=v;}};
- const groove=new Set([3,4,5,6,7,8,9,13,14,17,18,19,20]);
- const riffA=[[0,3],[.75,1],[1.5,2],[2.25,0],[2.5,3],[3.25,2]];
- const riffGather=[[0,0],[.5,2],[1,1],[1.5,3],[2.5,2],[3,1],[3.5,3]];
- for(let bar=3;bar<=20;bar++){
-  const s=4*(bar-1),chord=CHORDS[PROGRESSION[bar-1]],upper=chord.notes.slice(-4).map(n=>n+12),root=chord.root;
-  const peak=bar>=19,drive=peak?1.1:bar>=17?.92:.9;
-  // Kick.
-  let kicks=[0,1,2,3];
-  if(bar===10)kicks=[0,2];else if(bar===11||bar===12)kicks=[0,2.5];else if(bar===15)kicks=[2.5];else if(bar===16)kicks=[0,2];
-  for(const k of kicks){const light=bar>=10&&bar<=12||bar===15||bar===16;hit(light?KL:K,s+k,(light?.7:.92)*drive);duckAt(s+k,light?.18:.32);}
-  // Claps and backbeat.
-  if(bar>=7&&bar<=9||bar===13||bar===14||peak)for(const k of [1,3])hit(CL[(bar+k)%3],s+k,peak?.42:.36,0,.12);
-  if(bar===11||bar===12)hit(CL[bar%3],s+2,.3,0,.15);
-  if(bar>=7&&bar<=9||peak)hit(SN,s+3,.12,0,.1);
-  // Hats.
-  if(groove.has(bar)){
-   for(let k=0;k<4;k++)hit(HAT[k],s+k+.5,(.2+random()*.02)*(peak?1.15:1),.18);
-   const sixteenths=bar>=7&&bar!==17&&bar!==18;
-   if(sixteenths)for(let k=0;k<4;k++)for(const o of [.25,.75])hit(HAT[(k+1)%4],s+k+o+.012,.08+random()*.02,o===.25?-.3:.3);
-   if([6,8,14,19,20].includes(bar))hit(OH,s+3.5,.12,-.2,.1);
-  }else if(bar===11||bar===12)for(let k=0;k<8;k++)hit(HAT[k%4],s+k*.5+.25,.11+(k%2)*.04,k%2?.35:-.35);
-  else if(bar===16)for(const k of [1.5,3.5])hit(HAT[0],s+k,.1,.2,.2);
-  // Snare and tom roll accelerating into the montage.
-  if(bar===17)for(let k=0;k<4;k++){hit(SN2,s+k,.22+k*.03,0,.1);hit(tom(hz(40+k*2)),s+k,.18,(k-1.5)*.15);}
-  if(bar===18){
-   for(let k=0;k<4;k++)hit(SN2,s+k*.5,.24+k*.03,0,.1);
-   for(let k=0;k<8;k++){const b=s+2+k*.25;hit(SN2,b,.27+k*.025,0,.1);if(k%2)hit(tom(hz(47+k)),b,.16,(k-3.5)*.1);}
+  // Filter position of the chord stabs: closed at the drop, opening through each scene.
+  const openness = bar => ({3: .28, 4: .42, 5: .62, 6: .85, 11: .3, 12: .4, 13: .7, 14: .9, 17: .5, 18: .85, 19: 1, 20: 1}[bar] ?? .8);
+  for (let bar = 3; bar <= 20; bar++) {
+    const s = 4 * (bar - 1), chord = CHORDS[PROGRESSION[bar - 1]];
+    if (bar >= 7 && bar <= 10 || bar === 15 || bar === 16) continue;
+    // Off-beat stabs. In the build they become eighths, then sixteenths.
+    const hits = bar === 17 ? [0, .5, 1, 1.5, 2, 2.5, 3, 3.5] : bar === 18 ? Array.from({length: 16}, (_, i) => i / 4) : [.5, 1.5, 2.5, 3.5];
+    hits.forEach((k, h) => chord.notes.forEach((n, j) => voice(chords, stab(n, .2, openness(bar) * (bar === 18 ? .6 + h / 30 : 1)), B(s + k) + j * 96, (bar >= 19 ? .15 : .13) * (h % 2 ? 1 : .86), (j - 1.5) * .28, {room: .2, echo: bar < 17 ? .18 : 0})));
+    if (bar >= 19) chord.notes.forEach((n, j) => voice(chords, stab(n + 12, .9, 1), B(s) + j * 140, .12, (j - 1.5) * .3, {hall: .25}));
   }
-  // Bass.
-  let bassline=[[0,.45,0],[.75,.4,0],[1.5,.4,12],[2.5,.45,0],[3.25,.4,7]];
-  if(bar===10)bassline=[[0,3.6,0]];
-  if(bar===11||bar===12)bassline=[[0,.9,0],[1.5,.35,12],[2.5,.5,0],[3.5,.25,12]];
-  if(bar===15||bar===16)bassline=[[0,3.7,0]];
-  if(bar===17||bar===18)bassline=[0,.5,1,1.5,2,2.5,3,3.5].map((k,i)=>[k,.4,i%2?12:0]);
-  if(peak)bassline=[[0,.45,0],[.75,.4,0],[1.5,.4,12],[2,.4,0],[2.5,.45,0],[3.25,.4,7],[3.75,.2,12]];
-  for(const [k,len,iv]of bassline)place(bass,bassNote(root+iv,len*beat),B(s+k),bar===15||bar===16||bar===10?.7:peak?.95:.85);
-  // Plucks and keys.
-  let riff=riffA,pg=.2,len=.2,bright=1;
-  if(bar===11||bar===12){riff=riffGather;pg=.13;len=.11;bright=.6;}
-  if(bar===15||bar===16){riff=[[0,3],[1.5,2],[3,1]];pg=.16;len=.5;bright=.5;}
-  if(bar===17||bar===18){riff=Array.from({length:16},(_,i)=>[i*.25,i%4+(bar===18&&i>=8?4:0)]);pg=.12+(bar-17)*.04;len=.1;}
-  if(bar===10)pg=.15;
-  for(const [k,idx]of riff){
-   const note=upper[idx%4]+12*Math.floor(idx/4);
-   place(music,pluck(note,len,bright),B(s+k),pg,Math.sin((s+k)*1.7)*.45,.22,.25);
-  }
-  if(bar>=7&&bar<=9||bar===13||bar===14||peak)for(const [k,idx]of [[.5,3],[1.5,2],[2.5,3],[3.5,1]])
-   place(music,pluck(upper[idx]+12,.12,.45),B(s+k),.07,k%2?.6:-.6,.25,.3);
-  // Bar pad, wider and louder in the open bars of the stack.
-  if(bar!==10){const open=bar===15||bar===16,sides=pad(chord.notes,4*beat+.5,{attack:.08,release:.5,cutoff:t=>open?900+900*Math.sin(Math.PI*clamp(t/2)):1500});placePad(sides,B(s),open?.11:.07,.8,open?.45:.3);}
- }
- // Bar 10 dark switch: a darker sustained pad that the low-pass dip shapes.
- placePad(pad(CHORDS['B6/9'].notes,4*beat+.4,{attack:.05,release:.4,cutoff:()=>2400}),B(36),.09,.8,.35);
-
- // Opening swell and bar 2 tension.
- placePad(pad(CHORDS['Emaj9'].notes,4*beat+.6,{attack:1.4,release:.5,cutoff:t=>260+700*smooth(t/1.9)}),0,.12,.85,.4);
- placePad(pad(CHORDS['Amaj9'].notes,4*beat,{attack:.4,release:.01,cutoff:t=>500+2200*smooth(t/1.875)}),B(4),.1,.85,.4);
- place(fx,air(4*beat,1100),0,.085,0,.2);
-
- // Picture cues.
- const fxAt=(data,frame,gain,pan=0,send=.15,offset=0)=>place(fx,data,S(frame)+offset,gain,pan,send);
- const o=c.open,pl=c.plan,sh=c.shape,ga=c.gather,st=c.stack,mo=c.montage,ti=c.title;
- fxAt(blip(hz(76)),o.eyes[0],.5,-.15);mark('open.eyes',o.eyes[0]);
- fxAt(blip(hz(80)),o.eyes[1],.5,.15);mark('open.eyes',o.eyes[1]);
- fxAt(blip(hz(71),.24,hz(78)),o.smile,.45,0);mark('open.smile',o.smile);
- fxAt(tick(2200,.05,.6),o.badge,.45,.1);fxAt(thud(85,.2),o.badge,.6,0,.05);mark('open.badge',o.badge);
- fxAt(whoosh(.2,500,2600),o.lanyard,.5,[-.4,.2]);fxAt(thud(95,.22),o.lanyard,.6,.1,.05,Math.round(.19*RATE));mark('open.lanyard',o.lanyard);
- {const len=(B(8)-S(o.windup))/RATE;fxAt(riser(len,280,3200),o.windup,.3,0,.2);fxAt(blip(220,.22,330),o.windup,.2,0,.2);
-  // Pitch rise on the tonic underneath the riser.
-  const sw=saw(),lp=filter();fxAt(render(len,t=>lp.run(sw(hz(52)*2**(t/len)),500+1800*t/len,.9)*(t/len)**1.5),o.windup,.07,0,.15);}
- mark('open.windup',o.windup);
- fxAt(whoosh((B(8)-S(o.dash))/RATE,700,6000,'rise',1.1),o.dash,.32,[-.6,.6],.1);mark('open.dash',o.dash);
-
- place(drums,impact(1),B(8),.75,0,.1);mark('plan.word',pl.word);
- pl.cards.forEach((f,i)=>{fxAt(tick(hz([76,78,80,83][i]),.06,.4),f,.42,-.3+i*.2);mark('plan.cards',f);});
- fxAt(whoosh(.45,400,1800),pl.push,.8,[.3,-.3]);mark('plan.push',pl.push);
- pl.speakers.forEach((f,i)=>{fxAt(pop([600,760][i]),f,.5,i?.3:-.3);mark('plan.speakers',f);});
- fxAt(blip(900,.12,1700),pl.lift,.4,.2);mark('plan.lift',pl.lift);
- fxAt(wood(190),pl.drop,.6,0,.1);mark('plan.drop',pl.drop);
- fxAt(tick(2400,.04,.6),pl.publish,.35,0);fxAt(bell(83,1.4),pl.publish,.32,.15,.3);mark('plan.publish',pl.publish);
- fxAt(whoosh((B(24)-S(pl.wipe))/RATE,300,6000,'rise',1.2),pl.wipe,.7,[-.7,.7],.15);mark('plan.wipe',pl.wipe);
-
- sh.styles.forEach((f,i)=>{
-  const b=24+2*i;
-  STABS[i].forEach((n,j)=>place(music,keys(n,.55,.65,1.2),B(b)+j*120,.13,(j-1.5)*.22,.25,.15));
-  STABS[i].forEach((n,j)=>place(music,pluck(n+12,.16,.9),B(b),.05,(j-1.5)*.3,.2));
-  mark('shape.styles',f);
- });
- fxAt(tick(1800,.05,.7),sh.dark,.45,0);fxAt(thud(70,.18),sh.dark,.3);mark('shape.dark',sh.dark);
- fxAt(swell([59,63,66,71],.95),sh.wall,.9,0,.35);mark('shape.wall',sh.wall);
- fxAt(whoosh((B(40)-S(sh.exit))/RATE,400,5000,'rise',1.2),sh.exit,.5,[.6,-.6],.15);mark('shape.exit',sh.exit);
-
- fxAt(thud(120,.2),ga.ticket,.65,0,.08);mark('gather.ticket',ga.ticket);
- ga.steps.forEach((f,i)=>{fxAt(tick(hz([71,73,76,78,80][i]),.05,.35),f,.38,-.4+i*.2);if(i===4)fxAt(bell(92,.6,{index:.5,ratio:2,decay:.2,cut:4500}),f,.18,.4,.25);mark('gather.steps',f);});
- fxAt(rip(.2),ga.tear,.4,.2,.1);mark('gather.tear',ga.tear);
- {const a=S(ga.checkIn[0]),z=S(ga.checkIn[1]),step=B(.25),n=Math.ceil((z-a)/step);
-  for(let k=0;k<n;k++)place(fx,tick(2100+(k%4)*90,.035,.3),a+k*step,.1,-.7+1.4*k/Math.max(1,n-1),.05);}
- mark('gather.checkIn',ga.checkIn[0]);
- ga.bookmarks.forEach((f,i)=>{fxAt(wood(820+i*60),f,.32,-.3+i*.3,.1);mark('gather.bookmarks',f);});
- ga.arrivals.forEach((f,i)=>{fxAt(bell([80,83,88][i],1.1,{index:.45,ratio:2,decay:.38,cut:4000}),f,.22,.3-i*.3,.35);mark('gather.arrivals',f);});
- fxAt(whoosh(.4,600,3500),ga.send,.7,[-.5,.5],.15);mark('gather.send',ga.send);
- {const a=S(ga.delivered[0]),z=S(ga.delivered[1]),notes=[83,85,88,90,92];
-  for(let k=0;k<11;k++){const at=a+Math.floor((random()+1)/2*(z-a)),pan=random()*.8;
-   place(fx,bell(notes[k%5],.7,{index:.3,ratio:2,decay:.2,cut:4000}),k?at:a,.08,pan,.4);}}
- mark('gather.delivered',ga.delivered[0]);
-
- place(drums,impact(1.4),B(56),.8,0,.15);fxAt(air(2.2,2600),st.explode,.13,0,.3);mark('stack.explode',st.explode);
- st.callouts.forEach((f,i)=>{fxAt(tick(1900+i*120,.04,.4),f,.45,i%2?.35:-.35);mark('stack.callouts',f);});
- st.compress.forEach((f,i)=>{fxAt(wood(hz([47,49,52,54][i])),f,.55,0,.08);mark('stack.compress',f);});
- place(drums,impact(.9),B(68),.7,0,.12);mark('stack.merge',st.merge);
- fxAt(bell(88,.8,{index:.6,ratio:3,decay:.25,cut:5500}),st.line,.26,.2,.25);mark('stack.line',st.line);
- place(fx,riser((B(72)-B(68))/RATE,250,5000),B(68),.3,[-.3,.3],.2);mark('stack.riser',st.riser[0]);
-
- mo.panels.forEach((f,i)=>{
-  const b=72+i,chord=CHORDS[PROGRESSION[i<4?18:19]];
-  hit(KH,b,.9);hit(CL[i%3],b,.25,0,.1);hit(tom(hz(43+i)),b,.16,(i-3.5)*.1);
-  chord.notes.slice(-4).forEach((n,j)=>place(music,keys(n+12,.3,.75,.8),B(b)+j*90,.075,(j-1.5)*.25,.2));
-  place(fx,whoosh(.18,900,5000,'rise',1.2),B(b)-Math.round(.18*RATE),.16,i%2?.4:-.4,.08);
-  mark('montage.panels',f);
- });
- place(fx,reverse([59,63,66,71],.4),S(mo.pull)-Math.round(.4*RATE),.35,0,.15);mark('montage.pull',mo.pull);
- {const len=.2,end=B(79.5)-240;const bp=filter();let ph=0;
-  place(fx,render(len,t=>{const x=t/len;bp.run(random(),4000*(200/4000)**x,1.4);ph+=TAU*(400*(60/400)**x)/RATE;return(bp.band*1.5+Math.sin(ph)*.4)*Math.sin(Math.PI*x)**1.5;}),end-Math.round(len*RATE),.5,0,.05);}
- mark('montage.implode',mo.implode);
-
- // Everything stops at beat 79.5; only the title content follows the gap.
- const cut=B(79.5),fade=240;
- for(const b of [music,drums,bass,fx,room,echo])for(const ch of [b.left,b.right]){
-  for(let i=cut-fade;i<cut;i++)ch[i]*=smooth((cut-i)/fade);ch.fill(0,cut);
- }
- const title=B(80);
- place(drums,impact(2.2),title,.9,0,.2);
- CHORDS['E6/9'].notes.forEach((n,j)=>place(music,keys(n,4.6,.55,2.8),title+j*360,.055,(j-2.5)*.18,.35));
- placePad(pad(CHORDS['E6/9'].notes.slice(1),7,{attack:.12,release:3.2,cutoff:t=>700+1500*Math.exp(-t/2.5)}),title,.045,.85,.45);
- {const sides=pad([28],4.5,{attack:.01,release:3.4,cutoff:()=>200});place(bass,sides[0],title,.22,0);place(bass,sides[1],title,.22,0);}
- place(bass,bassNote(28,3.5),title,.4,0);
- mark('title.impact',ti.impact);
- fxAt(thud(90,.24),ti.land,.6,0,.1);fxAt(whoosh(.32,1800,700,'fall',1),ti.land,.22,[.0,.5],.15,Math.round(.02*RATE));mark('title.land',ti.land);
- [76,80,83,88,92].forEach((n,k)=>fxAt(bell(n,1.2,{index:.35,ratio:2,decay:.5,cut:4500}),ti.wordmark,.07+k*.012,-.5+k*.25,.5,Math.round(k*beat/3*RATE)));
- fxAt(air(.9,4000),ti.wordmark,.08,0,.3);mark('title.wordmark',ti.wordmark);
- place(music,keys(66,1.2,.45,1.6),S(ti.tagline),.075,-.2,.4);mark('title.tagline',ti.tagline);
- ti.words.forEach((f,i)=>{place(music,keys([68,71,76][i],1,.5,1.6),S(f),.085+i*.008,-.2+i*.2,.4);mark('title.words',f);});
- fxAt(tick(2300,.03,.3),ti.url,.18,.1,.1);mark('title.url',ti.url);
- fxAt(blip(hz(88),.08),ti.blink,.05,0,.1);mark('title.blink',ti.blink);
-
- // Short stereo room: damped feedback combs into all-pass diffusers. The
- // feedback stays below unity and the state is cleared at the title.
- const wet=bus(1);
- for(const [side,ch]of [[0,'left'],[1,'right']]){
-  const src=room[ch],dst=wet[ch];
-  [.0233,.0291,.0343,.0401].forEach((sec,j)=>{
-   const n=Math.round((sec+side*.0017)*RATE),buf=new Float64Array(n),fb=.76-j*.02;let cur=0,damp=0;
-   for(let i=0;i<count;i++){if(i===title){buf.fill(0);damp=0;}const v=buf[cur];damp+=.38*(v-damp);buf[cur]=src[i]+damp*fb;dst[i]+=v*.22;cur=cur+1===n?0:cur+1;}
+  CLIMB.forEach((chord, i) => {
+    const b = 24 + i * 2;
+    // Each style change is a full stab on the beat and two echoes of it in rhythm.
+    for (const [k, g] of [[0, 1], [.75, .55], [1.5, .7]]) chord.notes.forEach((n, j) => voice(chords, stab(n, k ? .16 : .5, .7 + i * .06), B(b + k) + j * 110, .17 * g, (j - 1.5) * .3, {room: .22, echo: .2}));
+    voice(lead, bell(chord.notes[3] + 12, 1.3, .8), B(b), .16, .15, {hall: .5, echo: .3});
   });
-  for(const sec of [.0051,.0019]){const n=Math.round((sec+side*.0003)*RATE),buf=new Float64Array(n);let cur=0;
-   for(let i=0;i<count;i++){if(i===title)buf.fill(0);const x=dst[i],d=buf[cur];dst[i]=d-x*.5;buf[cur]=x+d*.5;cur=cur+1===n?0:cur+1;}}
- }
- // Cross-fed dotted-eighth echo for the plucks; repeats never cross the title.
- const taps=[[B(.75),.32,true],[B(1.5),.14,false]];
- const mix={left:new Float64Array(count),right:new Float64Array(count)};
- // Music bus low-pass: open except for the dark-mode dip in bar 10.
- const cutoff=b=>b<36?19000:b<36.75?19000*(500/19000)**((b-36)/.75):b<38.5?500:b<40?500*(19000/500)**((b-38.5)/1.5):19000;
- const lpL=filter(),lpR=filter(),mL=filter(),mR=filter();
- let pl0=0,pr0=0,dl=0,dr=0;
- const silenceA=S(clock.silence[0]),silenceB=S(clock.silence[1]),last=S(clock.duration-3),fadeOut=S(clock.duration-3-36);
- for(let i=0;i<count;i++){
-  const b=i/RATE/beat,fc=Math.round(cutoff(b)),p=pump[i];
-  let el=0,er=0;
-  for(const [d,g,cross]of taps){const j=i-d;if(j>=0&&(i<title||j>=title)){el+=(cross?echo.right[j]:echo.left[j])*g;er+=(cross?echo.left[j]:echo.right[j])*g;}}
-  const ml=lpL.run(music.left[i]+el,fc),mr=lpR.run(music.right[i]+er,fc);
-  let l=ml*p+bass.left[i]*p*p+drums.left[i]+fx.left[i]+wet.left[i],r=mr*p+bass.right[i]*p*p+drums.right[i]+fx.right[i]+wet.right[i];
-  l=mL.run(l,15000,.6);r=mR.run(r,15000,.6);
-  if(i===title){pl0=0;pr0=0;dl=0;dr=0;}
-  // DC blocker before the master envelope, so silences stay exact.
-  dl=l-pl0+.9985*dl;dr=r-pr0+.9985*dr;pl0=l;pr0=r;
-  let gain=smooth(i/S(1));
-  if(i>=silenceA&&i<silenceB)gain=0;
-  if(i>=fadeOut)gain*=smooth((last-i)/(last-fadeOut));
-  if(i>=last)gain=0;
-  mix.left[i]=gain?Math.tanh(dl*1.1)/1.1*gain:0;mix.right[i]=gain?Math.tanh(dr*1.1)/1.1*gain:0;
- }
- let peak=0;
- for(let i=0;i<count;i++){if(!Number.isFinite(mix.left[i]+mix.right[i]))throw new Error('Non-finite score');peak=Math.max(peak,Math.abs(mix.left[i]),Math.abs(mix.right[i]));}
- if(peak>.88){const g=.88/peak;for(let i=0;i<count;i++){mix.left[i]*=g;mix.right[i]*=g;}}
- events.sort((a,b)=>a.frame-b.frame||(a.kind<b.kind?-1:a.kind>b.kind?1:0));
- return{left:mix.left,right:mix.right,count,events,...(stems?{stems:{music,drums,bass,fx,wet}}:{})};
+  // Pads hold the harmony under everything, wider in the open bars.
+  const padBars = [[1, 'Fm', 4, t => 240 + 1100 * smooth(t / 1.8), .1], [2, 'E', 4, t => 600 + 2600 * smooth(t / 1.8), .15], [10, 'Fm', 4, () => 900, .22], [15, 'D', 4, t => 700 + 1700 * smooth(t / 1.6), .3], [16, 'E', 4, t => 900 + 2200 * smooth(t / 1.6), .3]];
+  for (let bar = 3; bar <= 20; bar++) if (![10, 15, 16].includes(bar) && !(bar >= 7 && bar <= 9)) padBars.push([bar, PROGRESSION[bar - 1], 4, () => 1500 + 600 * openness(bar), .13]);
+  for (const [bar, name, bars, cutoff, gain] of padBars) { const pair = padChord([CHORDS[name].root + 12, ...CHORDS[name].notes], bars * beat + .4, cutoff), at = B(4 * (bar - 1)); placeStereo(pad, pair, at, gain); placeStereo(hall, pair, at, gain * .35); }
+  CLIMB.forEach((chord, i) => { const pair = padChord([chord.root + 12, ...chord.notes], 2 * beat + .3, () => 1500 + i * 260), at = B(24 + i * 2); placeStereo(pad, pair, at, .12); placeStereo(hall, pair, at, .04); });
+
+  const hook = (bar, name, power = 1, gain = .2, harmony = false) => HOOK[name].forEach(([st, note, len]) => {
+    const at = B(4 * (bar - 1) + (st + swing(st) * .5) / 4);
+    voice(lead, leadNote(note, len * step * .92, power), at, gain, 0, {hall: .22, echo: .3});
+    // Two quieter takes, left and right, make the line wide without moving it off centre.
+    for (const side of [-1, 1]) voice(lead, leadNote(note + side * .07, len * step * .92, power * .85), at + 180 + side * 90, gain * .42, side * .75, {hall: .15});
+    if (harmony) voice(lead, leadNote(under(note, name), len * step * .92, power * .7), at, gain * .45, -.3, {hall: .2});
+  });
+  // The drop states the hook, the second half of Gather answers it, the montage plays it at full power.
+  hook(3, 'D', .7); hook(4, 'E', .75); hook(5, 'Cm', .85); hook(6, 'Fm', .9);
+  hook(13, 'Cm', .9, .2, true); hook(14, 'Fm', 1, .2, true);
+  hook(19, 'D', 1.25, .23, true); hook(20, 'E', 1.3, .23, true);
+  for (const bar of [19, 20]) HOOK[PROGRESSION[bar - 1]].forEach(([st, note, len]) => voice(lead, leadNote(note + 12, len * step * .9, 1.1), B(4 * (bar - 1) + (st + swing(st) * .5) / 4), .07, .3, {hall: .3}));
+  // Gather opens with a bouncing pluck on the chord tones.
+  for (const bar of [11, 12]) { const notes = CHORDS[PROGRESSION[bar - 1]].notes; for (let i = 0; i < 16; i++) if (i % 4 !== 3) voice(lead, pluck(notes[[0, 2, 1, 3, 2, 1][i % 6]] + 12, .08, .5 + (i % 4) * .12), B(4 * (bar - 1) + (i + swing(i)) / 4), .12, i % 2 ? .45 : -.45, {echo: .45, room: .2}); }
+  // The open bars of the stack remember the hook at half speed, as bells.
+  [[56, 78], [57.5, 76], [59, 73], [60, 76], [61.5, 80], [63, 78]].forEach(([b, n], i) => voice(lead, bell(n, 2.2, .7), B(b), .15, i % 2 ? .35 : -.35, {hall: .6, echo: .35}));
+  // The build: a pluck line that climbs the scale in sixteenths.
+  for (let i = 0; i < 32; i++) voice(lead, pluck(SCALE[Math.floor(i / 4) % 8] + (i >= 16 ? 12 : 0), .07, .5 + i / 40), B(64 + i / 4), .07 + i * .0025, i % 2 ? .5 : -.5, {echo: .3, room: .2});
+
+  // ------------------------------------------------------ sound design
+  // Pans follow where an event is on screen, kept inside +-0.6 so both cuts agree.
+  const inside = v => clamp(v, -.6, .6);
+  const sfx = (data, frame, gain, pan = 0, sends = {room: .18}, offset = 0) => voice(fx, data, S(frame) + Math.round(offset * RATE), gain, Array.isArray(pan) ? pan.map(inside) : inside(pan), sends);
+  const pop = (note, len = .09) => { let ph = 0; const f = hz(note); return render(len, t => { ph += TAU * f * (.55 + .45 * (1 - Math.exp(-t / .012))) / RATE; return Math.sin(ph) * Math.min(1, t / .002) * Math.exp(-t / (len * .3)); }); };
+  const tick = (freq = 2200, len = .03, body = .4) => { const bp = filter().set(freq, 2.5); return render(len, t => { bp.run(noise()); return bp.band * 1.5 * Math.exp(-t / .004) + Math.sin(TAU * freq * .22 * t) * body * Math.exp(-t / .012); }); };
+  const wood = (note, len = .16) => { let ph = 0; const f = hz(note), bp = filter().set(1500, 1.2); return render(len, t => { ph += TAU * f * (1 + .2 * Math.exp(-t / .005)) / RATE; bp.run(noise());
+    return (Math.sin(ph) * Math.exp(-t / .055) + .3 * Math.sin(ph * 3.94) * Math.exp(-t / .02)) * Math.min(1, t / .001) + bp.band * .3 * Math.exp(-t / .004); }); };
+  const thud = (note = 42, len = .24, dust = .5) => { const freq = hz(note), lp = filter().set(700); return render(len, t => (Math.sin(TAU * freq * t * (1 + .35 * Math.exp(-t / .012))) * Math.exp(-t / .06) + lp.run(noise()) * dust * Math.exp(-t / .03)) * Math.min(1, t / .001)); };
+  // A whoosh is noise through a band-pass that sweeps, with air above it. `shape` 0 to 1 is where it is loudest.
+  const whoosh = (len, f0, f1, shape = .5, q = 1.4) => { const bp = filter(), hp = filter().set(5000); return render(len, (t, i) => { const x = t / len;
+    if ((i & 15) === 0) bp.set(f0 * (f1 / f0) ** x, q);
+    const n = noise(); bp.run(n); hp.run(n);
+    const env = x < shape ? (x / shape) ** 1.6 : (1 - (x - shape) / (1 - shape)) ** 1.8;
+    return (bp.band * 2.2 + hp.high * .18) * env; }); };
+  const riser = (len, power = 1) => { const bp = filter(), sw = saw(rnd()), lp = filter(); return render(len, (t, i) => { const x = t / len;
+    if ((i & 15) === 0) { bp.set(300 * 2 ** (4.6 * x), 2.4); lp.set(700 + 3200 * x, 1); }
+    bp.run(noise());
+    // Sixteenth tremolo in the last half pulls it into the bar line.
+    const trem = 1 - .45 * smooth((x - .5) * 2) * (.5 + .5 * Math.cos(TAU * t / step));
+    return (bp.band * 1.5 + lp.run(sw(hz(45) * 2 ** (2 * x))) * .2) * x ** 1.8 * trem * power; }); };
+  const swell = (data, len) => { const out = reversed(data.subarray(0, Math.min(data.length, Math.round(len * RATE)))); for (let i = 0; i < 400 && i < out.length; i++) out[out.length - 1 - i] *= i / 400; return out; };
+  const scribble = len => { const bp = filter().set(3100, 2.6); let gate = 0, k = 0; return render(len, t => { if (k++ % 420 === 0) gate = .35 + .65 * rnd(); bp.run(noise()); return bp.band * gate * smooth(t / .01) * smooth((len - t) / .03); }); };
+  const tear = len => { const bp = filter(); let gate = 1, k = 0; return render(len, (t, i) => { if ((i & 15) === 0) bp.set(3400 - 1700 * t / len, .9); if (k++ % 70 === 0) gate = rnd() < .25 ? .1 : .5 + rnd() * .5; bp.run(noise()); return bp.band * gate * Math.exp(-t / (len * .55)) * 2; }); };
+  const printer = len => { const sq = pulse(.3), bp = filter().set(1300, 1.5), whine = sine(); return render(len, t => { bp.run(sq(172) * (.5 + .5 * Math.sign(Math.sin(TAU * 52 * t))));
+    return (bp.band * .7 + whine(880 + 380 * t / len) * .12) * smooth(t / .012) * smooth((len - t) / .02); }); };
+  const chirp = (f0, f1, len) => { let ph = 0; return render(len, t => { ph += TAU * f0 * (f1 / f0) ** (t / len) / RATE; return Math.sin(ph) * Math.sin(Math.PI * t / len) ** .7; }); };
+  const sparkle = (len, density = 18) => { const out = new Float32Array(Math.round(len * RATE)); for (let k = 0; k < density; k++) { const start = Math.floor(rnd() ** 1.4 * (out.length - 2400)), f = 3200 + rnd() * 5200, g = .3 + rnd() * .7; for (let i = 0; i < 2000; i++) out[start + i] += Math.sin(TAU * f * i / RATE) * Math.exp(-i / 330) * g * .4; } return out; };
+
+  const o = q.open, pl = q.plan, sh = q.shape, ga = q.gather, st = q.stack, mo = q.montage, ti = q.title;
+  // Open. The four parts of the face play the first four notes of the hook.
+  [[o.eyes[0], 78, -.08], [o.eyes[1], 76, .08]].forEach(([frame, note, pan]) => { sfx(pop(note - 12, .11), frame, .5, pan); sfx(bell(note, .9, .6), frame, .13, pan, {hall: .4, echo: .25}); });
+  mark('open.eyes', o.eyes[0]); mark('open.eyes', o.eyes[1]);
+  sfx(chirp(hz(69), hz(73), .16), o.smile, .2, 0); sfx(bell(73, .9, .6), o.smile, .13, 0, {hall: .6, echo: .25}, .12); sfx(whoosh(.2, 900, 3200, .6, 2), o.smile, .16, [-.15, .15]); mark('open.smile', o.smile);
+  sfx(scribble(.4), o.badge, .22, [-.25, .25]); sfx(thud(40, .22, .3), o.badge, .5, 0, {room: .2}, .28); sfx(tick(3300, .05, .1), o.badge, .4, .05, {room: .3}, .23); sfx(bell(76, 1, .6), o.badge, .13, 0, {hall: .6, echo: .25}, .3); mark('open.badge', o.badge);
+  sfx(whoosh(.18, 2600, 700, .3, 1.6), o.lanyard, .34, [-.3, .1]); sfx(whoosh(.18, 2400, 650, .3, 1.6), o.lanyard, .3, [.3, -.1], {room: .2}, .03); sfx(thud(38, .28, .5), o.lanyard, .55, 0, {room: .25}, .15); sfx(pop(57, .1), o.lanyard, .3, 0, {room: .2}, .15); mark('open.lanyard', o.lanyard);
+  // The crouch: a spring is wound. The riser carries it to the drop.
+  sfx(chirp(330, 150, .2), o.windup, .22, 0); sfx(thud(37, .2, .2), o.windup, .34, 0); sfx(tick(1800, .03, .3), o.windup + 14, .2, 0);
+  { const len = (B(8) - S(o.windup)) / RATE; sfx(riser(len, 1), o.windup, .36, 0, {room: .2, hall: .2}); }
+  mark('open.windup', o.windup);
+  sfx(chirp(380, 2600, .14), o.dash, .2, [-.2, .6]); sfx(whoosh((B(8) - S(o.dash)) / RATE + .1, 500, 5200, .62, 1.2), o.dash - 2, .5, [-.5, .7]); mark('open.dash', o.dash);
+
+  // Plan.
+  voice(drums, impact(1), B(8), .7, 0, {hall: .25}); sfx(swell(CR, .9), 0, .2, .1, {hall: .3}, (B(8) - Math.round(.9 * RATE)) / RATE); mark('plan.word', pl.word);
+  // A card: a tuned knock on the beat as it leaves its rule, and the slide of its rise under it.
+  pl.cards.forEach((frame, i) => { sfx(wood([57, 59, 61, 64][i] + 12, .14), frame, .32, .3, {room: .25}); sfx(whoosh(.32, 700, 2400, .35, 1.8), frame, .12, .3); mark('plan.cards', frame); });
+  sfx(whoosh(.36, 260, 1500, .5, 1.1), pl.push, .34, [.4, 0]); mark('plan.push', pl.push);
+  pl.speakers.forEach((frame, k) => { sfx(whoosh(.5, 1800, 600, .75, 1.6), frame - 6, .2, [.7, .3]); sfx(pop([76, 78][k], .1), frame + 9, .42, .45, {room: .25, echo: .2}); mark('plan.speakers', frame); });
+  [[0, 66], [2, 69], [3, 73]].forEach(([index, note]) => sfx(pop(note, .07), pl.speakers[1] + 16 + index * 3, .18, .45));
+  sfx(whoosh(.34, 1500, 300, .4, 1.1), pl.lift - 4, .3, [0, .35]); sfx(chirp(600, 1300, .09), pl.lift, .16, .3); for (let k = 0; k < 5; k++) sfx(tick(2600 + k * 160, .02, .2), pl.lift + 5 + k * 1.5, .16, .05); mark('plan.lift', pl.lift);
+  sfx(whoosh(.5, 500, 1300, .5, 1.3), pl.lift + 12, .13, .3); sfx(wood(45, .2), pl.drop, .5, .3, {room: .25}); sfx(thud(37, .2, .3), pl.drop, .36, .3); mark('plan.drop', pl.drop);
+  sfx(tick(1500, .03, .7), pl.publish, .4, .55); sfx(tick(2300, .025, .4), pl.publish + 3, .3, .55); [[76, 0], [81, .11]].forEach(([n, d]) => sfx(bell(n, 1.3, 1), pl.publish + 3, .2, .45, {hall: .5, echo: .3}, d));
+  for (let i = 0; i < 5; i++) sfx(whoosh(.5, 3000, 7000, .5, 3), pl.publish + i * 2, .05, [-.1, .6]); mark('plan.publish', pl.publish);
+  sfx(riser((B(24) - S(pl.wipe)) / RATE, .8), pl.wipe, .26, 0, {room: .2}); sfx(whoosh(.5, 600, 4200, .7, 1.1), pl.wipe + 9, .5, [.6, -.6]); mark('plan.wipe', pl.wipe);
+
+  // Shape. Each wipe has its own texture, under the chord that marks it.
+  const wipes = [
+    frame => sfx(thud(42, .2, .4), frame, .3, .3),
+    frame => { for (let k = 0; k < 10; k++) sfx(tick(1900 + k * 130, .02, .1), frame + k * .55, .16, lerp(.0, .6, k / 9)); },
+    frame => { sfx(chirp(260, 1500, .26), frame, .16, .5); sfx(whoosh(.3, 500, 3000, .7, 1.6), frame, .16, .5); },
+    frame => sfx(whoosh(.3, 3800, 900, .35, 2.2), frame, .3, [-.1, .6]),
+    frame => { for (let k = 0; k < 4; k++) sfx(whoosh(.14, k % 2 ? 2400 : 1500, k % 2 ? 1200 : 2800, .5, 2.4), frame + k * 1.6, .18, k % 2 ? [.6, 0] : [0, .6]); },
+    frame => { for (let k = 0; k < 14; k++) sfx(pop(69 + [0, 2, 4, 7, 9][k % 5] + 12 * Math.floor(k / 5), .05), frame + k * .7, .09, lerp(.0, .6, rnd())); },
+  ];
+  sh.styles.forEach((frame, i) => { wipes[i](frame); sfx(tick(2500, .02, .5), frame, .22, -.55); mark('shape.styles', frame); });
+  sfx(tick(1300, .03, .9), sh.dark, .42, -.25); sfx(tick(900, .03, .9), sh.dark + 2, .3, -.25); sfx(whoosh(.55, 4200, 300, .25, 1.2), sh.dark, .34, [-.1, .6]); mark('shape.dark', sh.dark);
+  { const grid = sh.wall - Math.round(clock.beatFrames); for (let k = 0; k < 11; k++) sfx(wood(64 + [0, 2, 4, 7][k % 4], .08), grid + 6 + k, .1, lerp(-.5, .5, k / 10)); sfx(whoosh(.3, 1200, 400, .4, 1.2), grid - 1, .26, [.4, 0]); }
+  voice(lead, swell(bell(88, 1.4, 1), .9), S(sh.wall) - Math.round(.9 * RATE), .1, 0, {hall: .5}); sfx(bell(81, 1.4, .9), sh.wall, .12, 0, {hall: .6, echo: .3}); mark('shape.wall', sh.wall);
+  sfx(whoosh((B(40) - S(sh.exit)) / RATE, 300, 5200, .72, 1.1), sh.exit, .46, [0, 0]); mark('shape.exit', sh.exit);
+
+  // Gather.
+  sfx(printer(.4), ga.ticket, .2, .25); sfx(thud(47, .12, .6), ga.ticket + 12, .3, .3); mark('gather.ticket', ga.ticket);
+  ga.steps.forEach((frame, i) => { sfx(wood([62, 64, 66, 69, 71][i] + 12, .14), frame, .26, lerp(-.1, .5, i / 4), {room: .25, echo: .15}); mark('gather.steps', frame); });
+  sfx(thud(45, .16, .9), ga.steps[4] + 2, .4, .45); sfx(bell(83, .8, 1), ga.steps[4] + 2, .1, .45, {hall: .5});
+  sfx(tear(.24), ga.tear, .34, [.3, .5]); sfx(whoosh(.4, 1400, 500, .3, 1.5), ga.tear + 4, .16, [.5, .1]); mark('gather.tear', ga.tear);
+  // Check-in: one small tick for each of the forty badges, at the frame it is checked. Pitch and position follow the grid.
+  for (let row = 0; row < 5; row++) for (let col = 0; col < 8; col++) {
+    const frame = ga.checkIn[0] + (col + row * 1.4) / (7 + 4 * 1.4) * (ga.checkIn[1] - ga.checkIn[0] - 10);
+    sfx(pop(SCALE[(col + row) % 5] + 12, .045), frame, .075, lerp(-.1, .55, col / 7), {room: .2});
+  }
+  sfx(bell(88, 1, 1), ga.checkIn[1] - 10, .11, .3, {hall: .6}); mark('gather.checkIn', ga.checkIn[0]);
+  sfx(whoosh(.34, 2200, 700, .4, 1.4), ga.bookmarks[0] - 9, .18, [.4, .1]);
+  ga.bookmarks.forEach((frame, i) => { sfx(pop(69 + i * 2, .07), frame, .34, .25, {room: .25}); sfx(whoosh(.4, 900, 2200, .5, 1.8), frame + 2, .12, [.1, .55]); mark('gather.bookmarks', frame); });
+  ga.arrivals.forEach((frame, i) => { sfx(bell([76, 78, 81][i], 1.1, .8), frame, .17, .55, {hall: .5, echo: .25}); sfx(tick(1700, .02, .4), frame, .16, .55); mark('gather.arrivals', frame); });
+  sfx(whoosh(.24, 700, 1800, .6, 1.6), ga.send - 8, .12, 0); sfx(tick(1500, .03, .7), ga.send, .36, -.05); sfx(whoosh(.42, 500, 3800, .6, 1.3), ga.send, .4, [-.2, .5]); mark('gather.send', ga.send);
+  // Each of the fourteen darts lands at its own frame; the picture and this loop share one formula.
+  for (let i = 0; i < 14; i++) {
+    const landing = ga.delivered[0] + pictureHash(i * 17 + 3) * (ga.delivered[1] - ga.delivered[0]);
+    sfx(bell(SCALE[(i * 3) % 7] + 12, .7, .7), landing, .085, lerp(.1, .6, (i % 5) / 4), {hall: .5});
+    sfx(pop(81, .04), landing, .06, .4);
+  }
+  mark('gather.delivered', ga.delivered[0]);
+
+  // Stack.
+  voice(drums, impact(1.5), B(56), .78, 0, {hall: .35}); sfx(whoosh(.9, 300, 2400, .25, .9), st.explode, .3, [0, 0], {hall: .4}); mark('stack.explode', st.explode);
+  sfx(sparkle(.5, 14), st.explode + 12, .07, .2, {hall: .4});
+  st.callouts.forEach((frame, i) => { sfx(whoosh(.12, 2200, 4200, .6, 3), frame, .12, [.2, .6]); sfx(wood([57, 59, 61, 64, 66][i] + 12, .12), frame + 3, .24, .6, {room: .25, echo: .2}); mark('stack.callouts', frame); });
+  sfx(chirp(700, 180, .3), st.compress[0] - 5, .16, .2);
+  st.compress.forEach((frame, i) => { sfx(wood([45, 47, 49, 52][i], .22), frame, .5, .2, {room: .3}); sfx(thud([35, 37, 40, 42][i], .2, .5), frame, .4, .2); sfx(tick(2800, .04, .1), frame + 3, .16, .2, {room: .4}); mark('stack.compress', frame); });
+  voice(drums, impact(.9), B(68), .66, 0, {hall: .25}); sfx(whoosh(.36, 400, 2600, .4, 1.2), st.merge - 1, .3, [.2, .3]); mark('stack.merge', st.merge);
+  { const len = (B(72) - B(68)) / RATE; place(fx, riser(len, 1.15), B(68), .4, 0); place(room, riser(len, 1), B(68), .08, 0); } mark('stack.riser', st.riser[0]);
+  [[81, 0], [85, .09], [88, .18]].forEach(([n, d]) => sfx(bell(n, 1.2, 1), st.line, .14, .4, {hall: .55, echo: .3}, d)); mark('stack.line', st.line);
+  sfx(whoosh(.5, 500, 6000, .8, 1), clock.scenes[4].end - 14, .5, [.3, 0]);
+
+  // Montage. Each band is a swipe across the frame and a tuned drum; the drums climb.
+  mo.panels.slice(0, 7).forEach((frame, i) => {
+    sfx(whoosh(.2, 1200, 5200, .55, 1.7), frame, .26, [-.6, .6]); voice(drums, tom(45 + [0, 2, 4, 7, 9, 12, 14][i]), B(72 + i), .34, lerp(-.3, .3, i / 6), {room: .25});
+    mark('montage.panels', frame);
+  });
+  sfx(whoosh(.2, 1500, 5600, .55, 1.7), mo.panels[6] + 4, .2, [-.6, .6]);
+  voice(fx, swell(CR, .42), S(mo.pull) - Math.round(.42 * RATE) + B(.5), .2, 0, {hall: .3}); mark('montage.pull', mo.pull);
+  // The fold: everything is drawn down into the point, and the sound goes with it.
+  { const len = (cut - B(79)) / RATE - .01; let ph = 0; const bp = filter(); place(fx, render(len, (t, i) => { const x = t / len; if ((i & 15) === 0) bp.set(5200 * (160 / 5200) ** x, 1.5); bp.run(noise()); ph += TAU * (520 * (55 / 520) ** x) / RATE; return (bp.band * 1.6 + Math.sin(ph) * .5) * Math.sin(Math.PI * Math.min(1, x * 1.15)) ** .8; }), B(79), .5, 0); }
+  mark('montage.panels', mo.panels[7]); mark('montage.implode', mo.implode);
+
+  // The band stops for the half beat before the title. The reverb tails ring on.
+  for (const b of [drums, bass, chords, lead, pad, fx, room, hall, taps]) for (const ch of [b.left, b.right]) { for (let i = cut - 200; i < cut; i++) ch[i] *= (cut - i) / 200; ch.fill(0, cut); }
+
+  // A reversed cymbal and a rising sweep fill that half beat and end on the chord. With
+  // digital silence here, over a still picture, the half beat sounded like a fault.
+  { const len = (title - cut) / RATE, rise = swell(CR2, len); for (let i = 0; i < 480; i++) rise[i] *= i / 480; voice(fx, rise, cut, .34, 0, {hall: .3}); voice(fx, whoosh(len, 500, 6500, .97, 1.2), cut, .3, [-.3, .3]); }
+
+  // Title: the first A major chord of the piece.
+  voice(drums, impact(2.2), title, .8, 0, {hall: .4}); voice(drums, CR2, title, .3, 0, {hall: .4}); place(drums, K, title, .85);
+  { const pair = padChord([45, 52, ...CHORDS.A.notes], 7.3, t => 700 + 2800 * Math.exp(-t / 1.8)); for (const side of pair) for (let i = 0; i < side.length; i++) side[i] *= Math.exp(-i / RATE / 2.6); placeStereo(pad, pair, title, .47); placeStereo(hall, pair, title, .24); }
+  CHORDS.A.notes.forEach((n, j) => voice(chords, stab(n, 3.5, .9), title + j * 420, .185, (j - 2) * .25, {hall: .5}));
+  place(bass, bassNote(33, 3.6, .3), title, .75);
+  sfx(sparkle(1.4, 30), ti.impact, .12, 0, {hall: .5}); mark('title.impact', ti.impact);
+  // He runs on the spot: quick soft steps, left and right.
+  for (let k = 0; k < 5; k++) sfx(thud(50, .05, 1.2), ti.impact + 3 + k * 5.6, .1, k % 2 ? .12 : -.12);
+  sfx(thud(38, .3, .8), ti.land, .62, -.3, {room: .3}); sfx(whoosh(.3, 2400, 600, .12, 1), ti.land, .3, [-.4, -.1]); sfx(sparkle(1.1, 16), ti.land, .1, -.3, {hall: .4}); mark('title.land', ti.land);
+  [0, 4].forEach((d, row) => { sfx(whoosh(.36, 900, 3600, .6, 1.8), ti.wordmark + 2 + d, .2, [-.2, .4]); sfx(bell([76, 81][row], 1.6, .8), ti.wordmark + 2 + d, .15, .1, {hall: .6, echo: .3}); }); mark('title.wordmark', ti.wordmark);
+  // The tagline is uncovered letter by letter under a rising run of the home chord.
+  [57, 61, 64, 69, 73, 76, 81, 85].forEach((n, k) => voice(lead, pluck(n + 12, .1, .7), S(ti.tagline) + k * Math.round(step * RATE), .1, lerp(-.4, .4, k / 7), {hall: .5, echo: .3}));
+  voice(lead, bell(83, 1.6, .8), S(ti.tagline), .13, 0, {hall: .6}); mark('title.tagline', ti.tagline);
+  // Plan. Shape. Gather. C sharp, E, A: the chord of home, one note a word.
+  ti.words.forEach((frame, i) => { const n = [73, 76, 81][i]; voice(lead, leadNote(n, .5, .8), S(frame), .17, lerp(-.25, .25, i / 2), {hall: .5, echo: .3}); voice(lead, bell(n + 12, 1.8, 1), S(frame), .13, lerp(-.25, .25, i / 2), {hall: .6}); sfx(whoosh(.2, 1500, 4000, .6, 2.4), frame, .08, [-.2, .2]); mark('title.words', frame); });
+  for (let k = 0; k < 6; k++) sfx(tick(2500 + (k % 3) * 300, .012, .1), ti.url + k, .1, 0); mark('title.url', ti.url);
+  sfx(tick(3000, .012, 0), ti.blink, .05, -.3); sfx(tick(2600, .012, 0), ti.blink + 4, .04, -.3); mark('title.blink', ti.blink);
+
+  // ------------------------------------------------------------- mix
+  // Effects returns. The halls are cleared at the title so nothing rings across the silence.
+  const roomWet = plate(room, {decay: .42, damping: .35, predelay: .008, clearAt: title});
+  // The hall is shorter while the band plays, and long for the last chord.
+  const hallWet = plate(hall, {decay: i => (i < title ? .6 : .84), damping: .28, predelay: .025, clearAt: title});
+  // The hall returns nothing below 180 Hz. Its two sides are not in phase, and low reverb is mud.
+  for (const side of [hallWet.left, hallWet.right]) { const hp = biquad('highpass', 180); for (let i = 0; i < count; i++) side[i] = hp(side[i]); }
+  const tapsWet = echo(taps, B(.75), {feedback: .36, clearAt: title});
+
+  // The exposure dips of the picture close a low-pass on the music for the same frames.
+  const sc = clock.scenes, wall = sh.wall - Math.round(clock.beatFrames);
+  const dips = [[pl.push - 1, pl.push + 9], [pl.lift - 5, pl.lift + 7], [pl.wipe + 11, sc[2].start - 3], [wall - 1, wall + 7], [sh.exit + 7, sc[3].start - 2], [sc[3].end - 9, sc[3].end - 1], [st.merge - 1, st.merge + 9], [sc[4].end - 11, sc[4].end - 1]];
+  const dipAt = frame => { let d = 0; for (const [a, b] of dips) d = Math.max(d, Math.min(1, (frame - a + 3) / 3, (b + 4 - frame) / 4)); return d; };
+  // Bar 10 is the dark mode: the whole band goes under a low-pass and comes back for Gather.
+  const dark = b => (b < 36 ? 0 : b < 36.6 ? (b - 36) / .6 : b < 38.5 ? 1 : b < 40 ? 1 - (b - 38.5) / 1.5 : 0);
+  const music = bus(count), lpL = filter(), lpR = filter();
+  for (let i = 0; i < count; i++) {
+    const p = pump[i];
+    let l = chords.left[i] * p * TRIM.chords + pad.left[i] * (.35 + .65 * p) * TRIM.pad + lead.left[i] * (.8 + .2 * p) * TRIM.lead + tapsWet.left[i] * TRIM.wet + hallWet.left[i] * TRIM.wet;
+    let r = chords.right[i] * p * TRIM.chords + pad.right[i] * (.35 + .65 * p) * TRIM.pad + lead.right[i] * (.8 + .2 * p) * TRIM.lead + tapsWet.right[i] * TRIM.wet + hallWet.right[i] * TRIM.wet;
+    if ((i & 31) === 0) { const b = i / RATE / beat, close = Math.max(dipAt(i / RATE * clock.fps) * .8, dark(b)), cutoff = 17000 * (700 / 17000) ** close; lpL.set(cutoff, .8); lpR.set(cutoff, .8); }
+    l = lpL.run(l); r = lpR.run(r);
+    music.left[i] = l; music.right[i] = r;
+  }
+  compress(music, {threshold: -16, ratio: 2, attack: .012, release: .18, makeup: 1.5});
+  compress(drums, {threshold: -14, ratio: 3, attack: .006, release: .09, makeup: 2});
+
+  // Bass is mono. Effects sit in front of the music; the music dips a little under the loud ones.
+  const mix = bus(count), hpL = biquad('highpass', 30), hpR = biquad('highpass', 30), sideA = biquad('highpass', 150), sideB = biquad('highpass', 150), airL = biquad('highshelf', 7000, 3), airR = biquad('highshelf', 7000, 3), mudL = biquad('peak', 280, -1.5, 1), mudR = biquad('peak', 280, -1.5, 1);
+  // The arrangement has a shape: the montage is the loudest part, the open bars the quietest.
+  const LEVELS = [[1, -1], [3, 0], [7, -.4], [10, -1.5], [11, -2.2], [13, -.2], [15, -2], [17, -1.4], [19, 2.2], [21, 1]];
+  const contour = bar => {
+    let g = LEVELS[0][1];
+    for (let k = 0; k < LEVELS.length && bar >= LEVELS[k][0]; k++) g = lerp(k ? LEVELS[k - 1][1] : LEVELS[k][1], LEVELS[k][1], Math.min(1, (bar - LEVELS[k][0]) / .06));
+    // The build rises through its two bars.
+    if (bar >= 17 && bar < 19) g = lerp(-1.4, .6, (bar - 17) / 2);
+    return 10 ** (g / 20);
+  };
+  let key = 0, shape = 1; const fall = Math.exp(-1 / (.12 * RATE));
+  for (let i = 0; i < count; i++) {
+    const fxLevel = Math.max(Math.abs(fx.left[i]), Math.abs(fx.right[i])); key = fxLevel > key ? fxLevel : key * fall;
+    const under = 1 - .28 * Math.min(1, key * 3.2), low = (bass.left[i] + bass.right[i]) * .5 * (.25 + .75 * pump[i]) * TRIM.bass;
+    if ((i & 255) === 0) shape = contour(i / RATE / beat / 4 + 1);
+    const left = (music.left[i] * under + drums.left[i] * TRIM.drums + low) * shape + fx.left[i] * TRIM.fx + roomWet.left[i] * .9;
+    const right = (music.right[i] * under + drums.right[i] * TRIM.drums + low) * shape + fx.right[i] * TRIM.fx + roomWet.right[i] * .9;
+    // Wide pads and the hall put low notes out of phase, and a phone plays the sum. Below
+    // 150 Hz the two channels are made the same: the difference signal is high-passed.
+    const mid = (left + right) * .5, side = sideB(sideA((left - right) * .5)), l = mid + side, r = mid - side;
+    mix.left[i] = airL(mudL(hpL(l))) * TRIM.master; mix.right[i] = airR(mudR(hpR(r))) * TRIM.master;
+  }
+  compress(mix, {threshold: -12, ratio: 1.6, attack: .03, release: .2, makeup: 0});
+  for (let i = 0; i < count; i++) { mix.left[i] = Math.tanh(mix.left[i] * 1.05) / 1.05; mix.right[i] = Math.tanh(mix.right[i] * 1.05) / 1.05; }
+  limit(mix, .86);
+  // Exact silence in the last three frames, and a fade to it at the end.
+  const last = S(clock.duration - 3), fadeFrom = S(clock.duration - 45);
+  for (let i = 0; i < count; i++) {
+    let g = Math.min(1, i / 1600);
+    if (i >= fadeFrom) g *= smooth((last - i) / (last - fadeFrom));
+    if (i >= last) g = 0;
+    mix.left[i] *= g; mix.right[i] *= g;
+  }
+  for (let i = 0; i < count; i++) if (!Number.isFinite(mix.left[i] + mix.right[i])) throw new Error(`The score is not finite at sample ${i}`);
+  events.sort((a, b) => a.frame - b.frame || (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
+  return {left: mix.left, right: mix.right, count, events, notes: [...played].sort((a, b) => a - b), ...(stems ? {stems: {drums, bass, chords, lead, pad, fx, music}} : {})};
+}
+
+// The picture's integer hash (kit.ts), so sounds land on the frames the picture uses.
+function pictureHash(n) {
+  let x = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
+  x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); x ^= x >>> 16;
+  return (x >>> 0) / 4294967296;
 }
