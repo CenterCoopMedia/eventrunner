@@ -109,7 +109,7 @@ module.exports = {
   ...announcementSuppression.handlers,
   ...adminFeedback.handlers,
   ...adminChangeRequests.handlers,
-  ...socialFeed.handlers,
+  ...socialFeed.handlers, // createSocialPost, reportSocialPost, removeSocialPost
   ...adminAccess.handlers,
   ...adminEventStats.handlers,
   ...webMcpDiagnostics.handlers,
