@@ -339,3 +339,23 @@ test('Pages checks refuse a site link into the folders Pages does not serve', ()
     ]);
   });
 });
+
+test('Pages checks refuse raw source links even when the file is present in the checkout', () => {
+  withTempRoot((root) => {
+    fs.mkdirSync(path.join(root, 'docs', 'adr'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'docs', 'adr', 'decision.md'), '# Decision\n');
+    fs.writeFileSync(path.join(root, 'docs', 'DEPLOY_RUNBOOK.md'), '# Deploy\n');
+    fs.writeFileSync(path.join(root, 'README.md'), '# Repository\n');
+    writeLanding(root, [
+      '<a href="./adr/decision.md">Decision</a>',
+      '<a href="./DEPLOY_RUNBOOK.md">Deploy</a>',
+      '<a href="../README.md">Repository overview</a>',
+      '<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/decision.md">Decision on GitHub</a>',
+    ].join(''));
+    assert.deepEqual(checkPages(root), [
+      'docs/index.html: ./adr/decision.md (Pages does not serve docs/adr/decision.md; link to the file on GitHub)',
+      'docs/index.html: ./DEPLOY_RUNBOOK.md (Pages does not serve docs/DEPLOY_RUNBOOK.md; link to the file on GitHub)',
+      'docs/index.html: ../README.md (Pages does not serve README.md; link to the file on GitHub)',
+    ]);
+  });
+});

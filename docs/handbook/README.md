@@ -2,7 +2,7 @@
 
 Event Runner is the event site the Center for Cooperative Media operates for conferences and gatherings. Staff run it from an admin. Attendees sign in with an emailed code, or with Google when it is enabled. You do not need a developer to use it.
 
-This wiki is for **people using a site**, not for people changing the code.
+Choose the guide for your role, then return here when you need help with a different task.
 
 ## Who you are
 
@@ -11,14 +11,15 @@ This wiki is for **people using a site**, not for people changing the code.
 - **[Client](for-clients.md)** — your organization wants CCM to run an event, or you are deciding whether this fits
 - **[Getting help](getting-help.md)** — which door to knock on (Discussions, issues, email)
 
-## The product
+## Common tasks
 
-- Public site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
+- [Publish a page](../ADMIN_GUIDE.md#pages)
+- [Create or update a session](../operator/admin-sessions.md)
+- [Save your schedule](for-attendees.md#schedule)
+- [Learn what Event Runner includes](overview.md)
 - [FAQ](faq.md)
 - [Glossary](glossary.md)
-- [Roadmap](https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/ROADMAP.md)
-- [Project board](https://github.com/orgs/CenterCoopMedia/projects/2) — titles are technical; the **What this is** column is the plain-language version
 
-## Contributing code
+## Help improve Event Runner
 
-If you are sending a pull request, start at [CONTRIBUTING.md](https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md). The short version of who decides is [GOVERNANCE.md](https://github.com/CenterCoopMedia/eventrunner/blob/main/GOVERNANCE.md).
+Code, architecture records, and contributor instructions live in the [GitHub project](https://github.com/CenterCoopMedia/eventrunner). Start with the [contribution guide](https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md) if you want to change the software.

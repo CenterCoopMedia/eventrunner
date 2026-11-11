@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Admin guide — Event Runner documentation</title>
-  <meta name="description" content="Running a client site from the admin panel, in the order the work happens.">
+  <title>Admin guide — Event Runner guides</title>
+  <meta name="description" content="Edit pages, manage registration and tickets, send email, and choose your site branding.">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/admin-guide/">
   <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/eventrunner/favicon-32.png">
@@ -12,19 +12,19 @@
 
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Admin guide — Event Runner documentation">
-  <meta property="og:description" content="Running a client site from the admin panel, in the order the work happens.">
+  <meta property="og:title" content="Admin guide — Event Runner guides">
+  <meta property="og:description" content="Edit pages, manage registration and tickets, send email, and choose your site branding.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/admin-guide/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta property="og:image:alt" content="Event Runner guides">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Admin guide — Event Runner documentation">
-  <meta name="twitter:description" content="Running a client site from the admin panel, in the order the work happens.">
+  <meta name="twitter:title" content="Admin guide — Event Runner guides">
+  <meta name="twitter:description" content="Edit pages, manage registration and tickets, send email, and choose your site branding.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
-  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="twitter:image:alt" content="Event Runner guides">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
@@ -34,8 +34,9 @@
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
   <script src="/eventrunner/scroll-regions.js" defer></script>
+  <script src="/eventrunner/docs-ui.js" defer></script>
 </head>
-<body>
+<body class="docs-site">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="wrap">
@@ -58,68 +59,57 @@
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Documentation</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="/eventrunner/">Home</a>
-        <a href="/eventrunner/docs/">Documentation</a>
-        <a href="/eventrunner/demo/">Demo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="/eventrunner/features/">Features</a>
+        <a href="/eventrunner/how-it-works/">How it works</a>
+        <a href="/eventrunner/docs/" aria-current="location">Guides</a>
+        <a href="/eventrunner/project/">About</a>
+        <a class="btn nav-cta" href="/eventrunner/demo/">Try the demo</a>
       </nav>
     </header>
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <ol>
         <li><a href="/eventrunner/">Home</a></li>
-        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><a href="/eventrunner/docs/">Guides</a></li>
         <li><span aria-current="page">Admin guide</span></li>
         </ol>
       </nav>
     <div class="docs-layout">
-      <nav class="docs-nav" aria-label="Documentation">
-        <p class="docs-nav-section">Start here</p>
-        <ul>
-          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
-          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
-          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
-          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
-          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
-        </ul>
-        <p class="docs-nav-section">Operate</p>
-        <ul>
-          <li><a href="/eventrunner/docs/admin-guide/" aria-current="page" class="is-current">Admin guide</a></li>
-          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
-          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
-          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
-          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
-          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
-          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
-          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
-          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
-          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
-          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
-        </ul>
-        <p class="docs-nav-section">Build</p>
-        <ul>
-          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
-          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
-          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
-          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
-          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
-          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
-          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
-          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
-          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
-        </ul>
-        <p class="docs-nav-section">Get help</p>
-        <ul>
-          <li><a href="/eventrunner/docs/support/">Support</a></li>
-          <li><a href="/eventrunner/docs/security/">Security</a></li>
-        </ul>
-      </nav>
+      <details class="docs-disclosure" data-docs-navigation open>
+        <summary>Browse all guides</summary>
+        <div class="docs-nav-scroll" data-scroll-region data-scroll-label="Guide navigation">
+          <nav class="docs-nav" aria-label="Documentation">
+            <p class="docs-nav-section">Start here</p>
+            <ul>
+              <li><a href="/eventrunner/docs/overview/">Meet Event Runner</a></li>
+              <li><a href="/eventrunner/docs/handbook/for-clients/">For event organizers</a></li>
+              <li><a href="/eventrunner/docs/handbook/">The event handbook</a></li>
+            </ul>
+            <p class="docs-nav-section">Run your event</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+              <li><a href="/eventrunner/docs/admin-guide/" aria-current="page" class="is-current">Admin guide</a></li>
+              <li><a href="/eventrunner/docs/admin-sessions/">Manage your sessions</a></li>
+            </ul>
+            <p class="docs-nav-section">Attend an event</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+            </ul>
+            <p class="docs-nav-section">Get help</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/faq/">Frequently asked questions</a></li>
+              <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+              <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+              <li><a href="/eventrunner/docs/support/">Support</a></li>
+              <li><a href="/eventrunner/docs/security/">Report a security concern</a></li>
+              <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+            </ul>
+          </nav>
+        </div>
+      </details>
       <main class="docs-main" id="main">
         <article class="prose">
           <h1>Admin guide</h1>
@@ -166,7 +156,7 @@
               <li><a href="#legal-pages">Legal pages</a></li>
             </ul>
           </nav>
-          <p>How to run a client&#39;s site from the admin panel, in the order the work happens. For the narrative &quot;why does this work this way&quot; version, hand a new staff member <a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see <a href="/eventrunner/docs/design-reference/"><code>design-reference.md</code></a>. You do not need it to run a site.</p>
+          <p>How to run a client&#39;s site from the admin panel, in the order the work happens. For the narrative &quot;why does this work this way&quot; version, hand a new staff member <a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/design-reference.md"><code>design-reference.md</code></a>. You do not need it to run a site.</p>
           <p>Open <strong>Session pitches</strong> to review private proposals. Share <code>/pitch</code> for public intake. Operators set the call deadline, or choose <strong>Open until I close it</strong> for a call with no deadline, and choose this site&#39;s form or an external form, such as Airtable. With an Airtable form, an operator connects the approved table once; staff then choose <strong>Refresh from Airtable</strong>, or an operator turns on an automatic refresh. A refresh adds new pitches, updates changed text, keeps every decision and note, and marks changed or removed records in the queue. A person who pitches through this site&#39;s form gets a receipt. Receipts are on by default; to turn them off, choose <strong>Staff send each receipt</strong> under <strong>Pitch emails</strong>. Staff send acceptance and decline emails from each pitch, after a preview. Saving a decision sends no email. See <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/session-pitches.md">Operate session pitch intake</a> for decisions, pitch emails, the Airtable refresh, CSV import and export, draft conversion, and private data boundaries.</p>
           <p><strong>Draft and live are separate almost everywhere below.</strong> Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.</p>
           <p><strong>The banner above each admin page counts what is saved and not published.</strong> It names the count by kind, such as &quot;2 unpublished changes: 1 content block, 1 page.&quot;, and links to <strong>Unpublished changes</strong>, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.</p>
@@ -250,7 +240,7 @@
           <p>Work down the controls in this order.</p>
           <p><strong>Site style.</strong> The base look: A light palette, a dark palette, a type pairing, a shape, a header, and a default set of illustrations. Each one is finished work with a recommended configuration already chosen — you should not have to touch anything else to get a good result. Try the selected style on your event content before publishing. Picking a style replaces every value you have not changed yourself.</p>
           <p><strong>Logo and icon.</strong> Two slots are asked for here — the primary logo and the square icon — and the other three sit behind <strong>More image slots</strong>: The footer logo, the social sharing image, and the favicon. All five use the same image picker the Media tab uses.</p>
-          <p>The square icon also sets the app icon. A phone or a desktop browser shows the app icon when a visitor installs the site. To use your own app icon, upload a square PNG to the square icon slot, from 512 to 4096 pixels on a side. Any other value gives the neutral placeholder icon: An SVG, JPEG, or WebP file, an image that is not square, or a path that is not an uploaded file. The app icon changes at the next deploy. If the site publisher is on for your deployment, it also changes at the next content publish. Publishing the theme alone does not change it. When the placeholder is used, the deploy log names the reason. If the site publisher is on, its log after a content publish names the reason too. <a href="/eventrunner/docs/deploy-runbook/"><code>DEPLOY_RUNBOOK.md</code></a> §9 describes the site publisher.</p>
+          <p>The square icon also sets the app icon. A phone or a desktop browser shows the app icon when a visitor installs the site. To use your own app icon, upload a square PNG to the square icon slot, from 512 to 4096 pixels on a side. Any other value gives the neutral placeholder icon: An SVG, JPEG, or WebP file, an image that is not square, or a path that is not an uploaded file. The app icon changes at the next deploy. If the site publisher is on for your deployment, it also changes at the next content publish. Publishing the theme alone does not change it. When the placeholder is used, the deploy log names the reason. If the site publisher is on, its log after a content publish names the reason too. <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>DEPLOY_RUNBOOK.md</code></a> §9 describes the site publisher.</p>
           <p><strong>Homepage hero image.</strong> The picture at the top of your home page. In <strong>Identity</strong>, choose an image and add the required alt text. <strong>Save draft</strong> saves it without making it public. <strong>Publish</strong> saves and publishes it. <strong>Publish the theme</strong> applies theme changes right away; it does not publish this picture. You can also edit and publish the same picture in <strong>Content → Home → Hero</strong>.</p>
           <p><strong>Main brand colour.</strong> One colour, as a hex value. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. Leave it blank to keep the site style&#39;s own colour.</p>
           <p><strong>Five more choices sit under Advanced.</strong> Each site style also answers <strong>Long read opening</strong> (a drop cap, a standfirst, or plain, for the first paragraph of a page on the Long read template), <strong>Quote device</strong> (how a quoted sentence is set), <strong>Directory style</strong> (how the speaker shelf and the attendee index are set), <strong>Section boundary</strong> (whether a section heading carries its folio, and where), and <strong>Table rules</strong> (hairline rows, a ruled head, or the full grid). Every style comes with the answer that suits it, and each choice retunes values the style already declares.</p>
@@ -558,9 +548,9 @@
           </ul>
           <p><strong>If a delete stops part way.</strong> When the account has left the directory but some of its data did not clear, the page keeps a notice with <strong>Try the delete again</strong>. The page does the same when the answer does not arrive, for example after a timeout or a dropped connection, because the delete may have started. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log. For up to an hour after the delete, the person&#39;s open session can still claim a ticket; a retry also releases a ticket claim made after the delete. A refusal made before anything was deleted, such as a speaker-linked account, shows in the record itself.</p>
           <h2 id="ticketing">Ticketing<a class="heading-anchor" href="#ticketing" aria-label="Link to this section">#</a></h2>
-          <p>The workspace follows the deployment&#39;s configured provider (<a href="/eventrunner/docs/client-onboarding/"><code>CLIENT_ONBOARDING.md</code></a> §3 item 5):</p>
+          <p>The workspace follows the deployment&#39;s configured provider (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/CLIENT_ONBOARDING.md"><code>CLIENT_ONBOARDING.md</code></a> §3 item 5):</p>
           <ul>
-          <li><strong>Stripe</strong>: Native event-site selection, Stripe-hosted payment, and the organizer controls below. Merchant setup and opening live sales require the <a href="/eventrunner/docs/stripe-ticketing/">Stripe launch and support runbook</a>.</li>
+          <li><strong>Stripe</strong>: Native event-site selection, Stripe-hosted payment, and the organizer controls below. Merchant setup and opening live sales require the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/stripe-ticketing.md">Stripe launch and support runbook</a>.</li>
           <li><strong>Eventbrite</strong>: Provider status shows webhook registration state and recent sync activity.</li>
           <li><strong>Manual / CSV import</strong>: Upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it.</li>
           <li><strong>None</strong>: Nothing to configure.</li>
@@ -580,7 +570,7 @@
           <p>Money refunds happen through <strong>Open this payment in Stripe Dashboard</strong>, using the organizer&#39;s authorized Stripe account. <strong>Refund history</strong> records provider results. A succeeded full refund invalidates all tickets. For a succeeded partial refund, an operator chooses <strong>Refund to allocate</strong>, then selects affected tickets or explicitly chooses <strong>Keep every ticket valid</strong> for a price adjustment. <strong>Review refund allocation</strong> confirms that decision without creating a money refund. A dispute appears under <strong>Payment disputes</strong> for merchant review; it does not automatically cancel admission. Reasons and actions appear in <strong>Audit trail</strong>.</p>
           <p>For a discount, staff or an operator opens <strong>Promo codes</strong> and selects <strong>New promo code</strong>. A code takes a percent or an amount off each eligible ticket. Choose the ticket types it applies to, or none for every paid type; free tickets are never discounted. <strong>Use limit</strong> and <strong>Limit per order</strong> count discounted tickets, and an order with more discounted tickets than the per-order limit is refused. Start and end times use the event&#39;s time zone. Attendees enter the code on the <strong>Review</strong> step and see the lower total before they pay. A code held by an unpaid checkout comes back when that checkout expires. A used code cannot be deleted, because its orders name it: clear <strong>Code is active</strong> instead. The order view, the orders export and the event package show each order&#39;s code and discount.</p>
           <p>For complimentary seats, an operator opens <strong>Issue complimentary admission</strong>, enters each attendee and a reason, and uses <strong>Review complimentary tickets</strong> before the final issue confirmation. Comps consume real event/type capacity. At the door, staff enter or scan a human-readable code in <strong>Ticket code for check-in</strong>, then select <strong>Check in attendee</strong>. A repeat reports already checked in. Only an operator can use <strong>Undo check-in → Undo recorded check-in</strong>, with a reason.</p>
-          <p>If a payment response is lost, the purchaser uses <strong>Resume existing checkout</strong> or <strong>Recover existing checkout</strong>. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the <a href="/eventrunner/docs/stripe-ticketing/#6-support-the-payment-and-the-attendee-separately">support matrix</a> before suggesting another payment, refund, resend, or admission change.</p>
+          <p>If a payment response is lost, the purchaser uses <strong>Resume existing checkout</strong> or <strong>Recover existing checkout</strong>. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/stripe-ticketing.md#6-support-the-payment-and-the-attendee-separately">support matrix</a> before suggesting another payment, refund, resend, or admission change.</p>
           <h2 id="invoices">Invoices<a class="heading-anchor" href="#invoices" aria-label="Link to this section">#</a></h2>
           <p><strong>Invoices</strong> under Registration and tickets is where staff bill sponsors and partners. Write a draft, issue it, download or email its PDF, and record the payment. When the site takes payments through Stripe, the sponsor can also pay by card through a link.</p>
           <p>Invoices are private. The database refuses every browser read and write, for operators and staff alike, and every change goes through the server. Each change writes a row to the audit log.</p>
@@ -634,7 +624,7 @@
           <p>If the page says the email may have been sent, the email provider did not confirm it. Check the <strong>Email log</strong> before you send it again.</p>
           <p>Invoice email is transactional mail. It never goes on the announcement stream and has no unsubscribe link.</p>
           <h3 id="pay-by-card-through-a-stripe-link">Pay by card through a Stripe link<a class="heading-anchor" href="#pay-by-card-through-a-stripe-link" aria-label="Link to this section">#</a></h3>
-          <p>Staff can make a card payment link for an issued invoice. This needs Stripe: the site&#39;s ticketing provider is Stripe, and the operator has set up the Stripe account, mode and key (<a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing runbook</a>). Without Stripe, <strong>Pay by card</strong> on the invoice record says so, and the rest of the invoice works as before.</p>
+          <p>Staff can make a card payment link for an issued invoice. This needs Stripe: the site&#39;s ticketing provider is Stripe, and the operator has set up the Stripe account, mode and key (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/stripe-ticketing.md">Stripe ticketing runbook</a>). Without Stripe, <strong>Pay by card</strong> on the invoice record says so, and the rest of the invoice works as before.</p>
           <ol>
           <li>Open the issued invoice. Find <strong>Pay by card</strong> on the record.</li>
           <li>Select <strong>Create payment link</strong>.</li>
@@ -893,7 +883,7 @@
           </div>
           <p>No spreadsheet holds an account id, an invite token, staged speaker edits, a private note, a checkout link, bank details, or a raw payment provider record. Amounts are in the currency&#39;s major unit (<code>25.00</code>). Staff do not see the two operator rows; the page says who exports them. Attendees and session pitches export from their own pages, because those exports follow the page&#39;s filter.</p>
           <p><strong>The event data package.</strong> Operators only. <strong>Download event data package</strong> saves one zip file named <code>event-data-package-&lt;date&gt;.zip</code>. It holds a JSON file for each record type, CSV files for the main lists, <code>manifest.json</code> with record counts and checksums, and <code>README.md</code>, which describes each file, the links between files, and how to handle the personal data in it. Choose the parts under <strong>Parts to include</strong>; all nine are chosen at the start. <strong>Include staff notes on session pitches</strong> is off at the start. The package holds live records only, in its CSV files too: a draft that was never published, or a newer draft of a live record, is not in it. A hidden live record is in it, with <code>visible: false</code> in JSON and <strong>Hidden</strong> <code>yes</code> in CSV. The package never holds the admin allowlist, credentials, the admin log, or raw provider records. It holds file paths and links for media and materials, not the files. The <strong>Invoices</strong> part holds every invoice, drafts too, because an invoice draft is a record and not an unpublished edit. Each issued invoice keeps its own copy of the issuer block and payment instructions. Its card payment links and any card payment flagged for review go too, with their status, amount and times. Like ticket orders, they hold no Stripe ID and no payment page address; the Stripe Dashboard is the record of those. The invoice settings and the number counter stay behind.</p>
-          <p>The page sends a package of up to 9 MB built from at most 50,000 stored documents. Each document counts once, even when two files draw on it. A larger event gets a message that names <code>scripts/export-event-package.cjs</code>, which builds the same package from a terminal. <a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a> covers the script, how to check a package, a full Firebase backup, the Storage files, and how to keep the past site online read-only.</p>
+          <p>The page sends a package of up to 9 MB built from at most 50,000 stored documents. Each document counts once, even when two files draw on it. A larger event gets a message that names <code>scripts/export-event-package.cjs</code>, which builds the same package from a terminal. <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/archive-handoff.md">Archive and hand off a past event</a> covers the script, how to check a package, a full Firebase backup, the Storage files, and how to keep the past site online read-only.</p>
           <h2 id="settings-event-settings">Settings → Event settings<a class="heading-anchor" href="#settings-event-settings" aria-label="Link to this section">#</a></h2>
           <p>The event&#39;s own identity fields: Name, dates, time zone, venue, social accounts, milestones, and the rest. The venue&#39;s places, movements, and map are set here too, in the panels described below. Saving keeps values that the form does not edit.</p>
           <p><strong>From address.</strong> The address is shown as read-only text for all admins, including operators. To send from a different address, contact us. Operators can still edit the sender name and reply-to address. Staff can read those values.</p>
@@ -1014,24 +1004,26 @@
           <p>Each automatic instructions email and explicit resend also records its outcome in the admin log, including a safe failure reason when setup fails before the email provider is contacted. Messages that reach the email core appear in <strong>Email log</strong> with their rendered bodies and provider result.</p>
           <p><strong>When it takes effect.</strong> At once. The database rules, the server, and the admin rail all read the access lists live: A granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.</p>
           <h2 id="legal-pages">Legal pages<a class="heading-anchor" href="#legal-pages" aria-label="Link to this section">#</a></h2>
-          <p>Privacy policy and terms of service ship as CMS content pages seeded from provider-aware templates, each clause needing review flagged <code>[Client legal review required]</code>. They stay flagged — a persistent banner in the admin panel and a visible notice on the public page — until an admin clears the review flag after the client&#39;s counsel has actually reviewed the seeded copy. See <a href="/eventrunner/docs/client-onboarding/"><code>CLIENT_ONBOARDING.md</code></a>&#39;s legal review section for the full context. Do not publish another organization&#39;s terms verbatim; the seeded text is a starting point, not a finished policy.</p>
+          <p>Privacy policy and terms of service ship as CMS content pages seeded from provider-aware templates, each clause needing review flagged <code>[Client legal review required]</code>. They stay flagged — a persistent banner in the admin panel and a visible notice on the public page — until an admin clears the review flag after the client&#39;s counsel has actually reviewed the seeded copy. See <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/CLIENT_ONBOARDING.md"><code>CLIENT_ONBOARDING.md</code></a>&#39;s legal review section for the full context. Do not publish another organization&#39;s terms verbatim; the seeded text is a starting point, not a finished policy.</p>
         </article>
-        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/ADMIN_GUIDE.md"><code>docs/ADMIN_GUIDE.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <div class="source-note"><a href="/eventrunner/support/">Ask for help</a><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/ADMIN_GUIDE.md">Improve this guide on GitHub</a></div>
         <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/handbook/glossary/"><span>Previous</span>Glossary</a>
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/admin-sessions/"><span>Next</span>Work with sessions in the admin</a>
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/handbook/for-event-staff/"><span>Previous</span>For event staff</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/admin-sessions/"><span>Next</span>Manage your sessions</a>
         </nav>
       </main>
     </div>
     <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
       <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="/eventrunner/docs/security/">Security</a>
+        <a class="footer-brand" href="/eventrunner/"><strong>Event Runner</strong></a>
+        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>
       </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/eventrunner/support/">Support</a>
+        <a href="/eventrunner/privacy/">Privacy</a>
+        <a href="/eventrunner/terms-of-service/">Terms</a>
+        <a href="/eventrunner/project/">About the project</a>
+      </nav>
     </footer>
   </div>
 </body>

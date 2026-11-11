@@ -32,6 +32,12 @@ const DOCS_GENERATOR_PATHS = new Set([
   'scripts/build-pages.cjs',
   'scripts/build-pages.test.cjs',
   'scripts/lib/markdown-pages.cjs',
+  // Publication and verification stay in the public site's tiers too.
+  'scripts/check-docs.cjs',
+  'scripts/check-docs.test.cjs',
+  'scripts/stage-pages.cjs',
+  'scripts/stage-pages.test.cjs',
+  'scripts/dev/check-public-site.mjs',
 ]);
 
 const COPY_CHECKED_DOC_FILES = new Set([
@@ -87,6 +93,16 @@ function isDemoPath(path) {
 
 function isDocsGeneratorPath(path) {
   return DOCS_GENERATOR_PATHS.has(path) || /^scripts\/lib\/pages-[^/]+\.cjs$/.test(path);
+}
+
+// The demo job also checks the rendered marketing site and user guides.
+// Keep this classifier standalone: CI loads it from the PR's base commit
+// into a temporary directory, without importing proposed site manifests.
+function isPublicSitePath(path) {
+  // Source notes and review evidence are repository-only, not served Pages assets.
+  if (/^docs\/(?:adr|design|examples|handbook|operator|performance|plans|pr-evidence|testing)\//.test(path)) return false;
+  return isDocsGeneratorPath(path) ||
+    (path.startsWith('docs/') && /\.(?:html|css|[cm]?js|svg|png|webp|jpe?g|gif|avif|ico|woff2?|ttf|otf|mp4|webm|vtt)$/.test(path));
 }
 
 function isDocsPath(path) {
@@ -178,6 +194,7 @@ function resultForPaths(paths, mode, categories) {
     demo,
     demoGenerator,
     docsGenerator,
+    publicSite,
     app,
     backend,
     shared,
@@ -192,7 +209,7 @@ function resultForPaths(paths, mode, categories) {
   } = categories;
   const jobs = {
     docs: docs || full,
-    demo: demo || app || shared || full,
+    demo: demo || publicSite || app || shared || full,
     // Scanned documentation selects this tier so the copy gate cannot be
     // bypassed by a documentation-only pull request.
     lint: copyDocs || demoGenerator || docsGenerator || app || backend || shared || rulesTests ||
@@ -225,6 +242,7 @@ function classifyPaths(input) {
     demo: paths.some(isDemoPath),
     demoGenerator: paths.some(isDemoGeneratorPath),
     docsGenerator: paths.some(isDocsGeneratorPath),
+    publicSite: paths.some(isPublicSitePath),
     app: paths.some(isAppPath),
     backend: paths.some(isBackendPath),
     shared: paths.some(isSharedPath),

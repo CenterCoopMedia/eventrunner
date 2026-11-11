@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { pagesSite } = require('./lib/pages-site.cjs');
+const { isPublicFile } = require('./lib/pages-public-files.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 // Local task ledgers and agent state are not versioned project documentation.
@@ -29,9 +30,8 @@ const GENERATED_DOCS_PREFIX = 'docs/docs/';
 // A link into it is checked only when a local build is present; the Pages
 // workflow runs this checker after it builds the demo.
 const BUILT_AT_DEPLOY_DIRS = ['docs/demo'];
-// Kept in the repository but removed before the Pages upload
-// (.github/workflows/pages.yml). A served page links to these files on
-// GitHub instead, as build-pages does for any file the site does not serve.
+// Report the established folder names for these repository-only records.
+// Other paths use the shared public-file allowlist that stages the upload.
 const NOT_SERVED_DIRS = ['docs/plans', 'docs/pr-evidence'];
 
 const BASE_PAGE_METADATA = [
@@ -210,10 +210,17 @@ function isUnbuiltDeployTarget(candidate, root) {
 }
 
 function notServedDir(candidate, root) {
-  return NOT_SERVED_DIRS.find((dir) => {
+  const hidden = NOT_SERVED_DIRS.find((dir) => {
     const relative = path.relative(path.join(root, dir), candidate);
     return !relative.startsWith('..') && !path.isAbsolute(relative);
   });
+  if (hidden) return hidden;
+  const relative = path.relative(path.join(root, 'docs'), candidate).replaceAll(path.sep, '/');
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return displayPath(root, candidate);
+  const file = fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()
+    ? `${relative ? `${relative}/` : ''}index.html`
+    : relative;
+  return isPublicFile(file) ? undefined : `docs/${relative}`;
 }
 
 function checkLocalTargets(sourcePath, targets, root, htmlReferences = false, pagesBase = pagesSite().base) {
@@ -223,11 +230,6 @@ function checkLocalTargets(sourcePath, targets, root, htmlReferences = false, pa
     const resolved = localTargetPath(sourcePath, target, root, pagesBase);
     if (!resolved) continue;
     if (!resolved.error && isUnbuiltDeployTarget(resolved.path, root)) continue;
-    const hidden = servedPage && !resolved.error && notServedDir(resolved.path, root);
-    if (hidden) {
-      errors.push(`${displayPath(root, sourcePath)}: ${target} (Pages does not serve ${hidden}; link to the file on GitHub)`);
-      continue;
-    }
     if (resolved.error) {
       errors.push(`${displayPath(root, sourcePath)}: ${target} (${resolved.error})`);
     } else {
@@ -235,6 +237,9 @@ function checkLocalTargets(sourcePath, targets, root, htmlReferences = false, pa
       const directoryRoute = htmlReferences && withoutFragment.endsWith('/');
       if (!targetExists(resolved.path, resolved.pagesRoute || directoryRoute)) {
         errors.push(`${displayPath(root, sourcePath)}: missing ${target}`);
+      } else {
+        const hidden = servedPage && notServedDir(resolved.path, root);
+        if (hidden) errors.push(`${displayPath(root, sourcePath)}: ${target} (Pages does not serve ${hidden}; link to the file on GitHub)`);
       }
     }
   }

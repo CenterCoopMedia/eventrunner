@@ -3,28 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Eventbrite verification — Event Runner documentation</title>
-  <meta name="description" content="Verifying the ticketing adapter against a real Eventbrite account.">
+  <title>Eventbrite verification — Event Runner</title>
+  <meta name="description" content="Read Eventbrite verification in the Event Runner repository on GitHub.">
+  <meta name="robots" content="noindex, follow">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/eventbrite-verification/">
   <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/eventrunner/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/eventrunner/apple-touch-icon.png">
 
-  <meta property="og:type" content="article">
+  <meta property="og:type" content="website">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Eventbrite verification — Event Runner documentation">
-  <meta property="og:description" content="Verifying the ticketing adapter against a real Eventbrite account.">
+  <meta property="og:title" content="Eventbrite verification — Event Runner">
+  <meta property="og:description" content="Read Eventbrite verification in the Event Runner repository on GitHub.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/eventbrite-verification/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta property="og:image:alt" content="Event Runner guides">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Eventbrite verification — Event Runner documentation">
-  <meta name="twitter:description" content="Verifying the ticketing adapter against a real Eventbrite account.">
+  <meta name="twitter:title" content="Eventbrite verification — Event Runner">
+  <meta name="twitter:description" content="Read Eventbrite verification in the Event Runner repository on GitHub.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
-  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="twitter:image:alt" content="Event Runner guides">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
@@ -34,8 +35,9 @@
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
   <script src="/eventrunner/scroll-regions.js" defer></script>
+  <script src="/eventrunner/docs-ui.js" defer></script>
 </head>
-<body>
+<body class="docs-site">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="wrap">
@@ -58,246 +60,43 @@
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Documentation</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="/eventrunner/">Home</a>
-        <a href="/eventrunner/docs/">Documentation</a>
-        <a href="/eventrunner/demo/">Demo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="/eventrunner/features/">Features</a>
+        <a href="/eventrunner/how-it-works/">How it works</a>
+        <a href="/eventrunner/docs/" aria-current="location">Guides</a>
+        <a href="/eventrunner/project/">About</a>
+        <a class="btn nav-cta" href="/eventrunner/demo/">Try the demo</a>
       </nav>
     </header>
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <ol>
         <li><a href="/eventrunner/">Home</a></li>
-        <li><a href="/eventrunner/docs/">Documentation</a></li>
         <li><span aria-current="page">Eventbrite verification</span></li>
         </ol>
       </nav>
-    <div class="docs-layout">
-      <nav class="docs-nav" aria-label="Documentation">
-        <p class="docs-nav-section">Start here</p>
-        <ul>
-          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
-          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
-          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
-          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
-          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
-        </ul>
-        <p class="docs-nav-section">Operate</p>
-        <ul>
-          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
-          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
-          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
-          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
-          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
-          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
-          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
-          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
-          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
-          <li><a href="/eventrunner/docs/eventbrite-verification/" aria-current="page" class="is-current">Eventbrite verification</a></li>
-          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
-        </ul>
-        <p class="docs-nav-section">Build</p>
-        <ul>
-          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
-          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
-          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
-          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
-          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
-          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
-          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
-          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
-          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
-        </ul>
-        <p class="docs-nav-section">Get help</p>
-        <ul>
-          <li><a href="/eventrunner/docs/support/">Support</a></li>
-          <li><a href="/eventrunner/docs/security/">Security</a></li>
-        </ul>
-      </nav>
-      <main class="docs-main" id="main">
-        <article class="prose">
-          <h1>Eventbrite adapter verification</h1>
-          <nav class="contents" aria-labelledby="contents-title">
-            <p class="contents-title" id="contents-title">On this page</p>
-            <ul>
-              <li><a href="#setup-register-the-webhook">Setup: register the webhook</a></li>
-              <li><a href="#per-assumption-capture-and-diff-plan">Per-assumption capture and diff plan</a></li>
-              <li><a href="#filing-the-results">Filing the results</a></li>
-            </ul>
-          </nav>
-          <p>Verifies the six numbered judgment calls documented in
-          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/functions/src/ticketing/providers/eventbrite.cjs"><code>functions/src/ticketing/providers/eventbrite.cjs</code></a>&#39;s
-          module doc (and itemized in
-          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/functions/src/ticketing/providers/__fixtures__/README.md"><code>functions/src/ticketing/providers/__fixtures__/README.md</code></a>)
-          against a real Eventbrite sandbox event, and tells you how to diff what you capture against the
-          committed synthetic fixtures. See issue #79 for the tracked scope this runbook covers.</p>
-          <p><strong>Prerequisite:</strong> an Eventbrite account with a test/sandbox event, its numeric event id
-          (<code>EVENT_TICKETING_EVENT_ID</code>), and an API token (<code>TICKETING_API_TOKEN</code>) from the account&#39;s API keys
-          page. A dev/staging Event Runner deployment with <code>EVENT_TICKETING_PROVIDER=eventbrite</code> configured.</p>
-          <h2 id="setup-register-the-webhook">Setup: register the webhook<a class="heading-anchor" href="#setup-register-the-webhook" aria-label="Link to this section">#</a></h2>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_TICKETING_PROVIDER=eventbrite EVENT_TICKETING_EVENT_ID=&lt;sandbox event id&gt; \
-          TICKETING_API_TOKEN=&lt;from Eventbrite account&gt; \
-          TICKETING_WEBHOOK_SECRET=&lt;generate one: `openssl rand -hex 32`, store like EMAIL_WEBHOOK_BASIC_AUTH&gt; \
-          EVENT_FIREBASE_PROJECT_ID=&lt;dev project id&gt; \
-            node scripts/register-ticketing-webhook.cjs
-          </code></pre>
-          <p>Confirm success via <code>getTicketingStatus</code> (admin Settings) or the Cloud Functions log for the
-          registration call.</p>
-          <p>The script registers every action the adapter handles: <code>order.placed</code>, <code>order.updated</code>,
-          <code>order.refunded</code>, and <code>attendee.updated</code> (#357). In the Eventbrite dashboard, confirm that the
-          webhook lists all four. If the script names an older webhook at the same endpoint, delete that
-          webhook in Eventbrite.</p>
-          <p>Then exercise all three flows against the sandbox event&#39;s real checkout (or Eventbrite&#39;s test-order
-          tooling, if offered): place an order, refund one, cancel one.</p>
-          <h2 id="per-assumption-capture-and-diff-plan">Per-assumption capture and diff plan<a class="heading-anchor" href="#per-assumption-capture-and-diff-plan" aria-label="Link to this section">#</a></h2>
-          <p>For each of the six numbered assumptions, capture the specific real artifact named below, sanitize
-          it (strip every real identifier — attendee/organizer names, emails, the sandbox account&#39;s org name
-          and id, real order/ticket numeric ids, phone numbers, and free-text fields. Replace them with clearly
-          synthetic placeholders in the same shape. Every delivery body echoes <code>config.endpoint_url</code>, and that
-          URL carries <code>TICKETING_WEBHOOK_SECRET</code>: replace the token value in <code>config.endpoint_url</code> with
-          <code>fixture-placeholder</code> (<code>?token=fixture-placeholder</code>) before the body is saved anywhere. Do not use <code>[REDACTED]</code> blocks because preserving field shape is the
-          whole point), and diff it against the named fixture file.</p>
-          <h3 id="1-webhook-authentication-url-secret-356">1. Webhook authentication (URL secret, #356)<a class="heading-anchor" href="#1-webhook-authentication-url-secret-356" aria-label="Link to this section">#</a></h3>
-          <p>Eventbrite does not sign webhook deliveries, and its webhook API takes no signing secret. The
-          adapter does not check an HMAC. <code>register-ticketing-webhook.cjs</code> registers the callback URL with
-          <code>?token=&lt;TICKETING_WEBHOOK_SECRET&gt;</code> added. <code>ticketingWebhook</code> compares that query parameter with the
-          secret in constant time and answers 401 when it is missing or wrong. The body is not trusted for
-          ticket data: the function reads only an order id from an <code>api_url</code> on <code>www.eventbriteapi.com</code>, and
-          the sync drain fetches that order from the Eventbrite API with this deployment&#39;s token. A delivery
-          with the right secret that the adapter cannot read gets 200 and is ignored, so Eventbrite does not
-          retry it. A secret shorter than 32 characters, or none, refuses every delivery and stops the
-          registration script; other ticketing functions keep working.</p>
-          <p>This is proven offline only, with faked fetch (<code>eventbrite.test.cjs</code>,
-          <code>eventbriteEndToEnd.test.cjs</code>). It is not yet confirmed against Eventbrite. Confirm it in the
-          sandbox:</p>
-          <ul>
-          <li><strong>Check the registration:</strong> in the Eventbrite dashboard, the webhook URL ends in
-          <code>?token=…</code>. Do not copy the value into notes, issues, or screenshots.</li>
-          <li><strong>Check a delivery:</strong> place a sandbox order. <code>getTicketingStatus</code> shows the delivery, and the
-          order reaches <code>ticket_sync_queue</code>. If Eventbrite drops or rewrites the query string, every
-          delivery gets a 401. Record that as a corrected verdict; do not weaken the check.</li>
-          <li><strong>Check a refusal:</strong> send one POST to the bare callback URL, without <code>token</code>. It must get a 401.</li>
-          <li><strong>Capture:</strong> the request headers of one delivery, to record whether Eventbrite sends any
-          signature header at all. If it does, record its name and scheme as a corrected verdict.</li>
-          <li><strong>Know the log exposure:</strong> Cloud Run request logs record the full request URL, query string
-          included. Event Runner code never logs the secret, but anyone who can read the project&#39;s request
-          logs can read it. Keep log access to operators. If the secret leaks, generate a new one, update
-          the secret, deploy, and run the registration script again; then delete the old webhook it names.</li>
-          <li><strong>Verdict:</strong> confirmed, or corrected with what Eventbrite really sends.</li>
-          </ul>
-          <h3 id="2-delivery-id">2. Delivery id<a class="heading-anchor" href="#2-delivery-id" aria-label="Link to this section">#</a></h3>
-          <ul>
-          <li><strong>Capture:</strong> Observe authenticated order-update notifications for the same order before and
-          after an API-side state change. Include a byte-identical retry if Eventbrite sends one.</li>
-          <li><strong>Sanitize:</strong> Keep only sanitized order and receipt identifiers. Do not retain raw request
-          bodies or callback URLs containing the webhook secret.</li>
-          <li><strong>Check:</strong> Each authenticated receipt gets a different random UUID. Pending notifications
-          share one order queue row and advance its generation. After a completed reconciliation,
-          another notification re-arms an authoritative API read even when its body is byte-identical.
-          Confirm the resulting ticket status and entitlement follow the current API state.</li>
-          </ul>
-          <h3 id="3-api_url-shape">3. <code>api_url</code> shape<a class="heading-anchor" href="#3-api_url-shape" aria-label="Link to this section">#</a></h3>
-          <ul>
-          <li><strong>Capture:</strong> the full webhook payload body for one delivery of each action (<code>order.placed</code>,
-          <code>order.updated</code>, <code>order.refunded</code>, <code>attendee.updated</code>), specifically its <code>api_url</code> field.</li>
-          <li><strong>Sanitize:</strong> replace any real event/order/attendee numeric ids in the URL path with a
-          renumbered fake sequence, keeping the path <em>shape</em> identical. Replace the token in
-          <code>config.endpoint_url</code> as the general rule above says.</li>
-          <li><strong>Diff against:</strong> the adapter accepts three shapes, none yet confirmed against Eventbrite:
-          <code>/v3/events/{eventId}/orders/{orderId}/</code> (<code>webhook-attendee-updated.json</code> and the other first
-          fixtures), <code>/v3/orders/{orderId}/</code> (<code>webhook-order-placed-order-path.json</code>, the shape
-          Eventbrite&#39;s documentation shows for <code>order.*</code>), and <code>/v3/events/{eventId}/attendees/{attendeeId}/</code>
-          (<code>webhook-attendee-updated-attendee-path.json</code>, the documented <code>attendee.*</code> shape, mapped to its
-          order through <code>GET /events/{id}/attendees/{id}/</code>). If that read returns 404 or no <code>order_id</code>,
-          the function answers 500 so Eventbrite retries: the attendee may not have propagated yet. An
-          attendee that is gone for good is retried until Eventbrite stops, so record in the sandbox how
-          soon after <code>attendee.updated</code> the attendee read succeeds, and how long Eventbrite keeps
-          retrying a 500. An authenticated delivery in any other shape gets 200 and is ignored, so a
-          shape the adapter does not know loses the update without an error. Record which shape each action really uses. This is the single most load-bearing
-          assumption — verify it carefully.</li>
-          </ul>
-          <h3 id="4-orderrefunded-folding">4. <code>order.refunded</code> folding<a class="heading-anchor" href="#4-orderrefunded-folding" aria-label="Link to this section">#</a></h3>
-          <ul>
-          <li><strong>Capture:</strong> the webhook delivery body produced when you refund an order, specifically its
-          <code>config.action</code> field.</li>
-          <li><strong>Sanitize:</strong> strip real order/attendee ids and any customer-identifying fields; keep <code>api_url</code>
-          and <code>config.action</code> shape intact.</li>
-          <li><strong>Diff against:</strong> <code>webhook-order-refunded.json</code>, which models <code>config.action: &quot;order.refunded&quot;</code>
-          on the wire. The registration sends <code>order.refunded</code> (#357), so a refund must produce a
-          delivery. Confirm the real refund delivery&#39;s <code>config.action</code> string matches what the fixture
-          assumes, and confirm the adapter&#39;s fold into <code>eventType: &#39;order.updated&#39;</code> still makes sense (a
-          subsequent <code>GET /orders/{id}/</code> should pick up the refunded ticket status).</li>
-          </ul>
-          <h3 id="5-order-completeness-complete-signal">5. Order completeness (&quot;complete&quot; signal)<a class="heading-anchor" href="#5-order-completeness-complete-signal" aria-label="Link to this section">#</a></h3>
-          <ul>
-          <li><strong>Capture:</strong> the <code>GET /orders/{id}/?expand=attendees</code> response body immediately after
-          <code>order.placed</code> fires (before Eventbrite&#39;s data has necessarily propagated) and again a few
-          seconds or minutes later — specifically whether the <code>attendees</code> key is present, absent, or
-          populated at each point.</li>
-          <li><strong>Sanitize:</strong> replace attendee names and emails with fake placeholders in the same shape; keep
-          the <code>attendees</code> array&#39;s presence, absence, and length.</li>
-          <li><strong>Diff against:</strong> <code>order-processing.json</code> (no <code>attendees</code> key) and <code>order-complete.json</code>
-          (populated <code>attendees</code>). Confirm the real API actually omits the key entirely when not yet
-          hydrated, rather than returning an empty array, which would need different handling — this is
-          the assumption&#39;s whole premise.</li>
-          </ul>
-          <h3 id="6-registerwebhook-org-discovery">6. <code>registerWebhook</code> org discovery<a class="heading-anchor" href="#6-registerwebhook-org-discovery" aria-label="Link to this section">#</a></h3>
-          <ul>
-          <li><strong>Capture:</strong> the response body of <code>GET /users/me/organizations/</code> for the sandbox account —
-          specifically, does it return exactly one organization, and does the adapter&#39;s &quot;use the first
-          result&quot; logic pick the right one? If the sandbox account has more than one org, this is the
-          multi-org case the assumption explicitly flags as unverified.</li>
-          <li><strong>Sanitize:</strong> replace the real organization name and numeric id with fake placeholders, keeping
-          the response shape (array of org objects with whatever fields are present).</li>
-          <li><strong>Diff against:</strong> <code>organizations.json</code>. Note whether the sandbox account only has one org (the
-          assumption trivially holds) or more than one (the assumption needs a real decision — e.g.
-          &quot;prompt the operator to choose&quot; or &quot;match by name&quot; — recorded as a corrected verdict, not
-          silently patched).</li>
-          </ul>
-          <h2 id="filing-the-results">Filing the results<a class="heading-anchor" href="#filing-the-results" aria-label="Link to this section">#</a></h2>
-          <ol>
-          <li><strong>Name every sanitized fixture with a <code>-sanitized</code> suffix</strong> (e.g.
-          <code>webhook-order-placed-sanitized.json</code>) — never overwrite or reuse an existing synthetic
-          filename.</li>
-          <li><strong>Add a one-line provenance note</strong> to each new file (a header comment, or a new column in
-          <code>__fixtures__/README.md</code>) stating it was &quot;captured from a real Eventbrite sandbox delivery on
-          <code>&lt;date&gt;</code>, values sanitized&quot; — so it&#39;s never mistaken for the documentation-derived synthetic
-          originals.</li>
-          <li><strong>Update <code>__fixtures__/README.md</code>&#39;s opening paragraph</strong> — its current wording (&quot;None of it was
-          captured from a real Eventbrite account&quot;) stops being true the moment one sanitized-real fixture
-          is added.</li>
-          <li><strong>Write an explicit verdict for each of the six assumptions</strong> — confirmed, or corrected, with
-          what changed. This is what &quot;done&quot; actually requires; the fixture files are supporting evidence,
-          not the deliverable itself.</li>
-          <li><strong>Any adapter code or fixture change goes through a normal PR</strong> on its own branch — never a
-          direct push — updating <code>eventbrite.cjs</code>&#39;s module doc comments, the fixtures, and their tests
-          together.</li>
-          <li>Never commit an unsanitized payload, even temporarily — sanitize before the first <code>git add</code>, and
-          never paste an unsanitized payload into an issue, PR description, or this runbook&#39;s results.</li>
-          </ol>
-        </article>
-        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/EVENTBRITE_VERIFICATION.md"><code>docs/EVENTBRITE_VERIFICATION.md</code></a>. Edit the Markdown, not the HTML.</p>
-        <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/postmark-provisioning/"><span>Previous</span>Postmark provisioning</a>
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/npm-name-claim/"><span>Next</span>npm name claim</a>
-        </nav>
-      </main>
-    </div>
-    <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
-      <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="/eventrunner/docs/security/">Security</a>
+    <main class="docs-handoff prose" id="main">
+      <h1>Eventbrite verification</h1>
+      <p class="lede">This technical document is maintained with the source code on GitHub.</p>
+      <p>Architecture decisions, deployment instructions, and contributor records stay with the source code. Event organizers and attendees can use the guides on this site.</p>
+      <div class="handoff-actions">
+        <a class="btn" href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/EVENTBRITE_VERIFICATION.md">Read this document on GitHub</a>
+        <a class="btn btn-ghost" href="/eventrunner/docs/">Browse the guides</a>
       </div>
+    </main>
+    <footer class="site-footer">
+      <div>
+        <a class="footer-brand" href="/eventrunner/"><strong>Event Runner</strong></a>
+        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/eventrunner/support/">Support</a>
+        <a href="/eventrunner/privacy/">Privacy</a>
+        <a href="/eventrunner/terms-of-service/">Terms</a>
+        <a href="/eventrunner/project/">About the project</a>
+      </nav>
     </footer>
   </div>
 </body>

@@ -156,7 +156,7 @@ jobs:
         run: |
           if [ -f scripts/build-pages.cjs ]; then
             test -f scripts/build-pages.test.cjs
-            node --test scripts/build-pages.test.cjs
+            node --test scripts/build-pages.test.cjs scripts/stage-pages.test.cjs
           fi
 
   lint:
@@ -314,13 +314,16 @@ jobs:
     needs: changes
     if: needs.changes.outputs.demo == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
+    env:
+      CHROME_DEVEL_SANDBOX: /opt/eventrunner-chromium-sandbox
     # Builds the static demo (spec issue #94) twice and fails if the two
     # builds differ in any byte or the result is over the public bundle
     # budget. docs/demo/ is build output and is not committed: pages.yml
     # builds and publishes it on every push to main, so feature branches
     # never conflict on its content-hashed chunk names. No credentials —
     # scripts/build-demo.cjs always uses its own placeholder VITE_FIREBASE_*
-    # values — so this runs on fork PRs too.
+    # values — so this runs on fork PRs too. The public-site browser check
+    # runs here so marketing and guide changes do not need the emulators.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -330,11 +333,49 @@ jobs:
       - name: Pack shared into functions vendor
         run: npm run prepare:functions
       - name: Install dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
         run: npm ci
       - name: Run demo generator tests
         run: node --test scripts/build-demo.test.cjs scripts/dev/build-demo-at.test.cjs
       - name: Build the demo twice and enforce its bundle budget
         run: node scripts/build-demo.cjs --check
+      - name: Build the public demo for site link checks
+        # --check uses throwaway directories; the browser check serves docs/demo.
+        run: node scripts/build-demo.cjs
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('node_modules/@playwright/test/package.json') }}
+      - name: Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          # Use the same pinned browser and runner preparation as the E2E job.
+          grep -rl 'dl.google.com' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null || true
+          sudo rm -f /etc/apt/sources.list.d/*google*
+          sudo sed -i '/dl\.google\.com/d' /etc/apt/sources.list 2>/dev/null || true
+          grep -r 'dl.google.com' /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null && echo "google source still present" && exit 1 || true
+          npx playwright install --with-deps chromium
+      - name: Install the pinned Chromium sandbox helper
+        run: |
+          helper="$(node -e "const path = require('node:path'); console.log(path.join(path.dirname(require('@playwright/test').chromium.executablePath()), 'chrome_sandbox'))")"
+          test -f "$helper"
+          sudo install -o root -g root -m 4755 "$helper" "$CHROME_DEVEL_SANDBOX"
+          test -u "$CHROME_DEVEL_SANDBOX"
+      - name: Verify the public site and capture evidence
+        id: public_site_evidence
+        timeout-minutes: 5
+        run: node scripts/dev/check-public-site.mjs
+      - name: Upload public site visual evidence
+        if: ${{ always() && (steps.public_site_evidence.outcome == 'success' || steps.public_site_evidence.outcome == 'failure' || steps.public_site_evidence.outcome == 'cancelled') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-site-visual-evidence
+          path: test-results/public-site-evidence/
+          if-no-files-found: error
+          retention-days: 7
 
   rules:
     name: Security rules on emulators

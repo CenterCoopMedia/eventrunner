@@ -3,284 +3,153 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Project status | Event Runner</title>
-  <meta name="description" content="White-label event CMS. Each client event uses a separate Firebase project. Staff manage the site in the admin panel. The Center for Cooperative Media operates the service.">
+  <title>About | Event Runner</title>
+  <meta name="description" content="Event Runner is an open-source event website platform operated by the Center for Cooperative Media at Montclair State University.">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/project/">
   <link rel="icon" type="image/svg+xml" href="../favicon.svg">
-
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Event Runner | Event CMS for conferences and gatherings">
-  <meta property="og:description" content="White-label event CMS. Each client event uses a separate Firebase project. Staff manage the site in the admin panel. The Center for Cooperative Media operates the service.">
+  <meta property="og:title" content="About | Event Runner">
+  <meta property="og:description" content="Event Runner is an open-source event website platform operated by the Center for Cooperative Media at Montclair State University.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/project/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner: a white-label event CMS from the Center for Cooperative Media">
+  <meta property="og:image:alt" content="Event Runner: conference websites your team can run">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Event Runner | Event CMS for conferences and gatherings">
-  <meta name="twitter:description" content="White-label event CMS. Each client event uses a separate Firebase project. Staff manage the site in the admin panel. The Center for Cooperative Media operates the service.">
+  <meta name="twitter:title" content="About | Event Runner">
+  <meta name="twitter:description" content="Event Runner is an open-source event website platform operated by the Center for Cooperative Media at Montclair State University.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/social-preview.png">
-  <meta name="twitter:image:alt" content="Event Runner: a white-label event CMS from the Center for Cooperative Media">
-  <!-- The two grounds this site paints. Browser chrome cannot read a custom
-       property, so this is the one place the palette is written as hex:
-       --brand-surface-rgb in each mode. build-pages checks both against
-       docs/tokens.css and fails on a stale one, and copies them onto every
-       generated documentation page. -->
+  <meta name="twitter:image:alt" content="Event Runner: conference websites your team can run">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
-
   <link rel="preload" href="../fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="../fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../tokens.css">
   <link rel="stylesheet" href="../styles.css">
+  <script src="../site.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
-
   <div class="wrap">
-    <!-- The masthead: a rule-bounded title block, type and rules only. It
-         runs at the compact size so the headline below it leads the page. -->
     <header class="site-header">
       <a class="brand" href="../">
-        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <rect x="2.5" y="2" width="3" height="20"/>
-          <rect x="5.5" y="2" width="16" height="3"/>
-          <rect x="5.5" y="11" width="9.5" height="2"/>
-          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <g transform="scale(0.4)" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 44h7 M8 50h4" fill="none" stroke="rgb(var(--color-accent-rgb))" stroke-width="3.5"/>
+            <g transform="matrix(1 0 -0.16 1 8 0)">
+              <path d="M28 6 40 23 50 6" fill="none" stroke="rgb(var(--color-accent-rgb))" stroke-width="3.5"/>
+              <path d="m31 59-7 10-7-3-1 2 M43 59l9 12 5-2 M54 42l8-8" fill="none" stroke="currentColor" stroke-width="2.8"/>
+              <rect x="23" y="23" width="32" height="36" rx="5" fill="rgb(var(--color-surface-rgb))" stroke="currentColor" stroke-width="2.5"/>
+              <path d="M24.25 28a3.75 3.75 0 0 1 3.75-3.75h22A3.75 3.75 0 0 1 53.75 28v4.75h-29.5Z" fill="rgb(var(--color-accent-rgb))"/>
+              <rect x="35" y="18" width="8" height="7" rx="1.5" fill="currentColor"/>
+              <circle cx="33" cy="43" r="2.2" fill="currentColor"/>
+              <circle cx="45" cy="43" r="2.2" fill="currentColor"/>
+              <path d="M34 50q5 4 10 0" fill="none" stroke="currentColor" stroke-width="2.5"/>
+            </g>
+          </g>
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Event CMS for conferences and gatherings</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="#hero">What it is</a>
-        <a href="#demo">Demo</a>
-        <a href="../docs/">Docs</a>
-        <a href="#status">Status</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="../features/">Features</a>
+        <a href="../how-it-works/">How it works</a>
+        <a href="../docs/">Guides</a>
+        <a href="../project/" aria-current="page">About</a>
+        <a href="../demo/" class="btn nav-cta">Try the demo</a>
       </nav>
     </header>
-
     <main id="main">
-      <section class="hero" id="hero">
-        <div class="thesis">
-          <h1>An event CMS that staff can run without editing code</h1>
-          <p class="lede">Event Runner is a white-label event CMS. Each client event uses a separate Firebase project. The Center for Cooperative Media deploys and operates the service. Staff manage the schedule, speakers, pages, registration, and event updates in the admin panel.</p>
+      <section class="page-intro">
+        <h1>Event sites from the Center for Cooperative Media.</h1>
+        <p class="lede">Event Runner gives nonprofits, newsrooms, universities, and event producers a website their own staff can manage. The Center for Cooperative Media at Montclair State University operates the service.</p>
+        <div class="actions">
+          <a class="btn" href="../how-it-works/">Plan your event site</a>
+          <a class="btn btn-ghost" href="https://centerforcooperativemedia.org">Visit the Center</a>
         </div>
+      </section>
 
-        <aside class="status-panel" aria-label="Build status">
-          <p class="folio-row">
-            <span class="folio">Build status</span>
-            <span class="folio-row__rule" aria-hidden="true"></span>
-            <span class="folio">v1</span>
-          </p>
-          <ul class="status-list" role="list">
-            <li class="status-row">
-              <span class="status-row-name">Email core and adapters</span>
-              <span class="status-label status-label-done">Done</span>
-            </li>
-            <li class="status-row">
-              <span class="status-row-name">Emailed-code sign-in</span>
-              <span class="status-label status-label-done">Done</span>
-            </li>
-            <li class="status-row">
-              <span class="status-row-name">Block CMS</span>
-              <span class="status-label status-label-done">Done</span>
-            </li>
-            <li class="status-row">
-              <span class="status-row-name">Schedule and speakers</span>
-              <span class="status-label status-label-done">Done</span>
-            </li>
-            <li class="status-row">
-              <span class="status-row-name">Ticketing adapters</span>
-              <span class="status-label status-label-done">Done</span>
-            </li>
-            <li class="status-row">
-              <span class="status-row-name">Packaging and release</span>
-              <span class="status-label status-label-progress">In progress</span>
-            </li>
-            <li class="status-row">
-              <span class="status-row-name">Admin editorial desk</span>
-              <span class="status-label status-label-done">Done</span>
-            </li>
-            <li class="status-row">
-              <span class="status-row-name">Design vocabulary, six waves</span>
-              <span class="status-label status-label-progress">In progress</span>
-            </li>
+      <section class="section split-section">
+        <div><h2>Made for the work around the event.</h2></div>
+        <div>
+          <p>A conference website keeps changing. Speakers send new biographies. Sessions move rooms. Attendees need the latest schedule. Event Runner puts those updates in the hands of the people running the event.</p>
+          <p>The project grew from the Collaborative Journalism Summit website. Its schedule, speaker, registration, and publishing tools now form a separate platform for other events.</p>
+          <a class="text-link" href="../features/">Explore the features <span aria-hidden="true">&rarr;</span></a>
+        </div>
+      </section>
+
+      <section class="section split-section">
+        <div><h2>Your event and your content.</h2></div>
+        <div>
+          <p>Your organization keeps ownership of what it publishes. Each event has its own site and data. Your staff work in the admin panel; the Event Runner team manages the hosting.</p>
+          <p>The service includes setup, onboarding, and support. Your agreement describes the service and its fees.</p>
+          <a class="text-link" href="../docs/handbook/for-clients/">Read the organizer guide <span aria-hidden="true">&rarr;</span></a>
+        </div>
+      </section>
+
+      <section class="section split-section" id="contribute">
+        <div><h2>Open source.<br>Open to contributions.</h2></div>
+        <div>
+          <p>The code is available under the Apache-2.0 license. Contributors can inspect it, report problems, and propose improvements. The Event Runner name remains reserved to the Center for Cooperative Media.</p>
+          <p>Engineering documentation lives with the code: architecture decisions, deployment runbooks, and contribution instructions are available in GitHub.</p>
+          <ul class="resource-list">
+            <li><a href="https://github.com/CenterCoopMedia/eventrunner">Source code</a><span>Explore the project and its current work.</span></li>
+            <li><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md">Contribution guide</a><span>Set up the project and propose a change.</span></li>
+            <li><a href="https://github.com/CenterCoopMedia/eventrunner/tree/main/docs/adr">Architecture decisions</a><span>Read the engineering decisions behind the product.</span></li>
+            <li><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md">Deployment runbook</a><span>Technical instructions for deployment operators.</span></li>
+            <li><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0 license</a><span>Read the terms for using and sharing the code.</span></li>
           </ul>
-        </aside>
+        </div>
       </section>
 
-      <section class="section section-major" id="demo">
-        <div class="section-head">
-          <h2>Explore the demos</h2>
-          <span class="section-head__rule" aria-hidden="true"></span>
+      <section class="section split-section" id="demo">
+        <div><h2>Explore the demos.</h2></div>
+        <div class="demo-options">
+          <div>
+            <h3>Visitor demo</h3>
+            <p>The read-only preview uses selected historical content from the March 27, 2026 NC News &amp; Information Summit. It is not the full program, an official NC Local website, an endorsement, or a future event.</p>
+            <p>No account is needed. Sign-in, registration, ticket claims, email, the attendee directory, and calendar exports are disabled.</p>
+            <a class="text-link" href="../demo/">Open the visitor demo <span aria-hidden="true">&rarr;</span></a>
+          </div>
+          <div>
+            <h3>Admin demonstration</h3>
+            <p>The separately hosted demo includes staff workflows. Admin screens require an authorized account, and its content can differ from the visitor demo.</p>
+            <a class="text-link" href="https://eventrunner-demo.web.app/admin">Open the hosted admin <span aria-hidden="true">&rarr;</span></a>
+          </div>
         </div>
-        <h3>Static visitor preview</h3>
-        <p>Browse an NC Local past-event mock-up of the March 27, 2026 NC News &amp; Information Summit in Raleigh. Its selected historical program includes eight named sessions, 25 public speakers, and documented partner roles. It does not reproduce the full agenda or represent an official NC Local site, endorsement, or future event.</p>
-        <p>The preview is read-only, needs no account, and has no admin panel. Sign-in, registration, ticket claims, email actions, the attendee directory, and calendar exports are disabled. Use the demo controls to compare all six site styles in light or dark mode. The specimen book shows the interface components in the selected style and mode.</p>
+      </section>
+
+      <section class="section split-section" id="status">
+        <div>
+          <h2>Follow the work.</h2>
+          <p>Current development and release notes live in GitHub. For a question about your own event, contact the team directly.</p>
+        </div>
         <div class="actions">
-          <a class="btn" href="../demo/">Open the static visitor preview</a>
-          <a class="btn btn-ghost" href="../demo/#/specimen">Open the specimen book</a>
+          <a class="btn" href="../support/">Contact the team</a>
+          <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner/issues">View project issues</a>
         </div>
-        <h3>Hosted admin/client demo</h3>
-        <p>The separate Firebase-hosted deployment demonstrates client and admin workflows. Admin screens require an authorized account; opening the link does not grant access. Its content and release can differ from the static preview.</p>
-        <div class="actions">
-          <a class="btn btn-ghost" href="https://eventrunner-demo.web.app/">Open the hosted client demo</a>
-          <a class="btn btn-ghost" href="https://eventrunner-demo.web.app/admin">Open the hosted admin</a>
-          <a class="btn btn-ghost" href="../docs/admin-guide/">See the admin guide</a>
-        </div>
-        <p class="note">The hosted demo was reseeded with the NC Local historical content on October 9, 2026 (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/346">issue 346</a>). Hosted-demo verification remains tracked in <a href="https://github.com/CenterCoopMedia/eventrunner/issues/35">issue 35</a>.</p>
-      </section>
-
-      <section class="section" id="capabilities">
-        <div class="section-head">
-          <h2>What v1 includes</h2>
-          <span class="section-head__rule" aria-hidden="true"></span>
-        </div>
-        <div class="feature-list">
-          <article class="feature">
-            <h3>Schedule and speakers</h3>
-            <p>Sessions, bookmarks, and ICS calendar links. Staff can invite speakers, review profiles, approve changes, and publish an attendee directory.</p>
-          </article>
-          <article class="feature">
-            <h3>Block CMS and sign-in</h3>
-            <p>A draft-and-publish block CMS for pages and event content. Attendees can use Google sign-in or an emailed six-digit code.</p>
-          </article>
-          <article class="feature">
-            <h3>Ticketing</h3>
-            <p>Stripe, Eventbrite, and manual CSV adapters use one provider-neutral registration state machine.</p>
-          </article>
-        </div>
-        <p class="note">The <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">triage record</a> lists the full v1 scope and excluded features.</p>
-      </section>
-
-      <section class="section" id="deployment">
-        <div class="section-head">
-          <h2>How it is deployed</h2>
-          <span class="section-head__rule" aria-hidden="true"></span>
-        </div>
-        <p>Each client event uses a separate Firebase project. The Center for Cooperative Media deploys and operates it. The client data, sender domain, and ticket-provider settings stay in that deployment. Client staff use the admin panel. They do not manage a repository or server.</p>
-        <p class="note">The code uses the Apache-2.0 license and can be read, forked, or self-hosted. The Event Runner product name is reserved to the Center for Cooperative Media.</p>
-      </section>
-
-      <section class="section section-major" id="operators">
-        <div class="section-head">
-          <h2>For event operators</h2>
-          <span class="section-head__rule" aria-hidden="true"></span>
-        </div>
-        <p>Event Runner is for nonprofits, newsrooms, universities, and event producers that need a staff-managed event site. It includes schedules, speakers, registration, pages, and session materials.</p>
-        <div class="actions">
-          <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general">Contact CCM about hosting</a>
-        </div>
-        <p class="note">Use the General discussion category to ask the Center for Cooperative Media about hosting and licensing.</p>
-      </section>
-
-      <section class="section" id="contribute">
-        <div class="section-head">
-          <h2>For contributors</h2>
-          <span class="section-head__rule" aria-hidden="true"></span>
-        </div>
-        <p>The reference implementation is the 2026 Collaborative Journalism Summit site. That repository remains the live event site. Event Runner is a separate public extraction that accepts contributions under Apache-2.0.</p>
-        <div class="actions">
-          <a class="btn btn-ghost" href="https://github.com/CenterCoopMedia/eventrunner">Open the repository</a>
-          <a class="btn btn-ghost" href="../docs/decisions/0001-event-platform-v1/">Read the specification</a>
-          <a class="btn btn-ghost" href="../docs/contributing/">Read the contribution guide</a>
-        </div>
-        <p class="note">Licensed under <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>.</p>
-      </section>
-
-      <section class="section section-major" id="status">
-        <div class="section-head">
-          <h2>Project status</h2>
-          <span class="section-head__rule" aria-hidden="true"></span>
-        </div>
-        <p>v1 has five milestones. Milestones 1 through 4 are complete. Milestone 5 covers packaging and release verification. The public demo, site-style comparison, runbooks, and end-to-end checks are included. Eventbrite sandbox verification and final release packaging remain.</p>
-        <p>After v1, six parity milestones bring the reference summit site's features across. Milestone 7, the public site, is complete. Milestones 8 to 12 are open. The admin CMS moved onto its own editorial desk in September 2026, and the design vocabulary is expanding in six waves across the open milestones. Wave 1 is merged.</p>
-        <ol class="milestones" role="list">
-          <li class="milestone">
-            <span class="milestone-id">Milestone 1</span>
-            <div class="milestone-body">
-              <h3>Prerequisites</h3>
-              <p>Copyright, organization setup, trademark review, Postmark, and the first public commit.</p>
-            </div>
-            <span class="status-label status-label-done">Done</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-id">Milestone 2</span>
-            <div class="milestone-body">
-              <h3>Core port</h3>
-              <p>Configuration, email, OTP, CMS, schedule, and profiles. A new project starts as a generic event site.</p>
-            </div>
-            <span class="status-label status-label-done">Done</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-id">Milestone 3</span>
-            <div class="milestone-body">
-              <h3>Feature wave</h3>
-              <p>Speakers, materials, media library, reactions, badges, PDF output, and live updates.</p>
-            </div>
-            <span class="status-label status-label-done">Done</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-id">Milestone 4</span>
-            <div class="milestone-body">
-              <h3>Ticketing</h3>
-              <p>Eventbrite and manual CSV adapters on a provider-neutral registration state machine.</p>
-            </div>
-            <span class="status-label status-label-done">Done</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-id">Milestone 5</span>
-            <div class="milestone-body">
-              <h3>Packaging</h3>
-              <p>Runbooks, public demo, community files, end-to-end checks, Eventbrite sandbox verification, and release packaging.</p>
-            </div>
-            <span class="status-label status-label-progress">In progress</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-id">Milestones 7 to 12</span>
-            <div class="milestone-body">
-              <h3>Parity with the reference site</h3>
-              <p>The public site (done), the attendee and schedule experience, admin operations, CMS editors and publishing, communication and billing, and the speaker experience.</p>
-            </div>
-            <span class="status-label status-label-progress">In progress</span>
-          </li>
-          <li class="milestone">
-            <span class="milestone-id">Design system</span>
-            <div class="milestone-body">
-              <h3>The editorial desk and the vocabulary expansion</h3>
-              <p>The admin on its own desk in the event's colours, then six waves: the state and motion grammar, new devices, illustration sets, schedule devices, three site styles, and admin devices.</p>
-            </div>
-            <span class="status-label status-label-progress">In progress</span>
-          </li>
-        </ol>
-        <p class="note">
-          <a href="../docs/roadmap/">Full roadmap</a>
-          ·
-          <a href="https://github.com/CenterCoopMedia/eventrunner/issues">Issues</a>
-          ·
-          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">Triage record</a>
-        </p>
       </section>
     </main>
-
     <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
       <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="../docs/security/">Security</a>
-        ·
-        <a href="../privacy/">Privacy</a>
-        ·
-        <a href="../terms-of-service/">Terms</a>
+        <strong>Event Runner</strong>
+        <p>An initiative of the Center for Cooperative Media<br>at Montclair State University.</p>
       </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="../support/">Support</a>
+        <a href="../videos/">Videos</a>
+        <a href="../docs/">Guides</a>
+        <a href="../project/">About</a>
+        <a href="../privacy/">Privacy</a>
+        <a href="../terms-of-service/">Terms</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">GitHub</a>
+      </nav>
     </footer>
   </div>
 </body>

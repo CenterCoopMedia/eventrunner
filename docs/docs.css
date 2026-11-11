@@ -47,94 +47,95 @@
   }
 }
 
-/* ---------- Layout ---------- */
+/* ---------- Guide layout and navigation ---------- */
 
 .docs-layout {
   display: grid;
-  grid-template-columns: 15rem minmax(0, 1fr);
-  gap: var(--space-2xl);
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 5rem);
   align-items: start;
-  padding-block: var(--space-lg) var(--space-2xl);
+  padding-block: var(--space-xl) var(--space-3xl);
 }
 
 .docs-main {
   min-width: 0;
 }
 
-/* ---------- Section navigation ----------
-
-   The docket the admin uses: a standing grouped list of words down the
-   leading edge, each group head a folio on a hairline. */
-
-.docs-nav {
+.docs-disclosure {
   position: sticky;
   top: var(--space-lg);
-  font-family: var(--font-data);
-  font-size: var(--text-caption);
-  line-height: var(--text-caption-leading);
+  min-width: 0;
+  border-block: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+.docs-disclosure > summary {
+  min-height: 48px;
+  padding: var(--space-sm) 0;
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.docs-disclosure > summary::marker {
+  color: rgb(var(--color-accent-rgb));
+}
+
+.docs-nav-scroll {
+  max-height: calc(100dvh - 10rem);
+  padding: 0 var(--space-xs) var(--space-md);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.docs-nav {
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.35;
 }
 
 .docs-nav-section {
-  margin: var(--space-lg) 0 var(--space-2xs);
-  padding-block-end: var(--space-2xs);
-  border-block-end: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
-  font-family: var(--folio-font);
-  font-size: var(--folio-size);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--folio-tracking);
-  text-transform: uppercase;
-  color: rgb(var(--folio-text-rgb));
+  margin: var(--space-lg) var(--space-xs) var(--space-xs);
+  font-weight: var(--weight-bold);
+  color: rgb(var(--color-text-primary-rgb));
 }
 
 .docs-nav-section:first-child {
-  margin-block-start: 0;
+  margin-block-start: var(--space-xs);
 }
 
 .docs-nav ul {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-inline-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
 .docs-nav li a {
-  display: block;
-  padding: var(--space-2xs) 0 var(--space-2xs) var(--space-sm);
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: var(--space-xs);
   color: rgb(var(--color-text-secondary-rgb));
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
-/* Dense is not cramped. A mouse gets the docket's own rhythm above — a
-   caption line and 4px, entries flush against each other so there is no
-   dead space between two words. A finger gets the 44px bar instead
-   (interface guidelines, Accessibility). The word does not move on its
-   line and neither the size nor the leading changes: only the air around
-   the word grows, so the docket still reads as a list of words rather
-   than a stack of buttons. A caption line at this leading is under 21px,
-   so 12px each side carries most of the bar and the floor carries the
-   rest at the smallest caption size. */
+.docs-nav li a.is-current {
+  color: rgb(var(--color-surface-rgb));
+  background: rgb(var(--color-accent-rgb));
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
 @media (pointer: coarse) {
   .docs-nav li a {
-    padding-block: var(--space-sm);
-    min-block-size: 44px;
+    min-height: 44px;
   }
-}
-
-/* The current item thickens the rail it already sits on. Four signals, never
-   colour alone: the marker, the weight, the ink step, and aria-current. */
-.docs-nav li a.is-current {
-  color: rgb(var(--color-text-primary-rgb));
-  font-weight: var(--weight-semibold);
-  border-inline-start: var(--rule-strong-width) solid rgb(var(--color-accent-rgb));
-  margin-inline-start: calc(-1 * var(--rule-hairline-width));
-  padding-inline-start: calc(var(--space-sm) - var(--rule-hairline-width));
 }
 
 @media (hover: hover) {
   .docs-nav li a:hover {
-    color: rgb(var(--color-text-primary-rgb));
     text-decoration: underline;
-    text-underline-offset: 0.25em;
+    text-underline-offset: 0.2em;
   }
 }
 
@@ -152,7 +153,7 @@
 
 .prose h1 {
   margin: 0 0 var(--space-md);
-  font-size: var(--text-h1);
+  font-size: clamp(2.25rem, 4.5vw, 4rem);
   font-weight: var(--weight-bold);
   line-height: var(--text-h1-leading);
   letter-spacing: var(--text-h1-tracking);
@@ -161,8 +162,8 @@
 /* The strong rule sits ABOVE the heading, never under it. */
 .prose h2 {
   margin: var(--space-xl) 0 var(--space-sm);
-  padding-block-start: var(--space-sm);
-  border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+  padding-block-start: var(--space-lg);
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
   font-size: var(--text-h2);
   font-weight: var(--weight-semibold);
   line-height: var(--text-h2-leading);
@@ -319,8 +320,8 @@ h6:hover > .heading-anchor {
 .prose table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--text-caption);
-  line-height: var(--text-caption-leading);
+  font-size: var(--text-body);
+  line-height: var(--text-body-leading);
 }
 
 .prose th,
@@ -343,28 +344,19 @@ h6:hover > .heading-anchor {
   white-space: nowrap;
 }
 
-/* ---------- On this page ----------
-
-   A contents list, not a panel: no ground, no border, and no closing rule —
-   the strong rule on the first h2 below it already ends it. */
+/* ---------- On this page ---------- */
 
 .contents {
-  margin-block-end: var(--space-xl);
-  font-family: var(--font-data);
-  font-size: var(--text-caption);
-  line-height: var(--text-caption-leading);
+  margin-block: var(--space-lg) var(--space-xl);
+  padding-block: var(--space-md);
+  border-block: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+  font-size: var(--text-body);
+  line-height: 1.4;
 }
 
 .contents-title {
   margin: 0 0 var(--space-xs);
-  padding-block-end: var(--space-2xs);
-  border-block-end: var(--folio-rule-width) solid rgb(var(--folio-rule-rgb));
-  font-family: var(--folio-font);
-  font-size: var(--folio-size);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--folio-tracking);
-  text-transform: uppercase;
-  color: rgb(var(--folio-text-rgb));
+  font-weight: var(--weight-semibold);
 }
 
 .contents ul {
@@ -376,29 +368,192 @@ h6:hover > .heading-anchor {
 }
 
 .contents li {
-  margin-block-end: var(--space-3xs);
+  margin-block-end: var(--space-xs);
   break-inside: avoid;
 }
 
-/* ---------- Documentation home ---------- */
+.contents a {
+  display: inline-block;
+  padding-block: var(--space-3xs);
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .contents a:hover {
+    text-decoration: underline;
+  }
+}
+
+/* ---------- Guides home ---------- */
+
+.docs-home {
+  padding-block: var(--space-xl) var(--space-3xl);
+}
+
+.docs-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.8fr);
+  gap: var(--space-2xl);
+  align-items: center;
+}
+
+.docs-intro h1 {
+  margin: 0 0 var(--space-lg);
+  font-size: clamp(2.75rem, 5.8vw, 5rem);
+  font-weight: var(--weight-bold);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+
+.docs-intro .lede {
+  max-width: 38rem;
+  margin: 0;
+}
+
+.guide-search {
+  min-width: 0;
+  padding-block-start: var(--space-md);
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+.guide-search label {
+  display: block;
+  margin-block-end: var(--space-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.guide-search-control {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.guide-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: var(--space-sm);
+  border: var(--rule-hairline-width) solid rgb(var(--color-border-control-rgb));
+  border-radius: var(--radius-base);
+  background: rgb(var(--color-surface-rgb));
+  color: rgb(var(--color-text-primary-rgb));
+  font: inherit;
+}
+
+.guide-search input::placeholder {
+  color: rgb(var(--color-text-secondary-rgb));
+  opacity: 1;
+}
+
+.guide-search button {
+  min-height: 44px;
+  padding: var(--space-xs);
+  border: 0;
+  background: transparent;
+  color: rgb(var(--color-accent-rgb));
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.guide-search p {
+  margin: var(--space-xs) 0 0;
+  color: rgb(var(--color-text-secondary-rgb));
+  font-size: var(--text-caption);
+}
+
+.guide-search .guide-search-status {
+  min-height: 1.5em;
+  color: rgb(var(--color-text-primary-rgb));
+}
+
+.guide-starts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xl);
+  margin-block: var(--space-2xl);
+  padding-block: var(--space-xl);
+  border-block: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+.guide-starts a {
+  display: block;
+  color: rgb(var(--color-text-primary-rgb));
+  text-decoration: none;
+}
+
+.guide-starts strong {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-family: var(--font-heading);
+  font-size: var(--text-h3);
+  line-height: 1.25;
+  letter-spacing: var(--text-h3-tracking);
+}
+
+.guide-starts strong span {
+  flex-shrink: 0;
+  color: rgb(var(--color-accent-rgb));
+}
+
+.guide-starts a > span {
+  display: block;
+  margin-block-start: var(--space-sm);
+  color: rgb(var(--color-text-secondary-rgb));
+}
+
+@media (hover: hover) {
+  .guide-starts a:hover strong {
+    color: rgb(var(--color-accent-rgb));
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+}
+
+.guide-directory {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2xl);
+  margin-block-start: var(--space-2xl);
+}
 
 .docs-section {
-  margin-block-start: var(--page-section-gap);
+  min-width: 0;
+}
+
+.docs-section h2 {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-h2);
+  line-height: var(--text-h2-leading);
+}
+
+.docs-section-summary {
+  margin: 0 0 var(--space-lg);
+  color: rgb(var(--color-text-secondary-rgb));
 }
 
 .docs-index-list {
   list-style: none;
-  margin: var(--space-md) 0 0;
+  margin: 0;
   padding: 0;
 }
 
 .docs-index-list li {
   margin: 0;
-  padding-block: var(--page-row-pad-block);
+  padding-block: var(--space-md);
   border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
 }
 
 .docs-index-list a {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: 44px;
+  color: rgb(var(--color-text-primary-rgb));
   font-family: var(--font-heading);
   font-size: var(--text-h3);
   font-weight: var(--weight-bold);
@@ -407,32 +562,66 @@ h6:hover > .heading-anchor {
   text-decoration: none;
 }
 
+.docs-index-list a span {
+  color: rgb(var(--color-accent-rgb));
+}
+
 @media (hover: hover) {
   .docs-index-list a:hover {
+    color: rgb(var(--color-accent-rgb));
     text-decoration: underline;
     text-underline-offset: 0.2em;
   }
 }
 
-.docs-index-list span {
-  display: block;
-  margin-block-start: var(--space-3xs);
+.docs-index-list p {
+  margin: var(--space-xs) 0 0;
   color: rgb(var(--color-text-secondary-rgb));
-  font-size: var(--text-caption);
-  line-height: var(--text-caption-leading);
+}
+
+.guides-help {
+  margin-block-start: var(--space-2xl);
+  padding-block-start: var(--space-xl);
+  border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+}
+
+.guides-help h2 {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-h2);
+}
+
+.guides-help p {
+  margin: 0 0 var(--space-lg);
+}
+
+.docs-handoff {
+  margin-block: var(--space-2xl) var(--space-3xl);
+}
+
+.handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-block-start: var(--space-xl);
+}
+
+.docs-home [hidden] {
+  display: none !important;
 }
 
 /* ---------- Source note and pagination ---------- */
 
 .source-note {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-lg);
   max-width: var(--measure);
   margin: var(--space-xl) 0 0;
   padding-block-start: var(--space-md);
   border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
-  font-family: var(--font-data);
   color: rgb(var(--color-text-secondary-rgb));
   font-size: var(--text-caption);
-  line-height: var(--text-caption-leading);
 }
 
 /* One rule opens the pager, not one per link: the pair is a single region,
@@ -480,6 +669,15 @@ h6:hover > .heading-anchor {
   }
 }
 
+@media (pointer: coarse) {
+  .contents a,
+  .source-note a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 56rem) {
@@ -488,22 +686,49 @@ h6:hover > .heading-anchor {
     gap: var(--space-xl);
   }
 
-  /* On a narrow screen the full index below the article is more useful
-     than a wall of links above it; breadcrumbs and the previous/next
-     links carry navigation at the top. */
-  .docs-nav {
+  .docs-disclosure {
     position: static;
-    order: 2;
-    padding-block-start: var(--space-lg);
-    border-block-start: var(--rule-strong-width) solid rgb(var(--section-rule-rgb));
   }
 
-  .docs-main {
-    order: 1;
+  .docs-nav-scroll {
+    max-height: none;
+    overflow-y: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .docs-intro {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xl);
+  }
+
+  .guide-search {
+    max-width: 38rem;
+  }
+
+  .guide-starts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-lg);
+    padding-block: var(--space-lg);
+  }
+
+  .guide-starts a + a {
+    border-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
+    padding-block-start: var(--space-lg);
   }
 
   .contents ul {
     columns: 1;
+  }
+}
+
+@media (max-width: 40rem) {
+  .guide-directory {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-xl);
+  }
+
+  .guide-search-control {
+    flex-wrap: wrap;
   }
 }
 
@@ -522,13 +747,18 @@ h6:hover > .heading-anchor {
    empty 15rem beside it. */
 
 @media print {
-  .docs-nav,
+  .docs-disclosure,
+  .guide-search,
+  .guide-starts,
+  .guides-help,
   .page-nav,
   .site-header nav {
     display: none;
   }
 
-  .docs-layout {
+  .docs-layout,
+  .docs-intro,
+  .guide-directory {
     display: block;
     padding-block: var(--space-md);
   }

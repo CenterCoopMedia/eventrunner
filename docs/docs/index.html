@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Documentation — Event Runner</title>
-  <meta name="description" content="Guides, runbooks, and decision records for Event Runner, the white-label event CMS operated by the Center for Cooperative Media.">
+  <title>Guides — Event Runner</title>
+  <meta name="description" content="Practical guides for setting up an Event Runner site, publishing your program, and taking part in an event.">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/">
   <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/eventrunner/favicon-32.png">
@@ -12,19 +12,19 @@
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Documentation — Event Runner">
-  <meta property="og:description" content="Guides, runbooks, and decision records for Event Runner, the white-label event CMS operated by the Center for Cooperative Media.">
+  <meta property="og:title" content="Guides — Event Runner">
+  <meta property="og:description" content="Practical guides for setting up an Event Runner site, publishing your program, and taking part in an event.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta property="og:image:alt" content="Event Runner guides">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Documentation — Event Runner">
-  <meta name="twitter:description" content="Guides, runbooks, and decision records for Event Runner, the white-label event CMS operated by the Center for Cooperative Media.">
+  <meta name="twitter:title" content="Guides — Event Runner">
+  <meta name="twitter:description" content="Practical guides for setting up an Event Runner site, publishing your program, and taking part in an event.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
-  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="twitter:image:alt" content="Event Runner guides">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
@@ -34,8 +34,9 @@
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
   <script src="/eventrunner/scroll-regions.js" defer></script>
+  <script src="/eventrunner/docs-ui.js" defer></script>
 </head>
-<body>
+<body class="docs-site">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="wrap">
@@ -58,234 +59,140 @@
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Documentation</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="/eventrunner/">Home</a>
-        <a href="/eventrunner/docs/">Documentation</a>
-        <a href="/eventrunner/demo/">Demo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="/eventrunner/features/">Features</a>
+        <a href="/eventrunner/how-it-works/">How it works</a>
+        <a href="/eventrunner/docs/" aria-current="location">Guides</a>
+        <a href="/eventrunner/project/">About</a>
+        <a class="btn nav-cta" href="/eventrunner/demo/">Try the demo</a>
       </nav>
     </header>
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <ol>
         <li><a href="/eventrunner/">Home</a></li>
-        <li><span aria-current="page">Documentation</span></li>
+        <li><span aria-current="page">Guides</span></li>
         </ol>
       </nav>
-
-    <div class="docs-layout">
-      <nav class="docs-nav" aria-label="Documentation">
-        <p class="docs-nav-section">Start here</p>
-        <ul>
-          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
-          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
-          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
-          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
-          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
-        </ul>
-        <p class="docs-nav-section">Operate</p>
-        <ul>
-          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
-          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
-          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
-          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
-          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
-          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
-          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
-          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
-          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
-          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
-          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
-        </ul>
-        <p class="docs-nav-section">Build</p>
-        <ul>
-          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
-          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
-          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
-          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
-          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
-          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
-          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
-          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
-          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
-        </ul>
-        <p class="docs-nav-section">Get help</p>
-        <ul>
-          <li><a href="/eventrunner/docs/support/">Support</a></li>
-          <li><a href="/eventrunner/docs/security/">Security</a></li>
-        </ul>
+    <main class="docs-home" id="main">
+      <header class="docs-intro">
+        <div>
+          <h1>Find your next step</h1>
+          <p class="lede">Set up your site, publish your program, or plan your day. Start with the guide for the work you need to do.</p>
+        </div>
+        <form class="guide-search" role="search" aria-label="Find a guide" data-guide-search-form hidden>
+          <label for="guide-query">Find a guide</label>
+          <div class="guide-search-control">
+            <input id="guide-query" name="q" type="search" placeholder="Try sessions or sign-in" aria-describedby="guide-search-help" autocomplete="off">
+            <button type="reset" hidden>Clear</button>
+          </div>
+          <p id="guide-search-help">Search guide titles and descriptions.</p>
+          <p class="guide-search-status" role="status" aria-live="polite" aria-atomic="true" data-guide-search-status></p>
+        </form>
+      </header>
+      <nav class="guide-starts" aria-label="Documentation" data-guide-starts>
+        <a href="/eventrunner/docs/handbook/for-clients/"><strong>I’m organizing an event <span aria-hidden="true">→</span></strong><span>Get a site, prepare your content, and know who does what.</span></a>
+        <a href="/eventrunner/docs/handbook/for-event-staff/"><strong>I’m running the site <span aria-hidden="true">→</span></strong><span>Edit pages, manage speakers, and keep the program current.</span></a>
+        <a href="/eventrunner/docs/handbook/for-attendees/"><strong>I’m attending an event <span aria-hidden="true">→</span></strong><span>Sign in, save sessions, and get ready for the day.</span></a>
       </nav>
-
-      <main class="docs-main" id="main">
-        <article class="prose">
-          <h1>Documentation</h1>
-          <p class="lede">Guides, runbooks, and decision records for Event Runner, the white-label event CMS operated by the Center for Cooperative Media.</p>
-          <p>Every page here is rendered from the Markdown in the repository. The <a href="/eventrunner/demo/">demo site</a> shows what attendees see; the guides below cover running one.</p>
-        <section class="docs-section" id="start">
+      <div class="guide-directory" data-guide-directory>
+        <section class="docs-section" id="start" data-guide-section>
           <h2>Start here</h2>
-          <p>What Event Runner is, and the plain-language handbook for the people using a site.</p>
+          <p class="docs-section-summary">Understand the service, choose your next step, and get your team ready.</p>
           <ul class="docs-index-list">
-            <li>
-              <a href="/eventrunner/docs/overview/">Overview</a>
-              <span>What the product is, what v1 includes, and how a deployment is run.</span>
+            <li data-guide-entry data-guide-search="Meet Event Runner What your event site can do and how to explore it.">
+              <a rel="next" href="/eventrunner/docs/overview/">Meet Event Runner<span aria-hidden="true">→</span></a>
+              <p>What your event site can do and how to explore it.</p>
             </li>
-            <li>
-              <a href="/eventrunner/docs/handbook/">Handbook</a>
-              <span>The non-technical guide, split by who you are.</span>
+            <li data-guide-entry data-guide-search="For event organizers What your organization manages, what we handle, and how to start.">
+              <a href="/eventrunner/docs/handbook/for-clients/">For event organizers<span aria-hidden="true">→</span></a>
+              <p>What your organization manages, what we handle, and how to start.</p>
             </li>
-            <li>
-              <a href="/eventrunner/docs/handbook/for-clients/">For clients</a>
-              <span>What a client organization owns, and what CCM operates.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a>
-              <span>Running the site day to day from the admin panel.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a>
-              <span>Signing in, bookmarking sessions, and fixing a profile.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/handbook/faq/">FAQ</a>
-              <span>Short answers to the questions that come up most.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/handbook/getting-help/">Getting help</a>
-              <span>Which door to use for which kind of problem.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/handbook/glossary/">Glossary</a>
-              <span>The words this project uses, defined once.</span>
+            <li data-guide-entry data-guide-search="The event handbook Find the right guide for your role.">
+              <a href="/eventrunner/docs/handbook/">The event handbook<span aria-hidden="true">→</span></a>
+              <p>Find the right guide for your role.</p>
             </li>
           </ul>
         </section>
-        <section class="docs-section" id="operate">
-          <h2>Operate</h2>
-          <p>The runbooks CCM staff follow to provision, deploy, and hand over a client event.</p>
+        <section class="docs-section" id="organize" data-guide-section>
+          <h2>Run your event</h2>
+          <p class="docs-section-summary">Prepare your site, keep the program current, and help your attendees.</p>
           <ul class="docs-index-list">
-            <li>
-              <a href="/eventrunner/docs/admin-guide/">Admin guide</a>
-              <span>Running a client site from the admin panel, in the order the work happens.</span>
+            <li data-guide-entry data-guide-search="For event staff The daily work: pages, speakers, attendees, and event updates.">
+              <a href="/eventrunner/docs/handbook/for-event-staff/">For event staff<span aria-hidden="true">→</span></a>
+              <p>The daily work: pages, speakers, attendees, and event updates.</p>
             </li>
-            <li>
-              <a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a>
-              <span>Create, edit, preview, and publish sessions without breaking schedule references.</span>
+            <li data-guide-entry data-guide-search="Admin guide Edit pages, manage registration and tickets, send email, and choose your site branding.">
+              <a href="/eventrunner/docs/admin-guide/">Admin guide<span aria-hidden="true">→</span></a>
+              <p>Edit pages, manage registration and tickets, send email, and choose your site branding.</p>
             </li>
-            <li>
-              <a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a>
-              <span>Configure organizer-owned payments, verify readiness, and support orders and admission.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a>
-              <span>Export the event data package, back up the project, and keep the past site online read-only.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a>
-              <span>Enable, use, and verify bounded public and authenticated site tools.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/design-reference/">Site design reference</a>
-              <span>Every site style, option, layout axis, and token, in full. The deep end.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/client-onboarding/">Client onboarding</a>
-              <span>The provisioning checklist from first call to handover.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a>
-              <span>Standing up a client Firebase project and shipping to it.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a>
-              <span>Sender domain, message streams, and webhook cutover.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a>
-              <span>Verifying the ticketing adapter against a real Eventbrite account.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/npm-name-claim/">npm name claim</a>
-              <span>Claiming and holding the package name.</span>
+            <li data-guide-entry data-guide-search="Manage your sessions Create, edit, preview, and publish the sessions in your program.">
+              <a href="/eventrunner/docs/admin-sessions/">Manage your sessions<span aria-hidden="true">→</span></a>
+              <p>Create, edit, preview, and publish the sessions in your program.</p>
             </li>
           </ul>
         </section>
-        <section class="docs-section" id="build">
-          <h2>Build</h2>
-          <p>What contributors need before opening a pull request, and the decisions behind the code.</p>
+        <section class="docs-section" id="attend" data-guide-section>
+          <h2>Attend an event</h2>
+          <p class="docs-section-summary">Find your way around an event site and make the program your own.</p>
           <ul class="docs-index-list">
-            <li>
-              <a href="/eventrunner/docs/contributing/">Contributing</a>
-              <span>Setup, tests, sign-off, and the proportional CI tiers.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a>
-              <span>The behavior expected in every project space, and how to report a problem.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/governance/">Governance</a>
-              <span>Who decides what, and how a decision gets made.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/releasing/">Releasing</a>
-              <span>How a tagged release is cut and what it promises.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a>
-              <span>The interface rules the web app is held to.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a>
-              <span>The v1 architecture decision record. This is the contract.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a>
-              <span>The proposed record that brings calendar sync back as an opt-in, and what a client sets up first.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/roadmap/">Roadmap</a>
-              <span>The five v1 milestones and what is left.</span>
-            </li>
-            <li>
-              <a href="/eventrunner/docs/changelog/">Changelog</a>
-              <span>What changed, release by release.</span>
+            <li data-guide-entry data-guide-search="For attendees Sign in, save sessions, find materials, and update your profile.">
+              <a href="/eventrunner/docs/handbook/for-attendees/">For attendees<span aria-hidden="true">→</span></a>
+              <p>Sign in, save sessions, find materials, and update your profile.</p>
             </li>
           </ul>
         </section>
-        <section class="docs-section" id="help">
+        <section class="docs-section" id="help" data-guide-section>
           <h2>Get help</h2>
-          <p>Where to ask, and how to report something that should not be public.</p>
+          <p class="docs-section-summary">Find an answer or reach the right person.</p>
           <ul class="docs-index-list">
-            <li>
-              <a href="/eventrunner/docs/support/">Support</a>
-              <span>Where questions go, and what to expect back.</span>
+            <li data-guide-entry data-guide-search="Frequently asked questions Answers about sign-in, event features, demos, and hosting.">
+              <a href="/eventrunner/docs/handbook/faq/">Frequently asked questions<span aria-hidden="true">→</span></a>
+              <p>Answers about sign-in, event features, demos, and hosting.</p>
             </li>
-            <li>
-              <a href="/eventrunner/docs/security/">Security</a>
-              <span>Reporting a vulnerability privately.</span>
+            <li data-guide-entry data-guide-search="Getting help Where to ask a question or report a problem.">
+              <a href="/eventrunner/docs/handbook/getting-help/">Getting help<span aria-hidden="true">→</span></a>
+              <p>Where to ask a question or report a problem.</p>
+            </li>
+            <li data-guide-entry data-guide-search="Glossary The words you will see in your event site and these guides.">
+              <a href="/eventrunner/docs/handbook/glossary/">Glossary<span aria-hidden="true">→</span></a>
+              <p>The words you will see in your event site and these guides.</p>
+            </li>
+            <li data-guide-entry data-guide-search="Support Support contacts and what to include when you ask for help.">
+              <a href="/eventrunner/docs/support/">Support<span aria-hidden="true">→</span></a>
+              <p>Support contacts and what to include when you ask for help.</p>
+            </li>
+            <li data-guide-entry data-guide-search="Report a security concern How to report a vulnerability privately.">
+              <a href="/eventrunner/docs/security/">Report a security concern<span aria-hidden="true">→</span></a>
+              <p>How to report a vulnerability privately.</p>
+            </li>
+            <li data-guide-entry data-guide-search="Code of conduct The behavior expected in project spaces and how to report a concern.">
+              <a href="/eventrunner/docs/code-of-conduct/">Code of conduct<span aria-hidden="true">→</span></a>
+              <p>The behavior expected in project spaces and how to report a concern.</p>
             </li>
           </ul>
         </section>
-        </article>
-        <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/overview/"><span>Next</span>Overview</a>
-        </nav>
-      </main>
-    </div>
+      </div>
+      <section class="guides-help">
+        <h2>Ask for help</h2>
+        <p>Tell us what you’re trying to do and where you got stuck.</p>
+        <a class="btn btn-ghost" href="/eventrunner/support/">Get help</a>
+      </section>
+    </main>
 
     <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
       <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="/eventrunner/docs/security/">Security</a>
+        <a class="footer-brand" href="/eventrunner/"><strong>Event Runner</strong></a>
+        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>
       </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/eventrunner/support/">Support</a>
+        <a href="/eventrunner/privacy/">Privacy</a>
+        <a href="/eventrunner/terms-of-service/">Terms</a>
+        <a href="/eventrunner/project/">About the project</a>
+      </nav>
     </footer>
   </div>
 </body>

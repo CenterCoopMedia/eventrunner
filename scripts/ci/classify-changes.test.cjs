@@ -55,19 +55,63 @@ test('demo generator and committed Pages output select demo checks without emula
   assert.deepEqual(selected(output), ['demo']);
 });
 
-test('Pages generator paths select documentation checks and lint', () => {
+test('Pages generation and publication select site evidence without emulator suites', () => {
   for (const path of [
     'scripts/build-pages.cjs',
     'scripts/build-pages.test.cjs',
     'scripts/lib/pages-index.cjs',
+    'scripts/lib/pages-manifest.cjs',
+    'scripts/lib/pages-public-files.cjs',
     'scripts/lib/markdown-pages.cjs',
+    'scripts/check-docs.cjs',
+    'scripts/check-docs.test.cjs',
+    'scripts/stage-pages.cjs',
+    'scripts/stage-pages.test.cjs',
+    'scripts/dev/check-public-site.mjs',
   ]) {
     const result = classifyPaths([path]);
     assert.equal(result.mode, 'docs', path);
-    assert.deepEqual(selected(result), ['docs', 'lint', 'audit', 'unit'], path);
+    assert.deepEqual(selected(result), ['docs', 'demo', 'lint', 'audit', 'unit'], path);
+    assert.equal(result.jobs.rules, false, path);
+    assert.equal(result.jobs.e2e, false, path);
   }
+});
 
-  assert.deepEqual(selected(classifyPaths(['docs/docs/index.html'])), ['docs']);
+test('public HTML, scripts, styles, and media select the site browser check', () => {
+  const publicFiles = [
+    'docs/features/index.html',
+    'docs/how-it-works/index.html',
+    'docs/docs/index.html',
+    'docs/docs/handbook/for-attendees/index.html',
+    'docs/site.js',
+    'docs/docs-ui.js',
+    'docs/scroll-regions.js',
+    'docs/styles.css',
+    'docs/docs.css',
+    'docs/tokens.css',
+    'docs/fonts/bricolage-grotesque-latin-variable.woff2',
+    'docs/assets/brand.svg',
+    'docs/videos/general-trailer-landscape.png',
+    'docs/videos/general-trailer-landscape.mp4',
+  ];
+  for (const path of publicFiles) {
+    const result = classifyPaths([path]);
+    assert.equal(result.mode, 'docs', path);
+    assert.deepEqual(selected(result), ['docs', 'demo'], path);
+  }
+  // The homepage retains its existing copy gate as well.
+  assert.deepEqual(selected(classifyPaths(['docs/index.html'])), ['docs', 'demo', 'lint']);
+});
+
+test('repository-only design notes and screenshots keep the documentation-only tier', () => {
+  for (const path of [
+    'docs/pr-evidence/pr-811/home.png',
+    'docs/plans/evidence/capture.png',
+    'docs/design/reference.svg',
+    'docs/testing/fixture.html',
+  ]) {
+    assert.deepEqual(selected(classifyPaths([path])), ['docs'], path);
+  }
 });
 
 test('the Pages site address selects both the documentation and the demo checks', () => {
@@ -243,6 +287,35 @@ test('the two longest suites run in shards, and each shard is told its slice', (
   const web = job('unit-web', 'build');
   assert.match(web, /strategy:\s+fail-fast: false\s+matrix:\s+shard: \[1, 2\]/);
   assert.match(web, /npm run test -w apps\/web -- --shard=\$\{\{ matrix\.shard \}\}\/2/);
+});
+
+test('public site evidence runs once in the demo tier with a built demo and sandboxed browser', () => {
+  const workflow = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'ci.yml'), 'utf8');
+  const job = (name, next) => workflow.slice(workflow.indexOf(`\n  ${name}:`), workflow.indexOf(`\n  ${next}:`));
+  const demo = job('demo', 'rules');
+  const e2e = job('e2e', 'gate');
+
+  assert.match(demo, /if: needs\.changes\.outputs\.demo == 'true' && needs\.changes\.outputs\.local != 'true'/);
+  assert.match(demo, /runs-on: ubuntu-latest/);
+  assert.doesNotMatch(demo, /setup-java|firebase\/emulators|run-e2e\.sh|matrix\.shard|continue-on-error: true/);
+  assert.match(demo, /PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"/);
+  assert.match(demo, /key: playwright-\$\{\{ runner\.os \}\}-\$\{\{ hashFiles\('node_modules\/@playwright\/test\/package\.json'\) \}\}/);
+  assert.match(demo, /npx playwright install --with-deps chromium/);
+  assert.match(demo, /CHROME_DEVEL_SANDBOX: \/opt\/eventrunner-chromium-sandbox/);
+  assert.match(demo, /sudo install -o root -g root -m 4755 "\$helper" "\$CHROME_DEVEL_SANDBOX"/);
+
+  // The reproducibility check removes both its scratch output and dist.
+  // A regular build must follow it before link checks can serve docs/demo.
+  const hygieneAt = demo.indexOf('run: node scripts/build-demo.cjs --check');
+  const buildAt = demo.indexOf('run: node scripts/build-demo.cjs\n');
+  const browserAt = demo.indexOf('run: node scripts/dev/check-public-site.mjs');
+  assert.ok(hygieneAt >= 0 && buildAt > hygieneAt && browserAt > buildAt);
+  assert.equal((workflow.match(/run: node scripts\/dev\/check-public-site\.mjs/g) || []).length, 1);
+  assert.doesNotMatch(e2e, /public_site_evidence|public-site-visual-evidence|check-public-site\.mjs/);
+
+  // Failed captures remain available, while the failure still blocks CI.
+  assert.match(demo, /always\(\).*steps\.public_site_evidence\.outcome == 'failure'.*steps\.public_site_evidence\.outcome == 'cancelled'/);
+  assert.match(demo, /name: public-site-visual-evidence\s+path: test-results\/public-site-evidence\/\s+if-no-files-found: error/);
 });
 
 test('the browser suite runner passes a shard to Playwright only when one is set', () => {

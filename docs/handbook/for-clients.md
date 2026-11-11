@@ -1,43 +1,41 @@
-# For clients
+# For event organizers
 
-You are an organization that wants an event site. CCM deploys one Firebase project per event and operates it. Your staff run the admin. You do not fork the repo.
+Event Runner gives your event its own website. The Center for Cooperative Media sets it up and hosts it. Your team runs the content from an admin panel, without a developer.
 
-## What you are buying
+## What we handle
 
-The code is [Apache-2.0](https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE). Anyone can read it. CCM's service is:
+- Setting up and hosting your site
+- Connecting your sign-in email and your ticketing account
+- Adding your first admins
+- Help while your event is live
 
-1. A managed deployment for your event
-2. Setup and onboarding (sender domain, tickets, first admin)
-3. Support while the event is live
+## What your team handles
 
-The **Event Runner** name is CCM's. Apache-2.0 does not give anyone else the right to sell hosting under that name.
+- The schedule, speakers, and pages
+- Event updates and announcements to your attendees and speakers
+- Your logos, colors, and site style
+- Ticket sales and refunds, through your own Stripe or Eventbrite account, a spreadsheet, or no tickets at all
 
-## What v1 includes
-
-Schedule, speakers, attendees, a block CMS, emailed login codes, announcement email to your registered attendees or speakers, session materials, a media library, Stripe, Eventbrite, or spreadsheet tickets, sponsor invoices, and your colors and fonts.
-
-Confirmation emails, speaker mail, and event announcements go through one agreed email provider (Postmark) from a sender address on your domain. Announcements use their own broadcast stream, apart from login codes and receipts. Every announcement has a one-click unsubscribe link, and the site does not send announcements to anyone who used it.
-
-What v1 does not include is in the [triage record](https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md): video generation, social feeds, speaker chat. Announcement email reaches your event's attendees and speakers only; it is not a newsletter or marketing list tool.
+Announcements reach only your event's attendees and speakers. Each one has an unsubscribe link. It is not a newsletter or marketing tool.
 
 ## What you will need to give us
 
-- Event name, dates, timezone, venue
-- The public URL you want
-- Who the first admins are
-- Whether tickets are Stripe, Eventbrite, a spreadsheet, or none of these
-- A sender address on **your** domain (for login codes). We will ask you to add SPF, DKIM, and a DMARC policy. Without that, emailed codes get quarantined.
+- Event name, dates, time zone, and venue
+- The web address you want for the site
+- The names and emails of your first admins
+- How you sell tickets: Stripe, Eventbrite, a spreadsheet, or none
+- An email address on your own domain to send sign-in codes from. We will help you add the email records your domain needs, so the codes do not land in junk folders.
 
 ## Set up your event
 
-Your first operator signs in to the admin panel and opens **Set up your event**. The numbered steps and progress count include your tasks and tasks you share with the Event Runner team. These include a second operator, your logos, event email, and the legal review of the privacy policy and terms.
+Your first admin signs in to the admin panel and opens **Set up your event**. The numbered steps include your tasks and tasks you share with the Event Runner team, such as a second admin, your logos, event email, and a review of the privacy policy and terms.
 
-**Hosting status** is a separate, read-only area. It shows checks managed by the Event Runner team, including Google sign-in, as **Ready** or **Awaiting Event Runner setup**. These checks do not reduce your task completion count. You do not need to turn on Google sign-in yourself.
+**Hosting status** is a separate, read-only area. It shows the checks the Event Runner team manages as **Ready** or **Awaiting Event Runner setup**. You do not need to turn on Google sign-in yourself.
 
-Finishing your tasks does not mean the site is ready to share. Every setup task and hosting check must be ready first. Use **Check again** to refresh the results. If a check fails, the page warns you that it is showing the last results.
+Your site is ready to share when every setup task and hosting check is ready. Use **Check again** to refresh the results.
 
-Never send a provider key or password through the site or in a public thread. The hosting team asks for them directly.
+Never send a password or account key through the site or in a public post. The Event Runner team asks for them directly.
 
 ## How to start
 
-Open a [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) thread or email info@eventrunner.org. Do not send an attendee list to GitHub.
+Email info@eventrunner.org or open a [General discussion](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general). Do not post an attendee list in public.
