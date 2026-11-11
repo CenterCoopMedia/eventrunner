@@ -674,7 +674,9 @@ async function stepEmail(ctx) {
   const servers = await postmarkAccount(ctx, 'read the mail servers', `/servers?${query}`);
   let server = (servers.Servers || []).find((item) => item.Name === environment);
   if (!server) {
-    server = await postmarkAccount(ctx, 'create the mail server', '/servers', { method: 'POST', json: { Name: environment } });
+    server = await postmarkAccount(ctx, 'create the mail server', '/servers', {
+      method: 'POST', json: { Name: environment, TrackLinks: 'None', TrackOpens: false },
+    });
     notes.push('created the mail server');
   }
   await rememberResources(ctx, { postmarkServerId: server.ID });

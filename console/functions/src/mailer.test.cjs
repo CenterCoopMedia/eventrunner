@@ -57,6 +57,8 @@ test('the Postmark mailer posts one message with the server token', async () => 
   assert.equal(body.To, 'sam@example.org');
   assert.equal(body.From, 'Event Runner <hello@console.example>');
   assert.equal(body.MessageStream, 'outbound');
+  assert.equal(body.TrackLinks, 'None');
+  assert.equal(body.TrackOpens, false);
   assert.equal(body.Subject, 'Join Local <News> & Co on Event Runner');
   assert.ok(body.TextBody && body.HtmlBody);
 });

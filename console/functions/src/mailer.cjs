@@ -192,6 +192,8 @@ function createPostmarkMailer({ token, from, fetch }) {
         HtmlBody: message.html,
         MessageStream: 'outbound',
         Tag: tag,
+        TrackLinks: 'None',
+        TrackOpens: false,
         ...(attachments.length ? { Attachments: attachments } : {}),
       }),
     });

@@ -95,6 +95,21 @@ test('send maps the EmailMessage onto the Postmark payload', async () => {
   assert.deepEqual(result, { providerMessageId: 'pm-123', status: 'sent', providerStatus: 200 });
 });
 
+test('sign-in messages disable link and open tracking in the provider payload', async () => {
+  const fetchImpl = fakeFetch([fakeResponse({ status: 200, jsonBody: { MessageID: 'pm-auth' } })]);
+  const provider = createPostmarkProvider({ env: ENV, fetchImpl });
+  await provider.send({
+    to: 'a@example.com',
+    from: 'sender@example.com',
+    subject: 'Sign in',
+    text: 'Your sign-in code is 123456.',
+    tag: 'auth.otp',
+  });
+  const payload = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.equal(payload.TrackLinks, 'None');
+  assert.equal(payload.TrackOpens, false);
+});
+
 test('send omits MessageStream, Headers, ReplyTo, Tag when absent and uses bare From', async () => {
   const fetchImpl = fakeFetch([fakeResponse({ status: 200, jsonBody: { MessageID: 'pm-1' } })]);
   const provider = createPostmarkProvider({ env: ENV, fetchImpl });
