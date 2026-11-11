@@ -841,6 +841,32 @@ test('a deploy that keeps failing leaves a readable record and tells operators, 
   assert.equal(statusMail(fake.mailer).filter((s) => s === 'ready').length, 2, 'one email per Owner, once');
 });
 
+for (const allFail of [false, true]) {
+  test(`a completed site stays ready when ${allFail ? 'all Owner emails fail' : 'one Owner email fails'}`, async () => {
+    const fake = setup();
+    const send = fake.mailer.sendStatusChange.bind(fake.mailer);
+    const attempts = [];
+    fake.mailer.sendStatusChange = async (message) => {
+      if (message.status === 'ready') {
+        attempts.push(message.to);
+        if (allFail || message.to === 'ana@example.org') throw new Error(`mail refused for ${message.to}`);
+      }
+      return send(message);
+    };
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    assert.equal(fake.db.read('applications/a1').status, 'ready');
+    const record = fake.db.read('console_builds/a1');
+    assert.equal(record.state, 'done');
+    assert.equal(record.error, null);
+    assert.ok(record.ownersEmailedAt);
+    assert.match(record.steps.find((step) => step.id === 'ready').detail, /some Owner emails could not be sent/);
+    assert.deepEqual(attempts.sort(), ['ana@example.org', 'bo@example.org']);
+    assert.ok(!statusMail(fake.mailer).includes('build-failed'));
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    assert.equal(attempts.length, 2, 'no repeat notice attempt after the completed build');
+  });
+}
+
 test('a second run after a finished build changes nothing and emails nobody', async () => {
   const fake = setup();
   await provision({ appId: 'a1', deps: fake.deps });

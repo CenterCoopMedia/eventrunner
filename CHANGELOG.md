@@ -860,6 +860,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A completed site reaches ready when an Owner email cannot be delivered.
+  The build records the notice failure and does not repeat the attempt (#820).
 - Both Auth lifecycle triggers run as the compute service account, with per-secret
   access prepared before deployment. Automated deploys set
   `EVENT_COMPUTE_SERVICE_ACCOUNT`; manual deploys must set it in the target
