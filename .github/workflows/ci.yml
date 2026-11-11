@@ -156,7 +156,7 @@ jobs:
         run: |
           if [ -f scripts/build-pages.cjs ]; then
             test -f scripts/build-pages.test.cjs
-            node --test scripts/build-pages.test.cjs
+            node --test scripts/build-pages.test.cjs scripts/stage-pages.test.cjs
           fi
 
   lint:
@@ -461,6 +461,19 @@ jobs:
           if [ -n "$DEMO_VISUAL_BASE_SHA" ]; then
             node scripts/dev/build-demo-at.cjs --rev "$DEMO_VISUAL_BASE_SHA" --out "$DEMO_VISUAL_BEFORE_DIR"
           fi
+      - name: Verify the public site and capture evidence
+        id: public_site_evidence
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.demo_builds.outcome == 'success' }}
+        timeout-minutes: 5
+        run: node scripts/dev/check-public-site.mjs
+      - name: Upload public site visual evidence
+        if: ${{ always() && matrix.shard == 1 && (steps.public_site_evidence.outcome == 'success' || steps.public_site_evidence.outcome == 'failure' || steps.public_site_evidence.outcome == 'cancelled') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-site-visual-evidence
+          path: test-results/public-site-evidence/
+          if-no-files-found: error
+          retention-days: 7
       - name: Capture public demo visual evidence
         id: demo_visuals
         if: ${{ !cancelled() && matrix.shard == 1 && steps.demo_builds.outcome == 'success' }}

@@ -2,8 +2,8 @@ name: Pages
 
 # Builds and deploys the GitHub Pages site: docs/ as committed, plus the
 # static demo in docs/demo/, which is build output and not committed
-# (scripts/build-demo.cjs). docs/plans/ and docs/pr-evidence/ stay in the
-# repository but are left off the site.
+# (scripts/build-demo.cjs). Only the reviewed public file allowlist reaches
+# dist/pages. Source runbooks, ADRs, plans and evidence stay in the repository.
 #
 # The site's public address is one value (scripts/lib/pages-site.cjs). The
 # repository variable PAGES_BASE_URL overrides it for the deploy, for example
@@ -113,15 +113,12 @@ jobs:
       - name: Configure Pages
         if: steps.source.outputs.deploy == 'true'
         uses: actions/configure-pages@v5
-      - name: Leave the plans and PR evidence off the site
-        # The owner decided Pages does not serve these folders. They stay in
-        # the repository; this removes them from the runner's copy only, after
-        # the link check, which refuses a served page that links into them.
-        run: rm -rf docs/plans docs/pr-evidence
+      - name: Stage the public website
+        run: node scripts/stage-pages.cjs
       - name: Upload the site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: dist/pages
 
   deploy:
     name: Deploy to GitHub Pages

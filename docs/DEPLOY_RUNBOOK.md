@@ -1063,7 +1063,7 @@ implements it: the refresh went straight from "next deploy" to this on-demand jo
 ## 10. Project site on GitHub Pages
 
 This section is not per client. It covers the project's own site: the homepage, the support,
-privacy and terms pages, the project status page, the documentation under `docs/docs/`, and the
+privacy and terms pages, the product and About pages, the guides under `docs/docs/`, and the
 static demo under `docs/demo/`.
 `.github/workflows/pages.yml` builds the site and deploys it on every push to `main`.
 
@@ -1077,10 +1077,18 @@ link, the demo's Vite base, and how the link checker maps a path to a file under
 | `https://centercoopmedia.github.io/eventrunner/` | `/eventrunner/` | the committed default |
 | `https://eventrunner.org/` | `/` | the `PAGES_BASE_URL` repository variable, after the switch below |
 
-The committed `docs/docs/` and the hand-written pages (`LANDING_PAGES` in `scripts/build-pages.cjs`) are
+The committed `docs/docs/` and the hand-written pages (`LANDING_PAGES` in `scripts/lib/pages-public-files.cjs`) are
 built for the committed default. When the `PAGES_BASE_URL` repository variable is set, the
 workflow renders the pages again for that address before it builds the demo and checks the links.
 The workflow commits nothing.
+
+**Only website files are uploaded.** After rendering and link checks, `scripts/stage-pages.cjs`
+copies the allowlisted pages, assets, and built demo into `dist/pages`. The Pages artifact uses
+that directory. Source Markdown, ADRs, operator runbooks, plans, and PR evidence stay in the
+repository. Old engineering documentation URLs show a short, unindexed handoff to the source
+on GitHub. Public guide navigation and search use only `SECTIONS` in
+`scripts/lib/pages-manifest.cjs`. Add a new marketing route to `LANDING_PAGES` before linking
+to it; put new marketing images under `docs/assets/`.
 
 **The workflow does not deploy to a wrong address.** Before it deploys, the workflow compares the
 address with the URL that Pages reports. If they are not the same, the run fails and the site that

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Code of conduct — Event Runner documentation</title>
-  <meta name="description" content="The behavior expected in every project space, and how to report a problem.">
+  <title>Code of conduct — Event Runner guides</title>
+  <meta name="description" content="The behavior expected in project spaces and how to report a concern.">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/">
   <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/eventrunner/favicon-32.png">
@@ -12,19 +12,19 @@
 
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Code of conduct — Event Runner documentation">
-  <meta property="og:description" content="The behavior expected in every project space, and how to report a problem.">
+  <meta property="og:title" content="Code of conduct — Event Runner guides">
+  <meta property="og:description" content="The behavior expected in project spaces and how to report a concern.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/code-of-conduct/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta property="og:image:alt" content="Event Runner guides">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Code of conduct — Event Runner documentation">
-  <meta name="twitter:description" content="The behavior expected in every project space, and how to report a problem.">
+  <meta name="twitter:title" content="Code of conduct — Event Runner guides">
+  <meta name="twitter:description" content="The behavior expected in project spaces and how to report a concern.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
-  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="twitter:image:alt" content="Event Runner guides">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
@@ -34,8 +34,9 @@
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
   <script src="/eventrunner/scroll-regions.js" defer></script>
+  <script src="/eventrunner/docs-ui.js" defer></script>
 </head>
-<body>
+<body class="docs-site">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="wrap">
@@ -58,68 +59,57 @@
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Documentation</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="/eventrunner/">Home</a>
-        <a href="/eventrunner/docs/">Documentation</a>
-        <a href="/eventrunner/demo/">Demo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="/eventrunner/features/">Features</a>
+        <a href="/eventrunner/how-it-works/">How it works</a>
+        <a href="/eventrunner/docs/" aria-current="location">Guides</a>
+        <a href="/eventrunner/project/">About</a>
+        <a class="btn nav-cta" href="/eventrunner/demo/">Try the demo</a>
       </nav>
     </header>
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <ol>
         <li><a href="/eventrunner/">Home</a></li>
-        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><a href="/eventrunner/docs/">Guides</a></li>
         <li><span aria-current="page">Code of conduct</span></li>
         </ol>
       </nav>
     <div class="docs-layout">
-      <nav class="docs-nav" aria-label="Documentation">
-        <p class="docs-nav-section">Start here</p>
-        <ul>
-          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
-          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
-          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
-          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
-          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
-        </ul>
-        <p class="docs-nav-section">Operate</p>
-        <ul>
-          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
-          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
-          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
-          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
-          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
-          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
-          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
-          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
-          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
-          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
-          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
-        </ul>
-        <p class="docs-nav-section">Build</p>
-        <ul>
-          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
-          <li><a href="/eventrunner/docs/code-of-conduct/" aria-current="page" class="is-current">Code of conduct</a></li>
-          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
-          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
-          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
-          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
-          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
-          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
-          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
-        </ul>
-        <p class="docs-nav-section">Get help</p>
-        <ul>
-          <li><a href="/eventrunner/docs/support/">Support</a></li>
-          <li><a href="/eventrunner/docs/security/">Security</a></li>
-        </ul>
-      </nav>
+      <details class="docs-disclosure" data-docs-navigation open>
+        <summary>Browse all guides</summary>
+        <div class="docs-nav-scroll" data-scroll-region data-scroll-label="Guide navigation">
+          <nav class="docs-nav" aria-label="Documentation">
+            <p class="docs-nav-section">Start here</p>
+            <ul>
+              <li><a href="/eventrunner/docs/overview/">Meet Event Runner</a></li>
+              <li><a href="/eventrunner/docs/handbook/for-clients/">For event organizers</a></li>
+              <li><a href="/eventrunner/docs/handbook/">The event handbook</a></li>
+            </ul>
+            <p class="docs-nav-section">Run your event</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+              <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+              <li><a href="/eventrunner/docs/admin-sessions/">Manage your sessions</a></li>
+            </ul>
+            <p class="docs-nav-section">Attend an event</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+            </ul>
+            <p class="docs-nav-section">Get help</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/faq/">Frequently asked questions</a></li>
+              <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+              <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+              <li><a href="/eventrunner/docs/support/">Support</a></li>
+              <li><a href="/eventrunner/docs/security/">Report a security concern</a></li>
+              <li><a href="/eventrunner/docs/code-of-conduct/" aria-current="page" class="is-current">Code of conduct</a></li>
+            </ul>
+          </nav>
+        </div>
+      </details>
       <main class="docs-main" id="main">
         <article class="prose">
           <h1>Contributor Covenant Code of Conduct</h1>
@@ -236,22 +226,23 @@
           [FAQ]: https://www.contributor-covenant.org/faq
           [translations]: https://www.contributor-covenant.org/translations</p>
         </article>
-        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md"><code>CODE_OF_CONDUCT.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <div class="source-note"><a href="/eventrunner/support/">Ask for help</a><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CODE_OF_CONDUCT.md">Improve this guide on GitHub</a></div>
         <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/contributing/"><span>Previous</span>Contributing</a>
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/governance/"><span>Next</span>Governance</a>
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/security/"><span>Previous</span>Report a security concern</a>
         </nav>
       </main>
     </div>
     <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
       <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="/eventrunner/docs/security/">Security</a>
+        <a class="footer-brand" href="/eventrunner/"><strong>Event Runner</strong></a>
+        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>
       </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/eventrunner/support/">Support</a>
+        <a href="/eventrunner/privacy/">Privacy</a>
+        <a href="/eventrunner/terms-of-service/">Terms</a>
+        <a href="/eventrunner/project/">About the project</a>
+      </nav>
     </footer>
   </div>
 </body>

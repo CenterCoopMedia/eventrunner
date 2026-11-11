@@ -48,34 +48,25 @@ const {
   REPO_BLOB,
   REPO_URL,
   SECTIONS,
+  LEGACY_PAGES,
   pagesInOrder,
   routesBySource,
 } = require('./lib/pages-manifest.cjs');
 const { GITHUB_PAGES_URL, pagesSite, parsePagesBaseUrl } = require('./lib/pages-site.cjs');
+const { LANDING_PAGES } = require('./lib/pages-public-files.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(ROOT, 'docs', 'docs');
 const TOKENS_FILE = 'tokens.css';
-// Hand-written pages under docs/ that state the site's absolute address in
-// their head. The first is the landing page: its canonical URL is the address
-// the committed site is built for, and the address the others are moved from.
-const LANDING_PAGES = Object.freeze([
-  'index.html',
-  'videos/index.html',
-  'project/index.html',
-  'support/index.html',
-  'privacy/index.html',
-  'terms-of-service/index.html',
-]);
 
 const PRODUCT = 'Event Runner';
 // The documentation site has its own social card, so a link to a guide is not
 // previewed as the product landing page (docs/social-preview.png).
 const SOCIAL_IMAGE_FILE = 'og-default.png';
-const SOCIAL_IMAGE_ALT = 'Event Runner documentation';
+const SOCIAL_IMAGE_ALT = 'Event Runner guides';
 const DOCS_DESCRIPTION =
-  'Guides, runbooks, and decision records for Event Runner, the white-label event CMS ' +
-  'operated by the Center for Cooperative Media.';
+  'Practical guides for setting up an Event Runner site, publishing your program, ' +
+  'and taking part in an event.';
 // Fonts are self-hosted under docs/fonts and declared by styles.css, so no
 // page here reaches a font CDN. See docs/fonts/README.md.
 const PRELOADED_FONTS = ['source-sans-3-latin.woff2', 'bricolage-grotesque-latin.woff2'];
@@ -391,7 +382,7 @@ function routeDepth(route) {
   return route.split('/').filter(Boolean).length;
 }
 
-function head({ site, title, description, canonical, themeTags, ogType }) {
+function head({ site, title, description, canonical, themeTags, ogType, noindex = false }) {
   const socialImage = `${site.url}${SOCIAL_IMAGE_FILE}`;
   const safeTitle = escapeHtml(title);
   const safeDescription = escapeHtml(description);
@@ -403,6 +394,7 @@ function head({ site, title, description, canonical, themeTags, ogType }) {
     '  <meta name="viewport" content="width=device-width, initial-scale=1">',
     `  <title>${safeTitle}</title>`,
     `  <meta name="description" content="${safeDescription}">`,
+    ...(noindex ? ['  <meta name="robots" content="noindex, follow">'] : []),
     `  <link rel="canonical" href="${escapeHtml(canonical)}">`,
     `  <link rel="icon" type="image/svg+xml" href="${site.base}favicon.svg">`,
     `  <link rel="icon" type="image/png" sizes="32x32" href="${site.base}favicon-32.png">`,
@@ -432,28 +424,26 @@ function head({ site, title, description, canonical, themeTags, ogType }) {
     `  <link rel="stylesheet" href="${site.base}styles.css">`,
     `  <link rel="stylesheet" href="${site.base}docs.css">`,
     `  <script src="${site.base}scroll-regions.js" defer></script>`,
+    `  <script src="${site.base}docs-ui.js" defer></script>`,
     '</head>',
-    '<body>',
+    '<body class="docs-site">',
     '  <a class="skip-link" href="#main">Skip to content</a>',
     '',
     '  <div class="wrap">',
-    // The masthead is the same device the landing page carries: a
-    // rule-bounded title block in type and rules only, at the compact size
-    // (design brief §2.1). The line under the name states which surface of
-    // the site the reader is on.
     '    <header class="site-header">',
     `      <a class="brand" href="${site.base}">`,
     ...MARK,
     '        <span class="brand-words">',
     `          <strong>${PRODUCT}</strong>`,
-    '          <span class="brand-line">Documentation</span>',
+    '          <span class="brand-line">Conference websites</span>',
     '        </span>',
     '      </a>',
     '      <nav aria-label="Site">',
-    `        <a href="${site.base}">Home</a>`,
-    `        <a href="${site.docsBase}">Documentation</a>`,
-    `        <a href="${site.demoBase}">Demo</a>`,
-    `        <a href="${REPO_URL}">Repo</a>`,
+    `        <a href="${site.base}features/">Features</a>`,
+    `        <a href="${site.base}how-it-works/">How it works</a>`,
+    `        <a href="${site.docsBase}" aria-current="location">Guides</a>`,
+    `        <a href="${site.base}project/">About</a>`,
+    `        <a class="btn nav-cta" href="${site.demoBase}">Try the demo</a>`,
     '      </nav>',
     '    </header>',
   ].join('\n');
@@ -477,20 +467,25 @@ function breadcrumbs(trail) {
 }
 
 function sidebar(site, currentRoute) {
-  const lines = ['      <nav class="docs-nav" aria-label="Documentation">'];
+  const lines = [
+    '      <details class="docs-disclosure" data-docs-navigation open>',
+    '        <summary>Browse all guides</summary>',
+    '        <div class="docs-nav-scroll" data-scroll-region data-scroll-label="Guide navigation">',
+    '          <nav class="docs-nav" aria-label="Documentation">',
+  ];
   for (const section of SECTIONS) {
-    lines.push(`        <p class="docs-nav-section">${escapeHtml(section.title)}</p>`);
-    lines.push('        <ul>');
+    lines.push(`            <p class="docs-nav-section">${escapeHtml(section.title)}</p>`);
+    lines.push('            <ul>');
     for (const page of section.pages) {
       const href = `${site.docsBase}${page.route}`;
       const current = page.route === currentRoute
         ? ' aria-current="page" class="is-current"'
         : '';
-      lines.push(`          <li><a href="${href}"${current}>${escapeHtml(page.title)}</a></li>`);
+      lines.push(`              <li><a href="${href}"${current}>${escapeHtml(page.title)}</a></li>`);
     }
-    lines.push('        </ul>');
+    lines.push('            </ul>');
   }
-  lines.push('      </nav>');
+  lines.push('          </nav>', '        </div>', '      </details>');
   return lines.join('\n');
 }
 
@@ -516,14 +511,16 @@ function pagination(site, previous, next) {
 function footer(site) {
   return [
     '    <footer class="site-footer">',
-    '      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>',
     '      <div>',
-    '        <a href="https://centerforcooperativemedia.org">CCM</a>',
-    '        ·',
-    `        <a href="${REPO_URL}/blob/main/LICENSE">Apache-2.0</a>`,
-    '        ·',
-    `        <a href="${site.docsBase}security/">Security</a>`,
+    `        <a class="footer-brand" href="${site.base}"><strong>Event Runner</strong></a>`,
+    '        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>',
     '      </div>',
+    '      <nav class="footer-links" aria-label="Footer">',
+    `        <a href="${site.base}support/">Support</a>`,
+    `        <a href="${site.base}privacy/">Privacy</a>`,
+    `        <a href="${site.base}terms-of-service/">Terms</a>`,
+    `        <a href="${site.base}project/">About the project</a>`,
+    '      </nav>',
     '    </footer>',
     '  </div>',
     '</body>',
@@ -571,7 +568,7 @@ function renderPage(page, { site, themeTags, routes, departures, errors, root })
   const canonical = `${site.docsUrl}${page.route}`;
   const trail = [
     { label: 'Home', href: site.base },
-    { label: 'Documentation', href: site.docsBase },
+    { label: 'Guides', href: site.docsBase },
   ];
   if (routeDepth(page.route) > 1) {
     trail.push({ label: page.section.title, href: `${site.docsBase}#${page.section.id}` });
@@ -591,9 +588,9 @@ function renderPage(page, { site, themeTags, routes, departures, errors, root })
     indent(rendered.html, 10),
     '        </article>',
     '',
-    '        <p class="source-note">This page is generated from ' +
-    `<a href="${REPO_BLOB}${page.source}"><code>${escapeHtml(page.source)}</code></a>. ` +
-    'Edit the Markdown, not the HTML.</p>',
+    '        <div class="source-note">' +
+    `<a href="${site.base}support/">Ask for help</a>` +
+    `<a href="${REPO_BLOB}${page.source}">Improve this guide on GitHub</a></div>`,
     pagination(site, page.previous, page.next),
     '      </main>',
     '    </div>',
@@ -603,7 +600,7 @@ function renderPage(page, { site, themeTags, routes, departures, errors, root })
   const html = [
     head({
       site,
-      title: `${title} — ${PRODUCT} documentation`,
+      title: `${title} — ${PRODUCT} guides`,
       description,
       canonical,
       themeTags,
@@ -621,20 +618,20 @@ function renderPage(page, { site, themeTags, routes, departures, errors, root })
  *
  * @returns {{ path: string, contents: string }}
  */
-function renderIndex({ site, themeTags, pages }) {
+function renderIndex({ site, themeTags }) {
   const sections = SECTIONS.map((section) => {
     const items = section.pages
       .map((page) => [
-        '            <li>',
-        `              <a href="${site.docsBase}${page.route}">${escapeHtml(page.title)}</a>`,
-        `              <span>${escapeHtml(page.summary)}</span>`,
+        `            <li data-guide-entry data-guide-search="${escapeHtml(`${page.title} ${page.summary}`)}">`,
+        `              <a${page.route === SECTIONS[0].pages[0].route ? ' rel="next"' : ''} href="${site.docsBase}${page.route}">${escapeHtml(page.title)}<span aria-hidden="true">→</span></a>`,
+        `              <p>${escapeHtml(page.summary)}</p>`,
         '            </li>',
       ].join('\n'))
       .join('\n');
     return [
-      `        <section class="docs-section" id="${section.id}">`,
+      `        <section class="docs-section" id="${section.id}" data-guide-section>`,
       `          <h2>${escapeHtml(section.title)}</h2>`,
-      `          <p>${escapeHtml(section.summary)}</p>`,
+      `          <p class="docs-section-summary">${escapeHtml(section.summary)}</p>`,
       '          <ul class="docs-index-list">',
       items,
       '          </ul>',
@@ -643,30 +640,44 @@ function renderIndex({ site, themeTags, pages }) {
   }).join('\n');
 
   const body = [
-    breadcrumbs([{ label: 'Home', href: site.base }, { label: 'Documentation' }]),
-    '',
-    '    <div class="docs-layout">',
-    sidebar(site, ''),
-    '',
-    '      <main class="docs-main" id="main">',
-    '        <article class="prose">',
-    '          <h1>Documentation</h1>',
-    `          <p class="lede">${escapeHtml(DOCS_DESCRIPTION)}</p>`,
-    '          <p>Every page here is rendered from the Markdown in the repository. ' +
-    `The <a href="${site.demoBase}">demo site</a> shows what attendees see; ` +
-    'the guides below cover running one.</p>',
+    breadcrumbs([{ label: 'Home', href: site.base }, { label: 'Guides' }]),
+    '    <main class="docs-home" id="main">',
+    '      <header class="docs-intro">',
+    '        <div>',
+    '          <h1>Find your next step</h1>',
+    '          <p class="lede">Set up your site, publish your program, or plan your day. Start with the guide for the work you need to do.</p>',
+    '        </div>',
+    '        <form class="guide-search" role="search" aria-label="Find a guide" data-guide-search-form hidden>',
+    '          <label for="guide-query">Find a guide</label>',
+    '          <div class="guide-search-control">',
+    '            <input id="guide-query" name="q" type="search" placeholder="Try sessions, sign-in, or hosting" aria-describedby="guide-search-help" autocomplete="off">',
+    '            <button type="reset" hidden>Clear</button>',
+    '          </div>',
+    '          <p id="guide-search-help">Search guide titles and descriptions.</p>',
+    '          <p class="guide-search-status" role="status" aria-live="polite" aria-atomic="true" data-guide-search-status></p>',
+    '        </form>',
+    '      </header>',
+    '      <nav class="guide-starts" aria-label="Documentation" data-guide-starts>',
+    `        <a href="${site.docsBase}handbook/for-clients/"><strong>I’m organizing an event <span aria-hidden="true">→</span></strong><span>Get a site, prepare your content, and know who does what.</span></a>`,
+    `        <a href="${site.docsBase}handbook/for-event-staff/"><strong>I’m running the site <span aria-hidden="true">→</span></strong><span>Edit pages, manage speakers, and keep the program current.</span></a>`,
+    `        <a href="${site.docsBase}handbook/for-attendees/"><strong>I’m attending an event <span aria-hidden="true">→</span></strong><span>Sign in, save sessions, and get ready for the day.</span></a>`,
+    '      </nav>',
+    '      <div class="guide-directory" data-guide-directory>',
     sections,
-    '        </article>',
-    pagination(site, null, pages[0]),
-    '      </main>',
-    '    </div>',
+    '      </div>',
+    '      <section class="guides-help">',
+    '        <h2>Ask for help</h2>',
+    '        <p>Tell us what you’re trying to do and where you got stuck.</p>',
+    `        <a class="btn btn-ghost" href="${site.base}support/">Get help</a>`,
+    '      </section>',
+    '    </main>',
     '',
   ].join('\n');
 
   const html = [
     head({
       site,
-      title: `Documentation — ${PRODUCT}`,
+      title: `Guides — ${PRODUCT}`,
       description: DOCS_DESCRIPTION,
       canonical: site.docsUrl,
       themeTags,
@@ -677,6 +688,39 @@ function renderIndex({ site, themeTags, pages }) {
   ].join('\n');
 
   return { path: 'index.html', contents: html };
+}
+
+/** Keep existing engineering bookmarks useful without indexing them as user guides. */
+function renderLegacyPage(page, { site, themeTags }) {
+  const source = `${REPO_BLOB}${page.source}`;
+  const body = [
+    breadcrumbs([{ label: 'Home', href: site.base }, { label: page.title }]),
+    '    <main class="docs-handoff prose" id="main">',
+    `      <h1>${escapeHtml(page.title)}</h1>`,
+    '      <p class="lede">This technical document is maintained with the source code on GitHub.</p>',
+    '      <p>Architecture decisions, deployment instructions, and contributor records stay with the source code. Event organizers and attendees can use the guides on this site.</p>',
+    '      <div class="handoff-actions">',
+    `        <a class="btn" href="${escapeHtml(source)}">Read this document on GitHub</a>`,
+    `        <a class="btn btn-ghost" href="${site.docsBase}">Browse the guides</a>`,
+    '      </div>',
+    '    </main>',
+  ].join('\n');
+  return {
+    path: `${page.route}index.html`,
+    contents: [
+      head({
+        site,
+        title: `${page.title} — ${PRODUCT}`,
+        description: `Read ${page.title} in the Event Runner repository on GitHub.`,
+        canonical: `${site.docsUrl}${page.route}`,
+        themeTags,
+        ogType: 'website',
+        noindex: true,
+      }),
+      body,
+      footer(site),
+    ].join('\n'),
+  };
 }
 
 function indent(html, spaces) {
@@ -742,8 +786,13 @@ function supportContact(env = process.env) {
 function withSupportContact(html, contact) {
   if (!contact) return html;
   return html
-    .replace(/(<span data-support-name>)[^<]*(<\/span>)/g, (_, open, close) => `${open}${escapeHtml(contact.name)}${close}`)
-    .replace(/<a data-support-email href="[^"]*">[^<]*<\/a>/g, () => `<a data-support-email href="mailto:${contact.email}">${contact.email}</a>`);
+    .replace(/(<span\b(?=[^>]*\bdata-support-name\b)[^>]*>)[^<]*(<\/span>)/g, (_, open, close) => `${open}${escapeHtml(contact.name)}${close}`)
+    .replace(/(<a\b(?=[^>]*\bdata-support-email\b)[^>]*>)([^<]*)(<\/a>)/g, (_, open, label, close) => {
+      const email = escapeHtml(contact.email);
+      const linked = open.replace(/\bhref=("|')[^"']*\1/, `href="mailto:${email}"`);
+      const prefix = /^Email\s/i.test(label) ? 'Email ' : '';
+      return `${linked}${prefix}${email}${close}`;
+    });
 }
 
 /**
@@ -789,7 +838,11 @@ function buildSite({ root = ROOT, site = pagesSite(), env = process.env } = {}) 
     files.set(result.path, result.contents);
     headingsByRoute.set(page.route, result.headings);
   }
-  const index = renderIndex({ site, themeTags, pages });
+  for (const page of LEGACY_PAGES) {
+    const result = renderLegacyPage(page, { site, themeTags });
+    files.set(result.path, result.contents);
+  }
+  const index = renderIndex({ site, themeTags });
   files.set(index.path, index.contents);
 
   return { files, landingPages, tokensCss: buildTokensCss(), departures, errors, headingsByRoute, site };

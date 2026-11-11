@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Overview — Event Runner documentation</title>
-  <meta name="description" content="What the product is, what v1 includes, and how a deployment is run.">
+  <title>Meet Event Runner — Event Runner guides</title>
+  <meta name="description" content="What your event site can do and how to explore it.">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/overview/">
   <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/eventrunner/favicon-32.png">
@@ -12,19 +12,19 @@
 
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Overview — Event Runner documentation">
-  <meta property="og:description" content="What the product is, what v1 includes, and how a deployment is run.">
+  <meta property="og:title" content="Meet Event Runner — Event Runner guides">
+  <meta property="og:description" content="What your event site can do and how to explore it.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/overview/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta property="og:image:alt" content="Event Runner guides">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Overview — Event Runner documentation">
-  <meta name="twitter:description" content="What the product is, what v1 includes, and how a deployment is run.">
+  <meta name="twitter:title" content="Meet Event Runner — Event Runner guides">
+  <meta name="twitter:description" content="What your event site can do and how to explore it.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
-  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="twitter:image:alt" content="Event Runner guides">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
@@ -34,8 +34,9 @@
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
   <script src="/eventrunner/scroll-regions.js" defer></script>
+  <script src="/eventrunner/docs-ui.js" defer></script>
 </head>
-<body>
+<body class="docs-site">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="wrap">
@@ -58,215 +59,103 @@
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Documentation</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="/eventrunner/">Home</a>
-        <a href="/eventrunner/docs/">Documentation</a>
-        <a href="/eventrunner/demo/">Demo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="/eventrunner/features/">Features</a>
+        <a href="/eventrunner/how-it-works/">How it works</a>
+        <a href="/eventrunner/docs/" aria-current="location">Guides</a>
+        <a href="/eventrunner/project/">About</a>
+        <a class="btn nav-cta" href="/eventrunner/demo/">Try the demo</a>
       </nav>
     </header>
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <ol>
         <li><a href="/eventrunner/">Home</a></li>
-        <li><a href="/eventrunner/docs/">Documentation</a></li>
-        <li><span aria-current="page">Overview</span></li>
+        <li><a href="/eventrunner/docs/">Guides</a></li>
+        <li><span aria-current="page">Meet Event Runner</span></li>
         </ol>
       </nav>
     <div class="docs-layout">
-      <nav class="docs-nav" aria-label="Documentation">
-        <p class="docs-nav-section">Start here</p>
-        <ul>
-          <li><a href="/eventrunner/docs/overview/" aria-current="page" class="is-current">Overview</a></li>
-          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
-          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
-          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
-          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
-        </ul>
-        <p class="docs-nav-section">Operate</p>
-        <ul>
-          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
-          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
-          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
-          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
-          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
-          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
-          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
-          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
-          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
-          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
-          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
-        </ul>
-        <p class="docs-nav-section">Build</p>
-        <ul>
-          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
-          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
-          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
-          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
-          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
-          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
-          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
-          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
-          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
-        </ul>
-        <p class="docs-nav-section">Get help</p>
-        <ul>
-          <li><a href="/eventrunner/docs/support/">Support</a></li>
-          <li><a href="/eventrunner/docs/security/">Security</a></li>
-        </ul>
-      </nav>
+      <details class="docs-disclosure" data-docs-navigation open>
+        <summary>Browse all guides</summary>
+        <div class="docs-nav-scroll" data-scroll-region data-scroll-label="Guide navigation">
+          <nav class="docs-nav" aria-label="Documentation">
+            <p class="docs-nav-section">Start here</p>
+            <ul>
+              <li><a href="/eventrunner/docs/overview/" aria-current="page" class="is-current">Meet Event Runner</a></li>
+              <li><a href="/eventrunner/docs/handbook/for-clients/">For event organizers</a></li>
+              <li><a href="/eventrunner/docs/handbook/">The event handbook</a></li>
+            </ul>
+            <p class="docs-nav-section">Run your event</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+              <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+              <li><a href="/eventrunner/docs/admin-sessions/">Manage your sessions</a></li>
+            </ul>
+            <p class="docs-nav-section">Attend an event</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+            </ul>
+            <p class="docs-nav-section">Get help</p>
+            <ul>
+              <li><a href="/eventrunner/docs/handbook/faq/">Frequently asked questions</a></li>
+              <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+              <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+              <li><a href="/eventrunner/docs/support/">Support</a></li>
+              <li><a href="/eventrunner/docs/security/">Report a security concern</a></li>
+              <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+            </ul>
+          </nav>
+        </div>
+      </details>
       <main class="docs-main" id="main">
         <article class="prose">
-          <h1>Event Runner</h1>
+          <h1>Meet Event Runner</h1>
           <nav class="contents" aria-labelledby="contents-title">
             <p class="contents-title" id="contents-title">On this page</p>
             <ul>
-              <li><a href="#demos">Demos</a></li>
-              <li><a href="#who-it-is-for">Who it is for</a></li>
-              <li><a href="#what-it-includes">What it includes</a></li>
-              <li><a href="#operating-model">Operating model</a></li>
-              <li><a href="#repo-layout">Repo layout</a></li>
-              <li><a href="#develop">Develop</a></li>
-              <li><a href="#license-and-trademark">License and trademark</a></li>
-              <li><a href="#security">Security</a></li>
-              <li><a href="#support">Support</a></li>
+              <li><a href="#find-your-starting-point">Find your starting point</a></li>
+              <li><a href="#what-your-site-can-do">What your site can do</a></li>
+              <li><a href="#explore-before-you-start">Explore before you start</a></li>
+              <li><a href="#get-help-with-your-event">Get help with your event</a></li>
             </ul>
           </nav>
-          <p>A white-label event CMS for conferences and gatherings. Each client event gets its own Firebase project. The Center for Cooperative Media deploys and operates it. Client staff run the site from the admin CMS. They never touch the code.</p>
-          <p><strong>License:</strong> <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>. The code is free. The trademark is the exclusivity lever: nobody else can market hosting under this name.</p>
-          <p><strong>Status:</strong> Preparing for the first outside client, NC Local. The <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">v1 architecture spec</a> and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">feature triage</a> are the contract; later decisions are in the <a href="https://github.com/CenterCoopMedia/eventrunner/tree/main/docs/adr">decision records</a>. Work is tracked on the <a href="/eventrunner/docs/roadmap/">roadmap</a> and the <a href="https://github.com/orgs/CenterCoopMedia/projects/2">project board</a>. Milestones 1 to 4 and the public-site parity milestone are complete. The registration and pitch steppers (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0008-registration-and-pitch-steppers.md">ADR 0008</a>) are built. The client console is live at <a href="https://console.eventrunner.org">console.eventrunner.org</a>: a client opens one signup link, accepts the agreement, fills in setup, and the site builder makes their site with no keys, files or DNS (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0007-client-console-self-serve-onboarding.md">ADR 0007</a>). Sites are archived for seven days before they are deleted.</p>
-          <p>Site: <a href="https://centercoopmedia.github.io/eventrunner/">centercoopmedia.github.io/eventrunner</a>
-          Documentation: <a href="https://centercoopmedia.github.io/eventrunner/docs/">centercoopmedia.github.io/eventrunner/docs</a>
-          Handbook: <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a></p>
-          <h2 id="demos">Demos<a class="heading-anchor" href="#demos" aria-label="Link to this section">#</a></h2>
-          <h3 id="static-visitor-preview">Static visitor preview<a class="heading-anchor" href="#static-visitor-preview" aria-label="Link to this section">#</a></h3>
-          <p><a href="https://centercoopmedia.github.io/eventrunner/demo/">Open the static visitor preview</a>. It is an NC Local past-event mock-up of the March 27, 2026 NC News &amp; Information Summit in Raleigh. Its selected historical program includes eight named sessions, 25 public speakers, and documented partner roles. It does not reproduce the full agenda or represent an official NC Local site, endorsement, or future event. See the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/nclocal-demo.md">historical content and sources</a>.</p>
-          <p>The preview is read-only, needs no account, and has no admin panel. Sign-in, registration, ticket claims, email actions, the attendee directory, and calendar exports are disabled. Compare all six site styles in light or dark mode, or open the <a href="https://centercoopmedia.github.io/eventrunner/demo/#/specimen">specimen book</a> for interface components.</p>
-          <h3 id="hosted-adminclient-demo">Hosted admin/client demo<a class="heading-anchor" href="#hosted-adminclient-demo" aria-label="Link to this section">#</a></h3>
-          <p><a href="https://eventrunner-demo.web.app/">Open the hosted client demo</a> or its <a href="https://eventrunner-demo.web.app/admin">admin panel</a>. This separate Firebase-hosted deployment demonstrates client and admin workflows. Admin screens require an authorized account; opening the link does not grant access. The <a href="/eventrunner/docs/admin-guide/">admin guide</a> explains the staff editing screens.</p>
-          <p>The hosted demo was reseeded with the NC Local historical content on October 9, 2026 (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/346">#346</a>). Its content and release can differ from the static preview. Hosted-demo verification remains tracked in <a href="https://github.com/CenterCoopMedia/eventrunner/issues/35">#35</a>.</p>
-          <h2 id="who-it-is-for">Who it is for<a class="heading-anchor" href="#who-it-is-for" aria-label="Link to this section">#</a></h2>
-          <p>Nonprofit and journalism organizations, universities, and event producers who want a staff-run event site: schedule, speakers, registration, materials, and a block-based CMS.</p>
-          <p>The reference implementation is the <a href="https://summit.collaborativejournalism.org">2026 Collaborative Journalism Summit</a> site (<code>jamditis/cjs2026</code>). That repo stays the live production event. This repo is a new extract, not a fork. Features cut from v1 stay in the summit repo.</p>
-          <h2 id="what-it-includes">What it includes<a class="heading-anchor" href="#what-it-includes" aria-label="Link to this section">#</a></h2>
-          <p><strong>The public site and attendees</strong></p>
+          <p>Event Runner gives your conference or gathering a website your team can keep up to date. Bring the schedule, speakers, tickets, practical information, and event updates together in one place. The Center for Cooperative Media sets up and hosts the site; your team manages the content.</p>
+          <h2 id="find-your-starting-point">Find your starting point<a class="heading-anchor" href="#find-your-starting-point" aria-label="Link to this section">#</a></h2>
           <ul>
-          <li>Block-based CMS with draft and publish, pages, updates, a timeline, and a media library</li>
-          <li>Schedule, sessions, bookmarks, and calendar links</li>
-          <li>Google sign-in and emailed 6-digit codes</li>
-          <li>Attendee directory and profiles</li>
-          <li>Sponsors and organizations</li>
-          <li>Per-event theming: seven site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode</li>
+          <li><strong>Planning an event?</strong> Read <a href="/eventrunner/docs/handbook/for-clients/">For event organizers</a> to see what is included and what you need to get started.</li>
+          <li><strong>Working on an event site?</strong> Start with <a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a>, then use the <a href="/eventrunner/docs/admin-guide/">Admin guide</a> for a particular task.</li>
+          <li><strong>Going to an event?</strong> <a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a> explains sign-in, saved sessions, materials, and your profile.</li>
           </ul>
-          <p><strong>Registration and tickets</strong></p>
-          <ul>
-          <li>Ticketing through Eventbrite, a manual or CSV ticket list, or Stripe Checkout on the organizer&#39;s own Stripe account (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0004-stripe-ticket-commerce.md">ADR 0004</a>)</li>
-          <li>A checkout in steps: tickets, attendees, registration questions, review, and pay</li>
-          <li>Registration questions: a standard set (organization, job title, diet, access needs, photo consent, directory listing) and up to 10 custom questions. Answers belong to each attendee&#39;s account and only staff see them</li>
-          <li>Promo codes, priced on the server with use limits that hold under racing checkouts</li>
-          <li>Complimentary tickets, refunds, check-in, and a private attendee record</li>
-          </ul>
-          <p><strong>Speakers and the program</strong></p>
-          <ul>
-          <li>Session pitches in steps, with co-presenters, a staff review queue, and intake from the site, a CSV file, or Airtable (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0005-airtable-pitch-intake.md">ADR 0005</a>)</li>
-          <li>An accepted pitch invites each presenter as a speaker</li>
-          <li>Speaker invite, accept, and a profile in steps, with private travel, access, and audio and video needs</li>
-          <li>Session materials with embargo</li>
-          </ul>
-          <p><strong>Running the event</strong></p>
-          <ul>
-          <li>An admin CMS on its own editorial desk, in the event&#39;s own colours, with a setup checklist for launch. Features start on and each has a switch on its own page</li>
-          <li>Transactional email through a provider adapter (Postmark is the reference)</li>
-          <li>Announcement email to registered attendees, approved attendees, or speakers, with a preview, a test send, a confirmation of the recipient count, a separate broadcast stream, and one-click unsubscribe</li>
-          <li>Scheduled reminders (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0006-scheduled-reminders.md">ADR 0006</a>) and live updates</li>
-          <li>Sponsor invoices with a PDF, email, and an optional card payment link</li>
-          <li>Import of speakers, sessions, organizations, and registrations from CSV files, and spreadsheet exports, including speaker logistics</li>
-          <li>An event data package for the handoff after the event</li>
-          <li>A &quot;Report a problem&quot; button in the admin and the console that sends the report to the hosting team</li>
-          </ul>
-          <p>What v1 does not include is listed in the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">triage record</a>. Video generation, social feeds, and speaker chat stay out. Sponsor invoicing was cut in the triage and is back in scope (<a href="/eventrunner/docs/decisions/0001-event-platform-v1/#42-collections-not-carried-over">ADR 0001 §4.2 amendment</a>, <a href="https://github.com/CenterCoopMedia/eventrunner/issues/208">#208</a>). Airtable is in scope for session pitch intake only: a read-only refresh from one approved table into the private review queue (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0005-airtable-pitch-intake.md">ADR 0005</a>). Other Airtable sync stays out. Announcement email goes only to the event&#39;s attendees and speakers; it is not a marketing list tool.</p>
-          <h2 id="operating-model">Operating model<a class="heading-anchor" href="#operating-model" aria-label="Link to this section">#</a></h2>
-          <p>One Firebase project per client event. A client with a second event, or a new edition, gets a new
-          project. <code>scripts/export-event-template.cjs</code> carries the approved branding, page templates and
-          selected static settings into it, and nothing else; see &quot;Reuse a past event as a template&quot; in
-          <a href="/eventrunner/docs/client-onboarding/"><code>docs/CLIENT_ONBOARDING.md</code></a>. Configuration is two tiers:</p>
-          <ol>
-          <li><strong>Deploy-time</strong> environment variables (project id, providers, public URL). Documented in <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/.env.example"><code>.env.example</code></a>.</li>
-          <li><strong>Runtime</strong> Firestore <code>config/*</code> documents that client admins edit: name, dates, venue, theme, badges.</li>
-          </ol>
-          <p>See spec §2.</p>
-          <h2 id="repo-layout">Repo layout<a class="heading-anchor" href="#repo-layout" aria-label="Link to this section">#</a></h2>
-          <pre data-scroll-region data-scroll-label="Code example"><code>apps/web            Vite frontend: the public site, the admin CMS, the demo, the specimen book
-          functions           Cloud Functions by domain module
-          packages/shared     Config schema, theme, lifecycle clock, time, registration, badges
-          scripts             Operator tools, generators, and the CI checks
-          design/tokens       The three token tiers, the seven site styles, the admin&#39;s own set
-          docs                Spec, roadmap, design records, and the GitHub Pages site
-          </code></pre>
-          <p><code>packages/shared</code> is CommonJS with hand-written ESM shims so the same module serves Vite and Cloud Functions with no transpile step.</p>
-          <h2 id="develop">Develop<a class="heading-anchor" href="#develop" aria-label="Link to this section">#</a></h2>
-          <p>Node 22 (22.12 or later), Node 24, or Node 26 and later. Vitest 5 does not run on Node 23 or 25.</p>
-          <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">npm run prepare:functions
-          npm install
-          npm test            # shared package, Cloud Functions, console functions, and scripts (Node&#39;s test runner)
-          npm run test:web    # the web app and the console web app (Vitest)
-          npm run test:rules  # Firestore and Storage rules on the emulators (needs Java)
-          npm run test:e2e    # browser journeys on the emulators (Playwright)
-          npm run lint
-          npm run build
-          </code></pre>
-          <p>None of these needs a credential. Every external service has a fake in the tests.</p>
-          <p>Rules that apply to every PR:</p>
-          <ul>
-          <li>No hardcoded event name, city, hex color, or domain. Event identity comes from config.</li>
-          <li><code>ticket_sync_queue</code> is the only queue in the system.</li>
-          <li>CI must stay credential-free so fork PRs can run every check.</li>
-          </ul>
-          <p>See <a href="/eventrunner/docs/contributing/">CONTRIBUTING.md</a>.</p>
-          <h2 id="license-and-trademark">License and trademark<a class="heading-anchor" href="#license-and-trademark" aria-label="Link to this section">#</a></h2>
-          <p>Copyright 2026 Center for Cooperative Media. Licensed under the Apache License, Version 2.0. See <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">LICENSE</a> and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/NOTICE">NOTICE</a>.</p>
-          <p>Apache-2.0 does not grant trademark rights. &quot;Event Runner&quot; as a product name is reserved to the Center for Cooperative Media.</p>
-          <h2 id="security">Security<a class="heading-anchor" href="#security" aria-label="Link to this section">#</a></h2>
-          <p>Do not open a public issue for a vulnerability. Use <a href="https://github.com/CenterCoopMedia/eventrunner/security">private vulnerability reporting</a> or email info@eventrunner.org. See <a href="/eventrunner/docs/security/">SECURITY.md</a>.</p>
-          <p>Operator-run client deployments are out of scope for public reports. Email the operator of that deployment.</p>
-          <h2 id="support">Support<a class="heading-anchor" href="#support" aria-label="Link to this section">#</a></h2>
-          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
-          <table>
-          <thead>
-          <tr><th>You are…</th><th>Start here</th></tr>
-          </thead>
-          <tbody>
-          <tr><td>Attendee or event staff with a how-to</td><td><a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a">Q&amp;A</a></td></tr>
-          <tr><td>An organization that wants a hosted event</td><td><a href="https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general">General</a></td></tr>
-          <tr><td>Reporting a product bug</td><td><a href="https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml">Bug form</a></td></tr>
-          <tr><td>CCM already hosts your site</td><td>info@eventrunner.org</td></tr>
-          <tr><td>Changing the code</td><td><a href="/eventrunner/docs/contributing/">CONTRIBUTING.md</a></td></tr>
-          </tbody>
-          </table>
-          </div>
-          <p>The <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a> is the handbook for attendees, staff, and clients. <a href="/eventrunner/docs/governance/">GOVERNANCE.md</a> is who decides.</p>
-          <p>An initiative of the Center for Cooperative Media at Montclair State University.</p>
+          <h2 id="what-your-site-can-do">What your site can do<a class="heading-anchor" href="#what-your-site-can-do" aria-label="Link to this section">#</a></h2>
+          <p>Publish sessions, speaker profiles, pages, and updates from the admin panel. Keep drafts separate from published content. Give attendees a schedule they can browse, save, and add to their calendar. Connect the registration option agreed for your event, including Eventbrite, Stripe, or a spreadsheet.</p>
+          <p>Your site uses your event&#39;s identity. Choose a site style, add your logos, and set your colors. Your team edits content without changing code. Available features and staff permissions depend on how your event is configured.</p>
+          <h2 id="explore-before-you-start">Explore before you start<a class="heading-anchor" href="#explore-before-you-start" aria-label="Link to this section">#</a></h2>
+          <p>The <a href="https://centercoopmedia.github.io/eventrunner/demo/">static visitor preview</a> shows an NC Local past-event example. It uses a selected historical program with eight named sessions and 25 public speakers from the March 27, 2026 NC News &amp; Information Summit. It is not an official NC Local site or the full event program.</p>
+          <p>The preview is read-only and has no admin panel. Sign-in, registration, email actions, and calendar exports are disabled. You can compare the six site styles in light and dark mode. The <a href="https://centercoopmedia.github.io/eventrunner/demo/#/specimen">specimen book</a> shows the controls and page elements in each style.</p>
+          <p>The separate <a href="https://eventrunner-demo.web.app/">hosted admin/client demo</a> includes an <a href="https://eventrunner-demo.web.app/admin">admin panel</a>. Admin access requires an authorized account. Opening the link does not grant access, and the hosted demo&#39;s content and release can differ from the static preview.</p>
+          <h2 id="get-help-with-your-event">Get help with your event<a class="heading-anchor" href="#get-help-with-your-event" aria-label="Link to this section">#</a></h2>
+          <p>Ask your event team about tickets, accessibility needs, or changes to your registration. For help running a site or starting a new one, see <a href="/eventrunner/docs/handbook/getting-help/">Getting help</a>. The <a href="/eventrunner/docs/handbook/faq/">frequently asked questions</a> cover common questions about the service.</p>
         </article>
-        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/README.md"><code>README.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <div class="source-note"><a href="/eventrunner/support/">Ask for help</a><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/handbook/overview.md">Improve this guide on GitHub</a></div>
         <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/handbook/"><span>Next</span>Handbook</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/handbook/for-clients/"><span>Next</span>For event organizers</a>
         </nav>
       </main>
     </div>
     <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
       <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="/eventrunner/docs/security/">Security</a>
+        <a class="footer-brand" href="/eventrunner/"><strong>Event Runner</strong></a>
+        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>
       </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/eventrunner/support/">Support</a>
+        <a href="/eventrunner/privacy/">Privacy</a>
+        <a href="/eventrunner/terms-of-service/">Terms</a>
+        <a href="/eventrunner/project/">About the project</a>
+      </nav>
     </footer>
   </div>
 </body>

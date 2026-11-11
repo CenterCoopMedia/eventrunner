@@ -3,28 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Use read-only browser diagnostics — Event Runner documentation</title>
-  <meta name="description" content="Enable, use, and verify bounded public and authenticated site tools.">
+  <title>Browser diagnostics — Event Runner</title>
+  <meta name="description" content="Read Browser diagnostics in the Event Runner repository on GitHub.">
+  <meta name="robots" content="noindex, follow">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/webmcp-diagnostics/">
   <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/eventrunner/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/eventrunner/apple-touch-icon.png">
 
-  <meta property="og:type" content="article">
+  <meta property="og:type" content="website">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Use read-only browser diagnostics — Event Runner documentation">
-  <meta property="og:description" content="Enable, use, and verify bounded public and authenticated site tools.">
+  <meta property="og:title" content="Browser diagnostics — Event Runner">
+  <meta property="og:description" content="Read Browser diagnostics in the Event Runner repository on GitHub.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/webmcp-diagnostics/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta property="og:image:alt" content="Event Runner guides">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Use read-only browser diagnostics — Event Runner documentation">
-  <meta name="twitter:description" content="Enable, use, and verify bounded public and authenticated site tools.">
+  <meta name="twitter:title" content="Browser diagnostics — Event Runner">
+  <meta name="twitter:description" content="Read Browser diagnostics in the Event Runner repository on GitHub.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
-  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="twitter:image:alt" content="Event Runner guides">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
@@ -34,8 +35,9 @@
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
   <script src="/eventrunner/scroll-regions.js" defer></script>
+  <script src="/eventrunner/docs-ui.js" defer></script>
 </head>
-<body>
+<body class="docs-site">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="wrap">
@@ -58,116 +60,43 @@
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Documentation</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="/eventrunner/">Home</a>
-        <a href="/eventrunner/docs/">Documentation</a>
-        <a href="/eventrunner/demo/">Demo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="/eventrunner/features/">Features</a>
+        <a href="/eventrunner/how-it-works/">How it works</a>
+        <a href="/eventrunner/docs/" aria-current="location">Guides</a>
+        <a href="/eventrunner/project/">About</a>
+        <a class="btn nav-cta" href="/eventrunner/demo/">Try the demo</a>
       </nav>
     </header>
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <ol>
         <li><a href="/eventrunner/">Home</a></li>
-        <li><a href="/eventrunner/docs/">Documentation</a></li>
-        <li><span aria-current="page">Use read-only browser diagnostics</span></li>
+        <li><span aria-current="page">Browser diagnostics</span></li>
         </ol>
       </nav>
-    <div class="docs-layout">
-      <nav class="docs-nav" aria-label="Documentation">
-        <p class="docs-nav-section">Start here</p>
-        <ul>
-          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
-          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
-          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
-          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
-          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
-        </ul>
-        <p class="docs-nav-section">Operate</p>
-        <ul>
-          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
-          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
-          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
-          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
-          <li><a href="/eventrunner/docs/webmcp-diagnostics/" aria-current="page" class="is-current">Use read-only browser diagnostics</a></li>
-          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
-          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
-          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
-          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
-          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
-          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
-        </ul>
-        <p class="docs-nav-section">Build</p>
-        <ul>
-          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
-          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
-          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
-          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
-          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
-          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
-          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
-          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
-          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
-        </ul>
-        <p class="docs-nav-section">Get help</p>
-        <ul>
-          <li><a href="/eventrunner/docs/support/">Support</a></li>
-          <li><a href="/eventrunner/docs/security/">Security</a></li>
-        </ul>
-      </nav>
-      <main class="docs-main" id="main">
-        <article class="prose">
-          <h1>Use read-only browser diagnostics</h1>
-          <nav class="contents" aria-labelledby="contents-title">
-            <p class="contents-title" id="contents-title">On this page</p>
-            <ul>
-              <li><a href="#access">Access</a></li>
-              <li><a href="#admin-diagnostics">Admin diagnostics</a></li>
-              <li><a href="#limits">Limits</a></li>
-            </ul>
-          </nav>
-          <p>Event Runner can register read-only diagnostic tools in a supported browser when the event’s experimental setting is on. The tools supplement the visible admin. They do not replace it.</p>
-          <h2 id="access">Access<a class="heading-anchor" href="#access" aria-label="Link to this section">#</a></h2>
-          <p>Public tools contain public event information only. Admin diagnostics appear only after the normal admin access check succeeds. Each admin tool calls the existing authenticated server boundary with the current Firebase ID token. Signing out removes the admin tool set.</p>
-          <p>A tool registration does not grant access. The server still decides whether the caller can read the result. Turn on <code>webmcpPublic</code> for a client public site and <code>webmcpAdmin</code> for its admin diagnostics. Both validated feature flags default off. The static demo enables the public set without changing a client default.</p>
-          <h2 id="admin-diagnostics">Admin diagnostics<a class="heading-anchor" href="#admin-diagnostics" aria-label="Link to this section">#</a></h2>
-          <p>The admin set contains these tools:</p>
-          <ul>
-          <li><code>check_event_readiness</code></li>
-          <li><code>validate_current_page_draft</code></li>
-          <li><code>inspect_publish_queue</code></li>
-          <li><code>inspect_system_errors</code></li>
-          <li><code>check_media_usage</code></li>
-          <li><code>check_ticketing_health</code></li>
-          </ul>
-          <p>Each tool calls one fixed server endpoint. The current-page validator uses only the page id from the open admin editor route. It is unavailable on other admin routes.</p>
-          <p>The admin set follows the admin tiers. An operator holds all six tools. A staff account holds five: <code>inspect_system_errors</code> is registered for operators only, and the server refuses it to staff regardless of what is registered.</p>
-          <p>Results do not contain attendee records, ticket details, payments, invitations, email content, provider credentials, storage administration, secrets, tokens, or unrestricted internal logs. Publish and system-error lists report their total and truncated count. Media checks report the total, checked, and truncated asset counts without object paths.</p>
-          <h2 id="limits">Limits<a class="heading-anchor" href="#limits" aria-label="Link to this section">#</a></h2>
-          <p>The tools cannot save, publish, deploy, delete, send email, export data, change provider setup, or run an arbitrary function. Use the visible admin controls for all changes.</p>
-          <p>Before either experimental setting is enabled outside the demo, invoke every tool in a real supported top-level browser and compare the result with the related screen. Confirm that public routes list no admin tool name. Sign out and confirm that the admin names disappear. Record any mismatch as an issue.</p>
-        </article>
-        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/webmcp-diagnostics.md"><code>docs/operator/webmcp-diagnostics.md</code></a>. Edit the Markdown, not the HTML.</p>
-        <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/archive-handoff/"><span>Previous</span>Archive and hand off a past event</a>
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/design-reference/"><span>Next</span>Site design reference</a>
-        </nav>
-      </main>
-    </div>
-    <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
-      <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="/eventrunner/docs/security/">Security</a>
+    <main class="docs-handoff prose" id="main">
+      <h1>Browser diagnostics</h1>
+      <p class="lede">This technical document is maintained with the source code on GitHub.</p>
+      <p>Architecture decisions, deployment instructions, and contributor records stay with the source code. Event organizers and attendees can use the guides on this site.</p>
+      <div class="handoff-actions">
+        <a class="btn" href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/webmcp-diagnostics.md">Read this document on GitHub</a>
+        <a class="btn btn-ghost" href="/eventrunner/docs/">Browse the guides</a>
       </div>
+    </main>
+    <footer class="site-footer">
+      <div>
+        <a class="footer-brand" href="/eventrunner/"><strong>Event Runner</strong></a>
+        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/eventrunner/support/">Support</a>
+        <a href="/eventrunner/privacy/">Privacy</a>
+        <a href="/eventrunner/terms-of-service/">Terms</a>
+        <a href="/eventrunner/project/">About the project</a>
+      </nav>
     </footer>
   </div>
 </body>

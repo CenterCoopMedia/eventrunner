@@ -3,28 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Client onboarding — Event Runner documentation</title>
-  <meta name="description" content="The provisioning checklist from first call to handover.">
+  <title>Client onboarding runbook — Event Runner</title>
+  <meta name="description" content="Read Client onboarding runbook in the Event Runner repository on GitHub.">
+  <meta name="robots" content="noindex, follow">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/client-onboarding/">
   <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/eventrunner/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/eventrunner/apple-touch-icon.png">
 
-  <meta property="og:type" content="article">
+  <meta property="og:type" content="website">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Client onboarding — Event Runner documentation">
-  <meta property="og:description" content="The provisioning checklist from first call to handover.">
+  <meta property="og:title" content="Client onboarding runbook — Event Runner">
+  <meta property="og:description" content="Read Client onboarding runbook in the Event Runner repository on GitHub.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/client-onboarding/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta property="og:image:alt" content="Event Runner guides">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Client onboarding — Event Runner documentation">
-  <meta name="twitter:description" content="The provisioning checklist from first call to handover.">
+  <meta name="twitter:title" content="Client onboarding runbook — Event Runner">
+  <meta name="twitter:description" content="Read Client onboarding runbook in the Event Runner repository on GitHub.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
-  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="twitter:image:alt" content="Event Runner guides">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
@@ -34,8 +35,9 @@
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
   <script src="/eventrunner/scroll-regions.js" defer></script>
+  <script src="/eventrunner/docs-ui.js" defer></script>
 </head>
-<body>
+<body class="docs-site">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="wrap">
@@ -58,458 +60,43 @@
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Documentation</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="/eventrunner/">Home</a>
-        <a href="/eventrunner/docs/">Documentation</a>
-        <a href="/eventrunner/demo/">Demo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="/eventrunner/features/">Features</a>
+        <a href="/eventrunner/how-it-works/">How it works</a>
+        <a href="/eventrunner/docs/" aria-current="location">Guides</a>
+        <a href="/eventrunner/project/">About</a>
+        <a class="btn nav-cta" href="/eventrunner/demo/">Try the demo</a>
       </nav>
     </header>
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <ol>
         <li><a href="/eventrunner/">Home</a></li>
-        <li><a href="/eventrunner/docs/">Documentation</a></li>
-        <li><span aria-current="page">Client onboarding</span></li>
+        <li><span aria-current="page">Client onboarding runbook</span></li>
         </ol>
       </nav>
-    <div class="docs-layout">
-      <nav class="docs-nav" aria-label="Documentation">
-        <p class="docs-nav-section">Start here</p>
-        <ul>
-          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
-          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
-          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
-          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
-          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
-        </ul>
-        <p class="docs-nav-section">Operate</p>
-        <ul>
-          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
-          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
-          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
-          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
-          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
-          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
-          <li><a href="/eventrunner/docs/client-onboarding/" aria-current="page" class="is-current">Client onboarding</a></li>
-          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
-          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
-          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
-          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
-        </ul>
-        <p class="docs-nav-section">Build</p>
-        <ul>
-          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
-          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
-          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
-          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
-          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
-          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
-          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
-          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
-          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
-        </ul>
-        <p class="docs-nav-section">Get help</p>
-        <ul>
-          <li><a href="/eventrunner/docs/support/">Support</a></li>
-          <li><a href="/eventrunner/docs/security/">Security</a></li>
-        </ul>
-      </nav>
-      <main class="docs-main" id="main">
-        <article class="prose">
-          <h1>Client onboarding</h1>
-          <nav class="contents" aria-labelledby="contents-title">
-            <p class="contents-title" id="contents-title">On this page</p>
-            <ul>
-              <li><a href="#0-prerequisites">0. Prerequisites</a></li>
-              <li><a href="#1-project-provisioning">1. Project provisioning</a></li>
-              <li><a href="#2-init-event-the-answers-file">2. init-event: the answers file</a></li>
-              <li><a href="#3-the-56-items">3. The §5.6 items</a></li>
-              <li><a href="#4-readiness-gating---check">4. Readiness gating (--check)</a></li>
-              <li><a href="#5-go-live">5. Go live</a></li>
-              <li><a href="#6-optional-google-calendar-sync-configfeaturescalendarsync">6. Optional: Google Calendar sync (config/features.calendarSync)</a></li>
-              <li><a href="#reuse-a-past-event-as-a-template">Reuse a past event as a template</a></li>
-              <li><a href="#handoff-to-the-client">Handoff to the client</a></li>
-            </ul>
-          </nav>
-          <p>The operator&#39;s start-to-finish checklist for standing up <strong>one client event</strong>, from a signed
-          agreement to a live, launch-ready site. This is the provisioning and content checklist; the
-          infrastructure steps it points into live in <a href="/eventrunner/docs/deploy-runbook/"><code>docs/DEPLOY_RUNBOOK.md</code></a> so they
-          are documented once. When you finish, hand the client <a href="/eventrunner/docs/handbook/for-clients/"><code>docs/handbook/for-clients.md</code></a>
-          and <a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> — see <a href="#handoff-to-the-client">Handoff</a>
-          below.</p>
-          <p><strong>Done when:</strong> <code>node scripts/init-event.cjs --check</code> exits 0 and the client&#39;s first two admins can
-          sign in and edit content.</p>
-          <h2 id="0-prerequisites">0. Prerequisites<a class="heading-anchor" href="#0-prerequisites" aria-label="Link to this section">#</a></h2>
-          <p>Before you start provisioning:</p>
-          <ul>
-          <li>The client has answered <a href="/eventrunner/docs/handbook/for-clients/"><code>docs/handbook/for-clients.md</code></a>&#39;s &quot;What you
-          will need to give us&quot; list: event name/dates/timezone/venue, the public URL they want, who the
-          first admins are, their ticketing choice, and a sender address on <strong>their own domain</strong>.</li>
-          <li>You know which ticketing provider this is: <code>stripe</code> (native sales through the organizer&#39;s Stripe
-          account), <code>eventbrite</code>, <code>manual</code> (CSV import), or <code>none</code>. Every
-          onboarding step below that mentions ticketing is gated on this choice, not optional busywork —
-          a <code>manual</code> deployment genuinely has no webhook step, not a skipped one.</li>
-          <li>You have (or can get) <code>gcloud</code> access to create a GCP project, and Firebase Console access to add
-          Firebase to it.</li>
-          </ul>
-          <h2 id="1-project-provisioning">1. Project provisioning<a class="heading-anchor" href="#1-project-provisioning" aria-label="Link to this section">#</a></h2>
-          <p>This is entirely <a href="/eventrunner/docs/deploy-runbook/"><code>docs/DEPLOY_RUNBOOK.md</code></a>&#39;s job — do not duplicate it here.
-          Work through, in order:</p>
-          <ol>
-          <li><strong>§0–2</strong> — name the project, set up Workload Identity Federation (once per GCP org/project if
-          not already done), create the project, enable its APIs, create the per-client deploy service
-          account and bind it to <code>refs/heads/main</code> only.</li>
-          <li><strong>§3</strong> — create the GitHub Environment for this client and set every <code>vars.*</code> and <code>secrets.*</code>
-          row the runbook&#39;s tables list, including the provider secrets your ticketing/email choice needs.</li>
-          <li><strong>§4</strong> — decide now whether this client auto-deploys on push (<code>AUTO_DEPLOY_ENVIRONMENTS</code>) or
-          stays on manual <code>workflow_dispatch</code> while it&#39;s new. Manual is the safer default for a first
-          event.</li>
-          <li><strong>§5</strong> — run the <strong>bootstrap dispatch</strong> (provision + functions only), confirming it succeeds
-          before you touch this document again. Do not run the normal dispatch yet — there is no
-          <code>config/event</code> document for it to build content from.</li>
-          </ol>
-          <p>Stop here and come back to this document once the bootstrap dispatch is green.</p>
-          <h2 id="2-init-event-the-answers-file">2. init-event: the answers file<a class="heading-anchor" href="#2-init-event-the-answers-file" aria-label="Link to this section">#</a></h2>
-          <p><code>init-event.cjs</code> is the one-time content bootstrap (<code>docs/DEPLOY_RUNBOOK.md</code> §5 step 2) — it does
-          not run from <code>deploy-client.yml</code>, and it is not repeatable in the way a deploy is: re-running it
-          never overwrites anything the client has already edited (<code>seeded: true</code> bookkeeping), so running it
-          again by mistake is safe, not silent data loss.</p>
-          <p>Build a <code>client-answers.json</code> from the client&#39;s intake (see <code>scripts/lib/answers.cjs</code> for the
-          prompt list and validation this file goes through — the same file interactive mode would produce
-          answering the same questions one at a time, and
-          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/examples/demo-answers.json"><code>docs/examples/demo-answers.json</code></a> for a filled-in example). At
-          minimum it needs the event name, dates, timezone, venue, the public URL, the ticketing provider
-          choice (and its event ID if <code>eventbrite</code>), the email provider choice, and the sender address.</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">export GOOGLE_APPLICATION_CREDENTIALS=&lt;path to your own gcloud ADC, for this one-time step&gt;
-          export EVENT_FIREBASE_PROJECT_ID=&lt;the client&#39;s GCP project id&gt;
-          node scripts/init-event.cjs --answers client-answers.json --admin &lt;first-admin@client-domain&gt;
-          </code></pre>
-          <p>Repeat <code>--admin</code> for a second address if you already know it — item 5 below still applies if you
-          don&#39;t yet. <code>--admin</code> seeds the <strong>operator</strong> tier (branding, features, access, deployment settings).
-          Pass <code>--staff &lt;email&gt;</code> for anyone who should run content, schedule, speakers, and attendees without
-          the deployment settings; staff can also be granted later from admin Settings → Access
-          (<code>docs/ADMIN_GUIDE.md</code>, &quot;Who can do what&quot;).</p>
-          <p>This seeds <code>config/*</code>, the fifteen default pages, placeholder CMS content, the two legal page
-          templates (flagged <code>reviewRequired</code>, see item 4 below), the client-visible email template
-          overrides, and the placeholder branding assets. It then prints the manual checklist below and the
-          seven-row launch-readiness table as <strong>warnings</strong> — init itself never fails on an unmet item; only
-          <code>--check</code> (§6) gates going live.</p>
-          <h2 id="3-the-56-items">3. The §5.6 items<a class="heading-anchor" href="#3-the-56-items" aria-label="Link to this section">#</a></h2>
-          <p>These are the steps a deploy cannot automate — the same list <code>init-event.cjs</code> prints after seeding
-          (<code>scripts/lib/checklist.cjs</code>, spec §5.6), reproduced here with the command for each so this document
-          stands on its own as a checklist you can work top to bottom.</p>
-          <h3 id="12-firebase-auth-manual-console-steps">1–2. Firebase Auth (manual console steps)<a class="heading-anchor" href="#12-firebase-auth-manual-console-steps" aria-label="Link to this section">#</a></h3>
-          <p>Firebase Console → Authentication:</p>
-          <ol>
-          <li><strong>Sign-in method</strong> → enable <strong>Google</strong>. Set the project support email and the public-facing app
-          name — both appear in the Google consent dialog. Emailed one-time codes work without this;
-          Google sign-in specifically does not.</li>
-          <li><strong>Settings → Authorized domains</strong> → add the client&#39;s custom domain (the one from <code>EVENT_PUBLIC_URL</code>)
-          <strong>and</strong> the Hosting default domain (<code>&lt;EVENT_HOSTING_SITE&gt;.web.app</code>). Sign-in fails silently on
-          any domain not on this list — this bites operators who verify the custom domain and forget the
-          default one is still needed for previews and the pre-cutover URL. For a custom domain added with
-          <code>scripts/add-web-address.cjs</code> (item 3), the status check adds it to the list itself once Hosting
-          serves it; the default domain is still yours to add.</li>
-          </ol>
-          <p>There is no Admin SDK read for &quot;is Google sign-in enabled&quot; — nothing in the platform can check
-          this for you. Once both steps are done, record it:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/init-event.cjs --attest-auth
-          </code></pre>
-          <p>This stamps <code>config/event.auth</code> (<code>googleProviderEnabled</code>, <code>authorizedDomainsConfigured</code>,
-          <code>attestedAt</code>, <code>attestedBy</code>) and — because enabling Google sign-in changes what the seeded privacy
-          policy is <em>true about</em> — refreshes the two legal templates&#39; sign-in clause through the normal seed
-          path (client edits are still never overwritten). This is what clears the Auth row in <code>--check</code>.</p>
-          <h3 id="3-firebase-hosting-custom-domain">3. Firebase Hosting custom domain<a class="heading-anchor" href="#3-firebase-hosting-custom-domain" aria-label="Link to this section">#</a></h3>
-          <p>For the client&#39;s own domain, add it with the script, not the Firebase console:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_FIREBASE_PROJECT_ID=&lt;id&gt; node scripts/add-web-address.cjs summit.example.org
-          </code></pre>
-          <p>It asks Hosting for the domain, stores the record that
-          <strong>Settings → Web address</strong> reads, and prints the DNS records (including the TXT record for
-          verification) to give the client. See &quot;Custom web address status in the admin&quot; in
-          <code>docs/DEPLOY_RUNBOOK.md</code>. Then wait for certificate issuance before announcing the site. The
-          first status check after Hosting serves the domain adds it to the authorized domains. Both
-          steps can take anywhere from minutes to about a day; re-check readiness (§6) rather than assuming
-          it finished.</p>
-          <p>The script refuses <code>*.eventrunner.org</code>. If this client&#39;s domain is a <code>*.eventrunner.org</code>
-          subdomain rather than their own domain, add it in Firebase Hosting and see the
-          wildcard-vs-per-client DNS note in <code>docs/DEPLOY_RUNBOOK.md</code> (issue #66) — the attach mechanics are
-          the same Hosting custom-domain flow either way.</p>
-          <h3 id="4-sender-domain-spfdkimdmarc">4. Sender domain (SPF/DKIM/DMARC)<a class="heading-anchor" href="#4-sender-domain-spfdkimdmarc" aria-label="Link to this section">#</a></h3>
-          <p>Emailed one-time codes are this platform&#39;s only sign-in path that depends on mail, and an
-          unauthenticated sender domain is exactly the condition that gets those codes quarantined by the
-          institutional mail filters a lot of this buyer set runs. Get the client to publish, in <strong>their</strong>
-          DNS, on the domain their sender address uses:</p>
-          <ul>
-          <li>an SPF record (or include) for the email provider,</li>
-          <li>a DKIM TXT record from the provider console,</li>
-          <li>a DMARC policy.</li>
-          </ul>
-          <p>Then confirm:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/verify-sender-domain.cjs
-          </code></pre>
-          <p>Reads <code>config/event.sender.email</code> for the domain unless you pass <code>--domain</code>, and — on a <strong>pass</strong> —
-          is the <em>only</em> writer of <code>config/event.sender.domainVerified</code>/<code>domainVerifiedAt</code>, which is what
-          clears the sender row in <code>--check</code>. A provider with no domain API of its own (<code>webhook</code>, <code>console</code>)
-          can never get an automated pass; for those, confirm the DNS yourself and record it with
-          <code>--attest</code>:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/verify-sender-domain.cjs --attest
-          </code></pre>
-          <p>Don&#39;t skip this step because &quot;the emails are going out fine in testing&quot; — quarantine is
-          inconsistent across mail filters and shows up as an intermittent, hard-to-reproduce client
-          complaint weeks into the event, not a clean failure during setup.</p>
-          <p>Tell the client that the admin Email log keeps each sent-message row for 90 days. A row includes
-          the recipient address and may include the subject and rendered body. Automatic maintenance removes
-          the row after 90 days. Sign-in codes and speaker invitations do not store their subject or body.</p>
-          <h3 id="5-ticketing-capability-gated">5. Ticketing (capability-gated)<a class="heading-anchor" href="#5-ticketing-capability-gated" aria-label="Link to this section">#</a></h3>
-          <p>Complete the step for the provider this client selected. The checklist
-          (<code>scripts/lib/checklist.cjs</code>) supports native Stripe sales, Eventbrite, manual CSV import, and
-          deployments with no ticketing provider:</p>
-          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
-          <table>
-          <thead>
-          <tr><th>Provider</th><th>Step</th></tr>
-          </thead>
-          <tbody>
-          <tr><td><code>stripe</code></td><td>Follow <a href="/eventrunner/docs/stripe-ticketing/"><code>docs/operator/stripe-ticketing.md</code></a> from §1 to §5. It names the owners, sets up a test deployment, binds <code>TICKETING_API_TOKEN</code> and <code>TICKETING_WEBHOOK_SECRET</code>, registers and checks the webhook, and opens the catalog. The site shows <strong>Get tickets</strong> only after the catalog is published.</td></tr>
-          <tr><td><code>eventbrite</code></td><td>Create the API token in the ticketing provider (<code>TICKETING_API_TOKEN</code> — already set as a GitHub Environment secret per the runbook §3). Generate <code>TICKETING_WEBHOOK_SECRET</code> with <code>openssl rand -hex 32</code> and set it the same way. Eventbrite does not sign deliveries, so the script registers this secret in the webhook URL, and the function refuses a delivery without it. Then register the webhook: <code>node scripts/register-ticketing-webhook.cjs</code>. The script registers every Eventbrite action the adapter handles, refunds included. If it names an older webhook at the same endpoint, delete that webhook in Eventbrite. Confirm the delivery via <code>getTicketingStatus</code> (admin Settings, or the Cloud Functions log for the registration call).</td></tr>
-          <tr><td><code>manual</code></td><td>No webhook to register. Upload the first attendee CSV through the admin Ticketing tab instead — that upload <em>is</em> the equivalent step for this provider.</td></tr>
-          <tr><td><code>none</code></td><td>Nothing to do. There is no token, no webhook, and no import.</td></tr>
-          </tbody>
-          </table>
-          </div>
-          <p><code>register-ticketing-webhook.cjs</code> checks the provider&#39;s own <code>registerWebhook</code> capability
-          (<code>typeof provider.registerWebhook === &#39;function&#39;</code>), never a hardcoded provider-name comparison —
-          today only <code>eventbrite</code> implements it, but the script (and this checklist) does not need to change
-          if a future provider adds the capability.</p>
-          <h3 id="6-cloud-billing">6. Cloud Billing<a class="heading-anchor" href="#6-cloud-billing" aria-label="Link to this section">#</a></h3>
-          <p>Google Cloud Console → confirm the Cloud Billing API is enabled for the deploying service account.
-          Without it, the functions deploy fails its pre-flight check with a 403 that reads like an unrelated
-          permissions error, not a billing one — check this <strong>before</strong> the first real deploy dispatch, not
-          after debugging a cryptic failure.</p>
-          <h3 id="7-first-operator-then-a-second">7. First operator, then a second<a class="heading-anchor" href="#7-first-operator-then-a-second" aria-label="Link to this section">#</a></h3>
-          <p>The first operator (from <code>--admin</code> above, or <code>config/bootstrap.adminEmails</code>) signs in and confirms
-          the admin panel loads. Point them at <strong>Set up your event</strong> on the rail: it shows every row of
-          <code>--check</code> (§4) as a step, says which steps are theirs, and links to the screen for each. Then, from <strong>admin Settings → Access</strong>, grant a second operator — do not
-          leave <code>config/bootstrap</code> as a single point of failure for a client who could lose access to one
-          inbox. <code>--check</code> (§6) requires at least two operator accounts for exactly this reason; staff
-          accounts do not count, because a staff account cannot restore anyone&#39;s access. Grant the client&#39;s
-          day-to-day editors as staff from the same page.</p>
-          <h3 id="legal-review-sign-off">Legal review sign-off<a class="heading-anchor" href="#legal-review-sign-off" aria-label="Link to this section">#</a></h3>
-          <p>Not numbered in §5.6 (it&#39;s set at seed time, not checked off separately), but it gates go-live:
-          <code>init-event.cjs</code> seeds the privacy policy and terms of service from provider-aware templates
-          (<code>scripts/lib/legal.cjs</code>) with <code>config/event.legal.reviewRequired = true</code> and every jurisdiction- or
-          policy-dependent clause marked <code>[Client legal review required]</code>. While that flag is set, the admin
-          panel shows a persistent banner and the public pages carry a visible notice. There is no script for
-          this step — it is a human sign-off: the client&#39;s counsel reviews the seeded pages (edited in the
-          admin Content editor like any other page) and an operator clears <code>legal.reviewRequired</code> from <strong>admin
-          → Set up your event</strong> once they&#39;re comfortable (a confirmation box, then <strong>Mark the review
-          complete</strong>). Nothing in the platform ever asserts another organization&#39;s
-          terms on the client&#39;s behalf; the templates are a starting point, not a finished document.</p>
-          <h2 id="4-readiness-gating---check">4. Readiness gating (<code>--check</code>)<a class="heading-anchor" href="#4-readiness-gating---check" aria-label="Link to this section">#</a></h2>
-          <p>Once every item above is done (or deliberately attested), confirm launch readiness read-only:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/init-event.cjs --check
-          </code></pre>
-          <p>This prints the same seven-row table <code>init-event.cjs</code> prints as warnings, but here it <strong>gates</strong>:
-          exit 0 only when every row is met (legal review cleared, sender domain verified/attested, at least
-          two admins, seeded-content threshold, and the rest — see <code>scripts/lib/readiness.cjs</code> for the full
-          row list and each row&#39;s remedy text). Exit non-zero means at least one row is still UNMET; the
-          remedy column says what to run or click to clear it. Re-run after each fix — this is meant to be
-          run repeatedly, not once.</p>
-          <h2 id="5-go-live">5. Go live<a class="heading-anchor" href="#5-go-live" aria-label="Link to this section">#</a></h2>
-          <ol>
-          <li><code>--check</code> is green.</li>
-          <li>Run the <strong>normal dispatch</strong> (<code>docs/DEPLOY_RUNBOOK.md</code> §5 step 3) — this is the first run whose
-          <code>content</code>/<code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code> jobs actually execute, since <code>config/event</code> now
-          exists.</li>
-          <li>Confirm <code>docs/DEPLOY_RUNBOOK.md</code> §6&#39;s verification steps: the smoke job passed, the custom
-          domain resolves and serves the deployed site (not a certificate-pending placeholder), and a
-          fresh sign-in works end to end (Google if enabled, and an emailed code).</li>
-          <li>Add this client to <code>AUTO_DEPLOY_ENVIRONMENTS</code> now, if they&#39;re ready to auto-deploy on merge to
-          <code>main</code> — or keep them on manual dispatch and revisit later (<code>docs/DEPLOY_RUNBOOK.md</code> §4).</li>
-          </ol>
-          <h2 id="6-optional-google-calendar-sync-configfeaturescalendarsync">6. Optional: Google Calendar sync (<code>config/features.calendarSync</code>)<a class="heading-anchor" href="#6-optional-google-calendar-sync-configfeaturescalendarsync" aria-label="Link to this section">#</a></h2>
-          <p>This feature is <strong>off by default</strong>. <a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003</a>
-          is proposed and still needs owner acceptance. Keep the flag off until that acceptance and
-          client-specific verification are recorded. Existing file exports continue to work.</p>
-          <p>After acceptance, the operator and the client&#39;s authorized project owner must:</p>
-          <ol>
-          <li>Enable the Google Calendar API in the client&#39;s existing Firebase/GCP project.</li>
-          <li>Enable Google as a Firebase Authentication provider. Check the OAuth web client and its
-          redirect URI, including <code>https://&lt;auth-domain&gt;/__/auth/handler</code>. Add the deployed site domain
-          to Firebase&#39;s authorized domains. Follow <a href="https://firebase.google.com/docs/auth/web/google-signin">Firebase&#39;s Google provider setup</a>.</li>
-          <li>Configure the consent screen with the client&#39;s approved name, support contact, privacy
-          policy, domains, and <code>https://www.googleapis.com/auth/calendar.app.created</code> scope. This
-          scope permits the dedicated calendar&#39;s creation; <code>calendar.events</code> alone does not.</li>
-          <li>Configure the intended audience and synthetic test users. Follow Google&#39;s current
-          <a href="https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification">verification requirements</a>
-          for the scope and audience. Record the result; do not assume a fixed review time.</li>
-          <li>Test the grant with an existing Google sign-in and an email sign-in. The latter links the
-          chosen Google account to the event account, as the control states. A refused grant must
-          leave file exports available.</li>
-          <li>In a test deployment, verify creation, reload and reuse, changed session details, removal
-          of the final bookmark, retry after a failed write, account changes, and preservation of
-          events added by the attendee. Tokens must stay in memory. Only the calendar ID is saved
-          locally; clearing browser storage can create a new calendar.</li>
-          <li>Enable <code>config/features.calendarSync</code> in the admin Features editor only after these checks
-          pass. Sync runs while the personal schedule page is open. Confirm the production audience
-          can grant access. Leave or set the flag off if setup or verification is incomplete.</li>
-          </ol>
-          <h2 id="reuse-a-past-event-as-a-template">Reuse a past event as a template<a class="heading-anchor" href="#reuse-a-past-event-as-a-template" aria-label="Link to this section">#</a></h2>
-          <p>Each event runs in its own Firebase project. A second event, or next year&#39;s edition of the same
-          event, gets a new project, not a new section of the old one. This keeps accounts, tickets, pitches
-          and logs of one event out of the other. A template carries the parts the client already approved:
-          branding, page templates and selected static settings.</p>
-          <h3 id="what-a-template-carries">What a template carries<a class="heading-anchor" href="#what-a-template-carries" aria-label="Link to this section">#</a></h3>
-          <p>The export reads an allowlist. Anything not on the list stays in the past project, including any
-          collection added in a later release.</p>
-          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
-          <table>
-          <thead>
-          <tr><th>Carried</th><th>Stays in the past project</th></tr>
-          </thead>
-          <tbody>
-          <tr><td><code>config/theme</code>: colours, fonts, style and layout choices</td><td>Logo and image files (the inventory lists them)</td></tr>
-          <tr><td><code>config/features</code> and <code>config/badges</code></td><td><code>config/bootstrap</code> (the admin allowlist) and <code>config/providers</code></td></tr>
-          <tr><td><code>config/event</code>: tagline, timezone, operator and contact lines, social accounts, search description, registration action label</td><td>Name, dates, venue, tracks, registration window, sender, Auth attestation, legal review</td></tr>
-          <tr><td>Live page documents and their sections</td><td>Accounts, profiles, bookmarks and speakers</td></tr>
-          <tr><td>Live content blocks on those pages, including sponsor package blocks</td><td>Tickets, orders, payments and <code>ticket_sync_queue</code></td></tr>
-          <tr><td></td><td>Session pitches and the pitch call, schedule, sponsor organizations, timeline and updates</td></tr>
-          <tr><td></td><td>Sent email rows, sign-in codes, rate limits, admin logs and every other record</td></tr>
-          </tbody>
-          </table>
-          </div>
-          <p>The privacy and terms content is not carried. Init builds it again from the new project&#39;s providers,
-          and legal review starts again. A block that init builds from settings is not carried either: the home
-          page title, the When and Where lines, the venue blocks, and the support and conduct contact links.
-          Init builds them from the new event&#39;s answers. A block that shows a stored file stays out: copy the
-          file into the new project and add the block there. The inventory names the file by its storage path
-          only, never by a download link.</p>
-          <p>A page in the template must keep the safety rules of a page saved in the admin. Only the default
-          system pages may be system pages, each at its own route. Other pages cannot use a reserved route,
-          such as <code>/admin</code> or <code>/pitch</code>. No two pages may share an id, a path or a section.</p>
-          <p>A content block in the template must keep the rules of a block saved in the content editor. Each
-          required field has a value, and a sponsor package limit is a whole number of 1 or more. Rich text
-          is cleaned by the editor&#39;s sanitizer before it is stored, so a script or an event handler in a
-          hand-edited file never reaches the site. A block that breaks a rule is named, and nothing is
-          written.</p>
-          <h3 id="steps">Steps<a class="heading-anchor" href="#steps" aria-label="Link to this section">#</a></h3>
-          <ol>
-          <li><p>Provision a new project for the new event (§1). Never point a template at the past project.</p></li>
-          <li><p>Print the inventory from the past project. This writes nothing:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">export EVENT_FIREBASE_PROJECT_ID=&lt;the past event&#39;s project id&gt;
-          node scripts/export-event-template.cjs --dry-run
-          </code></pre>
-          <p>Read every row. &quot;Review&quot; rows name each block that mentions the past event&#39;s name or year, names
-          an email address, or quotes a person, and each carried contact address. They name the block, not
-          its text. &quot;Feature switches carried&quot; lists each switch and marks the ones that open public intake.</p></li>
-          <li><p>Write the template file, then review the JSON with the client:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/export-event-template.cjs --out past-event-template.json
-          </code></pre>
-          <p>Pass <code>--page &lt;id&gt;</code> (repeatable) to carry only some pages. The default pages fill the rest.</p></li>
-          <li><p>Write the new answers file (§2). It needs the new name, dates later than every date of the past
-          event, the sender address and a named owner. The owner must also be an operator:</p>
-          <pre data-scroll-region data-scroll-label="Code example (json)"><code class="language-json">{
-            &quot;event&quot;: { &quot;name&quot;: &quot;...&quot;, &quot;shortName&quot;: &quot;...&quot;, &quot;timezone&quot;: &quot;...&quot;, &quot;days&quot;: [...], &quot;sender&quot;: { &quot;email&quot;: &quot;...&quot; } },
-            &quot;owner&quot;: { &quot;name&quot;: &quot;...&quot;, &quot;email&quot;: &quot;owner@client-domain&quot; }
-          }
-          </code></pre></li>
-          </ol>
-          <ol start="5">
-          <li><p>Seed the new project from the template:</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">export EVENT_FIREBASE_PROJECT_ID=&lt;the new event&#39;s project id&gt;
-          node scripts/init-event.cjs --answers next-answers.json --admin owner@client-domain --template past-event-template.json
-          </code></pre>
-          <p>Init refuses the template, and writes nothing, in each of these cases:</p>
-          <ul>
-          <li>The project is the past project.</li>
-          <li>The project already holds any event record: configuration, pages, content, email templates,
-          accounts, speakers, sessions, organizations, timeline entries, updates, tickets, orders,
-          pitches, admin logs, email rows, or any other collection.</li>
-          <li>The project has Firebase Authentication accounts. Init checks this with real credentials. Under
-          the Firestore emulator alone it cannot, so it prints a warning: confirm in the console that the
-          project has no accounts.</li>
-          <li><code>--force</code> is given.</li>
-          <li>The answers file has no dates, or a date that is not later than the past event.</li>
-          <li>The answers file has no named owner, or the owner is not an operator.</li>
-          </ul>
-          <p><code>--dry-run</code> reports the writes first.</p>
-          <p><strong>If the apply stops part way</strong> (a network error, a closed laptop), run the same command again with
-          the same template file. The first write of an apply is <code>config/template</code> with status <code>applying</code>.
-          A rerun with the same template continues from there, as long as the project holds only what the
-          apply writes. Init then sets the status to <code>applied</code>. A different template, or a project that has
-          gained accounts or other records since, is refused. In that case delete the project and start
-          again from a new one.</p></li>
-          <li><p>Work through §3 in full for the new project. The sender domain, ticketing provider, Auth steps and
-          Cloud Billing start unmet, even when the past event passed them. Confirm that the billing account
-          and the provider accounts are the ones for the new event.</p></li>
-          <li><p>Run <code>--check</code> (§4). A project made from a template has one more row, <strong>Template reuse</strong>. It passes
-          when the apply finished, every event date is later than the past event, and the named owner is
-          still an operator. Each reused block counts as seeded until an editor saves it, so review every page before
-          launch.</p></li>
-          </ol>
-          <h3 id="accounts-across-separate-events">Accounts across separate events<a class="heading-anchor" href="#accounts-across-separate-events" aria-label="Link to this section">#</a></h3>
-          <p>Accounts belong to one project. An attendee of both events signs in to the new site and gets a new
-          account. Their profile, bookmarks, badges and tickets do not move. Grant operators and staff again
-          with <code>--admin</code>, <code>--staff</code> or admin Settings → Access. Invite speakers again. To show that someone came
-          before, an admin records it in <strong>Past attendance</strong> on that person&#39;s record in the new event
-          (<code>docs/ADMIN_GUIDE.md</code>).</p>
-          <h3 id="export-and-archive-of-the-past-event">Export and archive of the past event<a class="heading-anchor" href="#export-and-archive-of-the-past-event" aria-label="Link to this section">#</a></h3>
-          <ul>
-          <li>The template file holds no accounts, but it holds the client&#39;s copy. Keep it with the client&#39;s
-          records. Do not put it in a public repository or issue.</li>
-          <li>Take the past event&#39;s own exports before you change it: the attendee export and the session
-          materials archive (<code>docs/ADMIN_GUIDE.md</code>).</li>
-          <li>Set the past event&#39;s archive date in admin Event settings. Its pages then show as back issues.
-          With ticket sales, follow &quot;Archiving an event with ticket sales&quot; in <code>docs/DEPLOY_RUNBOOK.md</code> first.</li>
-          <li>The past project keeps its records until the client asks for their removal. The new event does not
-          read from the past project, so removing the past project later does not change the new event.</li>
-          </ul>
-          <h2 id="handoff-to-the-client">Handoff to the client<a class="heading-anchor" href="#handoff-to-the-client" aria-label="Link to this section">#</a></h2>
-          <p>Once the site is live, point the client at the two handbook pages instead of re-explaining their
-          content here:</p>
-          <ul>
-          <li><a href="/eventrunner/docs/handbook/for-clients/"><code>docs/handbook/for-clients.md</code></a> — what they bought, what v1 does and
-          doesn&#39;t include, and how to reach support.</li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> — the narrative walkthrough of
-          what staff can change without a developer: pages, schedule, speakers, attendees, live updates,
-          theme, badges. Pair it with <a href="/eventrunner/docs/admin-guide/"><code>docs/ADMIN_GUIDE.md</code></a> for the task-by-task reference
-          to every admin surface.</li>
-          </ul>
-          <h3 id="after-the-event-data-export-and-archive">After the event: data export and archive<a class="heading-anchor" href="#after-the-event-data-export-and-archive" aria-label="Link to this section">#</a></h3>
-          <p>The client keeps its data. At the end of the engagement, hand over the event&#39;s records and agree how long they are kept. <a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a> is the runbook:</p>
-          <ol>
-          <li>An operator downloads the event data package from <strong>Data export</strong> (or runs <code>scripts/export-event-package.cjs</code> for a large event) and checks it with <code>--verify</code>.</li>
-          <li>The operator takes a Firebase managed export and copies the Storage bucket when the client wants a full backup.</li>
-          <li>The operator sets the archive date and <code>config/event.historicalDemo</code> to keep the past site online and read-only, or disables Hosting. After <code>historicalDemo</code> is on, only Google sign-in opens the admin panel, so export first.</li>
-          <li>The handoff record names the package date, the parts included, who received each file, and the retention period.</li>
-          </ol>
-          <p>Explain the difference between access to the cloud project, the client&#39;s ownership of the data, and the portable export. The runbook&#39;s first table states it.</p>
-          <p>Do not send the client screenshots of another client&#39;s event data, and do not put their attendee
-          list, admin emails, or any other client-specific detail in a public GitHub issue or discussion —
-          see <code>docs/handbook/for-clients.md</code>&#39;s &quot;How to start&quot; note.</p>
-        </article>
-        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/CLIENT_ONBOARDING.md"><code>docs/CLIENT_ONBOARDING.md</code></a>. Edit the Markdown, not the HTML.</p>
-        <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/design-reference/"><span>Previous</span>Site design reference</a>
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/deploy-runbook/"><span>Next</span>Deploy runbook</a>
-        </nav>
-      </main>
-    </div>
-    <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
-      <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="/eventrunner/docs/security/">Security</a>
+    <main class="docs-handoff prose" id="main">
+      <h1>Client onboarding runbook</h1>
+      <p class="lede">This technical document is maintained with the source code on GitHub.</p>
+      <p>Architecture decisions, deployment instructions, and contributor records stay with the source code. Event organizers and attendees can use the guides on this site.</p>
+      <div class="handoff-actions">
+        <a class="btn" href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/CLIENT_ONBOARDING.md">Read this document on GitHub</a>
+        <a class="btn btn-ghost" href="/eventrunner/docs/">Browse the guides</a>
       </div>
+    </main>
+    <footer class="site-footer">
+      <div>
+        <a class="footer-brand" href="/eventrunner/"><strong>Event Runner</strong></a>
+        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/eventrunner/support/">Support</a>
+        <a href="/eventrunner/privacy/">Privacy</a>
+        <a href="/eventrunner/terms-of-service/">Terms</a>
+        <a href="/eventrunner/project/">About the project</a>
+      </nav>
     </footer>
   </div>
 </body>

@@ -322,7 +322,7 @@ source; the HTML under `docs/docs/` is generated output and is committed.
 The site address is one value, in `scripts/lib/pages-site.cjs`: an https origin and a path base.
 This script, `build-demo.cjs`, and `check-docs.cjs` read it. `PAGES_BASE_URL` overrides the
 committed default for one run, and `node scripts/lib/pages-site.cjs` prints the address in use.
-This script also moves the hand-written landing pages (`docs/index.html`, `docs/videos/index.html`)
+This script also moves the hand-written pages listed in `scripts/lib/pages-public-files.cjs`
 to that address: their canonical and social card URLs. `--check` fails when they name another
 address. The Pages workflow reads the `PAGES_BASE_URL` repository variable; the switch to the
 custom domain is in `docs/DEPLOY_RUNBOOK.md` §10.
@@ -339,9 +339,10 @@ is the handwritten half — layout, devices, rhythm — and reads them by name. 
 reached through `scripts/lib/shared-theme.cjs` rather than the bare `shared/theme` specifier,
 because the documentation CI tier has no `node_modules` for the workspace link to live in.
 
-`scripts/lib/pages-manifest.cjs` lists every published document and its route. A document reaches
-the site only by being listed there, so historical planning records under `docs/plans/` stay out of
-the navigation. `scripts/lib/markdown-pages.cjs` is a small dependency-free Markdown renderer that
+`scripts/lib/pages-manifest.cjs` lists the public guides and their routes in `SECTIONS`. Engineering
+documents remain on GitHub. `LEGACY_PAGES` keeps old documentation URLs useful with short,
+unindexed handoff pages; those pages stay out of guide navigation and search.
+`scripts/lib/markdown-pages.cjs` is a small dependency-free Markdown renderer that
 escapes every character it takes from the source, so no document can inject markup into the site.
 Relative links to other published documents become site routes; links to anything else in the
 repository become GitHub URLs, and the build lists them.
@@ -350,6 +351,18 @@ repository become GitHub URLs, and the build lists them.
 file whose committed bytes differ from a fresh render, on any unexpected file left in `docs/docs/`,
 and on a `docs/tokens.css` that no longer matches `design/tokens/`. `scripts/build-pages.test.cjs`
 runs it, so the documentation CI tier enforces it with the runner's Node and no `npm install`.
+
+### `stage-pages.cjs`
+
+Creates the website upload in `dist/pages` after the docs and demo builds. It copies only paths
+allowed by `scripts/lib/pages-public-files.cjs`: public marketing pages, generated guides and
+legacy handoff pages, website assets, and the built demo. Source records and evidence stay in
+the repository. Video transcripts and font license notes are intentional downloadable assets.
+
+The script refuses an incomplete page or demo build before replacing a previous staging
+directory. It also refuses symbolic links. The Pages workflow uploads `dist/pages`; it never
+uploads the source `docs/` directory. `scripts/stage-pages.test.cjs` runs in the documentation
+CI job and checks both included assets and excluded source records.
 
 ### `verify-sender-domain.cjs`
 

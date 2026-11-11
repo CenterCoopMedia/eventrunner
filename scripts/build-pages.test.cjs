@@ -35,7 +35,7 @@ const {
 } = require('./build-pages.cjs');
 const { isUnbuiltDeployTarget, localTargetPath } = require('./check-docs.cjs');
 const { renderMarkdown, renderInline, slugify, escapeHtml } = require('./lib/markdown-pages.cjs');
-const { SECTIONS, pagesInOrder, routesBySource } = require('./lib/pages-manifest.cjs');
+const { LEGACY_PAGES, REPO_BLOB, SECTIONS, pagesInOrder, routesBySource } = require('./lib/pages-manifest.cjs');
 const { pagesSite, parsePagesBaseUrl } = require('./lib/pages-site.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -50,6 +50,7 @@ const CUSTOM_DOMAIN_SITE = parsePagesBaseUrl('https://docs.eventrunner.org/');
 
 const site = buildSite({ site: DEFAULT_SITE });
 const pages = pagesInOrder();
+const legacyFiles = new Set(LEGACY_PAGES.map((page) => `${page.route}index.html`));
 
 function textOf(html) {
   return html.replace(/<[^>]+>/g, ' ');
@@ -79,6 +80,35 @@ test('historical plans and PR evidence stay out of the navigation', () => {
   for (const page of pages) {
     assert.ok(!page.source.startsWith('docs/plans/'), `plans must not be published: ${page.source}`);
     assert.ok(!page.source.startsWith('docs/pr-evidence/'), `PR evidence must not be published: ${page.source}`);
+  }
+});
+
+test('public navigation and guide search omit engineering records', () => {
+  const index = site.files.get('index.html');
+  const sources = new Set(pages.map((page) => page.source));
+  for (const page of LEGACY_PAGES) {
+    assert.ok(!sources.has(page.source), `${page.source} is in the public guide manifest`);
+    assert.ok(!index.includes(`href="${DOCS_BASE}${page.route}"`), `${page.route} is in the guide index`);
+    assert.ok(!routesBySource(DOCS_BASE).has(page.source), `${page.source} rewrites into public guides`);
+  }
+  assert.equal(pages.find((page) => page.route === 'overview/').source, 'docs/handbook/overview.md');
+});
+
+test('old engineering bookmarks provide a noindex handoff to their exact repository source', () => {
+  const publicRoutes = new Set(pages.map((page) => page.route));
+  const legacyRoutes = new Set();
+  for (const page of LEGACY_PAGES) {
+    assert.ok(!publicRoutes.has(page.route), `duplicate public and legacy route: ${page.route}`);
+    assert.ok(!legacyRoutes.has(page.route), `duplicate legacy route: ${page.route}`);
+    legacyRoutes.add(page.route);
+    assert.ok(fs.existsSync(path.join(ROOT, page.source)), `missing legacy source: ${page.source}`);
+    const html = site.files.get(`${page.route}index.html`);
+    assert.ok(html, `missing handoff: ${page.route}`);
+    assert.match(html, /<meta name="robots" content="noindex(?:,\s*follow)?">/);
+    assert.ok(html.includes(`href="${REPO_BLOB}${page.source}"`), page.route);
+    assert.ok(!html.includes('class="docs-nav"'), `${page.route} contains the guide sidebar`);
+    assert.ok(!html.includes('aria-label="Documentation pages"'), `${page.route} contains guide pagination`);
+    assert.ok(!html.includes('data-guide-entry'), `${page.route} appears as a searchable guide`);
   }
 });
 
@@ -171,23 +201,23 @@ test('no link keeps a stale /run-of-show/ path', () => {
   }
 });
 
-test('the project page links into the documentation site', () => {
+test('the project page separates user guides from contributor resources', () => {
   const landing = fs.readFileSync(path.join(ROOT, 'docs', 'project', 'index.html'), 'utf8');
   assert.match(landing, /href="\.\.\/docs\/"/);
-  for (const route of ['admin-guide/', 'contributing/', 'roadmap/', 'security/']) {
+  for (const route of ['handbook/for-clients/']) {
     assert.ok(landing.includes(`../docs/${route}`), `the project page should link to ${route}`);
   }
   assert.ok(
-    !/blob\/main\/(docs\/ADMIN_GUIDE|CONTRIBUTING|SECURITY|docs\/ROADMAP)\.md/.test(landing),
-    'the landing page should not send readers to raw blob pages that have a web route',
+    !/blob\/main\/(docs\/ADMIN_GUIDE|SECURITY)\.md/.test(landing),
+    'public guides should use their web routes',
   );
+  assert.ok(landing.includes(`${REPO_BLOB}CONTRIBUTING.md`), 'contributor resources belong on GitHub');
 });
 
 // ----------------------------------------------------------- demo entry points
 
 test('demo entry points distinguish the historical preview and hosted admin/client demo', () => {
   const entries = [
-    ['project page', fs.readFileSync(path.join(ROOT, 'docs/project/index.html'), 'utf8')],
     ['README', fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8')],
     ['FAQ', fs.readFileSync(path.join(ROOT, 'docs/handbook/faq.md'), 'utf8')],
     ['generated overview', site.files.get('overview/index.html')],
@@ -211,14 +241,27 @@ test('demo entry points distinguish the historical preview and hosted admin/clie
   }
 });
 
-test('landing and README link to the same canonical static preview and specimen', () => {
+test('the About page distinguishes visitor and authorized admin demonstrations', () => {
+  const landing = fs.readFileSync(path.join(ROOT, 'docs/project/index.html'), 'utf8');
+  const text = textOf(landing).replace(/\s+/g, ' ');
+  assert.match(text, /read-only preview/i);
+  assert.match(text, /historical content/i);
+  assert.match(text, /not the full program.*official NC Local/i);
+  assert.match(text, /sign-in.*registration.*disabled/i);
+  assert.match(text, /admin screens require an authorized account/i);
+});
+
+test('About and README preserve the appropriate visitor and admin demo destinations', () => {
   const origin = 'https://centercoopmedia.github.io/eventrunner/';
   const landing = fs.readFileSync(path.join(ROOT, 'docs/project/index.html'), 'utf8');
   const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
   const landingLinks = [...landing.matchAll(/href="([^"]+)"/g)].map((match) => new URL(match[1], `${origin}project/`).href);
   const readmeLinks = [...readme.matchAll(/\]\((https:\/\/[^)]+)\)/g)].map((match) => match[1]);
-  for (const href of [`${origin}demo/`, `${origin}demo/#/specimen`, 'https://eventrunner-demo.web.app/', 'https://eventrunner-demo.web.app/admin']) {
+  for (const href of [`${origin}demo/`, 'https://eventrunner-demo.web.app/admin']) {
     assert.ok(landingLinks.includes(href), `landing is missing ${href}`);
+    assert.ok(readmeLinks.includes(href), `README is missing ${href}`);
+  }
+  for (const href of [`${origin}demo/#/specimen`, 'https://eventrunner-demo.web.app/']) {
     assert.ok(readmeLinks.includes(href), `README is missing ${href}`);
   }
 });
@@ -290,7 +333,7 @@ test('every page has one h1, a skip link, and a main landmark', () => {
     assert.ok(html.includes('<a class="skip-link" href="#main">'), `${file}: missing skip link`);
     assert.ok(html.includes('id="main"'), `${file}: missing main landmark`);
     assert.ok(html.includes('aria-label="Breadcrumb"'), `${file}: missing breadcrumbs`);
-    assert.ok(html.includes('aria-label="Documentation"'), `${file}: missing section navigation`);
+    if (!legacyFiles.has(file)) assert.ok(html.includes('aria-label="Documentation"'), `${file}: missing section navigation`);
   }
 });
 
@@ -373,10 +416,11 @@ test('the home page lists every section and page', () => {
   }
 });
 
-test('each page names the Markdown file it came from', () => {
+test('each guide offers a source link without generator instructions', () => {
   for (const page of pages) {
     const html = site.files.get(`${page.route}index.html`);
     assert.ok(html.includes(`blob/main/${page.source}`), `${page.route}: missing its source link`);
+    assert.ok(!html.includes('Edit the Markdown, not the HTML'), `${page.route}: generator instructions leaked into the guide`);
   }
 });
 
@@ -386,7 +430,7 @@ test('a link to another published document becomes a route', () => {
   const routes = routesBySource(DOCS_BASE);
   const resolve = linkResolver({ source: 'docs/handbook/faq.md', routes, departures: [], errors: [], site: DEFAULT_SITE });
   assert.equal(resolve('for-clients.md'), `${DOCS_BASE}handbook/for-clients/`);
-  assert.equal(resolve('../ROADMAP.md'), `${DOCS_BASE}roadmap/`);
+  assert.equal(resolve('../ROADMAP.md'), `${REPO_BLOB}docs/ROADMAP.md`);
   assert.equal(resolve('../ADMIN_GUIDE.md#speakers'), `${DOCS_BASE}admin-guide/#speakers`);
 });
 
@@ -394,9 +438,17 @@ test('a blob URL for a published document becomes a route', () => {
   const routes = routesBySource(DOCS_BASE);
   const resolve = linkResolver({ source: 'README.md', routes, departures: [], errors: [], site: DEFAULT_SITE });
   assert.equal(
-    resolve('https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md'),
-    `${DOCS_BASE}contributing/`,
+    resolve(`${REPO_BLOB}docs/ADMIN_GUIDE.md`),
+    `${DOCS_BASE}admin-guide/`,
   );
+});
+
+test('engineering source links go straight to GitHub, not the legacy handoff pages', () => {
+  const resolve = linkResolver({ source: 'README.md', routes: routesBySource(DOCS_BASE), departures: [], errors: [], site: DEFAULT_SITE });
+  for (const page of LEGACY_PAGES) {
+    assert.equal(resolve(page.source), `${REPO_BLOB}${page.source}`);
+    assert.equal(resolve(`${REPO_BLOB}${page.source}`), `${REPO_BLOB}${page.source}`);
+  }
 });
 
 test('a link that leaves the manifest is flagged and sent to GitHub', () => {
@@ -953,7 +1005,7 @@ test('the site renders for both bases: the project path and a custom domain at /
       assert.ok(html.includes(`<meta property="og:image" content="${address.url}og-default.png">`), label);
       assert.ok(html.includes(`<meta name="twitter:image" content="${address.url}og-default.png">`), label);
       assert.ok(html.includes(`<link rel="icon" type="image/svg+xml" href="${address.base}favicon.svg">`), label);
-      assert.ok(html.includes(`<a href="${address.demoBase}">Demo</a>`), label);
+      assert.ok(html.includes(`href="${address.demoBase}"`), `${label}: missing the demo link`);
       for (const match of html.matchAll(/(?:href|src)="(\/[^"]*)"/g)) {
         const href = match[1];
         assert.ok(href.startsWith(address.base), `${label}: ${href} is outside ${address.base}`);
@@ -1013,6 +1065,12 @@ test('the support name and address come from settings, and are refused when inco
     '<span data-support-name>A &amp; B</span> <a data-support-email href="mailto:help@example.org">help@example.org</a>',
   );
   assert.equal(withSupportContact(page, null), page);
+  for (const [input, expected] of [
+    ['<a class="btn" data-support-email href="mailto:a@b.co">Email a@b.co</a>', '<a class="btn" data-support-email href="mailto:help@example.org">Email help@example.org</a>'],
+    ['<a href="mailto:a@b.co" data-support-email class="text-link">a@b.co</a>', '<a href="mailto:help@example.org" data-support-email class="text-link">help@example.org</a>'],
+  ]) {
+    assert.equal(withSupportContact(input, contact), expected);
+  }
   for (const name of ['index.html', 'support/index.html', 'privacy/index.html', 'terms-of-service/index.html']) {
     const text = fs.readFileSync(path.join(ROOT, 'docs', name), 'utf8');
     assert.match(text, /data-support-email/, `${name} should take the support address from settings`);

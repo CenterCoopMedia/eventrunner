@@ -3,28 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Roadmap — Event Runner documentation</title>
-  <meta name="description" content="The five v1 milestones and what is left.">
+  <title>Development roadmap — Event Runner</title>
+  <meta name="description" content="Read Development roadmap in the Event Runner repository on GitHub.">
+  <meta name="robots" content="noindex, follow">
   <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/roadmap/">
   <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/eventrunner/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/eventrunner/apple-touch-icon.png">
 
-  <meta property="og:type" content="article">
+  <meta property="og:type" content="website">
   <meta property="og:site_name" content="Event Runner">
-  <meta property="og:title" content="Roadmap — Event Runner documentation">
-  <meta property="og:description" content="The five v1 milestones and what is left.">
+  <meta property="og:title" content="Development roadmap — Event Runner">
+  <meta property="og:description" content="Read Development roadmap in the Event Runner repository on GitHub.">
   <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/roadmap/">
   <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta property="og:image:alt" content="Event Runner guides">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Roadmap — Event Runner documentation">
-  <meta name="twitter:description" content="The five v1 milestones and what is left.">
+  <meta name="twitter:title" content="Development roadmap — Event Runner">
+  <meta name="twitter:description" content="Read Development roadmap in the Event Runner repository on GitHub.">
   <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
-  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="twitter:image:alt" content="Event Runner guides">
   <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
 
@@ -34,8 +35,9 @@
   <link rel="stylesheet" href="/eventrunner/styles.css">
   <link rel="stylesheet" href="/eventrunner/docs.css">
   <script src="/eventrunner/scroll-regions.js" defer></script>
+  <script src="/eventrunner/docs-ui.js" defer></script>
 </head>
-<body>
+<body class="docs-site">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <div class="wrap">
@@ -58,341 +60,43 @@
         </svg>
         <span class="brand-words">
           <strong>Event Runner</strong>
-          <span class="brand-line">Documentation</span>
+          <span class="brand-line">Conference websites</span>
         </span>
       </a>
       <nav aria-label="Site">
-        <a href="/eventrunner/">Home</a>
-        <a href="/eventrunner/docs/">Documentation</a>
-        <a href="/eventrunner/demo/">Demo</a>
-        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+        <a href="/eventrunner/features/">Features</a>
+        <a href="/eventrunner/how-it-works/">How it works</a>
+        <a href="/eventrunner/docs/" aria-current="location">Guides</a>
+        <a href="/eventrunner/project/">About</a>
+        <a class="btn nav-cta" href="/eventrunner/demo/">Try the demo</a>
       </nav>
     </header>
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <ol>
         <li><a href="/eventrunner/">Home</a></li>
-        <li><a href="/eventrunner/docs/">Documentation</a></li>
-        <li><span aria-current="page">Roadmap</span></li>
+        <li><span aria-current="page">Development roadmap</span></li>
         </ol>
       </nav>
-    <div class="docs-layout">
-      <nav class="docs-nav" aria-label="Documentation">
-        <p class="docs-nav-section">Start here</p>
-        <ul>
-          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
-          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
-          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
-          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
-          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
-          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
-        </ul>
-        <p class="docs-nav-section">Operate</p>
-        <ul>
-          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
-          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
-          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
-          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
-          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
-          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
-          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
-          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
-          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
-          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
-          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
-        </ul>
-        <p class="docs-nav-section">Build</p>
-        <ul>
-          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
-          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
-          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
-          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
-          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
-          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
-          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
-          <li><a href="/eventrunner/docs/roadmap/" aria-current="page" class="is-current">Roadmap</a></li>
-          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
-        </ul>
-        <p class="docs-nav-section">Get help</p>
-        <ul>
-          <li><a href="/eventrunner/docs/support/">Support</a></li>
-          <li><a href="/eventrunner/docs/security/">Security</a></li>
-        </ul>
-      </nav>
-      <main class="docs-main" id="main">
-        <article class="prose">
-          <h1>Roadmap</h1>
-          <nav class="contents" aria-labelledby="contents-title">
-            <p class="contents-title" id="contents-title">On this page</p>
-            <ul>
-              <li><a href="#m1-prerequisites-and-repo-bootstrap-effectively-complete">M1: Prerequisites and repo bootstrap — effectively complete</a></li>
-              <li><a href="#m2-scaffold-and-core-port-complete">M2: Scaffold and core port — complete</a></li>
-              <li><a href="#m3-feature-port-wave-complete">M3: Feature port wave — complete</a></li>
-              <li><a href="#m4-ticketing-adapter-complete">M4: Ticketing adapter — complete</a></li>
-              <li><a href="#m5-packaging-and-transfer-in-progress">M5: Packaging and transfer — in progress</a></li>
-              <li><a href="#m51-operator-follow-ups">M5.1: Operator follow-ups</a></li>
-              <li><a href="#m6-agent-ready-operations-webmcp">M6: Agent-ready operations + WebMCP</a></li>
-              <li><a href="#m13-registration-and-pitch-steppers-adr-0008-built-in-review">M13: Registration and pitch steppers (ADR 0008) — built, in review</a></li>
-              <li><a href="#m14-client-console-adr-0007-in-progress">M14: Client console (ADR 0007) — in progress</a></li>
-              <li><a href="#parity-milestones">Parity milestones</a></li>
-            </ul>
-          </nav>
-          <p>v1 is five phases. The architecture spec and triage record are the contract. Issues in this repo are the queue.</p>
-          <p>First-customer readiness work is tracked in <a href="https://github.com/CenterCoopMedia/eventrunner/issues/337">epic #337</a> and the <a href="https://github.com/orgs/CenterCoopMedia/projects/2">Run of Show v1 project</a>. The epic links each product issue and its acceptance criteria.</p>
-          <h2 id="m1-prerequisites-and-repo-bootstrap-effectively-complete">M1: Prerequisites and repo bootstrap — effectively complete<a class="heading-anchor" href="#m1-prerequisites-and-repo-bootstrap-effectively-complete" aria-label="Link to this section">#</a></h2>
-          <p>Legal and operator setup that gated the public repo. Two residual operator tasks are closing today.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Copyright holder and LICENSE grantor: Center for Cooperative Media</li>
-          <li class="task-item"><input type="checkbox" disabled checked> CCM GitHub organization with operator admin</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Trademark screen and domain acquisition for the working name</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Postmark account (one account, per-client message streams)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Workspaces layout, day-one legal files, credential-free CI</li>
-          </ul>
-          <h2 id="m2-scaffold-and-core-port-complete">M2: Scaffold and core port — complete<a class="heading-anchor" href="#m2-scaffold-and-core-port-complete" aria-label="Link to this section">#</a></h2>
-          <p>A fresh Firebase project boots to a working generic event site, including event-neutral emailed-code login.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Event configuration layer (deploy-time env + runtime <code>config/*</code>)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Shared workspace package with functions vendor packing</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Email core and adapters (Postmark, webhook, console)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Operator notifier and telemetry</li>
-          <li class="task-item"><input type="checkbox" disabled checked> OTP authentication with tokenized templates</li>
-          <li class="task-item"><input type="checkbox" disabled checked> CMS content with two-revision draft/publish</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Pages-as-data</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Admin config mutation endpoints</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Theming</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Schedule and bookmarks</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Attendee profiles</li>
-          <li class="task-item"><input type="checkbox" disabled checked> <code>init-event</code> bootstrap</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Credential-free CI and per-client deploy matrix</li>
-          </ul>
-          <h2 id="m3-feature-port-wave-complete">M3: Feature port wave — complete<a class="heading-anchor" href="#m3-feature-port-wave-complete" aria-label="Link to this section">#</a></h2>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Speaker canonical store and invite pipeline</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Speaker profile wizard and public pages</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Session materials (two collections, embargo)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Media library with Storage rules hardening</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Session reactions</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Badges from per-event config</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Schedule PDF and <code>updatesMeta</code> SSR</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Live-updates admin form and feedback inbox</li>
-          </ul>
-          <h2 id="m4-ticketing-adapter-complete">M4: Ticketing adapter — complete<a class="heading-anchor" href="#m4-ticketing-adapter-complete" aria-label="Link to this section">#</a></h2>
-          <p>Last, because everything else has to be stable first.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> TicketingProvider core (tickets collection, webhook dedup, sync queue)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Eventbrite adapter</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Manual/CSV adapter</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Registration state machine</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Provider-owned registration prompts and ticket templates</li>
-          </ul>
-          <h3 id="native-stripe-ticket-commerce-implementation-in-review">Native Stripe ticket commerce — implementation in review<a class="heading-anchor" href="#native-stripe-ticket-commerce-implementation-in-review" aria-label="Link to this section">#</a></h3>
-          <p><a href="https://github.com/CenterCoopMedia/eventrunner/issues/483">Epic #483</a> extends the provider
-          layer with one organizer-owned Stripe account per deployment, a server-owned catalog,
-          capacity-safe hosted Checkout, authoritative reconciliation, purchaser/attendee separation,
-          and organizer admission/support controls. Existing Eventbrite, manual/CSV, none, and
-          external registration remain supported. The decision is recorded in
-          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0004-stripe-ticket-commerce.md">ADR 0004</a>; the
-          <a href="/eventrunner/docs/stripe-ticketing/">Stripe launch and support runbook</a> covers readiness,
-          credential rotation, retention, and incident handling.</p>
-          <p>Implementation review and synthetic CI are separate from a merchant&#39;s launch decision.
-          An authorized Stripe sandbox rehearsal, final live configuration, and written commercial
-          and retention approvals remain deployment requirements. No client credentials, real
-          payment rehearsal, or live sales are supplied by the epic&#39;s repository tests.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled> Complete review and CI for native Stripe ticket commerce (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/483">#483</a>).</li>
-          <li class="task-item"><input type="checkbox" disabled> Embedded payment collection (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/325">#325</a>); the current implementation uses Stripe-hosted Checkout.</li>
-          <li class="task-item"><input type="checkbox" disabled> Day/session/material-specific ticket entitlements (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/326">#326</a>); MVP ticket types grant full-event admission.</li>
-          </ul>
-          <h2 id="m5-packaging-and-transfer-in-progress">M5: Packaging and transfer — in progress<a class="heading-anchor" href="#m5-packaging-and-transfer-in-progress" aria-label="Link to this section">#</a></h2>
-          <p>Issues #92 and #79 moved to a new milestone, M5.1: Operator follow-ups, because they wait on a third party.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Operator documentation (deploy runbook, client onboarding, admin guide)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Cloud Run site-publisher</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Community scaffolding completion</li>
-          <li class="task-item"><input type="checkbox" disabled checked> E2E suite on emulators in CI</li>
-          <li class="task-item"><input type="checkbox" disabled checked> First public push and issue migration (this repository)</li>
-          </ul>
-          <p>Five items remain. Each needs an operator account this sandbox does not have.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled> Hosted demo end-to-end verification and screenshots (#35); the <a href="https://centercoopmedia.github.io/eventrunner/demo/">static visitor preview</a> and <a href="https://eventrunner-demo.web.app/">hosted client demo</a> are available.</li>
-          <li class="task-item"><input type="checkbox" disabled> Complete Postmark deployment, webhook setup, and delivery tests (#91)</li>
-          <li class="task-item"><input type="checkbox" disabled> Demo discoverability: crawlable public demo routes (#96)</li>
-          <li class="task-item"><input type="checkbox" disabled> Claim the Eventrunner npm package names and scopes (#99)</li>
-          <li class="task-item"><input type="checkbox" disabled> Complete Eventrunner operator provisioning and launch readiness (#100)</li>
-          </ul>
-          <h2 id="m51-operator-follow-ups">M5.1: Operator follow-ups<a class="heading-anchor" href="#m51-operator-follow-ups" aria-label="Link to this section">#</a></h2>
-          <p>Items that wait on a third party.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled> Trademark counsel review of the Eventrunner rename (#92)</li>
-          <li class="task-item"><input type="checkbox" disabled> Verify the Eventbrite adapter against a real sandbox event (#79)</li>
-          </ul>
-          <h2 id="m6-agent-ready-operations-webmcp">M6: Agent-ready operations + WebMCP<a class="heading-anchor" href="#m6-agent-ready-operations-webmcp" aria-label="Link to this section">#</a></h2>
-          <p>Read-only diagnostics done. Write tools wait on a separate security and product review.</p>
-          <h2 id="m13-registration-and-pitch-steppers-adr-0008-built-in-review">M13: Registration and pitch steppers (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0008-registration-and-pitch-steppers.md">ADR 0008</a>) — built, in review<a class="heading-anchor" href="#m13-registration-and-pitch-steppers-adr-0008-built-in-review" aria-label="Link to this section">#</a></h2>
-          <p>Every public intake is a stepper with the same keyboard path, errors and save behaviour.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Stepper component and the admin setup page on it</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Pitch stepper with co-presenters; staff lists for format, length and track</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Admin pitch pages; CSV, Airtable and export for the new fields</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Accept a pitch: a speaker per presenter, invited in one action</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Speaker profile stepper with private logistics</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Registration questions: the form editor, private answers, the attendee record and the export</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Complete your registration, and the Stripe checkout in steps with questions</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Promo codes (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0004-stripe-ticket-commerce.md#amendment-2026-11-04-promo-codes">ADR 0004 amendment</a>)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Registrations import and the speaker logistics export</li>
-          </ul>
-          <h2 id="m14-client-console-adr-0007-in-progress">M14: Client console (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0007-client-console-self-serve-onboarding.md">ADR 0007</a>) — in progress<a class="heading-anchor" href="#m14-client-console-adr-0007-in-progress" aria-label="Link to this section">#</a></h2>
-          <p>A client signs up, answers plain questions, connects Stripe or Eventbrite with a button, and gets a site. No keys, files or DNS.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Shared answer validator and the admin setup checklist</li>
-          <li class="task-item"><input type="checkbox" disabled> Console foundation: sign-up, organizations, team invites</li>
-          <li class="task-item"><input type="checkbox" disabled> Guided setup and the status page</li>
-          <li class="task-item"><input type="checkbox" disabled> Stripe and Eventbrite connections (needs the owner&#39;s prerequisites)</li>
-          <li class="task-item"><input type="checkbox" disabled> Operator review</li>
-          <li class="task-item"><input type="checkbox" disabled> Provisioner (needs the owner&#39;s prerequisites)</li>
-          <li class="task-item"><input type="checkbox" disabled> Custom web address; custom sender domain from the console</li>
-          <li class="task-item"><input type="checkbox" disabled> Runbook and a live proof in a test folder</li>
-          </ul>
-          <h2 id="parity-milestones">Parity milestones<a class="heading-anchor" href="#parity-milestones" aria-label="Link to this section">#</a></h2>
-          <p>Prospective clients asked for the platform they used at CJS 2026. CJS parity is now the product target. See <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-09-09-cjs-parity-gap.md">docs/plans/2026-09-09-cjs-parity-gap.md</a> for the full gap analysis and issue list.</p>
-          <h3 id="m7-public-site-completeness-complete">M7: Public site completeness — complete<a class="heading-anchor" href="#m7-public-site-completeness-complete" aria-label="Link to this section">#</a></h3>
-          <p>A visitor can reach and read every page the seed creates, and the site presents itself correctly to search engines and social previews.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Render the navigation from page documents (#147)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the sign-in and account control to the header (#148)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Build the footer link list and organizer links (#149)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Serve per route metadata from the server (#150)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Generate a sitemap, a robots file, and a web manifest at publish time (#151)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Reset scroll position on route change and add a back to top control (#152)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add a countdown and a lifecycle aware home lead (#153)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add a configured registration action (#154)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add an information card arrangement to the home page (#155)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add a sponsor strip section to the home page (#156)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Seed a recap page and a guidelines page (#157)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Seed a city guide page (#158)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add an uploaded venue map with labelled rooms (#159)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add search and a section index to long content pages (#160)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add a session recording link field (#161)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add raster app icons to the web manifest (#218)</li>
-          </ul>
-          <p>Follow-ups filed while the milestone ran, carried into later milestones rather
-          than held against M7: #218, #219, #226, #227, #230, #231, #233, #234, #236.</p>
-          <h3 id="design-system-the-editorial-desk-and-the-vocabulary-expansion-in-progress">Design system: the editorial desk and the vocabulary expansion — in progress<a class="heading-anchor" href="#design-system-the-editorial-desk-and-the-vocabulary-expansion-in-progress" aria-label="Link to this section">#</a></h3>
-          <p>The admin CMS moved onto the editorial desk on 2026-09-10 (#245): a dark rail, a
-          white title band, tinted state badges, 44px controls, and the event&#39;s own colours
-          worked into the admin&#39;s action family. The design vocabulary then expands in six
-          waves so a site and its admin read as designed. Tracking issue #249; direction
-          record <code>docs/plans/2026-09-10-design-vocabulary-expansion.md</code>. Every wave is one
-          pull request stacked on the wave below.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> The admin CMS on the editorial desk, in the event&#39;s own colours (#245)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> The direction record (#250)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Wave 1: the state grammar, the motion grammar and its test, eight shared
-          controls, the stage and measure width system, the specimen book and its
-          capture script; closed #219, #233, #236 (#254)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Wave 2: text, feedback and input devices; the fact and quote blocks (closed #234);
-          five option groups on every style</li>
-          <li class="task-item"><input type="checkbox" disabled> Wave 3: four illustration sets (a first pass sits on its branch)</li>
-          <li class="task-item"><input type="checkbox" disabled> Wave 4: schedule devices on the schedule (#162 to #167) and the dashboard
-          shells (#168, #210)</li>
-          <li class="task-item"><input type="checkbox" disabled> Wave 5: three site styles: Gallery, Playbill, Listings</li>
-          <li class="task-item"><input type="checkbox" disabled> Wave 6: admin devices on the M9 to M11 pages</li>
-          </ul>
-          <h3 id="m8-attendee-and-schedule-experience-complete-except-177">M8: Attendee and schedule experience — complete except #177<a class="heading-anchor" href="#m8-attendee-and-schedule-experience-complete-except-177" aria-label="Link to this section">#</a></h3>
-          <p>An attendee can find a session, build a personal schedule, and take it with them.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Add schedule search (#162)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add format and track filters (#163)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add a sort control and put filter state in the URL (#164)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Show bookmark counts on session rows (#165)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the print control, the PDF control, and a plain text view (#166)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Mark running and finished sessions during the event (#167)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Build the attendee dashboard shell (#168)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the personal schedule and resource cards to the dashboard (#169)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add per session private notes (#170)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Generate a personal schedule PDF (#171)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Share a personal schedule from its own projection (#172)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the public shared schedule page (#173)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add search and an organization filter to the attendee directory (#174)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add photo cropping and default avatars to the photo fields (#175)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add free text custom badges behind a flag (#176)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add optional calendar sync of saved sessions (#177)</li>
-          </ul>
-          <h3 id="m9-admin-overview-and-operations">M9: Admin overview and operations<a class="heading-anchor" href="#m9-admin-overview-and-operations" aria-label="Link to this section">#</a></h3>
-          <p>An organizer can see how the event is going and act on it without leaving the admin.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Add a server side event statistics endpoint (#178)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the admin overview page (#179)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add milestones and goals to the event settings (#180)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the registration funnel and content readiness panels (#181)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add session popularity to the admin (#182)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the outbound email log (#183)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add attendee export (#184)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Extend attendee administration (#185)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add operator and staff admin tiers (#186)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the admin access page (#187)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the change request queue (#188)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add bulk material download and coverage tracking to the materials page (#189)</li>
-          </ul>
-          <h3 id="m10-cms-editors-and-publishing">M10: CMS editors and publishing<a class="heading-anchor" href="#m10-cms-editors-and-publishing" aria-label="Link to this section">#</a></h3>
-          <p>Every collection the site renders can be edited and published from the admin.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the updates editor (#190)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add an update category and featured flag (#191)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the organizations editor (#192)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add a sponsor detail page and package blocks (#193)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the timeline editor and the history section (#194)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the version history page (#195)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the pending changes page and banner (#196)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add rich text editing for rich text fields (#197)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add an editor tour and section edit links (#198)</li>
-          </ul>
-          <h3 id="m11-communication-social-and-billing">M11: Communication, social, and billing<a class="heading-anchor" href="#m11-communication-social-and-billing" aria-label="Link to this section">#</a></h3>
-          <p>Organizers can announce, message, and bill, and attendees can talk to each other where a client wants that.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the announcement store and the site banner (#199)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Extend live updates with categories, audience, and key dates (#200)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add batch send to the email provider interface (#201)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the announcement email composer (#202)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add saved templates and a send history to the composer (#203, #496, #497)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add an editable speaker mail template (#204)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add the social feed read surface and moderation store (#205)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add the post composer and thread view (#206)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add the notification inbox (#207)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add the invoice record and the admin invoice form (#208)</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Add invoice output and the invoice list (#209). Issue, the PDF, mark paid, void, duplicate and the export shipped. Emailing the PDF (part 4) shipped.</li>
-          <li class="task-item"><input type="checkbox" disabled checked> Pay an issued invoice by card through a Stripe link (#519), with an amendment to ADR 0004. Needs the Stripe provider; a real Stripe test rehearsal is still to run.</li>
-          </ul>
-          <h3 id="m12-speaker-experience">M12: Speaker experience<a class="heading-anchor" href="#m12-speaker-experience" aria-label="Link to this section">#</a></h3>
-          <p>A speaker has one place that shows their session, what is still owed, and where to send it.</p>
-          <ul>
-          <li class="task-item"><input type="checkbox" disabled> Build the speaker dashboard shell (#210)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add the speaker countdown and status header (#211)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add the session hub with details and co-speaker tabs (#212)</li>
-          <li class="task-item"><input type="checkbox" disabled> Give speakers their own material upload path (#213)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add speaker action items and a completion meter (#214)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add the speaker resources card (#215)</li>
-          <li class="task-item"><input type="checkbox" disabled> Add discussion points submission (#216)</li>
-          </ul>
-          <p>See <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">docs/adr/0001-event-platform-v1.md</a> and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md">docs/plans/2026-08-16-event-platform-v1-triage.md</a>.</p>
-        </article>
-        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/ROADMAP.md"><code>docs/ROADMAP.md</code></a>. Edit the Markdown, not the HTML.</p>
-        <nav class="page-nav" aria-label="Documentation pages">
-          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/"><span>Previous</span>ADR 0003: Optional Google Calendar sync</a>
-          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/changelog/"><span>Next</span>Changelog</a>
-        </nav>
-      </main>
-    </div>
-    <footer class="site-footer">
-      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
-      <div>
-        <a href="https://centerforcooperativemedia.org">CCM</a>
-        ·
-        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
-        ·
-        <a href="/eventrunner/docs/security/">Security</a>
+    <main class="docs-handoff prose" id="main">
+      <h1>Development roadmap</h1>
+      <p class="lede">This technical document is maintained with the source code on GitHub.</p>
+      <p>Architecture decisions, deployment instructions, and contributor records stay with the source code. Event organizers and attendees can use the guides on this site.</p>
+      <div class="handoff-actions">
+        <a class="btn" href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/ROADMAP.md">Read this document on GitHub</a>
+        <a class="btn btn-ghost" href="/eventrunner/docs/">Browse the guides</a>
       </div>
+    </main>
+    <footer class="site-footer">
+      <div>
+        <a class="footer-brand" href="/eventrunner/"><strong>Event Runner</strong></a>
+        <p>Built and supported by the Center for Cooperative Media at Montclair State University.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/eventrunner/support/">Support</a>
+        <a href="/eventrunner/privacy/">Privacy</a>
+        <a href="/eventrunner/terms-of-service/">Terms</a>
+        <a href="/eventrunner/project/">About the project</a>
+      </nav>
     </footer>
   </div>
 </body>
