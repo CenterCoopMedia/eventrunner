@@ -70,7 +70,9 @@ export default function Login() {
       <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
         {readOnlyDemo
           ? 'Use the Google account for your admin email. This demo does not send email codes.'
-          : 'Use your Google account, or get a one-time code by email. No password needed.'}
+          : eventConfig?.auth?.googleProviderEnabled === true
+            ? 'Use your Google account, or get a one-time code by email. No password needed.'
+            : 'Get a one-time code by email. No password needed.'}
       </p>
 
       <div className="mt-lg">

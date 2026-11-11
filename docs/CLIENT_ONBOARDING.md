@@ -88,6 +88,10 @@ Firebase Console → Authentication:
 1. **Sign-in method** → enable **Google**. Set the project support email and the public-facing app
    name — both appear in the Google consent dialog. Emailed one-time codes work without this;
    Google sign-in specifically does not.
+
+   Until Google setup is recorded with `--attest-auth`, the sign-in form offers emailed codes.
+   Recording the setup makes the Google option available too. The historical demo's admin sign-in
+   remains Google-only.
 2. **Settings → Authorized domains** → add the client's custom domain (the one from `EVENT_PUBLIC_URL`)
    **and** the Hosting default domain (`<EVENT_HOSTING_SITE>.web.app`). Sign-in fails silently on
    any domain not on this list — this bites operators who verify the custom domain and forget the

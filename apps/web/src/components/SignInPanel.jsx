@@ -89,14 +89,15 @@ export function FormError({ id, message, errorRef }) {
 }
 
 /**
- * @param {{ onSignedIn?: () => void, initialEmail?: string, allowEmailCode?: boolean }} props
+ * @param {{ onSignedIn?: () => void, initialEmail?: string, allowEmailCode?: boolean, allowGoogle?: boolean }} props
  *   `onSignedIn` fires after either path completes — the caller decides
  *   where that leads (the home page from /signin, staying put on the
  *   acceptance page). `initialEmail` prefills the address the invitation
  *   was sent to, when the caller knows it. `allowEmailCode` is false when
- *   the server refuses one-time codes. Google sign-in stays available.
+ *   the server refuses one-time codes. `allowGoogle` follows the site's
+ *   hosting setup, with the historical demo's admin exception.
  */
-function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true }) {
+function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allowGoogle = false }) {
   const { signInWithGoogle, sendOtpCode, verifyOtpCode } = useAuth();
   const { showToast } = useToast();
 
@@ -240,22 +241,26 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true }) {
         <FormError id="signin-error" message={error.message} errorRef={errorRef} />
       )}
 
-      <button
-        type="button"
-        onClick={googleSignIn}
-        disabled={busy === 'google'}
-        className={secondaryButtonClass}
-      >
-        {busy === 'google' ? 'Waiting for Google…' : 'Continue with Google'}
-      </button>
+      {allowGoogle && (
+        <button
+          type="button"
+          onClick={googleSignIn}
+          disabled={busy === 'google'}
+          className={secondaryButtonClass}
+        >
+          {busy === 'google' ? 'Waiting for Google…' : 'Continue with Google'}
+        </button>
+      )}
 
       {allowEmailCode ? (
       <>
-      <div className="flex items-center gap-sm" aria-hidden="true">
-        <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
-        <span className="font-data text-caption text-text-secondary">or</span>
-        <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
-      </div>
+      {allowGoogle && (
+        <div className="flex items-center gap-sm" aria-hidden="true">
+          <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
+          <span className="font-data text-caption text-text-secondary">or</span>
+          <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
+        </div>
+      )}
 
       {step === 'email' ? (
         <form onSubmit={requestCode} noValidate className="space-y-sm">
@@ -453,5 +458,6 @@ export default function SignInPanel(props) {
   const readOnly = isReadOnlyDemo(eventConfig);
   const adminEntry = adminReturnPath(useLocation().state?.from);
   if (readOnly && !adminEntry) return <DemoSignInNotice />;
-  return <SignInForm {...props} allowEmailCode={!readOnly} />;
+  const allowGoogle = eventConfig?.auth?.googleProviderEnabled === true || (readOnly && Boolean(adminEntry));
+  return <SignInForm {...props} allowEmailCode={!readOnly} allowGoogle={allowGoogle} />;
 }

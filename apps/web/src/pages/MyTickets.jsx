@@ -60,7 +60,7 @@ export default function MyTickets() {
   if (demo) return <article className="space-y-md">{heading}<p>This event demo does not issue tickets.</p></article>;
   if (loading) return <p role="status">Checking your sign-in…</p>;
   if (!user) return <article className="space-y-md">{heading}<p>Sign in with the verified email assigned to your ticket.</p><SignInPanel /></article>;
-  if (!user.emailVerified) return <article className="space-y-md">{heading}<p>Sign in with Google or an emailed code to verify your ticket email.</p><Link to="/signin" className={secondaryActionClass}>Open sign-in</Link></article>;
+  if (!user.emailVerified) return <article className="space-y-md">{heading}<p>Sign in with an emailed code to verify your ticket email.</p><Link to="/signin" className={secondaryActionClass}>Open sign-in</Link></article>;
   return <article className="ticket-print-page min-w-0 space-y-lg text-body text-text-primary">
     {heading}
     <div className="space-y-sm no-print"><p>These tickets have been claimed by your verified account. Claim an assigned ticket with its order reference to add it here. Purchaser payment details remain private.</p><button type="button" className={secondaryActionClass} aria-busy={busy} aria-disabled={busy} onClick={() => { if (!busy) setRefresh((value) => value + 1); }}>{busy ? 'Refreshing tickets…' : 'Refresh tickets'}</button></div>
