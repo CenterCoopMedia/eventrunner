@@ -11,6 +11,7 @@ const { reviewedAnswers, siteNameOf } = require('../console/functions/src/review
 const { siteAddress, siteNameProblem } = require('../console/functions/src/siteNames.cjs');
 const { PROVIDERS, connectionChanging } = require('../console/functions/src/connectionState.cjs');
 const { ACCOUNT_COLLECTION, STATE_COLLECTION, DELETION_COLLECTION, connectionSecretId, deleteStoredConnection } = require('../console/functions/src/connections.cjs');
+const { deleteStripeRoutes, stripeRoutes } = require('../console/functions/src/stripeWebhooks.cjs');
 const { GITHUB_HEADERS, installationToken } = require('../console/functions/src/buildDispatch.cjs');
 const { requiredRecords } = require('./provision-client.cjs');
 
@@ -427,6 +428,8 @@ async function ticketAccess(ctx) {
 }
 
 async function ticketHooks(ctx) {
+  const routes = await stripeRoutes({ db: ctx.deps.db, appId: ctx.appId, projectId: ctx.resources.projectId });
+  if (routes.length || ctx.build?.stripeRouteAccountId || ctx.resources.stripeRouting === 'shared') return routes;
   const access = await ticketAccess(ctx);
   if (!access) return [];
   const { choice, token, org } = access;
@@ -479,6 +482,15 @@ async function ticketHooks(ctx) {
 }
 
 async function ticketWebhooks(ctx) {
+  const routes = await stripeRoutes({ db: ctx.deps.db, appId: ctx.appId, projectId: ctx.resources.projectId });
+  if (routes.length || ctx.build?.stripeRouteAccountId || ctx.resources.stripeRouting === 'shared') {
+    // This non-secret marker survives the build-record purge and cleanup retries.
+    ctx.resources.stripeRouting = 'shared';
+    ctx.resources.ticketProvider = 'stripe';
+    await saveResources(ctx);
+    await deleteStripeRoutes({ db: ctx.deps.db, secrets: ctx.deps.consoleSecrets, appId: ctx.appId, projectId: ctx.resources.projectId });
+    return;
+  }
   const hooks = await ticketHooks(ctx);
   const choice = ctx.ticketAccess?.choice || reviewedAnswers(ctx.app || {}).tickets?.choice || 'none';
   ctx.resources.ticketProvider = choice;
@@ -716,7 +728,7 @@ async function inspect(ctx) {
     await check(id, () => pendingProject ? { state: 'pending-project-deletion' } : read());
   }
   if (r.projectId) {
-    await check('ticket-webhooks', async () => ctx.tomb && ctx.completed.includes('ticket-webhooks')
+    await check('ticket-webhooks', async () => ctx.tomb && ctx.completed.includes('ticket-webhooks') && r.stripeRouting !== 'shared'
       ? { state: 'absent', evidence: 'completed-step' }
       : { state: (await ticketHooks(ctx)).length ? 'present' : 'absent' });
     for (const name of r.buckets) await projectCheck(`bucket:${name}`, async () => ({ state: await google(ctx, 'verify bucket', `${STORAGE}/b/${encode(name)}`, { allow: [404] }) ? 'present' : 'absent' }));

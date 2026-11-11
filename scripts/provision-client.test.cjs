@@ -88,7 +88,6 @@ function fakeCloud(options = {}) {
     mailDomain: null,
     endpoints: [...(options.endpoints || [])],
     stripeToken: options.stripeToken ?? STRIPE_TOKEN,
-    platformKey: 'sk_live_ccm_platform',
     liveConnect: options.liveConnect ?? !/^(?:sk|rk)_test_/.test(options.stripeToken ?? STRIPE_TOKEN),
     stripeAccountId: 'acct_1',
     eventbriteToken: options.eventbriteToken ?? EVENTBRITE_TOKEN,
@@ -313,10 +312,10 @@ function fakeCloud(options = {}) {
   function stripeRoute(url, method, body, headers) {
     const p = url.pathname;
     // Stripe refuses webhook endpoint calls made with a Connect OAuth token.
-    if (p.startsWith('/v1/webhook_endpoints') && state.liveConnect && headers.Authorization === `Bearer ${state.stripeToken}`) {
+    if (p.startsWith('/v1/webhook_endpoints') && state.liveConnect) {
       return answer({ error: { type: 'invalid_request_error', code: 'oauth_not_supported' } }, 403);
     }
-    const key = p.startsWith('/v1/webhook_endpoints') && state.liveConnect ? state.platformKey : state.stripeToken;
+    const key = state.stripeToken;
     if (headers.Authorization !== `Bearer ${key}`) return answer({ error: { message: `bad token ${headers.Authorization}` } }, 401);
     if (p === '/v1/account') return answer({ id: state.stripeAccountId });
     if (method === 'GET') return answer({ data: state.endpoints });
@@ -326,7 +325,6 @@ function fakeCloud(options = {}) {
     }
     const params = new URLSearchParams(body);
     state.endpointsMade = (state.endpointsMade || 0) + 1;
-    if (state.liveConnect && params.get('connect') !== 'true') return answer({ error: { message: 'a platform endpoint must listen to connected accounts' } }, 400);
     const created = { id: `we_${state.endpointsMade}`, url: params.get('url'), status: 'enabled', enabled_events: params.getAll('enabled_events[]'), secret: 'whsec_fixture' };
     state.endpoints.push(created);
     return answer(created);
@@ -430,10 +428,10 @@ function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding
     'applications/a1': application({ status: 'approved', buildStart: { state: 'started', at: new Date(NOW - 1000) }, ...app }),
     'console_connections/a1': accounts || { stripe: { accountId: 'acct_1', connectedBy: 'ana' } },
   });
-  const consoleSecrets = makeFakeSecrets(secrets || { 'connection-stripe-a1': STRIPE_TOKEN, 'connection-eventbrite-a1': EVENTBRITE_TOKEN });
-  // CCM's platform key lives in the console project beside the connections; it is read, never moved.
-  const readConsoleSecret = consoleSecrets.readSecret.bind(consoleSecrets);
-  consoleSecrets.readSecret = async (id) => (id === 'CONSOLE_STRIPE_SECRET_KEY' ? fake.state.platformKey : readConsoleSecret(id));
+  const consoleSecrets = makeFakeSecrets({
+    CONSOLE_STRIPE_WEBHOOK_SECRET: 'whsec_shared_fixture',
+    ...(secrets || { 'connection-stripe-a1': STRIPE_TOKEN, 'connection-eventbrite-a1': EVENTBRITE_TOKEN }),
+  });
   const clientSecrets = makeFakeSecrets();
   const clientFirestore = makeFakeDb({});
   const mailer = fakeMailer();
@@ -483,6 +481,7 @@ const bindingsOf = (fake, resource) => fake.state.policies[resource] || [];
 const holds = (bindings, role, member) => bindings.some((b) => b.role === role && b.members.includes(member));
 const statusMail = (mailer) => mailer.sent.filter((m) => m.kind === 'status').map((m) => m.status);
 const notices = (mailer) => mailer.sent.filter((m) => m.kind === 'operator');
+const remainingConnectionTokens = (fake) => [...fake.consoleSecrets.store.keys()].filter((id) => id.startsWith('connection-'));
 
 test('one approved request becomes a built site, and the record and the status say so', async () => {
   const fake = setup();
@@ -672,17 +671,17 @@ test('the token is tested, moved, and deleted from the console, and the leftover
   const fake = setup();
   await provision({ appId: 'a1', deps: fake.deps });
   assert.equal(fake.clientSecrets.store.get('TICKETING_API_TOKEN'), STRIPE_TOKEN);
-  assert.equal(fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET'), 'whsec_fixture');
-  // A live Connect token cannot manage webhook endpoints (Stripe 403 oauth_not_supported); CCM's platform key makes a Connect endpoint.
-  const made = fake.calls.find((c) => c.method === 'POST' && c.url.endsWith('/v1/webhook_endpoints'));
-  assert.equal(made.headers.Authorization, 'Bearer sk_live_ccm_platform');
-  assert.equal(new URLSearchParams(made.body).get('connect'), 'true');
-  assert.equal(fake.db.read('console_builds/a1').stripeEndpointOwner, 'platform');
-  assert.equal(fake.consoleSecrets.store.size, 0);
+  const secret = fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET');
+  assert.match(secret, /^whsec_[a-f0-9]{64}$/);
+  assert.equal(fake.consoleSecrets.store.get('stripe-webhook-a1'), secret);
+  assert.deepEqual(fake.db.read('console_stripe_routes/acct_1'), { appId: 'a1', projectId: PROJECT, region: 'us-central1' });
+  assert.equal(fake.db.read('console_builds/a1').stripeRouteAccountId, 'acct_1');
+  assert.ok(!fake.calls.some((c) => c.url.includes('/v1/webhook_endpoints')));
+  assert.deepEqual(remainingConnectionTokens(fake), []);
   const secretPolicy = bindingsOf(fake, `secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets/TICKETING_API_TOKEN`);
   assert.ok(holds(secretPolicy, 'roles/secretmanager.secretAccessor', `serviceAccount:${COMPUTE}`));
   assert.ok(fake.calls.some((c) => c.url.endsWith('/v1/account')));
-  assert.equal(fake.state.endpoints[0].url, `https://us-central1-${PROJECT}.cloudfunctions.net/ticketingWebhook`);
+  assert.equal(fake.state.endpoints.length, 0);
 });
 
 test('fresh provisioning grants CCM support site operator and project Editor access alongside client Owners', async () => {
@@ -928,7 +927,7 @@ test('a test-mode connection fails a live build and its token is deleted', async
   });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
   assert.match(fake.db.read('console_builds/a1').error, /test mode, and this is a live build/);
-  assert.equal(fake.consoleSecrets.store.size, 0);
+  assert.deepEqual(remainingConnectionTokens(fake), []);
   assert.equal(fake.clientSecrets.store.has('TICKETING_API_TOKEN'), false);
   assert.ok(!fake.calls.some((c) => new URL(c.url).host === 'api.stripe.com'), 'a test token is not used');
   assert.ok(notices(fake.mailer).some((n) => n.noticeKind === 'build-run-failed'));
@@ -951,24 +950,27 @@ test('a test-mode run builds with a test-mode connection, and records that it di
   assert.equal(fake.state.variables.EVENT_STRIPE_MODE, 'test');
 });
 
-test('a Stripe endpoint whose signing secret is lost is replaced', async () => {
+test('a direct test Stripe endpoint whose signing secret is lost is replaced', async () => {
   const url = `https://us-central1-${PROJECT}.cloudfunctions.net/ticketingWebhook`;
-  const fake = setup({ cloud: { endpoints: [{ id: 'we_old', url, status: 'enabled', enabled_events: [] }] } });
-  await provision({ appId: 'a1', deps: fake.deps });
+  const fake = setup({
+    app: { connections: { stripe: { connected: true, displayName: 'NC Local', livemode: false } } },
+    secrets: { 'connection-stripe-a1': TEST_TOKEN },
+    cloud: { stripeToken: TEST_TOKEN, endpoints: [{ id: 'we_old', url, status: 'enabled', enabled_events: [] }] },
+  });
+  assert.equal(await provision({ appId: 'a1', testMode: true, deps: fake.deps }), 0);
   assert.deepEqual(fake.state.endpoints.map((e) => e.id), ['we_1']);
   assert.ok(fake.state.endpoints[0].enabled_events.includes('checkout.session.completed'));
   assert.equal(fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET'), 'whsec_fixture');
 });
 
-test('a second live Stripe site is refused while another site holds a platform Connect endpoint', async () => {
-  // A platform Connect endpoint receives every connected account's events, so two would cross clients.
-  const other = { id: 'we_other', url: 'https://us-central1-er-other.cloudfunctions.net/ticketingWebhook', status: 'enabled', enabled_events: [] };
-  const fake = setup({ cloud: { endpoints: [other] } });
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
-  const record = fake.db.read('console_builds/a1');
-  assert.equal(record.failedStep, 'tickets');
-  assert.match(record.error, /shared receiver/);
-  assert.deepEqual(fake.state.endpoints.map((e) => e.id), ['we_other']);
+test('a second live Stripe site registers its own route without changing another site', async () => {
+  const fake = setup();
+  const other = { appId: 'a2', projectId: 'er-second', region: 'us-central1' };
+  await fake.db.doc('console_stripe_routes/acct_other').set(other);
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.deepEqual(fake.db.read('console_stripe_routes/acct_other'), other);
+  assert.equal(fake.db.read('console_stripe_routes/acct_1').appId, 'a1');
+  assert.equal(fake.state.endpoints.length, 0);
 });
 
 function eventbriteRequest() {
@@ -992,7 +994,7 @@ test('Eventbrite: registering the webhook uses the organization that holds the e
   assert.equal(register.env.TICKETING_API_TOKEN, EVENTBRITE_TOKEN);
   assert.equal(register.env.TICKETING_WEBHOOK_SECRET, fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET'));
   assert.equal(register.env.EVENT_TICKETING_EVENT_ID, '555');
-  assert.equal(fake.consoleSecrets.store.size, 0);
+  assert.deepEqual(remainingConnectionTokens(fake), []);
   assert.ok(fake.calls.some((c) => c.url.endsWith('/v3/events/555/')));
 });
 
@@ -1001,7 +1003,7 @@ test('with no ticket account nothing moves, and any leftover is deleted', async 
   const fake = setup({ app: { frozen, answers: frozen, connections: {} }, accounts: {} });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.state.variables.EVENT_TICKETING_PROVIDER, 'manual');
-  assert.equal(fake.consoleSecrets.store.size, 0);
+  assert.deepEqual(remainingConnectionTokens(fake), []);
   assert.equal(fake.clientSecrets.store.has('TICKETING_API_TOKEN'), false);
   assert.ok(!fake.commands.some((c) => c.args[0].includes('register-ticketing')));
 });
@@ -1189,69 +1191,66 @@ test('a second run after a finished build changes nothing and emails nobody', as
 test('a retry after the token moved finds it in the client project', async () => {
   const fake = setup({ cloud: { deployFailures: 3 } });
   await provision({ appId: 'a1', deps: fake.deps });
-  assert.equal(fake.consoleSecrets.store.size, 0);
+  assert.deepEqual(remainingConnectionTokens(fake), []);
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.clientSecrets.store.get('TICKETING_API_TOKEN'), STRIPE_TOKEN);
 });
 
-test('a retry after the endpoint was made keeps its platform ownership on the record', async () => {
+test('a retry after the route was made keeps its account and site signing secret', async () => {
   const fake = setup({ cloud: { deployFailures: 3 } });
   await provision({ appId: 'a1', deps: fake.deps });
-  assert.equal(fake.db.read('console_builds/a1').stripeEndpointOwner, 'platform');
+  const secret = fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET');
+  assert.equal(fake.db.read('console_builds/a1').stripeRouteAccountId, 'acct_1');
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
-  assert.equal(fake.state.endpoints.length, 1, 'the retry reuses the endpoint');
-  assert.equal(fake.db.read('console_builds/a1').stripeEndpointOwner, 'platform');
+  assert.equal(fake.state.endpoints.length, 0);
+  assert.equal(fake.db.read('console_builds/a1').stripeRouteAccountId, 'acct_1');
+  assert.equal(fake.consoleSecrets.store.get('stripe-webhook-a1'), secret);
 });
 
-test('a failed signing-secret write leaves the endpoint owner available for decommission', async () => {
-  const fake = setup();
+test('a failed test-account signing-secret write leaves its owner available for decommission', async () => {
+  const fake = setup({
+    accounts: { stripe: { accountId: 'acct_1', livemode: false, connectedBy: 'ana' } },
+    secrets: { 'connection-stripe-a1': TEST_TOKEN },
+    cloud: { stripeToken: TEST_TOKEN },
+  });
   const write = fake.clientSecrets.writeSecret.bind(fake.clientSecrets);
   fake.clientSecrets.writeSecret = async (id, value) => {
     if (id === 'TICKETING_WEBHOOK_SECRET') throw new Error('secret add: HTTP 500');
     return write(id, value);
   };
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.equal(await provision({ appId: 'a1', testMode: true, deps: fake.deps }), 1);
   const record = fake.db.read('console_builds/a1');
   assert.equal(record.failedStep, 'tickets');
   assert.equal(fake.state.endpoints.length, 1);
   assert.equal(record.stripeEndpointId, null, 'the endpoint is not yet paired with a saved secret');
-  assert.equal(record.stripeEndpointOwner, 'platform');
+  assert.equal(record.stripeEndpointOwner, 'account');
   assert.equal(fake.clientSecrets.store.has('TICKETING_WEBHOOK_SECRET'), false);
-  // The real cleanup consumes this partial record and the provider refuses client-token endpoint calls.
+  // Cleanup uses the direct test account's token for this partial record.
   await DECOMMISSION_STEPS.find((step) => step.id === 'ticket-webhooks').run({
     appId: 'a1', app: fake.db.read('applications/a1'), build: record, resources: record.resources, deps: fake.deps,
   });
   assert.equal(fake.state.endpoints.length, 0);
   const removed = fake.calls.find((call) => call.method === 'DELETE' && call.url.includes('/v1/webhook_endpoints/'));
-  assert.equal(removed.headers.Authorization, `Bearer ${fake.state.platformKey}`);
+  assert.equal(removed.headers.Authorization, `Bearer ${TEST_TOKEN}`);
   // Retrying without a saved secret replaces the endpoint and records the new identity.
   fake.clientSecrets.writeSecret = write;
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(await provision({ appId: 'a1', testMode: true, deps: fake.deps }), 0);
   assert.equal(fake.state.endpoints.length, 1);
   assert.equal(fake.db.read('console_builds/a1').stripeEndpointId, fake.state.endpoints[0].id);
 });
 
-test('a signing secret that did not save is not paired with the new account\'s endpoint', async () => {
+test('a failed Console signing-secret copy leaves no route, and a retry uses the saved site secret', async () => {
   const fake = setup();
-  const stored = () => fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET');
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
-  await fake.clientSecrets.writeSecret('TICKETING_WEBHOOK_SECRET', 'whsec_account_a');
-  await fake.db.doc('applications/a1').update({ status: 'building' });
-  fake.state.endpoints = [];
-  fake.state.stripeToken = `${STRIPE_TOKEN}2`;
-  fake.consoleSecrets.store.set('connection-stripe-a1', fake.state.stripeToken);
-  const writeSecret = fake.clientSecrets.writeSecret.bind(fake.clientSecrets);
-  fake.clientSecrets.writeSecret = async (id, value) => {
-    if (id === 'TICKETING_WEBHOOK_SECRET') throw new Error('no answer');
-    return writeSecret(id, value);
-  };
+  fake.consoleSecrets.failWrite = true;
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
-  assert.equal(stored(), 'whsec_account_a');
-  assert.equal(fake.state.endpoints.length, 1, 'the new account has its endpoint, and the old secret');
-  fake.clientSecrets.writeSecret = writeSecret;
+  const secret = fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET');
+  assert.ok(secret);
+  assert.equal(fake.db.read('console_stripe_routes/acct_1'), undefined);
+  fake.consoleSecrets.failWrite = false;
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
-  assert.equal(stored(), 'whsec_fixture');
-  assert.equal(fake.state.endpoints.length, 1);
+  assert.equal(fake.consoleSecrets.store.get('stripe-webhook-a1'), secret);
+  assert.equal(fake.db.read('console_stripe_routes/acct_1').appId, 'a1');
+  assert.equal(fake.state.endpoints.length, 0);
 });
 
 test('a retry on a replaced token deploys again, or the site keeps the old one', async () => {

@@ -47,7 +47,7 @@ const { requireOwner, toMillis } = require('./access.cjs');
 const { withDefaults } = require('./answers.cjs');
 const { checkAnswers, stepErrors } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
-const { BUILD_COLLECTION, RETRY_STATUSES, canRetryBuild, readBuild } = require('./buildState.cjs');
+const { RETRY_STATUSES, canRetryBuild, readBuild } = require('./buildState.cjs');
 const { ARCHIVED_MESSAGE, CLOSED, readApplication } = require('./applications.cjs');
 const { hostName } = require('./hostName.cjs');
 const {
@@ -125,33 +125,6 @@ async function requireConnectable({ db, now = Date.now }, get, { appId, data, pr
   if (!canRetryBuild(data, await readBuild(get, db, appId), now())) throw new ConsoleError(409, 'locked', stillBuilding);
   if (withDefaults(data.frozen || data.answers).tickets.choice !== provider) {
     throw new ConsoleError(409, 'locked', 'Your request does not use this account.');
-  }
-}
-
-/**
- * Each live Stripe site's payment webhook is a platform Connect endpoint,
- * which receives every connected account's events. Until a shared receiver
- * routes events by account (eventrunner issue 835), only one live Stripe
- * account may be connected, so no client's payments reach another client's
- * site. The same request may reconnect its own account.
- */
-async function requireOnlyLiveStripe(tx, db, appId) {
-  // A connected account, or a built site that still holds a platform endpoint
-  // after its account was disconnected, reserves the one slot.
-  const held = await tx.get(db.collection(ACCOUNT_COLLECTION));
-  const builds = await tx.get(db.collection(BUILD_COLLECTION));
-  let other = builds.docs.some((doc) => doc.id !== appId && doc.data()?.stripeEndpointOwner === 'platform');
-  for (const doc of held.docs) {
-    if (other) break;
-    const stripe = doc.data()?.stripe;
-    if (doc.id === appId || !stripe?.accountId) continue;
-    // Existing private rows predate mode storage. Unknown mode keeps the slot.
-    const livemode = typeof stripe.livemode === 'boolean' ? stripe.livemode
-      : (await tx.get(db.collection('applications').doc(doc.id))).data()?.connections?.stripe?.livemode;
-    other = livemode !== false;
-  }
-  if (other) {
-    throw new ConsoleError(409, 'locked', 'Event Runner can connect one live Stripe account for now. Email info@eventrunner.org and we will set up yours.');
   }
 }
 
@@ -336,7 +309,6 @@ async function completeConnection(deps, { body, user }) {
       await requireConnectable(deps, (r) => tx.get(r), { appId, data, provider });
       const changing = changingState(data, provider, at, changeId);
       const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
-      if (provider === 'stripe' && answer.details?.livemode === true) await requireOnlyLiveStripe(tx, db, appId);
       previous = previousOf(data, accounts, provider);
       const same = previous.account?.accountId === answer.accountId;
       const keepEvent = provider === 'eventbrite' ? { event: same ? previous.connection?.event ?? null : null } : {};

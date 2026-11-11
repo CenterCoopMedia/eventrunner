@@ -312,6 +312,25 @@ test('purge verifies steps in order, preserves unrelated resources, and a second
   assert.equal(mutations(s).length, mutationCount);
 });
 
+test('purge of a shared Stripe site removes only its route and signing secret without a Stripe call', async () => {
+  const s = setup({
+    build: { stripeRouteAccountId: 'acct_own', stripeEndpointId: null, stripeEndpointOwner: null },
+    seed: {
+      'console_stripe_routes/acct_own': { appId: 'a1', projectId: PROJECT, region: 'us-central1' },
+      'console_stripe_routes/acct_other': { appId: 'a2', projectId: 'er-other', region: 'us-central1' },
+    },
+  });
+  await s.secrets.writeSecret('stripe-webhook-a1', 'whsec_site_fixture');
+  await s.secrets.writeSecret('stripe-webhook-a2', 'whsec_other_fixture');
+  assert.equal(await s.run('purge', true), 0);
+  assert.equal(s.db.read('console_stripe_routes/acct_own'), undefined);
+  assert.equal(s.secrets.store.has('stripe-webhook-a1'), false);
+  assert.equal(s.db.read('console_stripe_routes/acct_other').appId, 'a2');
+  assert.equal(s.secrets.store.has('stripe-webhook-a2'), true);
+  assert.equal(s.calls.some((c) => c.host === 'api.stripe.com'), false);
+  assert.equal(await s.run('verify'), 0);
+});
+
 test('immediate purge disables a live site and removes only its Eventbrite webhooks', async () => {
   const s = setup({ provider: 'eventbrite' });
   assert.equal(await s.run('purge', true), 0, s.logs.join('\n'));

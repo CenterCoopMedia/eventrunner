@@ -689,56 +689,25 @@ test('moving a token to a client site leaves the row that keeps the connection',
 });
 
 test('connecting a different account keeps the old one when another request uses it', async () => {
-  // Two live Stripe accounts cannot both be connected (next test), so this runs in test mode.
   const { stripe, deps } = sharing();
-  stripe.answer = { ...stripeAnswer(), details: { livemode: false } };
   await complete(deps, { state: await start(deps) });
   assert.deepEqual(stripe.revoked, []);
 });
 
-test('the same live Stripe account is refused for a second request', async () => {
-  const { stripe, deps } = sharing();
+test('connecting a shared live account succeeds; a build claims its unique payment route', async () => {
+  const { db, stripe, deps } = sharing();
   stripe.answer = stripeAnswer('acct_client1');
-  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
+  await complete(deps, { state: await start(deps) });
+  assert.equal(db.read('console_connections/a1').stripe.accountId, 'acct_client1');
 });
 
-test('a disconnected site that still holds a platform endpoint keeps the one live Stripe slot', async () => {
-  const { db, deps } = setup();
-  await db.doc('console_builds/other').set({ state: 'done', stripeEndpointId: 'we_other', stripeEndpointOwner: 'platform' });
-  await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
-    assert.equal(err.status, 409);
-    assert.match(err.message, /one live Stripe account/);
-    return true;
-  });
-});
-
-test('test-mode private rows and existing test applications leave the live Stripe slot free', async () => {
-  for (const extra of [
-    { 'console_connections/test': { stripe: { accountId: 'acct_test', livemode: false } } },
-    {
-      'console_connections/test': { stripe: { accountId: 'acct_test' } },
-      'applications/test': applicationDoc({ connections: { stripe: stripeConnection({ livemode: false }) } }),
-    },
-  ]) {
-    const { db, deps } = setup({ extra });
-    const { connector } = stripeHttp();
-    deps.connectors.stripe = connector;
-    assert.equal((await complete(deps, { state: await start(deps) })).body.connected, true);
-    assert.equal(privateRow(db).stripe.livemode, true);
-  }
-});
-
-test('an account with unknown mode still reserves the live Stripe slot', async () => {
-  const { deps } = setup({ extra: { 'console_connections/orphan': { stripe: { accountId: 'acct_unknown' } } } });
-  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
-});
-
-test('a live OAuth code is refused before any Stripe request when another live slot is held', async () => {
-  const { deps } = sharing();
+test('a live OAuth exchange is allowed while another live account is connected', async () => {
+  const { deps, db } = sharing();
   const { connector, calls } = stripeHttp();
   deps.connectors.stripe = connector;
-  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
-  assert.deepEqual(calls, []);
+  assert.equal((await complete(deps, { state: await start(deps) })).body.connected, true);
+  assert.ok(calls.some((url) => url === 'https://connect.stripe.com/oauth/token'));
+  assert.equal(privateRow(db).stripe.livemode, true);
 });
 
 test('a test OAuth exchange is allowed while another live slot is held', async () => {
@@ -750,30 +719,12 @@ test('a test OAuth exchange is allowed while another live slot is held', async (
   assert.equal(privateRow(db).stripe.livemode, false);
 });
 
-test('a competing live connection during exchange is refused and a failed deauthorization is reported', async () => {
-  const { db, deps, log, secrets } = setup();
-  const { connector, calls } = stripeHttp({
-    onExchange: () => db.doc('console_connections/other').set({ stripe: { accountId: 'acct_other', livemode: true } }),
-    revokeStatus: 500,
-  });
-  deps.connectors.stripe = connector;
-  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 502, code: 'disconnect-failed' });
-  assert.ok(calls.some((url) => url === 'https://connect.stripe.com/oauth/deauthorize'));
-  assert.equal(secrets.store.size, 0);
-  assert.equal(privateRow(db).stripe, undefined);
-  assert.match(JSON.stringify(log.errors), /stripe revoke: HTTP 500 server_error/);
-  assert.ok(!JSON.stringify(log.errors).includes('private-provider-body'));
-});
-
-test('a second live Stripe account is refused before the exchange while another request holds one', async () => {
-  const { stripe, secrets, deps } = sharing();
-  await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
-    assert.equal(err.status, 409);
-    assert.match(err.message, /one live Stripe account/);
-    return true;
-  });
-  assert.equal(secrets.store.get('connection-stripe-a1'), undefined);
-  assert.equal(stripe.exchanged.length, 0);
+test('a second live Stripe account connects independently', async () => {
+  const { db, stripe, secrets, deps } = sharing();
+  await complete(deps, { state: await start(deps) });
+  assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
+  assert.equal(db.read('console_connections/a1').stripe.accountId, 'acct_new');
+  assert.equal(db.read('console_connections/a2').stripe.accountId, 'acct_client1');
   assert.deepEqual(stripe.revoked, []);
 });
 

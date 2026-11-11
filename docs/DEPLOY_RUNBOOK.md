@@ -267,7 +267,7 @@ Set the applicable rows as Environment **secrets**
 | `EMAIL_WEBHOOK_BASIC_AUTH` | `EVENT_EMAIL_PROVIDER = postmark` and delivery-event ingest is enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | `EVENT_EMAIL_PROVIDER = webhook` |
 | `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER = eventbrite` or `stripe`; Stripe requires a secret or restricted key matching `EVENT_STRIPE_MODE`. With Stripe, `invoiceAdmin` binds it too, for invoice pay links. `manual` and `none` use no ticketing API token |
-| `TICKETING_WEBHOOK_SECRET` | `eventbrite` or `stripe`; for Eventbrite, generate a random value of at least 32 characters (`openssl rand -hex 32`). Eventbrite does not sign deliveries, so `register-ticketing-webhook.cjs` puts this secret in the webhook URL. For Stripe, use the signing secret generated for this deployed endpoint in the configured mode. `manual` and `none` use no webhook secret |
+| `TICKETING_WEBHOOK_SECRET` | `eventbrite` or `stripe`; for Eventbrite, generate a random value of at least 32 characters (`openssl rand -hex 32`). Eventbrite does not sign deliveries, so `register-ticketing-webhook.cjs` puts this secret in the webhook URL. A live Stripe Connect build generates a per-site signing secret and shares it only with the trusted Console receiver; a direct test endpoint uses Stripe's endpoint signing secret. `manual` and `none` use no webhook secret |
 | `OPERATOR_WEBHOOK_URL`, `OPERATOR_WEBHOOK_SECRET` | `EVENT_OPERATOR_NOTIFIER = webhook` |
 | `AIRTABLE_API_TOKEN` | `EVENT_AIRTABLE_ENABLED = true`. An Airtable personal access token with only the `data.records:read` scope and only the pitch base. Store it in Secret Manager only |
 
@@ -1276,7 +1276,7 @@ The client console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md)
 
    - **Stripe**: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI `https://console.eventrunner.org/connect/stripe/return`. Put the Connect client id in `console/functions/.env` as `CONSOLE_STRIPE_CLIENT_ID`. Use the test mode client id and key for a rehearsal, with `CONSOLE_TEST_MODE` set (§11.2).
      - A new account's live client id stays unavailable until the sandbox setup is done, payments are activated, and the Connect integration questions are answered. Do them in that order.
-     - The console's secret key exchanges and revokes connection tokens, and the site builder uses it to make each live client's webhook endpoint on the platform account (`connect=true`), because Stripe refuses webhook endpoint calls made with a Connect OAuth token. Make it a restricted key with two permissions: **Connect OAuth: Write** and **Webhook Endpoints, Event Destinations: Write**, both on the platform account itself. Store it in Secret Manager, then redeploy, because a deploy pins each secret's version. The site builder's service account needs `roles/secretmanager.secretAccessor` on this one secret.
+     - The console's secret key exchanges and revokes connection tokens. Platform endpoint setup uses **Webhook Endpoints, Event Destinations: Write**, and OAuth uses **Connect OAuth: Write**, both on the platform account itself. Live builds register private routes to one shared Console receiver and do not read this platform API key. Set up `CONSOLE_STRIPE_WEBHOOK_SECRET`, the receiver's read access to `stripe-webhook-` secrets, and the provisioner's write access by following the [shared receiver migration runbook](runbooks/stripe-connect-receiver.md). Complete NC Local's migration before deploying the Console version that admits more live accounts.
      - Creating a live key emails a verification link to the Stripe login address. Give that address a working mail route first. If mail to it bounced earlier, Stripe can stop sending: **Personal details** then shows "We've had trouble sending you emails," and the key pop-up keeps saying a link was sent.
    - **Eventbrite**: make an app, and set its OAuth redirect URI to `https://console.eventrunner.org/connect/eventbrite/return`. Put its API key in `console/functions/.env` as `CONSOLE_EVENTBRITE_CLIENT_ID`, and its client secret in the secret above.
    - **Secret Manager**: turn on the Secret Manager API in the console project. Give the functions' runtime service account the **Secret Manager Admin** role, with an IAM condition on the secret name prefix `projects/<project-number>/secrets/connection-`, so it cannot change other secrets. Without a condition, the role reaches every secret in the project.
@@ -1300,7 +1300,7 @@ Dispatch `.github/workflows/deploy-console.yml` from `main`. It runs in the GitH
 
 A deploy does not delete a function that left the code. In `--non-interactive` mode it stops, lists each one and prints its `firebase functions:delete` command. Run those commands and deploy again. A removed public function keeps answering at its direct address until it is deleted.
 
-Secrets stay in the console project's Secret Manager, and the Environment holds none: `CONSOLE_POSTMARK_TOKEN`, `CONSOLE_STRIPE_SECRET_KEY`, `CONSOLE_EVENTBRITE_CLIENT_SECRET`, `CONSOLE_GITHUB_APP_PRIVATE_KEY`. A function that names a secret will not deploy without it, so until a provider is ready store a placeholder. The functions' runtime account needs read access to each one.
+Secrets stay in the console project's Secret Manager, and the Environment holds none: `CONSOLE_POSTMARK_TOKEN`, `CONSOLE_STRIPE_SECRET_KEY`, `CONSOLE_STRIPE_WEBHOOK_SECRET`, `CONSOLE_EVENTBRITE_CLIENT_SECRET`, `CONSOLE_GITHUB_APP_PRIVATE_KEY`. A function that names a secret will not deploy without it, so until a provider is ready store a placeholder. The functions' runtime account needs read access to each one. Only `stripeConnectWebhook` binds the platform webhook signing secret; grant it read access to the `stripe-webhook-` prefix for site signing secrets. The provisioner needs `roles/secretmanager.viewer` on `CONSOLE_STRIPE_WEBHOOK_SECRET` to confirm setup from version metadata.
 
 Set these up as the project owner before the first deploy, because the deploy account cannot:
 
@@ -1397,7 +1397,7 @@ Use placeholders from your own records. Nothing below belongs in the repository.
      --member="serviceAccount:${PROVISIONER}" --role=roles/datastore.user --condition=None
    gcloud projects add-iam-policy-binding <console-project-id> \
      --member="serviceAccount:${PROVISIONER}" --role=roles/secretmanager.admin \
-     --condition='title=connection tokens only,expression=resource.name.startsWith("projects/<console-project-number>/secrets/connection-")'
+     --condition='title=site connection secrets,expression=resource.name.startsWith("projects/<console-project-number>/secrets/connection-") || resource.name.startsWith("projects/<console-project-number>/secrets/stripe-webhook-")'
    ```
 
    A project's creator becomes its owner. That is what lets the provisioner do everything else inside a client project, so it holds no role on the folder beyond creating projects.
@@ -1524,7 +1524,7 @@ The tests run against a fake of each service, and the fake answers as the rehear
 - GitHub: `GITHUB_TOKEN` with `actions: write` dispatches `deploy.yml` and the run starts. `display_title` follows `run-name`. An App token with the three permissions above can create an Environment.
 - Postmark: `ApiTokens[0]` on the account's `/servers` answer. `/message-streams` accepts a `Broadcasts` stream with Postmark-managed unsubscribe. Webhooks accept `HttpAuth`, pass Postmark's test of each trigger, and list the URL back in a form this comparison matches.
 - Cloudflare: a TXT value comes back in the form it was stored. A `pm-bounces` CNAME and the certificate's records are not proxied.
-- Stripe and Eventbrite: `GET /v1/account` answers with the connected account's id for a Connect OAuth token. Stripe refuses webhook endpoint calls made with that token (403 `oauth_not_supported`), so a live build makes the endpoint on the platform account with the console's key and `connect=true`. `GET /users/me/` answers for a live Eventbrite token.
+- Stripe and Eventbrite: `GET /v1/account` answers with the connected account's id for a Connect OAuth token. Verify live Stripe delivery through the shared Console receiver using the [migration runbook](runbooks/stripe-connect-receiver.md); live builds register routes without managing endpoints. `GET /users/me/` answers for a live Eventbrite token.
 
 ### 12.4.1 Turn on Google sign-in after a build
 
@@ -1680,8 +1680,8 @@ these permissions on the client projects:
 | Read the deployed ticket token and list client secrets | `roles/secretmanager.secretAccessor`, `roles/secretmanager.viewer` |
 
 The existing console `roles/datastore.user` and conditional
-`roles/secretmanager.admin` grants cover console records and `connection-`
-secrets. Cloudflare DNS Edit, the Postmark account token, and the provisioner
+`roles/secretmanager.admin` grants cover console records, `connection-` tokens
+and `stripe-webhook-` signing secrets. Cloudflare DNS Edit, the Postmark account token, and the provisioner
 App permissions in section 12.1 already cover their deletion calls.
 
 **Required setup change:** The WIF condition in section 12.1 permits only
