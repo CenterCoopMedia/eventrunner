@@ -498,7 +498,7 @@ test('each grant the rehearsal missed is made up front', async () => {
   assert.ok(holds(project, 'roles/iam.serviceAccountTokenCreator', `serviceAccount:service-${NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com`));
   assert.ok(holds(project, 'roles/run.invoker', `serviceAccount:${COMPUTE}`));
   assert.ok(holds(project, 'roles/eventarc.eventReceiver', `serviceAccount:${COMPUTE}`));
-  for (const role of ['roles/datastore.user', 'roles/firebaseauth.admin', 'roles/cloudbuild.builds.builder']) {
+  for (const role of ['roles/datastore.user', 'roles/firebaseauth.admin', 'roles/firebasehosting.admin', 'roles/cloudbuild.builds.builder']) {
     assert.ok(holds(project, role, `serviceAccount:${COMPUTE}`), role);
   }
   assert.equal(holds(project, 'roles/editor', `serviceAccount:${COMPUTE}`), false);

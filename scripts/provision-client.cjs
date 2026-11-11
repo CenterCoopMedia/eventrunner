@@ -127,6 +127,8 @@ const COMPUTE_ROLES = Object.freeze([
   'roles/datastore.user',
   // OTP sign-in creates and verifies accounts; account deletion removes them.
   'roles/firebaseauth.admin',
+  // Settings and the hourly custom-domain check manage Firebase Hosting domains.
+  'roles/firebasehosting.admin',
   // The default build account reads source, writes images and build logs.
   // This role also covers the runtime's Storage object reads and writes.
   'roles/cloudbuild.builds.builder',
