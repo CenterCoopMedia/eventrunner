@@ -294,10 +294,10 @@ function buildHandlers() {
   // welcome email has a send-once key and never throws, and onUserDeleted's
   // deletes are idempotent.
   const { defineSecret, defineString } = require('firebase-functions/params');
-  const runtimeOptions = {
-    failurePolicy: true,
-    serviceAccount: defineString('EVENT_COMPUTE_SERVICE_ACCOUNT'),
-  };
+  const runtimeOptions = { failurePolicy: true };
+  if (process.env.FUNCTIONS_EMULATOR !== 'true') {
+    runtimeOptions.serviceAccount = defineString('EVENT_COMPUTE_SERVICE_ACCOUNT');
+  }
   // onUserCreated sends the welcome email, so it binds the provider's send
   // secrets.
   const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
