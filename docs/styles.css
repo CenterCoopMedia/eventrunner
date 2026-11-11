@@ -224,6 +224,7 @@ img, video { height: auto; }
   background: rgb(var(--color-accent-rgb));
   color: rgb(var(--color-surface-rgb));
 }
+.example-masthead > div { min-width: 0; }
 .example-masthead h2 { margin: 0; font-size: clamp(2rem, 3.2vw, 3.1rem); line-height: 0.98; letter-spacing: -0.04em; }
 .example-masthead p { margin: 0.65rem 0 0; font-size: 0.95rem; }
 .gather-mark { width: 105px; height: 105px; flex-shrink: 0; }
@@ -341,6 +342,7 @@ img, video { height: auto; }
 .resource-list li { display: flex; flex-direction: column; gap: 0.4rem; padding: 1.1rem 0; border-top: 1px solid rgb(var(--rule-hairline-rgb)); }
 .resource-list li > a { align-self: flex-start; font-weight: 600; font-size: 1.15rem; }
 .resource-list li > span { color: rgb(var(--color-text-secondary-rgb)); }
+.demo-options { display: grid; gap: 2rem; }
 .legal-page { max-width: var(--measure); margin-inline: auto; }
 .legal-page .hero-single { padding-bottom: 2rem; }
 .legal-page .section { padding-block: 1.4rem; }
@@ -442,9 +444,9 @@ img, video { height: auto; }
   .hero-copy .lede { font-size: 1.2rem; }
   .hero-detail { font-size: 1rem; }
   .hero-copy .actions { gap: 0.75rem 1.15rem; }
-  .example-masthead { padding: 1.3rem; }
-  .example-masthead h2 { font-size: 2.4rem; }
-  .gather-mark { width: 80px; height: 80px; }
+  .example-masthead { padding: 1.3rem; gap: 1rem; }
+  .example-masthead h2 { font-size: clamp(2rem, 9.8vw, 2.4rem); }
+  .gather-mark { width: clamp(3.75rem, 20vw, 5rem); height: clamp(3.75rem, 20vw, 5rem); }
   .example-content { padding: 1.15rem 0.85rem 0.7rem; }
   .example-caption { padding-inline: 0.85rem; }
   .example-controls { gap: 0.2rem; }

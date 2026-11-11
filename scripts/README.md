@@ -364,6 +364,19 @@ directory. It also refuses symbolic links. The Pages workflow uploads `dist/page
 uploads the source `docs/` directory. `scripts/stage-pages.test.cjs` runs in the documentation
 CI job and checks both included assets and excluded source records.
 
+### `dev/check-public-site.mjs`
+
+Runs in the GitHub-hosted **Demo build hygiene** job after the demo build. It checks the
+marketing pages and guides at desktop, phone, and narrow widths in both display modes,
+including local links, assets, schedule interactions, guide search, old engineering URLs,
+reduced motion, and reading without JavaScript. Chromium keeps its sandbox enabled and
+serves only allowlisted files from the checkout; external requests are blocked.
+
+The job uploads full-page screenshots and `manifest.json` as **public-site-visual-evidence**,
+including failure captures when a check fails. Rendered site and publication-tool changes
+select this job without requiring the emulator suites. This script refuses local execution;
+use the repository's hosted CI workflow for verification.
+
 ### `verify-sender-domain.cjs`
 
 Wraps the configured EmailProvider's `verifySenderDomain()` as the onboarding checklist command

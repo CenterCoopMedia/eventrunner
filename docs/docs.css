@@ -686,7 +686,9 @@ h6:hover > .heading-anchor {
   }
 
   .docs-nav-scroll {
-    max-height: 60dvh;
+    max-height: none;
+    overflow-y: visible;
+    scrollbar-gutter: auto;
   }
 
   .docs-intro {

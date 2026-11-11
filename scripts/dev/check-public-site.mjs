@@ -4,7 +4,7 @@
  * Hosted browser verification for the public marketing site and user guides.
  * Serves only the Pages allowlist, on loopback under the committed path base.
  * No live service, browser download, emulator, account, or production write.
- * Run after build-demo in the existing hosted E2E job (shard 1).
+ * Run after build-demo in the existing hosted demo job.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -86,9 +86,29 @@ async function serve() {
   };
 }
 
-async function ready(page) {
+async function ready(page, { javaScriptEnabled = true } = {}) {
+  if (!javaScriptEnabled) {
+    // Page callbacks such as requestAnimationFrame do not reliably run when
+    // scripts are disabled. Poll from Node, using only synchronous DOM reads.
+    await page.evaluate(() => {
+      for (const image of globalThis.document.images) image.loading = 'eager';
+    });
+    await expect.poll(() => page.evaluate(() => ({
+      fonts: globalThis.document.fonts.status,
+      pendingImages: [...globalThis.document.images]
+        .filter((image) => !image.complete || image.naturalWidth === 0)
+        .map((image) => image.currentSrc || image.src),
+    })), { timeout: 8000, message: 'The no-JavaScript page must finish loading its fonts and images' })
+      .toEqual({ fonts: 'loaded', pendingImages: [] });
+    return;
+  }
   await page.evaluate(async () => {
     await globalThis.document.fonts.ready;
+    // Full-page captures include content below the viewport. Ask the browser
+    // to load and decode those images before checking their rendered layout.
+    const images = [...globalThis.document.images];
+    for (const image of images) image.loading = 'eager';
+    await Promise.all(images.map((image) => image.decode()));
     await new Promise((resolve) => globalThis.requestAnimationFrame(resolve));
   });
 }
@@ -116,6 +136,8 @@ async function checkLocalLinks(page, origin) {
     ...[...globalThis.document.querySelectorAll('a[href]')].map((element) => ({ url: element.href, anchor: true })),
     ...[...globalThis.document.querySelectorAll('script[src], img[src], source[src], link[rel="stylesheet"]')]
       .map((element) => ({ url: element.src || element.href, anchor: false })),
+    ...[...globalThis.document.querySelectorAll('video[poster]')]
+      .map((element) => ({ url: element.poster, anchor: false })),
   ]);
   for (const link of links) {
     const url = new URL(link.url, page.url());
@@ -146,6 +168,7 @@ async function checkExample(page) {
   await expect(example.locator('.example-controls')).toBeVisible();
   await example.getByRole('button', { name: 'Save Listening to your community', exact: true }).press('Enter');
   await expect(firstSave).toHaveAttribute('aria-pressed', 'true');
+  await expect(firstSave).toHaveAccessibleName('Save Listening to your community');
   await expect(example.locator('[data-save-count]')).toHaveText('1');
   await example.getByRole('button', { name: 'Day two', exact: true }).click();
   await expect(example.locator('[data-day="one"]')).toBeHidden();
@@ -160,7 +183,8 @@ async function checkExample(page) {
   await expect(example.locator('[data-day="two"]')).toBeVisible();
   await firstSave.press('Enter');
   await expect(firstSave).toHaveAttribute('aria-pressed', 'false');
-  await expect(firstSave).toHaveAccessibleName('Save Listening to your community');
+  // Removing a saved row hides it from both the screen and accessibility tree.
+  await expect(firstSave).toHaveAttribute('aria-label', 'Save Listening to your community');
   await expect(savedFilter).toBeFocused();
   await expect(example.locator('[data-session="listen"]')).toBeHidden();
   await expect(example.locator('[data-save-count]')).toHaveText('1');
@@ -173,6 +197,9 @@ async function checkExample(page) {
   await expect(savedFilter).toHaveAttribute('aria-pressed', 'false');
   await expect(example.locator('[data-day="two"]')).toBeVisible();
   await expect(example.locator('[data-example-empty]')).toBeHidden();
+  await example.getByRole('button', { name: 'Day one', exact: true }).click();
+  await expect(firstSave).toBeVisible();
+  await expect(firstSave).toHaveAccessibleName('Save Listening to your community');
 }
 
 async function checkSearch(page) {
@@ -221,7 +248,10 @@ async function main() {
     browser = await chromium.launch({ chromiumSandbox: true });
     report.browser = { name: 'Chromium', version: browser.version() };
     const run = async (name, view, mode, action, options = {}) => {
-      const record = { name, viewport: { width: view.width, height: view.height }, colorScheme: mode, errors: [] };
+      const record = {
+        name, viewport: { width: view.width, height: view.height }, colorScheme: mode,
+        javaScriptEnabled: options.javaScriptEnabled !== false, errors: [],
+      };
       const context = await browser.newContext({
         viewport: record.viewport, colorScheme: mode, deviceScaleFactor: 1,
         reducedMotion: options.reducedMotion || 'no-preference',
@@ -253,6 +283,7 @@ async function main() {
         }
       } catch (error) {
         record.errors.push(error.message);
+        record.failure = { url: page.url(), stack: error.stack || error.message };
         record.screenshot = `${name}--failure.png`;
         await page.screenshot({ path: path.join(OUT, record.screenshot), fullPage: true }).catch(() => {});
       } finally {
@@ -263,17 +294,17 @@ async function main() {
         console.log(`${record.passed ? 'PASS' : 'FAIL'} ${name}`);
       }
     };
-    const visit = async (page, route) => {
+    const visit = async (page, route, options = {}) => {
       const response = await page.goto(`${server.origin}${SITE.base}${route}`, { waitUntil: 'load' });
       assert.equal(response.status(), 200, `Page did not load: ${route || '/'}`);
-      await ready(page);
+      await ready(page, options);
     };
 
     for (const view of VIEWS) {
       for (const mode of ['light', 'dark']) {
         for (const [route, label] of PAGES) {
           const screenshot = ['home', 'guides'].includes(label)
-            || (mode === 'light' && view.width !== 320 && ['features', 'support', 'about', 'how-it-works'].includes(label));
+            || (mode === 'light' && view.width !== 320);
           await run(`${label}--${view.label}--${mode}`, view, mode, async (page, record) => {
             await visit(page, route);
             record.layout = await checkLayout(page);
@@ -332,15 +363,15 @@ async function main() {
     }, { reducedMotion: 'reduce' });
 
     await run('javascript-off-reading', VIEWS[1], 'light', async (page) => {
-      await visit(page, '');
+      await visit(page, '', { javaScriptEnabled: false });
       await expect(page.locator('[data-event-example] [data-session]:visible')).toHaveCount(5);
       await expect(page.locator('.example-controls')).toBeHidden();
       await checkLayout(page);
-      await visit(page, 'docs/');
+      await visit(page, 'docs/', { javaScriptEnabled: false });
       await expect(page.locator('[data-guide-search-form]')).toBeHidden();
       await expect(page.locator('[data-guide-entry]:visible')).toHaveCount(manifestModule.pagesInOrder().length);
       await checkLayout(page);
-      await visit(page, 'docs/handbook/for-attendees/');
+      await visit(page, 'docs/handbook/for-attendees/', { javaScriptEnabled: false });
       const disclosure = page.locator('[data-docs-navigation]');
       await expect(disclosure).toHaveAttribute('open', '');
       await expect(disclosure.locator('a[aria-current="page"]')).toBeVisible();
