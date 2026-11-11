@@ -142,3 +142,161 @@ test('text colours keep at least 4.5:1', () => {
     }
   }
 });
+
+// Two formats. Each scene file exports one LAYOUT table with a landscape and a
+// vertical composition; the vertical cut is composed again, not cropped.
+const layouts = {
+  shared: (await import('../showreel/shared.ts')).LAYOUT,
+  page: (await import('../showreel/page.ts')).LAYOUT,
+  open: (await import('../showreel/scene-open.ts')).LAYOUT,
+  plan: (await import('../showreel/scene-plan.ts')).LAYOUT,
+  shape: (await import('../showreel/scene-shape.ts')).LAYOUT,
+  gather: (await import('../showreel/scene-gather.ts')).LAYOUT,
+  stack: (await import('../showreel/scene-stack.ts')).LAYOUT,
+  montage: (await import('../showreel/scene-montage.ts')).LAYOUT,
+  title: (await import('../showreel/scene-title.ts')).LAYOUT,
+};
+const SAFE = {x0: 60, x1: 1020, y0: 250, y1: 1540};
+const inX = (x, label) => assert.ok(x >= SAFE.x0 - 1e-9 && x <= SAFE.x1 + 1e-9, `${label}: x ${x} is inside ${SAFE.x0} to ${SAFE.x1}`);
+const inY = (y, label) => assert.ok(y >= SAFE.y0 - 1e-9 && y <= SAFE.y1 + 1e-9, `${label}: y ${y} is inside ${SAFE.y0} to ${SAFE.y1}`);
+const inBox = ({x, y, w, h}, label) => { inX(x, label); inX(x + w, label); inY(y, label); inY(y + h, label); };
+const shape = value => (Array.isArray(value) ? value.map(shape) : value && typeof value === 'object'
+  ? Object.fromEntries(Object.keys(value).sort().map(key => [key, shape(value[key])])) : typeof value);
+
+test('every layout table has both formats with the same keys', () => {
+  for (const [name, table] of Object.entries(layouts)) {
+    assert.deepEqual(Object.keys(table).sort(), ['landscape', 'vertical'], `${name} has two formats`);
+    // Arrays of points may differ in length (the tagline has one line or two); objects must match key for key.
+    const keys = value => (Array.isArray(value) ? 'array' : value && typeof value === 'object'
+      ? Object.fromEntries(Object.keys(value).sort().map(key => [key, keys(value[key])])) : typeof value);
+    assert.deepEqual(keys(table.vertical), keys(table.landscape), `${name} has the same keys in both formats`);
+  }
+  assert.deepEqual(shape(layouts.title.vertical.tagline.lines[0]), shape(layouts.title.landscape.tagline.lines[0]));
+});
+
+test('the vertical frame is 1080 by 1920 and its page picture 1080 by 1220', async () => {
+  const kit = await import('../showreel/kit.ts');
+  assert.deepEqual(kit.FRAME, {landscape: {w: 1920, h: 1080}, vertical: {w: 1080, h: 1920}});
+  kit.setFormat('vertical');
+  assert.deepEqual([kit.W, kit.H, kit.FORMAT], [1080, 1920, 'vertical']);
+  kit.setFormat('landscape');
+  assert.deepEqual([kit.W, kit.H, kit.FORMAT], [1920, 1080, 'landscape']);
+  assert.throws(() => kit.setFormat('square'));
+  assert.deepEqual(layouts.page.vertical, {w: 1080, h: 1220, phone: true});
+  assert.deepEqual(layouts.page.landscape, {w: 1920, h: 1080, phone: false});
+  assert.equal((await project('vertical')).format, 'vertical');
+  assert.equal((await project()).format, 'landscape');
+  await assert.rejects(project('square'));
+});
+
+test('essential vertical content sits inside the phone safe area', () => {
+  const S = layouts.shared.vertical;
+  inX(S.sample.x, 'sample note'); inY(S.sample.y, 'sample note');
+  inX(S.railX0, 'rails'); inX(S.railX1, 'rails'); S.railY.forEach(y => inY(y, 'rail'));
+
+  const O = layouts.open.vertical;
+  assert.deepEqual([O.origin[0] + 240, O.origin[1] + 240], [540, 880], 'the mark centre');
+
+  const P = layouts.plan.vertical;
+  inBox(P.publish, 'publish button'); inY(P.day.y, 'day heading');
+  for (const t of [P.word, ...P.captions]) { inX(t.x, 'plan type'); inY(t.y, 'plan type'); }
+  // Under the push the word, the time and the speakers stay inside the safe area.
+  const screen = x => 540 + (x - P.push.x) * P.push.zoom;
+  const screenY = y => 960 + (y - (S.railY[1] + P.inset + P.cardH / 2 + P.push.drop)) * P.push.zoom;
+  inX(screen(P.word.x), 'Plan. under the push'); inY(screenY(P.word.y - P.word.size * .72), 'Plan. under the push');
+  inX(screen(S.railX0 + P.time.x), 'time under the push');
+  inX(screen(S.railX1 - P.speaker.right + P.speaker.r), 'speakers under the push');
+  inY(screenY(S.railY.at(-1)), 'last rule under the push');
+  inY(S.railY.at(-1), 'last card');
+
+  const H = layouts.shape.vertical;
+  inBox(H.win, 'site window'); inX(H.word.x, 'Shape.'); inY(H.word.y, 'Shape.');
+  for (let i = 0; i < 6; i++) inY(H.list.y + i * H.list.step, 'picker line');
+  assert.ok(H.list.y + 5 * H.list.step < H.win.y, 'the picker ends above the window');
+  inY(H.win.y + H.win.h + H.under.drop + 9 * H.under.k, 'mode switch row');
+  inY(H.wall.y, 'wall title');
+  for (let i = 0; i < H.wall.pages.length; i++) {
+    const t = H.tile, col = i % t.cols, row = Math.floor(i / t.cols);
+    inBox({x: t.x + col * (t.w + t.gap), y: t.y + row * (t.h + t.gap), w: t.w, h: t.h}, `wall tile ${i}`);
+  }
+  assert.equal(H.wall.pages.at(-1), 11, 'the window becomes the last tile, Atlas dark');
+
+  const G = layouts.gather.vertical, {x: SX, y: SY} = G.stage;
+  // The ticket with its stub is 620 wide at k = 1.
+  const ticket = 620 * G.ticket.k;
+  inBox({x: SX - ticket / 2, y: SY - 30 * G.ticket.k - 135 * G.ticket.k, w: ticket, h: 270 * G.ticket.k}, 'ticket');
+  inX(SX + G.stepper.dx - 60, 'first step label'); inX(SX + G.stepper.dx + 4 * G.stepper.gap + 40, 'last step label');
+  inY(SY + G.stepper.dy + G.stepper.labelDy, 'step labels');
+  inBox({x: SX + G.grid.dx, y: SY + G.grid.dy, w: 7 * 106 + 86, h: 5 * 112 + 16 + 52}, 'check-in grid and count');
+  for (let i = 0; i < 3; i++) inBox({x: SX + G.rows.dx, y: SY + G.rows.dy + i * G.rows.step, w: G.rows.w, h: G.rows.h}, `saved row ${i}`);
+  inBox(G.phone, 'phone'); inBox(G.card, 'message card');
+  for (const [arc, count] of [[0, 4], [1, 5], [2, 5]]) for (let slot = 0; slot < count; slot++) {
+    const angle = G.fan.a0 + slot / (count - 1) * G.fan.spread, r = G.fan.r0 + arc * G.fan.dr;
+    const x = G.fan.x + Math.cos(angle) * r * G.fan.sx, y = G.fan.y + Math.sin(angle) * r * G.fan.sy;
+    inBox({x: x - G.face / 2, y: y - G.face / 2, w: G.face, h: G.face}, `recipient ${arc}.${slot}`);
+  }
+  for (const t of [G.word, G.caption]) { inX(t.x, 'gather type'); inY(t.y, 'gather type'); }
+
+  const K = layouts.stack.vertical;
+  inBox(K.win, 'merged page'); inX(K.label, 'part names'); inY(K.centre.y, 'bottom plate');
+  for (const t of [...K.lines, K.note]) { inX(t.x, 'stack type'); inY(t.y, 'stack type'); }
+
+  const M = layouts.montage.vertical;
+  inX(M.label.x, 'band label'); assert.ok(M.art.right >= SAFE.x0, 'band drawing keeps the right margin');
+  assert.ok(Math.abs(1920 / 8 * M.label.size - 100) < 2, 'band labels are about 100 px');
+
+  const T = layouts.title.vertical;
+  inX(T.hero.x, 'hero'); inY(T.hero.y, 'hero'); inY(T.top, 'lockup top');
+  for (const l of T.tagline.lines) { inX(l.x, 'tagline'); inY(l.y, 'tagline'); }
+  inY(T.words.rule, 'three words'); inY(T.url.y, 'site address');
+});
+
+test('vertical secondary type is 32 px or more', () => {
+  const P = layouts.plan.vertical, H = layouts.shape.vertical, G = layouts.gather.vertical;
+  const sizes = {
+    'plan room': P.room.size, 'plan day': P.type.day, 'plan state': P.type.state, 'publish': P.type.publish,
+    'speaker name': P.badge.name, 'speaker role': P.badge.role, 'picker': H.list.size, 'mode row': 28 * H.under.k,
+    'ticket lines': Math.min(...G.ticket.type), 'step labels': G.stepper.label, 'step numbers': 20 * G.stepper.k, 'check-in count': G.grid.count,
+    'row time': G.rows.time, 'row title': G.rows.title, 'phone title': G.phone.title.size, 'phone time': G.phone.slot.time.size,
+    'phone session': G.phone.slot.name.size, 'message': G.card.message.size, 'recipients line': G.card.to.size, 'send': G.card.button.size,
+  };
+  for (const [name, size] of Object.entries(sizes)) assert.ok(size >= 32 - 1e-9, `${name} is ${size} px`);
+  assert.ok(H.list.size >= 40, 'the picker labels are 40 px or more');
+});
+
+test('the landscape layout keeps its numbers', () => {
+  // The whole of every landscape table, against the numbers recorded when the tables were
+  // made from the literals of the landscape-only film. A landscape number changes the film
+  // that was approved, so a change here must be on purpose: update the record with it.
+  const record = JSON.parse(fs.readFileSync(new URL('./showreel-landscape-layout.json', import.meta.url), 'utf8'));
+  assert.deepEqual(Object.keys(record).sort(), Object.keys(layouts).sort());
+  for (const [name, table] of Object.entries(layouts)) assert.deepEqual(JSON.parse(JSON.stringify(table.landscape)), record[name], `${name}: landscape table`);
+  assert.deepEqual(layouts.shared.landscape, {railY: [160, 338, 516, 694, 872], railX0: 700, railX1: 1800, sample: {x: 120, y: 1014}});
+  assert.deepEqual(layouts.open.landscape.origin, [720, 300]);
+  assert.deepEqual(layouts.open.landscape.keys, [[918, 558, 4.4], [954, 558, 3.7], [954, 579, 3.0], [954, 579, 3.0], [960, 528, 1.32], [960, 540, 1]]);
+  const P = layouts.plan.landscape;
+  assert.deepEqual(P.publish, {x: 1610, y: 66, w: 190, h: 58});
+  assert.deepEqual([P.cardH, P.inset, P.rise, P.push], [150, 14, 170, {x: 1290, drop: 10, zoom: 1.4}]);
+  const H = layouts.shape.landscape;
+  assert.deepEqual(H.win, {x: 700, y: 150, w: 1120, h: 630});
+  assert.deepEqual(H.tile, {w: 430, h: 242, gap: 24, x: 64, y: 84, cols: 4, rows: 3});
+  assert.deepEqual(H.wall.pages, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  assert.equal(H.crop, false);
+  const G = layouts.gather.landscape;
+  assert.deepEqual([G.stage, G.card.x, G.card.y, G.phone.x, G.phone.y, G.phone.w, G.phone.h], [{x: 1250, y: 500}, 850, 382, 1500, 238, 236, 470]);
+  assert.deepEqual(G.fan, {x: 1100, y: 500, a0: -.86, spread: 1.72, r0: 400, dr: 132, sx: 1, sy: .8});
+  const K = layouts.stack.landscape;
+  assert.deepEqual([K.plate, K.gap, K.centre, K.win], [{w: 640, h: 400}, 104, {x: 1130, y: 700}, {x: 700, y: 170, w: 1120, h: 630}]);
+  assert.deepEqual(layouts.montage.landscape, {label: {x: 120, size: .62, base: .2}, art: {right: 120, pad: 28}});
+  const T = layouts.title.landscape;
+  assert.deepEqual([T.scale, T.top, T.hero], [1.75, 112, {x: 960, y: 470, size: 7.6}]);
+  assert.deepEqual(T.tagline.lines, [{text: 'Make room for your event.', x: 960, y: 726, delay: 0}]);
+});
+
+test('each format has its own frame cache, and a render removes only its own stale folders', async () => {
+  const {cachePrefix, ownsFolder} = await import('../showreel/render.mjs');
+  assert.equal(cachePrefix('landscape'), '');
+  assert.equal(cachePrefix('vertical'), 'vertical-');
+  assert.ok(ownsFolder('landscape', 'a14c7c478c429d6c') && !ownsFolder('landscape', 'vertical-a14c7c478c429d6c'));
+  assert.ok(ownsFolder('vertical', 'vertical-a14c7c478c429d6c') && !ownsFolder('vertical', 'a14c7c478c429d6c'));
+});

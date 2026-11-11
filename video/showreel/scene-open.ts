@@ -1,15 +1,29 @@
 // Cold open. A name badge is built on the beat, comes alive as Badger, winds up
 // and runs. The lines it leaves behind become the rules of the schedule.
-import {type C, type Project, W, camera, spring, prog, outCubic, inCubic, outExpo, lerp, rgb, mix, line, ring, BLACK} from './kit.ts';
+import {type C, type Format, type Point, type Project, W, H, camera, spring, prog, outCubic, inCubic, outExpo, lerp, rgb, mix, line, ring, BLACK} from './kit.ts';
 import {badger, REST, type Pose} from './badger.ts';
-import {type Scene, ground, RAIL_Y, streaks, rule, SOFT} from './shared.ts';
+import {type Scene, ground, LAYOUT as SHARED, streaks, rule, SOFT} from './shared.ts';
+
+/**
+ * Frame-dependent positions. `origin` is the rig's top-left corner in world
+ * space; the mark's centre is 240 px right of and below it. `keys` are the
+ * camera framings [centre x, centre y, zoom], one for each cut: left eye, both
+ * eyes, face (held while the badge is drawn), whole figure, wide.
+ */
+export const LAYOUT: Record<Format, {origin: Point; keys: [number, number, number][]}> = {
+  landscape: {origin: [720, 300], keys: [[918, 558, 4.4], [954, 558, 3.7], [954, 579, 3.0], [954, 579, 3.0], [960, 528, 1.32], [960, 540, 1]]},
+  // The mark's centre sits at (540, 880). The wide framing stays a little close,
+  // so the figure still fills the narrow frame. The last two framings are the same:
+  // a cut from zoom 1.2 to 1.12 is too small to read as a cut, and looked like a flicker.
+  vertical: {origin: [300, 640], keys: [[498, 898, 4.4], [534, 898, 3.7], [534, 919, 3.0], [534, 919, 3.0], [540, 880, 1.12], [540, 880, 1.12]]},
+};
 
 export function open(p: Project): Scene {
   const q = p.clock.cues.open, D = p.brand.dark, end = p.clock.scenes[0].end;
   const inks = {ink: D.ink, accent: D.primary, surface: D.surface};
-  const UNIT = 6, OX = 720, OY = 300;
-  // Camera framings: left eye, both eyes, face (held while the badge is drawn), whole figure, wide.
-  const keys = [[918, 558, 4.4], [954, 558, 3.7], [954, 579, 3.0], [954, 579, 3.0], [960, 528, 1.32], [960, 540, 1]];
+  const L = LAYOUT[p.format], S = SHARED[p.format];
+  const UNIT = 6, [OX, OY] = L.origin;
+  const keys = L.keys;
   const hits = [q.eyes[0], q.eyes[1], q.smile, q.badge, q.lanyard, q.windup];
   const launch = q.dash - 3;
 
@@ -50,9 +64,12 @@ export function open(p: Project): Scene {
 
     c.save(); camera(c, cx, cy, zoom);
     // The five rules trail from the runner; each keeps going until it spans the frame.
+    // Each rule is placed so that, through the last framing, it lies on the
+    // schedule rule of the next scene.
     if (f >= launch) {
       c.lineCap = 'round';
-      RAIL_Y.forEach((y, i) => {
+      S.railY.forEach((rail, i) => {
+        const y = cy + (rail - H / 2) / zoom;
         const reach = outCubic(prog(f, launch + 2 + i * 1.5, end - 3 + i * .6));
         const settle = prog(f, end - 10, end);
         line(c, lerp(OX + dx, -200, outCubic(prog(f, launch, launch + 6))), y, lerp(OX + dx, W + 200, reach), y, rgb(mix(D.primary, rule(D), settle), lerp(.9, 1, settle)), lerp(5, 2, settle) / zoom);

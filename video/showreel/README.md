@@ -1,7 +1,8 @@
 # Showreel teaser
 
 A 45-second motion graphics teaser for Event Runner, 1920 × 1080 at 30 fps with
-an original score. It is a separate piece from the [public set](../README.md):
+an original score. A vertical cut, 1080 × 1920, is composed from the same code
+for phones (see "Two formats"). It is a separate piece from the [public set](../README.md):
 it is not on the public allowlist, the videos page does not list it, and its
 MP4 and WAV are not committed. Adding it to the public page is an owner decision.
 
@@ -21,11 +22,28 @@ python video/flash.py video/out/showreel.mp4
 npm --prefix video run check
 ```
 
+The vertical cut takes `--format vertical` with any of the modes below. Its
+outputs carry the format in their names, so the two cuts never overwrite each
+other:
+
+```sh
+node video/showreel/render.mjs --format vertical --workers 4  # video/out/showreel-vertical.mp4
+python video/flash.py video/out/showreel-vertical.mp4 --output video/out/showreel-vertical-flash.json
+```
+
+| Mode | Landscape | Vertical |
+| --- | --- | --- |
+| Full film | `showreel.mp4` | `showreel-vertical.mp4` |
+| `--frames A-B` | `showreel-A-B.mp4` | `showreel-vertical-A-B.mp4` |
+| `--stills` | `showreel-stills/` | `showreel-stills-vertical/` |
+| `--sheet N` | `showreel-sheet-NN.jpg`, 480 × 270 tiles | `showreel-vertical-sheet-NN.jpg`, 270 × 480 tiles |
+
 `--frames A-B` renders an inclusive range for review, `--stills 0,56,112`
 writes PNG stills, and `--sheet 9` writes contact sheets of every ninth frame
 with the frame number on each tile. Frames are cached in `video/.cache/showreel`
 under a key of every input (scene code, data, fonts, the mark, the renderer
-and the lockfile); frames from other inputs are deleted. The renderer refuses
+and the lockfile). The data holds the format, so each format has its own
+folder; frames from other inputs of the same format are deleted. The renderer refuses
 a score that was not composed from the current clock. Set `VIDEO_CHROMIUM` to a Chromium binary
 when the pinned Playwright does not have its own.
 
@@ -42,8 +60,62 @@ frames; every cue is a whole frame.
 | 7–10 | 338–562 | Shape | The style picker changes the site through six styles, each with a different wipe. The dark mode sweeps in, then all twelve looks show as a wall. |
 | 11–14 | 563–787 | Gather | A ticket is bought in five steps and torn. Its main part becomes the first badge at check-in. Sessions are saved to a phone. One announcement goes to everyone registered. |
 | 15–18 | 788–1012 | One site | Five parts float as an exploded stack and are named. On the build they close one at a time, turn to face the viewer and become the published page. |
-| 19–20 | 1013–1124 | Montage | A run sheet: eight ruled colour bands, one for each part of the product, are lit from the top on seven beats. On the eighth beat they fold into a point. Half a beat of silence. |
+| 19–20 | 1013–1124 | Montage | A run sheet: eight ruled colour bands, one for each part of the product, are lit from the top on seven beats. On the eighth beat they fold into a point. For the last half beat the point opens into a rule that runs to both edges and a reverse cymbal rises to the title: the band stops, but the picture and the sound do not. |
 | 21–24 | 1125–1349 | Title | On the chord Badger is large and running on the spot. The landing cuts to the official lockup, and the name is uncovered beside the mark. "Make room for your event." and "Plan. Shape. Gather." follow. The layout is at rest from frame 1252; after that only one blink at frame 1294 and the grain move. |
+
+## Two formats
+
+The vertical cut is not a crop or a letterbox of the landscape picture. Each
+scene file has one `LAYOUT` table with a `landscape` and a `vertical` entry, and
+reads `LAYOUT[p.format]` when it is built. Timing, easing, cues and drawing order
+are shared. `kit.ts` sets the frame size with `setFormat`, and `main.ts` calls it
+before any buffer, page or scene is made. The landscape numbers in the tables
+are the literals of the landscape-only film, and
+`tests/showreel-landscape-layout.json` records them, so a change to the
+landscape picture must be on purpose.
+
+A phone app covers the top and bottom of the picture. So type, controls and the
+character at rest stay inside x 60 to 1020 and y 250 to 1540. Grounds, rules and
+bands run to the edges. Each scene is a stacked page: the scene word and its
+caption at the top, the stage below. No type is under 32 px, except the 26 px
+sample-event note at x 60, baseline 1536. The page pictures are scaled pictures
+of a site, so their small type is smaller than that.
+
+- **Open.** The same rig and cuts, with the mark's centre at (540, 880). The
+  close framings are the landscape ones moved to that centre. The whole figure
+  is at a zoom of 1.12 and the camera holds there for the crouch: a cut from 1.2
+  to 1.12 is too small to read as a cut and looked like a flicker. The five trailing lines land on the
+  vertical rules: y 700 to 1500, x 60 to 1020.
+- **Plan.** "Plan." with two captions above a header row: the day on the left,
+  the record state and Publish on the right. Four cards 960 wide sit between
+  the rules. The word and the cards already fill the safe width, so the camera
+  holds still at the push cue; any zoom would move them out of the safe area.
+  The focus outline on the second card marks the beat.
+  Speaker name cards fly in from the right; the whip still goes left.
+- **Shape.** The picker sits to the right of "Shape.", in 40 px type. Under them
+  a site window fills the safe width and shows the top of a phone layout of the
+  event page (`drawMobilePage` in `page.ts`, 1080 × 1220). The wipes work in
+  that page's coordinates. The wall shows four styles in eight large tiles,
+  light on the left and dark on the right; the window becomes the last tile,
+  Atlas dark.
+- **Gather.** One column round a stage at (540, 1000). The ticket is about 680
+  wide with the steps under it, then the 8 × 5 check-in grid. The saved
+  sessions sit over a 600 px phone and the copies drop into it on a sideways
+  arc. The message card is 860 wide; the fourteen recipients fan out under it
+  and the darts fly down.
+- **One site.** The stack stands left of centre with the part names on its
+  right. It merges into the phone page, light Institutional, 700 wide.
+- **Montage.** Eight full-width bands, 240 high, with 100 px labels and larger
+  drawings. The fold still closes on the centre.
+- **Title.** Badger large at (540, 860) on the chord. The lockup keeps the
+  geometry of `badger-lockup.svg` at about 830 wide. The tagline is set in two
+  lines, then "Plan. Shape. Gather." and the address.
+
+The exposure dips and shutter windows in `stage.ts` are the same frames in both
+cuts. A tall frame makes the same object a larger share of the picture, so the
+vertical cut keeps bright moving areas near the landscape share: Badger is no
+larger than in landscape, and the shape window is 640 high (about 30% of the frame)
+so that a style wipe stays inside the flash screen.
 
 ## What the picture claims, and where it comes from
 
@@ -154,12 +226,12 @@ scenes. The motion now follows four rules:
 4. **Decoration is soft.** Rings, rays, trails and streaks stay at or below
    `SOFT`, which keeps their change under the screen's threshold.
 
-Run the screen again after any change to motion, colour or timing. Screen the
-whole film, not a clip: the screen keeps history, and a clip of the title
-passed with 4 transitions while the same frames in the full film had 7. The
-cause was Badger at title size. His body rose 4 px on each stride and his legs
-were above `SOFT`, and both count at that size, so he now holds still with
-limbs at `SOFT`.
+Run the screen again on both cuts after any change to motion, colour, timing
+or layout. Screen the whole film, not a clip: the screen keeps history, and a
+clip of the title passed with 4 transitions while the same frames in the full
+film had 7. The cause was Badger at title size. His body rose 4 px on each
+stride and his legs were above `SOFT`, and both count at that size, so he now
+holds still with limbs at `SOFT`.
 
 ## Sound
 
@@ -189,7 +261,7 @@ bass plays that figure too.
 | 13–14 | Gather | The full groove returns and the hook plays its second half, with a harmony. |
 | 15–16 | One site | Open bars: a wide pad, and the hook at half speed as bells. |
 | 17–18 | One site | The build: snare from quarters to sixteenths, stabs from eighths to sixteenths, a climbing pluck line and a riser. |
-| 19–20 | Montage | The peak: the hook with an octave above it, and a tuned drum that climbs with each band. Everything stops at beat 79.5. |
+| 19–20 | Montage | The peak: the hook with an octave above it, and a tuned drum that climbs with each band. The band stops at beat 79.5; the reverb, a reverse cymbal and a rising sweep carry the half beat to the title. |
 | 21–24 | Title | The A chord, held. "Plan. Shape. Gather." are C♯, E and A: the chord of home, one note a word. |
 
 ### Sound design
@@ -213,7 +285,11 @@ of the picture is a quick low-pass dip in the music.
 
 Some events have a sound made only for them: a pen for the badge outline, a
 printer for the ticket, torn paper for the stub, a different texture for each
-of the six wipes, and a fold that pulls the sound down into the silence.
+of the six wipes, and a fold that pulls the sound down before the title.
+
+The first version had half a beat of digital silence over a still picture
+before the title. Seven frames is too short to read as a rest; it read as a
+freeze. A stop that short needs a lead-in.
 
 ### Mix
 
@@ -256,7 +332,7 @@ person must listen on headphones, laptop speakers and a phone before release.
 
 `npm --prefix video run check` runs `tests/showreel.test.mjs` (clock, cue order,
 fixture-only content, contrast, the rig against the mark, the run cycle) and
-`tests/showreel-score.test.mjs` (length, determinism, headroom, exact silences,
+`tests/showreel-score.test.mjs` (length, determinism, headroom, the lead-in to the title, silence at the end,
 a sound for each cue, every note in the key, the shape of the arrangement, a
 mono low end, and the signal tools).
 

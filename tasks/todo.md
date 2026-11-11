@@ -39,11 +39,16 @@ V1 runs and works only on `score.mjs`, `make-score.mjs`, `audio-kit.mjs` and
 
 ### PR 3. Native vertical cut
 
-- [ ] One `LAYOUT` table for each scene, chosen by format. Landscape frames
-      stay identical to PR 1 (reference frames in the scratchpad).
-- [ ] Vertical layouts composed for 1080 by 1920: stacked narrator and stage,
-      a phone page picture, a three-column wall, downward paths.
-- [ ] Essential content inside y 250 to 1540. Flash screen passes.
+- [x] One `LAYOUT` table for each scene, chosen by format. Landscape frames
+      stay identical to PR 1: 93 frames compared, 0 differ, and a recorded
+      copy of the landscape tables is in the tests.
+- [x] Vertical layouts composed for 1080 by 1920: stacked narrator and stage,
+      a phone page picture, a wall of eight large tiles, downward paths.
+- [x] Essential content inside y 250 to 1540 (a test holds the named boxes).
+      The first and last montage labels are outside it, by design of the
+      eight full-height bands.
+- [x] Flash screen passes at native size on both final films: 6 transitions
+      in the worst second for each (the limit is 6), no hazard frames.
 
 ### PR 2. Sound
 
@@ -51,6 +56,22 @@ V1 runs and works only on `score.mjs`, `make-score.mjs`, `audio-kit.mjs` and
 - [x] Designed sound for every picture event, placed by screen position.
 - [x] Master to -16 LUFS; measurements and spectrogram reviewed.
 - [ ] A person listens on headphones, laptop speakers and a phone.
+
+### Review (2026-11-10)
+
+- All three parts are open as a stack: #793 (design), #795 (sound), #799
+  (vertical). Merge from the top down.
+- Independent reviews found real defects, now fixed: a harmony voice and some
+  effect notes outside the key, a home chord in bar 8, a low end that was out
+  of phase at the title, a step into the silence, and a stale landscape
+  number in the vertical Gather scene.
+- The title failed the native flash screen after the design pass. My check
+  had used a clip, which is not valid. Badger now holds still at title size.
+- Not done by a machine: nobody has listened to the score or watched either
+  film at speed. The flash margin is zero on both films.
+- Weak spots the owner may want changed: small type on the vertical wall
+  tiles, an empty band under the Shape window in the vertical cut, and a
+  title that is 4.5 LU quieter than the montage.
 
 ## Plan for review: audit follow-up (2026-11-09)
 

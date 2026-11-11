@@ -1,20 +1,48 @@
 // One site. The parts float as an exploded stack, each named in turn. On the
 // build they close one by one, turn to face the viewer and become the page.
-import {type C, type Project, type RGB, type Point, spring, prog, outCubic, inExpo, inOutCubic, clamp, lerp, rgb, mix, text, fillBox, strokeBox, disc, line, shadowed, BLACK} from './kit.ts';
+import {type C, type Format, type Project, type RGB, type Point, spring, prog, outCubic, inExpo, inOutCubic, clamp, lerp, rgb, mix, text, fillBox, strokeBox, disc, line, shadowed, BLACK} from './kit.ts';
 import {type Scene, ground, phrase, sample, word, SOFT, PARTS} from './shared.ts';
 
-const PW = 640, PH = 400, GAP = 104, CX = 1130, CY = 700;
-const WIN = {x: 700, y: 170, w: 1120, h: 630};
+import {LAYOUT as PAGE} from './page.ts';
+
+type Text = {x: number; y: number; size: number};
+/** Plate artwork is drawn in this space, then scaled to the plate. */
+const ART = {w: 640, h: 400};
+/**
+ * Frame-dependent positions. Plates are `plate` in size, `gap` apart, with the
+ * bottom plate centred on `centre`. On the merge they become `win`. `push` is
+ * the point the last push goes through. `label` is the x of the part names.
+ * `ring` places the soft ring of each closing gap: a rise above the centre and
+ * its start radius and growth.
+ */
+export const LAYOUT: Record<Format, {
+  plate: {w: number; h: number}; gap: number; centre: {x: number; y: number}; win: {x: number; y: number; w: number; h: number};
+  push: {x: number; y: number}; label: number; ring: {dy: number; r0: number; dr: number}; lines: [Text, Text]; note: Text;
+}> = {
+  landscape: {
+    plate: {w: 640, h: 400}, gap: 104, centre: {x: 1130, y: 700}, win: {x: 700, y: 170, w: 1120, h: 630},
+    push: {x: 1260, y: 420}, label: 1570, ring: {dy: -150, r0: 300, dr: 320},
+    lines: [{x: 108, y: 400, size: 104}, {x: 108, y: 520, size: 104}], note: {x: 120, y: 610, size: 44},
+  },
+  // The stack stands left of centre with the names on its right. It merges into
+  // the phone window of the shape scene.
+  vertical: {
+    plate: {w: 560, h: 350}, gap: 120, centre: {x: 440, y: 1380}, win: {x: 190, y: 640, w: 700, h: 700 * PAGE.vertical.h / PAGE.vertical.w},
+    push: {x: 540, y: 860}, label: 800, ring: {dy: -150, r0: 260, dr: 280},
+    lines: [{x: 60, y: 360, size: 104}, {x: 60, y: 470, size: 104}], note: {x: 60, y: 550, size: 44},
+  },
+};
 
 export function stack(p: Project, site: HTMLCanvasElement): Scene {
   const q = p.clock.cues.stack, D = p.brand.dark, [start, end] = [p.clock.scenes[4].start, p.clock.scenes[4].end];
+  const L = LAYOUT[p.format], PW = L.plate.w, PH = L.plate.h, GAP = L.gap, CX = L.centre.x, CY = L.centre.y, WIN = L.win;
   // Five of the parts, with the colours the montage also gives them.
   const parts = [0, 1, 2, 3, 5].map(i => PARTS[i]);
   const accent = parts.map(([, style, key]) => p.styles[style].dark[key]), LABELS = parts.map(([name]) => name);
   // Grey artwork stays close to the plate, so only the accents count as bright.
   const bar = (): RGB => mix(D.surfaceAlt, D.ink, .22);
 
-  // Plate artwork, in plate space: x from -320 to 320, y from -200 to 200.
+  // Plate artwork, in art space: x from -320 to 320, y from -200 to 200.
   const art: ((c: C, a: RGB) => void)[] = [
     (c, a) => {
       fillBox(c, -280, -160, 560, 26, 6, rgb(a)); fillBox(c, -280, -110, 300, 190, 10, rgb(a, .35));
@@ -52,7 +80,7 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
     let knock = 0;
     for (const cue of [...q.compress, q.merge]) knock += Math.max(0, 1 - Math.abs(f - cue - 1.5) / 4) * (cue === q.merge ? 9 : 5);
     ground(c, D);
-    c.save(); c.translate(1260, 420 + knock); c.scale(push, push); c.translate(-1260, -420); c.globalAlpha = 1 - prog(f, end - 5, end);
+    c.save(); c.translate(L.push.x, L.push.y + knock); c.scale(push, push); c.translate(-L.push.x, -L.push.y); c.globalAlpha = 1 - prog(f, end - 5, end);
 
     const theta = lerp((38 + 7 * inOutCubic(prog(f, start, q.merge))) * Math.PI / 180, 0, merge);
     const tilt = lerp(.5, 1, merge);
@@ -75,7 +103,7 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
       const named = outCubic(prog(f, q.callouts[i], q.callouts[i] + 8));
       c.save(); c.translate(cx, cy - z); c.transform(Math.cos(theta), Math.sin(theta) * tilt, -Math.sin(theta), Math.cos(theta) * tilt, 0, 0);
       c.scale(lerp(.7, 1, grow), lerp(.7, 1, grow)); c.globalAlpha *= grow;
-      const sx = size.w / PW, sy = size.h / PH;
+      const sx = size.w / ART.w, sy = size.h / ART.h;
       fillBox(c, -size.w / 2, -size.h / 2, size.w, size.h, 6, rgb(mix(D.surfaceAlt, accent[i], .06 + .1 * named)));
       strokeBox(c, -size.w / 2, -size.h / 2, size.w, size.h, 6, rgb(mix(D.inkMuted, accent[i], named), .5 + .4 * named), 2.5);
       if (flat < 1) { c.save(); c.scale(sx, sy); c.globalAlpha *= (1 - flat) * lit; art[i](c, accent[i]); c.restore(); }
@@ -89,7 +117,7 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
       // Callout: a leader from the plate's corner to its name.
       const gone = prog(f, q.compress[0] - 5, q.compress[0] - 2);
       if (named > 0 && gone < 1) {
-        const [ax, ay] = project(PW / 2 - 24, -PH / 2 + 24, z), lx = 1570;
+        const [ax, ay] = project(PW / 2 - 24, -PH / 2 + 24, z), lx = L.label;
         const a = 1 - gone;
         disc(c, ax, ay, 7 * named, rgb(accent[i], a));
         line(c, ax, ay, lerp(ax, lx - 18, named), ay, rgb(accent[i], .8 * a), 2.5);
@@ -104,13 +132,14 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
     c.globalAlpha = 1 - prog(f, end - 8, end - 2);
     // The second pair of lines arrives with the build, so each holds for two seconds or more.
     const swap = q.compress[0] - 6;
-    word(c, 'Every part.', 108, 400, 104, D.ink, f, q.explode + 2, swap);
-    word(c, 'One site.', 108, 520, 104, D.primary, f, q.callouts[2], swap);
+    const [one, two] = L.lines, note = L.note;
+    word(c, 'Every part.', one.x, one.y, one.size, D.ink, f, q.explode + 2, swap);
+    word(c, 'One site.', two.x, two.y, two.size, D.primary, f, q.callouts[2], swap);
     // A soft ring marks each closing gap.
-    for (const cue of q.compress) { const wave = prog(f, cue, cue + 14); if (wave > 0 && wave < 1) { c.save(); c.translate(CX, CY - 150); c.scale(1, .5); c.beginPath(); c.arc(0, 0, 300 + 320 * outCubic(wave), 0, Math.PI * 2); c.strokeStyle = rgb(D.primary, SOFT * (1 - wave)); c.lineWidth = 8 * (1 - wave); c.stroke(); c.restore(); } }
-    word(c, 'Your team', 108, 400, 104, D.ink, f, q.compress[0] + 2);
-    word(c, 'runs it.', 108, 520, 104, D.ink, f, q.compress[0] + 5);
-    phrase(c, 'No code to touch.', 120, 610, {size: 44, color: D.primary}, f, q.compress[2]);
+    for (const cue of q.compress) { const wave = prog(f, cue, cue + 14); if (wave > 0 && wave < 1) { c.save(); c.translate(CX, CY + L.ring.dy); c.scale(1, .5); c.beginPath(); c.arc(0, 0, L.ring.r0 + L.ring.dr * outCubic(wave), 0, Math.PI * 2); c.strokeStyle = rgb(D.primary, SOFT * (1 - wave)); c.lineWidth = 8 * (1 - wave); c.stroke(); c.restore(); } }
+    word(c, 'Your team', one.x, one.y, one.size, D.ink, f, q.compress[0] + 2);
+    word(c, 'runs it.', two.x, two.y, two.size, D.ink, f, q.compress[0] + 5);
+    phrase(c, 'No code to touch.', note.x, note.y, {size: note.size, color: D.primary}, f, q.compress[2]);
     sample(c, p.copy.sample, D.inkMuted, 1);
     c.globalAlpha = 1;
   }};
