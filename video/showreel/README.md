@@ -94,6 +94,31 @@ made these choices:
 
 A test holds the first four rules.
 
+## Design rules
+
+The owner's list of generated-looking design signs is used as a lens, not as a
+deny list. Each element must have a reason in this product. The second pass
+made these choices:
+
+- **No label above a headline.** The scene words stand alone. Nothing is
+  numbered 01, 02, 03.
+- **State in words.** "Draft, 1 change" and "Live" are text, as the admin
+  schedule shows record state. There is no chip and no status dot.
+- **No decoration on an edge.** Cards, the ticket and the style picker have no
+  coloured side bar.
+- **Mono type is for data.** Times and step numbers use IBM Plex Mono, as the
+  product does. Captions and notes are Source Sans at 26 px or more.
+- **Product corners.** Cards and buttons use the 4 px radius token.
+- **A flat ground.** No glow, no gradient and no dot grid. Depth comes from
+  motion blur, shadow under lifted cards and grain.
+- **One motif.** The speed lines of the opening become the rules of the
+  schedule, and the montage is a run sheet of eight ruled bands, not a grid
+  of cards.
+- **Colour has a meaning.** Each part of the product has one preset colour in
+  both the stack and the montage (`PARTS` in [`shared.ts`](shared.ts)).
+
+A test holds the first four rules.
+
 ## Where this piece departs from the public-set plan
 
 The [production plan](../../docs/video-production.md) was approved for the

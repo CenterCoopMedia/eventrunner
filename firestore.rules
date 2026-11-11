@@ -641,7 +641,7 @@ service cloud.firestore {
     //
     // Reports are staff-only. The reporter and the post's author cannot
     // read or list them. No client writes either store, admins included:
-    // reportSocialPost and removeSocialPost are the only writers.
+    // createSocialPost, reportSocialPost and removeSocialPost are the writers.
     function socialFeedOpen() {
       return exists(/databases/$(database)/documents/config/features)
         && get(/databases/$(database)/documents/config/features).data.get('socialFeed', false) == true

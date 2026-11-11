@@ -163,6 +163,7 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
         theme: overlay.theme ? 'live' : 'snapshot',
         badges: overlay.badges ? 'live' : 'snapshot',
       },
+      featuresStatus: status.features,
       // Whether each doc is live AND its current values were confirmed by
       // the server. `sources` stays 'live' after a doc is deleted, its
       // listener fails, or a retry answers from the cache, because the last
