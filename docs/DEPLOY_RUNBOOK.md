@@ -399,8 +399,10 @@ npx firebase deploy --only functions:<id>[,functions:<id>...] \
   --project <GCP_PROJECT_ID> --non-interactive --force
 ```
 
-Then it runs the normal full deploy without `--force`. The handlers now exist with retry enabled,
-so Firebase does not ask again. Firebase continues to stop for function deletion, unsafe trigger
+The script checks the complete inventory after this targeted deploy. Every targeted handler must
+exist with retry enabled before the normal full deploy runs without `--force`. If Firebase exits 0
+without finishing a targeted create or retry-policy change, the quota recovery below runs first.
+The handlers then exist with retry enabled, so Firebase does not ask again. Firebase continues to stop for function deletion, unsafe trigger
 migration, and other protected changes. The script refuses the targeted deploy, and deploys
 nothing, in these cases:
 
@@ -424,27 +426,35 @@ idempotent. Review every new retry handler for idempotency before it merges.
 normalized trigger identity is unchanged. A changed event type, filter, path, platform or codebase
 stops before deployment. Review that migration separately; do not add blanket `--force`.
 
-**Recover a partial first Functions deploy.** If the first bootstrap creates some Functions and then
-fails, read the failed run and repair its original API, permission, quota, or provider-configuration
-failure. Keep the commit, `EVENT_FIREBASE_REGION`, and GitHub Environment provider settings
-unchanged, and rerun the same `bootstrap: true` dispatch. The rerun sees a nonempty inventory, so
-it does not force the full deploy. Case 2 creates the absent retry handlers first, and the full
-deploy then runs without `--force`.
+**Recover a partial first Functions deploy.** A Firebase exit of 0 with missing Functions or
+inactive targeted retry policies enters the bounded recovery below. Do not start another deploy
+while that recovery is active. If the step fails after recovery, or Firebase exits with a nonzero
+code, read the failed run and repair its API, permission, quota, or provider-configuration failure.
+Keep the commit, `EVENT_FIREBASE_REGION`, and GitHub Environment provider settings unchanged,
+and rerun the same `bootstrap: true` dispatch. Each new attempt reads a complete inventory. A
+nonempty inventory forbids full-deploy force; Case 2 creates the absent retry handlers first,
+then the full deploy runs without `--force`.
 
 **Check after the full deploy.** After the full deploy exits 0, the script discovers the local
 Functions, if it has not yet, and reads the complete inventory again. Each local Function must be
-there, with the same id, in each of its regions. If a Function is not there, or its region is not a
-literal value, the step fails and names the Function. `firebase-tools` 15.22.4 can exit 0 when a
-create gets a quota error, before the create is done, and it then prints no summary. Run
-39329645906 did this to `downloadEventPackage`. This check makes such a run fail.
+there, with the same id, in each of its regions. A missing Function enters bounded quota recovery.
+A region that is not literal, an incomplete inventory, or a discovery failure stops immediately.
+`firebase-tools` 15.22.4 can exit 0 when a create gets a quota error, before the create is done,
+and it then prints no summary. Fresh-client run43091008410 left17 Functions absent this way
+(#827). Inventory verification prevents that incomplete result from counting as success.
 
-**Quota errors (HTTP 429).** A large deploy can exceed the Cloud Functions limit "Per project
-mutation requests per minute per region". The log then shows `Quota Exceeded` and
-`failed to update function` or `failed to create function` lines. Firebase CLI retries these, and
-most later show `Successful update operation` or `Successful create operation`. If the step fails,
-or it names a Function that is not deployed, wait a minute and run the same deploy again. Do not
-change the commit. The rerun skips each Function that is active and unchanged, so it sends fewer
-requests and creates the Functions that are not there. Then run the smoke test again.
+**Quota errors (HTTP 429).** A large deploy can exceed Cloud Functions write quotas: v1 allows80
+requests per100 seconds per project, and v2 allows60 per60 seconds per region. The log shows
+`Quota Exceeded` and `failed to update function` or `failed to create function` lines. Firebase CLI
+normally retries these. If it exits 0 with missing Functions or inactive targeted retry policies,
+the helper waits105 seconds, reads a fresh complete inventory, and starts another guarded Firebase
+process. It makes at most3 attempts with2 waits. Each attempt recalculates whether any force is
+safe; unchanged Functions are skipped. See [Google's quota limits](https://docs.cloud.google.com/functions/quotas).
+
+Exhaustion fails the step with the missing Function names, `retry policy change(s) are not active`
+when applicable, and `Quota recovery was exhausted after 3 guarded attempts`. A nonzero Firebase
+exit or an unknown inventory does not enter this recovery. Diagnose a failed step before a manual
+rerun; a waiting recovery is still active work. Keep the existing smoke test after deployment.
 
 To read the complete inventory from an operator's machine, use a clean checkout with Node 22 and
 `npm ci` complete:
