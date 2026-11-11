@@ -491,7 +491,7 @@ test('each grant the rehearsal missed is made up front', async () => {
   assert.ok(holds(project, `projects/${PROJECT}/roles/eventrunnerDeployInvoker`, deploy), 'the invoker role');
   assert.ok(fake.state.role.includedPermissions.includes('run.services.setIamPolicy'));
   assert.ok(holds(bindingsOf(fake, `${iam}/${COMPUTE}`), 'roles/iam.serviceAccountUser', deploy), 'act as compute');
-  assert.ok(!holds(bindingsOf(fake, `${iam}/${PROJECT}@appspot.gserviceaccount.com`), 'roles/iam.serviceAccountUser', deploy), 'no App Engine actAs grant');
+  assert.ok(holds(bindingsOf(fake, `${iam}/${PROJECT}@appspot.gserviceaccount.com`), 'roles/iam.serviceAccountUser', deploy), 'appspot actAs for the Firebase deploy preflight');
 
   assert.ok(fake.state.identities.some((service) => service === 'storage.googleapis.com'), 'the storage agent is made first');
   assert.ok(holds(project, 'roles/pubsub.publisher', `serviceAccount:service-${NUMBER}@gs-project-accounts.iam.gserviceaccount.com`));
@@ -507,7 +507,8 @@ test('a new project provisions compute secret access and actAs without an appspo
   const appspot = `${PROJECT}@appspot.gserviceaccount.com`;
   assert.ok(!fake.calls.some((call) => {
     const url = new URL(call.url);
-    return url.hostname === 'iam.googleapis.com' && url.pathname.split('/').at(-1).split(':')[0] === appspot;
+    const [account, action] = url.pathname.split('/').at(-1).split(':');
+    return url.hostname === 'iam.googleapis.com' && account === appspot && action === 'setIamPolicy';
   }));
   const deploy = `serviceAccount:${DEPLOY}`;
   assert.ok(holds(bindingsOf(fake, `iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/${COMPUTE}`), 'roles/iam.serviceAccountUser', deploy));

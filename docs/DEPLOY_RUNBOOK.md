@@ -1238,7 +1238,7 @@ Set these up as the project owner before the first deploy, because the deploy ac
   ```
 - The Artifact Registry repository `gcf-artifacts` in `us-central1`, with the cleanup policy `firebase-functions-cleanup` (delete images older than 86400 seconds).
 - For the Pub/Sub service agent, `roles/iam.serviceAccountTokenCreator`. For the functions' runtime account, `roles/run.invoker`, `roles/eventarc.eventReceiver`, `roles/datastore.user`, and `roles/iam.serviceAccountTokenCreator` on itself, so emailed sign-in can make tokens.
-- For the deploy account, the role list in §2 without `roles/storage.admin`, plus `roles/secretmanager.viewer`, the custom role `eventrunnerDeployInvoker`, and `roles/iam.serviceAccountUser` on the compute and App Engine default accounts.
+- For the deploy account, the role list in §2 without `roles/storage.admin`, plus `roles/secretmanager.viewer`, the custom role `eventrunnerDeployInvoker`, and `roles/iam.serviceAccountUser` on the compute runtime account and the App Engine default account when it exists. Firebase CLI's `checkServiceAccountIam` requires App Engine `actAs` before every Functions deploy, even when all functions run as compute. This grant does not give the App Engine account secret access.
 
 To deploy by hand instead, run from the repository root with the console project's public web settings:
 
@@ -1423,7 +1423,7 @@ The script does each of these, and sections 1 to 3 are wrong or silent on them. 
 
 - A provider conditioned on one environment cannot be shared, so each client project has its own pool (`github-actions`, provider `github`), in place of section 1's shared one.
 - The deploy account also needs the custom role `eventrunnerDeployInvoker`, with `cloudfunctions.functions.setIamPolicy`, `firebaseextensions.instances.list`, `firebasestorage.defaultBucket.get`, `resourcemanager.projects.getIamPolicy` and `run.services.setIamPolicy`.
-- The deploy account needs `roles/iam.serviceAccountUser` on the compute runtime account, granted on that account.
+- The deploy account needs `roles/iam.serviceAccountUser` on both the compute and the appspot service accounts, granted on each account and not on the project.
 - The storage service agent may not exist. Create it (`gcloud beta services identity create --service=storage.googleapis.com`), then grant it `roles/pubsub.publisher`. A new agent can take minutes to be accepted.
 - The deploy account cannot make these grants, so an owner makes them first: the pubsub agent gets `roles/iam.serviceAccountTokenCreator`, and the compute account gets `roles/run.invoker` and `roles/eventarc.eventReceiver`. The compute account also gets `roles/iam.serviceAccountTokenCreator` on itself for `createCustomToken`. That last one is unconfirmed, and granted anyway.
 - `cloudbilling.googleapis.com` must be on, and the deploy account cannot turn it on. `gcloud services enable` takes at most 20 at a time (`SU_MAX_BATCH_SIZE_EXCEEDED`).
