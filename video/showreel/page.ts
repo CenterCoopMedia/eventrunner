@@ -3,7 +3,7 @@
 import {type C, type Project, type Style, type Palette, W, H, rgb, mix, text, wrap, fillBox, strokeBox, line, disc, quadPoints, trace} from './kit.ts';
 
 export function drawPage(c: C, p: Project, style: Style, mode: 'light' | 'dark') {
-  const P: Palette = style[mode], e = p.experience, r = style.radius === 'sharp' ? 0 : 10;
+  const P: Palette = style[mode], e = p.experience, r = style.radius === 'sharp' ? 0 : 4;
   const heading = {family: style.font, weight: style.weight};
   const hair = rgb(mix(P.surface, P.ink, .22)), upper = style.id === 'zine';
   c.fillStyle = rgb(P.surface); c.fillRect(0, 0, W, H);
@@ -24,29 +24,28 @@ export function drawPage(c: C, p: Project, style: Style, mode: 'light' | 'dark')
   else line(c, 120, 128, 1800, 128, hair, 2);
 
   // Hero.
-  const kicker = `${e.dates} · ${e.venue}`.toUpperCase();
-  if (style.id === 'newsroom') fillBox(c, 120, 222, 12, 34, 0, rgb(P.primary));
-  text(c, kicker, style.id === 'newsroom' ? 148 : 120, 250, {family: 'Mono', weight: 500, size: 26, tracking: 3, color: rgb(P.primary)});
+  // The headline comes first. When and where follow it as a plain line, not as a label above it.
   const size = style.id === 'broadsheet' ? 132 : style.id === 'zine' ? 128 : 112;
   const title = upper ? e.headline.toUpperCase() : e.headline;
   const lines = wrap(c, title, 1000, {...heading, size});
-  lines.forEach((value, i) => text(c, value, 116, 390 + i * size * 1.06, {...heading, size, tracking: -size * .012, color: rgb(P.ink)}));
-  const below = 390 + (lines.length - 1) * size * 1.06;
-  wrap(c, e.subtitle, 900, {size: 36, weight: 400}).forEach((value, i) => text(c, value, 120, below + 92 + i * 50, {size: 36, weight: 400, color: rgb(P.inkMuted)}));
-  fillBox(c, 120, below + 214, 236, 76, r, rgb(P.primary));
-  text(c, 'Register', 238, below + 254, {size: 30, weight: 700, align: 'center', baseline: 'middle', color: rgb(P.surface)});
-  strokeBox(c, 380, below + 214, 280, 76, r, rgb(P.ink), 2.5);
-  text(c, 'View schedule', 520, below + 254, {size: 30, weight: 700, align: 'center', baseline: 'middle', color: rgb(P.ink)});
+  lines.forEach((value, i) => text(c, value, 116, 330 + i * size * 1.06, {...heading, size, tracking: -size * .012, color: rgb(P.ink)}));
+  const below = 330 + (lines.length - 1) * size * 1.06;
+  text(c, `${e.dates} · ${e.venue}`, 120, below + 86, {size: 36, weight: 600, color: rgb(P.primary)});
+  wrap(c, e.subtitle, 900, {size: 36, weight: 400}).forEach((value, i) => text(c, value, 120, below + 152 + i * 50, {size: 36, weight: 400, color: rgb(P.inkMuted)}));
+  fillBox(c, 120, below + 274, 236, 76, r, rgb(P.primary));
+  text(c, 'Register', 238, below + 314, {size: 30, weight: 700, align: 'center', baseline: 'middle', color: rgb(P.surface)});
+  strokeBox(c, 380, below + 274, 280, 76, r, rgb(P.ink), 2.5);
+  text(c, 'View schedule', 520, below + 314, {size: 30, weight: 700, align: 'center', baseline: 'middle', color: rgb(P.ink)});
 
   if (style.id === 'zine') {
     // Cut-and-paste sticker at the preset's callout angle.
-    c.save(); c.translate(980, 236); c.rotate(-2.5 * Math.PI / 180);
+    c.save(); c.translate(880, below + 312); c.rotate(-2.5 * Math.PI / 180);
     fillBox(c, -120, -40, 240, 80, 0, rgb(P.primary));
     text(c, `${p.copy.days} DAYS`, 0, 4, {...heading, size: 44, align: 'center', baseline: 'middle', color: rgb(P.surface)}); c.restore();
   }
   if (style.id === 'field-guide') {
     // A sprig, in the manner of the botanical line drawings.
-    const stem = quadPoints([1085, below + 290], [1135, below + 200], [1100, below + 96]);
+    const stem = quadPoints([1085, below + 350], [1135, below + 260], [1100, below + 156]);
     c.lineCap = 'round'; trace(c, stem, 0, 1, rgb(P.primary), 3);
     for (let i = 1; i <= 5; i++) {
       const [x, y] = stem[i * 4], side = i % 2 ? 1 : -1;
@@ -72,9 +71,6 @@ export function drawPage(c: C, p: Project, style: Style, mode: 'light' | 'dark')
     wrap(c, s.title, pw - (left - px) - 40, {size: 31, weight: 700}).slice(0, 2).forEach((value, k) => text(c, value, left, y + 84 + k * 38, {size: 31, weight: 700, color: rgb(P.ink)}));
     if (i < 2) line(c, px + 40, y + 164, px + pw - 40, y + 164, hair, 2);
   });
-  // Footer band.
-  fillBox(c, 0, 984, W, 96, 0, rgb(P.surfaceAlt));
-  text(c, `${style.label.toUpperCase()} · ${mode.toUpperCase()}`, 120, 1040, {family: 'Mono', weight: 500, size: 22, tracking: 2.5, color: rgb(P.inkMuted)});
 }
 
 /** All twelve pages, cached. Index is style * 2 + (dark ? 1 : 0). */

@@ -1,15 +1,16 @@
 // One site. The parts float as an exploded stack, each named in turn. On the
 // build they close one by one, turn to face the viewer and become the page.
-import {type C, type Project, type RGB, type Point, W, H, spring, prog, outCubic, inExpo, inOutCubic, clamp, lerp, rgb, mix, text, fillBox, strokeBox, disc, line, shadowed, BLACK} from './kit.ts';
-import {type Scene, ground, folio, phrase, sample, word, SOFT} from './shared.ts';
+import {type C, type Project, type RGB, type Point, spring, prog, outCubic, inExpo, inOutCubic, clamp, lerp, rgb, mix, text, fillBox, strokeBox, disc, line, shadowed, BLACK} from './kit.ts';
+import {type Scene, ground, phrase, sample, word, SOFT, PARTS} from './shared.ts';
 
 const PW = 640, PH = 400, GAP = 104, CX = 1130, CY = 700;
 const WIN = {x: 700, y: 170, w: 1120, h: 630};
 
 export function stack(p: Project, site: HTMLCanvasElement): Scene {
   const q = p.clock.cues.stack, D = p.brand.dark, [start, end] = [p.clock.scenes[4].start, p.clock.scenes[4].end];
-  const accent = [0, 4, 3, 5, 1].map(i => p.styles[i].dark.primary);
-  const LABELS = ['Pages', 'Schedule', 'Speakers', 'Tickets', 'Email'];
+  // Five of the parts, with the colours the montage also gives them.
+  const parts = [0, 1, 2, 3, 5].map(i => PARTS[i]);
+  const accent = parts.map(([, style, key]) => p.styles[style].dark[key]), LABELS = parts.map(([name]) => name);
   // Grey artwork stays close to the plate, so only the accents count as bright.
   const bar = (): RGB => mix(D.surfaceAlt, D.ink, .22);
 
@@ -50,7 +51,7 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
     // Each closing gap gives the frame a small knock.
     let knock = 0;
     for (const cue of [...q.compress, q.merge]) knock += Math.max(0, 1 - Math.abs(f - cue - 1.5) / 4) * (cue === q.merge ? 9 : 5);
-    ground(c, D, W / 2, H / 2, push, [CX, 480], 1 + .6 * flat);
+    ground(c, D);
     c.save(); c.translate(1260, 420 + knock); c.scale(push, push); c.translate(-1260, -420); c.globalAlpha = 1 - prog(f, end - 5, end);
 
     const theta = lerp((38 + 7 * inOutCubic(prog(f, start, q.merge))) * Math.PI / 180, 0, merge);
@@ -66,7 +67,7 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
 
     // Shadow on the floor under the whole stack.
     c.save(); c.translate(cx, cy + 60 * (1 - flat)); c.transform(Math.cos(theta), Math.sin(theta) * tilt, -Math.sin(theta), Math.cos(theta) * tilt, 0, 0);
-    shadowed(c, 90, 0, .55 * explode, () => fillBox(c, -size.w / 2, -size.h / 2, size.w, size.h, 30, rgb(BLACK, .5))); c.restore();
+    shadowed(c, 90, 0, .55 * explode, () => fillBox(c, -size.w / 2, -size.h / 2, size.w, size.h, 12, rgb(BLACK, .5))); c.restore();
 
     for (let i = 0; i < 5; i++) {
       const z = elevation(i), grow = outCubic(prog(f, q.explode + i * 1.5, q.explode + 8 + i * 1.5));
@@ -75,12 +76,12 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
       c.save(); c.translate(cx, cy - z); c.transform(Math.cos(theta), Math.sin(theta) * tilt, -Math.sin(theta), Math.cos(theta) * tilt, 0, 0);
       c.scale(lerp(.7, 1, grow), lerp(.7, 1, grow)); c.globalAlpha *= grow;
       const sx = size.w / PW, sy = size.h / PH;
-      fillBox(c, -size.w / 2, -size.h / 2, size.w, size.h, 20, rgb(mix(D.surfaceAlt, accent[i], .06 + .1 * named), lerp(.94, 1, flat)));
-      strokeBox(c, -size.w / 2, -size.h / 2, size.w, size.h, 20, rgb(mix(D.inkMuted, accent[i], named), .5 + .4 * named), 2.5);
+      fillBox(c, -size.w / 2, -size.h / 2, size.w, size.h, 6, rgb(mix(D.surfaceAlt, accent[i], .06 + .1 * named)));
+      strokeBox(c, -size.w / 2, -size.h / 2, size.w, size.h, 6, rgb(mix(D.inkMuted, accent[i], named), .5 + .4 * named), 2.5);
       if (flat < 1) { c.save(); c.scale(sx, sy); c.globalAlpha *= (1 - flat) * lit; art[i](c, accent[i]); c.restore(); }
       if (i === 4 && page > 0) {
         // The top plate becomes the published page.
-        c.save(); c.beginPath(); c.roundRect(-size.w / 2, -size.h / 2, size.w, size.h, 16); c.clip(); c.globalAlpha *= page;
+        c.save(); c.beginPath(); c.roundRect(-size.w / 2, -size.h / 2, size.w, size.h, 6); c.clip(); c.globalAlpha *= page;
         c.imageSmoothingQuality = 'high'; c.drawImage(site, -size.w / 2, -size.h / 2, size.w, size.h); c.restore();
       }
       c.restore();
@@ -92,7 +93,6 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
         const a = 1 - gone;
         disc(c, ax, ay, 7 * named, rgb(accent[i], a));
         line(c, ax, ay, lerp(ax, lx - 18, named), ay, rgb(accent[i], .8 * a), 2.5);
-        text(c, `0${i + 1}`, lx, ay - 26, {family: 'Mono', weight: 500, size: 19, tracking: 2, color: rgb(accent[i], named * a)});
         text(c, LABELS[i], lx + (1 - named) * 26, ay + 14, {family: 'Bricolage', weight: 800, size: 42, tracking: -.8, color: rgb(D.ink, named * a)});
       }
     }
@@ -102,7 +102,6 @@ export function stack(p: Project, site: HTMLCanvasElement): Scene {
     c.restore();
 
     c.globalAlpha = 1 - prog(f, end - 8, end - 2);
-    folio(c, '04 — One site', 120, 262, D.primary, f, start + 2);
     // The second pair of lines arrives with the build, so each holds for two seconds or more.
     const swap = q.compress[0] - 6;
     word(c, 'Every part.', 108, 400, 104, D.ink, f, q.explode + 2, swap);

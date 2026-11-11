@@ -1,6 +1,6 @@
 // Title. On the chord Badger is large and running on the spot. The landing
 // cuts to the official lockup and the name is uncovered beside the mark.
-import {type C, type Project, W, H, spring, prog, outCubic, outExpo, clamp, rgb, text, ring, line, hash, TAU, setFont} from './kit.ts';
+import {type C, type Project, W, spring, prog, outCubic, outExpo, clamp, rgb, text, ring, line, hash, TAU, setFont} from './kit.ts';
 import {badger, REST, type Pose} from './badger.ts';
 import {type Scene, ground, word, streaks, SOFT} from './shared.ts';
 
@@ -29,7 +29,7 @@ export function title(p: Project): Scene {
     const HERO = 7.6, hx = W / 2 - 40 * HERO, hy = 470 - 40 * HERO;
     const [ox, oy] = running ? [W / 2, 470] : [mx, my];
     const burst = outExpo(prog(f, q.impact, q.impact + 22));
-    ground(c, D, W / 2, H / 2, 1, [W / 2, 420], 1.5 + .3 * (1 - prog(f, q.impact, q.impact + 40)));
+    ground(c, D);
 
     // Impact: soft rings and rays.
     for (const delay of [0, 5, 11]) {
@@ -47,10 +47,11 @@ export function title(p: Project): Scene {
     streaks(c, D.ink, running * prog(f, q.impact, q.impact + 5), 71, f);
 
     // He runs on the spot: the body holds still and bright, the legs are a soft smear.
-    const grow = outCubic(prog(f, q.impact, q.impact + 5));
+    // The body does not bob and the limbs stay at SOFT. At this size both count as
+    // transitions for the flash screen, and the landing cut is under a second away.
     const pose: Pose = {
       ...REST,
-      runAmount: running, run: (f - q.impact) / 30 * 2.6, limbAlpha: running ? SOFT + .1 : 1,
+      runAmount: running, bob: 0, run: (f - q.impact) / 30 * 2.6, limbAlpha: running ? SOFT : 1,
       lean: running ? .26 : .16,
       squash: 1 - .14 * Math.max(0, 1 - Math.abs(f - q.land - 1.5) / 3),
       barStretch: 1 + 4 * running,
@@ -64,7 +65,8 @@ export function title(p: Project): Scene {
       c.beginPath(); c.arc(x, y, 6 + 16 * t, 0, TAU); c.fillStyle = rgb(D.inkMuted, SOFT * (1 - t)); c.fill();
     }
     c.save();
-    if (running) { c.translate(W / 2, 470 + 32 * HERO); c.scale(grow, grow); c.translate(-W / 2, -470 - 32 * HERO); c.translate(hx, hy); c.scale(HERO, HERO); }
+    // He is there at full size on the chord. A grow would sweep bright strokes across the frame.
+    if (running) { c.translate(hx, hy); c.scale(HERO, HERO); }
     else { c.translate(left, TOP + 8 * SCALE); c.scale(MARK, MARK); }
     badger(c, pose, inks); c.restore();
 
@@ -99,6 +101,6 @@ export function title(p: Project): Scene {
     });
     // Typed in whole characters on whole frames, complete before the picture settles.
     const url = p.copy.site, typed = Math.floor(clamp((Math.floor(f) - q.url + 1) * 2.5, 0, url.length));
-    if (typed > 0) text(c, url.slice(0, typed), W / 2, 936, {family: 'Mono', weight: 500, size: 34, tracking: 3.4, align: 'center', color: rgb(D.inkMuted)});
+    if (typed > 0) text(c, url.slice(0, typed), W / 2, 940, {size: 40, weight: 600, align: 'center', color: rgb(D.inkMuted)});
   }};
 }

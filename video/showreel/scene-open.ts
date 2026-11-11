@@ -1,6 +1,6 @@
 // Cold open. A name badge is built on the beat, comes alive as Badger, winds up
 // and runs. The lines it leaves behind become the rules of the schedule.
-import {type C, type Project, W, H, camera, spring, prog, outCubic, inCubic, outExpo, clamp, lerp, rgb, mix, line, ring, BLACK} from './kit.ts';
+import {type C, type Project, W, camera, spring, prog, outCubic, inCubic, outExpo, lerp, rgb, mix, line, ring, BLACK} from './kit.ts';
 import {badger, REST, type Pose} from './badger.ts';
 import {type Scene, ground, RAIL_Y, streaks, rule, SOFT} from './shared.ts';
 
@@ -20,7 +20,7 @@ export function open(p: Project): Scene {
     for (let i = 1; i < keys.length; i++) if (f >= hits[i]) [cx, cy, zoom] = keys[i];
     const go = prog(f, launch, q.dash + 11);
 
-    ground(c, D, cx, cy, zoom, [W / 2, H / 2], clamp(f / 20, .25, 1));
+    ground(c, D);
     const t4 = (f - q.lanyard) / 30;
     // The crouch is a pose change on the cut, then a hold.
     const wind = f >= q.windup ? 1 : 0;
