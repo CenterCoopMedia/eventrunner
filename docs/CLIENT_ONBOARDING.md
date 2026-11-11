@@ -218,6 +218,8 @@ Console-built sites also include CCM's configured support accounts as full opera
 
 Explain that CCM support can access site content, attendee records and settings for diagnosis and support. **Settings → Access** labels these accounts **CCM support**. Clients can change or remove them under the existing last-operator rule. Give another organizer operator access so the client team can manage access independently.
 
+CCM support does not satisfy the second-operator setup check and is excluded from the Owner-alert recipients. The configured platform contact still gets a copy of client alerts.
+
 The first operator (from `--admin` above, or `config/bootstrap.adminEmails`) signs in and confirms
 the admin panel loads. Point them at **Set up your event** on the rail: it shows every row of
 `--check` (§4) as a step, says which steps are theirs, and links to the screen for each. Then, from **admin Settings → Access**, grant a second operator — do not

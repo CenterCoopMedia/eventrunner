@@ -1169,6 +1169,8 @@ Operators only. One ruled table of every admin account with its tier word, and a
 
 **CCM support.** The builder adds the configured CCM support accounts as operators alongside your own operators. Their rows show **CCM support**. These accounts have full access to site content, attendee records and settings for support and diagnosis. You can change or remove them with the same controls; the last-operator rule still applies. A build retry adds the configured support accounts again and preserves other operators.
 
+CCM support does not count toward the second-organizer setup check or receive alerts meant for your operators. The configured CCM platform contact still gets a copy of each client alert.
+
 **Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. A new account grant sends one transactional email naming the event, role, event admin address and any staff end time. It tells the person to use the exact granted email address and request an emailed sign-in code. Google sign-in is not required. The admin address is a regular sign-in page, not a one-time invitation.
 
 **Email outcome.** Access stays saved even if the email setup or send fails. The result states access and email outcomes separately. Provider acceptance does not confirm delivery. An uncertain result means the provider may have accepted the email, or an earlier attempt already claimed it; the site does not automatically send another copy. Check **Email log** before sending again. A no-op grant, ordinary tier change, end-time change or removal sends no instructions.

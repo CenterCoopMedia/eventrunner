@@ -102,6 +102,18 @@ test('one admin is not enough — config/bootstrap must not be a single point of
   assert.equal(rows.find((r) => r.id === 'admins').ok, false);
 });
 
+test('CCM support cannot replace a second client operator in the setup check', () => {
+  const bootstrap = {
+    adminEmails: ['owner@example.org', 'support@example.org', 'agent@example.org'],
+    supportAdminEmails: ['Support@Example.org', 'agent@example.org'],
+  };
+  const row = () => evaluateReadiness(readySnapshot({ bootstrap })).find((r) => r.id === 'admins');
+  assert.equal(row().ok, false);
+  assert.match(row().detail, /1 operator account configured \(CCM support excluded\)/);
+  bootstrap.adminEmails.push('second-owner@example.org');
+  assert.equal(row().ok, true);
+});
+
 test('a half-attested auth step does not pass', () => {
   const rows = evaluateReadiness(readySnapshot({
     event: {
