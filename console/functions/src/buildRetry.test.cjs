@@ -40,6 +40,17 @@ function setup({ app = {}, record = null, startBuild, extra = {} } = {}) {
   };
 }
 
+test('a paused build saves a failed start without dispatch, and can retry after resume', async () => {
+  const { db, deps: d, started } = setup({ extra: { 'console_config/settings': { buildsPaused: true } } });
+  const { runStartBuild } = require('./buildDispatch.cjs');
+  assert.equal(await runStartBuild(d, { orgId: 'o1', appId: 'a1', eventName: 'Test' }), false);
+  assert.equal(started.length, 0);
+  assert.equal(db.read('applications/a1').buildStart.state, 'failed');
+  await db.collection('console_config').doc('settings').set({ buildsPaused: false });
+  assert.equal(await runStartBuild(d, { orgId: 'o1', appId: 'a1', eventName: 'Test' }), true);
+  assert.equal(started.length, 1);
+});
+
 test('a run that never reported can be retried after an hour, and not before', () => {
   const at = Date.parse('2026-11-04T12:00:00Z');
   const started = (ago) => ({ status: 'approved', buildStart: { state: 'started', at: new Date(at - ago) } });

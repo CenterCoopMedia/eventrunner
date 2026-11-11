@@ -217,7 +217,7 @@ async function saveConsoleSettings({ db, now = Date.now }, { body, user }) {
   const settings = checkSettings(CONSOLE_FIELDS, {}, input);
   const auditRef = db.collection('console_audit').doc();
   await db.runTransaction(async (tx) => {
-    tx.set(db.collection('console_config').doc('settings'), settings);
+    tx.set(db.collection('console_config').doc('settings'), settings, { merge: true });
     tx.create(auditRef, { action: 'save-settings', appId: null, by: user.uid, at: new Date(now()) });
   });
   return { body: { settings } };

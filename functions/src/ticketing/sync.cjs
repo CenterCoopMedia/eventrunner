@@ -226,7 +226,7 @@ async function finishQueueRow({ db, ref, lease, remove = false, patch = {}, now 
 async function notifySyncException({ notifyOperator, orderId, code, message, log }) {
   if (typeof notifyOperator !== 'function') return;
   try {
-    await notifyOperator({ kind: 'error', title: `Ticket order ${orderId} needs attention`, summary: message,
+    await notifyOperator({ kind: 'ticket-order', title: `Ticket order ${orderId} needs attention`, summary: message,
       fields: { orderId, code }, dedupeKey: `ticketing-exception:${orderId}:${code}` });
   } catch { log.warn('ticketing: operator notification unavailable'); }
 }

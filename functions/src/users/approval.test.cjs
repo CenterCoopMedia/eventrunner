@@ -212,6 +212,15 @@ test('revoking an already revoked account is an unchanged no-op', async () => {
   assert.equal(res.body.changed, false);
 });
 
+test('an admin can make an entitlement-loss revocation explicit before another purchase', async () => {
+  const db = seeded({ registrationStatus: 'revoked', revocationReason: 'entitlement_lost' });
+  const res = makeRes();
+  await revoke(db)(req('admin'), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.changed, true);
+  assert.equal(db.read('users', 'uid-ada').revocationReason, 'admin_revocation');
+});
+
 test('an account carrying an unknown status is refused by both endpoints', async () => {
   // The reference implementation's legacy vocabulary (`registered`,
   // `confirmed`, `ticket_only`) does not exist in v1 — a document carrying

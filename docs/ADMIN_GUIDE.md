@@ -500,9 +500,11 @@ The schedule does nothing on a historical demo, and nothing after the last event
 
 The full attendee list with registration status and a search/filter. What action is available depends on the current status:
 
-- **Pending / ticketed** → Approve
+- **Pending** → Approve
+- **Ticketed** → Approve or Revoke access
 - **Approved** → Revoke. Approving again is available only when the original approval came from a ticket; re-approving records the approval as an admin decision so a later revoke behaves correctly.
-- **Revoked** → Approve. That is the only way out of revoked.
+- **Ticket access ended** → Approve or Revoke access. This means no valid claimed ticket remains. A new valid claimed ticket restores ticket access, under the current automatic-approval policy. Select Revoke access to keep the account blocked after another purchase.
+- **Revoked** → Approve. An explicit organizer revocation stays blocked until an organizer approves the account again.
 
 Approve and revoke always go through the server endpoints. Every registration field involved is server-owned and not editable directly, even for the account's own owner.
 

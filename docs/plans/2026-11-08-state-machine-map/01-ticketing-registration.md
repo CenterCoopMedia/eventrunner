@@ -5,7 +5,7 @@ Scope read: functions/src/ticketing/** (incl. providers/), functions/src/admin/i
 ---
 
 ## 1. Account registration status  (explicit)
-- Entity / storage: `users/{uid}.registrationStatus` + `users/{uid}.approvalSource` (`'admin' | 'ticket' | null`). Vocabulary at packages/shared/src/registration.cjs:21, transition table at packages/shared/src/registration.cjs:25-34, entitlement formula at packages/shared/src/registration.cjs:65-68.
+- Entity / storage: `users/{uid}.registrationStatus`, `approvalSource` (`'admin' | 'ticket' | null`) and server-owned `revocationReason` (`'entitlement_lost' | 'admin_revocation' | null`). Vocabulary and transitions live in packages/shared/src/registration.cjs.
 - States: `pending`, `ticketed`, `approved`, `revoked` (+ no document = account missing).
 - Transitions:
   - (none) -> pending: auth onCreate, functions/src/users/lifecycle.cjs:68,103. The same doc is also seeded by createUserFromTicket at functions/src/ticketing/registration.cjs:396-398, which reuses `buildNewUserDoc`.
@@ -14,14 +14,15 @@ Scope read: functions/src/ticketing/** (incl. providers/), functions/src/admin/i
   - pending|ticketed -> approved (`admin_approval`), revoked -> approved (`admin_reapproval`), approved(source ticket) -> approved(source admin) re-pin: functions/src/users/approval.cjs:89-113.
   - approved -> ticketed (`auto_approval_disabled`, which also fires when only a free ticket remains): entitlement.cjs:188-192.
   - ticketed|approved -> revoked (`entitlement_lost`): entitlement.cjs:212-220. (`admin_revocation`): approval.cjs:155-166.
+  - revoked -> ticketed (`ticket_restored`): a valid claimed ticket returns and `revocationReason` is `entitlement_lost`. Both the claim and entitlement transactions enforce the reason; the current automatic-approval policy may then approve a paid ticket holder. Ticket recovery clears the reason.
+  - revoked(entitlement_lost) -> revoked(admin_revocation): an organizer selects Revoke access on a Ticket access ended row. New tickets cannot undo this explicit decision.
   - a `pending_info` ticket holds the current state (`held`): entitlement.cjs:205-210.
-- Terminal states / reversibility: `revoked` is terminal except via admin re-approval. No ticket event can leave it (registration.cjs:33; entitlement.cjs:96-99).
+- Terminal states / reversibility: Explicit or unclassified revocation requires admin re-approval. Only `revocationReason: 'entitlement_lost'` can recover from a valid ticket.
 - Other copies of this lifecycle:
   - firestore.rules:449-454 `requesterIsApprovedAttendee` reads `'approved' || speakerId`. shared `hasAttendeeAccess` (registration.cjs:79-84) also admits `role` admin. functions/src/core/auth.cjs:450-455 bridges the gap by spoofing `role:'admin'`, so they agree in effect but not textually.
   - The status list is restated, not imported, at functions/src/users/export.cjs:70 (`STATUS_FILTER_VALUES`), apps/web/src/admin/pages/AdminAttendees.jsx:81-94 (filters + labels), apps/web/src/components/ProfileSidebar.jsx:28-33, apps/web/src/admin/pages/AdminAttendees.jsx:109-114 (which actions are allowed, hand-coded), apps/web/src/lib/accountViews.js:10, and functions/src/announcements/audience.cjs:10-13,88. All agree today. eventStats imports the shared list (functions/src/admin/eventStats.cjs:57,75).
 - Problems:
   - **Two writers implement the promotion half of the machine.** applyTicketClaimToUser (registration.cjs:57-91) and recomputeEntitlement (entitlement.cjs:149-233) both do pending->ticketed->approved. They differ: only recompute demotes approved->ticketed when auto-approve is off or only free seats remain. Only recompute applies the `pending_info` hold. The claim's own ticket write (registration.cjs:156) then fires onTicketWritten (entitlement.cjs:311-333), which runs recompute anyway, so the claim-side copy is redundant.
-  - **An automatic revoke and an admin revoke are the same stored state.** Both produce `revoked` + `approvalSource:null` (entitlement.cjs:213-219; approval.cjs:165). An attendee who was auto-revoked after a refund and then buys and claims a new valid ticket stays `revoked`. The claim path cannot move revoked->ticketed (registration.cjs:78; table has no such edge), so only staff can let them back in.
   - The trigger name `auto_approval_disabled` is reused for "only a free ticket is left" (entitlement.cjs:188), so the table's trigger vocabulary no longer describes the cause.
 
 ## 2. Ticket admission status  (explicit)
@@ -275,13 +276,12 @@ Scope read: functions/src/ticketing/** (incl. providers/), functions/src/admin/i
 
    Fix: route both through shared transition functions.
 10. **Unknown-status fallbacks are inconsistent.** An unknown invoice status reads as `draft`, the most permissive state (invoices.cjs:121). An unknown ticket status reads as `pending_info`, the least permissive (sync.cjs:90). Unknown send and pay-link states read as `uncertain` and `failed` (invoices.cjs:216,233). linkRefusal does not normalize at all (invoicePayLink.cjs:207). Fix: fail closed (refuse writes) on an unknown invoice status.
-11. **Automatic and admin revocation are indistinguishable.** Both store `revoked`/`approvalSource:null` (entitlement.cjs:213-219; approval.cjs:165). A refunded attendee who buys again can never be re-ticketed without staff. Fix: record a `revokedBy: 'admin'|'entitlement'` and add a `revoked(entitlement) -> ticketed` edge on `ticket_claimed`.
-12. **Pay-link "usable now" is computed three times** (invoicePayLink.cjs:143-151, InvoiceCardPayment.jsx:68-80, settleEnded :295). Every state can become `paid` (:591), so terminal states are not terminal. A `failed` link keeps `idempotencyKey` (:350-353). Fix: export currentPayLink to the client via shared/invoice. Record a payment through a closed link only in the review, not by overwriting the link's terminal status.
-13. **The same fact is mirrored in pairs:**
+11. **Pay-link "usable now" is computed three times** (invoicePayLink.cjs:143-151, InvoiceCardPayment.jsx:68-80, settleEnded :295). Every state can become `paid` (:591), so terminal states are not terminal. A `failed` link keeps `idempotencyKey` (:350-353). Fix: export currentPayLink to the client via shared/invoice. Record a payment through a closed link only in the review, not by overwriting the link's terminal status.
+12. **The same fact is mirrored in pairs:**
     - `ticket_answers.ticketStatus` mirrors `tickets.status` (ticketAnswers.cjs:174-189).
     - `paymentReviews[].resolved` mirrors `system_errors.resolved` (invoicePayLink.cjs:492-496).
     - `reconciliationException` mirrors order `status==='exception'` (stripeReconcile.cjs:125-137,184).
 
     Fix: derive one from the other at read time, or document which side is authoritative.
-14. **Firestore rules restate the attendee-access predicate.** firestore.rules:449-454 omits the `role` admin branch that shared `hasAttendeeAccess` has (packages/shared/src/registration.cjs:83). It agrees only because core/auth.cjs:450-455 spoofs the role. Fix: a comment-level cross-reference, plus a rules test asserting parity.
-15. **Pause/resume bumps the catalog `revision`** (commerceAdmin.cjs:176), which invalidates in-flight checkouts as "prices changed" (stripeCheckout.cjs:241-243). Fix: keep a separate `termsRevision`, or leave `revision` alone on pause.
+13. **Firestore rules restate the attendee-access predicate.** firestore.rules:449-454 omits the `role` admin branch that shared `hasAttendeeAccess` has (packages/shared/src/registration.cjs:83). It agrees only because core/auth.cjs:450-455 spoofs the role. Fix: a comment-level cross-reference, plus a rules test asserting parity.
+14. **Pause/resume bumps the catalog `revision`** (commerceAdmin.cjs:176), which invalidates in-flight checkouts as "prices changed" (stripeCheckout.cjs:241-243). Fix: keep a separate `termsRevision`, or leave `revision` alone on pause.

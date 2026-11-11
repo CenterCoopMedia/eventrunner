@@ -8,6 +8,7 @@ const { answeredQuestions, checkAnswers, readRegistrationForm } = require('share
 const { verifyAuthToken } = require('../core/auth.cjs');
 const { promoRef, takePromoCheck } = require('./promoCodes.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
+const { stripeErrorDetails } = require('./stripeErrors.cjs');
 const { sendError, methodNotAllowed } = require('../core/errors.cjs');
 const {
   CATALOG, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
@@ -389,7 +390,7 @@ function verifyCreatedSession(session, order) {
  * window. No reconciliation calls here: provider reconciliation can call this
  * recovery without a recursive dependency or trusting a redirect.
  */
-async function recoverCheckoutAttempt({ db, provider, orderId, now = () => new Date() }) {
+async function recoverCheckoutAttempt({ db, provider, orderId, now = () => new Date(), log = console }) {
   const orderRef = db.collection(ORDERS).doc(orderId);
   const lease = await db.runTransaction(async (tx) => {
     const orderSnap = await tx.get(orderRef);
@@ -434,6 +435,7 @@ async function recoverCheckoutAttempt({ db, provider, orderId, now = () => new D
   try {
     session = await provider.createCheckoutSession(lease.attempt.stripeRequest, { idempotencyKey: lease.attempt.idempotencyKey });
   } catch (err) {
+    log.error('Stripe checkout creation failed', stripeErrorDetails(err));
     // A lost/failed response cannot establish that Stripe did not create the
     // session. Keep inventory held and keep the same key and request forever.
     // Stripe refusing the key says the client ended the connection, so paid

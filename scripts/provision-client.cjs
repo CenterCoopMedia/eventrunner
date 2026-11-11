@@ -33,6 +33,7 @@ const { toMillis } = require('../console/functions/src/access.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('../console/functions/src/consoleSettings.cjs');
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
+const { stripeErrorDetails } = require('../functions/src/ticketing/stripeErrors.cjs');
 const { historyEntry } = require('../console/functions/src/applications.cjs');
 const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
 const { BUILD_COLLECTION } = require('../console/functions/src/buildRetry.cjs');
@@ -219,7 +220,11 @@ async function call(ctx, label, url, { method = 'GET', headers = {}, json, form,
     }
     if (response.ok) return body;
     const said = quiet ? '' : body.error?.message || body.errors?.[0]?.message || body.Message || body.message || '';
-    const err = new Error(`${label}: HTTP ${response.status}${said ? ` ${String(said).slice(0, 300)}` : ''}`);
+    const stripeDetails = url.startsWith(`${STRIPE}/`) ? stripeErrorDetails({
+      ...body.error, statusCode: response.status, requestId: response.headers?.get?.('request-id'),
+    }) : null;
+    const diagnostic = stripeDetails ? ` ${JSON.stringify(stripeDetails)}` : '';
+    const err = new Error(`${label}: HTTP ${response.status}${diagnostic}${said ? ` ${String(said).slice(0, 300)}` : ''}`);
     err.status = response.status;
     throw err;
   }
@@ -908,7 +913,7 @@ function deployVariables(ctx) {
     EVENT_STORAGE_BUCKET: bucket,
     EVENT_ALLOWED_ORIGINS: `https://${domain},https://${site}.web.app`,
     EVENT_EMAIL_PROVIDER: 'postmark',
-    EVENT_OPERATOR_NOTIFIER: 'none',
+    EVENT_OPERATOR_NOTIFIER: 'email',
     EVENT_APP_CHECK_ENFORCED: 'false',
     EVENT_OTP_SEND_CEILING_PER_HOUR: '500',
     EVENT_SITE_PUBLISHER_ENABLED: 'false',
@@ -1086,7 +1091,14 @@ async function stepSeed(ctx) {
     const emailsOf = (role) => members.docs.map((doc) => doc.data()).filter((member) => member.role === role).map((member) => member.email);
     const answers = toInitAnswers(frozen);
     if (answers.event.sender.email !== senderAddress(name)) throw new Error('the sender address does not match the web address');
-    const file = await writeAnswers({ ...answers, providers: { email: { announcementStream: ANNOUNCEMENT_STREAM } } });
+    // init-event prints its operator checklist into public Actions logs.
+    if (ctx.deps.env.GITHUB_ACTIONS === 'true') {
+      for (const email of [...emailsOf('owner'), ...emailsOf('editor')]) console.log(`::add-mask::${email}`);
+    }
+    const file = await writeAnswers({ ...answers, providers: {
+      email: { announcementStream: ANNOUNCEMENT_STREAM },
+      notifier: { operatorEmail: 'amditisj@montclair.edu' },
+    } });
     const args = [
       'scripts/init-event.cjs', '--answers', file,
       ...emailsOf('owner').flatMap((email) => ['--admin', email]),
@@ -1137,6 +1149,7 @@ async function stepReady(ctx) {
       status: 'ready',
       eventName: ctx.eventName,
       adminLink: `https://${ctx.domain}/admin`,
+      note: 'Automatic ticket approval is off. Review ticket holders in Attendees, or enable Automatic ticket approval in Settings after you review the access policy.',
     });
     if (!sent) throw new Error('we could not email every Owner');
     ctx.ownersEmailedAt = new Date(ctx.deps.now());

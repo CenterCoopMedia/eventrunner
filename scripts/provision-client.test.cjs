@@ -751,6 +751,7 @@ test('the Environment allows main only, needs the App, and holds variables the d
   assert.equal(variables.EVENT_PUBLIC_URL, `https://${DOMAIN}`);
   assert.equal(variables.EVENT_STRIPE_ACCOUNT_ID, 'acct_1');
   assert.equal(variables.EVENT_STRIPE_MODE, 'live');
+  assert.equal(variables.EVENT_OPERATOR_NOTIFIER, 'email');
 });
 
 test('it deploys in the bootstrap order, and seeds between the two deploys', async () => {
@@ -766,6 +767,9 @@ test('it deploys in the bootstrap order, and seeds between the two deploys', asy
     '--admin', 'ana@example.org', '--admin', 'bo@example.org', '--staff', 'ben@example.org',
   ]);
   assert.equal(fake.answersWritten[0].providers.email.announcementStream, 'announcements');
+  assert.deepEqual(fake.answersWritten[0].providers.notifier, {
+    operatorEmail: 'amditisj@montclair.edu',
+  });
   assert.equal(fake.answersWritten[0].event.sender.email.endsWith(`@${DOMAIN}`), true);
 });
 

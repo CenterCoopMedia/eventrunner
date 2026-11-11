@@ -16,8 +16,8 @@ import { plannerMessage } from '../plannerErrors.js';
 //   approved  → Revoke (and Approve again only while the grant came from a
 //               ticket, where re-approving pins approvalSource to 'admin' so
 //               a later refund cannot reverse it)
-//   revoked   → Approve (admin re-approval — the only way out of revoked;
-//               a ticket sync never undoes a revocation)
+//   revoked   → Approve; Revoke access also appears after ticket access ended
+//               so an organizer can prevent a later ticket from restoring it.
 //
 // Restyled onto the fixed admin identity (docs/plans/2026-08-27-admin-
 // identity-story.md). This is the galley: hairline rows on Panel, no zebra,
@@ -99,8 +99,8 @@ const REGISTRATION_LABELS = {
  * its word on the standing-matter ink; every other status renders in the
  * neutral tone, because none of them is this admin's Draft/Live vocabulary.
  */
-function registrationState(status) {
-  if (status === 'revoked') return deadMatter(REGISTRATION_LABELS.revoked);
+function registrationState(status, reason) {
+  if (status === 'revoked') return deadMatter(reason === 'entitlement_lost' ? 'Ticket access ended' : REGISTRATION_LABELS.revoked);
   return { id: status ?? 'pending', label: REGISTRATION_LABELS[status] ?? status ?? 'Pending' };
 }
 
@@ -111,7 +111,8 @@ function canApprove(row) {
 }
 
 function canRevoke(row) {
-  return ['ticketed', 'approved'].includes(row.registrationStatus);
+  return ['ticketed', 'approved'].includes(row.registrationStatus) ||
+    (row.registrationStatus === 'revoked' && row.revocationReason === 'entitlement_lost');
 }
 
 /** "1 attendee", "42 attendees". */
@@ -398,7 +399,12 @@ export default function AdminAttendees() {
                       <span className="text-admin-base font-bold text-admin-ink">
                         {row.displayName || 'No name yet'}
                       </span>
-                      <RecordState state={registrationState(row.registrationStatus)} />
+                      <RecordState state={registrationState(row.registrationStatus, row.revocationReason)} />
+                      {row.registrationStatus === 'revoked' && row.revocationReason === 'entitlement_lost' ? (
+                        <span className="text-admin-xs text-admin-ink-secondary">
+                          A valid ticket restores ticket access. Revoke access to keep this account blocked.
+                        </span>
+                      ) : null}
                       {row.approvalSource ? (
                         <span className="text-admin-xs text-admin-ink-secondary">
                           approved by {row.approvalSource === 'admin' ? 'an organizer' : 'ticket'}
@@ -467,7 +473,7 @@ export default function AdminAttendees() {
                         busyLabel="Revoking…"
                         busy={busyUid === row.id}
                         disabled={busyUid === row.id}
-                        consequence="They lose access to the attendee-only pages at once, and their bookmarks and profile stay on the record. Approving them again restores it."
+                        consequence="They lose access to the attendee-only pages. A new ticket will not restore access. Their bookmarks and profile stay on the record. Approving them again restores access."
                         onConfirm={() => act('revokeUser', row.id)}
                       />
                     ) : null}
