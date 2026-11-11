@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { main } = require('./smoke-test.cjs');
+const { main, probe } = require('./smoke-test.cjs');
 const { endpoints } = require('../.github/smoke-endpoints.json');
 const { createDeliveryWebhookHandler } = require('../functions/src/email/send.cjs');
 const { createTicketingWebhookHandler } = require('../functions/src/ticketing/webhook.cjs');
@@ -53,18 +53,57 @@ async function runSmoke(t, { failedEndpoint, status, networkError, publicStatus 
     ? [`https://us-central1-demo-run-of-show.cloudfunctions.net/${failedEndpoint}`]
     : publicStatus >= 400 ? [PUBLIC_URL] : [];
   assert.deepEqual(failedUrls, expectedFailures);
-  assert.equal(requests.length, endpoints.length + 1);
-  assert.deepEqual(requests[0], { url: PUBLIC_URL, method: 'GET', redirect: 'manual' });
-  assert.deepEqual(requests.slice(1), endpoints.map((name) => ({
+  const expected = [{ url: PUBLIC_URL, method: 'GET', redirect: 'manual' }, ...endpoints.map((name) => ({
     url: `https://us-central1-demo-run-of-show.cloudfunctions.net/${name}`,
     method: 'OPTIONS',
     redirect: 'manual',
-  })));
+  }))];
+  const retryUrl = (networkError || [500, 503].includes(failedEndpoint ? status : publicStatus)) ? expectedFailures[0] : null;
+  assert.deepEqual(requests.map(({ signal, ...request }) => {
+    assert.ok(signal instanceof AbortSignal);
+    return request;
+  }),
+    expected.flatMap((request) => request.url === retryUrl ? [request, request] : [request]));
   return exitCode;
 }
 
 test('smoke accepts the real POST-only webhook guards without submitting deliveries', async (t) => {
   assert.equal(await runSmoke(t), 0);
+});
+
+for (const failure of ['transport', 'unavailable']) {
+  test(`one transient ${failure} failure can recover`, async (t) => {
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () => {
+      calls += 1;
+      if (calls === 1) {
+        if (failure === 'transport') throw new Error('Connection reset');
+        return new Response(null, { status: 503 });
+      }
+      return new Response(null, { status: 204 });
+    });
+    assert.deepEqual(await probe(PUBLIC_URL, { method: 'OPTIONS' }),
+      { url: PUBLIC_URL, ok: true, status: 204, error: null });
+    assert.equal(calls, 2);
+  });
+}
+
+test('a request with no response is aborted on both bounded attempts', { timeout: 5000 }, async (t) => {
+  let aborted = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => { aborted += 1; reject(signal.reason); }, { once: true });
+  }));
+  const result = await probe(PUBLIC_URL, { timeoutMs: 5 });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, null);
+  assert.equal(result.error, 'request timed out after 5 ms');
+  assert.equal(aborted, 2);
+});
+
+test('a transient response never retries a method that can write', async (t) => {
+  const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 503 }));
+  assert.equal((await probe(PUBLIC_URL, { method: 'POST' })).ok, false);
+  assert.equal(fetch.mock.calls.length, 1);
 });
 
 for (const name of [...Object.keys(webhooks), 'getSiteContent']) {

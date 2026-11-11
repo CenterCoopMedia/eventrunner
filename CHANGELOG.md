@@ -866,6 +866,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Deployment smoke requests have a 10-second deadline and retry a transient
+  GET/OPTIONS failure once. Persistent and deterministic failures still stop
+  the workflow (#817).
 - Function deployment logs record each deployed function's runtime account and
   secret binding names from the complete inventory, without secret values or
   extra cloud reads (#816).
