@@ -1031,15 +1031,22 @@ async function stepEnvironment(ctx) {
   ctx.vars = deployVariables(ctx);
   const { EVENT_STRIPE_ACCOUNT_ID: stripeAccountId, ...variables } = ctx.vars;
   if (stripeAccountId) {
-    const sodium = require('libsodium-wrappers');
-    await sodium.ready;
-    const key = await call(ctx, 'read the Environment encryption key', `${base}/secrets/public-key`, { headers, quiet: true });
-    const encrypted = sodium.crypto_box_seal(Buffer.from(stripeAccountId), Buffer.from(key.key, 'base64'));
-    await call(ctx, 'write the Stripe account identifier', `${base}/secrets/EVENT_STRIPE_ACCOUNT_ID`, {
-      method: 'PUT', headers, quiet: true,
-      json: { key_id: key.key_id, encrypted_value: Buffer.from(encrypted).toString('base64') },
-    });
-    notes.push('wrote the masked Stripe account identifier');
+    const secretUrl = `${base}/secrets/EVENT_STRIPE_ACCOUNT_ID`;
+    const secret = await call(ctx, 'read the Stripe identifier metadata', secretUrl, { headers, quiet: true, allow: [404] });
+    const binding = `${environment}:${stripeAccountId}`;
+    // GitHub exposes secret metadata, so the private build record retains the last value written.
+    if (!secret || ctx.stripeEnvironmentBinding !== binding) {
+      const sodium = require('libsodium-wrappers');
+      await sodium.ready;
+      const key = await call(ctx, 'read the Environment encryption key', `${base}/secrets/public-key`, { headers, quiet: true });
+      const encrypted = sodium.crypto_box_seal(Buffer.from(stripeAccountId), Buffer.from(key.key, 'base64'));
+      await call(ctx, 'write the Stripe account identifier', secretUrl, {
+        method: 'PUT', headers, quiet: true,
+        json: { key_id: key.key_id, encrypted_value: Buffer.from(encrypted).toString('base64') },
+      });
+      await ctx.recordRef.update({ stripeEnvironmentBinding: binding });
+      notes.push('wrote the masked Stripe account identifier');
+    }
   }
   let written = 0;
   for (const [name, value] of Object.entries(variables)) {
@@ -1410,6 +1417,7 @@ async function provision({ appId, testMode = false, deps }) {
     ticketsChangedAt: previous.exists ? previous.data().ticketsChangedAt || null : null,
     stripeEndpointId: previous.exists ? previous.data().stripeEndpointId || null : null,
     stripeEndpointOwner: previous.exists ? previous.data().stripeEndpointOwner || null : null,
+    stripeEnvironmentBinding: previous.exists ? previous.data().stripeEnvironmentBinding || null : null,
     resources: previous.exists ? previous.data().resources || {} : {},
   };
   // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
@@ -1432,6 +1440,7 @@ async function provision({ appId, testMode = false, deps }) {
       ticketsChangedAt: ctx.ticketsChangedAt,
       stripeEndpointId: ctx.stripeEndpointId,
       stripeEndpointOwner: ctx.stripeEndpointOwner,
+      stripeEnvironmentBinding: ctx.stripeEnvironmentBinding,
       environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
       resources: ctx.resources,
     });
