@@ -25,8 +25,7 @@
  *   • Clearing it on revocation is the other half: §3.4 calls an admin
  *     revocation "explicit and separate: it clears `approvalSource` and sets
  *     `revoked` directly, so it is never undone by a later ticket sync."
- *     Recomputation cannot leave `revoked` (the table has no
- *     `revoked → ticketed` edge, and `revoked → approved` needs
+ *     Recomputation cannot leave an admin revocation (`revoked → approved` needs
  *     `admin_reapproval`), so re-approval is an organizer's decision, made
  *     here.
  *
@@ -144,6 +143,10 @@ async function applyRevokeUser({ db, uid, now = () => new Date() }) {
     const current = data.registrationStatus ?? null;
 
     if (current === 'revoked') {
+      if (data.revocationReason === 'entitlement_lost') {
+        tx.set(ref, { revocationReason: 'admin_revocation', updatedAt: now() }, { merge: true });
+        return { ok: true, changed: true, registrationStatus: 'revoked', approvalSource: null, previousStatus: current };
+      }
       return {
         ok: true,
         changed: false,
@@ -162,7 +165,7 @@ async function applyRevokeUser({ db, uid, now = () => new Date() }) {
     }
     tx.set(
       ref,
-      { registrationStatus: 'revoked', approvalSource: null, updatedAt: now() },
+      { registrationStatus: 'revoked', approvalSource: null, revocationReason: 'admin_revocation', updatedAt: now() },
       { merge: true },
     );
     return {

@@ -398,7 +398,7 @@ function fakeCloud(options = {}) {
 }
 
 /** One request and everything the builder is handed. */
-function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding/         3 uploaded, 0 skipped', env = {}, initCode = 0 } = {}) {
+function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding/         4 uploaded, 0 protected, 0 errors', env = {}, initCode = 0 } = {}) {
   const fake = fakeCloud(cloud);
   const db = seeded({
     'applications/a1': application({ status: 'approved', buildStart: { state: 'started', at: new Date(NOW - 1000) }, ...app }),
@@ -491,21 +491,36 @@ test('each grant the rehearsal missed is made up front', async () => {
   assert.ok(holds(project, `projects/${PROJECT}/roles/eventrunnerDeployInvoker`, deploy), 'the invoker role');
   assert.ok(fake.state.role.includedPermissions.includes('run.services.setIamPolicy'));
   assert.ok(holds(bindingsOf(fake, `${iam}/${COMPUTE}`), 'roles/iam.serviceAccountUser', deploy), 'act as compute');
-  assert.ok(holds(bindingsOf(fake, `${iam}/${PROJECT}@appspot.gserviceaccount.com`), 'roles/iam.serviceAccountUser', deploy), 'act as appspot');
+  assert.ok(holds(bindingsOf(fake, `${iam}/${PROJECT}@appspot.gserviceaccount.com`), 'roles/iam.serviceAccountUser', deploy), 'appspot actAs for the Firebase deploy preflight');
 
   assert.ok(fake.state.identities.some((service) => service === 'storage.googleapis.com'), 'the storage agent is made first');
   assert.ok(holds(project, 'roles/pubsub.publisher', `serviceAccount:service-${NUMBER}@gs-project-accounts.iam.gserviceaccount.com`));
   assert.ok(holds(project, 'roles/iam.serviceAccountTokenCreator', `serviceAccount:service-${NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com`));
   assert.ok(holds(project, 'roles/run.invoker', `serviceAccount:${COMPUTE}`));
   assert.ok(holds(project, 'roles/eventarc.eventReceiver', `serviceAccount:${COMPUTE}`));
+  for (const role of ['roles/datastore.user', 'roles/firebaseauth.admin', 'roles/firebasehosting.admin', 'roles/cloudbuild.builds.builder']) {
+    assert.ok(holds(project, role, `serviceAccount:${COMPUTE}`), role);
+  }
+  assert.equal(holds(project, 'roles/editor', `serviceAccount:${COMPUTE}`), false);
   assert.ok(holds(bindingsOf(fake, `${iam}/${COMPUTE}`), 'roles/iam.serviceAccountTokenCreator', `serviceAccount:${COMPUTE}`), 'compute signs as itself');
 });
 
-test('a project with no appspot account still builds, and says so', async () => {
+test('a new project provisions compute secret access and actAs without an appspot account', async () => {
   const fake = setup({ cloud: { noAppspot: true } });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
-  const step = fake.db.read('console_builds/a1').steps.find((s) => s.id === 'deploy-identity');
-  assert.match(step.detail, /no appspot account/);
+  const appspot = `${PROJECT}@appspot.gserviceaccount.com`;
+  assert.ok(!fake.calls.some((call) => {
+    const url = new URL(call.url);
+    const [account, action] = url.pathname.split('/').at(-1).split(':');
+    return url.hostname === 'iam.googleapis.com' && account === appspot && action === 'setIamPolicy';
+  }));
+  const deploy = `serviceAccount:${DEPLOY}`;
+  assert.ok(holds(bindingsOf(fake, `iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/${COMPUTE}`), 'roles/iam.serviceAccountUser', deploy));
+  for (const id of fake.clientSecrets.store.keys()) {
+    const policy = bindingsOf(fake, `secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets/${id}`);
+    assert.ok(holds(policy, 'roles/secretmanager.secretAccessor', `serviceAccount:${COMPUTE}`), id);
+    assert.ok(policy.every((binding) => binding.members.every((member) => member !== `serviceAccount:${appspot}`)));
+  }
 });
 
 test('a new agent that IAM does not know yet is tried again, then the grant lands', async () => {
@@ -736,6 +751,7 @@ test('the Environment allows main only, needs the App, and holds variables the d
   assert.equal(variables.EVENT_PUBLIC_URL, `https://${DOMAIN}`);
   assert.equal(variables.EVENT_STRIPE_ACCOUNT_ID, 'acct_1');
   assert.equal(variables.EVENT_STRIPE_MODE, 'live');
+  assert.equal(variables.EVENT_OPERATOR_NOTIFIER, 'email');
 });
 
 test('it deploys in the bootstrap order, and seeds between the two deploys', async () => {
@@ -751,6 +767,9 @@ test('it deploys in the bootstrap order, and seeds between the two deploys', asy
     '--admin', 'ana@example.org', '--admin', 'bo@example.org', '--staff', 'ben@example.org',
   ]);
   assert.equal(fake.answersWritten[0].providers.email.announcementStream, 'announcements');
+  assert.deepEqual(fake.answersWritten[0].providers.notifier, {
+    operatorEmail: 'amditisj@montclair.edu',
+  });
   assert.equal(fake.answersWritten[0].event.sender.email.endsWith(`@${DOMAIN}`), true);
 });
 
@@ -921,18 +940,18 @@ test('init-event gets no foreign quota project, and no credential it does not ne
   assert.equal(env.EVENT_STORAGE_BUCKET, `${PROJECT}.firebasestorage.app`);
 });
 
-test('a skipped branding line is a failure, though init-event exits 0', async () => {
-  const fake = setup({ branding: '  branding/         1 uploaded, 2 skipped\n    warning: branding/logo.svg: User project specified in the request is invalid' });
+test('a branding error is a failure, though init-event exits 0', async () => {
+  const fake = setup({ branding: '  branding/         1 uploaded, 1 protected, 2 errors\n    warning: branding/logo.svg: User project specified in the request is invalid' });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
   const record = fake.db.read('console_builds/a1');
   assert.equal(record.failedStep, 'seed');
-  assert.match(record.error, /skipped branding uploads/);
+  assert.match(record.error, /branding uploads failed/);
   const stored = (await fake.clientFirestore.collection('config').doc('event').get()).data();
   assert.notEqual(stored.sender.domainVerified, true, 'an unstamped site is seeded again');
 });
 
 test('a retry after a seed failure seeds again with --force', async () => {
-  const fake = setup({ branding: '  branding/         0 uploaded, 3 skipped' });
+  const fake = setup({ branding: '  branding/         0 uploaded, 0 protected, 4 errors' });
   await provision({ appId: 'a1', deps: fake.deps });
   fake.commands.length = 0;
   await provision({ appId: 'a1', deps: fake.deps }).catch(() => {});
@@ -954,9 +973,16 @@ test('a retry builds in the region and folder the first run chose, even after th
 });
 
 test('brandingProblem reads the line init-event prints', () => {
-  assert.equal(brandingProblem('  branding/         3 uploaded, 0 skipped\n'), null);
-  assert.match(brandingProblem('  branding/         skipped (--skip-branding)\n'), /skipped/);
+  assert.equal(brandingProblem('  branding/         4 uploaded, 0 protected, 0 errors\n'), null);
+  assert.equal(brandingProblem('  branding/         3 uploaded, 1 protected, 0 errors\n'), null);
+  assert.match(brandingProblem('  branding/         skipped (--skip-branding)\n'), /result was missing/);
   assert.match(brandingProblem('nothing here'), /no branding line/);
+});
+
+test('a preserved client logo does not fail a build retry', async () => {
+  const fake = setup({ branding: '  branding/         3 uploaded, 1 protected, 0 errors' });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.db.read('applications/a1').status, 'ready');
 });
 
 test('init-event exiting with an error fails the step', async () => {

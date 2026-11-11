@@ -119,10 +119,9 @@ async function holdsPaidTicket({ db, tx, uid }) {
  *
  *   • `pending` never becomes `revoked` — there is no such edge. An account
  *     that never held a ticket simply stays `pending`.
- *   • `revoked` is terminal here. `revoked → approved` exists only under
- *     `admin_reapproval`, so a later ticket sync can never undo an admin
- *     revocation (§3.4: "An admin revocation is explicit and separate …  so
- *     it is never undone by a later ticket sync").
+ *   • Only an `entitlement_lost` revocation can return to `ticketed` when a
+ *     valid ticket returns. An explicit or unclassified admin revocation
+ *     stays revoked until admin reapproval.
  *   • Auto-approval writes `approvalSource: 'ticket'`, NEVER `'admin'`:
  *     only an explicit organizer decision may survive a refund.
  *
@@ -133,8 +132,7 @@ async function holdsPaidTicket({ db, tx, uid }) {
  * when the user is not entitled but still holds a `pending_info` ticket, the
  * account is HELD at its current state instead of being revoked.
  * `pending_info` is §3.3's explicit "we do not know yet" bucket (it is also
- * where every unrecognized provider status lands), `revoked` is terminal for
- * this function by the rule above, and a claimed ticket can become
+ * where every unrecognized provider status lands), and a claimed ticket can become
  * `pending_info` later, when a sync can no longer describe it. Revoking on
  * ignorance would strand that holder in a state only an admin could leave
  * (a claim itself needs a `valid` ticket, registration.cjs). Revocation
@@ -192,6 +190,8 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
     }
 
     if (entitled) {
+      if (hasValidTicket && data.revocationReason === 'entitlement_lost' &&
+          isValidTransition(current, 'ticketed', 'ticket_restored')) next = 'ticketed';
       // A claimed ticket is what makes a pending account `ticketed`; the
       // flag is what may then carry it to `approved` (§3.4 table).
       if (hasValidTicket && isValidTransition(current, 'ticketed', 'ticket_claimed')) {
@@ -225,7 +225,8 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
     }
     tx.set(
       userRef,
-      { registrationStatus: next, approvalSource: nextSource, updatedAt: now() },
+      { registrationStatus: next, approvalSource: nextSource,
+        revocationReason: next === 'revoked' ? 'entitlement_lost' : null, updatedAt: now() },
       { merge: true },
     );
     return { uid, action: 'updated', registrationStatus: next, approvalSource: nextSource };
@@ -249,13 +250,20 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
  * @returns {(change: { before?: object|null, after?: object|null }) =>
  *   Promise<{ recomputed: Array<object> }>}
  */
-function createOnTicketWritten({ db, now = () => new Date(), log = console }) {
+function createOnTicketWritten({ db, now = () => new Date(), log = console, notifyOperator }) {
   return async function onTicketWritten({ before = null, after = null } = {}) {
     const uids = affectedUids(before, after);
     const recomputed = [];
     for (const uid of uids) {
       try {
-        recomputed.push(await recomputeEntitlement({ db, uid, now }));
+        const result = await recomputeEntitlement({ db, uid, now });
+        recomputed.push(result);
+        const newlyValid = after?.claimedByUid === uid && after?.status === VALID &&
+          (before?.claimedByUid !== uid || before?.status !== VALID);
+        if (newlyValid && result.registrationStatus === 'ticketed' && notifyOperator) {
+          await notifyOperator({ kind: 'approval-required', title: 'A ticket holder is waiting for approval',
+            summary: 'Review this account in Attendees.', fields: { uid }, dedupeKey: `approval-required:${uid}` });
+        }
       } catch (err) {
         // Name the account before rethrowing: the retry is automatic, but an
         // operator reading logs needs to know whose entitlement is stale.
@@ -293,6 +301,8 @@ function createOnApprovalPolicyWritten({ db, now = () => new Date() }) {
 /** Deployable exports: ticket and approval-policy reconciliation triggers. */
 function buildHandlers() {
   const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+  const { defineSecret } = require('firebase-functions/params');
+  const { notifierSecretNames } = require('../telemetry/systemErrors.cjs').internals;
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
 
   return {
@@ -310,6 +320,7 @@ function buildHandlers() {
     }),
     onTicketWritten: onDocumentWritten({
       region,
+      secrets: notifierSecretNames(process.env).map(defineSecret),
       // Same crash-recovery model as the projection triggers: a dropped
       // delivery would leave an account entitled after a refund (or shut out
       // after a claim), and the recomputation is idempotent by construction.
@@ -322,7 +333,8 @@ function buildHandlers() {
       const after = event.data?.after;
       // The snapshots are used ONLY to identify the affected accounts — the
       // handler re-reads every value it acts on.
-      await createOnTicketWritten({ db })({
+      const { notifyOperator } = require('../telemetry/systemErrors.cjs').internals.buildNotifyDeps();
+      await createOnTicketWritten({ db, notifyOperator })({
         before: before && before.exists ? before.data() : null,
         after: after && after.exists ? after.data() : null,
       });

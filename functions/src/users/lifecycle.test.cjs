@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const {
   buildNewUserDoc,
@@ -431,25 +433,59 @@ test('a config read that fails, or a refused send, leaves the account written an
   assert.equal(errors.length, 1);
 });
 
-test('only onUserCreated binds the send secrets, and building the handlers builds no email provider', () => {
-  const saved = { provider: process.env.EVENT_EMAIL_PROVIDER, project: process.env.GCLOUD_PROJECT };
+test('Auth handlers use the compute runtime, and only onUserCreated binds send secrets without building a provider', () => {
+  const saved = { provider: process.env.EVENT_EMAIL_PROVIDER, project: process.env.GCLOUD_PROJECT, runtime: process.env.EVENT_COMPUTE_SERVICE_ACCOUNT, emulator: process.env.FUNCTIONS_EMULATOR };
   // A postmark deployment: getEmailProvider would throw here with no API key,
   // so a handler built eagerly would fail this test.
   process.env.EVENT_EMAIL_PROVIDER = 'postmark';
   // v1 functions read their endpoint lazily and need a project id.
   process.env.GCLOUD_PROJECT = saved.project || 'demo-run-of-show';
+  process.env.EVENT_COMPUTE_SERVICE_ACCOUNT = '555000111-compute@developer.gserviceaccount.com';
+  process.env.FUNCTIONS_EMULATOR = 'false';
   try {
     const { handlers } = require('./lifecycle.cjs');
     const secretsOf = (fn) => (fn.__endpoint?.secretEnvironmentVariables ?? []).map((s) => s.key);
     assert.deepEqual(secretsOf(handlers.onUserCreated), ['EMAIL_PROVIDER_API_KEY']);
     assert.equal(handlers.onUserCreated.__endpoint.eventTrigger.retry, true);
     assert.deepEqual(secretsOf(handlers.onUserDeleted), []);
+    for (const fn of [handlers.onUserCreated, handlers.onUserDeleted]) {
+      assert.equal(fn.__endpoint.platform, 'gcfv1');
+      assert.equal(fn.__endpoint.serviceAccountEmail.value(), '555000111-compute@developer.gserviceaccount.com');
+      assert.equal(fn.__endpoint.eventTrigger.retry, true);
+    }
   } finally {
-    for (const [key, name] of [['provider', 'EVENT_EMAIL_PROVIDER'], ['project', 'GCLOUD_PROJECT']]) {
+    for (const [key, name] of [['provider', 'EVENT_EMAIL_PROVIDER'], ['project', 'GCLOUD_PROJECT'], ['runtime', 'EVENT_COMPUTE_SERVICE_ACCOUNT'], ['emulator', 'FUNCTIONS_EMULATOR']]) {
       if (saved[key] === undefined) delete process.env[name];
       else process.env[name] = saved[key];
     }
   }
+});
+
+test('real SDK emulator discovery declares no cloud runtime param and preserves Auth behavior', () => {
+  const script = `
+    const path = require('node:path');
+    const sdk = path.dirname(require.resolve('firebase-functions'));
+    const { loadStack } = require(path.join(sdk, '../runtime/loader.js'));
+    loadStack(path.resolve('functions')).then((stack) => {
+      const created = stack.endpoints.onUserCreated;
+      const deleted = stack.endpoints.onUserDeleted;
+      console.log(JSON.stringify({
+        params: (stack.params || []).map((param) => param.name),
+        createdSecrets: created.secretEnvironmentVariables.map((secret) => secret.key),
+        retry: [created.eventTrigger.retry, deleted.eventTrigger.retry],
+      }));
+    }).catch(() => process.exit(1));
+  `;
+  const output = execFileSync(process.execPath, ['-e', script], {
+    cwd: path.resolve(__dirname, '../../..'),
+    env: { ...process.env, GCLOUD_PROJECT: 'demo-runtime-contract', FUNCTIONS_EMULATOR: 'true', EVENT_EMAIL_PROVIDER: 'postmark', EVENT_COMPUTE_SERVICE_ACCOUNT: '' },
+    timeout: 5000,
+    encoding: 'utf8',
+  });
+  const result = JSON.parse(output);
+  assert.ok(!result.params.includes('EVENT_COMPUTE_SERVICE_ACCOUNT'));
+  assert.deepEqual(result.createdSecrets, ['EMAIL_PROVIDER_API_KEY']);
+  assert.deepEqual(result.retry, [true, true]);
 });
 
 test('an Owner or an Editor on config/bootstrap gets no welcome email, and the account is still written', async () => {

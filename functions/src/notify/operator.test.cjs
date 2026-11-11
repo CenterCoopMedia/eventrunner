@@ -103,6 +103,37 @@ test('dispatches to the email sink with operatorEmail from config/providers', as
   assert.equal(sendEmail.calls[0].subject, '[ex27] ERROR: [EX27] db down');
 });
 
+test('client-actionable alerts reach owners and platform; platform faults stay with the operator', async () => {
+  const sendEmail = fakeSendEmail();
+  const notifier = createOperatorNotifier({ env: EMAIL_ENV, sendEmail,
+    getConfig: fakeGetConfig({ bootstrap: { adminEmails: ['owner@example.com', 'OPS@example.com'] }, providers: { notifier: {
+      operatorEmail: 'ops@example.com',
+    } } }),
+  });
+  for (const kind of ['ticket-order', 'approval-required']) {
+    sendEmail.calls.length = 0;
+    assert.equal((await notifier.notify({ ...EVENT, kind })).delivered, true);
+    assert.deepEqual(sendEmail.calls.map((message) => message.to).sort(), ['ops@example.com', 'owner@example.com']);
+  }
+  sendEmail.calls.length = 0;
+  await notifier.notify(EVENT);
+  assert.deepEqual(sendEmail.calls.map((message) => message.to), ['ops@example.com']);
+});
+
+test('owner routing follows the current access list instead of an old seed copy', async () => {
+  let owners = ['old@example.com'];
+  const sendEmail = fakeSendEmail();
+  const notifier = createOperatorNotifier({ env: EMAIL_ENV, sendEmail,
+    getConfig: async () => ({ ...CONFIG, bootstrap: { adminEmails: owners } }),
+  });
+  await notifier.notify({ ...EVENT, kind: 'ticket-order' });
+  assert.ok(sendEmail.calls.some((message) => message.to === 'old@example.com'));
+  owners = ['new@example.com'];
+  sendEmail.calls.length = 0;
+  await notifier.notify({ ...EVENT, kind: 'ticket-order' });
+  assert.deepEqual(sendEmail.calls.map((message) => message.to).sort(), ['new@example.com', 'ops@example.com']);
+});
+
 test("'none' (and unset) short-circuits without loading config", async () => {
   let configLoads = 0;
   const getConfig = async () => {

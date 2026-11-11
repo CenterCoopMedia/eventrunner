@@ -75,6 +75,10 @@ async function applyTicketClaimToUser({ db, uid, now = () => new Date() }) {
 
     let next = current;
     const patch = { updatedAt: now() };
+    if (snap.data()?.revocationReason === 'entitlement_lost' && isValidTransition(current, 'ticketed', 'ticket_restored')) {
+      next = 'ticketed';
+      patch.revocationReason = null;
+    }
     if (isValidTransition(current, 'ticketed', 'ticket_claimed')) {
       next = 'ticketed';
     }

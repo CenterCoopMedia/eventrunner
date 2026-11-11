@@ -728,7 +728,9 @@ async function runInit({
     console.log('  branding/         skipped (--skip-branding)');
   } else {
     const branding = await uploadPlaceholderBranding({ bucket, dryRun });
-    console.log(`  branding/         ${branding.uploaded.length} uploaded, ${branding.skipped.length} skipped`);
+    const errors = branding.skipped.filter((item) => item.kind === 'error').length;
+    const protectedAssets = branding.skipped.length - errors;
+    console.log(`  branding/         ${branding.uploaded.length} uploaded, ${protectedAssets} protected, ${errors} errors`);
     for (const s of branding.skipped) {
       // A slot holding a client's own asset is the system working, not a
       // problem; only a real upload failure is worth a warning.

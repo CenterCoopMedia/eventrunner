@@ -31,6 +31,7 @@ const TRANSITIONS = [
   { from: 'approved', to: 'revoked', triggers: ['admin_revocation', 'entitlement_lost'] },
   { from: 'ticketed', to: 'revoked', triggers: ['admin_revocation', 'entitlement_lost'] },
   { from: 'revoked', to: 'approved', triggers: ['admin_reapproval'] },
+  { from: 'revoked', to: 'ticketed', triggers: ['ticket_restored'] },
 ];
 
 /**

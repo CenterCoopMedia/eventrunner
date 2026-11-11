@@ -33,6 +33,7 @@ const { toMillis } = require('../console/functions/src/access.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('../console/functions/src/consoleSettings.cjs');
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
+const { stripeErrorDetails } = require('../functions/src/ticketing/stripeErrors.cjs');
 const { historyEntry } = require('../console/functions/src/applications.cjs');
 const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
 const { BUILD_COLLECTION } = require('../console/functions/src/buildRetry.cjs');
@@ -122,6 +123,17 @@ const DEPLOY_ROLES = Object.freeze([
   'roles/serviceusage.serviceUsageConsumer',
   'roles/storage.admin',
 ]);
+const COMPUTE_ROLES = Object.freeze([
+  // Account lifecycle, OTP challenges, configuration, and application data.
+  'roles/datastore.user',
+  // OTP sign-in creates and verifies accounts; account deletion removes them.
+  'roles/firebaseauth.admin',
+  // Settings and the hourly custom-domain check manage Firebase Hosting domains.
+  'roles/firebasehosting.admin',
+  // The default build account reads source, writes images and build logs.
+  // This role also covers the runtime's Storage object reads and writes.
+  'roles/cloudbuild.builds.builder',
+]);
 
 // Who a project or an Environment was made for, so a build never takes over another's.
 const OWNER_LABEL = 'eventrunner-request';
@@ -208,7 +220,11 @@ async function call(ctx, label, url, { method = 'GET', headers = {}, json, form,
     }
     if (response.ok) return body;
     const said = quiet ? '' : body.error?.message || body.errors?.[0]?.message || body.Message || body.message || '';
-    const err = new Error(`${label}: HTTP ${response.status}${said ? ` ${String(said).slice(0, 300)}` : ''}`);
+    const stripeDetails = url.startsWith(`${STRIPE}/`) ? stripeErrorDetails({
+      ...body.error, statusCode: response.status, requestId: response.headers?.get?.('request-id'),
+    }) : null;
+    const diagnostic = stripeDetails ? ` ${JSON.stringify(stripeDetails)}` : '';
+    const err = new Error(`${label}: HTTP ${response.status}${diagnostic}${said ? ` ${String(said).slice(0, 300)}` : ''}`);
     err.status = response.status;
     throw err;
   }
@@ -471,6 +487,7 @@ async function stepDeployIdentity(ctx) {
   const rulesAgent = serviceAccount(`service-${projectNumber}@gcp-sa-firebasestorage.iam.gserviceaccount.com`);
   const added = await grant(ctx, 'project roles', projectResource(ctx), [
     ...[...DEPLOY_ROLES, `projects/${projectId}/roles/${INVOKER_ROLE}`].map((name) => ({ role: name, member: deployMember })),
+    ...COMPUTE_ROLES.map((role) => ({ role, member: serviceAccount(compute) })),
     { role: 'roles/pubsub.publisher', member: storageAgent },
     { role: 'roles/iam.serviceAccountTokenCreator', member: pubsubAgent },
     { role: 'roles/firebaserules.firestoreServiceAgent', member: rulesAgent },
@@ -486,9 +503,10 @@ async function stepDeployIdentity(ctx) {
   });
   if (added > 0) notes.push(`added ${added} project roles`);
 
-  // Deploying a function acts as its runtime account, which is one of these two.
+  // Both function generations use the compute runtime account.
   const actAs = [{ role: 'roles/iam.serviceAccountUser', member: deployMember }];
   if (await grant(ctx, 'act as the compute account', accountResource(ctx, compute), actAs)) notes.push('let deploy act as the compute account');
+  // firebase-tools checkServiceAccountIam also requires appspot actAs before every Functions deploy.
   const appspot = `${projectId}@appspot.gserviceaccount.com`;
   if (await google(ctx, 'read the appspot account', accountResource(ctx, appspot), { allow: [404] })) {
     if (await grant(ctx, 'act as the appspot account', accountResource(ctx, appspot), actAs)) notes.push('let deploy act as the appspot account');
@@ -895,7 +913,7 @@ function deployVariables(ctx) {
     EVENT_STORAGE_BUCKET: bucket,
     EVENT_ALLOWED_ORIGINS: `https://${domain},https://${site}.web.app`,
     EVENT_EMAIL_PROVIDER: 'postmark',
-    EVENT_OPERATOR_NOTIFIER: 'none',
+    EVENT_OPERATOR_NOTIFIER: 'email',
     EVENT_APP_CHECK_ENFORCED: 'false',
     EVENT_OTP_SEND_CEILING_PER_HOUR: '500',
     EVENT_SITE_PUBLISHER_ENABLED: 'false',
@@ -1052,9 +1070,9 @@ function childEnv(ctx, extra = {}) {
 function brandingProblem(output) {
   const line = output.split('\n').find((text) => /^\s*branding\/\s/.test(text));
   if (!line) return 'it printed no branding line';
-  const skipped = Number(line.match(/(\d+) skipped/)?.[1] ?? NaN);
-  if (skipped === 0) return null;
-  return `it skipped branding uploads and still exited 0 (${line.trim()})`;
+  const errors = Number(line.match(/(\d+) errors/)?.[1] ?? NaN);
+  if (errors === 0) return null;
+  return `branding uploads failed or their result was missing (${line.trim()})`;
 }
 
 /**
@@ -1073,7 +1091,16 @@ async function stepSeed(ctx) {
     const emailsOf = (role) => members.docs.map((doc) => doc.data()).filter((member) => member.role === role).map((member) => member.email);
     const answers = toInitAnswers(frozen);
     if (answers.event.sender.email !== senderAddress(name)) throw new Error('the sender address does not match the web address');
-    const file = await writeAnswers({ ...answers, providers: { email: { announcementStream: ANNOUNCEMENT_STREAM } } });
+    // init-event prints its operator checklist into public Actions logs.
+    if (ctx.deps.env.GITHUB_ACTIONS === 'true') {
+      for (const email of [...emailsOf('owner'), ...emailsOf('editor')]) console.log(`::add-mask::${email}`);
+    }
+    const file = await writeAnswers({ ...answers, providers: {
+      email: { announcementStream: ANNOUNCEMENT_STREAM },
+      // The host specified this work inbox for platform alerts on every site.
+      // Site Owners are resolved from the current bootstrap access list.
+      notifier: { operatorEmail: 'amditisj@montclair.edu' },
+    } });
     const args = [
       'scripts/init-event.cjs', '--answers', file,
       ...emailsOf('owner').flatMap((email) => ['--admin', email]),
@@ -1124,6 +1151,7 @@ async function stepReady(ctx) {
       status: 'ready',
       eventName: ctx.eventName,
       adminLink: `https://${ctx.domain}/admin`,
+      note: 'Automatic ticket approval is off. Review ticket holders in Attendees, or enable Automatic ticket approval in Settings after you review the access policy.',
     });
     if (!sent) throw new Error('we could not email every Owner');
     ctx.ownersEmailedAt = new Date(ctx.deps.now());

@@ -103,6 +103,18 @@ describe('AdminAttendees', () => {
     expect(screen.queryByRole('button', { name: 'Revoke access' })).toBeNull();
   });
 
+  it('lets an organizer keep a refunded account blocked before another purchase', async () => {
+    callMock.mockResolvedValueOnce({ ok: true, changed: true, registrationStatus: 'revoked' });
+    render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
+    pushRows([row({ registrationStatus: 'revoked', revocationReason: 'entitlement_lost' })]);
+    expect(screen.getByText('Ticket access ended')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke access' }));
+    expect(screen.getByText(/A new ticket will not restore access/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke this person’s access' }));
+    await act(async () => { await Promise.resolve(); });
+    expect(callMock).toHaveBeenCalledWith('revokeUser', { uid: 'uid-ada' });
+  });
+
   it('filters by status and searches by name or email', () => {
     render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
     pushRows([
@@ -498,4 +510,3 @@ describe('AdminAttendees record and delete', () => {
     expect(screen.getByRole('button', { name: 'Try the delete again' })).toBeInTheDocument();
   });
 });
-

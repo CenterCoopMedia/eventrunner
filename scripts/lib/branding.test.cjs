@@ -64,13 +64,24 @@ test('a client-replaced asset is never overwritten by a placeholder', async () =
   assert.equal(bucket.uploads.includes('branding/logo.svg'), false);
 });
 
-test('unreadable metadata is treated as the client asset, not as ours', async () => {
+test('unreadable metadata prevents overwrite and reports an error', async () => {
   const file = {
     async exists() { return [true]; },
     async getMetadata() { throw new Error('permission denied'); },
   };
   const verdict = await mayOverwrite(file);
   assert.equal(verdict.overwrite, false);
+  assert.equal(verdict.kind, 'error');
+});
+
+test('an object read failure is reported without overwriting the object', async () => {
+  const bucket = fakeBucket();
+  bucket.file = () => ({ async exists() { throw new Error('permission denied'); } });
+  const result = await uploadPlaceholderBranding({ bucket: () => bucket });
+  assert.equal(result.uploaded.length, 0);
+  assert.equal(result.skipped.length, 4);
+  assert.ok(result.skipped.every((skip) => skip.kind === 'error'));
+  assert.deepEqual(bucket.uploads, []);
 });
 
 test('an absent object is always writable', async () => {

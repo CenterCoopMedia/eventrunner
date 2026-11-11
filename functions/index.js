@@ -5,6 +5,7 @@
 // export is re-exported here by name.
 
 require('./src/core/loadDeployEnv.cjs').loadDeployEnv();
+require('firebase-functions/v2').setGlobalOptions({ invoker: 'public' });
 
 const email = require('./src/email/send.cjs');
 const emailLog = require('./src/email/log.cjs');
