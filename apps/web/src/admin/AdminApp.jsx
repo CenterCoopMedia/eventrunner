@@ -81,6 +81,7 @@ const AdminAttendees = lazy(() => import('./pages/AdminAttendees.jsx'));
 // Change requests (issue #188): one screen behind one link, so it stays out
 // of the entry chunk the same way.
 const AdminChangeRequests = lazy(() => import('./pages/AdminChangeRequests.jsx'));
+const AdminFeedModeration = lazy(() => import('./pages/AdminFeedModeration.jsx'));
 // Materials gained the table, the archive and the coverage panel (issue
 // 189). One screen behind one link, loaded the same way.
 const AdminMaterialsTab = lazy(() => import('./pages/AdminMaterialsTab.jsx'));
@@ -344,6 +345,10 @@ export default function AdminApp() {
             element={<DeferredAdminPage label="announcements"><AdminAnnouncements /></DeferredAdminPage>}
           />
           <Route path="feedback" element={<AdminFeedback />} />
+          <Route
+            path="feed-moderation"
+            element={<DeferredAdminPage label="feed moderation"><AdminFeedModeration /></DeferredAdminPage>}
+          />
           <Route
             path="email-log"
             element={<DeferredAdminPage label="the email log"><AdminEmailLog /></DeferredAdminPage>}

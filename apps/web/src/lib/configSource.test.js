@@ -52,6 +52,35 @@ describe('subscribeConfigDoc', () => {
     expect(onNext).not.toHaveBeenCalled();
   });
 
+  it('reports confirmed, cached and gone to onStatus, listening for metadata changes', () => {
+    let capturedOptions;
+    let capturedSuccess;
+    let capturedError;
+    onSnapshotMock.mockImplementation((_ref, options, onSuccess, onError) => {
+      capturedOptions = options;
+      capturedSuccess = onSuccess;
+      capturedError = onError;
+      return vi.fn();
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const onNext = vi.fn();
+    const onStatus = vi.fn();
+    subscribeConfigDoc('features', onNext, onStatus);
+    expect(capturedOptions).toEqual({ includeMetadataChanges: true });
+    capturedSuccess({ exists: () => true, data: () => ({ socialFeed: true }), metadata: { fromCache: true } });
+    expect(onStatus).toHaveBeenLastCalledWith('cached');
+    capturedSuccess({ exists: () => true, data: () => ({ socialFeed: true }), metadata: { fromCache: false } });
+    expect(onStatus).toHaveBeenLastCalledWith('confirmed');
+    expect(onNext).toHaveBeenCalledTimes(2);
+    capturedSuccess({ exists: () => false, metadata: { fromCache: false } });
+    expect(onStatus).toHaveBeenLastCalledWith('gone');
+    capturedError(new Error('offline'));
+    expect(onStatus).toHaveBeenLastCalledWith('gone');
+    expect(onStatus).toHaveBeenCalledTimes(4);
+    warn.mockRestore();
+  });
+
   it('re-attaches a fresh listener after a delay when the listener errors', () => {
     let capturedError;
     let attachCount = 0;

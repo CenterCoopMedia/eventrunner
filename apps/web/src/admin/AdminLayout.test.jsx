@@ -319,7 +319,7 @@ describe('the admin shell', () => {
     // The Overview is the first link on the rail.
     expect(nav.querySelector('a')).toHaveTextContent('Overview');
     expect(nav.querySelector('a')).toHaveAttribute('href', '/admin/overview');
-    for (const group of DOCKET) {
+    for (const group of docketForTier('operator')) {
       for (const item of group.items) {
         // Absolute, so a section reached from another section is not a dead
         // route: a relative `to` resolves against the current location here.
@@ -329,14 +329,7 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Nine links above the base's sixteen (the Overview, issue #179, the
-    // Email log, issue #183, Change requests, issue #188, Organizations,
-    // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
-    // issue #195, Unpublished changes, issue #196, and Announcements,
-    // issue #199), Import records, Data export, issue #329, Invoices, issue
-    // #208, Scheduled reminders, issue #518, Set up your event, ADR 0007,
-    // Registration form, ADR 0008 §4, and Web address, ADR 0007 §8, every
-    // one a word. No icon rail, no glyph-only item.
+    // Every docket destination has a text label and its own link.
     expect(nav.querySelectorAll('a')).toHaveLength(33);
     expect(screen.getByRole('link', { name: 'Scheduled reminders' })).toHaveAttribute('href', '/admin/reminders');
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
@@ -413,7 +406,7 @@ describe('the admin shell', () => {
       'sessions', 'pitches', 'speakers', 'organizations',
       'attendees', 'ticketing', 'invoices', 'badges',
       'announcements', 'reminders', 'live-updates', 'email-log',
-      'import', 'feedback', 'change-requests', 'data-export',
+      'import', 'feedback', 'feed-moderation', 'change-requests', 'data-export',
       'settings',
     ]);
   });
@@ -515,8 +508,18 @@ describe('the admin shell', () => {
     ]);
     expect(staffDocket[0].items.map((item) => item.to)).toEqual(['overview', 'setup']);
     expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
-    expect(docketForTier('operator')).toEqual(DOCKET);
+    expect(docketForTier('operator')).toEqual(DOCKET.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.to !== 'feed-moderation'),
+    })));
     expect(docketForTier(null)).toEqual([]);
+  });
+
+  it('hides Feed moderation from the unreleased docket while retaining its staff route', async () => {
+    await renderAdmin();
+    openEveryGroup();
+    expect(screen.queryByRole('link', { name: 'Feed moderation', exact: true })).toBeNull();
+    expect(sectionTier('/admin/feed-moderation')).toBe('staff');
   });
 
   // The pending-changes banner (issue #196) sits above the stone, never

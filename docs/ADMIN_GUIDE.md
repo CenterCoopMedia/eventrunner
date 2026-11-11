@@ -29,7 +29,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, closing a flagged card payment, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, make a card payment link, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, make a card payment link, mark paid and duplicate), Import records, Feedback, Feed moderation, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Operators can change the sender name, reply-to address, social sharing image, and the announce and archive dates. Staff can read those values. Staff can read those values. No admin can change the from address or the mailing address in the email footer. Our team manages those settings on request.
 
@@ -931,6 +931,16 @@ Each row lists the emails of that request and their state: **Sent**, **Not sent*
 ### Response targets
 
 The system does not promise a reply time, and no email names one. Decide your own targets as policy, for example "acknowledge within two working days, and record an outcome within ten". Write them where your team and your visitors can read them, such as a page on the site. Use the **Open** filter to find requests that wait for a reply.
+
+## Feed moderation
+
+Open `/admin/feed-moderation` directly for cleanup. Staff and operators can review private reports and remove reported posts even when the attendee feed, attendee directory, or both are off. Attendees cannot read this report list or remove posts. A current staff or operator grant is required; a profile role alone grants no access.
+
+The list shows up to 50 reports at a time, newest first, grouped by post. **Refresh reports** reads the newest reports again. **Older reports** opens the next page; **Newest reports** returns to the beginning. Each row shows the reported post and how many reports for it appear on that page. Reporter identities are not displayed. Removed or unavailable posts keep a plain status in the list. Each refresh checks current access; an access denial clears the whole list.
+
+Choose **Remove post**, read the consequence, then choose **Remove this post**. **Keep it** or Escape cancels. Removal permanently clears the post text and author, leaving only a removed marker and its timestamps and thread link. The server records who removed it and when in the admin log, in the same transaction, without copying the removed text or author. Repeating a removal adds no second audit record. If removal fails, the post stays as it was; the row explains the failure and offers another try. A post already removed elsewhere also loses its text in this tab.
+
+The attendee feed remains off by default. Assign staff moderation before an operator opts an event in. This cleanup screen does not enable the feature. Features stays operator-only.
 
 ## Materials
 
