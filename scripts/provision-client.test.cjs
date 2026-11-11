@@ -652,6 +652,7 @@ test('the token is tested, moved, and deleted from the console, and the leftover
   const made = fake.calls.find((c) => c.method === 'POST' && c.url.endsWith('/v1/webhook_endpoints'));
   assert.equal(made.headers.Authorization, 'Bearer sk_live_ccm_platform');
   assert.equal(new URLSearchParams(made.body).get('connect'), 'true');
+  assert.equal(fake.db.read('console_builds/a1').stripeEndpointOwner, 'platform');
   assert.equal(fake.consoleSecrets.store.size, 0);
   const secretPolicy = bindingsOf(fake, `secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets/TICKETING_API_TOKEN`);
   assert.ok(holds(secretPolicy, 'roles/secretmanager.secretAccessor', `serviceAccount:${COMPUTE}`));

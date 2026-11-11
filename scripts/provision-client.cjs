@@ -854,7 +854,8 @@ async function stripeEndpoint(ctx, token, notes, connection) {
   if (!created.secret) throw new Error('create the payment webhook: the answer held no signing secret');
   await putClientSecret(ctx, WEBHOOK_SECRET, created.secret);
   ctx.stripeEndpointId = created.id;
-  await ctx.recordRef.update({ stripeEndpointId: created.id });
+  // Cleanup must use the credential that owns the endpoint.
+  await ctx.recordRef.update({ stripeEndpointId: created.id, stripeEndpointOwner: auth.connect ? 'platform' : 'account' });
   notes.push('created the payment webhook');
 }
 

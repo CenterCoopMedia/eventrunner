@@ -42,7 +42,7 @@ function setup(options = {}) {
   };
   const db = makeFakeDb({
     'applications/a1': app,
-    ...(!options.noBuild ? { 'console_builds/a1': { state: 'done', resources: RESOURCES, stripeEndpointId: 'we_own', environmentClaim: 'show', ...options.build } } : {}),
+    ...(!options.noBuild ? { 'console_builds/a1': { state: 'done', resources: RESOURCES, stripeEndpointId: 'we_own', stripeEndpointOwner: 'platform', environmentClaim: 'show', ...options.build } } : {}),
     'console_connections/a1': { eventbrite: { eventOrganizationId: 'org-fixture' } },
     'console_connection_states/s1': { appId: 'a1' },
     'console_connection_states/s2': { appId: 'other' },
@@ -169,7 +169,7 @@ function setup(options = {}) {
       }
       if (url.host === 'api.stripe.com') {
         if (p === '/v1/webhook_endpoints') {
-          assert.equal(init.headers.Authorization, options.build?.testMode ? 'Bearer client-fixture' : 'Bearer platform-fixture', 'a live site uses the platform key; a test site its deployed token');
+          assert.equal(init.headers.Authorization, (options.build?.stripeEndpointOwner ?? 'platform') === 'platform' ? 'Bearer platform-fixture' : 'Bearer client-fixture', 'a platform-owned endpoint uses the platform key; an account-owned one the deployed token');
           const offset = url.searchParams.has('starting_after') ? state.endpoints.findIndex((h) => h.id === url.searchParams.get('starting_after')) + 1 : 0;
           const data = options.paginate ? state.endpoints.slice(offset, offset + 1) : state.endpoints;
           return answer({ data, has_more: options.paginate && offset + data.length < state.endpoints.length });

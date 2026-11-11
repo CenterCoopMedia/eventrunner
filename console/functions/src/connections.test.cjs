@@ -665,6 +665,22 @@ test('connecting a different account keeps the old one when another request uses
   assert.deepEqual(stripe.revoked, []);
 });
 
+test('the same live Stripe account is refused for a second request', async () => {
+  const { stripe, deps } = sharing();
+  stripe.answer = stripeAnswer('acct_client1');
+  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
+});
+
+test('a disconnected site that still holds a platform endpoint keeps the one live Stripe slot', async () => {
+  const { db, deps } = setup();
+  await db.doc('console_builds/other').set({ state: 'done', stripeEndpointId: 'we_other', stripeEndpointOwner: 'platform' });
+  await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
+    assert.equal(err.status, 409);
+    assert.match(err.message, /one live Stripe account/);
+    return true;
+  });
+});
+
 test('a second live Stripe account is refused while another request holds one, and the new account is let go', async () => {
   const { stripe, secrets, deps } = sharing();
   await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
@@ -695,7 +711,8 @@ test('a half-made connection, a late refusal and a failed write all keep an acco
   assert.deepEqual(late.stripe.revoked, []);
 
   const write = sharing();
-  write.stripe.answer = stripeAnswer('acct_client1');
+  // Test mode: a second request cannot hold a live Stripe account.
+  write.stripe.answer = { ...stripeAnswer('acct_client1'), details: { livemode: false } };
   write.secrets.failWrite = true;
   await assert.rejects(complete(write.deps, { state: await start(write.deps) }), { status: 502 });
   assert.deepEqual(write.stripe.revoked, []);

@@ -399,9 +399,9 @@ async function ticketAccess(ctx) {
   if (!PROVIDERS.includes(choice)) return null;
   // The deployed copy owns the installed webhook; a console reconnect may
   // already hold a different account while a failed build waits for retry.
-  // A live Stripe site's endpoint is on CCM's platform account: Stripe refuses
-  // webhook endpoint calls made with a Connect OAuth token (see provision-client).
-  const token = choice === 'stripe' && !ctx.build?.testMode
+  // A Connect site's endpoint is on CCM's platform account, as the build
+  // recorded: Stripe refuses webhook endpoint calls made with a Connect OAuth token.
+  const token = choice === 'stripe' && ctx.build?.stripeEndpointOwner === 'platform'
     ? await ctx.deps.consoleSecrets.readSecret('CONSOLE_STRIPE_SECRET_KEY')
     : await ctx.deps.clientSecrets(ctx.resources.projectId).readSecret('TICKETING_API_TOKEN')
       || await ctx.deps.consoleSecrets.readSecret(connectionSecretId(ctx.appId, choice));
