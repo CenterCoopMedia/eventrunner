@@ -1385,7 +1385,7 @@ Use placeholders from your own records. Nothing below belongs in the repository.
 
 9. **Settings.** Set the client folder, billing account and region at `/review/settings` in the console, with the agreement. No signup link can be created until all four are set.
 
-10. **Check the organization's policies on the client folder.** A new organization may set `iam.automaticIamGrantsForDefaultServiceAccounts`, so the compute account gets no Editor role, and `iam.allowedPolicyMemberDomains`, which refuses the `allUsers` binding public functions need. The rehearsed project did not have these. Allow what the deployed site needs on the client folder, or the deploy fails.
+10. **Check the organization's policies on the client folder.** `iam.allowedPolicyMemberDomains` can refuse the `allUsers` binding public functions need. Allow public invocation on the client folder where required, or the deploy fails. Provisioning grants the compute account its required roles explicitly; it does not depend on automatic Editor grants.
 
 ### 12.2 When a build fails
 
@@ -1425,12 +1425,12 @@ The script does each of these, and sections 1 to 3 are wrong or silent on them. 
 - The deploy account also needs the custom role `eventrunnerDeployInvoker`, with `cloudfunctions.functions.setIamPolicy`, `firebaseextensions.instances.list`, `firebasestorage.defaultBucket.get`, `resourcemanager.projects.getIamPolicy` and `run.services.setIamPolicy`.
 - The deploy account needs `roles/iam.serviceAccountUser` on both the compute and the appspot service accounts, granted on each account and not on the project.
 - The storage service agent may not exist. Create it (`gcloud beta services identity create --service=storage.googleapis.com`), then grant it `roles/pubsub.publisher`. A new agent can take minutes to be accepted.
-- The deploy account cannot make these grants, so an owner makes them first: the pubsub agent gets `roles/iam.serviceAccountTokenCreator`, and the compute account gets `roles/run.invoker` and `roles/eventarc.eventReceiver`. The compute account also gets `roles/iam.serviceAccountTokenCreator` on itself for `createCustomToken`. That last one is unconfirmed, and granted anyway.
+- The provisioner makes the runtime grants before the first deploy. The compute account gets `roles/datastore.user` for Firestore and `roles/firebaseauth.admin` for account creation, verification and deletion. It also gets `roles/cloudbuild.builds.builder` for source reads, image writes and build logs; that role includes the Storage object operations the runtime uses. It needs no Editor grant. The existing Eventarc grants are `roles/run.invoker` and `roles/eventarc.eventReceiver`, and it gets `roles/iam.serviceAccountTokenCreator` on itself to sign custom tokens. The Pub/Sub agent gets `roles/iam.serviceAccountTokenCreator` for event delivery.
 - `cloudbilling.googleapis.com` must be on, and the deploy account cannot turn it on. `gcloud services enable` takes at most 20 at a time (`SU_MAX_BATCH_SIZE_EXCEEDED`).
 - The Hosting custom domain API is `v1beta1`. Firebase REST calls need the `x-goog-user-project` header.
 - The `gcf-artifacts` repository needs the cleanup policy `firebase-functions-cleanup` (`olderThan: 86400s`), set by an owner. The deploy account cannot set it, even with `--force`, and a run without `--force` then fails.
 - A first functions deploy can hit quota 429s and Eventarc agent failures on a few Firestore triggers. Run it again.
-- `init-event.cjs` exits 0 when branding uploads are skipped. Credentials with a `quota_project_id` from another project cause that ("User project specified in the request is invalid"), so clear the quota project and treat any skipped branding as a failure.
+- `init-event.cjs` reports uploaded placeholders, protected client assets and errors separately. The provisioner refuses a branding error or a missing result, while an existing client logo stays untouched and does not fail a retry. Clear a credential's `quota_project_id` from another project before seeding; it can cause Storage errors ("User project specified in the request is invalid").
 
 ### 12.4 What only a live run can prove
 

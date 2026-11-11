@@ -122,6 +122,15 @@ const DEPLOY_ROLES = Object.freeze([
   'roles/serviceusage.serviceUsageConsumer',
   'roles/storage.admin',
 ]);
+const COMPUTE_ROLES = Object.freeze([
+  // Account lifecycle, OTP challenges, configuration, and application data.
+  'roles/datastore.user',
+  // OTP sign-in creates and verifies accounts; account deletion removes them.
+  'roles/firebaseauth.admin',
+  // The default build account reads source, writes images and build logs.
+  // This role also covers the runtime's Storage object reads and writes.
+  'roles/cloudbuild.builds.builder',
+]);
 
 // Who a project or an Environment was made for, so a build never takes over another's.
 const OWNER_LABEL = 'eventrunner-request';
@@ -471,6 +480,7 @@ async function stepDeployIdentity(ctx) {
   const rulesAgent = serviceAccount(`service-${projectNumber}@gcp-sa-firebasestorage.iam.gserviceaccount.com`);
   const added = await grant(ctx, 'project roles', projectResource(ctx), [
     ...[...DEPLOY_ROLES, `projects/${projectId}/roles/${INVOKER_ROLE}`].map((name) => ({ role: name, member: deployMember })),
+    ...COMPUTE_ROLES.map((role) => ({ role, member: serviceAccount(compute) })),
     { role: 'roles/pubsub.publisher', member: storageAgent },
     { role: 'roles/iam.serviceAccountTokenCreator', member: pubsubAgent },
     { role: 'roles/firebaserules.firestoreServiceAgent', member: rulesAgent },
@@ -1053,9 +1063,9 @@ function childEnv(ctx, extra = {}) {
 function brandingProblem(output) {
   const line = output.split('\n').find((text) => /^\s*branding\/\s/.test(text));
   if (!line) return 'it printed no branding line';
-  const skipped = Number(line.match(/(\d+) skipped/)?.[1] ?? NaN);
-  if (skipped === 0) return null;
-  return `it skipped branding uploads and still exited 0 (${line.trim()})`;
+  const errors = Number(line.match(/(\d+) errors/)?.[1] ?? NaN);
+  if (errors === 0) return null;
+  return `branding uploads failed or their result was missing (${line.trim()})`;
 }
 
 /**

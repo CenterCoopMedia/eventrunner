@@ -398,7 +398,7 @@ function fakeCloud(options = {}) {
 }
 
 /** One request and everything the builder is handed. */
-function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding/         3 uploaded, 0 skipped', env = {}, initCode = 0 } = {}) {
+function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding/         4 uploaded, 0 protected, 0 errors', env = {}, initCode = 0 } = {}) {
   const fake = fakeCloud(cloud);
   const db = seeded({
     'applications/a1': application({ status: 'approved', buildStart: { state: 'started', at: new Date(NOW - 1000) }, ...app }),
@@ -498,6 +498,10 @@ test('each grant the rehearsal missed is made up front', async () => {
   assert.ok(holds(project, 'roles/iam.serviceAccountTokenCreator', `serviceAccount:service-${NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com`));
   assert.ok(holds(project, 'roles/run.invoker', `serviceAccount:${COMPUTE}`));
   assert.ok(holds(project, 'roles/eventarc.eventReceiver', `serviceAccount:${COMPUTE}`));
+  for (const role of ['roles/datastore.user', 'roles/firebaseauth.admin', 'roles/cloudbuild.builds.builder']) {
+    assert.ok(holds(project, role, `serviceAccount:${COMPUTE}`), role);
+  }
+  assert.equal(holds(project, 'roles/editor', `serviceAccount:${COMPUTE}`), false);
   assert.ok(holds(bindingsOf(fake, `${iam}/${COMPUTE}`), 'roles/iam.serviceAccountTokenCreator', `serviceAccount:${COMPUTE}`), 'compute signs as itself');
 });
 
@@ -932,18 +936,18 @@ test('init-event gets no foreign quota project, and no credential it does not ne
   assert.equal(env.EVENT_STORAGE_BUCKET, `${PROJECT}.firebasestorage.app`);
 });
 
-test('a skipped branding line is a failure, though init-event exits 0', async () => {
-  const fake = setup({ branding: '  branding/         1 uploaded, 2 skipped\n    warning: branding/logo.svg: User project specified in the request is invalid' });
+test('a branding error is a failure, though init-event exits 0', async () => {
+  const fake = setup({ branding: '  branding/         1 uploaded, 1 protected, 2 errors\n    warning: branding/logo.svg: User project specified in the request is invalid' });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
   const record = fake.db.read('console_builds/a1');
   assert.equal(record.failedStep, 'seed');
-  assert.match(record.error, /skipped branding uploads/);
+  assert.match(record.error, /branding uploads failed/);
   const stored = (await fake.clientFirestore.collection('config').doc('event').get()).data();
   assert.notEqual(stored.sender.domainVerified, true, 'an unstamped site is seeded again');
 });
 
 test('a retry after a seed failure seeds again with --force', async () => {
-  const fake = setup({ branding: '  branding/         0 uploaded, 3 skipped' });
+  const fake = setup({ branding: '  branding/         0 uploaded, 0 protected, 4 errors' });
   await provision({ appId: 'a1', deps: fake.deps });
   fake.commands.length = 0;
   await provision({ appId: 'a1', deps: fake.deps }).catch(() => {});
@@ -965,9 +969,16 @@ test('a retry builds in the region and folder the first run chose, even after th
 });
 
 test('brandingProblem reads the line init-event prints', () => {
-  assert.equal(brandingProblem('  branding/         3 uploaded, 0 skipped\n'), null);
-  assert.match(brandingProblem('  branding/         skipped (--skip-branding)\n'), /skipped/);
+  assert.equal(brandingProblem('  branding/         4 uploaded, 0 protected, 0 errors\n'), null);
+  assert.equal(brandingProblem('  branding/         3 uploaded, 1 protected, 0 errors\n'), null);
+  assert.match(brandingProblem('  branding/         skipped (--skip-branding)\n'), /result was missing/);
   assert.match(brandingProblem('nothing here'), /no branding line/);
+});
+
+test('a preserved client logo does not fail a build retry', async () => {
+  const fake = setup({ branding: '  branding/         3 uploaded, 1 protected, 0 errors' });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.db.read('applications/a1').status, 'ready');
 });
 
 test('init-event exiting with an error fails the step', async () => {

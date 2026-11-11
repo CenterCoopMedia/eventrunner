@@ -45,14 +45,14 @@ const BRANDING_ASSETS = Object.freeze({
  * version of exactly the clobber the Firestore path refuses.
  *
  * @param {object} file a Storage File handle
- * @returns {Promise<{ overwrite: boolean, reason: string }>}
+ * @returns {Promise<{ overwrite: boolean, reason: string, kind?: 'protected'|'error' }>}
  */
 async function mayOverwrite(file) {
   let exists = false;
   try {
     [exists] = await file.exists();
   } catch (err) {
-    return { overwrite: false, reason: `could not check existing object: ${err.message}` };
+    return { overwrite: false, reason: `could not check existing object: ${err.message}`, kind: 'error' };
   }
   if (!exists) return { overwrite: true, reason: 'absent' };
   let metadata = null;
@@ -61,12 +61,12 @@ async function mayOverwrite(file) {
   } catch (err) {
     // Unknown provenance is treated as the client's: refusing to write is
     // recoverable (upload it again), overwriting a logo is not.
-    return { overwrite: false, reason: `could not read object metadata: ${err.message}` };
+    return { overwrite: false, reason: `could not read object metadata: ${err.message}`, kind: 'error' };
   }
   if (metadata?.metadata?.seeded === 'true') {
     return { overwrite: true, reason: 'still the seeded placeholder' };
   }
-  return { overwrite: false, reason: 'client-replaced asset' };
+  return { overwrite: false, reason: 'client-replaced asset', kind: 'protected' };
 }
 
 /**
@@ -109,9 +109,7 @@ async function uploadPlaceholderBranding({ bucket, dryRun = false, sourceDir = S
     }
     const verdict = await mayOverwrite(target.file(objectPath));
     if (!verdict.overwrite) {
-      // Not a problem: the slot already holds something this script must
-      // not touch. Reported, but never as a warning.
-      skipped.push({ path: objectPath, reason: verdict.reason, kind: 'protected' });
+      skipped.push({ path: objectPath, reason: verdict.reason, kind: verdict.kind });
       continue;
     }
     try {
