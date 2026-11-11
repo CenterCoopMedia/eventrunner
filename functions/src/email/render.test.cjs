@@ -322,9 +322,39 @@ test('buildGlobalTokens derives urls, dates, and year', () => {
   const tokens = buildGlobalTokens(CONFIG, { now: () => new Date('2027-01-01T00:00:00Z') });
   assert.equal(tokens.site_url, 'https://summit.example.org');
   assert.equal(tokens.login_url, 'https://summit.example.org/signin');
-  assert.equal(tokens.event_dates, '2027-05-13 to 2027-05-14');
+  assert.equal(tokens.event_dates, 'May 13, 2027 to May 14, 2027');
   assert.equal(tokens.current_year, '2027');
   assert.equal(tokens.venue_address, '1 Main St, Springfield, IL, 11111, USA');
+});
+
+test('event dates keep their calendar day and render readable single days and ranges', (t) => {
+  const previousZone = process.env.TZ;
+  process.env.TZ = 'Pacific/Honolulu';
+  t.after(() => {
+    if (previousZone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousZone;
+  });
+  for (const [days, expected] of [
+    [[{ date: '2027-03-12' }], 'March 12, 2027'],
+    [[{ date: '2027-05-13' }, { date: '2027-05-14' }], 'May 13, 2027 to May 14, 2027'],
+    [[{ date: '2027-12-31' }, { date: '2028-01-01' }], 'December 31, 2027 to January 1, 2028'],
+    [[{ date: '2028-02-29' }], 'February 29, 2028'],
+    [[{ date: '2027-03-12' }, {}], 'March 12, 2027'],
+    [[{ date: '2027-02-30' }], ''],
+    [[], ''],
+  ]) {
+    assert.equal(internals.formatEventDates({ days }), expected);
+  }
+  assert.equal(internals.formatEventDates({}), '');
+});
+
+test('the event_dates token is readable in the email subject and both bodies', () => {
+  const template = { ...TEMPLATE, subject: '{{event_dates}}', html: '<p>{{event_dates}}</p>',
+    text: '{{event_dates}}', tokens: ['event_dates'], requiredTokens: [] };
+  const out = render({ template, config: CONFIG });
+  assert.equal(out.subject, 'May 13, 2027 to May 14, 2027');
+  assert.equal(out.html, '<p>May 13, 2027 to May 14, 2027</p>');
+  assert.equal(out.text, 'May 13, 2027 to May 14, 2027');
 });
 
 test('buildGlobalTokens accepts seeded color aliases and prefers canonical colors', () => {

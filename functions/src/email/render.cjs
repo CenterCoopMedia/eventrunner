@@ -2,6 +2,7 @@
 
 const { configuredThemeColor } = require('shared/theme');
 const { listSocialAccounts } = require('shared/config');
+const { isCalendarDate } = require('shared/eventDateTime');
 
 /**
  * Template renderer (spec §6.1–6.2).
@@ -154,14 +155,19 @@ function siteUrl(config) {
   return url.replace(/\/+$/, '');
 }
 
-/** Format days[] into a human range like "2027-05-13 to 2027-05-14". */
+/** Format calendar days without shifting them into the server's timezone. */
 function formatEventDates(event) {
   const days = Array.isArray(event?.days) ? event.days : [];
   if (days.length === 0) return '';
   const first = days[0]?.date || '';
   const last = days[days.length - 1]?.date || '';
-  if (!first) return '';
-  return first === last ? first : `${first} to ${last}`;
+  if (!isCalendarDate(first)) return '';
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+  });
+  const start = formatter.format(new Date(`${first}T00:00:00Z`));
+  if (first === last || !isCalendarDate(last)) return start;
+  return `${start} to ${formatter.format(new Date(`${last}T00:00:00Z`))}`;
 }
 
 /** @param {object} venue config/event.venue */
