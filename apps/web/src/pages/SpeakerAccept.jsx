@@ -295,8 +295,7 @@ export default function SpeakerAccept() {
                 ) : (
                   'the invited address'
                 )}{' '}
-                — ask for a sign-in code at that address, or use a Google
-                account there. If you would rather use this account, ask the
+                and request a sign-in code at that address. To use this account, ask the
                 organizers to re-send the invitation to it.
               </p>
               <button type="button" onClick={() => signOut()} className={primaryActionClass}>

@@ -119,7 +119,8 @@ describe('checking the link', () => {
     renderAccept();
 
     await screen.findByLabelText('Email address');
-    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Email me a code' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue with Google' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Accept the invitation' })).not.toBeInTheDocument();
   });
 

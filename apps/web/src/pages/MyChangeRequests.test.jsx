@@ -157,7 +157,7 @@ describe('MyChangeRequests', () => {
   it('asks an unverified reader to verify, and asks for nothing', () => {
     auth = { user: { ...USER, emailVerified: false }, loading: false };
     renderPage();
-    expect(screen.getByText('Sign in with Google or an emailed code to see your change requests.')).toBeInTheDocument();
+    expect(screen.getByText('Sign in with an emailed code to see your change requests.')).toBeInTheDocument();
     expect(listMock).not.toHaveBeenCalled();
   });
 

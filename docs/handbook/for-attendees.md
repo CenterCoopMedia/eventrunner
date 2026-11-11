@@ -10,7 +10,7 @@ If you are also a speaker or an admin, open **Account** and select **Attendee**,
 
 Admins with another role also see **Manage event** on their attendee and speaker dashboards. On a phone, account choices use full-width rows. In the admin workspace, open **Menu** to find them.
 
-You can sign in with Google or with a 6-digit code we email you. University and nonprofit inboxes often quarantine the code. Check junk, and wait a minute before requesting another.
+You can sign in with a 6-digit code we email you. If the site offers Google, you can use that too. University and nonprofit inboxes often quarantine the code. Check junk, and wait a minute before requesting another.
 
 There is no password to remember. If the code never arrives, ask in [Q&A](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=q-a) or email the event organizer.
 
