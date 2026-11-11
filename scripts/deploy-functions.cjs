@@ -16,8 +16,9 @@
  * selectors must reach only intended creates or retry upgrades, without
  * deletions or trigger recreation. The full deploy runs without --force.
  *
- * After the full deploy, the script reads the complete inventory again and
- * fails unless every local function is there in each of its regions.
+ * After each deploy, the script reads the complete inventory again. A
+ * successful CLI exit with missing function state waits out the provider's
+ * write-quota window, then starts a fresh guarded deploy. Other failures stop.
  * firebase-tools 15.22.4 can exit 0 with a create still unfinished: after a
  * quota 429, the retry waits on a source token that only its own first try
  * would have supplied, the event loop empties, and Node exits 0 with no
@@ -42,6 +43,9 @@ const {
 } = require('firebase-tools/lib/deploy/functions/functionsDeployHelper.js');
 
 const PROJECT_DIR = path.resolve(__dirname, '..');
+// The v1 write quota uses a 100-second window; v2 uses a 60-second window.
+const QUOTA_RECOVERY_WAIT_MS = 105_000;
+const MAX_DEPLOY_ATTEMPTS = 3;
 
 function firebaseArgs(command, projectId) {
   return ['firebase', command, '--project', projectId, '--non-interactive'];
@@ -49,6 +53,10 @@ function firebaseArgs(command, projectId) {
 
 function defaultRun(args, options) {
   return spawnSync('npx', args, options);
+}
+
+function defaultWait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function failed(result) {
@@ -371,8 +379,133 @@ function absentFunctions(inventory, localFunctions) {
   });
 }
 
+function pendingRetryPolicies(inventory, plannedFunctions) {
+  const deployedByKey = new Map(inventory.map((fn) => [label(fn), fn]));
+  return plannedFunctions.filter((planned) => {
+    const endpoint = deployedByKey.get(label(planned));
+    return !endpoint
+      || !functionsBackend.isEventTriggered(endpoint)
+      || endpoint.eventTrigger.retry !== true;
+  }).map(label);
+}
+
 function deployFailure(deployment) {
   return Number.isInteger(deployment.status) && deployment.status > 0 ? deployment.status : 1;
+}
+
+function incompleteDeployment(deployed, localFunctions, pendingRetry = []) {
+  const absent = absentFunctions(deployed, localFunctions);
+  const absentKeys = new Set(absent);
+  return {
+    deployed,
+    localFunctions,
+    absent,
+    pendingRetry: pendingRetry.filter((entry) => !absentKeys.has(entry)),
+    recoverable: absent.every((entry) => !entry.endsWith('(no literal region)')),
+  };
+}
+
+function reportIncompleteDeployment(log, result, suffix) {
+  const details = [];
+  if (result.absent.length > 0) {
+    details.push(`${result.absent.length} function(s) are not deployed: ${result.absent.join(', ')}`);
+  }
+  if (result.pendingRetry.length > 0) {
+    details.push(`${result.pendingRetry.length} retry policy change(s) are not active: ${result.pendingRetry.join(', ')}`);
+  }
+  log.error(`deploy-functions: Firebase deploy exited 0, but ${details.join('; ')}.${suffix}`);
+}
+
+async function deployRetryPolicies({
+  projectId,
+  plan,
+  localFunctions,
+  run,
+  verifyCompleteInventory,
+  log,
+}) {
+  if (plan.selectors.length === 0) return null;
+
+  log.log('deploy-functions: accepting new retry policies with a targeted --force deploy: '
+    + plan.functions.map(label).join(', '));
+  const targeted = run([
+    'firebase', 'deploy', '--only', plan.selectors.join(','),
+    '--project', projectId, '--non-interactive', '--force',
+  ], { stdio: 'inherit' });
+  if (failed(targeted)) {
+    log.error(reportFailure('deploy-functions: targeted deploy of retry policies failed', targeted));
+    return { code: deployFailure(targeted) };
+  }
+
+  let targetedInventory;
+  try {
+    targetedInventory = await verifyCompleteInventory(projectId);
+  } catch (error) {
+    log.error(diagnosticFailure('deploy-functions: could not verify targeted retry policies', 'post-targeted-inventory', error));
+    return { code: 1 };
+  }
+  const pendingRetry = pendingRetryPolicies(targetedInventory, plan.functions);
+  return pendingRetry.length > 0
+    ? incompleteDeployment(targetedInventory, localFunctions, pendingRetry)
+    : null;
+}
+
+async function deployAttempt({
+  projectId,
+  bootstrap,
+  inventory,
+  run,
+  verifyCompleteInventory,
+  discoverFunctions,
+  readConfig,
+  log,
+}) {
+  const forceInitialDeploy = bootstrap === 'true' && inventory.length === 0;
+  let localFunctions;
+  if (forceInitialDeploy) {
+    log.log('deploy-functions: bootstrap inventory is empty; accepting initial retry and cleanup policies');
+  } else {
+    if (bootstrap === 'true') {
+      log.log(`deploy-functions: bootstrap inventory has ${inventory.length} function(s); deploying without --force`);
+    }
+    try {
+      localFunctions = await discoverFunctions(projectId);
+    } catch (error) {
+      log.error(diagnosticFailure('deploy-functions: could not read the local functions', 'pre-deploy-discovery', error));
+      return { code: 1 };
+    }
+    let plan;
+    try {
+      plan = planNewRetryFunctions(inventory, localFunctions, readConfig());
+    } catch (error) {
+      log.error(reportFailure('deploy-functions: refusing a forced deploy of retry policies', {}, error));
+      return { code: 1 };
+    }
+    const retryResult = await deployRetryPolicies({
+      projectId, plan, localFunctions, run, verifyCompleteInventory, log,
+    });
+    if (retryResult) return retryResult;
+  }
+
+  const args = [...firebaseArgs('deploy', projectId), '--only', 'functions'];
+  if (forceInitialDeploy) args.push('--force');
+  const deployment = run(args, { stdio: 'inherit' });
+  if (failed(deployment)) {
+    log.error(reportFailure('deploy-functions: Firebase deploy failed', deployment));
+    return { code: deployFailure(deployment) };
+  }
+
+  let deployed;
+  let verificationPhase = 'post-deploy-discovery';
+  try {
+    localFunctions ??= await discoverFunctions(projectId);
+    verificationPhase = 'post-deploy-inventory';
+    deployed = await verifyCompleteInventory(projectId);
+  } catch (error) {
+    log.error(diagnosticFailure('deploy-functions: could not verify the deployed functions', verificationPhase, error));
+    return { code: 1 };
+  }
+  return incompleteDeployment(deployed, localFunctions);
 }
 
 async function main({
@@ -381,6 +514,7 @@ async function main({
   verifyCompleteInventory = readCompleteInventory,
   discoverFunctions = discoverLocalFunctions,
   readConfig = () => readFunctionsConfig(PROJECT_DIR),
+  wait = defaultWait,
   log = console,
 } = {}) {
   const projectId = env.EVENT_FIREBASE_PROJECT_ID?.trim();
@@ -403,70 +537,47 @@ async function main({
     return 1;
   }
 
-  const forceInitialDeploy = bootstrap === 'true' && inventory.length === 0;
-  let localFunctions;
-  if (forceInitialDeploy) {
-    log.log('deploy-functions: bootstrap inventory is empty; accepting initial retry and cleanup policies');
-  } else {
-    if (bootstrap === 'true') {
-      log.log(`deploy-functions: bootstrap inventory has ${inventory.length} function(s); deploying without --force`);
-    }
-    try {
-      localFunctions = await discoverFunctions(projectId);
-    } catch (error) {
-      log.error(diagnosticFailure('deploy-functions: could not read the local functions', 'pre-deploy-discovery', error));
-      return 1;
-    }
-    let plan;
-    try {
-      plan = planNewRetryFunctions(inventory, localFunctions, readConfig());
-    } catch (error) {
-      log.error(reportFailure('deploy-functions: refusing a forced deploy of retry policies', {}, error));
-      return 1;
-    }
-    if (plan.selectors.length > 0) {
-      log.log('deploy-functions: accepting new retry policies with a targeted --force deploy: '
-        + plan.functions.map(label).join(', '));
-      const targeted = run([
-        'firebase', 'deploy', '--only', plan.selectors.join(','),
-        '--project', projectId, '--non-interactive', '--force',
-      ], { stdio: 'inherit' });
-      if (failed(targeted)) {
-        log.error(reportFailure('deploy-functions: targeted deploy of retry policies failed', targeted));
-        return deployFailure(targeted);
+  // #827: Fresh-client run 43091008410 exited 0 with 17 creates missing after
+  // quota exhaustion. Inventory verification and the outer workflow retry
+  // catch the failure. Delete this bounded recovery when #827 records a pinned
+  // Firebase CLI that completes quota-delayed creates without a fresh process.
+  for (let attempt = 1; attempt <= MAX_DEPLOY_ATTEMPTS; attempt += 1) {
+    const result = await deployAttempt({
+      projectId, bootstrap, inventory, run, verifyCompleteInventory, discoverFunctions, readConfig, log,
+    });
+    if (result.code !== undefined) return result.code;
+
+    if (result.absent.length === 0 && result.pendingRetry.length === 0) {
+      for (const endpoint of result.deployed) {
+        log.log(`deploy-functions: inventory ${JSON.stringify(inventoryMetadata(endpoint))}`);
       }
+      log.log(`deploy-functions: verified ${result.localFunctions.length} function(s) in the deployed inventory`);
+      return 0;
+    }
+    if (!result.recoverable || attempt === MAX_DEPLOY_ATTEMPTS) {
+      const suffix = result.recoverable
+        ? ` Quota recovery was exhausted after ${MAX_DEPLOY_ATTEMPTS} guarded attempts.`
+        : ' Automatic recovery is unsafe without a literal region for every function.';
+      reportIncompleteDeployment(log, result, suffix);
+      return 1;
+    }
+
+    log.log(`deploy-functions: ${result.absent.length + result.pendingRetry.length} function change(s) remain after attempt ${attempt}; `
+      + `waiting ${QUOTA_RECOVERY_WAIT_MS / 1000} seconds for function write quotas before a fresh guarded attempt`);
+    try {
+      await wait(QUOTA_RECOVERY_WAIT_MS);
+    } catch (error) {
+      log.error(diagnosticFailure('deploy-functions: could not wait for quota recovery', 'quota-recovery-wait', error));
+      return 1;
+    }
+    try {
+      inventory = await verifyCompleteInventory(projectId);
+    } catch (error) {
+      log.error(diagnosticFailure('deploy-functions: could not verify inventory for quota recovery', 'quota-recovery-inventory', error));
+      return 1;
     }
   }
-
-  const args = [...firebaseArgs('deploy', projectId), '--only', 'functions'];
-  if (forceInitialDeploy) args.push('--force');
-  const deployment = run(args, { stdio: 'inherit' });
-  if (failed(deployment)) {
-    log.error(reportFailure('deploy-functions: Firebase deploy failed', deployment));
-    return deployFailure(deployment);
-  }
-
-  let deployed;
-  let verificationPhase = 'post-deploy-discovery';
-  try {
-    localFunctions ??= await discoverFunctions(projectId);
-    verificationPhase = 'post-deploy-inventory';
-    deployed = await verifyCompleteInventory(projectId);
-  } catch (error) {
-    log.error(diagnosticFailure('deploy-functions: could not verify the deployed functions', verificationPhase, error));
-    return 1;
-  }
-  const absent = absentFunctions(deployed, localFunctions);
-  if (absent.length > 0) {
-    log.error(`deploy-functions: Firebase deploy exited 0, but ${absent.length} function(s) are not deployed: `
-      + `${absent.join(', ')}. Run the deploy again; unchanged functions are skipped.`);
-    return 1;
-  }
-  for (const endpoint of deployed) {
-    log.log(`deploy-functions: inventory ${JSON.stringify(inventoryMetadata(endpoint))}`);
-  }
-  log.log(`deploy-functions: verified ${localFunctions.length} function(s) in the deployed inventory`);
-  return 0;
+  return 1;
 }
 
 if (require.main === module) {
