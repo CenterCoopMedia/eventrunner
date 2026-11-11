@@ -614,6 +614,8 @@ test('a record for this site alone: a name outside it is refused', async () => {
 test('email gets a server, its streams and webhooks, and a verified sender', async () => {
   const fake = setup();
   await provision({ appId: 'a1', deps: fake.deps });
+  const serverRequest = fake.calls.find((call) => call.url === 'https://api.postmarkapp.com/servers' && call.method === 'POST');
+  assert.deepEqual(serverRequest.body, { Name: 'nclocal', TrackLinks: 'None', TrackOpens: false });
   assert.equal(fake.clientSecrets.store.get('EMAIL_PROVIDER_API_KEY'), 'server-token');
   const basicAuth = fake.clientSecrets.store.get('EMAIL_WEBHOOK_BASIC_AUTH');
   assert.match(basicAuth, new RegExp(`^${PROJECT}:[0-9a-f]{40}$`));

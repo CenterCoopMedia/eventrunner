@@ -100,6 +100,10 @@ function toPostmarkPayload(message) {
   if (message.text) payload.TextBody = message.text;
   if (message.replyTo) payload.ReplyTo = message.replyTo;
   if (message.tag) payload.Tag = message.tag;
+  if (message.tag === 'auth.otp') {
+    payload.TrackLinks = 'None';
+    payload.TrackOpens = false;
+  }
   if (message.headers && Object.keys(message.headers).length > 0) {
     payload.Headers = Object.entries(message.headers)
       .map(([Name, Value]) => ({ Name, Value: String(Value) }));
