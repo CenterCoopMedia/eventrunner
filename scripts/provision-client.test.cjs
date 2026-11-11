@@ -83,6 +83,8 @@ function fakeCloud(options = {}) {
     mailDomain: null,
     endpoints: [...(options.endpoints || [])],
     stripeToken: options.stripeToken ?? STRIPE_TOKEN,
+    platformKey: 'sk_live_ccm_platform',
+    liveConnect: options.liveConnect ?? !/^(?:sk|rk)_test_/.test(options.stripeToken ?? STRIPE_TOKEN),
     eventbriteToken: options.eventbriteToken ?? EVENTBRITE_TOKEN,
     environment: null,
     branchRules: [],
@@ -302,8 +304,13 @@ function fakeCloud(options = {}) {
   }
 
   function stripeRoute(url, method, body, headers) {
-    if (headers.Authorization !== `Bearer ${state.stripeToken}`) return answer({ error: { message: `bad token ${headers.Authorization}` } }, 401);
     const p = url.pathname;
+    // Stripe refuses webhook endpoint calls made with a Connect OAuth token.
+    if (p.startsWith('/v1/webhook_endpoints') && state.liveConnect && headers.Authorization === `Bearer ${state.stripeToken}`) {
+      return answer({ error: { type: 'invalid_request_error', code: 'oauth_not_supported' } }, 403);
+    }
+    const key = p.startsWith('/v1/webhook_endpoints') && state.liveConnect ? state.platformKey : state.stripeToken;
+    if (headers.Authorization !== `Bearer ${key}`) return answer({ error: { message: `bad token ${headers.Authorization}` } }, 401);
     if (p === '/v1/account') return answer({ id: 'acct_1' });
     if (method === 'GET') return answer({ data: state.endpoints });
     if (method === 'DELETE') {
@@ -312,6 +319,7 @@ function fakeCloud(options = {}) {
     }
     const params = new URLSearchParams(body);
     state.endpointsMade = (state.endpointsMade || 0) + 1;
+    if (state.liveConnect && params.get('connect') !== 'true') return answer({ error: { message: 'a platform endpoint must listen to connected accounts' } }, 400);
     const created = { id: `we_${state.endpointsMade}`, url: params.get('url'), status: 'enabled', enabled_events: params.getAll('enabled_events[]'), secret: 'whsec_fixture' };
     state.endpoints.push(created);
     return answer(created);
@@ -405,6 +413,9 @@ function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding
     'console_connections/a1': accounts || { stripe: { accountId: 'acct_1', connectedBy: 'ana' } },
   });
   const consoleSecrets = makeFakeSecrets(secrets || { 'connection-stripe-a1': STRIPE_TOKEN, 'connection-eventbrite-a1': EVENTBRITE_TOKEN });
+  // CCM's platform key lives in the console project beside the connections; it is read, never moved.
+  const readConsoleSecret = consoleSecrets.readSecret.bind(consoleSecrets);
+  consoleSecrets.readSecret = async (id) => (id === 'CONSOLE_STRIPE_SECRET_KEY' ? fake.state.platformKey : readConsoleSecret(id));
   const clientSecrets = makeFakeSecrets();
   const clientFirestore = makeFakeDb({});
   const mailer = fakeMailer();
@@ -637,6 +648,10 @@ test('the token is tested, moved, and deleted from the console, and the leftover
   await provision({ appId: 'a1', deps: fake.deps });
   assert.equal(fake.clientSecrets.store.get('TICKETING_API_TOKEN'), STRIPE_TOKEN);
   assert.equal(fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET'), 'whsec_fixture');
+  // A live Connect token cannot manage webhook endpoints (Stripe 403 oauth_not_supported); CCM's platform key makes a Connect endpoint.
+  const made = fake.calls.find((c) => c.method === 'POST' && c.url.endsWith('/v1/webhook_endpoints'));
+  assert.equal(made.headers.Authorization, 'Bearer sk_live_ccm_platform');
+  assert.equal(new URLSearchParams(made.body).get('connect'), 'true');
   assert.equal(fake.consoleSecrets.store.size, 0);
   const secretPolicy = bindingsOf(fake, `secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets/TICKETING_API_TOKEN`);
   assert.ok(holds(secretPolicy, 'roles/secretmanager.secretAccessor', `serviceAccount:${COMPUTE}`));
