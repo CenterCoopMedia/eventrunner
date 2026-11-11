@@ -694,11 +694,18 @@ test('connecting a different account keeps the old one when another request uses
   assert.deepEqual(stripe.revoked, []);
 });
 
-test('connecting a shared live account succeeds; a build claims its unique payment route', async () => {
-  const { db, stripe, deps } = sharing();
+test('an account routed to another live site is refused before token storage and its authorization is kept', async () => {
+  const { stripe, secrets, deps } = setup({ extra: {
+    'console_stripe_routes/acct_client1': { appId: 'a2', projectId: 'er-second', region: 'us-central1' },
+  } });
   stripe.answer = stripeAnswer('acct_client1');
-  await complete(deps, { state: await start(deps) });
-  assert.equal(db.read('console_connections/a1').stripe.accountId, 'acct_client1');
+  await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
+    assert.equal(err.status, 409);
+    assert.match(err.message, /another live site/);
+    return true;
+  });
+  assert.equal(secrets.store.has('connection-stripe-a1'), false);
+  assert.deepEqual(stripe.revoked, []);
 });
 
 test('a live OAuth exchange is allowed while another live account is connected', async () => {

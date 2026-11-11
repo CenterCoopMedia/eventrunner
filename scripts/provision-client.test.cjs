@@ -945,8 +945,14 @@ test('a test-mode run builds with a test-mode connection, and records that it di
     secrets: { 'connection-stripe-a1': TEST_TOKEN },
     cloud: { stripeToken: TEST_TOKEN },
   });
+  const deleteSecret = fake.consoleSecrets.deleteSecret.bind(fake.consoleSecrets);
+  fake.consoleSecrets.deleteSecret = async (id) => {
+    if (id.startsWith('stripe-webhook-')) throw new Error('secret delete: HTTP 403');
+    return deleteSecret(id);
+  };
   assert.equal(await provision({ appId: 'a1', testMode: true, deps: fake.deps }), 0);
   assert.equal(fake.db.read('console_builds/a1').testMode, true);
+  assert.equal(fake.state.endpoints.length, 1);
   assert.equal(fake.state.variables.EVENT_STRIPE_MODE, 'test');
 });
 
@@ -1001,6 +1007,11 @@ test('Eventbrite: registering the webhook uses the organization that holds the e
 test('with no ticket account nothing moves, and any leftover is deleted', async () => {
   const frozen = { ...application().frozen, tickets: { choice: 'spreadsheet' } };
   const fake = setup({ app: { frozen, answers: frozen, connections: {} }, accounts: {} });
+  const deleteSecret = fake.consoleSecrets.deleteSecret.bind(fake.consoleSecrets);
+  fake.consoleSecrets.deleteSecret = async (id) => {
+    if (id.startsWith('stripe-webhook-')) throw new Error('secret delete: HTTP 403');
+    return deleteSecret(id);
+  };
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.state.variables.EVENT_TICKETING_PROVIDER, 'manual');
   assert.deepEqual(remainingConnectionTokens(fake), []);
@@ -1246,6 +1257,7 @@ test('a failed Console signing-secret copy leaves no route, and a retry uses the
   const secret = fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET');
   assert.ok(secret);
   assert.equal(fake.db.read('console_stripe_routes/acct_1'), undefined);
+  assert.equal(fake.db.read('console_builds/a1').stripeRouteAccountId, 'acct_1', 'cleanup can recover an interrupted secret copy');
   fake.consoleSecrets.failWrite = false;
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.consoleSecrets.store.get('stripe-webhook-a1'), secret);

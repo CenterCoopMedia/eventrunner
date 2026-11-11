@@ -27,8 +27,10 @@ function setup() {
   const db = makeFakeDb(Object.fromEntries(SITES.map(({ accountId, secret: _secret, ...route }) => [`console_stripe_routes/${accountId}`, route])));
   const secrets = makeFakeSecrets(Object.fromEntries(SITES.map((site) => [routeSecretId(site.appId), site.secret])));
   const calls = [];
+  const logs = [];
   const deps = {
     db, secrets, endpointSecret: PLATFORM_SECRET, now: () => NOW,
+    log: { warn: (...args) => logs.push(args) },
     fetch: async (url, init) => {
       calls.push({ url, ...init });
       return new Response(null, { status: 204 });
@@ -39,7 +41,7 @@ function setup() {
     await stripeConnectWebhook({ ...deps, ...override })(req, res);
     return res;
   };
-  return { db, secrets, calls, deps, deliver };
+  return { db, secrets, calls, logs, deps, deliver };
 }
 
 test('two signed connected accounts reach only their own site with the original bytes and the site signature', async () => {
@@ -81,7 +83,7 @@ test('an unknown or missing account and test-mode payload never reach a site', a
 });
 
 test('missing destination secrets, bad identities, timeouts and non-success replies remain retryable without forwarding elsewhere', async () => {
-  const { deliver, secrets, db, calls } = setup();
+  const { deliver, secrets, db, calls, logs } = setup();
   await secrets.deleteSecret(routeSecretId('a1'));
   assert.equal((await deliver(request())).statusCode, 503);
   assert.equal(calls.length, 0);
@@ -91,7 +93,10 @@ test('missing destination secrets, bad identities, timeouts and non-success repl
   assert.equal(calls.length, 0);
   await db.doc('console_stripe_routes/acct_one').update({ projectId: SITES[0].projectId });
   assert.equal((await deliver(request(), { fetch: async () => new Response(null, { status: 503 }) })).statusCode, 502);
-  assert.equal((await deliver(request(), { fetch: async () => { throw new Error('timeout'); } })).statusCode, 502);
+  assert.equal((await deliver(request(), { fetch: async () => { throw new Error(SITES[0].secret); } })).statusCode, 502);
+  assert.equal(logs.at(-2)[1].destinationStatus, 503);
+  assert.equal(logs.at(-1)[1].category, 'destination');
+  assert.ok(!JSON.stringify(logs).includes(SITES[0].secret), 'raw errors and signing secrets never reach logs');
 });
 
 test('Stripe retries can repeat an event ID; a fresh valid timestamp is signed for the site idempotence check', async () => {

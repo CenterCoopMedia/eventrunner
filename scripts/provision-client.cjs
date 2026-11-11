@@ -50,7 +50,7 @@ const { internals: { stampVerification } } = require('./verify-sender-domain.cjs
 const { internals: { stampWebhookRegistration } } = require('./register-ticketing-webhook.cjs');
 const { EMAIL_ADDRESS_RE } = require('shared/email');
 const { SEED_ACTOR } = require('shared/seed');
-const { STRIPE_WEBHOOK_SECRET, deleteStripeRoutes, registerStripeRoute } = require('../console/functions/src/stripeWebhooks.cjs');
+const { STRIPE_WEBHOOK_SECRET, deleteStripeRoutes, registerStripeRoute, stripeRoutes } = require('../console/functions/src/stripeWebhooks.cjs');
 
 const CRM = 'https://cloudresourcemanager.googleapis.com/v3';
 const BILLING = 'https://cloudbilling.googleapis.com/v1';
@@ -875,6 +875,8 @@ async function stripeRoute(ctx, connection, notes) {
 }
 
 async function clearStripeRoute(ctx) {
+  // Existing non-Stripe/test builds need no new Secret Manager permissions.
+  if (!ctx.stripeRouteAccountId && !(await stripeRoutes({ db: ctx.deps.db, appId: ctx.appId, projectId: ctx.projectId })).length) return;
   await deleteStripeRoutes({ db: ctx.deps.db, secrets: ctx.deps.consoleSecrets, appId: ctx.appId, projectId: ctx.projectId });
   if (ctx.stripeRouteAccountId) {
     ctx.stripeRouteAccountId = null;

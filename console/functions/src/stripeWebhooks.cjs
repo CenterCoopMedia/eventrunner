@@ -24,6 +24,8 @@ async function registerStripeRoute({ db, secrets, appId, accountId, projectId, r
   // Publish only after the destination's secret is available to the receiver.
   // Each application's secret has its own name, including competing builds.
   const secretId = routeSecretId(appId);
+  // Keep cleanup possible if the copy succeeds but route publication fails.
+  await recordRef.update({ stripeRouteAccountId: accountId });
   if (await secrets.readSecret(secretId) !== secret) await secrets.writeSecret(secretId, secret);
   const routes = db.collection(STRIPE_ROUTE_COLLECTION);
   await db.runTransaction(async (tx) => {
@@ -62,40 +64,52 @@ async function deleteStripeRoutes({ db, secrets, appId, projectId }) {
 }
 
 /** The platform's signed bytes are the only source of the routing account. */
-function stripeConnectWebhook({ db, secrets, endpointSecret, fetch, now = Date.now }) {
+function stripeConnectWebhook({ db, secrets, endpointSecret, fetch, now = Date.now, log = console }) {
   return async (req, res) => {
     if (req.method !== 'POST') return res.status(405).send('POST required');
-    if (!endpointSecret) return res.status(503).send('Webhook unavailable');
     let event;
+    const fail = (category, status, message, detail = {}) => {
+      log.warn('stripe Connect webhook failed', {
+        category, status, ...detail,
+        ...(accountIdValid(event?.account) ? { accountId: event.account } : {}),
+        ...(typeof event?.id === 'string' && /^evt_[A-Za-z0-9]+$/.test(event.id) ? { eventId: event.id } : {}),
+      });
+      return res.status(status).send(message);
+    };
+    if (!endpointSecret) return fail('endpoint-secret', 503, 'Webhook unavailable');
     try {
       if (!Buffer.isBuffer(req.rawBody) || !req.rawBody.length) throw new Error('raw body required');
       const { webhooks } = require('stripe');
       event = webhooks.constructEvent(req.rawBody, req.headers?.['stripe-signature'], endpointSecret, 300, undefined, now());
     } catch {
-      return res.status(400).send('Invalid webhook signature');
+      return fail('signature', 400, 'Invalid webhook signature');
     }
-    if (!accountIdValid(event?.account) || event.livemode !== true) return res.status(400).send('Live connected account required');
+    if (!accountIdValid(event?.account) || event.livemode !== true) return fail('account-mode', 400, 'Live connected account required');
+    let stage = 'route-read';
     try {
       const route = (await db.collection(STRIPE_ROUTE_COLLECTION).doc(event.account).get()).data();
-      if (!route) return res.status(404).send('Unknown connected account');
+      if (!route) return fail('unknown-account', 404, 'Unknown connected account');
+      stage = 'route-identity';
       const url = ticketWebhookUrl(route);
+      stage = 'site-secret';
       const secret = await secrets.readSecret(routeSecretId(route.appId));
-      if (!secret) return res.status(503).send('Destination unavailable');
+      if (!secret) return fail(stage, 503, 'Destination unavailable');
       const timestamp = Math.floor(now() / 1000);
       const signature = createHmac('sha256', secret).update(`${timestamp}.`).update(req.rawBody).digest('hex');
       // Never follow redirects: even a site's redirect must not receive another copy.
+      stage = 'destination';
       const response = await fetch(url, {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10_000),
         headers: { 'Content-Type': 'application/json', 'Stripe-Signature': `t=${timestamp},v1=${signature}` },
         body: req.rawBody,
       });
       await response.body?.cancel();
-      if (!response.ok) return res.status(502).send('Destination refused webhook');
+      if (!response.ok) return fail('destination-status', 502, 'Destination refused webhook', { destinationStatus: response.status });
       return res.status(200).send('Received');
     } catch {
       // Stripe retries delivery; the destination already deduplicates event IDs.
       // Do not log provider bodies, signatures, secrets, or payment payloads.
-      return res.status(502).send('Webhook delivery failed');
+      return fail(stage, 502, 'Webhook delivery failed');
     }
   };
 }

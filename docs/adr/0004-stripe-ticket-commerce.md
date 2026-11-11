@@ -348,7 +348,9 @@ refused. Payment data stays in the trusted Console service until this check comp
 `console_stripe_routes/{accountId}` holds the application, project and region of the one site
 that owns that account's route. Browser clients, including operators, cannot read or write
 routes. The builder claims each account transactionally; it cannot replace another site's
-route. A successful account change removes the application's previous route in the same
+route. The Console refuses an already-routed account during connection, while distinct
+live accounts can connect independently. The build transaction also checks ownership
+to cover competing builds. A successful account change removes the application's previous route in the same
 transaction. A change to another ticket provider removes its Stripe route.
 
 The builder keeps the site's `TICKETING_WEBHOOK_SECRET` in the site's Secret Manager and

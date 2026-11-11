@@ -4,6 +4,10 @@ This is an operator migration for issue #835. It has not been run. Execute it on
 under a named coordinator deployment task, after NC Local's site has been built
 and confirmed. Keep new live account connections and builds closed until step 6.
 Do not run the normal Console deploy first: it removes the one-site guard.
+The build dispatcher always uses `main`, so merging activates the provisioner
+immediately. Complete steps 1–5, including the prefix grants and shared signing
+secret metadata grant, **before merging** this change. An undeployed Console
+does not hold back the provisioner. Keep live builds paused throughout migration.
 
 All command blocks use an authenticated Linux operator terminal at the repository
 root, on the reviewed release commit, with Node 22, installed dependencies,
@@ -159,8 +163,9 @@ coordinator's deployment receipt; keep payment payloads and secrets out of it.
 
 ## 6. Activate provisioning and remove the migration restriction
 
-Now run the normal reviewed Console deployment and activate the reviewed
-provisioner commit. Live builds create routes; they never create site endpoints.
+After the coordinator authorizes merging the reviewed provisioner change to
+`main`, run the normal reviewed Console deployment. Live builds create routes;
+they never create site endpoints.
 Normal shared-site decommissioning removes its route and secret copy. Retain the
 platform API key only for its existing OAuth and operator maintenance purposes;
 the live builder does not read it for webhook management.

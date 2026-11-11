@@ -48,6 +48,7 @@ const { withDefaults } = require('./answers.cjs');
 const { checkAnswers, stepErrors } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
 const { RETRY_STATUSES, canRetryBuild, readBuild } = require('./buildState.cjs');
+const { STRIPE_ROUTE_COLLECTION } = require('./stripeWebhooks.cjs');
 const { ARCHIVED_MESSAGE, CLOSED, readApplication } = require('./applications.cjs');
 const { hostName } = require('./hostName.cjs');
 const {
@@ -153,6 +154,9 @@ async function revokeIfUnused({ db, connectors, log = console }, provider, accou
   let users;
   try {
     users = await db.collection(ACCOUNT_COLLECTION).where(`${provider}.accountId`, '==', accountId).limit(1).get();
+    if (provider === 'stripe' && (await db.collection(STRIPE_ROUTE_COLLECTION).doc(accountId).get()).exists) {
+      return { revoked: false, shared: true };
+    }
   } catch (err) {
     log.error('console kept a connection because it could not check who uses it', provider, err.message);
     return { revoked: false, shared: false };
@@ -309,6 +313,12 @@ async function completeConnection(deps, { body, user }) {
       await requireConnectable(deps, (r) => tx.get(r), { appId, data, provider });
       const changing = changingState(data, provider, at, changeId);
       const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
+      if (provider === 'stripe' && answer.details?.livemode === true) {
+        const route = await tx.get(db.collection(STRIPE_ROUTE_COLLECTION).doc(answer.accountId));
+        if (route.exists && route.data().appId !== appId) {
+          throw new ConsoleError(409, 'locked', 'This Stripe account is already connected to another live site. Connect a different Stripe account.');
+        }
+      }
       previous = previousOf(data, accounts, provider);
       const same = previous.account?.accountId === answer.accountId;
       const keepEvent = provider === 'eventbrite' ? { event: same ? previous.connection?.event ?? null : null } : {};
