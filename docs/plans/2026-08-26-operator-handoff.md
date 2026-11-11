@@ -131,12 +131,9 @@ five alternatives is **"Eventrunner"** — clean on the federal trademark regist
 `events@runofshow.net`). Its DNS is in CCM's Cloudflare account, so every DNS-editing step below
 needs that account's login — the human present holds those credentials.
 
-This workstream depends on Workstream C step 1 for its actual DNS record *values* (Postmark
-generates them once the domain is added to a Server) — do Workstream C step 1 first if starting
-from nothing, then come back here. The steps are ordered here for narrative clarity, not execution
-order; `docs/POSTMARK_PROVISIONING.md` §4 has the fuller version of this with a general (non-CCM)
-form alongside the concrete one — read that section for the exact field-by-field table if anything
-below is ambiguous.
+For an approved new sender domain, obtain the actual DNS record values through
+`docs/POSTMARK_PROVISIONING.md` §4a, then apply those values below. §4 has the field-by-field
+instructions for the authorized domain; account and Server capacity are checked in Workstream C.
 
 1. **[HUMAN] Log in to the Cloudflare account that manages `runofshow.net` — account identity per
    operator records.**
@@ -186,104 +183,32 @@ below is ambiguous.
 
 ---
 
-## Workstream C — Postmark provisioning
+## Workstream C: Postmark acceptance
 
-Full detail lives in `docs/POSTMARK_PROVISIONING.md` — this section is a sequenced pointer into it
-by heading, not a duplicate. Read each referenced section before doing its step.
+Use [Postmark provisioning §7](../POSTMARK_PROVISIONING.md#7-acceptance-on-an-approved-writable-target)
+for the execution sequence. The approved rehearsal or client is the acceptance target; the
+historical public demo keeps console email and its read-only policy.
 
-1. **[HUMAN] Account creation and billing** (`docs/POSTMARK_PROVISIONING.md` §1, "One-time: the
-   CCM account"). Sign up for the Postmark account under an org-owned CCM email, not a personal
-   address. Note the Account Token (Account → API Tokens) — hand it to the agent for step 2 via
-   whatever secret-passing channel you're already using (never paste it into this doc or any repo
-   file). **Set up billing and confirm the plan tier covers the expected client count** — Postmark's
-   billing model here is a Server per client (§0, "Postmark's object model"), so the number of
-   Servers the plan supports, not just message volume, is the real capacity constraint. Ask
-   Postmark's plan page or support directly how many Servers the chosen tier allows, and compare
-   against how many client deployments are expected in the near term.
-   **Success check:** account exists, Account Token is in hand, and the human has confirmed
-   (in writing, e.g. a note back to the agent or in this doc's results section below) which plan
-   tier was chosen and how many Servers it supports.
+1. **[HUMAN] Confirm the target and permitted actions.** Name its Environment/project, current
+   deployed revision and actual Deploy run. Approve the private recipient list, message count
+   and fixture cleanup. Account creation and staff grants can send messages too.
+2. **[AGENT] Recover the existing target's evidence.** Read its dedicated Live Server, prior sends,
+   webhook registrations and Firestore rows before planning another send. Confirm account
+   approval and the plan's maximum Server count; the monthly message allowance is a different
+   capacity measure. Use §1–6 only for separately authorized setup or repair of this target.
+3. **[AGENT] Verify provider and webhook configuration.** Follow §7.2–7.3 for Server-token
+   isolation, operator-only Account Token custody, sender-domain verification, actual sending
+   streams, deployed endpoint and HTTP Basic auth. Keep credentials in approved stores and out
+   of command arguments, URLs and logs. Confirm Delivery/Bounce/SpamComplaint triggers on each
+   tested stream, plus SubscriptionChange for the announcements broadcast stream (§5).
+4. **[AGENT] Prove the approved mail round trip.** Follow §7.4, matching provider message IDs to
+   the target's `sent_emails` status changes for both delivery and bounce. Reconcile before/after
+   outbound counts and the authorized fixture cleanup. A registered webhook or accepted send
+   alone does not complete the check.
 
-2. **[AGENT] Create the dev/demo Server and stream, store the server token as a GitHub Environment
-   secret** (`docs/POSTMARK_PROVISIONING.md` §2 "Per deployment: create the Server" and §3 "Store
-   the tokens for this environment"; also `docs/DEPLOY_RUNBOOK.md` §3 for the GitHub Environment
-   secrets table and the Secret Manager mirroring commands).
-   a. Postmark → Servers → Add server, name it `runofshow-dev` (confirm this matches `EVENT_SLUG`
-      for this environment in `.env.example`/the GitHub Environment's variables rather than
-      assuming), type **Live** (not demo/test).
-   b. Open the Server → API Tokens tab → copy the Server Token. This is `EMAIL_PROVIDER_API_KEY`
-      for this environment.
-   c. Store `EMAIL_PROVIDER_API_KEY` (this Server's token) as a GitHub Environment **secret** (not
-      variable) on this client's environment — Settings → Environments → `<CLIENT_ENV>` → Secrets —
-      per `docs/DEPLOY_RUNBOOK.md` §3. Do **not** store `EMAIL_ACCOUNT_API_KEY` (the account token
-      from step 1) here or anywhere client-scoped — no deployed function binds it, only the
-      operator-run `scripts/verify-sender-domain.cjs` does (step 3 below), so it stays in operator
-      storage instead (`docs/POSTMARK_PROVISIONING.md` §3).
-   d. Mirror `EMAIL_PROVIDER_API_KEY` into Secret Manager and bind `secretAccessor` to the
-      *runtime* service account (the project's default compute SA,
-      `<PROJECT_NUMBER>-compute@developer.gserviceaccount.com` — not the deploy SA) per the
-      `gcloud secrets create` / `add-iam-policy-binding` commands in
-      `docs/POSTMARK_PROVISIONING.md` §3.
-   **Success check:** the Server exists in Postmark named after `EVENT_SLUG`; `EMAIL_PROVIDER_API_KEY`
-   shows up in `gh secret list --env <CLIENT_ENV>` (or the GitHub UI) and in
-   `gcloud secrets list --project=<GCP_PROJECT_ID>`; `gcloud secrets get-iam-policy
-   EMAIL_PROVIDER_API_KEY --project=<GCP_PROJECT_ID>` shows the runtime SA with
-   `roles/secretmanager.secretAccessor`. `EMAIL_ACCOUNT_API_KEY` is confirmed available in operator
-   storage, not in `gh secret list` or `gcloud secrets list` output for this project.
-
-3. **[AGENT] Verify the sender domain** (`docs/POSTMARK_PROVISIONING.md` §4, all subsections).
-   §4a is "add the domain in Postmark" (this is what produces the DKIM/Return-Path values
-   Workstream B needs — do this before Workstream B steps 2–3 if starting fresh). §4b is the
-   Cloudflare-side record publishing (== Workstream B above; don't redo it here). §4c is running
-   the verification script:
-   ```sh
-   EVENT_EMAIL_PROVIDER=postmark \
-   EMAIL_PROVIDER_API_KEY=<server token from step 2b> \
-   EMAIL_ACCOUNT_API_KEY=<account token from step 1, operator storage> \
-   EVENT_FIREBASE_PROJECT_ID=<this deployment's GCP project id> \
-     node scripts/verify-sender-domain.cjs --domain runofshow.net
-   ```
-   Re-run after DNS propagates — DKIM can take up to ~48 hours to show verified in Postmark even
-   after the record is correctly published (Cloudflare itself typically propagates in minutes, so
-   a long wait points at Postmark's own verification cadence, not a DNS problem).
-
-   **SPF is informational, don't chase it:** the verification gate is DKIM + Return-Path only
-   (issue #93). Postmark's Domains API deprecates its SPF field and satisfies SPF through the
-   Return-Path CNAME, so the script reports the SPF verdict but never blocks on it and never asks
-   you to publish an SPF record. If SPF shows `unknown` or `FAIL` while DKIM and Return-Path are
-   green, the domain is verified — **do not re-check or publish DNS records over it**.
-
-   **Success check:** `node scripts/verify-sender-domain.cjs --domain runofshow.net` exits `0`
-   (verified). Exit `1` means the domain is not verified — this covers DNS not propagated yet, a
-   wrong record, *and* a missing or rejected `EMAIL_ACCOUNT_API_KEY` (the provider then reports
-   DKIM/Return-Path as `unknown` instead of `fail`, which still isn't a pass, so the script still
-   exits `1`). Exit `2` is reserved for setup/provider failures that keep the script from checking
-   DNS at all — e.g. a missing or invalid `EMAIL_PROVIDER_API_KEY` (server token), no sender domain
-   configured, or the provider call itself erroring — not for an account-key problem, which is
-   exit `1`.
-
-4. **[AGENT] Register the delivery webhook** (`docs/POSTMARK_PROVISIONING.md` §5, "Register the
-   delivery webhook").
-   a. Generate a random `user:pass` pair, unique to this deployment:
-      `printf 'runofshow-dev:%s\n' "$(openssl rand -hex 20)"`.
-   b. Store the whole `user:pass` string as `EMAIL_WEBHOOK_BASIC_AUTH` — GitHub Environment secret
-      + Secret Manager, same pattern as step 2c/2d above.
-   c. Confirm which stream sends actually use before registering anything: check this
-      deployment's `config/providers.email.messageStream` — unset means the Server's default
-      `Outbound` stream, set means that named stream instead (`docs/POSTMARK_PROVISIONING.md`
-      §2.4/§5). In Postmark, this Server → that stream → Webhooks → add webhook, URL:
-      `https://<user>:<pass>@<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook`
-      — using this environment's actual `EVENT_FIREBASE_REGION` / `EVENT_FIREBASE_PROJECT_ID`
-      GitHub Environment variables, not a guess. Enable the **Delivery**, **Bounce**, and
-      **SpamComplaint** triggers only; leave **Open**, **Click**, and **SubscriptionChange** off
-      (nothing in this repo consumes the first two, and `parseDeliveryEvent()` 400s a
-      `SubscriptionChange` payload whose `SuppressSending` isn't exactly `true` —
-      `docs/POSTMARK_PROVISIONING.md` §5).
-   **Success check:** the webhook shows registered in Postmark's Server → Webhooks list with the
-   three triggers enabled; a test send followed by an intentionally-invalid-recipient bounce
-   produces both a `sent_emails` Activity entry and a bounce event that patches `deliveryStatus`
-   (`docs/POSTMARK_PROVISIONING.md` §6, last two checklist items) — confirms the webhook
-   round-trips end to end, not just that it's registered.
+Record completed and incomplete results below and in issue #91. Keep full recipient and
+message/row references in the private operator record. This handoff does not authorize a new
+deployment, provider/configuration change, purchase or send.
 
 ---
 
@@ -523,7 +448,7 @@ against reality. It needs no relationship to Workstream E beyond both being M5 o
    ```sh
    EVENT_TICKETING_PROVIDER=eventbrite EVENT_TICKETING_EVENT_ID=<sandbox event id> \
    TICKETING_API_TOKEN=<from step 1> TICKETING_WEBHOOK_SECRET=<generate one, store it like
-     EMAIL_WEBHOOK_BASIC_AUTH in Workstream C step 4b> \
+     EMAIL_WEBHOOK_BASIC_AUTH in docs/POSTMARK_PROVISIONING.md §5> \
    EVENT_FIREBASE_PROJECT_ID=<dev project id> \
      node scripts/register-ticketing-webhook.cjs
    ```
@@ -615,22 +540,18 @@ token, password, or API key value into this document — name only *where* it wa
 - [x] Inbound forwarding for `info@eventrunner.org` set up: yes, via Cloudflare Email Routing,
       forwarding to the maintainer's real inbox (`amditisj@montclair.edu`) — this is the inbound
       side, entirely separate from Postmark's outbound-only sending; see issue #91 for the
-      live-sending cutover once Postmark approves the account.
+      approved writable-target Postmark acceptance.
 
 ### Workstream C
-- [x] Postmark Server `Event Runner` created for the `eventrunner.org` sender domain (issue #98's
-      verified source of truth). Plan tier and Server capacity: not yet recorded here — see issue #91.
-- [ ] `EMAIL_PROVIDER_API_KEY` stored as a GitHub Environment secret at: (name the environment, not
-      the value) and mirrored to Secret Manager at project: (project id) — pending, see issue #91.
-      `EMAIL_ACCOUNT_API_KEY` (the Postmark account token) confirmed in operator storage only, never
-      a deployment's GitHub Environment or Secret Manager: yes, per issue #98's verified source of
-      truth ("Postmark account token remains operator-only"; "application deployments receive only
-      their Server token").
-- [ ] `verify-sender-domain.cjs` output: (paste exit code and summary line, not any secret)
-- [ ] SPF line in that output (informational only — any value is fine when DKIM and Return-Path
-      pass; no SPF record to publish): (paste the SPF verdict)
-- [ ] Delivery webhook registered with triggers Delivery/Bounce/SpamComplaint: yes/no
-- [ ] Round-trip test (send + bounce) confirmed via `sent_emails` row: yes/no
+- [ ] Approved writable target: Environment/project, deployed revision and actual Deploy run.
+- [ ] Dedicated Live Server and current plan's maximum Server count confirmed.
+- [ ] Server-token and webhook credential store names/runtime bindings verified; Account Token
+      remains operator-only. Record names and locations, never values.
+- [ ] Current target sender-domain verification: Exit code and summary, without credentials.
+- [ ] Actual sending streams and authenticated Delivery/Bounce/SpamComplaint webhook confirmed.
+- [ ] Successful delivery: Provider message and matching `sent_emails` status update recorded.
+- [ ] Authorized bounce: Provider event and matching `sent_emails` status update recorded.
+- [ ] Before/after outbound counts reconciled; approved fixture cleanup complete.
 
 ### Workstream D
 - [ ] Repo renamed `run-of-show` → `eventrunner` under `CenterCoopMedia` (no org change): yes/no
@@ -709,11 +630,9 @@ What's left, in order:
 8. Issue #35 itself is closed by whoever files that PR, once the demo URL is publicly browsable and
    `generate-content.cjs --demo --check` passes — not by this document.
 
-Postmark upgrade path (optional, not blocking issue #35): per issues #91/#100, the demo stays on
-`EVENT_EMAIL_PROVIDER=console` until Postmark approves live sending. Once approved,
-[`docs/POSTMARK_PROVISIONING.md`](../POSTMARK_PROVISIONING.md) §7 covers switching the demo to a
-real Postmark stream so a prospect can see a real OTP email — an upgrade, not a requirement for
-closing #35.
+Postmark acceptance uses an approved writable rehearsal or client under
+[Postmark provisioning §7](../POSTMARK_PROVISIONING.md#7-acceptance-on-an-approved-writable-target).
+The historical demo keeps `EVENT_EMAIL_PROVIDER=console` and its read-only policy.
 - [ ] Readiness gate (`init-event.cjs --check`) exits 0: yes/no
 - [ ] Normal dispatch succeeded, smoke passed: yes/no
 - [ ] Demo URL confirmed publicly browsable from an unauthenticated path: yes/no (URL)

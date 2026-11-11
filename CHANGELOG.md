@@ -1073,6 +1073,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Postmark acceptance instructions use an approved writable target and preserve
+  the historical demo's console email and read-only policy (#91).
 - `live_updates` is no longer readable by everyone. A row with no audience, which is every
   row saved before this release, is readable by admins only, so it leaves the public card.
   The Live updates page counts these rows and marks each one; edit and save a row to give it
