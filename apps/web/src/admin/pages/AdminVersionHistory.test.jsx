@@ -214,6 +214,10 @@ describe('one record’s versions', () => {
     expect(screen.queryByText(DOC_PATH)).not.toBeInTheDocument();
     expect(screen.getByText(/^2 versions shown, newest first, read at \d{1,2}:\d{2} (AM|PM) E[SD]T\.$/)).toHaveAttribute('role', 'status');
     expect(screen.getByRole('link', { name: 'Back to the list' })).toHaveAttribute('href', '/admin/versions?collection=cmsContent');
+    const draftName = `A current draft name ${'not present in published history '.repeat(5)}in full`;
+    reportRecord({ drafts: [{ ...CLEAN_DRAFT, value: draftName, status: 'dirty' }] });
+    expect(screen.getByRole('heading', { level: 1, name: draftName })).toBeInTheDocument();
+    expect(within(versionItem(2)).queryByText(draftName)).toBeNull();
   });
 
   it('says the site shows nothing when the published version is hidden', async () => {
@@ -226,10 +230,11 @@ describe('one record’s versions', () => {
   });
 
   it('marks a record whose live and draft documents are gone as removed, and keeps its versions', async () => {
-    await renderPage();
+    const removedName = `A removed record ${'with its complete name '.repeat(6)}still available`;
+    await renderPage(undefined, { pages: [{ entries: [{ ...EDITED, fields: { ...EDITED.fields, value: removedName } }, SEEDED], nextCursor: null }] });
     reportRecord({ live: [], drafts: [] });
     expect(screen.getByText('Removed')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Four days of workshops.' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: removedName })).toBeInTheDocument();
     expect(versionItem(2)).toBeInTheDocument();
   });
 

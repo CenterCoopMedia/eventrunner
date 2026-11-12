@@ -89,23 +89,6 @@ function Head({ children }) {
   );
 }
 
-/**
- * A row's name. A name cut at 80 characters keeps its whole text in reach:
- * as the cut text's title for a pointer, and as a visually hidden copy that
- * is what a screen reader reads (and a link's name).
- */
-function RecordName({ row }) {
-  if (row.name === row.fullName) return row.name;
-  return (
-    <>
-      <span aria-hidden="true" title={row.fullName}>
-        {row.name}
-      </span>
-      <span className="sr-only">{row.fullName}</span>
-    </>
-  );
-}
-
 function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice, resultRef }) {
   const { choice, rows } = group;
   const key = `collection:${choice.id}`;
@@ -162,11 +145,11 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice
                   <td className={cell}>
                     {href ? (
                       <Link to={href} className={rowTitleLinkClass}>
-                        <RecordName row={row} />
+                        {row.name}
                       </Link>
                     ) : (
                       <span className="text-admin-base font-bold text-admin-ink">
-                        <RecordName row={row} />
+                        {row.name}
                       </span>
                     )}
                   </td>
@@ -319,8 +302,7 @@ export default function AdminUnpublishedChanges() {
       ...group,
       rows: group.rows.map((row) => ({
         ...row,
-        name: versionRecordName(group.choice.id, docs.get(row.id)),
-        fullName: versionRecordName(group.choice.id, docs.get(row.id), { full: true }),
+        name: versionRecordName(group.choice.id, docs.get(row.id), { full: true }),
       })),
     };
   }).filter((group) => group.rows.length > 0 || resultKey === `collection:${group.choice.id}`);

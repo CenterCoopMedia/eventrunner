@@ -693,7 +693,9 @@ describe('invite actions', () => {
   });
 
   it('shows an invitation that was recorded but never delivered', async () => {
-    speakerDocs = [{ ...RAE, id: 'invited-one', firstName: 'Invited', lastName: 'One', status: 'invited' }];
+    const jobTitle = 'A long synthetic job title '.repeat(8).trim();
+    const organization = 'A long synthetic organization '.repeat(8).trim();
+    speakerDocs = [{ ...RAE, id: 'invited-one', firstName: 'Invited', lastName: 'One', status: 'invited', jobTitle, organization }];
     routeInviteFetch({
       invites: [
         { speakerId: 'invited-one', status: 'pending', sentAt: null, expiresAt: '2026-09-04T12:00:00.000Z' },
@@ -702,6 +704,7 @@ describe('invite actions', () => {
     await renderAt('/admin/speakers');
 
     await waitFor(() => expect(screen.getByText(/Invite not sent\. Select Resend invite\./)).toBeInTheDocument());
+    expect(screen.getByText(`${jobTitle}, ${organization} · Invite not sent. Select Resend invite.`)).toBeVisible();
   });
 
   it('shows the expiry of a delivered invitation', async () => {

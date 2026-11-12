@@ -875,6 +875,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Homepage hero-image edits keep save and publish feedback visible when the draft listener updates.
   Branding edits the visible image used by Home, and local URL/alt changes warn before navigation
   or reload. A failed save keeps edits dirty until the draft is confirmed (#726).
+- Attendee email addresses, speaker invitation details and version record names stay readable
+  in full, including unpublished or removed records without an editor link (#855).
 - Ticket order actions name their record, and ticket settings and promo-code saves have distinct
   screen-reader names. Console review hides the active form's opener and names result refreshes
   separately from the page refresh; Cancel returns focus to the opener (#737).
