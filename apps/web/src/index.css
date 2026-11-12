@@ -2882,7 +2882,7 @@
     outline-offset: 1px;
   }
 
-  .admin-format-button[aria-pressed='true'] {
+  .admin-room .admin-format-button[aria-pressed='true'] {
     background-color: Highlight;
     border-color: Highlight;
     color: HighlightText;
