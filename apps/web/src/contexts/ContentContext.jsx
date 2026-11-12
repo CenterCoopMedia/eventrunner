@@ -75,7 +75,7 @@ const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 // facts ask for their section with starter text kept (`keepStarter`),
 // because the seeded When fact is filled from the event's dates there
 // (pages/Home.jsx), and that page checks each block again after that.
-function isDrawable(block, { keepStarter = false } = {}) {
+export function isDrawable(block, { keepStarter = false } = {}) {
   return Boolean(block) && block.visible !== false && (keepStarter || !isStarterContent(block));
 }
 

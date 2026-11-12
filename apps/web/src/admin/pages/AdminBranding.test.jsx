@@ -229,10 +229,11 @@ describe('the Homepage hero image field', () => {
   const photo = {
     id: 'hero__photo', section: 'hero', field: 'photo', blockType: 'image',
     url: 'cms-images/live.jpg', alt: 'The live picture', order: 3,
-    caption: 'Keep the caption', focalX: 20, focalY: 40, visible: false,
+    caption: 'Keep the caption', focalX: 20, focalY: 40, visible: true,
   };
   beforeEach(() => {
     adminSources.cmsPages = [home];
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
   it('shows the current draft image and requires alt text', async () => {
@@ -271,16 +272,18 @@ describe('the Homepage hero image field', () => {
     });
   });
 
-  it('updates the first image in content order and publishes only that content document', async () => {
-    // A full section still permits updates. The second image is first in
-    // the listener array, but the renderer uses stored content order.
+  it('updates the first visible drawable image in content order and preserves a hidden row', async () => {
+    // A full section still permits updates. Hidden content comes first in
+    // stored order, and the second visible image is first in the listener.
     adminSources.cmsContent = [
       { ...photo, id: 'hero__second', field: 'second', order: 4 }, photo,
-      ...['title', 'subtitle'].map((field, order) => ({ id: `hero__${field}`, section: 'hero', field, blockType: 'text', order })),
+      { ...photo, id: 'hero__hidden', field: 'hidden', visible: false, order: 2, url: 'cms-images/hidden.jpg' },
+      { id: 'hero__title', section: 'hero', field: 'title', blockType: 'text', order: 0 },
     ];
     fetch.mockResolvedValueOnce(okResponse({ docId: photo.id }))
       .mockResolvedValueOnce(okResponse({ results: { cmsContent: { published: [photo.id], skipped: [] } } }));
     await renderBranding();
+    expect(screen.getByLabelText('Homepage hero image')).toHaveValue(photo.url);
     fireEvent.change(screen.getByLabelText('Homepage hero image'), { target: { value: 'cms-images/new.jpg' } });
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Guests in the hall' } });
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
@@ -292,6 +295,20 @@ describe('the Homepage hero image field', () => {
     });
     expect(String(fetch.mock.calls[1][0])).toMatch(/\/cmsPublish$/);
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ collection: 'cmsContent', docIds: [photo.id] });
+  });
+
+  it('guards local image edits on Branding navigation and reload', async () => {
+    adminSources.cmsContent = [photo];
+    await renderBranding();
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'An unsaved picture description' } });
+    const unload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(true);
+    fireEvent.click(screen.getByRole('link', { name: 'Overview', exact: true }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Unsaved changes' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    expect(screen.getByLabelText('Alt text')).toHaveValue('An unsaved picture description');
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('does not report success when publication skips the image', async () => {

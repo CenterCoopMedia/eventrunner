@@ -44,6 +44,7 @@
 // Storage bucket, and each slot is an ImagePicker over the `branding/`
 // namespace. Whatever is in `logos` is carried through every save verbatim.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   THEME_HEADERS,
   getPreset,
@@ -57,6 +58,8 @@ import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import HomeHeroImageEditor from '../components/HomeHeroImageEditor.jsx';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import { configuredThemeColor } from '../themeColors.js';
 import {
   ADMIN_SCHEME_IDS,
@@ -364,6 +367,8 @@ export default function AdminBranding() {
   const [form, setForm] = useState(() => toForm(theme));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [heroEdit, setHeroEdit] = useState({ dirty: false, busy: false });
+  const leaveGuard = useUnsavedNavigation(heroEdit.dirty || heroEdit.busy, { blocked: saving || heroEdit.busy });
   const [status, setStatus] = useState('');
   const [activeTask, setActiveTask] = useState('identity');
   const [moreLogosOpen, setMoreLogosOpen] = useState(false);
@@ -492,7 +497,7 @@ export default function AdminBranding() {
   }
 
   return (
-    <form className="flex flex-col gap-md" onSubmit={submit}>
+    <form className="flex flex-col gap-md" onSubmit={submit} inert={leaveGuard.pending ? '' : undefined}>
       <AdminPageHeader
         title="Branding"
         state={<RecordState state={isDirty ? state('dirty') : state('live')} />}
@@ -631,6 +636,7 @@ export default function AdminBranding() {
               rows={contentRows}
               ready={pagesReady && contentReady}
               disabled={saving}
+              onEditStateChange={setHeroEdit}
               branding
             />
 
@@ -1125,6 +1131,10 @@ export default function AdminBranding() {
           />
         </div>
       </div>
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog onStay={leaveGuard.stay} onDiscard={leaveGuard.discard} canDiscard={leaveGuard.canDiscard} />,
+        document.body,
+      ) : null}
     </form>
   );
 }
