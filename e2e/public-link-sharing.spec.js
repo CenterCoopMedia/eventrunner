@@ -25,10 +25,10 @@ test('a public session shares its current route and offers copy after a share fa
   await page.goto(`${route}?day=one`);
   await expect(page.getByRole('heading', { level: 1, name: session.title, exact: true })).toBeVisible();
   await page.evaluate(() => {
-    const canonical = document.createElement('link');
+    const canonical = globalThis.document.createElement('link');
     canonical.rel = 'canonical';
     canonical.href = '/previous-page';
-    document.head.append(canonical);
+    globalThis.document.head.append(canonical);
   });
   const share = page.getByRole('button', { name: 'Share session', exact: true });
   await share.focus();
