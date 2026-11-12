@@ -58,6 +58,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import AdminTableScroll from '../components/AdminTableScroll.jsx';
 
 const PAGE_SIZE = 25;
 const STATUS_WORDS = Object.freeze({ sent: 'Sent', failed: 'Failed' });
@@ -588,7 +589,7 @@ export default function AdminEmailLog() {
     );
   } else {
     body = (
-      <div
+      <AdminTableScroll
         role="region"
         aria-label="Sent messages"
         tabIndex={0}
@@ -659,7 +660,7 @@ export default function AdminEmailLog() {
             })}
           </tbody>
         </table>
-      </div>
+      </AdminTableScroll>
     );
   }
 

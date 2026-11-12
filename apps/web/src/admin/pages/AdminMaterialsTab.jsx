@@ -60,6 +60,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import AdminTableScroll from '../components/AdminTableScroll.jsx';
 
 const REVIEW_LABEL = { pending: 'Pending review', approved: 'Approved', rejected: 'Rejected' };
 
@@ -759,7 +760,7 @@ export default function AdminMaterialsTab() {
             <Notice tone={archiveResult.tone} message={archiveResult.message} />
           ) : null}
         </div>
-        <div
+        <AdminTableScroll
           role="region"
           aria-label="Materials"
           tabIndex={0}
@@ -808,7 +809,7 @@ export default function AdminMaterialsTab() {
               ))}
             </tbody>
           </table>
-        </div>
+        </AdminTableScroll>
       </>
     );
   }

@@ -44,6 +44,7 @@ import AdminPageHeader, {
   StatusBadge,
   proofRowClass,
 } from '../components/adminChrome.jsx';
+import AdminTableScroll from '../components/AdminTableScroll.jsx';
 
 // The galley head (AdminTicketing.jsx GalleyHead), copied rather than
 // imported: that component is local to the ticketing page.
@@ -177,7 +178,7 @@ export default function AdminUpdatesList() {
           action={writeLink}
         />
       ) : (
-        <div
+        <AdminTableScroll
           role="region"
           aria-label="Updates"
           tabIndex={0}
@@ -240,7 +241,7 @@ export default function AdminUpdatesList() {
               })}
             </tbody>
           </table>
-        </div>
+        </AdminTableScroll>
       )}
     </div>
   );

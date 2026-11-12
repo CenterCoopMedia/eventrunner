@@ -5,9 +5,10 @@ import { formatTicketMoney, formatTicketTime, orderStatusLabel, paymentStatusLab
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { Notice, Panel, secondaryButtonClass, SelectField, TextField, linkButtonClass } from './formControls.jsx';
 import CreateAccountFromTicket, { canCreateAccountFromTicket } from './CreateAccountFromTicket.jsx';
+import AdminTableScroll from './AdminTableScroll.jsx';
 
 export function TicketingTable({ label, children }) {
-  return <div role="region" aria-label={label} tabIndex={0} className="max-h-[32rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline"><table className="w-full min-w-[48rem] border-collapse text-admin-sm">{children}</table></div>;
+  return <AdminTableScroll role="region" aria-label={label} tabIndex={0} className="max-h-[32rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline"><table className="w-full min-w-[48rem] border-collapse text-admin-sm">{children}</table></AdminTableScroll>;
 }
 export function TicketingHead({ children }) {
   return <th scope="col" className="sticky top-0 z-10 border-b-admin-strong border-admin-rule-strong bg-admin-ground-soft px-sm py-xs text-start text-admin-xs font-semibold text-admin-ink-secondary">{children}</th>;
