@@ -436,7 +436,9 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 
 @media (forced-colors: active) {
   .button, .filter { border-color: ButtonText; }
-  .button:disabled:not([aria-busy="true"]), .button[aria-disabled="true"]:not([aria-busy="true"]) { color: GrayText; border-color: GrayText; }
+  .button:disabled:not([aria-busy="true"]),
+  .button[aria-disabled="true"]:not([aria-busy="true"]),
+  .steps a[aria-disabled="true"] { color: GrayText; border-color: GrayText; }
   .filter[aria-current="page"], .steps a[aria-current="step"] { outline: 2px solid Highlight; outline-offset: -4px; }
   .button:focus-visible, .filter:focus-visible, .steps a:focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }
   .console-spinner { border-color: GrayText; border-top-color: Highlight; }
