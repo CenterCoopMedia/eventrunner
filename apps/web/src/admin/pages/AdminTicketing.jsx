@@ -378,6 +378,8 @@ function ImportPanel({ call, onImported }) {
     if (!file) return;
     setNotice(null);
     setPreview(null);
+    setParsed(null);
+    setMapping({});
     try {
       const text = await file.text();
       const { headers, rows } = parseCsvFile(text);
@@ -396,8 +398,8 @@ function ImportPanel({ call, onImported }) {
         if (hit) guess[field.id] = hit;
       }
       setMapping(guess);
-    } catch {
-      setNotice({ kind: 'error', message: 'That file could not be read as text.' });
+    } catch (err) {
+      setNotice({ kind: 'error', message: err instanceof SyntaxError ? err.message : 'That file could not be read as text.' });
     }
   }
 

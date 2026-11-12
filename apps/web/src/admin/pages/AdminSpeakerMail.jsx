@@ -224,7 +224,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
         {entry.savedErrors.length > 0 ? (
           <Notice
             tone="caution"
-            message={`The saved wording fails its check, so speakers get the shipped wording: ${entry.savedErrors.join('; ')}. Use the shipped wording to return to plain editing.`}
+            message={`The saved wording fails its check, so speakers get the shipped wording: ${entry.savedErrors.join('; ')}. ${supported ? 'Fix the fields below or use the shipped wording.' : 'Use the shipped wording to return to plain editing.'}`}
           />
         ) : null}
         {!supported ? <Notice tone="caution" message={entry.editor.reason} /> : null}

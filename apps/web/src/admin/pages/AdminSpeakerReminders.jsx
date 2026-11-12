@@ -328,7 +328,7 @@ function WordingEditor({ call, timeZone }) {
         ))) : null}
         {result ? <Notice tone={result.tone} message={result.message} /> : null}
         <p className="text-admin-sm font-medium text-admin-state-caution">
-          Saving pauses scheduled reminders until you approve them again.
+          Saving or resetting the wording pauses scheduled reminders until you approve them again.
         </p>
         <div className="flex flex-wrap items-center gap-xs">
           {supported ? (

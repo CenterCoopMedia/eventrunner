@@ -556,7 +556,7 @@ The workspace follows the deployment's configured provider ([`CLIENT_ONBOARDING.
 
 - **Stripe**: Native event-site selection, Stripe-hosted payment, and the organizer controls below. Merchant setup and opening live sales require the [Stripe launch and support runbook](operator/stripe-ticketing.md).
 - **Eventbrite**: Provider status shows webhook registration state and recent sync activity.
-- **Manual / CSV import**: Upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it.
+- **Manual / CSV import**: Upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it. A malformed quoted field shows the CSV syntax error; choose a corrected file before previewing.
 - **None**: Nothing to configure.
 
 Ticket records are server-only in Firestore. Every list, search, import, and commerce action goes through an authenticated endpoint; even an admin browser cannot read the commerce collections directly.
@@ -752,6 +752,8 @@ Add speakers, sessions, organizations (sponsors and partners) and registrations 
 5. Select **Import N speakers as drafts** (the words name the type and count). Rows with an error are skipped. The import checks each record again as it saves it, so a field someone edited after your preview keeps their edit, and a record deleted after your preview is not made again. The result lists what happened to each row, and the import writes one row to the audit log.
 
 If the file or the mapping changes after the preview, the import is refused. Preview again.
+
+**CSV quotes.** Enclose a cell with a comma, quote or line break in double quotes. Double each quote inside that cell: `"John ""JJ"" Smith"`. The import refuses an unclosed quote, a quote in an unquoted cell, or text after a closing quote, and shows the CSV syntax error. These rules also apply to ticket and proposal CSV imports. A file-read failure has a separate message.
 
 **The external ID.** Each row needs an ID from the source system that stays the same each time you export the file, for example a registration number. The import uses it to find the record it made the last time:
 

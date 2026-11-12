@@ -50,20 +50,20 @@ export function parseCsv(text) {
       continue;
     }
     if (c === '"') {
-      if (field || closedQuote) throw new Error('CSV quotes must enclose the whole field.');
+      if (field || closedQuote) throw new SyntaxError('CSV quotes must enclose the whole field.');
       inQuotes = true;
     } else if (c === ',') {
       endField();
     } else if (c === '\n') {
       endRow();
     } else {
-      if (closedQuote) throw new Error('CSV quoted fields must end at a comma or line break.');
+      if (closedQuote) throw new SyntaxError('CSV quoted fields must end at a comma or line break.');
       field += c;
     }
   }
   // A trailing newline leaves nothing to flush; anything else (including a
   // file with no trailing newline) is one more row/field to close out.
-  if (inQuotes) throw new Error('CSV has an unclosed quoted field.');
+  if (inQuotes) throw new SyntaxError('CSV has an unclosed quoted field.');
   if (field.length > 0 || row.length > 0 || closedQuote) endRow();
 
   return rows;
