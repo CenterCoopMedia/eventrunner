@@ -178,7 +178,7 @@ describe('Console action feedback and recovery', () => {
     expect(screen.queryByLabelText('Note to the client')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
     const feedback = screen.getByText(/The decision is saved, but we could not refresh/).closest('[role="status"]');
-    fireEvent.click(within(feedback).getByRole('button', { name: 'Refresh request' }));
+    fireEvent.click(within(feedback).getByRole('button', { name: 'Refresh request after action' }));
     await waitFor(() => expect(screen.queryByText(/The decision is saved, but we could not refresh/)).not.toBeInTheDocument());
     expect(screen.getByText('Declined', { selector: '.tag' })).toBeInTheDocument();
     expect(callsTo('declineApplication')).toHaveLength(1);
