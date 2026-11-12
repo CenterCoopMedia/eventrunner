@@ -207,13 +207,13 @@ describe('the Home hero image slot', () => {
   it('creates a draft without a block type choice and can replace it after deletion', async () => {
     fetch.mockResolvedValue(okResponse({ docId: 'hero__image', status: 'dirty' }));
     await renderAt('/admin/content/home/hero');
-    expect(await screen.findByRole('heading', { name: 'Hero image' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Hero image')).toHaveAttribute('placeholder', 'Choose an image');
-    expect(screen.getByLabelText('Alt text')).toHaveAttribute('aria-required', 'true');
-    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/hero.jpg' } });
-    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'People at the event' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    await screen.findByText('Draft saved. Publish to show it on your site.');
+    const hero = within((await screen.findByRole('heading', { name: 'Hero image' })).closest('section'));
+    expect(hero.getByLabelText('Hero image')).toHaveAttribute('placeholder', 'Choose an image');
+    expect(hero.getByLabelText('Alt text')).toHaveAttribute('aria-required', 'true');
+    fireEvent.change(hero.getByLabelText('Hero image'), { target: { value: 'cms-images/hero.jpg' } });
+    fireEvent.change(hero.getByLabelText('Alt text'), { target: { value: 'People at the event' } });
+    fireEvent.click(hero.getByRole('button', { name: 'Save draft' }));
+    await hero.findByText('Draft saved. Publish to show it on your site.');
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(urlOf(0)).toMatch(/\/cmsCreateContent$/);
     expect(bodyOf(0)).toEqual({
@@ -224,25 +224,28 @@ describe('the Home hero image slot', () => {
     act(() => adminSubscriptions.get('cmsContent_drafts')([
       { id: 'hero__image', section: 'hero', field: 'image', blockType: 'image', url: 'cms-images/hero.jpg', alt: 'People at the event' },
     ]));
-    expect(screen.getByLabelText('Hero image')).toHaveValue('cms-images/hero.jpg');
-    expect(screen.getByText('Draft saved. Publish to show it on your site.')).toBeInTheDocument();
+    expect(hero.getByLabelText('Hero image')).toHaveValue('cms-images/hero.jpg');
+    expect(hero.getByText('Draft saved. Publish to show it on your site.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'People at the event' })).toHaveAttribute('href', '/admin/content/home/hero/image');
     const imageRow = screen.getByRole('link', { name: 'People at the event' }).closest('li');
+    fetch.mockResolvedValueOnce(okResponse({ entries: [], nextCursor: null }));
     fireEvent.click(within(imageRow).getByRole('button', { name: 'Delete', exact: true }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete this block' }));
-    await screen.findByText(/deleted. The live block and its draft were removed/);
+    await within(imageRow).findByText(/has no published version and cannot be restored after deletion/);
+    fireEvent.click(within(imageRow).getByRole('button', { name: 'Delete this block' }));
+    await within(imageRow).findByText(/deleted. The live block and its draft were removed/);
     act(() => adminSubscriptions.get('cmsContent_drafts')([]));
-    expect(screen.getByLabelText('Hero image')).toHaveValue('');
-    expect(screen.getByLabelText('Alt text')).toHaveValue('');
+    expect(hero.getByLabelText('Hero image')).toHaveValue('');
+    expect(hero.getByLabelText('Alt text')).toHaveValue('');
     expect(heroUnloadBlocked()).toBe(false);
-    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/replacement.jpg' } });
-    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'A replacement picture' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    await screen.findByText('Draft saved. Publish to show it on your site.');
-    expect(fetch).toHaveBeenCalledTimes(3);
-    expect(urlOf(1)).toMatch(/\/cmsDeleteContent$/);
-    expect(urlOf(2)).toMatch(/\/cmsCreateContent$/);
-    expect(bodyOf(2).fields).toMatchObject({ url: 'cms-images/replacement.jpg', alt: 'A replacement picture' });
+    fireEvent.change(hero.getByLabelText('Hero image'), { target: { value: 'cms-images/replacement.jpg' } });
+    fireEvent.change(hero.getByLabelText('Alt text'), { target: { value: 'A replacement picture' } });
+    fireEvent.click(hero.getByRole('button', { name: 'Save draft' }));
+    await hero.findByText('Draft saved. Publish to show it on your site.');
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(urlOf(1)).toMatch(/\/cmsGetVersionHistory$/);
+    expect(urlOf(2)).toMatch(/\/cmsDeleteContent$/);
+    expect(urlOf(3)).toMatch(/\/cmsCreateContent$/);
+    expect(bodyOf(3).fields).toMatchObject({ url: 'cms-images/replacement.jpg', alt: 'A replacement picture' });
   });
 
   it.each(['success', 'failure'])('keeps a delayed publish %s after the draft listener adds the image', async (outcome) => {
@@ -827,17 +830,22 @@ describe('creating and editing a block', () => {
   it('deletes a block through cmsDeleteContent', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
+    fetch.mockResolvedValueOnce(okResponse({ entries: [], nextCursor: null }));
     fetch.mockResolvedValueOnce(okResponse({ deleted: ['cmsContent/intro__body', 'cmsContent_drafts/intro__body'] }));
 
     await renderAt('/admin/content/scholarships/intro/body');
     // Moment 3: the first press states the cost, the second does the work.
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete this block' }));
     expect(fetch).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete this block' }));
+    await screen.findByText(/has no published version and cannot be restored after deletion/);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(urlOf(0)).toMatch(/\/cmsGetVersionHistory$/);
+    expect(bodyOf(0)).toEqual({ docPath: 'cmsContent/intro__body', limit: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Delete this block' }));
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(urlOf(0)).toMatch(/\/cmsDeleteContent$/);
-    expect(bodyOf(0)).toEqual({ section: 'intro', field: 'body' });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(urlOf(1)).toMatch(/\/cmsDeleteContent$/);
+    expect(bodyOf(1)).toEqual({ section: 'intro', field: 'body' });
   });
 });
 
@@ -949,7 +957,9 @@ describe('contextual block actions', () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
     await renderAt('/admin/content/scholarships/intro');
+    fetch.mockResolvedValueOnce(okResponse({ entries: [], nextCursor: null }));
     fireEvent.click(await screen.findByRole('button', { name: 'Delete', exact: true }));
+    await screen.findByText(/has no published version and cannot be restored after deletion/);
     const confirm = screen.getByRole('button', { name: 'Delete this block' });
     confirm.focus();
     fetch.mockResolvedValueOnce(okResponse({}));

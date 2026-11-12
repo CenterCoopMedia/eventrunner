@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import RecordRecovery from '../components/RecordRecovery.jsx';
 import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { timelineFields, validateTimelineForm } from '../timelineDoc.js';
@@ -306,7 +307,7 @@ export default function AdminTimelineEditor({ mode }) {
             busy={action === 'delete'}
             disabled={saving}
             consequence="The live entry and its draft are removed together. Its version history stays."
-            permanence="This cannot be undone."
+            permanence={<RecordRecovery collection="cmsTimeline" docId={docId} />}
             onConfirm={remove}
           />
         ) : null}

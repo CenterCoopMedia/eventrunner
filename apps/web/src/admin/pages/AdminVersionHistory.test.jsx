@@ -26,6 +26,8 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({
 import AdminVersionHistory from './AdminVersionHistory.jsx';
 import { unavailableButtonClass } from '../components/formControls.jsx';
 import { DELETE_FIELD_SENTINEL } from '../contentDoc.js';
+import { scheduleData } from '../../generated/scheduleData.js';
+import { organizationsData } from '../../generated/organizationsData.js';
 
 const DOC_PATH = 'cmsContent/hero__subtitle';
 // 2:02 PM on Sep 23, 2026 in New York.
@@ -236,6 +238,22 @@ describe('one record’s versions', () => {
     expect(screen.getByText('Removed')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: removedName })).toBeInTheDocument();
     expect(versionItem(2)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['cmsSchedule', scheduleData[0], 'Restoring the session does not restore its materials.'],
+    ['cmsOrganizations', organizationsData[0], 'Restoring the organization does not restore representative access or an edit that was waiting for review.'],
+  ])('states the missing side effects before restoring a removed %s record', async (collection, fields, words) => {
+    await renderPage(`/admin/versions/${collection}/gone`, { pages: [{ entries: [entry(1, { docPath: `${collection}/gone`, fields })], nextCursor: null }] });
+    act(() => {
+      listeners.get(collection).onNext([]);
+      listeners.get(`${collection}_drafts`).onNext([]);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Restore version 1' }));
+    const confirmation = screen.getByRole('region', { name: 'Restore version 1?' });
+    expect(confirmation).toHaveTextContent(words);
+    expect(confirmation).toHaveTextContent('The record is saved again as a draft. The site does not change until you publish.');
+    expect(historyCalls()).toHaveLength(1);
   });
 
   it('shows the first version as its values, in two columns', async () => {

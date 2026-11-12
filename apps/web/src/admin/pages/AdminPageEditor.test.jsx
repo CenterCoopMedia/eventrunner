@@ -650,21 +650,24 @@ describe('page editor', () => {
 
   it('deletes a regular page through cmsDeletePage, after stating what is lost', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce(okResponse({ entries: [{ revision: 1 }], nextCursor: null }));
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', deleted: true }));
     await renderAt('/admin/pages/scholarships');
 
     // Moment 3: the first press opens a still surface that names the cost;
     // the confirm button repeats the consequence rather than saying
-    // "Confirm", and nothing is sent until it is pressed.
+    // "Confirm". Opening reads recovery history but does not delete.
     fireEvent.click(await screen.findByRole('button', { name: 'Delete this page' }));
     expect(screen.getByText(/The live page and its draft both go/)).toBeInTheDocument();
-    expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Published versions can be restored as a draft/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(urlOf(0)).toMatch(/\/cmsGetVersionHistory$/);
+    expect(bodyOf(0)).toEqual({ docPath: 'cmsPages/scholarships', limit: 1 });
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete this page' }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(urlOf(0)).toMatch(/\/cmsDeletePage$/);
-    expect(bodyOf(0)).toEqual({ id: 'scholarships' });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(urlOf(1)).toMatch(/\/cmsDeletePage$/);
+    expect(bodyOf(1)).toEqual({ id: 'scholarships' });
   });
 
   it('starts existing sections collapsed and keeps changes through reopening', async () => {

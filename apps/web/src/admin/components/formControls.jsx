@@ -590,7 +590,7 @@ export function DestructiveConfirm({
       </h2>
       <p id={consequenceId} className="text-admin-sm text-admin-ink">
         {consequence}
-        {permanence ? ` ${permanence}` : ''}
+        {permanence ? <> {permanence}</> : null}
       </p>
       <div className="flex flex-wrap items-center gap-xs">
         <button

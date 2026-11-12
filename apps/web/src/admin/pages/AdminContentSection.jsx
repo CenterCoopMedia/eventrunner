@@ -11,6 +11,7 @@ import { Link, useParams } from 'react-router';
 import { isStarterContent } from 'shared/seed';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import RecordRecovery from '../components/RecordRecovery.jsx';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import { BLOCK_TYPE_IDS, blockTypeLabel } from '../blockTypes.js';
@@ -370,7 +371,7 @@ export default function AdminContentSection() {
                       busy={busy?.id === row.id && busy.action === 'delete'}
                       disabled={writeBlocked}
                       consequence="The live revision and its draft both go, and the section renders without this block."
-                      permanence="This cannot be undone."
+                      permanence={<RecordRecovery collection="cmsContent" docId={row.id} />}
                       onConfirm={() => remove(row)}
                     />
                   </div>

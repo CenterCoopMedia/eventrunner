@@ -25,6 +25,7 @@ import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { leadsToNoPublicPage, switchedOffSectionFor } from '../../lib/linkTargets.js';
 import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
+import RecordRecovery from '../components/RecordRecovery.jsx';
 import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
@@ -727,7 +728,7 @@ export default function AdminContentBlockEditor({ mode }) {
             busy={busy === 'delete'}
             disabled={busy !== null}
             consequence="This block and its saved draft will be deleted."
-            permanence="This cannot be undone."
+            permanence={<RecordRecovery collection="cmsContent" docId={`${sectionId}__${currentFieldId}`} />}
             onConfirm={remove}
           />
         ) : null}

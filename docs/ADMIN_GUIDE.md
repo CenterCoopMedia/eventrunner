@@ -289,7 +289,7 @@ Every update on the site's Updates page. Each row gives the update's title, its 
 
 **A picture and content blocks.** An update can also carry a picture and content blocks. This editor does not change them. When an update has them, the editor says so, and a save keeps them as they are.
 
-**Delete this update** removes the live update and its draft together. Its version history stays. If *Updates* is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.
+**Delete this update** removes the live update and its draft together. Published versions stay in **Version history → Removed records** and can be restored as a draft. Unpublished edits are lost. An update that was never published cannot be restored. If *Updates* is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.
 
 ## Timeline
 
@@ -305,7 +305,7 @@ The past editions of the event: Add, edit, publish, and delete them here. The ho
 
 **The list appears only in the History section.** If the home page has no section with the id `history`, published entries do not appear anywhere, and the Timeline list says so. Add a section with that id to the home page under Pages.
 
-**Delete** removes the live entry and its draft together. Its version history stays.
+**Delete** removes the live entry and its draft together. Published versions stay in **Version history → Removed records** and can be restored as a draft. Unpublished edits are lost. An entry that was never published cannot be restored.
 
 ## Unpublished changes
 
@@ -979,8 +979,8 @@ Every publish keeps a version of the record. A version holds the record's conten
 
 - **Pick a collection, then a record.** **Content type** picks content blocks, pages, sessions, organizations, updates, or the timeline. The list shows the records that collection holds now, with their state, the live version, and the time of the last publish. A record whose live version is hidden says **Hidden**, and the site shows nothing for it. **Search by name** narrows the list as you type. **Order records by** sorts by the most recent publish or by name. The collection, the search, and the order stay in the page address, so a reload or a shared link keeps them.
 - **Read a version.** A record's page lists its versions, newest first, 20 at a time. **Load older versions** reads the next 20. Each version names its number, its time on the event's clock, and the account that published it. Its table lists each field that changed, with the value before and after the publish. The first version lists its values. A long value shows its first 300 characters, and **Show all** opens the rest. Every value shows as plain text: Rich text shows its tags, and a link is not clickable.
-- **A deleted record keeps its versions.** The list does not show it, because the list shows the records that exist now. Its page still opens at `/admin/versions/<collection>/<id>`.
-- **Versions cannot be changed or restored.** The page only reads the history. To go back to an earlier version, copy its values into the record's editor, then save and publish. A value published by mistake stays in the history. An operator can remove it in the database console.
+- **Find a deleted record.** Choose its content type, then open **Removed records** below the current list. This group loads after the current list and names each record from its newest published version. **Check more history** reads another part of the history; the page says when more remains. Search and order apply to the current records and the removed records loaded so far. A record restored as a draft leaves the removed group. A record that was never published has no version to restore.
+- **Restore a version as a draft.** Open a record, choose **Restore version**, read the confirmation, then choose **Restore as draft**. Restoring does not publish. Any unpublished draft edits it replaces are lost. Select **Publish now** to put the restored version on the site. A removed content block can return only while its section is on a page. Restoring a removed session does not restore its materials. Restoring an organization does not restore representative access or an edit that was waiting for review. Published history stays unchanged, including a value published by mistake.
 
 ## System errors
 

@@ -24,6 +24,20 @@ export { COLLECTION_CHOICES };
 /** The collection the list opens on when the URL names none it knows. */
 export const DEFAULT_COLLECTION = 'cmsContent';
 
+/** Newest saved version for each record absent from both live and drafts. */
+export function removedVersionRecords(collection, versions, currentRows) {
+  const current = new Set(currentRows.filter((row) => row.current).map((row) => row.id));
+  const latest = new Map();
+  const prefix = `${collection}/`;
+  for (const entry of versions) {
+    if (typeof entry.docPath !== 'string' || !entry.docPath.startsWith(prefix)) continue;
+    const id = entry.docPath.slice(prefix.length);
+    if (!id || id.includes('/') || current.has(id)) continue;
+    if (!latest.has(id) || entry.revision > latest.get(id).revision) latest.set(id, { ...entry, id });
+  }
+  return [...latest.values()];
+}
+
 /**
  * The choice for a collection id, or null. A find over the list rather than
  * a lookup in a map, so a URL that says "constructor" finds nothing.

@@ -510,9 +510,12 @@ describe('the update editor', () => {
     await renderAt('/admin/updates/published');
     pushUpdates([PUBLISHED], [PUBLISHED_CLEAN]);
     await screen.findByRole('heading', { level: 1, name: PUBLISHED.title });
+    fetch.mockResolvedValueOnce(response({ entries: [{ revision: 1 }], nextCursor: null }));
     fetch.mockResolvedValueOnce(response({ id: 'published', deleted: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete this update' }));
-    expect(screen.getByText('The live update and its draft are removed together. Its version history stays. This cannot be undone.')).toBeInTheDocument();
+    expect(screen.getByText(/The live update and its draft are removed together/)).toBeInTheDocument();
+    expect(await screen.findByText(/Published versions can be restored as a draft/)).toBeInTheDocument();
+    expect(screen.getByText(/Unpublished edits are lost/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Delete this update' }));
     await waitFor(() => expect(callsTo('cmsDeleteUpdate')).toHaveLength(1));
     expect(bodyOf(callsTo('cmsDeleteUpdate')[0])).toEqual({ id: 'published' });
