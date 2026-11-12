@@ -792,6 +792,31 @@ test('an expired invite never takes an address off the operator list', async () 
   assert.equal(tierOn(fake, 'dee@example.org'), 'operator');
 });
 
+test('the first sync on an older site does not undo an Access page removal', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  // A site built before #839: no console record, and an operator took Bo off.
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  const { consoleAdminEmails, consoleStaffEmails, ...older } = (await ref.get()).data();
+  await ref.set({ ...older, adminEmails: older.adminEmails.filter((email) => email !== 'bo@example.org') });
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'bo@example.org'), null);
+  assert.ok(fake.clientFirestore.read('config/bootstrap').consoleAdminEmails.includes('bo@example.org'));
+});
+
+test('a team sync keeps a staffExpiry that is not a plain map', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  // The fake store keeps a Date where Firestore keeps a Timestamp.
+  await ref.update({ staffEmails: ['old@example.org'], staffExpiry: new Date(NOW) });
+  assert.equal(tierOn(fake, 'old@example.org'), null);
+  await invite(fake, 'dee@example.org', 'editor');
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(fake.clientFirestore.read('config/bootstrap').staffExpiry.getTime(), NOW);
+  assert.equal(tierOn(fake, 'old@example.org'), null);
+});
+
 test('a team sync never removes the last client operator or a support account', async () => {
   const fake = setup();
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);

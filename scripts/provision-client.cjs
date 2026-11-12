@@ -1200,7 +1200,9 @@ async function consoleTeam(db, orgId, at) {
  * role changes. A person removed from the team, or whose invite was
  * withdrawn, loses both tiers. An expired invite keeps what the last sync
  * granted. Support accounts are never added or removed. A change that would
- * leave no operator outside the support accounts is not written.
+ * leave no operator outside the support accounts is not written. A site's
+ * first sync only records the console team: an earlier Access page removal
+ * cannot be told apart from a late console change, so it is not undone.
  * @returns {Promise<'changed'|'unchanged'|'no-site'|'last-operator'>}
  */
 async function syncTeamAccess({ db, team, support, now }) {
@@ -1212,9 +1214,11 @@ async function syncTeamAccess({ db, team, support, now }) {
     const supportSet = new Set([...support, ...normalizeEmails(stored.supportAdminEmails)]);
     const client = (list) => list.filter((email) => !supportSet.has(email));
     const without = (list, drop) => list.filter((email) => !drop.includes(email));
+    const first = !Array.isArray(stored.consoleAdminEmails) && !Array.isArray(stored.consoleStaffEmails);
     const prev = { admin: client(normalizeEmails(stored.consoleAdminEmails)), staff: client(normalizeEmails(stored.consoleStaffEmails)) };
-    const held = (list) => list.filter((email) => (team.expired || []).includes(email));
+    const held = (list) => list.filter((email) => team.expired.includes(email));
     const next = { admin: client([...team.owners, ...held(prev.admin)]), staff: client([...team.editors, ...held(prev.staff)]) };
+    if (first) Object.assign(prev, next);
     const gone = without([...prev.admin, ...prev.staff], [...next.admin, ...next.staff]);
     const addAdmin = without(next.admin, prev.admin);
     const addStaff = without(next.staff, prev.staff);
@@ -1226,9 +1230,11 @@ async function syncTeamAccess({ db, team, support, now }) {
     const staffEmails = without([...new Set([...without(normalizeEmails(stored.staffEmails), dropStaff), ...addStaff])], adminEmails);
     if (client(adminEmails).length === 0 && client(admins).length > 0) return 'last-operator';
 
-    // A console Editor's access has no end time. A malformed map is left as it is.
+    // A console Editor's access has no end time. Anything but a plain map
+    // (core/auth.cjs refuses all staff for it) is left as it is.
     const expiry = stored.staffExpiry;
-    const isMap = Boolean(expiry) && typeof expiry === 'object' && !Array.isArray(expiry);
+    const proto = expiry && typeof expiry === 'object' && !Array.isArray(expiry) ? Object.getPrototypeOf(expiry) : undefined;
+    const isMap = proto === Object.prototype || proto === null;
     const staffExpiry = isMap ? Object.fromEntries(Object.entries(expiry).filter(([email]) => !addStaff.includes(email))) : expiry;
     const fields = { adminEmails, staffEmails, consoleAdminEmails: next.admin, consoleStaffEmails: next.staff, staffExpiry };
     if (Object.entries(fields).every(([field, value]) => JSON.stringify(stored[field]) === JSON.stringify(value))) return 'unchanged';
