@@ -54,7 +54,7 @@ function MaterialRow({ material }) {
       setState({ status: 'idle' });
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      setState({ status: 'error', message: err.message || 'This material is not available yet.' });
+      setState({ status: 'error', message: err.message || 'The material could not be opened. Try again.' });
     }
   }, [user, material.id, material.type, material.filename]);
 
