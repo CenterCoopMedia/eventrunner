@@ -104,7 +104,7 @@ function SpreadsheetRow({ sheet, busy, result, onExport }) {
     <li className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0">
       <div className={rowClass}>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2xs"><h3 className="text-admin-base font-bold text-admin-ink">{sheet.label}</h3><HelpTooltip label="this section">Download this set of event records as a spreadsheet. Keep files with private attendee or staff information secure.</HelpTooltip></div>
+          <div className="flex items-center gap-2xs"><h3 className="text-admin-base font-bold text-admin-ink">{sheet.label}</h3><HelpTooltip label={sheet.label}>Download this set of event records as a spreadsheet. Keep files with private attendee or staff information secure.</HelpTooltip></div>
           <p id={descriptionId} className="text-admin-sm text-admin-ink-secondary">
             {sheet.description}
           </p>

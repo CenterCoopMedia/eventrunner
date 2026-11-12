@@ -111,7 +111,7 @@ function SessionConfirmation({ session, speakerId, record, call, disabled }) {
   const name = `the confirmation for ${session.title}`;
   return (
     <li className="space-y-xs border-t-admin-hairline border-admin-rule-hairline pt-sm first:border-t-0 first:pt-0">
-      <div className="flex items-center gap-2xs"><h3 className="font-semibold [overflow-wrap:anywhere]">{session.title}</h3><HelpTooltip label="this section">Review this speaker’s session and the confirmation email before sending it.</HelpTooltip></div>
+      <div className="flex items-center gap-2xs"><h3 className="font-semibold [overflow-wrap:anywhere]">{session.title}</h3><HelpTooltip label={session.title}>Review this speaker’s session and the confirmation email before sending it.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink-secondary">{session.when} · {session.room}</p>
       <ConfirmationState record={record} />
       <ServerErrorSummary error={error} errorRef={errorRef} title="The confirmation was not sent" />

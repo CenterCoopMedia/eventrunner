@@ -7,7 +7,7 @@ function FigureItem({ title, action, to, children }) {
   const titleId = useId();
   return (
     <article className="admin-register-item" aria-labelledby={titleId}>
-      <div className="flex items-center gap-2xs"><h3 id={titleId}>{title}</h3><HelpTooltip label="this section">Review the latest total and status breakdown, then open the related records.</HelpTooltip></div>
+      <div className="flex items-center gap-2xs"><h3 id={titleId}>{title}</h3><HelpTooltip label={title}>Review the latest total and status breakdown, then open the related records.</HelpTooltip></div>
       <div className="admin-register-item__body">{children}</div>
       <Link className="admin-register-action" to={to}>{action}<span aria-hidden="true">→</span></Link>
     </article>

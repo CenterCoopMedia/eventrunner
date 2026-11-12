@@ -238,7 +238,7 @@ export default function AdminSetup() {
             {hosting.map((check) => (
               <li key={check.id} className="flex flex-col gap-xs">
                 <div className="flex flex-wrap items-center gap-xs">
-                  <div className="flex items-center gap-2xs"><h3 className="text-admin-base font-semibold text-admin-ink">{check.title}</h3><HelpTooltip label="this section">Review this hosting check and any action described below it.</HelpTooltip></div>
+                  <div className="flex items-center gap-2xs"><h3 className="text-admin-base font-semibold text-admin-ink">{check.title}</h3><HelpTooltip label={check.title}>Review this hosting check and any action described below it.</HelpTooltip></div>
                   <StatusBadge tone={check.ready ? 'ok' : 'caution'}>{check.ready ? 'Ready' : 'Awaiting Event Runner setup'}</StatusBadge>
                 </div>
                 <p className="text-admin-base text-admin-ink">{check.ready ? check.done : check.todo}</p>

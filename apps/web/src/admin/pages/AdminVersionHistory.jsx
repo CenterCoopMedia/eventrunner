@@ -72,9 +72,9 @@ function ValueCell({ value, time, timeZone, path }) {
     <>
       <span className="whitespace-pre-wrap">{`${text.slice(0, SHOWN_CHARACTERS)}…`}</span>
       <details className="mt-3xs">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink-link">
+        <summary data-help-skip="The disclosure label directly states that it shows the complete saved value." className="admin-target cursor-pointer font-semibold text-admin-ink-link">
           {`Show all ${text.length.toLocaleString('en-US')} characters`}
-         <HelpTooltip label="this section">Expand the full saved value to review the content of this version.</HelpTooltip></summary>
+         </summary>
         <span className="mt-2xs block whitespace-pre-wrap">{text}</span>
       </details>
     </>
@@ -154,7 +154,7 @@ function RestoreConfirm({ entry, removed, collection, busy, disabled, error, onC
       className="flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-soft px-md py-sm"
     >
       <div className="flex items-center gap-2xs"><h3 id={headingId} ref={headingRef} tabIndex={-1} className="font-admin-ui text-admin-base font-bold text-admin-ink">
-        {`Restore version ${entry.revision}?`}</h3><HelpTooltip label="this section">Restore this published version as a draft. Review and publish the draft to change the site.</HelpTooltip></div>
+        {`Restore version ${entry.revision}?`}</h3><HelpTooltip label={`Restore version ${entry.revision}`}>Restore this published version as a draft. Review and publish the draft to change the site.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">
         {`Version ${entry.revision} becomes the draft of this record.`}
         {removed ? ' The record is saved again as a draft.' : ''}
