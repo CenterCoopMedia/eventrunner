@@ -41,6 +41,7 @@
                 ? 'This site is taking longer than usual to open. You can keep waiting or reload this page.'
                 : elapsed >= 1000 ? 'Opening this site…' : '';
               reload.hidden = elapsed < 10000;
+              if (elapsed >= 10000) window.__eventHeldUpBoot = true;
             };
             update();
             const timers = [1000, 10000].filter((at) => at > performance.now())

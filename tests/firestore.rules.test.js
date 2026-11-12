@@ -638,6 +638,7 @@ describe("server-only collections stay deny-all", () => {
     "unsubscribe_rate_limits",
     "system_errors",
     "client_error_rate_limits",
+    "web_vitals_daily",
     "email_templates",
     // The change request rate limit (issue #188), one document per account.
     "change_request_rate_limits",
@@ -680,6 +681,24 @@ describe("server-only collections stay deny-all", () => {
       await assertFails(setDoc(doc(admin(), `${c}/d1`), { x: 1 }));
     });
   }
+
+  it("keeps field-performance aggregates closed to every browser tier", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "web_vitals_daily/2026-11-12__mobile__Lw"), {
+        day: "2026-11-12",
+        route: "/",
+        device: "mobile",
+        counts: { LCP: { 25: 4 } },
+        expiresAt: new Date("2026-12-12T00:00:00Z"),
+      });
+    });
+    for (const db of [anon(), nonAdmin(), staff(), admin()]) {
+      await assertFails(getDoc(doc(db, "web_vitals_daily/2026-11-12__mobile__Lw")));
+      await assertFails(getDocs(collection(db, "web_vitals_daily")));
+      await assertFails(setDoc(doc(db, "web_vitals_daily/forged"), { counts: { LCP: { 1: 1 } } }));
+      await assertFails(deleteDoc(doc(db, "web_vitals_daily/2026-11-12__mobile__Lw")));
+    }
+  });
 
   // The email log (issue #183) reads sent_emails through listSentEmails and
   // getSentEmail on the server. The rules stay closed: no tier lists the

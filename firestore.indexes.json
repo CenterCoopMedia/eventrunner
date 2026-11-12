@@ -217,5 +217,11 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "web_vitals_daily",
+      "fieldPath": "counts",
+      "indexes": []
+    }
+  ]
 }

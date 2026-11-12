@@ -73,3 +73,8 @@ test('new sites start with the attendee feed off', () => {
   assert.equal(buildFeatures().features.socialFeed, false);
   assert.equal(buildFeatures({ socialFeed: true }).features.socialFeed, true);
 });
+
+test('new sites start with field performance monitoring off', () => {
+  assert.equal(buildFeatures().features.coreWebVitals, false);
+  assert.equal(buildFeatures({ coreWebVitals: true }).features.coreWebVitals, true);
+});

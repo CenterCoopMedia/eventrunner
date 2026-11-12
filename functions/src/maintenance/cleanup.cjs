@@ -57,6 +57,8 @@ const SENT_EMAIL_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
  */
 const ANNOUNCEMENT_SEND_RETENTION_MS = SENT_EMAIL_RETENTION_MS;
 
+const { COLLECTION: WEB_VITALS_COLLECTION } = require('shared/webVitals');
+
 /** Batch bound per query, matching cleanupExpiredAuthChallenges. */
 const SWEEP_LIMIT = 250;
 
@@ -310,6 +312,39 @@ async function sweepExpiredAnnouncementSends({
 }
 
 /**
+ * Delete expired daily field-performance aggregates. Each row carries an
+ * expiry derived from its UTC day, so this sweep needs no visitor data and
+ * no second retention clock.
+ *
+ * @param {{ db: object, now?: () => number, batchLimit?: number,
+ *   maxBatches?: number }} deps
+ * @returns {Promise<{ deleted: number }>}
+ */
+async function sweepExpiredWebVitals({
+  db,
+  now = Date.now,
+  batchLimit = SWEEP_LIMIT,
+  maxBatches = MAX_SWEEP_BATCHES,
+}) {
+  const query = db.collection(WEB_VITALS_COLLECTION)
+    .where('expiresAt', '<', new Date(now()))
+    .limit(batchLimit);
+  let deleted = 0;
+
+  for (let i = 0; i < maxBatches; i += 1) {
+    const snapshot = await query.get();
+    if (snapshot.empty) break;
+    const batch = db.batch();
+    for (const doc of snapshot.docs) batch.delete(doc.ref);
+    await batch.commit();
+    deleted += snapshot.docs.length;
+    if (snapshot.docs.length < batchLimit) break;
+  }
+
+  return { deleted };
+}
+
+/**
  * Deployable exports (spec §1.3). Follows cleanupExpiredAuthChallenges's
  * conventions (auth/otp.cjs): onSchedule, region from EVENT_FIREBASE_REGION,
  * and every dependency required inside the callback so deploy analysis
@@ -356,6 +391,7 @@ function buildHandlers() {
           sweepStrandedPublishRows({ db, notifyOperator: notifier.notify }),
           sweepExpiredSentEmails({ db }),
           sweepExpiredAnnouncementSends({ db }),
+          sweepExpiredWebVitals({ db }),
         ]);
       },
     ),
@@ -366,6 +402,7 @@ module.exports = {
   sweepStrandedPublishRows,
   sweepExpiredSentEmails,
   sweepExpiredAnnouncementSends,
+  sweepExpiredWebVitals,
   get handlers() {
     return buildHandlers();
   },

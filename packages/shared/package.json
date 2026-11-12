@@ -41,6 +41,7 @@
     "./richText": { "require": "./src/richText.cjs", "import": "./src/richText.mjs" },
     "./seed": { "require": "./src/seed.cjs", "import": "./src/seed.mjs" },
     "./imageSizes": { "require": "./src/imageSizes.cjs", "import": "./src/imageSizes.mjs" },
-    "./consoleRequest": { "require": "./src/consoleRequest.cjs", "import": "./src/consoleRequest.mjs" }
+    "./consoleRequest": { "require": "./src/consoleRequest.cjs", "import": "./src/consoleRequest.mjs" },
+    "./webVitals": { "require": "./src/webVitals.cjs", "import": "./src/webVitals.mjs" }
   }
 }

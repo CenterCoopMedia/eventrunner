@@ -3,7 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { sweepExpiredSentEmails, sweepStrandedPublishRows, internals } = require('./cleanup.cjs');
+const {
+  sweepExpiredSentEmails,
+  sweepExpiredWebVitals,
+  sweepStrandedPublishRows,
+  internals,
+} = require('./cleanup.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 
 const {
@@ -252,6 +257,40 @@ test('sent-email retention drains in batches, stops at its bound, and is idempot
     { deleted: 0 },
   );
   assert.equal(db.writes.length, writesAfterDrain);
+});
+
+// --- field-performance retention ---------------------------------------------
+
+test('field-performance retention deletes rows after expiry and keeps the boundary and future rows', async () => {
+  const db = makeFakeDb({
+    'web_vitals_daily/expired': { expiresAt: new Date(NOW - 1), counts: { LCP: { 25: 3 } } },
+    'web_vitals_daily/boundary': { expiresAt: new Date(NOW), counts: { LCP: { 25: 2 } } },
+    'web_vitals_daily/current': { expiresAt: new Date(NOW + 1), counts: { INP: { 20: 1 } } },
+  });
+
+  assert.deepEqual(await sweepExpiredWebVitals({ db, now }), { deleted: 1 });
+  assert.deepEqual(db.ids('web_vitals_daily').sort(), ['boundary', 'current']);
+});
+
+test('field-performance retention drains only its bounded number of batches', async () => {
+  const expired = new Date(NOW - 1);
+  const db = makeFakeDb(Object.fromEntries(
+    Array.from({ length: 5 }, (_, index) => [
+      `web_vitals_daily/expired-${index}`,
+      { expiresAt: expired, counts: { CLS: { 10: 1 } } },
+    ]),
+  ));
+
+  assert.deepEqual(
+    await sweepExpiredWebVitals({ db, now, batchLimit: 2, maxBatches: 2 }),
+    { deleted: 4 },
+  );
+  assert.equal(db.ids('web_vitals_daily').length, 1);
+  assert.deepEqual(
+    await sweepExpiredWebVitals({ db, now, batchLimit: 2, maxBatches: 2 }),
+    { deleted: 1 },
+  );
+  assert.deepEqual(await sweepExpiredWebVitals({ db, now }), { deleted: 0 });
 });
 
 // --- announcement send retention (issue #497) --------------------------------

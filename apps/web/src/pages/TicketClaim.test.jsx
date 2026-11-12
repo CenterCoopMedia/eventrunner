@@ -231,6 +231,8 @@ describe('signed in', () => {
   it('requires the current account document and offers a bounded recovery that preserves the claim link', async () => {
     profileAvailable = false;
     const timeout = vi.spyOn(globalThis, 'setTimeout');
+    const heldUp = vi.fn();
+    globalThis.addEventListener('eventrunner:held-up', heldUp);
     const entry = '/ticket/claim?order=group-order-123&source=confirmation';
     renderClaim(entry);
     await screen.findByText(/Setting up your account/);
@@ -241,10 +243,13 @@ describe('signed in', () => {
     expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
     const waitingDeadline = timeout.mock.calls.find(([, delay]) => delay === 15_000)?.[0];
     expect(waitingDeadline).toBeTypeOf('function');
+    expect(heldUp).not.toHaveBeenCalled();
     act(() => waitingDeadline());
     expect(screen.getByRole('alert')).toHaveTextContent('Your account is taking longer to load.');
     expect(screen.getByRole('link', { name: 'Reload claim page' })).toHaveAttribute('href', entry);
     expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(heldUp).toHaveBeenCalledOnce();
+    globalThis.removeEventListener('eventrunner:held-up', heldUp);
     timeout.mockRestore();
 
     // The existing subscription can recover after that deadline, still without

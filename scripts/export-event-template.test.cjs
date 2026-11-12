@@ -76,7 +76,7 @@ async function pastEvent() {
     section: 'details', field: 'quote', blockType: 'quote', text: 'We came back every year.',
     attribution: 'A past attendee', visible: true, order: 1,
   });
-  await db.collection('config').doc('features').update({ feedbackInbox: true });
+  await db.collection('config').doc('features').update({ feedbackInbox: true, coreWebVitals: true });
   for (const [docPath, data] of Object.entries(operationalRecords())) {
     const [col, id] = docPath.split('/');
     await db.collection(col).doc(id).set(data);
@@ -150,6 +150,7 @@ test('the template carries branding, pages and selected settings, and nothing el
     assert.equal(text.includes(secret), false, `${secret} must stay in the source project`);
   }
   assert.deepEqual(Object.keys(template.answers).sort(), ['badges', 'event', 'features', 'theme']);
+  assert.equal(Object.hasOwn(template.answers.features, 'coreWebVitals'), false, 'client monitoring consent is not portable');
   assert.equal(template.answers.event.legal.operatorName, 'Example Newsroom Network');
   assert.equal(template.answers.event.name, undefined, 'the new event names itself');
   assert.equal(template.answers.event.days, undefined, 'the new event dates itself');
@@ -164,6 +165,10 @@ test('the template carries branding, pages and selected settings, and nothing el
   assert.equal(template.content.some((c) => c.id === 'hero__image'), false, 'a stored file is left out');
   assert.equal(template.content.some((c) => c.section.startsWith('privacy') || c.section.startsWith('terms')), false);
   assert.equal(parseTemplateFile(JSON.stringify(template)).ok, true);
+  template.answers.features.coreWebVitals = true;
+  const edited = parseTemplateFile(JSON.stringify(template));
+  assert.equal(edited.ok, false);
+  assert.ok(edited.errors.some((error) => error === 'template.answers.features.coreWebVitals: not on the template allowlist'));
 });
 
 test('--page narrows the export to the named pages', async () => {
@@ -194,6 +199,7 @@ test('a new event made from the template keeps its own project, records and chec
   assert.deepEqual(event.days.map((d) => d.date), ['2027-06-03']);
   assert.equal(event.sender.domainVerified, false, 'the sender domain is verified again');
   assert.equal(event.legal.reviewRequired, true, 'legal review starts again');
+  assert.equal(target.read('config', 'features').coreWebVitals, false, 'the source client monitoring opt-in is not inherited');
   assert.equal(target.read('config', 'theme').radius, 'round', 'approved branding is reused');
   assert.equal(target.read('config', 'theme').navPlacement, 'side');
   assert.ok(target.read('config', 'theme').placeholderLogos.includes('primary'), 'the logo file is not carried');
@@ -215,6 +221,7 @@ test('a new event made from the template keeps its own project, records and chec
   // The source project is untouched by the apply.
   assert.equal(source.read('config', 'event').name, 'Past Example Summit');
   assert.equal(source.read('config', 'template'), undefined);
+  assert.equal(source.read('config', 'features').coreWebVitals, true, 'the source opt-in is untouched');
 });
 
 test('--check on the new event keeps the sender, provider, Auth and template rows of its own', async () => {

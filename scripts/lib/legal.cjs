@@ -116,6 +116,21 @@ function buildPrivacyBlocks(ctx) {
       value: clause(signInSentence(ctx)),
     },
     {
+      section: 'privacy_data',
+      field: 'performance',
+      blockType: 'richtext',
+      value: clause(
+        'When field performance monitoring is on, this site samples 10% of browser documents and sends ' +
+        'performance measurements to the site’s own Event Runner function. The application payload has only a ' +
+        'metric name and value, a categorical route pattern, and a mobile or desktop viewport class. The function ' +
+        'stores Core Web Vitals and counts of waits that show the site’s taking-longer message only in anonymous ' +
+        'daily aggregate value buckets. The application payload and aggregate store do not contain full page URLs, ' +
+        'page-element selectors, account identifiers, cookie identifiers, session identifiers, IP addresses, or IP ' +
+        'address hashes. Standard platform HTTP request logs are separate from these aggregates and are unchanged. ' +
+        'The measurements use no third-party analytics endpoint.',
+      ),
+    },
+    {
       section: 'privacy_sharing',
       field: 'processors',
       blockType: 'richtext',
@@ -132,6 +147,16 @@ function buildPrivacyBlocks(ctx) {
       blockType: 'richtext',
       value: clause(
         '[Replace] State how long attendee records are kept after the event ends and what is deleted.',
+      ),
+    },
+    {
+      section: 'privacy_retention',
+      field: 'performance',
+      blockType: 'richtext',
+      value: clause(
+        'When field performance monitoring is on, each anonymous daily aggregate expires 30 days after the start ' +
+        'of its UTC day. An observation is therefore scheduled to expire after 29 to 30 days. Cleanup runs every ' +
+        '30 minutes, so an expired aggregate can remain until the next cleanup.',
       ),
     },
     {

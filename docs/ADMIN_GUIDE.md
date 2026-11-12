@@ -1148,6 +1148,12 @@ Feature flags, wired to a **whole-document replace** — every known flag is alw
 
 New sites start with attendee badges, custom badges, live updates, and change requests on. These features need no provider setup. Explicit setup choices and stored settings on existing sites stay unchanged. Written updates keep their existing default.
 
+**Field performance monitoring.** New and existing sites start with this feature off. Before an operator turns it on, the client's counsel reviews the performance notice and retention text on the Privacy policy page. When it is on, the site samples 10% of browser documents after the first paint. It sends Core Web Vitals and counts of waits that show the site's taking-longer message to the site's own Event Runner function. The application payload and daily aggregate store use categorical route patterns and mobile or desktop viewport classes. They do not contain full page URLs, page-element selectors, account identifiers, cookie identifiers, session identifiers, IP addresses, or IP address hashes. Standard platform HTTP request logs are separate and unchanged. The measurements use no third-party analytics endpoint.
+
+The function stores daily aggregate value buckets. A bucket expires 30 days after the start of its UTC day, so one observation is scheduled to expire after 29 to 30 days. Cleanup runs every 30 minutes, so an expired aggregate can remain until the next cleanup. Results are advisory: browsers do not all report every metric, the sample can be sparse, and an anonymous hostile client can submit false values. The report gives the upper edge of the bucket that contains the 75th percentile, rather than an exact percentile from individual visits.
+
+The collector keeps the first report for each metric and navigation in a sampled document. Chrome reports supported soft navigations. Other browsers use hard-navigation measurements. A total boot failure that never starts the application cannot report a held-up state.
+
 Operators can also switch a feature on or off where they use it: Badges, Live updates, Change requests, and the Written updates list and editor. Each switch saves immediately. Staff see the current state but cannot change it. See [Change requests](#change-requests).
 
 ## Settings → Badges
@@ -1201,3 +1207,5 @@ Each automatic instructions email and explicit resend also records its outcome i
 ## Legal pages
 
 Privacy policy and terms of service ship as CMS content pages seeded from provider-aware templates, each clause needing review flagged `[Client legal review required]`. They stay flagged — a persistent banner in the admin panel and a visible notice on the public page — until an admin clears the review flag after the client's counsel has actually reviewed the seeded copy. See [`CLIENT_ONBOARDING.md`](CLIENT_ONBOARDING.md)'s legal review section for the full context. Do not publish another organization's terms verbatim; the seeded text is a starting point, not a finished policy.
+
+A fresh Privacy policy includes conditional field-performance collection and retention clauses. Init does not replace a privacy block that a client has edited. For an existing site, review and add the current clauses in the Content editor before an operator enables **Field performance monitoring**. See the [deploy runbook](DEPLOY_RUNBOOK.md#field-performance-monitoring) for the reporting commands.

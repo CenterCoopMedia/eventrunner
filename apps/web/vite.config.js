@@ -81,6 +81,7 @@ export default defineConfig({
       'shared/invoice',
       'shared/imageSizes',
       'shared/ticketCommerce',
+      'shared/webVitals',
     ],
   },
   build: {

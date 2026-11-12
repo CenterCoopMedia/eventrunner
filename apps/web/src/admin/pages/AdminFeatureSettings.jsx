@@ -46,7 +46,7 @@ const FEATURE_GROUPS = [
   {
     title: 'Feedback and browser tools',
     description: 'Feedback, change requests, and connected tools.',
-    keys: ['feedbackInbox', 'changeRequests', 'webmcpPublic', 'webmcpAdmin'],
+    keys: ['feedbackInbox', 'changeRequests', 'coreWebVitals', 'webmcpPublic', 'webmcpAdmin'],
   },
 ];
 

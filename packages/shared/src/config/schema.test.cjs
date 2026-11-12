@@ -1049,6 +1049,14 @@ test('validateFeatures: socialFeed is a known boolean flag', () => {
   assert.ok(bad.errors.some((e) => e.includes('features.socialFeed: must be a boolean')));
 });
 
+test('validateFeatures: coreWebVitals is a known boolean flag', () => {
+  assert.equal(validateFeatures({ coreWebVitals: true }).ok, true);
+  assert.equal(validateFeatures({ coreWebVitals: false }).ok, true);
+  const bad = validateFeatures({ coreWebVitals: 'true' });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.includes('features.coreWebVitals: must be a boolean')));
+});
+
 test('historicalDemo is an optional boolean in deployed event configuration', () => {
   for (const historicalDemo of [true, false, undefined]) {
     assert.equal(validateEventConfig({ ...VALID_EVENT, historicalDemo }).ok, true);

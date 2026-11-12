@@ -18,6 +18,7 @@ import DeferredPage from './components/DeferredPage.jsx';
 import { adminRoute, publicRoutes, prefetchRoutes } from './routes.jsx';
 import { installDeferredRoutePrefetch } from './lib/deferredRoutePrefetch.js';
 import { IS_DEMO } from './lib/demoMode.js';
+import FieldVitals from './components/FieldVitals.jsx';
 
 export function AppRoutes() {
   useEffect(() => installDeferredRoutePrefetch(document, prefetchRoutes, IS_DEMO), []);
@@ -66,6 +67,7 @@ export default function App() {
   const { pathname, search } = useLocation();
   return (
     <EventConfigProvider pathname={pathname} search={search}>
+      <FieldVitals />
       <AuthProvider>
         <ProfileProvider>
           <ContentGate>
