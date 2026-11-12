@@ -128,6 +128,19 @@ describe('route intent', () => {
 });
 
 describe('route import lifecycle', () => {
+  it('preserves a spent reload budget when only the route table has loaded', async () => {
+    const neverLoads = new Promise(() => {});
+    function PendingPage() { throw neverLoads; }
+    function RouteTable() {
+      return <Suspense fallback={<p>Loading final page</p>}><PendingPage /></Suspense>;
+    }
+    const table = routePage(() => Promise.resolve({ default: RouteTable }), { resetReloadBudget: false });
+    await table.prefetch();
+    render(<table.Component />);
+    expect(screen.getByText('Loading final page')).toBeInTheDocument();
+    expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+  });
+
   it('retains real navigation recovery while another speculative import is pending', async () => {
     sessionStorage.removeItem(RELOAD_FLAG);
     let finish;

@@ -9,7 +9,7 @@ export function isRoutePrefetchPending() {
 
 // Navigation and intent share one import. Only mounting the page clears the
 // reload budget; downloading it while reading another page must not do so.
-export function routePage(importer) {
+export function routePage(importer, { resetReloadBudget = true } = {}) {
   let loaded;
   let pending;
   let speculation;
@@ -24,7 +24,7 @@ export function routePage(importer) {
   }
   const LazyPage = lazy(load);
   function Page(props) {
-    useEffect(() => { clearReloadFlag(); }, []);
+    useEffect(() => { if (resetReloadBudget) clearReloadFlag(); }, []);
     // A completed prefetch renders synchronously, without a loading fallback.
     return createElement(loaded?.default || LazyPage, props);
   }

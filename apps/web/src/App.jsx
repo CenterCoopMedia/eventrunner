@@ -20,7 +20,9 @@ import { installRoutePrefetch } from './lib/routePrefetch.js';
 import { IS_DEMO } from './lib/demoMode.js';
 
 // The route table is needed only beyond home or after explicit link intent.
-const routedPages = routePage(() => import('./routes.jsx'));
+// Loading only the table must not re-arm recovery for a page that keeps
+// failing after a reload. The final route owns that reset when it mounts.
+const routedPages = routePage(() => import('./routes.jsx'), { resetReloadBudget: false });
 const RoutedPages = routedPages.Component;
 function AdminPages() {
   return <RoutedPages admin />;
