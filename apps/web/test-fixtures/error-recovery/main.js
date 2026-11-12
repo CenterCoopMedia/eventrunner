@@ -3,10 +3,10 @@
 import { createElement as h, Fragment, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Link, Outlet, Route, Routes, useLocation } from 'react-router';
-import ErrorBoundary from '../../../apps/web/src/components/ErrorBoundary.jsx';
-import { initErrorReporting } from '../../../apps/web/src/lib/errorReporting.js';
-import '../../../apps/web/src/generated/theme.css';
-import '../../../apps/web/src/index.css';
+import ErrorBoundary from '../../src/components/ErrorBoundary.jsx';
+import { initErrorReporting } from '../../src/lib/errorReporting.js';
+import '../../src/generated/theme.css';
+import '../../src/index.css';
 
 initErrorReporting();
 

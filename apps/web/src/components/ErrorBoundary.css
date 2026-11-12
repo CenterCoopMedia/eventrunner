@@ -1,0 +1,27 @@
+.error-boundary {
+  @apply mx-auto max-w-prose px-md py-2xl text-center;
+}
+.error-boundary__title {
+  @apply font-heading text-h1 font-semibold text-text-primary;
+}
+.error-boundary__description {
+  @apply mt-xs text-body text-text-secondary;
+}
+.error-boundary__actions {
+  @apply mt-lg flex justify-center;
+}
+.error-boundary--admin {
+  @apply m-0 w-full max-w-none bg-admin-ground px-md py-lg text-left font-admin-ui text-admin-ink;
+}
+.error-boundary--admin .error-boundary__title {
+  @apply font-admin-ui text-admin-title font-bold text-admin-ink;
+}
+.error-boundary--admin .error-boundary__description {
+  @apply text-admin-sm text-admin-ink-secondary;
+}
+.error-boundary__reload {
+  @apply inline-flex min-h-admin-control items-center justify-center rounded-admin border-admin-hairline border-admin-action bg-admin-action px-md py-xs font-admin-ui text-admin-base font-bold text-admin-ink-inverse;
+}
+.error-boundary--inline {
+  @apply flex flex-wrap items-center gap-xs py-md text-body text-text-primary;
+}

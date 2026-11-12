@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, FUNCTIONS_ORIGIN, adminDb, callFunction, signIn } from './helpers.mjs';
 
 const ROOT = process.cwd();
-const FIXTURE = path.join(ROOT, 'e2e/fixtures/error-recovery');
+const FIXTURE = path.join(ROOT, 'apps/web/test-fixtures/error-recovery');
 const EVIDENCE = path.join(ROOT, 'test-results/admin-visual-evidence');
 let server;
 let output;
@@ -75,6 +75,15 @@ for (const [area, routePath, title] of [
     const reports = await intercept(page);
     await page.goto(`${origin}${routePath}`);
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    if (area === 'admin') {
+      expect(await page.getByRole('heading', { name: title }).evaluate((heading) => {
+        const actual = globalThis.getComputedStyle(heading).fontFamily;
+        heading.style.fontFamily = 'var(--admin-font-ui)';
+        const expected = globalThis.getComputedStyle(heading).fontFamily;
+        heading.style.removeProperty('font-family');
+        return actual === expected;
+      })).toBe(true);
+    }
     await expect(page.getByRole('navigation', { name: area === 'admin' ? 'Admin sections' : 'Main' })).toBeVisible();
     await expect.poll(() => reports.length).toBe(1);
     expect(reports[0].context.source).toBe('react-boundary');

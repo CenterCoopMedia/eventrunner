@@ -34,7 +34,8 @@ describe('dev server shared imports', () => {
     const e2e = path.join(root, '..', '..', 'e2e');
     const missing = readdirSync(e2e).filter((name) => name.endsWith('.spec.js')).filter((name) => {
       const text = readFileSync(path.join(e2e, name), 'utf8');
-      return /configFile:\s*false/.test(text) && !text.includes('optimizeDeps: consoleConfig.optimizeDeps');
+      return /\bcreateServer\s*\(/.test(text) && /configFile:\s*false/.test(text)
+        && !text.includes('optimizeDeps: consoleConfig.optimizeDeps');
     });
     expect(missing).toEqual([]);
   });

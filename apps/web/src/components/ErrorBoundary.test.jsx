@@ -168,7 +168,7 @@ describe('ErrorBoundary', () => {
       appearance: 'admin', title: 'This admin page could not be shown',
     });
     const panel = screen.getByRole('alert');
-    expect(panel.querySelector('h1')).toHaveClass('font-admin-ui', 'text-admin-title');
+    expect(panel).toHaveClass('admin-room');
     expect(panel.querySelector('[class*="text-body"], [class*="font-heading"], [class*="bg-accent"]')).toBeNull();
     unmount();
     renderBoundary(<Boom error={new Error('render failed')} />, {

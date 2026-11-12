@@ -5,6 +5,8 @@ import { useLocation } from 'react-router';
 import { isChunkLoadError, reloadOnce } from '../lib/chunkReload.js';
 import { isClientErrorReportingEnabled, reportClientError } from '../lib/errorReporting.js';
 import { primaryActionClass } from './controlClasses.js';
+import { IS_DEMO } from '../lib/demoMode.js';
+import './ErrorBoundary.css';
 
 class RenderErrorBoundary extends Component {
   constructor(props) {
@@ -24,7 +26,7 @@ class RenderErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    if (isClientErrorReportingEnabled()) {
+    if (!IS_DEMO && isClientErrorReportingEnabled()) {
       void reportClientError({
         message: error?.message || String(error),
         stack: typeof error?.stack === 'string' ? error.stack : null,
@@ -53,31 +55,29 @@ class RenderErrorBoundary extends Component {
         type="button"
         onClick={this.reload}
         className={admin
-          ? 'inline-flex min-h-admin-control items-center justify-center rounded-admin border-admin-hairline border-admin-action bg-admin-action px-md py-xs font-admin-ui text-admin-base font-bold text-admin-ink-inverse'
+          ? 'error-boundary__reload'
           : primaryActionClass}
       >
         Reload the page
       </button>
     );
     if (inline) return (
-      <div role="alert" className="stage flex flex-wrap items-center gap-xs py-md text-body text-text-primary">
+      <div role="alert" className="stage error-boundary--inline">
         <p><strong>{title}.</strong> {explanation}</p>
         {button}
       </div>
     );
     return (
       <div role="alert" className={admin
-        ? 'admin-room w-full bg-admin-ground px-md py-lg font-admin-ui text-admin-ink'
-        : 'mx-auto max-w-prose px-md py-2xl text-center'}>
-        <h1 className={admin
-          ? 'font-admin-ui text-admin-title font-bold text-admin-ink'
-          : 'font-heading text-h1 font-semibold text-text-primary'}>
+        ? 'admin-room error-boundary error-boundary--admin'
+        : 'error-boundary'}>
+        <h1 className="error-boundary__title">
           {title}
         </h1>
-        <p className={admin ? 'mt-xs text-admin-sm text-admin-ink-secondary' : 'mt-xs text-body text-text-secondary'}>
+        <p className="error-boundary__description">
           {explanation}
         </p>
-        <div className="mt-lg flex justify-center">{button}</div>
+        <div className="error-boundary__actions">{button}</div>
       </div>
     );
   }
