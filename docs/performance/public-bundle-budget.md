@@ -58,7 +58,10 @@ The shell prepares a route's JavaScript and CSS after 100 ms of mouse hover, key
 or a touch or pen press on an internal link. `src/routes.jsx` supplies both the router and the
 intent matcher, including demo hash links. Route parameters and the CMS catch-all follow
 React Router's path ranking. Downloads start only after intent, once per route module.
-The route table itself loads after intent or when opening a route beyond home.
+The route table stays in the entry bundle, so a direct link starts the matched page's import
+without a separate registry download or an extra loading placeholder.
+The optional intent handler loads on the first link interaction; a quick mouse sweep still
+cancels the page download. Save-Data and 2G connections also skip that handler download.
 
 Save-Data and slow-2g/2g connections skip prefetch. This prepares code only; page data,
 images and fonts still load when the page renders. A failed prefetch stays silent and leaves

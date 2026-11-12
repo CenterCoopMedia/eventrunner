@@ -15,30 +15,18 @@ import ScrollReset from './components/ScrollReset.jsx';
 import Home from './pages/Home.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import DeferredPage from './components/DeferredPage.jsx';
-import { routePage } from './lib/routePage.jsx';
-import { installRoutePrefetch } from './lib/routePrefetch.js';
+import { adminRoute, publicRoutes, prefetchRoutes } from './routes.jsx';
+import { installDeferredRoutePrefetch } from './lib/deferredRoutePrefetch.js';
 import { IS_DEMO } from './lib/demoMode.js';
 
-// The route table is needed only beyond home or after explicit link intent.
-// Loading only the table must not re-arm recovery for a page that keeps
-// failing after a reload. The final route owns that reset when it mounts.
-const routedPages = routePage(() => import('./routes.jsx'), { resetReloadBudget: false });
-const RoutedPages = routedPages.Component;
-function AdminPages() {
-  return <RoutedPages admin />;
-}
-function prefetchPath(pathname) {
-  routedPages.prefetch().then((module) => module?.prefetchPath(pathname));
-}
-
 export function AppRoutes() {
-  useEffect(() => installRoutePrefetch(document, prefetchPath, { hashRouter: IS_DEMO }), []);
+  useEffect(() => installDeferredRoutePrefetch(document, prefetchRoutes, IS_DEMO), []);
   return useRoutes([
     {
-      path: 'admin/*',
+      path: adminRoute.path,
       element: (
         <ErrorBoundary appearance="admin" title="Admin could not open">
-          <DeferredPage component={AdminPages} label="admin" />
+          <DeferredPage component={adminRoute.Component} label="admin" />
         </ErrorBoundary>
       ),
     },
@@ -48,7 +36,9 @@ export function AppRoutes() {
         element: <Layout />,
         children: [
           { index: true, element: <Home /> },
-          { path: '*', element: <DeferredPage component={RoutedPages} label="page" /> },
+          ...publicRoutes.map(({ path, Component, label, shape }) => ({
+            path, element: <DeferredPage component={Component} shape={shape} label={label} />,
+          })),
         ],
       }],
     },

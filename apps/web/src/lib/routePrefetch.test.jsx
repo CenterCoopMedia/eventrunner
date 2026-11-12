@@ -5,7 +5,7 @@ import { installRoutePrefetch, HOVER_DWELL_MS } from './routePrefetch.js';
 import { isRoutePrefetchPending, routePage } from './routePage.jsx';
 import { installChunkReload, RELOAD_FLAG } from './chunkReload.js';
 import ChunkErrorBoundary from '../components/ChunkErrorBoundary.jsx';
-import { prefetchPath } from '../routes.jsx';
+import { installDeferredRoutePrefetch } from './deferredRoutePrefetch.js';
 
 let removeListeners;
 let restoreReload;
@@ -38,12 +38,12 @@ function setup({ hashRouter = false, href = '/schedule' } = {}) {
   root.appendChild(link);
   const routes = [
     { path: '/', page: null },
-    { path: '/schedule', page },
-    { path: '/schedule/mine', page: null },
-    { path: '/schedule/:sessionId', page },
-    { path: '*', page: null },
+    { path: '/schedule', ...page },
+    { path: '/schedule/mine' },
+    { path: '/schedule/:sessionId', ...page },
+    { path: '*' },
   ];
-  removeListeners = installRoutePrefetch(root, (path) => prefetchPath(path, routes), { hashRouter });
+  removeListeners = installRoutePrefetch(root, routes, hashRouter);
   return { root, link, target: link.firstChild };
 }
 
@@ -54,6 +54,29 @@ function pointer(target, type, pointerType, relatedTarget = null) {
 }
 
 describe('route intent', () => {
+  it('keeps a fast sweep cancelled while optional intent code loads, then handles a later dwell', async () => {
+    const { root, target } = setup();
+    removeListeners();
+    removeListeners = installDeferredRoutePrefetch(root, [{ path: '/schedule', ...page }]);
+    pointer(target, 'pointerover', 'mouse');
+    pointer(target, 'pointerout', 'mouse');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(imports).toBe(0);
+    pointer(target, 'pointerover', 'mouse');
+    await vi.waitFor(() => expect(imports).toBe(1));
+    await page.prefetch();
+  });
+
+  it('does not handle buffered intent after the shell unmounts', async () => {
+    const { root, target } = setup();
+    removeListeners();
+    removeListeners = installDeferredRoutePrefetch(root, [{ path: '/schedule', ...page }]);
+    pointer(target, 'pointerover', 'mouse');
+    removeListeners();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(imports).toBe(0);
+  });
+
   it('imports nothing on installation or a fast sweep, then imports once after mouse dwell', async () => {
     const { target } = setup();
     await vi.advanceTimersByTimeAsync(500);
@@ -65,6 +88,7 @@ describe('route intent', () => {
     expect(imports).toBe(0);
     pointer(target, 'pointerover', 'mouse');
     await vi.advanceTimersByTimeAsync(HOVER_DWELL_MS);
+    expect(imports).toBe(1);
     await page.prefetch();
     fireEvent.focusIn(target);
     pointer(target, 'pointerdown', 'touch');
@@ -128,16 +152,14 @@ describe('route intent', () => {
 });
 
 describe('route import lifecycle', () => {
-  it('preserves a spent reload budget when only the route table has loaded', async () => {
-    const neverLoads = new Promise(() => {});
-    function PendingPage() { throw neverLoads; }
-    function RouteTable() {
-      return <Suspense fallback={<p>Loading final page</p>}><PendingPage /></Suspense>;
-    }
-    const table = routePage(() => Promise.resolve({ default: RouteTable }), { resetReloadBudget: false });
-    await table.prefetch();
-    render(<table.Component />);
-    expect(screen.getByText('Loading final page')).toBeInTheDocument();
+  it('preserves a spent reload budget when the final page fails', async () => {
+    let fail;
+    const reload = vi.fn();
+    const finalPage = routePage(() => new Promise((_resolve, reject) => { fail = reject; }));
+    render(<ChunkErrorBoundary reload={reload}><Suspense fallback={<p>Loading final page</p>}><finalPage.Component /></Suspense></ChunkErrorBoundary>);
+    await act(async () => { fail(new Error('Failed to fetch dynamically imported module: /assets/final-page.js')); });
+    expect(screen.getByRole('button', { name: 'Reload the page' })).toBeInTheDocument();
+    expect(reload).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
   });
 
@@ -169,7 +191,7 @@ describe('route import lifecycle', () => {
     }
   });
 
-  it('renders a prefetched module synchronously and clears the reload budget only on mount', async () => {
+  it('renders a prefetched module synchronously and clears the reload budget only on navigation', async () => {
     await page.prefetch();
     expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
     render(<Suspense fallback={<p>Loading route</p>}><page.Component /></Suspense>);

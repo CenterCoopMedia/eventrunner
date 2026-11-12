@@ -27,7 +27,7 @@ initErrorReporting();
 // the current deploy no longer publishes. Vite reports the failed
 // modulepreload as `vite:preloadError`; one reload per tab picks up the
 // current bundle. The flag that limits it to one is cleared where the chunk
-// actually mounts (lib/routePage.jsx), not here — clearing it on every entry load would
+// loads for navigation (lib/routePage.jsx), not here — clearing it on every entry load would
 // re-arm the reload on the very page the reload landed on, and loop.
 installChunkReload(globalThis, { isPrefetching: isRoutePrefetchPending });
 

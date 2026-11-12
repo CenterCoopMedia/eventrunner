@@ -1,11 +1,9 @@
 import { routePage } from './lib/routePage.jsx';
 import { loadSpecimenPage, SPECIMEN_PATH } from './pages/specimen/specimenRoute.js';
 import { loadPresetRemaps } from './lib/presetRemaps.js';
-import { matchRoutes, useRoutes } from 'react-router';
-import DeferredPage from './components/DeferredPage.jsx';
 
 function pageRoute(path, importer, label, shape) {
-  return { path, page: routePage(importer), label, shape };
+  return Object.assign(routePage(importer), { path, label, shape });
 }
 
 // The admin brings its own shell and access gate. Theme remaps are code,
@@ -50,18 +48,3 @@ export const publicRoutes = [
 ];
 
 export const prefetchRoutes = [{ path: '/' }, adminRoute, ...publicRoutes];
-
-export function prefetchPath(pathname, routes = prefetchRoutes) {
-  matchRoutes(routes, pathname)?.at(-1)?.route.page?.prefetch();
-}
-
-const renderRoutes = publicRoutes.map(({ path, page, label, shape }) => ({
-  path, element: <DeferredPage component={page.Component} shape={shape} label={label} />,
-}));
-const adminRoutes = [{
-  path: '*', element: <DeferredPage component={adminRoute.page.Component} label="admin" />,
-}];
-
-export default function RoutedPages({ admin = false }) {
-  return useRoutes(admin ? adminRoutes : renderRoutes);
-}
