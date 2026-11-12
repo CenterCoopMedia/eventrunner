@@ -9,7 +9,7 @@ const {
   buildSpeakerWording,
   parseSpeakerWording,
   defaultSpeakerWordingFields,
-} = require('./speakerWordingFields.cjs');
+} = require('./templates/speakerWordingFields.cjs');
 
 const SHIPPED_SOURCE_HASHES = Object.freeze({
   'speaker.invite': '0489b8be92bdc8995258e1208469c9d44cbe5eda936dc5dc93908925db4e19be',

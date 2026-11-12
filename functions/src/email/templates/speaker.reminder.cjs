@@ -38,7 +38,7 @@
  */
 
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
-const { buildSpeakerWording } = require('../speakerWordingFields.cjs');
+const { buildSpeakerWording } = require('./speakerWordingFields.cjs');
 
 const source = buildSpeakerWording('speaker.reminder');
 
