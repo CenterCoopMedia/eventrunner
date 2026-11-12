@@ -9,7 +9,7 @@
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { pageHeading } from 'shared/page';
 import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
@@ -54,6 +54,7 @@ import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { schedulePlainText } from '../lib/scheduleText.js';
 import { copyTextToClipboard } from '../lib/clipboard.js';
+import { SUPPRESS_STYLE_ID } from '../lib/modeRuntime.js';
 import { downloadSchedulePdf } from '../lib/schedulePdf.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
@@ -100,6 +101,7 @@ export default function Schedule() {
   const filtersRef = useRef(null);
   const filtersToggleRef = useRef(null);
   const searchRef = useRef(null);
+  const resultsSectionRef = useRef(null);
   const [settledCompactFilters, setSettledCompactFilters] = useState(compactFilters);
   useLayoutEffect(() => {
     if (compactFilters === settledCompactFilters) return;
@@ -126,6 +128,9 @@ export default function Schedule() {
   // the back button walks the changes back. The URL is untrusted input —
   // readScheduleView falls back to the default for every unknown value.
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigationType = useNavigationType();
+  const resolvedLocation = useRef(location.key);
 
   // Days are runtime config — a live config/event write could deliver a
   // malformed entry; drop anything without a usable string id rather than
@@ -263,6 +268,31 @@ export default function Schedule() {
   // carries already fell back at read time.
   const activeDayId = view.day ?? days[0]?.id ?? null;
 
+  useLayoutEffect(() => {
+    if (resolvedLocation.current === location.key) return undefined;
+    resolvedLocation.current = location.key;
+    if (navigationType === 'POP' || !location.state?.scheduleResolve || !features.schedule || !activeDayId) return undefined;
+    const results = resultsSectionRef.current?.querySelector('[data-schedule-results]');
+    const viewWindow = results?.ownerDocument.defaultView;
+    const media = viewWindow?.matchMedia?.('(prefers-reduced-motion: no-preference)');
+    if (!results || !media?.matches || results.ownerDocument.getElementById(SUPPRESS_STYLE_ID)) return undefined;
+    const style = viewWindow.getComputedStyle(results);
+    const time = style.getPropertyValue('--motion-base').trim();
+    const animation = results.animate([{ opacity: 0.5 }, { opacity: 1 }], {
+      duration: Number.parseFloat(time) * (time.endsWith('ms') ? 1 : 1000),
+      easing: style.getPropertyValue('--motion-ease').trim(),
+      fill: 'none',
+    });
+    // Cleanup cancellation rejects the native completion promise.
+    animation.finished.catch(() => {});
+    const stop = () => { if (!media.matches) animation.cancel(); };
+    media.addEventListener('change', stop);
+    return () => {
+      media.removeEventListener('change', stop);
+      animation.cancel();
+    };
+  }, [location.key, location.state, navigationType, features.schedule, activeDayId]);
+
   /**
    * Patch the view in the URL. Discrete control changes (a day, a filter, a
    * sort) push a history entry, so the back button undoes them; typing in
@@ -276,7 +306,7 @@ export default function Schedule() {
           { ...readScheduleView(prev, knownView), ...patch },
           { firstDayId: days[0]?.id ?? null },
         ),
-      { replace },
+      { replace, state: { scheduleResolve: ['q', 'formats', 'tracks', 'sort'].some((key) => Object.hasOwn(patch, key)) } },
     );
   }
 
@@ -549,6 +579,7 @@ export default function Schedule() {
               sheet appears only where the story has one. */}
             <section
               key={activeDay.id}
+              ref={resultsSectionRef}
               aria-labelledby={`day-${activeDay.id}`}
               className={backIssue ? 'back-issue map-grid mt-md' : 'map-grid mt-md'}
               {...(backIssue ? { 'data-back-issue': 'true' } : null)}
@@ -594,13 +625,13 @@ export default function Schedule() {
                   marginalia on. */}
               <Marginalia mark="squiggle" className="mt-3xs" />
               {activeSessions.length === 0 ? (
-                <p className="mt-md max-w-prose text-body text-text-secondary">
+                <p data-schedule-results="" className="mt-md max-w-prose text-body text-text-secondary">
                   No sessions are announced for {activeDay.label} yet.
                 </p>
               ) : entries.length === 0 ? (
                 // An empty result states what was searched (issue #162), so
                 // an empty page is never mistaken for an empty day.
-                <p className="mt-md max-w-prose text-body text-text-secondary">
+                <p data-schedule-results="" className="mt-md max-w-prose text-body text-text-secondary">
                   {query.trim()
                     ? `No sessions on ${activeDay.label} match “${query.trim()}”. Clear the search or a filter to see more sessions.`
                     : `No sessions on ${activeDay.label} match the selected filters. Clear a filter to see more sessions.`}
@@ -611,6 +642,7 @@ export default function Schedule() {
                 // the page sideways.
                 <HorizontalScrollRegion
                   label={`${activeDay.label} schedule grid`}
+                  data-schedule-results=""
                   className="mt-sm overflow-x-auto"
                 >
                   <ScheduleGrid
@@ -628,7 +660,7 @@ export default function Schedule() {
                 // column order, tabular figures, every relationship stated.
                 // No gap: every row opens with its own hairline, so the rules
                 // are the separation a card border used to be.
-                <ul className="schedule-route mt-sm">
+                <ul data-schedule-results="" className="schedule-route mt-sm">
                   {entries.map((entry, index) => (
                     <SessionCard
                       key={entry.session.id}

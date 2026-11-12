@@ -57,6 +57,8 @@ function withoutTransitions(doc, swap) {
   style.textContent =
     '*, *::before, *::after { transition: none !important; animation: none !important; }';
   doc.head.appendChild(style);
+  // CSS suppression does not stop effects created with Element.animate.
+  for (const animation of doc.getAnimations?.() ?? []) animation.cancel();
 
   swap();
 
