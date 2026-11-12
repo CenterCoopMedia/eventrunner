@@ -195,8 +195,8 @@ export default function AdminLiveUpdates() {
 
       <Panel help="Write an update attendees can read during the event and choose its audience." title={editingId ? 'Edit update' : 'Post an update'}>
         <form ref={composerRef} className="flex flex-col gap-sm" onSubmit={submit} onChangeCapture={() => setOutcome(null)}>
-          <fieldset aria-label={["Update details "].join('').trim()} disabled={saving || Boolean(deletingId)} className="admin-live-composer min-w-0">
-          <legend className="sr-only">Update details <HelpTooltip label="Update details">Set the message, topic and audience for this live update.</HelpTooltip></legend>
+          <fieldset  disabled={saving || Boolean(deletingId)} className="admin-live-composer min-w-0">
+          <legend className="sr-only">Update details </legend>
           <div className="admin-live-composer__message min-w-0">
           <TextAreaField help="Write the live update attendees should see during the event."
             label="Message"

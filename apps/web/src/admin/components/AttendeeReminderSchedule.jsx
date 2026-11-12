@@ -323,8 +323,8 @@ export default function AttendeeReminderSchedule({ call }) {
 
         {loadError ? <div className="flex flex-col gap-xs"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading}>{loading ? 'Trying again…' : 'Try again'}</button></div> : null}
         <form className="flex flex-col gap-md" onSubmit={save} noValidate>
-          <fieldset aria-label={["Attendee reminder settings "].join('').trim()} disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
-          <legend className="sr-only">Attendee reminder settings <HelpTooltip label="Attendee reminder settings">Choose when attendees receive reminders and what each message says.</HelpTooltip></legend>
+          <fieldset  disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
+          <legend className="sr-only">Attendee reminder settings </legend>
           <fieldset aria-label={["Days before the event "].join('').trim()} aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
             <legend className="text-admin-base font-semibold text-admin-ink">Days before the event <HelpTooltip label="Days before the event">Choose how many days before the event each reminder is due.</HelpTooltip></legend>
             <p id={`${offsetsId}-hint`} className="text-admin-sm text-admin-ink-secondary">

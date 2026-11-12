@@ -59,17 +59,17 @@ import TicketingConfirmation from '../components/TicketingConfirmation.jsx';
 
 const STATUS_WORDS = { accepted: 'Accepted', approved: 'Approved' };
 const REMINDER_WORDING_FIELDS = [
-  { name: 'subject', label: 'Subject', singleLine: true },
-  { name: 'greeting', label: 'Greeting' },
-  { name: 'introduction', label: 'Introduction' },
-  { name: 'biographyItem', label: 'Biography item' },
-  { name: 'headshotItem', label: 'Headshot item' },
-  { name: 'sessionDescriptionItem', label: 'Session-description item' },
-  { name: 'materialsItem', label: 'Materials item' },
-  { name: 'dueDateLine', label: 'Due-date line' },
-  { name: 'buttonLabel', label: 'Button label', singleLine: true },
-  { name: 'backupLinkInstructions', label: 'Backup-link instructions' },
-  { name: 'contactInstructions', label: 'Contact instructions' },
+  { name: 'subject', label: 'Subject', help: "Write the subject line for the speaker reminder email.", singleLine: true },
+  { name: 'greeting', label: 'Greeting', help: "Write how the reminder greets the speaker. Keep the supported name placeholders." },
+  { name: 'introduction', label: 'Introduction', help: "Explain why the reminder was sent and what the speaker still needs to do." },
+  { name: 'biographyItem', label: 'Biography item', help: "Ask for the speaker’s missing biography." },
+  { name: 'headshotItem', label: 'Headshot item', help: "Ask for the speaker’s missing headshot." },
+  { name: 'sessionDescriptionItem', label: 'Session-description item', help: "Ask for missing descriptions of the speaker’s sessions." },
+  { name: 'materialsItem', label: 'Materials item', help: "Ask for missing slides or other session materials." },
+  { name: 'dueDateLine', label: 'Due-date line', help: "State when the missing items are due. Keep the deadline placeholder." },
+  { name: 'buttonLabel', label: 'Button label', help: "Write the short action label on the speaker dashboard button.", singleLine: true },
+  { name: 'backupLinkInstructions', label: 'Backup-link instructions', help: "Explain how to use the backup link if the button does not work." },
+  { name: 'contactInstructions', label: 'Contact instructions', help: "Tell the speaker how to ask the event team for help." },
 ];
 const REMINDER_WORDING_FIELD_NAMES = new Set(REMINDER_WORDING_FIELDS.map(({ name }) => name));
 
@@ -283,8 +283,8 @@ function WordingEditor({ call, timeZone }) {
     const supported = data.editor?.kind === 'plain';
     body = (
       <form ref={formRef} className="flex flex-col gap-md" onSubmit={save} onChangeCapture={() => setResult(null)} noValidate>
-        <fieldset aria-label={["Reminder wording "].join('').trim()} disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
-        <legend className="sr-only">Reminder wording <HelpTooltip label="Reminder wording">Write the reminder text, then preview a copy for each speaker.</HelpTooltip></legend>
+        <fieldset  disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
+        <legend className="sr-only">Reminder wording </legend>
         <p className="text-admin-sm text-admin-ink">
           {data.saved
             ? `Saved wording, last changed ${formatWhen(data.saved.updatedAt, timeZone)} by ${data.saved.updatedBy ?? 'an admin'}.`
@@ -303,8 +303,8 @@ function WordingEditor({ call, timeZone }) {
             The item conditions, dashboard links, button, layout and branded footer stay fixed.
           </p>
         </div> : null}
-        {supported ? REMINDER_WORDING_FIELDS.map(({ name, label, singleLine }) => (singleLine ? (
-          <TextField help="Write the subject line for the speaker reminder email."
+        {supported ? REMINDER_WORDING_FIELDS.map(({ name, label, help, singleLine }) => (singleLine ? (
+          <TextField help={help}
             key={name}
             label={label}
             value={draft[name]}
@@ -315,7 +315,7 @@ function WordingEditor({ call, timeZone }) {
             }}
           />
         ) : (
-          <TextAreaField help="Write the reminder message, keeping the supported bracketed placeholders."
+          <TextAreaField help={help}
             key={name}
             label={label}
             rows={3}

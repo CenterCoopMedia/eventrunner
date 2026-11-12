@@ -39,25 +39,25 @@ const MESSAGES = {
     title: 'Invitation',
     description: 'The email a speaker gets when staff send or resend an invitation. It carries the private link that accepts it.',
     fields: [
-      { name: 'subject', label: 'Subject', singleLine: true },
-      { name: 'greeting', label: 'Greeting' },
-      { name: 'invitation', label: 'Invitation' },
-      { name: 'signInInstructions', label: 'Sign-in instructions' },
-      { name: 'buttonLabel', label: 'Button label', singleLine: true },
-      { name: 'backupLinkInstructions', label: 'Backup-link instructions' },
-      { name: 'contactInstructions', label: 'Contact instructions' },
+      { name: 'subject', label: 'Subject', help: "Write the subject line speakers see in their inbox.", singleLine: true },
+      { name: 'greeting', label: 'Greeting', help: "Write how the email greets the speaker. Keep the supported name placeholders." },
+      { name: 'invitation', label: 'Invitation', help: "Explain why the speaker is invited and what they should do next." },
+      { name: 'signInInstructions', label: 'Sign-in instructions', help: "Explain how the speaker uses the invitation link to sign in." },
+      { name: 'buttonLabel', label: 'Button label', help: "Write the short action label on the email’s button.", singleLine: true },
+      { name: 'backupLinkInstructions', label: 'Backup-link instructions', help: "Explain how to use the backup link if the button does not work." },
+      { name: 'contactInstructions', label: 'Contact instructions', help: "Tell the speaker how to ask the event team for help." },
     ],
   },
   'speaker.accepted': {
     title: 'Acceptance confirmation',
     description: 'The email a speaker gets once, after they accept the invitation. It links to their speaker profile.',
     fields: [
-      { name: 'subject', label: 'Subject', singleLine: true },
-      { name: 'greeting', label: 'Greeting' },
-      { name: 'confirmation', label: 'Confirmation' },
-      { name: 'profileInstructions', label: 'Profile instructions' },
-      { name: 'buttonLabel', label: 'Button label', singleLine: true },
-      { name: 'reviewNote', label: 'Review note' },
+      { name: 'subject', label: 'Subject', help: "Write the subject line speakers see in their inbox.", singleLine: true },
+      { name: 'greeting', label: 'Greeting', help: "Write how the email greets the speaker. Keep the supported name placeholders." },
+      { name: 'confirmation', label: 'Confirmation', help: "Confirm that the speaker has accepted the invitation." },
+      { name: 'profileInstructions', label: 'Profile instructions', help: "Ask the speaker to open their profile and complete the required details." },
+      { name: 'buttonLabel', label: 'Button label', help: "Write the short action label on the email’s button.", singleLine: true },
+      { name: 'reviewNote', label: 'Review note', help: "Explain what staff will review before the speaker’s profile is published." },
     ],
   },
 };
@@ -216,8 +216,8 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
   return (
     <Panel help="Edit this speaker email and review a preview before saving its wording." title={title} description={description}>
       <form ref={formRef} className="flex flex-col gap-md" onSubmit={save} noValidate aria-label={`${title} wording`}>
-        <fieldset aria-label={[(title), " wording "].join('').trim()} disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
-        <legend className="sr-only">{title} wording <HelpTooltip label="this section">Set the subject and message used for this speaker email.</HelpTooltip></legend>
+        <fieldset  disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
+        <legend className="sr-only">{title} wording </legend>
         <p className="text-admin-sm text-admin-ink">
           {savedLine}
           {changed ? ' The form has changes that are not saved.' : ''}
@@ -238,8 +238,8 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
             Links, layout, buttons and the branded footer stay fixed.
           </p>
         </div> : null}
-        {supported ? fields.map(({ name, label, singleLine }) => (singleLine ? (
-          <TextField help="Write the subject line speakers see in their inbox."
+        {supported ? fields.map(({ name, label, help, singleLine }) => (singleLine ? (
+          <TextField help={help}
             key={name}
             label={label}
             value={draft[name]}
@@ -247,7 +247,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
             onChange={(value) => edit(name, value)}
           />
         ) : (
-          <TextAreaField help="Write the message speakers receive, keeping the supported bracketed placeholders."
+          <TextAreaField help={help}
             key={name}
             label={label}
             rows={3}

@@ -100,7 +100,7 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
           {formats.length ? (
             <SelectField help="Choose how the proposed session will run, such as a panel or workshop." label="Format" value={form.format} onChange={edit('format')} options={choices(formats, 'No format')} />
           ) : (
-            <TextField help="Choose how the proposed session will run, such as a panel or workshop." label="Format" maxLength={120} value={form.format} onChange={edit('format')} />
+            <TextField help="Describe how the proposed session will run, such as a panel or workshop." label="Format" maxLength={120} value={form.format} onChange={edit('format')} />
           )}
           {lengths.length ? <SelectField help="Choose how many minutes the proposed session needs." label="Length" value={form.lengthMinutes} onChange={edit('lengthMinutes')} options={choices(lengths, 'No length', (m) => `${m} minutes`)} /> : null}
           {tracks.length ? <SelectField help="Choose the program topic that best fits this proposal." label="Track" value={form.track} onChange={edit('track')} options={choices(tracks, 'No track')} /> : null}
@@ -116,7 +116,7 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
           </div>
         </fieldset>
         <fieldset aria-label={["Co-presenters (", (form.presenters.length), " of ", (maxCo), ") "].join('').trim()} className="flex flex-col gap-sm">
-          <legend className="text-admin-base font-semibold">Co-presenters ({form.presenters.length} of {maxCo}) <HelpTooltip label="Co-presenters ({form.presenters.length} of {maxCo})">Record the other people who will present alongside the main contact.</HelpTooltip></legend>
+          <legend className="text-admin-base font-semibold">Co-presenters ({form.presenters.length} of {maxCo}) <HelpTooltip label="Co-presenters">Record the other people who will present alongside the main contact.</HelpTooltip></legend>
           {form.presenters.map((row, index) => (
             <div key={row.key} className="planner-fields grid items-end gap-sm border-admin-hairline border-admin-rule-hairline p-sm md:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
               <TextField data-help-skip="The label names this co-presenter’s name, email or organization." label={`Co-presenter ${index + 1} name`} required maxLength={120} value={row.name} onChange={(name) => editRow(row.key, { name })} />

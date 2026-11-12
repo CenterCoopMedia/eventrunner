@@ -652,8 +652,8 @@ export default function AdminInvoiceEditor({ mode }) {
         />
       ) : null}
 
-      {!locked ? <fieldset aria-label={["Invoice details "].join('').trim()} disabled={busy !== null} className="flex min-w-0 flex-col gap-md">
-        <legend className="sr-only">Invoice details <HelpTooltip label="Invoice details">Choose the recipient and contact details printed on this invoice.</HelpTooltip></legend>
+      {!locked ? <fieldset  disabled={busy !== null} className="flex min-w-0 flex-col gap-md">
+        <legend className="sr-only">Invoice details </legend>
         <Panel help="Who pays this invoice. Choose an organization to fill the name and its sponsor package." title="Bill to" description="Who pays this invoice. Choose an organization to fill the name and its sponsor package.">
           <div className="flex flex-col gap-sm">
             <SelectField data-help-skip="The label directly names the requested detail; no further explanation needed."

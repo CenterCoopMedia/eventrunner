@@ -172,7 +172,7 @@ function SendEmail({ pitch, kind, slot, disabled, call, onSent }) {
   return <form onSubmit={send} className="mt-sm space-y-sm">
     <ServerErrorSummary error={error} errorRef={errorRef} title="The email was not sent" />
     <fieldset disabled={busy || disabled} className="space-y-sm">
-      {kind === 'decision' ? <TextAreaField help="The submitter reads this note. Private review notes are never sent." label="Note to the submitter (optional)" value={feedback} onChange={(value) => { setFeedback(value); setPreview(null); setConfirmed(false); }} rows={3} maxLength={MAX_SUBMITTER_FEEDBACK_LENGTH}  /> : null}
+      {kind === 'decision' ? <TextAreaField hint="The submitter reads this note. Private review notes are never sent." help="The submitter reads this note. Private review notes are never sent." label="Note to the submitter (optional)" value={feedback} onChange={(value) => { setFeedback(value); setPreview(null); setConfirmed(false); }} rows={3} maxLength={MAX_SUBMITTER_FEEDBACK_LENGTH}  /> : null}
       <button type="button" className={secondaryButtonClass} onClick={showPreview}>Preview the {name}</button>
       {preview ? <section ref={previewRef} tabIndex={-1} aria-label={`Preview of the ${name}`} className="space-y-xs border-admin-hairline border-admin-rule-hairline p-sm">
         {preview.addressVerified ? null : <Notice tone="caution" message="This address came from an imported CSV. Nobody verified it. Check it before you send." />}

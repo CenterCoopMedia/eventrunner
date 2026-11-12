@@ -307,8 +307,8 @@ function SpeakerSchedule({ call }) {
         {loadError ? <div className="flex flex-col gap-xs"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading}>{loading ? 'Trying again…' : 'Try again'}</button></div> : null}
 
         <form className="flex flex-col gap-md" onSubmit={save} noValidate>
-          <fieldset aria-label={["Speaker reminder settings "].join('').trim()} disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
-          <legend className="sr-only">Speaker reminder settings <HelpTooltip label="Speaker reminder settings">Set the deadline, reminder days and send time for speaker reminders.</HelpTooltip></legend>
+          <fieldset  disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
+          <legend className="sr-only">Speaker reminder settings </legend>
           <fieldset aria-label={["Days before the due date "].join('').trim()} aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
             <legend className="text-admin-base font-semibold text-admin-ink">Days before the due date <HelpTooltip label="Days before the due date">Choose how many days before the deadline each reminder is due.</HelpTooltip></legend>
             <p id={`${offsetsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
