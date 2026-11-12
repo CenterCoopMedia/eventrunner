@@ -310,8 +310,17 @@ async function fullySeeded(overrides = {}) {
   await db.collection('users/uid-ada/bookmarks').doc('s1').set({ bookmarkedAt: T0 });
   await db.collection('users/uid-ada/bookmarks').doc('s2').set({ bookmarkedAt: T0 });
   await db.collection('users/uid-ada/sessionNotes').doc('s1').set({ text: 'Ask about the dataset.' });
+  await db.collection('users/uid-ada/notifications').doc('sp-bo-reply').set({
+    kind: 'post_reply', rootPostId: 'sp-ada-root', replyPostId: 'sp-bo-reply', createdAt: T0, readAt: null,
+  });
+  await db.collection('users/uid-ada/notifications').doc('sp-bo-reply-2').set({
+    kind: 'post_reply', rootPostId: 'sp-ada-root', replyPostId: 'sp-bo-reply-2', createdAt: T0, readAt: T0,
+  });
   await db.collection('users/uid-bo/bookmarks').doc('s1').set({ bookmarkedAt: T0 });
   await db.collection('users/uid-bo/sessionNotes').doc('s1').set({ text: 'Keep me.' });
+  await db.collection('users/uid-bo/notifications').doc('sp-ada-reply').set({
+    kind: 'post_reply', rootPostId: 'sp-bo-root', replyPostId: 'sp-ada-reply', createdAt: T0, readAt: null,
+  });
   return db;
 }
 
@@ -338,6 +347,7 @@ function assertUntouched(d) {
   assert.ok(db.read('schedule_shares', 'uid-ada'));
   assert.deepEqual(db.ids('users/uid-ada/bookmarks').sort(), ['s1', 's2']);
   assert.deepEqual(db.ids('users/uid-ada/sessionNotes'), ['s1']);
+  assert.deepEqual(db.ids('users/uid-ada/notifications').sort(), ['sp-bo-reply', 'sp-bo-reply-2']);
   assert.equal(db.read('sessionBookmarks', 's1').count, 3);
   assert.equal(db.read('tickets', 'tkt-1').claimedByUid, 'uid-ada');
   assert.ok(auth.users.has('uid-ada'));
@@ -359,6 +369,7 @@ function assertNeighbourKept({ db, auth, bucket }) {
   assert.ok(db.read('users_public', 'uid-bo'));
   assert.deepEqual(db.ids('users/uid-bo/bookmarks'), ['s1']);
   assert.deepEqual(db.ids('users/uid-bo/sessionNotes'), ['s1']);
+  assert.deepEqual(db.ids('users/uid-bo/notifications'), ['sp-ada-reply']);
   assert.equal(db.read('tickets', 'tkt-2').claimedByUid, 'uid-bo');
   assert.ok(auth.users.has('uid-bo'));
   assert.ok(bucket.files.has('profile-photos/uid-bo/photo.jpg'));
@@ -379,7 +390,7 @@ test('the per-account store list is one named constant the delete reads', () => 
     PER_ACCOUNT_STORES.map((store) => store.collection ?? store.subcollection ?? store.prefix),
     [
       'users_public', 'schedule_shares', 'organization_representatives', 'tickets', 'bookmarks',
-      'sessionNotes', 'profile-photos', 'profile_photo_uploads', 'change_requests', 'change_request_rate_limits',
+      'sessionNotes', 'notifications', 'profile-photos', 'profile_photo_uploads', 'change_requests', 'change_request_rate_limits',
       'organization_edit_requests', 'ticket_answers', 'session_pitch_rate_limits', 'session_pitches',
       'social_posts', 'social_reports',
     ],
@@ -400,8 +411,9 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
     ok: true,
     uid: 'uid-ada',
     removed: {
-      tickets: 1, bookmarks: 2, notes: 1, photos: 2, photoUploads: 1, changeRequests: 2, changeRequestLimits: 1, organizationEdits: 1,
-      registrationAnswers: 1, sessionPitches: 2, sessionPitchLimits: 1, socialPosts: 2, socialReports: 1,
+      tickets: 1, bookmarks: 2, notes: 1, notifications: 2, photos: 2, photoUploads: 1, changeRequests: 2,
+      changeRequestLimits: 1, organizationEdits: 1, registrationAnswers: 1, sessionPitches: 2, sessionPitchLimits: 1,
+      socialPosts: 2, socialReports: 1,
     },
   });
   // Feed: Ada's active rows and her report go. Bo's rows, Bo's reply under
@@ -422,6 +434,7 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
   assert.ok(!auth.users.has('uid-ada'));
   assert.deepEqual(db.ids('users/uid-ada/bookmarks'), []);
   assert.deepEqual(db.ids('users/uid-ada/sessionNotes'), []);
+  assert.deepEqual(db.ids('users/uid-ada/notifications'), []);
   assert.equal(db.read('sessionBookmarks', 's1').count, 2);
   assert.equal(db.read('sessionBookmarks', 's2').count, 0);
   assert.equal(bucket.files.has('profile-photos/uid-ada/photo.jpg'), false);
@@ -668,7 +681,7 @@ for (const [step, breakIt] of [
   });
 }
 
-test('404 only when no account, sign-in, saved session, note, or photo remains', async () => {
+test('404 only when no account, sign-in, saved session, note, notification, or photo remains', async () => {
   const d = deps(makeFakeDb(), { auth: makeAuth({}), bucket: makeBucket([]) });
   const nothing = await remove(d, 'uid-nobody');
   assert.equal(nothing.statusCode, 404);
@@ -680,6 +693,16 @@ test('404 only when no account, sign-in, saved session, note, or photo remains',
   assert.equal(leftover.statusCode, 200);
   assert.deepEqual(d.db.ids('users/uid-left/sessionNotes'), []);
   assert.deepEqual(adminLogs(d.db).map((row) => row.details), [{ resumed: true }]);
+
+  // A notification is also recipient account data and resumes its sweep.
+  const notification = deps(makeFakeDb(), { auth: makeAuth({}), bucket: makeBucket([]) });
+  await notification.db.collection('users/uid-left/notifications').doc('reply-left').set({
+    kind: 'post_reply', rootPostId: 'root-left', replyPostId: 'reply-left', createdAt: T0, readAt: null,
+  });
+  const notificationRes = await remove(notification, 'uid-left');
+  assert.equal(notificationRes.statusCode, 200);
+  assert.equal(notificationRes.body.removed.notifications, 1);
+  assert.deepEqual(notification.db.ids('users/uid-left/notifications'), []);
 
   // So is a photo, or a sign-in.
   const photo = deps(makeFakeDb(), { auth: makeAuth({}), bucket: makeBucket(['profile-photos/uid-left/p.jpg']) });
@@ -742,8 +765,8 @@ test('the sweep clears more than one page of every store, a page at a time', asy
 
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.deepEqual(res.body.removed, {
-    tickets: 0, bookmarks: 250, notes: 450, photos: 501, photoUploads: 0, changeRequests: 450, changeRequestLimits: 0,
-    organizationEdits: 0, registrationAnswers: 0, sessionPitches: 0, sessionPitchLimits: 0,
+    tickets: 0, bookmarks: 250, notes: 450, notifications: 0, photos: 501, photoUploads: 0, changeRequests: 450,
+    changeRequestLimits: 0, organizationEdits: 0, registrationAnswers: 0, sessionPitches: 0, sessionPitchLimits: 0,
     socialPosts: 0, socialReports: 0,
   });
   assert.deepEqual(db.ids('change_requests'), []);
@@ -919,6 +942,8 @@ test('the auth onDelete trigger releases the account\'s tickets and clears its s
   assert.ok(db.read('ticket_answers', 't-bo'));
   assert.equal(db.read('change_requests', 'cr-ada-1'), undefined);
   assert.ok(db.read('change_requests', 'cr-bo-1'));
+  assert.deepEqual(db.ids('users/uid-ada/notifications'), []);
+  assert.deepEqual(db.ids('users/uid-bo/notifications'), ['sp-ada-reply']);
   assert.deepEqual(db.ids('session_pitches'), ['p-bo-1']);
   assert.deepEqual(db.read('session_pitch_rate_limits', rateLimitIdFor('uid-ada')), { accountDeletedAt: T0 });
   assert.deepEqual([...bucket.files].filter((path) => path.includes('uid-ada')), []);

@@ -14,6 +14,9 @@
  *   removeSocialPost  POST { postId } — staff tier. Replaces the post with a
  *                     content-free tombstone and writes one audit row, in
  *                     one transaction.
+ *   markSocialNotificationRead POST { notificationId, action: 'read' } —
+ *                     the current approved/speaker owner, with both flags on.
+ *                     Sets server readAt once; a retry returns that same time.
  *
  * THE STORES. `social_posts/{postId}`:
  *
@@ -187,7 +190,22 @@ async function storePost({ db, uid, submission, now }) {
     }
     if (parentRef && (!parent.exists || parent.data().state !== ACTIVE
         || parent.data().parentPostId !== null)) return 'no-root';
-    tx.create(postRef, { state: ACTIVE, authorUid: uid, text, parentPostId, createdAt: new Date(clockMs(now)) });
+    const rootAuthorUid = parentRef ? parent.data().authorUid : null;
+    if (parentRef) {
+      if (!isValidDocId(rootAuthorUid)) return 'no-root';
+      // Account deletion removes this document before sweeping its stores.
+      // Reading it here orders both the reply and notification before that
+      // sweep, or refuses both after deletion, even while the root remains.
+      const recipient = await tx.get(db.collection('users').doc(rootAuthorUid));
+      if (!recipient.exists) return 'no-root';
+    }
+    const createdAt = new Date(clockMs(now));
+    tx.create(postRef, { state: ACTIVE, authorUid: uid, text, parentPostId, createdAt });
+    if (rootAuthorUid !== null && rootAuthorUid !== uid) {
+      tx.create(db.collection('users').doc(rootAuthorUid).collection('notifications').doc(postId), {
+        kind: 'post_reply', rootPostId: parentPostId, replyPostId: postId, createdAt, readAt: null,
+      });
+    }
     return 'stored';
   });
   return { outcome, postId };
@@ -219,6 +237,51 @@ function createCreateSocialPostHandler({ db, auth, now = Date.now, log = console
     if (outcome === 'removed') return sendError(res, 410, 'post-removed', 'This post was removed and cannot be submitted again.');
     res.status(outcome === 'stored' ? 201 : 200).json({ postId, state: ACTIVE });
   };
+}
+
+/** The notification owner comes only from the revocation-checked sign-in. */
+function createMarkSocialNotificationReadHandler({ db, auth, now = Date.now, log = console }) {
+  return async function markSocialNotificationRead(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    if ((req.rawBody?.length ?? 0) > MAX_BODY_BYTES || bodyBytes(req.body) > MAX_BODY_BYTES) {
+      return sendError(res, 413, 'payload-too-large', 'The request is too large.');
+    }
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)
+        || Object.keys(body).length !== 2 || body.action !== 'read'
+        || !isValidDocId(body.notificationId)) {
+      return badRequest(res, 'Send notificationId and action: read.');
+    }
+    const decoded = await verifyAuthToken({ auth }, req);
+    if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Sign in to read a notification.');
+    let result;
+    try {
+      result = await markNotificationRead({ db, uid: decoded.uid, notificationId: body.notificationId, now });
+    } catch (err) {
+      log.error('markSocialNotificationRead failed', { code: err?.code ?? 'unknown' });
+      return internal(res, 'The notification could not be marked read. Try again.');
+    }
+    if (result.outcome === 'closed') return notFound(res, FEED_CLOSED_MESSAGE);
+    if (result.outcome === 'forbidden') return sendError(res, 403, 'forbidden', 'An approved or speaker account is required.');
+    if (result.outcome === 'missing') return notFound(res, 'This notification is not available.');
+    res.status(200).json({ notificationId: body.notificationId, readAt: result.readAt.toISOString() });
+  };
+}
+
+async function markNotificationRead({ db, uid, notificationId, now }) {
+  const item = db.collection('users').doc(uid).collection('notifications').doc(notificationId);
+  return db.runTransaction(async (tx) => {
+    const [features, account, notification] = await tx.getAll(
+      db.collection('config').doc('features'), db.collection('users').doc(uid), item,
+    );
+    if (!feedOpen(features.exists ? features.data() : null)) return { outcome: 'closed' };
+    if (!accountGrant(account.exists ? account.data() : null)) return { outcome: 'forbidden' };
+    if (!notification.exists) return { outcome: 'missing' };
+    const previous = notification.data().readAt;
+    const readAt = previous === null ? new Date(clockMs(now)) : previous.toDate();
+    if (previous === null) tx.update(item, { readAt });
+    return { outcome: 'read', readAt };
+  });
 }
 
 /**
@@ -364,6 +427,7 @@ function buildHandlers() {
     createSocialPost: expose(createCreateSocialPostHandler),
     reportSocialPost: expose(createReportSocialPostHandler),
     removeSocialPost: expose(createRemoveSocialPostHandler),
+    markSocialNotificationRead: expose(createMarkSocialNotificationReadHandler),
   };
 }
 
@@ -371,6 +435,7 @@ module.exports = {
   createCreateSocialPostHandler,
   createReportSocialPostHandler,
   createRemoveSocialPostHandler,
+  createMarkSocialNotificationReadHandler,
   get handlers() {
     return buildHandlers();
   },

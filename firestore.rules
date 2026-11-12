@@ -434,6 +434,17 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.text.size() <= 10000;
       }
+
+      // Private reply notifications (issue #542). Only the recipient reads
+      // this server-owned subtree, and only while their live account still
+      // grants feed access and both feed flags are on. Admin access does not
+      // override ownership.
+      match /notifications/{replyId} {
+        allow read: if isSelf(userId)
+          && socialFeedOpen()
+          && requesterIsApprovedAttendee();
+        allow write: if false;
+      }
     }
 
     // The requester's OWN registration state, read from their users doc.

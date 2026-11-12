@@ -2501,6 +2501,126 @@ describe("event data export: sources and audit rows (issue 329)", () => {
   });
 });
 
+// Reply notifications are a private, server-owned account subtree (issue
+// #542). The owner needs the same live account grant and two feature flags as
+// the feed. Staff have no cleanup exception here because the item belongs to
+// one recipient.
+describe("private reply notification reads (issue 542)", () => {
+  const notification = (db, uid, replyId = "reply-1") => (
+    doc(db, `users/${uid}/notifications/${replyId}`)
+  );
+  const notificationList = (db, uid) => collection(db, `users/${uid}/notifications`);
+
+  async function setFeatures(data) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const ref = doc(ctx.firestore(), "config/features");
+      if (data === null) await deleteDoc(ref);
+      else await setDoc(ref, data);
+    });
+  }
+
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const [uid, account] of [
+        ["pending-notification", { registrationStatus: "pending", speakerId: null }],
+        ["revoked-notification", { registrationStatus: "revoked", speakerId: null }],
+        ["deleted-notification", { registrationStatus: "approved", speakerId: null }],
+      ]) {
+        await setDoc(doc(db, `users/${uid}`), { uid, ...account });
+      }
+      await setDoc(doc(db, "users_public/public-notification"), {
+        uid: "public-notification",
+        displayName: "Public only",
+        profileVisibility: "public",
+      });
+      for (const uid of [
+        "approved-1",
+        "speaker-1",
+        "pending-notification",
+        "revoked-notification",
+        "deleted-notification",
+        "public-notification",
+      ]) {
+        await setDoc(notification(db, uid), {
+          kind: "post_reply",
+          rootPostId: "root-1",
+          replyPostId: "reply-1",
+          createdAt: new Date("2026-11-01T12:00:00.000Z"),
+          readAt: null,
+        });
+      }
+      await deleteDoc(doc(db, "users/deleted-notification"));
+    });
+  });
+
+  afterAll(async () => {
+    await setFeatures({ attendeeDirectory: true, publicAttendeeProfiles: false });
+  });
+
+  it("allows an approved attendee and a speaker to get and list only their own notifications", async () => {
+    await setFeatures({ socialFeed: true, attendeeDirectory: true });
+    for (const uid of ["approved-1", "speaker-1"]) {
+      const owner = attendee(uid);
+      await assertSucceeds(getDoc(notification(owner, uid)));
+      await assertSucceeds(getDocs(notificationList(owner, uid)));
+    }
+  });
+
+  it("requires both feed flags for owner get and list", async () => {
+    for (const data of [
+      null,
+      {},
+      { socialFeed: true },
+      { attendeeDirectory: true },
+      { socialFeed: "true", attendeeDirectory: true },
+      { socialFeed: true, attendeeDirectory: false },
+    ]) {
+      await setFeatures(data);
+      const owner = attendee("approved-1");
+      await assertFails(getDoc(notification(owner, "approved-1")));
+      await assertFails(getDocs(notificationList(owner, "approved-1")));
+    }
+  });
+
+  it("refuses pending, revoked, deleted and public-only accounts", async () => {
+    await setFeatures({ socialFeed: true, attendeeDirectory: true });
+    for (const uid of [
+      "pending-notification",
+      "revoked-notification",
+      "deleted-notification",
+      "public-notification",
+    ]) {
+      const owner = attendee(uid);
+      await assertFails(getDoc(notification(owner, uid)));
+      await assertFails(getDocs(notificationList(owner, uid)));
+    }
+  });
+
+  it("refuses another attendee, non-owner staff and anonymous readers", async () => {
+    await setFeatures({ socialFeed: true, attendeeDirectory: true });
+    for (const reader of [attendee("approved-1"), staff(), admin(), anon()]) {
+      await assertFails(getDoc(notification(reader, "speaker-1")));
+      await assertFails(getDocs(notificationList(reader, "speaker-1")));
+    }
+  });
+
+  it("denies every client create, update and delete", async () => {
+    await setFeatures({ socialFeed: true, attendeeDirectory: true });
+    for (const writer of [attendee("approved-1"), staff(), admin()]) {
+      await assertFails(setDoc(notification(writer, "approved-1", "forged"), {
+        kind: "post_reply",
+        rootPostId: "root-1",
+        replyPostId: "forged",
+        createdAt: serverTimestamp(),
+        readAt: null,
+      }));
+      await assertFails(updateDoc(notification(writer, "approved-1"), { readAt: serverTimestamp() }));
+      await assertFails(deleteDoc(notification(writer, "approved-1")));
+    }
+  });
+});
+
 // The private attendee feed (issue #506). Attendees read posts only with
 // BOTH socialFeed and attendeeDirectory true and a current account grant
 // (approved, or linked to a speaker). Staff and operators read posts and

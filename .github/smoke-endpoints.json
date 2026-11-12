@@ -109,6 +109,7 @@
     "createSocialPost",
     "reportSocialPost",
     "removeSocialPost",
+    "markSocialNotificationRead",
     "saveChangeRequestNoticeSettings",
     "retryChangeRequestNotice",
     "addSessionMaterialLink",
