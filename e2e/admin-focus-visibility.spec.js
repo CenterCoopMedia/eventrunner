@@ -87,6 +87,7 @@ for (const kind of ['page', 'invoice', 'session']) {
       const directory = path.resolve('test-results/admin-focus-evidence');
       await fs.mkdir(directory, { recursive: true });
       await fs.writeFile(path.join(directory, `${kind}-header-measurements.json`), JSON.stringify(measurements, null, 2));
+      console.info(`Admin focus measurements (${kind}): ${JSON.stringify(measurements)}`);
     } finally {
       if (invoiceId) {
         await db.collection('invoices').doc(invoiceId).delete();
