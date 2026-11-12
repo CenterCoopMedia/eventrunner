@@ -15,8 +15,9 @@ import { PUBLIC_SUBSCRIPTION_ROUTES, publicSubscriptionsForRoute } from './lib/p
 import { eventConfig, features } from '@generated/eventConfig.js';
 import scheduleData, { speakers } from '@generated/scheduleData.js';
 import organizations from '@generated/organizationsData.js';
+import pages from '@generated/pagesData.js';
 
-const configDocs = vi.hoisted(() => ({}));
+const { configDocs, contentDocs } = vi.hoisted(() => ({ configDocs: {}, contentDocs: {} }));
 vi.mock('./lib/configSource.js', () => ({
   subscribeConfigDoc: (id, onNext, onStatus) => {
     onNext(configDocs[id] ?? null);
@@ -25,7 +26,10 @@ vi.mock('./lib/configSource.js', () => ({
   },
 }));
 vi.mock('./lib/contentSource.js', () => ({
-  subscribeContentCollection: () => () => {},
+  subscribeContentCollection: (name, _readSource, onNext) => {
+    if (contentDocs[name]) onNext(contentDocs[name]);
+    return () => {};
+  },
   subscribeSpeakersPublic: () => () => {},
 }));
 
@@ -91,6 +95,12 @@ beforeEach(() => {
   configDocs.features = { ...Object.fromEntries(Object.keys(features).map((key) => [key, true])), webmcpPublic: false, webmcpAdmin: false, liveUpdates: false };
   configDocs.badges = { categories: [], customBadgeBlockList: [] };
   configDocs.launch = { comingSoon: false };
+  // The historical snapshot omits history. A valid live page can add it,
+  // so exercise that conditional collection consumer too.
+  contentDocs.cmsPages = pages.map((page) => page.id === 'home'
+    ? { ...page, sections: [...page.sections, { id: 'history', label: 'Past editions', allowedBlocks: [], defaultBlocks: [] }] }
+    : page);
+  contentDocs.cmsTimeline = [{ id: 'past-fixture', year: 2025, title: 'Earlier fixture event', visible: true }];
   // Populate the real bookmark/share/profile consumers at the SDK boundary,
   // so their nested SessionCards and badge controls actually render.
   vi.mocked(onSnapshot).mockImplementation((reference, options, next) => {
@@ -149,8 +159,15 @@ describe('route content-read contract', () => {
     }
     if (['/profile', '/dashboard', '/attendees', '/attendees/:uid'].includes(path)) expect(reads.has('badges')).toBe(true);
     if (path === '/specimen') expect(reads.has('speakers_public')).toBe(true);
+    if (path === '/') {
+      expect(screen.getByRole('heading', { name: 'Past editions', exact: true })).toBeInTheDocument();
+      expect(reads.has('cmsTimeline')).toBe(true);
+      expect(reads.has('cmsOrganizations')).toBe(true);
+    }
     expect(screen.queryByText('This page could not be shown')).not.toBeInTheDocument();
     expect([...missing]).toEqual([]);
-    expect(reads.size).toBeGreaterThan(0);
+    // The admin overview reads config only; its all-stream policy is tested
+    // separately. Every public page also reads the shared content shell.
+    if (path !== '/admin/*') expect(reads.size).toBeGreaterThan(0);
   });
 });
