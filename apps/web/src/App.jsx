@@ -19,7 +19,7 @@ import RouteTitle from './components/RouteTitle.jsx';
 import ScrollReset from './components/ScrollReset.jsx';
 import Home from './pages/Home.jsx';
 import LoadingState from './components/LoadingState.jsx';
-import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import DeferredPage from './components/DeferredPage.jsx';
 import { clearReloadFlag } from './lib/chunkReload.js';
 import { loadSpecimenPage, SPECIMEN_PATH } from './pages/specimen/specimenRoute.js';
@@ -100,11 +100,14 @@ export function AppRoutes() {
           // The boundary sits OUTSIDE Suspense: a rejected dynamic import
           // surfaces as a thrown error at the lazy boundary, not as a
           // fallback, so a boundary inside Suspense would never see it.
-          <ChunkErrorBoundary>
+          <ErrorBoundary
+            appearance="admin"
+            title="Admin could not open"
+          >
             <Suspense fallback={<LoadingState label="Loading admin…" />}>
               <AdminApp />
             </Suspense>
-          </ChunkErrorBoundary>
+          </ErrorBoundary>
         }
       />
       <Route element={<LaunchGate />}>

@@ -72,7 +72,7 @@ import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
 import RegistrationAction from './RegistrationAction.jsx';
-import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
 import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import AnnouncementBanners from './AnnouncementBanners.jsx';
@@ -499,7 +499,9 @@ export default function Layout() {
           : 'stage flex-1 pb-2xl pt-md'
       }
     >
-      <Outlet context={accountViews} />
+      <ErrorBoundary>
+        <Outlet context={accountViews} />
+      </ErrorBoundary>
     </main>
   );
 
@@ -693,14 +695,14 @@ export default function Layout() {
         </div>
       </footer>
       {feedbackOpen ? (
-        <ChunkErrorBoundary>
+        <ErrorBoundary appearance="inline" title="The feedback form could not open">
           <Suspense fallback={null}>
             <FeedbackModal onClose={() => setFeedbackOpen(false)} />
           </Suspense>
-        </ChunkErrorBoundary>
+        </ErrorBoundary>
       ) : null}
       {changeRequestOpen && canRequestChange ? (
-        <ChunkErrorBoundary>
+        <ErrorBoundary appearance="inline" title="The change request form could not open">
           <Suspense fallback={null}>
             <ChangeRequestModal
               user={user}
@@ -708,7 +710,7 @@ export default function Layout() {
               onClose={() => setChangeRequestOpen(false)}
             />
           </Suspense>
-        </ChunkErrorBoundary>
+        </ErrorBoundary>
       ) : null}
     </div>
   );

@@ -118,7 +118,7 @@ export function isClientErrorReportingEnabled(env = import.meta.env) {
  * @param {{ env?: object, fetchImpl?: typeof fetch, now?: () => number }} [deps]
  */
 export async function reportClientError(report, deps = {}) {
-  const { env = import.meta.env, fetchImpl = typeof fetch === 'function' ? fetch : null, now = Date.now } = deps;
+  const { env, fetchImpl = typeof fetch === 'function' ? fetch : null, now = Date.now } = deps;
   try {
     // Backstop for any direct caller: initErrorReporting already declines to
     // install its listeners in the demo, but the sender itself must never be
