@@ -73,7 +73,7 @@ import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
 import RegistrationAction from './RegistrationAction.jsx';
 import ErrorBoundary from './ErrorBoundary.jsx';
-import { clearReloadFlag } from '../lib/chunkReload.js';
+import { clearReloadFlag, reloadOnce } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import AnnouncementBanners from './AnnouncementBanners.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
@@ -101,6 +101,7 @@ export function optionalOnDemand(importer, label) {
         return module;
       })
       .catch((error) => {
+        reloadOnce();
         console.warn(`Optional ${label} could not load.`, error);
         return { default: () => null };
       }),

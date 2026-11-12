@@ -15,6 +15,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
+import * as chunkReload from '../lib/chunkReload.js';
+import { isRoutePrefetchPending, routePage } from '../lib/routePage.jsx';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // jsdom applies no CSS, so a rule the shell depends on is asserted against
@@ -155,28 +157,95 @@ describe('Layout public model tools', () => {
     await waitFor(() => expect(renderPublicWebMcpRegistration).toHaveBeenCalled());
   });
 
-  it('keeps the shell visible when the optional module fails to load', async () => {
+  it('keeps the shell visible when optional recovery cannot reload', async () => {
     const error = new Error('chunk failed');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const recover = vi.spyOn(chunkReload, 'reloadOnce').mockReturnValue(false);
     const FailedRegistration = optionalOnDemand(
       () => Promise.reject(error),
       'public model tools',
     );
+    try {
+      render(
+        <>
+          <span>Event shell</span>
+          <Suspense fallback={null}><FailedRegistration /></Suspense>
+        </>,
+      );
 
-    render(
-      <>
-        <span>Event shell</span>
-        <Suspense fallback={null}><FailedRegistration /></Suspense>
-      </>,
-    );
+      expect(screen.getByText('Event shell')).toBeInTheDocument();
+      await waitFor(() => expect(warn).toHaveBeenCalledWith(
+        'Optional public model tools could not load.',
+        error,
+      ));
+      expect(recover).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('Event shell')).toBeInTheDocument();
+    } finally {
+      recover.mockRestore();
+      warn.mockRestore();
+    }
+  });
+});
 
-    expect(screen.getByText('Event shell')).toBeInTheDocument();
-    await waitFor(() => expect(warn).toHaveBeenCalledWith(
-      'Optional public model tools could not load.',
-      error,
-    ));
-    expect(screen.getByText('Event shell')).toBeInTheDocument();
-    warn.mockRestore();
+describe('optional imports during route speculation', () => {
+  let reload;
+  let warn;
+  let finish;
+  let speculation;
+  let removeListener;
+  let errors;
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    reload = vi.fn();
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const actualReloadOnce = chunkReload.reloadOnce;
+    vi.spyOn(chunkReload, 'reloadOnce').mockImplementation((options = {}) => actualReloadOnce({ ...options, reload }));
+    const pending = routePage(() => new Promise((resolve) => { finish = resolve; }));
+    speculation = pending.prefetch();
+    removeListener = chunkReload.installChunkReload(window, { reload, isPrefetching: isRoutePrefetchPending });
+    errors = [];
+  });
+
+  afterEach(async () => {
+    removeListener();
+    finish({ default: () => null });
+    await speculation;
+    vi.restoreAllMocks();
+    sessionStorage.clear();
+  });
+
+  function failedImport() {
+    return Promise.resolve().then(() => {
+      const error = new Error('Unable to preload CSS for an optional chunk');
+      const event = new Event('vite:preloadError', { cancelable: true });
+      event.payload = error;
+      errors.push(event);
+      window.dispatchEvent(event);
+      if (!event.defaultPrevented) throw error;
+    });
+  }
+
+  it.each([false, true])('keeps its fallback and respects a spent reload budget: %s', async (spent) => {
+    if (spent) sessionStorage.setItem(chunkReload.RELOAD_FLAG, '1');
+    const Optional = optionalOnDemand(failedImport, 'account menu');
+    render(<><p>Required shell</p><Suspense fallback={null}><Optional /></Suspense></>);
+    await waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+    expect(isRoutePrefetchPending()).toBe(true);
+    expect(errors[0].defaultPrevented).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(spent ? 0 : 1);
+    expect(sessionStorage.getItem(chunkReload.RELOAD_FLAG)).toBe('1');
+    expect(screen.getByText('Required shell')).toBeVisible();
+  });
+
+  it('starts only one reload for concurrent optional failures', async () => {
+    const Account = optionalOnDemand(failedImport, 'account menu');
+    const Tools = optionalOnDemand(failedImport, 'public model tools');
+    render(<Suspense fallback={null}><Account /><Tools /></Suspense>);
+    await waitFor(() => expect(warn).toHaveBeenCalledTimes(2));
+    expect(errors.every((event) => !event.defaultPrevented)).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem(chunkReload.RELOAD_FLAG)).toBe('1');
   });
 });
 
