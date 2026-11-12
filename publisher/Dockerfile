@@ -23,7 +23,7 @@
 # (npm run prepare:functions) — functions/package.json depends on it by
 # path, so `npm ci` cannot resolve the workspace tree without it.
 
-FROM node:22-slim
+FROM node:22.23.5-slim
 
 # vite and firebase-tools are devDependencies of the workspace root: the
 # job BUILDS the site, so a production-only install has nothing to build

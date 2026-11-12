@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Select the November 2026 Node.js security releases: Node 22.23.5 for development,
+  CI and publisher images, with patched minimums of 24.22.3 and 26.13.1 on the other
+  supported release lines. Cloud Functions keep their provider-managed Node 22 runtime.
+
 ### Added
 
 - New Console-built sites include configured CCM support operators alongside the client's
