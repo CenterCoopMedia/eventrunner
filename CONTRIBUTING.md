@@ -65,8 +65,11 @@ No `.env` and no cloud credentials are required for any of these — `test:rules
 2. Open an issue first if the change is more than a typo. Use the form that matches the work.
 3. Branch from `main`. One logical change per branch.
 4. Add or update tests next to the code (`*.test.cjs` beside the module).
-5. Fill in the pull request template, including how you verified the change.
-6. Sign off each commit (`git commit -s`) under the [Developer Certificate of Origin](https://developercertificate.org/).
+5. For a behavior change, add one file under `changelog.d/` using the
+   [fragment format](changelog.d/README.md). Name it `<issue>-<short-slug>.md` and describe the
+   change for someone reading the release notes. Pure refactors and test-only changes need none.
+6. Fill in the pull request template, including how you verified the change.
+7. Sign off each commit (`git commit -s`) under the [Developer Certificate of Origin](https://developercertificate.org/).
 
 ### Sign your commits (DCO)
 
@@ -211,7 +214,9 @@ CI runs the browser suite in three shards and the web unit tests in two, each on
 
 ## Releases
 
-Tags, `CHANGELOG.md` hygiene, and what a release includes are in [RELEASING.md](RELEASING.md).
+Behavior PRs add a [changelog fragment](changelog.d/README.md). The release PR collects the
+fragments into `CHANGELOG.md` and deletes the collected files. Tags, collection steps and what
+a release includes are in [RELEASING.md](RELEASING.md).
 
 One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, `functions/src/pdf/kit.cjs`, `console/functions/src/emailLayout.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 

@@ -47,8 +47,8 @@ worktree, a branch, and a list of issues.
   functions/node_modules/shared && npm install` so the lockfile hashes match.
 - Keep docs current in the same branch: `docs/ADMIN_GUIDE.md`,
   `docs/design-reference.md`, `docs/interface-guidelines.md`, `apps/web/README.md`,
-  `functions/README.md`, and a `CHANGELOG.md` entry under `[Unreleased]`, as the
-  change needs. Tick the issue in `docs/ROADMAP.md`.
+  `functions/README.md`, and a [changelog fragment](../changelog.d/README.md), as
+  the change needs. Tick the issue in `docs/ROADMAP.md`.
 - If a choice is not clear, take the simplest option that fits the parity plan
   and the design record, and write it down in your report. Do not stop to ask.
 - Before you write "Done when met", quote each clause of the issue's "Done

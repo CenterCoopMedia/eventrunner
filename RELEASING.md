@@ -27,22 +27,28 @@ called out plainly in the changelog entry — SemVer's normal pre-1.0 allowance.
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format, already in use in
 [CHANGELOG.md](CHANGELOG.md).
 
-- Every pull request that changes behavior (not a pure refactor, not a test-only change) adds an
-  entry under `## [Unreleased]`, in the category it belongs to (`Added`, `Changed`, `Fixed`,
-  `Removed`, `Security`) — creating the category heading if this PR is the first entry in it.
+- Every pull request that changes behavior adds one Markdown fragment under `changelog.d/`,
+  named `<issue>-<short-slug>.md`. Pure refactors and test-only changes need no fragment.
+  Use the category it belongs to: `Added`, `Changed`, `Fixed`, `Removed` or `Security`.
+  [The fragment format](changelog.d/README.md) includes an example.
 - Write the entry for the person reading the changelog cold, not for someone who already read the
   PR: what changed and why it matters, not the PR title. One line is normal; link the spec section
   or issue number the way existing entries do.
-- Do not pre-date or pre-number an entry. It stays under `Unreleased` until the tag that ships it
-  exists.
+- Leave dates and release versions out of fragments. The release PR collects them into
+  `CHANGELOG.md`; behavior PRs leave that shared file alone.
 
 ## Cutting a tag
 
 1. Confirm `main` is green: CI (lint, unit, web unit, build, hygiene, demo, rules, DCO, secret scan)
    — see [CONTRIBUTING.md](CONTRIBUTING.md)'s test table.
 2. Open a PR that:
-   - Retitles `## [Unreleased]` in `CHANGELOG.md` to `## [x.y.z] - YYYY-MM-DD`, and adds a fresh
-     empty `## [Unreleased]` above it.
+   - Reads every Markdown fragment in `changelog.d/` except `README.md`, and combines their
+     entries with the current `## [Unreleased]` entries in `CHANGELOG.md`. Group the entries
+     under one heading per category, preserving their issue links and meaning.
+   - Retitles that combined section to `## [x.y.z] - YYYY-MM-DD`, and adds a fresh empty
+     `## [Unreleased]` above it.
+   - Deletes the collected fragment files in the same PR, keeping `changelog.d/README.md`.
+     Check the diff: every deleted fragment entry must appear in the new version section.
    - Bumps `version` in the root `package.json` (and `apps/web/package.json` /
      `functions/package.json` if their versions are tracked independently at that point) to match.
    - Sign off the commit(s) — same DCO rule as any other PR.
