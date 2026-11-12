@@ -1,10 +1,11 @@
 // Real public components with controlled responses; GitHub-hosted CI only.
 // No feedback leaves the browser: every submission is intercepted here.
-/* global getComputedStyle, window */
+/* global document, getComputedStyle, window */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, APP_BASE_URL, signIn } from './helpers.mjs';
+import { eventConfig } from '../apps/web/src/generated/eventConfig.js';
 
 const EVIDENCE = path.resolve('test-results/admin-visual-evidence');
 const THEMES = ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'];
@@ -28,6 +29,90 @@ async function openFeedback(page) {
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('textbox', { name: 'Message', exact: true })).toBeFocused();
   return { dialog, opener };
+}
+
+for (const width of [1440, 390, 320]) {
+  test(`segmented choices keep separated touch targets and keyboard access at ${width}px`, async ({ browser }) => {
+    const touch = width < 1440;
+    const context = await browser.newContext({
+      baseURL: APP_BASE_URL,
+      viewport: { width, height: touch ? 844 : 1000 },
+      isMobile: touch,
+      hasTouch: touch,
+    });
+    const page = await context.newPage();
+    try {
+      // The historical demo has one day. Give the real specimen a short
+      // synthetic programme so adjacent choices and its unavailable state
+      // can be exercised without changing stored emulator or client data.
+      await page.route(/\/src\/generated\/eventConfig\.js(?:\?|$)/, async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({
+          response,
+          body: `${await response.text()}\neventConfig.days = ${JSON.stringify(
+            ['Friday, March 27', 'Saturday, March 28', 'Sunday, March 29'].map((label, index) => ({
+              ...eventConfig.days[0], id: `day-${index + 1}`, label, date: `2026-03-${27 + index}`,
+            })),
+          )};`,
+        });
+      });
+      await page.goto('/specimen');
+      const specimen = page.locator('[data-specimen-file="components/forms/SegmentedControl.jsx"]');
+      const groups = specimen.getByRole('radiogroup', { name: 'Day', exact: true });
+      await expect(groups).toHaveCount(3);
+      await page.evaluate(() => document.fonts.ready);
+      expect(await page.evaluate(() => window.matchMedia('(pointer: coarse)').matches)).toBe(touch);
+
+      for (const group of await groups.all()) {
+        await expect(group.getByRole('radio')).toHaveCount(3);
+        await expect(group.locator('[role="radio"][tabindex="0"]')).toHaveCount(1);
+        const bounds = await group.getByRole('radio').evaluateAll((options) => options.map((option) => {
+          const { x, y, width: targetWidth, height } = option.getBoundingClientRect();
+          return { x, y, width: targetWidth, height };
+        }));
+        for (const [index, target] of bounds.entries()) {
+          expect(target.width).toBeGreaterThanOrEqual(44);
+          expect(target.height).toBeGreaterThanOrEqual(44);
+          expect(target.x).toBeGreaterThanOrEqual(0);
+          expect(target.x + target.width).toBeLessThanOrEqual(width);
+          for (const other of bounds.slice(index + 1)) {
+            const horizontal = Math.max(other.x - target.x - target.width, target.x - other.x - other.width);
+            const vertical = Math.max(other.y - target.y - target.height, target.y - other.y - other.height);
+            expect(Math.max(horizontal, vertical)).toBeGreaterThanOrEqual(8);
+          }
+        }
+        if (width === 320) expect(new Set(bounds.map((target) => target.y)).size).toBeGreaterThan(1);
+        await expect(group).toHaveCSS('border-top-style', 'solid');
+      }
+
+      const available = groups.first();
+      const choices = available.getByRole('radio');
+      await choices.first().focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(choices.nth(1)).toBeFocused();
+      await expect(choices.nth(1)).toHaveAttribute('aria-checked', 'true');
+      await page.keyboard.press('End');
+      await expect(choices.last()).toBeFocused();
+      await expect(choices.last()).toHaveAttribute('aria-checked', 'true');
+      await page.keyboard.press('Home');
+      await expect(choices.first()).toBeFocused();
+      await expect(choices.first()).toHaveAttribute('aria-checked', 'true');
+
+      const unavailable = groups.last().getByRole('radio').last();
+      await groups.last().getByRole('radio').first().focus();
+      await page.keyboard.press('End');
+      await expect(unavailable).toBeFocused();
+      await expect(unavailable).toHaveAttribute('aria-disabled', 'true');
+      await expect(unavailable).toHaveAttribute('aria-checked', 'false');
+      await expect(unavailable).toHaveAccessibleName('Sunday, March 29 (No sessions published for this day yet)');
+      await expect(specimen.locator('.segmented__reason')).toHaveText('No sessions published for this day yet');
+      await expect(groups.last().locator('[role="radio"][tabindex="0"]')).toHaveCount(1);
+      await specimen.scrollIntoViewIfNeeded();
+      await capture(page, `segmented-touch-targets-${width}`);
+    } finally {
+      await context.close();
+    }
+  });
 }
 
 for (const width of [1440, 390, 320]) {
