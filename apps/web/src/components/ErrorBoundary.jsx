@@ -46,7 +46,7 @@ class RenderErrorBoundary extends Component {
     const Heading = inline ? 'strong' : 'h1';
     const explanation = this.state.chunk
       ? 'A page file did not load. Check your connection and reload.'
-      : description || 'Choose another page or reload.';
+      : description || 'Reload the page to try again.';
     return (
       <div role="alert" className={inline
         ? 'stage error-boundary--inline'

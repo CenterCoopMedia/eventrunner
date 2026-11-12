@@ -44,10 +44,7 @@ const Router = IS_DEMO ? HashRouter : BrowserRouter;
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Router>
-      <ErrorBoundary
-        title="The site could not be shown"
-        description="Reload the page to try again."
-      >
+      <ErrorBoundary title="The site could not be shown">
         <App />
       </ErrorBoundary>
     </Router>

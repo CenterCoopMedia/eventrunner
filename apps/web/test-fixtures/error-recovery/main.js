@@ -9,6 +9,8 @@ import '../../src/generated/theme.css';
 import '../../src/index.css';
 
 initErrorReporting();
+globalThis.document.documentElement.dataset.navigationType =
+  globalThis.performance.getEntriesByType('navigation')[0].type;
 
 function Crash() {
   const { pathname } = useLocation();
@@ -42,12 +44,12 @@ function Stepper() {
 function FailedForm({ title }) {
   return h(Fragment, null,
     h('h1', null, 'Page content'),
-    h(ErrorBoundary, { appearance: 'inline', title, description: 'Reload the page to try again.' }, h(Crash)));
+    h(ErrorBoundary, { appearance: 'inline', title }, h(Crash)));
 }
 
 createRoot(globalThis.document.getElementById('root')).render(
   h(BrowserRouter, null,
-    h(ErrorBoundary, { title: 'The site could not be shown', description: 'Reload the page to try again.' },
+    h(ErrorBoundary, { title: 'The site could not be shown' },
       h(Routes, null,
         h(Route, { element: h(Shell) },
           h(Route, { path: '/working', element: h('h1', null, 'Working page content') }),

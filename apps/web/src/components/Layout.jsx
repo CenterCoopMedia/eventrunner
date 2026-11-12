@@ -695,14 +695,14 @@ export default function Layout() {
         </div>
       </footer>
       {feedbackOpen ? (
-        <ErrorBoundary appearance="inline" title="The feedback form could not open" description="Reload the page to try again.">
+        <ErrorBoundary appearance="inline" title="The feedback form could not open">
           <Suspense fallback={null}>
             <FeedbackModal onClose={() => setFeedbackOpen(false)} />
           </Suspense>
         </ErrorBoundary>
       ) : null}
       {changeRequestOpen && canRequestChange ? (
-        <ErrorBoundary appearance="inline" title="The change request form could not open" description="Reload the page to try again.">
+        <ErrorBoundary appearance="inline" title="The change request form could not open">
           <Suspense fallback={null}>
             <ChangeRequestModal
               user={user}

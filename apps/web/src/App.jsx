@@ -103,7 +103,6 @@ export function AppRoutes() {
           <ErrorBoundary
             appearance="admin"
             title="Admin could not open"
-            description="Reload the page to try again."
           >
             <Suspense fallback={<LoadingState label="Loading admin…" />}>
               <AdminApp />
