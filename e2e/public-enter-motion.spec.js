@@ -9,13 +9,13 @@ async function observeEnters(page) {
       if (event.animationName !== 'motion-enter') return;
       // Hold the actual first frame so keyboard access and layout are
       // checked before the entrance can finish, even on a slow runner.
-      event.target.getAnimations().forEach((animation) => animation.pause());
+      event.target.getAnimations().forEach((animation) => { animation.pause(); animation.currentTime = 0; });
       if (globalThis.enterSelector && event.target.matches(globalThis.enterSelector)) globalThis.enterCount += 1;
     });
   });
 }
 
-async function opensTwice(page, trigger, selector, focus) {
+async function opensTwice(page, trigger, selector, focus, companions = []) {
   const body = page.locator(selector);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await page.evaluate((value) => { globalThis.enterSelector = value; globalThis.enterCount = 0; }, selector);
@@ -25,13 +25,24 @@ async function opensTwice(page, trigger, selector, focus) {
     await page.evaluate(() => globalThis.document.fonts.ready);
     const paused = await body.evaluate((element) => {
       const style = globalThis.getComputedStyle(element);
-      return { name: style.animationName, duration: style.animationDuration, height: element.offsetHeight,
+      const matrix = new globalThis.DOMMatrixReadOnly(style.transform === 'none' ? undefined : style.transform);
+      return { name: style.animationName, duration: style.animationDuration, height: element.offsetHeight, opacity: style.opacity,
+        x: matrix.m41, y: matrix.m42,
         nextTop: element.nextElementSibling?.offsetTop ?? null,
         paused: element.getAnimations().some((animation) => animation.playState === 'paused') };
     });
     expect(paused.name).toBe('motion-enter');
     expect(paused.duration).toBe('0.16s');
     expect(paused.paused).toBe(true);
+    expect(paused.opacity).toBe('0');
+    expect(paused.x).toBe(0);
+    expect(Math.abs(paused.y)).toBeLessThanOrEqual(8);
+    for (const companion of companions) {
+      expect(await page.locator(companion).evaluate((element) => {
+        const style = globalThis.getComputedStyle(element);
+        return { name: style.animationName, duration: style.animationDuration };
+      })).toEqual({ name: 'motion-enter', duration: '0.16s' });
+    }
     for (let tabs = 0; tabs < 12; tabs += 1) {
       await page.keyboard.press('Tab');
       if (await focus.evaluate((element) => element.ownerDocument.activeElement === element)) break;
@@ -40,9 +51,10 @@ async function opensTwice(page, trigger, selector, focus) {
     const finished = await body.evaluate((element) => {
       element.getAnimations().forEach((animation) => animation.finish());
       const style = globalThis.getComputedStyle(element);
-      return { height: element.offsetHeight, nextTop: element.nextElementSibling?.offsetTop ?? null, opacity: style.opacity, transform: style.transform };
+      return { height: element.offsetHeight, nextTop: element.nextElementSibling?.offsetTop ?? null, opacity: style.opacity,
+        identity: style.transform === 'none' || new globalThis.DOMMatrixReadOnly(style.transform).isIdentity };
     });
-    expect(finished).toEqual({ height: paused.height, nextTop: paused.nextTop, opacity: '1', transform: 'none' });
+    expect(finished).toEqual({ height: paused.height, nextTop: paused.nextTop, opacity: '1', identity: true });
     await trigger.press('Enter');
     await expect(body).toBeHidden();
   }
@@ -96,7 +108,7 @@ test('actual site Menu, More, filters and plain text enter without animating a r
   await page.goto('/');
   await expect(page.locator('article[data-content-source="live"]')).toBeVisible();
   const nav = page.getByRole('navigation', { name: 'Main', includeHidden: true });
-  await opensTwice(page, page.getByRole('button', { name: 'Menu', exact: true }), '.site-header-nav > ul', nav.locator('a').first());
+  await opensTwice(page, page.getByRole('button', { name: 'Menu', exact: true }), '.site-header-nav > ul:not(.site-header-account-actions)', nav.locator('a').first(), ['.site-header-account-actions']);
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(nav).toBeVisible();
   await opensTwice(page, nav.locator('.site-nav-more > summary'), '.site-nav-more__links', nav.locator('.site-nav-more__links a').first());
@@ -125,7 +137,7 @@ test('reduced motion leaves actual site menu and disclosure bodies instant', asy
     expect(await page.evaluate(() => globalThis.document.getAnimations().length)).toBe(0);
     await trigger.press('Enter');
   }
-  await openStill(page.getByRole('button', { name: 'Menu', exact: true }), '.site-header-nav > ul');
+  await openStill(page.getByRole('button', { name: 'Menu', exact: true }), '.site-header-nav > ul:not(.site-header-account-actions)');
   await page.setViewportSize({ width: 1440, height: 900 });
   await openStill(page.locator('.site-nav-more > summary'), '.site-nav-more__links');
   await page.getByRole('navigation', { name: 'Main' }).locator('a[href="/schedule"]').press('Enter');
