@@ -41,14 +41,19 @@ async function runDeploy({
   localFunctions = [],
   discover,
   status = () => 0,
+  inventoryReads,
   // The inventory read after a deploy. By default every local function is
   // there, as after a deploy that did all its work.
-  deployedInventory = localFunctions.flatMap((fn) => (fn.regions || []).map((region) => deployed(fn.id, region))),
+  deployedInventory = localFunctions.flatMap((fn) => (fn.regions || []).map((region) => (
+    fn.retry ? { ...deployedRetry(fn.id), region } : deployed(fn.id, region)
+  ))),
 }) {
   const calls = [];
   const messages = [];
   const errors = [];
+  const waits = [];
   const discoveredAfter = [];
+  let inventoryRead = 0;
   const code = await main({
     env: {
       EVENT_FIREBASE_PROJECT_ID: PROJECT,
@@ -56,6 +61,12 @@ async function runDeploy({
     },
     log: { log: (message) => messages.push(message), error: (message) => errors.push(message) },
     verifyCompleteInventory: async () => {
+      if (inventoryReads) {
+        const value = inventoryReads[inventoryRead];
+        inventoryRead += 1;
+        if (value instanceof Error) throw value;
+        return value;
+      }
       if (calls.length === 0) return completeInventory;
       if (deployedInventory instanceof Error) throw deployedInventory;
       return deployedInventory;
@@ -68,8 +79,9 @@ async function runDeploy({
       calls.push({ args, options });
       return { status: status(args) };
     },
+    wait: async (milliseconds) => waits.push(milliseconds),
   });
-  return { calls, code, messages, errors, discoveredAfter };
+  return { calls, code, messages, errors, waits, discoveredAfter, inventoryRead };
 }
 
 // Every Firebase call that carries --force must name functions one by one.
@@ -423,20 +435,83 @@ test('bootstrap deploys with existing functions retain the normal safeguards', a
 });
 
 // firebase-tools 15.22.4 can exit 0 after a quota 429 on a create, with the
-// create still unfinished and no summary printed (run 39329645906 left
-// downloadEventPackage absent). The script reads the inventory again.
-test('a full deploy that exits 0 but leaves a function absent fails and names it', async () => {
-  const { calls, code, errors } = await runDeploy({
+// create still unfinished and no summary printed. Run 43091008410 left 17
+// functions absent during the fresh-client proof for #827.
+test('a full deploy that repeatedly exits 0 with a function absent exhausts bounded quota recovery', async () => {
+  const { calls, code, errors, waits } = await runDeploy({
     bootstrap: false,
     completeInventory: [deployed('existingHttp')],
     localFunctions: [local('existingHttp', false), local('downloadEventPackage', false)],
     deployedInventory: [deployed('existingHttp')],
   });
   assert.equal(code, 1);
-  assert.deepEqual(calls.map((call) => call.args), [FULL_DEPLOY]);
+  assert.deepEqual(calls.map((call) => call.args), [FULL_DEPLOY, FULL_DEPLOY, FULL_DEPLOY]);
+  assert.deepEqual(waits, [105_000, 105_000]);
   assert.equal(errors.length, 1);
   assert.match(errors[0], /1 function\(s\) are not deployed: downloadEventPackage\(us-central1\)/);
+  assert.match(errors[0], /Quota recovery was exhausted after 3 guarded attempts/);
   assert.doesNotMatch(errors[0], /existingHttp/);
+});
+
+test('a partial fresh-client bootstrap waits for quota and succeeds through a fresh guarded deploy', async () => {
+  const existing = deployed('existingHttp');
+  const complete = [existing, deployed('downloadEventPackage')];
+  const { calls, code, errors, waits, inventoryRead } = await runDeploy({
+    bootstrap: true,
+    localFunctions: [local('existingHttp', false), local('downloadEventPackage', false)],
+    inventoryReads: [[], [existing], [existing], complete],
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(calls.map((call) => call.args), [[...FULL_DEPLOY, '--force'], FULL_DEPLOY]);
+  assert.deepEqual(waits, [105_000]);
+  assert.equal(inventoryRead, 4);
+  assert.equal(errors.length, 0);
+  assert.doesNotMatch(calls[1].args.join(' '), /--force/);
+});
+
+test('an incomplete inventory read during quota recovery stops before another deploy', async () => {
+  const existing = deployed('existingHttp');
+  const unavailable = Object.assign(new Error('unreachable region'), {
+    code: 'INVENTORY_UNREACHABLE_REGIONS', regions: [REGION],
+  });
+  const { calls, code, errors, waits, inventoryRead } = await runDeploy({
+    bootstrap: true,
+    localFunctions: [local('existingHttp', false), local('downloadEventPackage', false)],
+    inventoryReads: [[], [existing], unavailable],
+  });
+  assert.equal(code, 1);
+  assert.deepEqual(calls.map((call) => call.args), [[...FULL_DEPLOY, '--force']]);
+  assert.deepEqual(waits, [105_000]);
+  assert.equal(inventoryRead, 3);
+  assert.match(errors[0], /"phase":"quota-recovery-inventory"/);
+  assert.match(errors[0], /"code":"INVENTORY_UNREACHABLE_REGIONS"/);
+});
+
+test('a targeted retry deploy that exits 0 incomplete waits before any full deploy', async () => {
+  const existing = deployed('existingHttp');
+  const retry = deployedRetry('onUserCreated');
+  const complete = [existing, retry];
+  const { calls, code, errors, waits, inventoryRead } = await runDeploy({
+    bootstrap: true,
+    localFunctions: [local('existingHttp', false), local('onUserCreated', true)],
+    inventoryReads: [
+      [existing],
+      [existing],
+      [existing],
+      complete,
+      complete,
+    ],
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(calls.map((call) => call.args), [
+    ['firebase', 'deploy', '--only', 'functions:onUserCreated', '--project', PROJECT, '--non-interactive', '--force'],
+    ['firebase', 'deploy', '--only', 'functions:onUserCreated', '--project', PROJECT, '--non-interactive', '--force'],
+    FULL_DEPLOY,
+  ]);
+  assertNoBareForce(calls);
+  assert.deepEqual(waits, [105_000]);
+  assert.equal(inventoryRead, 5);
+  assert.equal(errors.length, 0);
 });
 
 test('a function deployed only in another region counts as absent', async () => {
@@ -450,30 +525,37 @@ test('a function deployed only in another region counts as absent', async () => 
   assert.match(errors[0], /not deployed: existingHttp\(europe-west1\)/);
 });
 
-test('a forced bootstrap deploy that leaves a function absent fails', async () => {
-  const { calls, code, errors } = await runDeploy({
+test('a forced bootstrap deploy never reuses broad force after inventory becomes partial', async () => {
+  const { calls, code, errors, waits } = await runDeploy({
     bootstrap: true,
     localFunctions: [local('onUserCreated', true), local('downloadEventPackage', false)],
-    deployedInventory: [deployed('onUserCreated')],
+    deployedInventory: [deployedRetry('onUserCreated')],
   });
   assert.equal(code, 1);
-  assert.deepEqual(calls.map((call) => call.args), [[...FULL_DEPLOY, '--force']]);
+  assert.deepEqual(calls.map((call) => call.args), [
+    [...FULL_DEPLOY, '--force'],
+    FULL_DEPLOY,
+    FULL_DEPLOY,
+  ]);
+  assert.deepEqual(waits, [105_000, 105_000]);
+  assert.equal(calls.filter((call) => call.args.includes('--force')).length, 1);
   assert.match(errors[0], /not deployed: downloadEventPackage\(us-central1\)/);
 });
 
 test('a function with no literal region fails the deploy check closed', async () => {
-  const { code, errors } = await runDeploy({
+  const { code, errors, waits } = await runDeploy({
     bootstrap: false,
     completeInventory: [deployed('paramRegion')],
     localFunctions: [{ id: 'paramRegion', retry: false, regions: null }],
     deployedInventory: [deployed('paramRegion')],
   });
   assert.equal(code, 1);
+  assert.deepEqual(waits, []);
   assert.match(errors[0], /paramRegion\(no literal region\)/);
 });
 
 test('a failed inventory read after the deploy fails closed', async () => {
-  const { calls, code, errors } = await runDeploy({
+  const { calls, code, errors, waits } = await runDeploy({
     bootstrap: false,
     completeInventory: [deployed('existingHttp')],
     localFunctions: [local('existingHttp', false)],
@@ -481,6 +563,7 @@ test('a failed inventory read after the deploy fails closed', async () => {
   });
   assert.equal(code, 1);
   assert.equal(calls.length, 1);
+  assert.deepEqual(waits, []);
   assert.match(errors[0], /could not verify the deployed functions:/);
   assert.match(errors[0], /"phase":"post-deploy-inventory"/);
   assert.match(errors[0], /"code":"INVENTORY_UNREACHABLE_REGIONS"/);
@@ -585,6 +668,7 @@ test('each inventory structural failure retains its fixed reason before and afte
 
 test('a failed full deploy reports its own exit code before any inventory check', async () => {
   let reads = 0;
+  let waits = 0;
   const code = await main({
     env: { EVENT_FIREBASE_PROJECT_ID: PROJECT, EVENT_BOOTSTRAP: 'false' },
     log: quiet,
@@ -595,9 +679,11 @@ test('a failed full deploy reports its own exit code before any inventory check'
     },
     discoverFunctions: async () => [local('existingHttp', false)],
     readConfig: () => [{ codebase: 'default', source: 'functions' }],
+    wait: async () => { waits += 1; },
   });
   assert.equal(code, 2);
   assert.equal(reads, 1);
+  assert.equal(waits, 0);
 });
 
 test('invalid workflow inputs stop before any Firebase command', async () => {
