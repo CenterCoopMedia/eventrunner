@@ -2873,3 +2873,30 @@
     overscroll-behavior: contain;
   }
 }
+
+@media (forced-colors: active) {
+  /* These states otherwise lose their authored ground. Keep the system
+     palette and the existing focus rings. */
+  .admin-status-badge {
+    outline: 1px solid CanvasText;
+    outline-offset: 1px;
+  }
+
+  .admin-format-button[aria-pressed='true'] {
+    background-color: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+    font-weight: 700;
+  }
+
+  .schedule-grid [data-track-forward]::before {
+    background-color: transparent;
+    border-inline: 2px solid Highlight;
+  }
+
+  .schedule-grid__head button[aria-pressed='true'] {
+    text-decoration-line: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 0.2em;
+  }
+}
