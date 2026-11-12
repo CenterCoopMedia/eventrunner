@@ -161,6 +161,8 @@ Every control and every interactive row defines these ten states, in both modes,
 
 **A dialog is a native `<dialog>` opened with `showModal()`.** That one call traps focus, makes the page behind it inert, sends Escape as `cancel`, and puts the dialog in the top layer. The component returns focus to the opener itself, because React removes the dialog on close and an element removed while it holds focus drops focus to the body. The scrim is tinted ink at low alpha, never a blur.
 
+**The admin command menu is a shortcut over the rail.** Cmd+K on Mac or Ctrl+K elsewhere opens **Find work**, also available as a worded rail control. It searches the signed-in tier's sections and this account's recent publishable records in this browser, never attendee records or actions. It opens without motion and leaves another open dialog alone. Choices are real links: close the command dialog before the existing unsaved-work warning handles navigation. The ordinary rail stays available.
+
 ### The shared controls
 
 Each one is keyboard-first, reads the tier-2 tokens, and lives in `apps/web/src/components/forms/`.

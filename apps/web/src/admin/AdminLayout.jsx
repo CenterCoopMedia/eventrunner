@@ -76,6 +76,8 @@ import AdminIcon from './components/AdminIcon.jsx';
 import AdminIconControl from './components/AdminIconControl.jsx';
 import PendingChangesBanner from './components/PendingChangesBanner.jsx';
 import ReportProblemDialog from './components/ReportProblemDialog.jsx';
+import AdminCommandMenu, { commandShortcut } from './components/AdminCommandMenu.jsx';
+import { CommandMenuAccount } from './commandMenuRecents.js';
 import { linkButtonClass } from './components/formControls.jsx';
 import { PendingChangesProvider } from './PendingChangesContext.jsx';
 import {
@@ -588,6 +590,26 @@ function AdminDesk() {
   const [reporting, setReporting] = useState(false);
   const reportRef = useRef(null);
   const mobileMenuRef = useRef(null);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const commandAccount = useMemo(() => ({ uid, pathname }), [uid, pathname]);
+  const openCommands = () => {
+    if (document.querySelector('dialog[open]')) return;
+    if (!wide && mobileDocketOpen) mobileMenuRef.current?.focus();
+    setMobileDocketOpen(false);
+    setCommandOpen(true);
+  };
+  useEffect(() => {
+    const onShortcut = (event) => {
+      if (event.defaultPrevented || !commandShortcut(event)) return;
+      event.preventDefault();
+      if (commandOpen || document.querySelector('dialog[open]')) return;
+      if (!wide && mobileDocketOpen) mobileMenuRef.current?.focus();
+      setMobileDocketOpen(false);
+      setCommandOpen(true);
+    };
+    document.addEventListener('keydown', onShortcut, true);
+    return () => document.removeEventListener('keydown', onShortcut, true);
+  }, [commandOpen, wide, mobileDocketOpen]);
   // The first-visit run waits while the reader is on "Set up your event"
   // (ADR 0007 §7): a new client opens there from the welcome email, and the
   // checklist, not the tour, is what they came for. The tour opens on the
@@ -635,6 +657,7 @@ function AdminDesk() {
   };
 
   return (
+    <CommandMenuAccount.Provider value={commandAccount}>
     <div className="admin-room flex min-h-screen min-h-svh flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
       <a href="#admin-content" className="skip-link skip-link--admin">
         Skip to main content
@@ -700,6 +723,11 @@ function AdminDesk() {
             id="admin-docket"
             hidden={railHidden}
             className="admin-mobile-docket__content fixed inset-x-0 bottom-0 top-14 z-40 min-h-0 overflow-y-auto overscroll-contain bg-admin-rail-ground lg:static lg:z-auto lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-visible">
+            <div className="px-md py-xs lg:px-xs">
+              <button type="button" className={`${railButtonClass} w-full justify-between`} onClick={openCommands}>
+                Find work <span aria-hidden="true" className="font-admin-data text-admin-xs">{/Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘K' : 'Ctrl+K'}</span>
+              </button>
+            </div>
             <nav aria-label="Admin sections" className="flex-1 px-md py-sm lg:px-xs">
               {docket.map((group) => {
                 const open = docketGroupOpen(group, groupState);
@@ -837,6 +865,8 @@ function AdminDesk() {
       </main>
       {/* Outside the main region, which is inert while the mobile menu is open. */}
       {reporting ? <ReportProblemDialog onClose={() => setReporting(false)} returnFocusRef={reportRef} /> : null}
+      {commandOpen ? <AdminCommandMenu docket={docket} onClose={() => setCommandOpen(false)} returnFocusRef={mobileMenuRef} /> : null}
     </div>
+    </CommandMenuAccount.Provider>
   );
 }

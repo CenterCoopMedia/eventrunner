@@ -134,6 +134,30 @@ beforeEach(() => {
 });
 
 describe('the admin shell', () => {
+  it('opens Find work from the rail and a text-field shortcut, and leaves an existing dialog alone', async () => {
+    await renderAdmin('/admin/pages');
+    const trigger = screen.getByRole('button', { name: 'Find work' });
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: 'Find work' });
+    expect(within(dialog).getByRole('option', { name: /Pages Content/ })).toHaveAttribute('href', '/admin/pages');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    const text = document.createElement('textarea');
+    document.querySelector('#admin-content').append(text);
+    text.focus();
+    const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    fireEvent.keyDown(text, { key: 'k', metaKey: mac, ctrlKey: !mac });
+    expect(screen.getByRole('dialog', { name: 'Find work' })).toHaveAttribute('open');
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search sections and recent records' }), { key: 'Escape' });
+    expect(text).toHaveFocus();
+    const other = document.createElement('dialog');
+    document.body.append(other);
+    other.showModal();
+    fireEvent.keyDown(other, { key: 'k', metaKey: mac, ctrlKey: !mac });
+    expect(screen.queryByRole('dialog', { name: 'Find work' })).not.toBeInTheDocument();
+    other.close();
+    other.remove();
+  });
+
   it('opens the docket at the same pixel breakpoint that hides Menu', () => {
     expect(ADMIN_DESKTOP_VIEWPORT).toBe('(min-width: 1024px)');
   });
