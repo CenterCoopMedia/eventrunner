@@ -136,7 +136,7 @@ export const BLOCK_TYPES = Object.freeze({
 
 /**
  * What to write in each part of the stat contract (design brief §2.1.1),
- * shown under that field in the block editor. The server enforces the same
+ * available from that field’s help tooltip in the block editor. The server enforces the same
  * parts and rejects a write that misses one (blockTypes.cjs
  * statContractErrors); blockTypes.test.js pins the two field sets together,
  * so the editor can never prompt for a part the server ignores, or stay
@@ -152,7 +152,7 @@ export const STAT_CONTRACT_HINTS = Object.freeze({
 });
 
 /**
- * What to write in each part of a fact (#234), shown under the field in the
+ * What to write in each part of a fact (#234), available from the field’s help tooltip in the
  * block editor. The type is not enforced on write beyond its required
  * fields; the hints exist because `label` and `value` are the registry's
  * names and "the term" and "the description" are the operator's.

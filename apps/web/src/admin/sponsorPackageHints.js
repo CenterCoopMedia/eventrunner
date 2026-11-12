@@ -1,5 +1,5 @@
-// What to write in each part of a sponsor package (#193), shown under the
-// field in the block editor. The package draws on the sponsors page, in
+// What to write in each part of a sponsor package (#193), available from
+// the field’s help tooltip in the block editor. The package draws on the sponsors page, in
 // the section the seed names Sponsorship packages.
 //
 // Its own module, not beside FACT_HINTS in blockTypes.js: blockTypes.js
