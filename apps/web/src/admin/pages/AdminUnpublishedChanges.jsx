@@ -56,6 +56,7 @@ import AdminPageHeader, {
   StatusBadge,
   proofRowClass,
 } from '../components/adminChrome.jsx';
+import AdminTableScroll from '../components/AdminTableScroll.jsx';
 
 /** cmsPublish takes at most this many ids for one collection (publish.cjs MAX_DOC_IDS). */
 const MAX_COLLECTION_IDS = 2000;
@@ -120,7 +121,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice
       ) : null}
       {/* A scrolling box has to take a tab stop to be scrolled by keyboard;
           the room's ring draws its focus. */}
-      {rows.length > 0 ? <div role="region" aria-label={choice.label} tabIndex={0} className="max-h-[32rem] overflow-auto">
+      {rows.length > 0 ? <AdminTableScroll role="region" aria-label={choice.label} tabIndex={0} className="max-h-[32rem] overflow-auto">
         <table className="w-full min-w-[40rem] border-collapse text-admin-sm" data-collection={choice.id}>
           <caption className="sr-only">{`${choice.label} with unpublished changes, newest first`}</caption>
           <thead>
@@ -170,7 +171,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice
             })}
           </tbody>
         </table>
-      </div> : null}
+      </AdminTableScroll> : null}
     </Panel>
   );
 }

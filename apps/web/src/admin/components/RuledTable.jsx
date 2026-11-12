@@ -19,6 +19,8 @@
 // SORT. A column named in `sort` carries aria-sort, so a screen reader
 // hears how the rows are ordered. This table draws no sort control: the
 // caller hands it the rows in order and says which order that is.
+import AdminTableScroll from './AdminTableScroll.jsx';
+
 const HEAD_CLASS =
   'sticky top-0 z-10 border-b-admin-strong border-admin-rule-strong bg-admin-ground-soft px-sm py-xs ' +
   'text-admin-xs font-semibold text-admin-ink-secondary';
@@ -51,7 +53,7 @@ export default function RuledTable({
   return (
     // A scrolling region has to be reachable by keyboard to be scrolled by
     // one, so it takes a tab stop and the caption as its name.
-    <div
+    <AdminTableScroll
       role="region"
       aria-label={caption}
       tabIndex={0}
@@ -98,6 +100,6 @@ export default function RuledTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </AdminTableScroll>
   );
 }

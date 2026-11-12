@@ -43,6 +43,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import AdminTableScroll from '../components/AdminTableScroll.jsx';
 import { ticketStatusLabel } from '../../lib/ticketingCommerce.js';
 import TicketingConfirmation from '../components/TicketingConfirmation.jsx';
 import CreateAccountFromTicket, { canCreateAccountFromTicket } from '../components/CreateAccountFromTicket.jsx';
@@ -328,7 +329,7 @@ function PreviewTable({ preview }) {
           </StatusBadge>
         ))}
       </div>
-      <div className="max-h-[28rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline">
+      <AdminTableScroll className="max-h-[28rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline">
         <table className="w-full min-w-[36rem] border-collapse text-admin-sm">
           <thead>
             <tr>
@@ -355,7 +356,7 @@ function PreviewTable({ preview }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </AdminTableScroll>
       {preview.rows.length > rows.length ? (
         <p className="text-admin-sm text-admin-ink-secondary">
           Showing the first {rows.length} of {preview.rows.length} rows.
@@ -594,7 +595,7 @@ function TicketList({ call, refreshToken }) {
       ) : tickets.length === 0 ? (
         <AdminEmptyState title="No tickets found" description="Import a CSV above, or adjust your search." />
       ) : (
-        <div className="max-h-[28rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline">
+        <AdminTableScroll className="max-h-[28rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline">
           <table className="w-full min-w-[40rem] border-collapse text-admin-sm">
             <thead>
               <tr>
@@ -623,7 +624,7 @@ function TicketList({ call, refreshToken }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </AdminTableScroll>
       )}
 
       {cursor ? (

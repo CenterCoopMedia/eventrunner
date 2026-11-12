@@ -4,8 +4,8 @@
 //
 // THE TITLE BAND. A page header is the section name at title size on the
 // raised ground, running to the edges of the stone and holding the top of
-// the viewport while the page scrolls, with the page's own actions at its
-// trailing end. The record's state and identifiers sit BESIDE the name or
+// the viewport when it leaves at least half the viewport for work. Page
+// actions stay at the trailing edge. State and identifiers sit BESIDE the name or
 // UNDER it, never above it: a label stacked over a title is an eyebrow, and
 // the eyebrow ban is absolute (brief §2.4). The description is a paragraph
 // under the band. Editor feedback has its own full-width row in the band,
@@ -19,6 +19,7 @@
 import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
 import LoadingStatus from '../../components/LoadingStatus.jsx';
 import useLoadingStage from '../../lib/useLoadingStage.js';
+import useAdminHeaderPadding from './useAdminHeaderPadding.js';
 import './adminLoading.css';
 import './actionFeedback.css';
 
@@ -154,9 +155,10 @@ export default function AdminPageHeader({
   feedback,
   as: Heading = 'h1',
 }) {
+  const headerRef = useAdminHeaderPadding();
   return (
     <>
-      <header className="admin-job-line flex flex-col gap-2xs border-admin-rule-header border-b-admin-header bg-admin-ground-raised">
+      <header ref={headerRef} className="admin-job-line flex flex-col gap-2xs border-admin-rule-header border-b-admin-header bg-admin-ground-raised">
         <div className={`admin-job-line__heading ${feedback !== undefined ? 'admin-job-line__heading--editor' : ''}`}>
           <div className="flex min-w-0 flex-wrap items-center gap-x-sm gap-y-2xs">
             {/* The ink dot a compositor puts on the chase: a small solid mark

@@ -2198,9 +2198,15 @@
     }
   }
 
-  /* The title band: the page's name on the raised ground, running to the
-     stone's edges. It scrolls with the work on a phone, where wrapped actions
-     would otherwise cover the form, and holds the viewport from 640px up. */
+  /* Title and table heads reserve their measured height for native focus
+     scrolling. Public pages and the static phone title band keep their
+     existing scrolling. */
+  .admin-table-scroll {
+    scroll-padding-top: calc(var(--admin-table-head-height, 0px) + var(--space-xs));
+  }
+
+  /* The title band scrolls on phones and when it needs over half the
+     viewport. A smaller band holds the top edge from 640px up. */
   .admin-job-line {
     position: static;
     z-index: 8;
@@ -2208,7 +2214,13 @@
     padding: var(--space-sm) var(--admin-stone-pad-inline);
   }
   @media (min-width: 640px) {
-    .admin-job-line {
+    html:has(.admin-room) {
+      scroll-padding-top: var(--admin-header-scroll-padding, 0px);
+    }
+    .admin-room [id] {
+      scroll-margin-top: 0;
+    }
+    .admin-job-line:not([data-scrolls]) {
       position: sticky;
       top: 0;
     }
