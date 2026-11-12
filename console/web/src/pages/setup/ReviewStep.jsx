@@ -71,7 +71,7 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
 }
 
 /** Each open problem, with a link to its step. */
-function Problems({ fields, orgId, appId }) {
+export function Problems({ fields, orgId, appId }) {
   const items = Object.entries(fields)
     .filter(([path]) => path !== 'team')
     .map(([path, message]) => ({ path, message, step: stepOfField(path) }))

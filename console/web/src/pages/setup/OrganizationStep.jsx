@@ -1,8 +1,8 @@
 import { TextField } from '../../setup/Field.jsx';
 
 /** Step 1: the organization's name, website and mailing address. */
-export default function OrganizationStep({ value, errors, onChange, onBlur }) {
-  const set = (key) => (next) => onChange({ ...value, [key]: next }, `organization.${key}`);
+export default function OrganizationStep({ value, errors, onChange }) {
+  const set = (key) => (next) => onChange({ ...value, [key]: next });
   return (
     <div className="stack">
       <p className="lead">Add the organization that runs the event.</p>
@@ -12,7 +12,6 @@ export default function OrganizationStep({ value, errors, onChange, onBlur }) {
         autoComplete="organization"
         value={value.name}
         onChange={set('name')}
-        onBlur={() => onBlur('organization.name')}
         error={errors['organization.name']}
       />
       <TextField
@@ -24,7 +23,6 @@ export default function OrganizationStep({ value, errors, onChange, onBlur }) {
         autoComplete="url"
         value={value.website}
         onChange={set('website')}
-        onBlur={() => onBlur('organization.website')}
         error={errors['organization.website']}
       />
       <TextField
@@ -35,7 +33,6 @@ export default function OrganizationStep({ value, errors, onChange, onBlur }) {
         autoComplete="street-address"
         value={value.address}
         onChange={set('address')}
-        onBlur={() => onBlur('organization.address')}
         error={errors['organization.address']}
       />
     </div>

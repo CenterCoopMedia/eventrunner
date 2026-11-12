@@ -14,11 +14,11 @@ function describedBy(id, hint, error) {
 
 /**
  * @param {{ path: string, label: string, value: string, onChange: (value: string) => void,
- *   onBlur?: () => void, error?: string, hint?: string, type?: string, multiline?: boolean,
+ *   error?: string, hint?: string, type?: string, multiline?: boolean,
  *   autoComplete?: string, inputMode?: string, maxLength?: number, children?: any }} props
  */
 export function TextField({
-  path, label, value, onChange, onBlur, error, hint, type = 'text', multiline = false,
+  path, label, value, onChange, error, hint, type = 'text', multiline = false,
   autoComplete = 'off', inputMode, maxLength = 1000, className = '',
 }) {
   const id = fieldId(path);
@@ -27,7 +27,6 @@ export function TextField({
     name: path,
     value: value ?? '',
     onChange: (e) => onChange(e.target.value),
-    onBlur,
     autoComplete,
     maxLength,
     'aria-invalid': error ? 'true' : undefined,
@@ -44,7 +43,7 @@ export function TextField({
 }
 
 /** A select with the same label, hint and error pattern. */
-export function SelectField({ path, label, value, onChange, onBlur, error, hint, options }) {
+export function SelectField({ path, label, value, onChange, error, hint, options }) {
   const id = fieldId(path);
   return (
     <div className="field">
@@ -54,7 +53,6 @@ export function SelectField({ path, label, value, onChange, onBlur, error, hint,
         name={path}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy(id, hint, error)}
       >
@@ -74,5 +72,5 @@ export function SelectField({ path, label, value, onChange, onBlur, error, hint,
 /** An error that belongs to a group of fields, for example "Add at least one day". */
 export function GroupError({ path, error }) {
   if (!error) return null;
-  return <p id={`${fieldId(path)}-error`} className="field-error" data-group-error={path}>{error}</p>;
+  return <p id={`${fieldId(path)}-error`} className="field-error" data-group-error={path} tabIndex={-1}>{error}</p>;
 }

@@ -33,11 +33,12 @@ function useNameCheck(name, appId) {
 }
 
 /** Step 3: the name in `name.eventrunner.org`. */
-export default function WebAddressStep({ value, errors, onChange, onBlur, appId }) {
+export default function WebAddressStep({ value, errors, onChange, appId }) {
   const verdict = useNameCheck(value.name, appId);
   const shown = value.name.trim().toLowerCase() || 'your-name';
   const current = verdict && verdict.name === value.name.trim().toLowerCase() ? verdict : null;
-  const error = current && !current.available ? current.message : errors['webAddress.name'];
+  const error = current && !current.available && ['taken', 'reserved'].includes(current.reason)
+    ? current.message : errors['webAddress.name'];
 
   return (
     <div className="stack">
@@ -49,8 +50,7 @@ export default function WebAddressStep({ value, errors, onChange, onBlur, appId 
         autoComplete="off"
         maxLength={27}
         value={value.name}
-        onChange={(next) => onChange({ name: next.toLowerCase() }, 'webAddress.name')}
-        onBlur={() => onBlur('webAddress.name')}
+        onChange={(next) => onChange({ name: next.toLowerCase() })}
         error={error}
       />
       <p className="preview" aria-label="Web address preview">
