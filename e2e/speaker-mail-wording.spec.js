@@ -47,16 +47,16 @@ test.describe.serial('Speaker email wording', () => {
     await expect(form.getByText('The shipped wording is in use.')).toBeVisible();
 
     // An unknown token is refused at save, and focus goes to the field.
-    const text = form.getByLabel('Plain text body');
-    const shippedText = await text.inputValue();
-    await text.fill(`${shippedText}\n{{not_a_token}}`);
+    const invitation = form.getByLabel('Invitation', { exact: true });
+    const shippedInvitation = await invitation.inputValue();
+    await invitation.fill(`${shippedInvitation}\n{{not_a_token}}`);
     await form.getByRole('button', { name: 'Save wording' }).click();
-    await expect(form.getByRole('alert')).toContainText('text: unknown token {{not_a_token}}');
-    await expect(text).toHaveAttribute('aria-invalid', 'true');
-    await expect(text).toBeFocused();
+    await expect(form.getByRole('alert')).toContainText('invitation: unknown token {{not_a_token}}');
+    await expect(invitation).toHaveAttribute('aria-invalid', 'true');
+    await expect(invitation).toBeFocused();
     expect((await adminDb().collection('email_templates').doc('speaker.invite').get()).exists).toBe(false);
 
-    await text.fill(shippedText);
+    await invitation.fill(shippedInvitation);
     await form.getByLabel('Subject').fill(subject);
     // The keyboard path: Enter in the subject field submits the form.
     await form.getByLabel('Subject').press('Enter');

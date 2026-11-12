@@ -247,7 +247,11 @@ test('CSV preview imports consented source rows once and refuses changed or unre
   await expect(page.getByRole('heading', { name: 'Import proposals from CSV' })).toBeVisible();
   await page.getByLabel('Source name').fill('outside-form');
   await page.getByLabel('Proposal CSV').setInputFiles({ name: 'proposals.csv', mimeType: 'text/csv', buffer: Buffer.from('externalId,email,title,description,organization,format,consent\noutside-1,external-pitch@example.test,Reporting together,A practical workshop on shared local reporting. Learn to plan a project; share evidence; and reach new readers.,Example newsroom,Workshop,true') });
-  await expect(page.getByText('1 proposals ready for review.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Match proposal columns' })).toBeVisible();
+  await expect(page.getByLabel('Source ID (required)')).toHaveValue('externalId');
+  await expect(page.getByLabel('Consent (required)')).toHaveValue('consent');
+  await page.getByRole('button', { name: 'Review proposals', exact: true }).click();
+  await expect(page.getByText('1 proposal ready for review.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Import reviewed proposals' })).toBeDisabled();
   await page.getByRole('checkbox', { name: /I reviewed these proposals/ }).check();
   await page.getByRole('button', { name: 'Import reviewed proposals' }).click();
