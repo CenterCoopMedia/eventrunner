@@ -407,10 +407,9 @@ export function buildRuntimeThemeCss(themeDoc) {
       ? [':root', ":root[data-mode='light']", ":root[data-theme][data-mode='light']"]
       : [":root[data-mode='dark']", ":root[data-theme][data-mode='dark']"];
     blocks.push(`${selectors.join(',\n')} {\n${modeLines[mode].join('\n')}\n}`);
-    const colors = deriveMoreContrastTokens(palettes[mode]);
-    if (Object.keys(colors).length === 0) continue;
+    const declarations = Object.entries(deriveMoreContrastTokens(palettes[mode])).map(([name, rgb]) => `  ${name}: ${rgb.join(' ')};`);
+    if (declarations.length === 0) continue;
     const selector = selectors.map((one) => `${one}:not(:has(.admin-room))`).join(',\n');
-    const declarations = Object.entries(colors).map(([name, rgb]) => `  ${name}: ${rgb.join(' ')};`);
     contrastBlocks.push(`${selector} {\n${declarations.join('\n')}\n}`);
   }
   if (contrastBlocks.length > 0) blocks.push(`@media screen and (prefers-contrast: more) {\n${contrastBlocks.join('\n')}\n}`);

@@ -193,7 +193,7 @@ test('the admin set gets the first-paint block too, on the same policy', () => {
   // Under 'system' both ordinary blocks sit inside the media query. The
   // public contrast preference has its own nested dark-scheme query below.
   const system = buildTokenCss({ ...THEME, mode: 'system' });
-  const ordinary = system.split('@media screen and (prefers-contrast: more)')[0];
+  const ordinary = system.replace(/@media screen and \(prefers-contrast: more\) \{[\s\S]*?\n\}/, '');
   const queries = [...ordinary.matchAll(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n\}/g)];
   assert.equal(queries.length, 2);
   assert.ok(queries.some((q) => q[1].includes(`${marker}:`)), 'the admin block is inside the query');
