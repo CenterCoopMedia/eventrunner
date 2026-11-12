@@ -4,6 +4,28 @@
 const RULESET_PATTERN = "(?im)(^co-authored-by:.*(claude|anthropic|openai|codex|chatgpt|gemini|copilot|cursor|grok|kimi)|^claude-session:|generated (with|by) .*(claude|openai|codex|chatgpt|gemini|copilot|cursor|grok|kimi)|noreply@anthropic\\.com|noreply@openai\\.com)";
 const attribution = new RegExp(RULESET_PATTERN.slice(5), 'im');
 
+// #902: named review credits reached squash commits through PR bodies (#896).
+// The push ruleset catches trailers/footers, but does not cover these lines.
+// This check remains needed while the repository prohibits named review credits.
+const MODEL = String.raw`(?:claude|opus|sonnet|haiku|codex|gpt(?:[- ]?\d[\w.-]*)?|chatgpt|openai|anthropic|gemini|copilot|cursor|grok|kimi|qwen|deepseek|llama|windsurf|aider)`;
+const LINE_START = String.raw`^[ \t]*(?:(?:[-*+>]|\d+[.)]|#{1,6})[ \t]+)?[*_\[]*`;
+const namedModel = new RegExp(String.raw`^[ \t*_:\[(]*(?:(?:passed|completed|performed|provided|verified|by|with|using|via|the)[ \t:()_*\[]+)*${MODEL}\b`, 'i');
+const parenthesizedModel = new RegExp(String.raw`^[ \t]*\([ \t]*${MODEL}\b(?:[ \t]+(?:${MODEL}|v?\d[\w.-]*|code|low|medium|high|xhigh)){0,6}[ \t]*\)[ \t]*$`, 'i');
+const reviewLabel = new RegExp(String.raw`${LINE_START}(?:(?:independent|full[- ]diff|cross[- ](?:model|family)|local|code|security|final|peer|automated)[ \t]+)*(?:(?:review(?:er|ed)?|credits?|attribution)\b([^\r\n]*?)(?::|=|[ \t]+-[ \t]+|\bby\b|\bwith\b|\busing\b)|(?:written|authored|generated|checked|approved)[ \t]+(?:by|with|using)\b|co[- ]authored[- ]by[ \t]*:)([^\r\n]*)`, 'i');
+const reviewerFirst = new RegExp(String.raw`${LINE_START}\b${MODEL}\b(?:[ \t]+(?:${MODEL}|v?\d[\w.-]*|\((?:low|medium|high|xhigh)\)|code|cross[- ](?:model|family)|full[- ]diff|security|independent|local)){0,6}[*_\]]*[ \t]+(?:review(?:ed|er)?|authored|generated|wrote|checked|approved)\b`, 'i');
+
+function hasReviewCredit(text) {
+  return text.split(/\r\n|\r|\n/).some((line) => {
+    const label = reviewLabel.exec(line);
+    if (label) {
+      if (namedModel.test(label[2]) || parenthesizedModel.test(label[1] || '')) return true;
+      const result = /^[ \t]*(?:clean|pass(?:ed)?|approved|no (?:findings|comments))[ \t]+(.+)$/i.exec(label[2]);
+      if (result && parenthesizedModel.test(result[1])) return true;
+    }
+    return reviewerFirst.test(line);
+  });
+}
+
 // Preserve every retained byte, including CRLF and a missing final newline.
 function stripAttribution(text) {
   return (text.match(/[^\r\n]*(?:\r\n|\r|\n|$)/g) || [])
@@ -36,7 +58,10 @@ async function cleanText({ get, update, fields, needsBody, core }) {
   const { data: verified } = await get();
   if (fields.some((field) => attribution.test(verified[field] || ''))) {
     core.setFailed('AI attribution remains after cleanup; edit the affected text.');
+  } else if (fields.some((field) => hasReviewCredit(verified[field] || ''))) {
+    core.setFailed('A named model/tool review credit remains; remove the credit line from the affected GitHub text.');
   }
+  return verified;
 }
 
 async function run({ github, context, core }) {
@@ -72,11 +97,21 @@ async function run({ github, context, core }) {
     throw new Error('Unsupported attribution cleanup event.');
   }
   try {
-    await cleanText(options);
+    const verified = await cleanText(options);
+    if (eventName === 'pull_request_target' && verified.state === 'open') {
+      // Compare immutable SHAs, not a mutable branch name or all repository
+      // history. Explicit pagination also covers PRs with more than 250 commits.
+      const commits = await github.paginate(github.rest.repos.compareCommitsWithBasehead, {
+        ...repo, basehead: `${verified.base.sha}...${verified.head.sha}`, per_page: 100,
+      }, ({ data }) => data.commits);
+      if (commits.some(({ commit }) => attribution.test(commit.message) || hasReviewCredit(commit.message))) {
+        core.setFailed('A PR commit message contains model/tool attribution; use git rebase -i to reword the unmerged commit.');
+      }
+    }
   } catch (error) {
     // Never echo submitted text, response bodies or credentials into logs.
     core.setFailed(`Attribution cleanup could not complete (HTTP ${Number(error.status) || 'unknown'}).`);
   }
 }
 
-module.exports = { RULESET_PATTERN, stripAttribution, cleanText, run };
+module.exports = { RULESET_PATTERN, hasReviewCredit, stripAttribution, cleanText, run };
