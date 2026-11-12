@@ -6,7 +6,7 @@
 // compile to a constant, so a client production build drops the branch and
 // never emits the chunk.
 //
-// The page's dynamic import lives here, beside the gate, and App.jsx is the
+// The page's dynamic import lives here, beside the gate, and routes.jsx is the
 // only caller. The gate is also a pure function so a test can state the
 // whole truth table without a build.
 import { IS_DEMO } from '../../lib/demoMode.js';
