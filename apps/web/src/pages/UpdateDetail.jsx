@@ -10,6 +10,7 @@
 // Editorial base restyle (design brief §2.1): the same back-link, header,
 // and body treatment SessionDetail.jsx gives its own detail page.
 import { Link, useParams } from 'react-router';
+import ShareLink from '../components/ShareLink.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import UpdateContent, { UpdateImage } from '../components/UpdateContent.jsx';
@@ -78,6 +79,7 @@ export default function UpdateDetail() {
         {dateLabel ? (
           <Dateline className="mt-2xs" dateTime={dateInstant.toISOString()} label={dateLabel} />
         ) : null}
+        <ShareLink className="mt-sm" path={`/updates/${encodeURIComponent(update.id)}`} title={update.title} shareLabel="Share update" copyLabel="Copy update link" />
       </header>
       {update.featuredImage ? <div className="mt-lg"><UpdateImage image={update.featuredImage} /></div> : null}
       {update.body ? (

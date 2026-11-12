@@ -64,6 +64,7 @@ describe('SpeakerDetail', () => {
     expect(screen.getByText('Editor, [Demo] Cooperative')).toBeInTheDocument();
     expect(screen.getByText('Community reporter.')).toBeInTheDocument();
     expect(screen.getByText('@rae')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy speaker link' })).toBeInTheDocument();
   });
 
   it('shows the speaker pronouns under the name, and nothing when there are none', () => {

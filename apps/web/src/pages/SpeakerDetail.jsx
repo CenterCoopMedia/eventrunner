@@ -23,6 +23,7 @@
 // sits inline with the name at directory scale (Speakers.jsx), never boxed
 // or shadowed on its own.
 import { Link, useParams } from 'react-router';
+import ShareLink from '../components/ShareLink.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -158,6 +159,7 @@ export default function SpeakerDetail() {
             ))}
           </ul>
         ) : null}
+        <ShareLink className="mt-sm" path={`/speakers/${encodeURIComponent(speaker.slug)}`} title={text(speaker.displayName)} shareLabel="Share speaker" copyLabel="Copy speaker link" />
       </header>
       <Rule weight="hairline" />
 

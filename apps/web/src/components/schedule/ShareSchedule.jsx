@@ -22,7 +22,7 @@ import {
   setScheduleVisibility,
   subscribeOwnScheduleShare,
 } from '../../lib/scheduleShareSource.js';
-import { copyTextToClipboard } from '../../lib/clipboard.js';
+import ShareLink from '../ShareLink.jsx';
 import { quietActionClass } from '../controlClasses.js';
 import { Radio } from '../forms/Choice.jsx';
 
@@ -52,7 +52,6 @@ export default function ShareSchedule({ uid }) {
   const [pending, setPending] = useState(null); // a wider choice awaiting its second press
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
   const confirmRef = useRef(null);
 
   useEffect(
@@ -94,13 +93,6 @@ export default function ShareSchedule({ uid }) {
     } finally {
       setSaving(false);
     }
-  }
-
-  async function copyLink() {
-    const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/schedule/user/${uid}`;
-    const ok = await copyTextToClipboard(link);
-    setCopied(ok);
-    if (ok) setTimeout(() => setCopied(false), 4000);
   }
 
   return (
@@ -162,14 +154,13 @@ export default function ShareSchedule({ uid }) {
         </p>
       ) : null}
 
-      <div className="mt-sm flex flex-wrap items-center gap-xs">
-        <button type="button" onClick={copyLink} className={quietActionClass}>
-          Copy your schedule link
-        </button>
-        <p role="status" className="font-data text-caption text-text-secondary">
-          {copied ? 'Copied.' : ''}
-        </p>
-      </div>
+      <ShareLink
+        className="mt-sm"
+        path={`/schedule/user/${encodeURIComponent(uid)}`}
+        title="My schedule"
+        shareLabel="Share your schedule link"
+        copyLabel="Copy your schedule link"
+      />
     </section>
   );
 }

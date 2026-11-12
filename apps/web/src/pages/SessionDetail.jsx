@@ -12,6 +12,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import { SpeakerNames, useSessionSpeakerNames } from '../components/SessionCard.jsx';
 import SessionActions from '../components/session/SessionActions.jsx';
+import ShareLink from '../components/ShareLink.jsx';
 import SessionFormat from '../components/session/SessionFormat.jsx';
 import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
@@ -129,6 +130,7 @@ export default function SessionDetail() {
           <p className="mt-2xs font-data text-caption text-text-secondary">{session.location}</p>
         ) : null}
         <SpeakerNames speakers={speakerNames} features={features} />
+        <ShareLink className="mt-sm" path={`/schedule/${encodeURIComponent(session.id)}`} title={session.title} shareLabel="Share session" copyLabel="Copy session link" />
       </header>
 
       {session.description ? (
