@@ -42,7 +42,7 @@ The [governance](GOVERNANCE.md) note is the short version of who decides.
 ## Dev setup
 
 1. Fork and clone this repository.
-2. Use Node 22, release 22.12 or later (`node -v`); Vitest 5 needs it. The Cloud Functions runtime pins that major, so `functions/package.json` declares `"node": "22"` and npm warns (`EBADENGINE`) on newer majors.
+2. Run `nvm use` to select Node 22.23.5 (`node -v`). Other supported releases are Node 22.23.5 or later in 22.x, Node 24.22.3 or later in 24.x, and Node 26.13.1 and later. The Cloud Functions runtime pins Node 22, so `functions/package.json` declares `"node": "22"` and npm warns (`EBADENGINE`) on newer majors.
 3. From the repo root:
 
 ```bash
