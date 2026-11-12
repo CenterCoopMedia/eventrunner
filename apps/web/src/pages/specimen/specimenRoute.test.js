@@ -1,7 +1,7 @@
 // The route exists under the demo build and under a development server, and
 // nowhere else.
 //
-// The second group reads specimenRoute.js and App.jsx as text. A render test
+// The second group reads specimenRoute.js and routes.jsx as text. A render test
 // cannot prove this one: vitest runs with DEV set, so the gate is open in
 // every render, and the fact that matters is a build fact — the dynamic
 // import must sit inside the gate, in the gate's own module, or the bundler
@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { loadSpecimenPage, SPECIMEN_ENABLED, SPECIMEN_PATH, specimenRouteEnabled } from './specimenRoute.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const appSource = fs.readFileSync(path.resolve(here, '..', '..', 'App.jsx'), 'utf8');
+const registrySource = fs.readFileSync(path.resolve(here, '..', '..', 'routes.jsx'), 'utf8');
 const routeSource = fs.readFileSync(path.resolve(here, 'specimenRoute.js'), 'utf8');
 const demoModeSource = fs.readFileSync(path.resolve(here, '..', '..', 'lib', 'demoMode.js'), 'utf8');
 
@@ -32,16 +32,16 @@ describe('specimenRouteEnabled', () => {
   });
 });
 
-describe('the route registration in specimenRoute.js and App.jsx', () => {
+describe('the route registration in specimenRoute.js and routes.jsx', () => {
   it('names the path from the module, so the two cannot drift', () => {
     expect(SPECIMEN_PATH).toBe('specimen');
-    expect(appSource).toContain('SPECIMEN_PATH');
+    expect(registrySource).toContain('SPECIMEN_PATH');
   });
 
   it('puts the dynamic import behind the gate, in the gate\'s own module', () => {
     const importLine = /export const loadSpecimenPage = SPECIMEN_ENABLED \? \(\) => import\('\.\/Specimen\.jsx'\) : null;/u;
     expect(routeSource).toMatch(importLine);
-    expect(appSource).toMatch(/const SpecimenPage = loadSpecimenPage \? lazyPage\(loadSpecimenPage\) : null;/u);
+    expect(registrySource).toMatch(/loadSpecimenPage \? \[pageRoute\(SPECIMEN_PATH, loadSpecimenPage,/u);
   });
 
   it('states the gate as an expression the bundler can fold, not as a call', () => {
@@ -51,7 +51,7 @@ describe('the route registration in specimenRoute.js and App.jsx', () => {
     // with IS_DEMO from lib/demoMode.js and disappears with this expression.
     const gate = /export const SPECIMEN_ENABLED =\s+import\.meta\.env\.VITE_DEMO_MODE === '1' \|\|\s+import\.meta\.env\.VITE_DEMO_MODE === 'true' \|\|\s+import\.meta\.env\.DEV;/u;
     expect(routeSource).toMatch(gate);
-    expect(appSource).not.toMatch(/SPECIMEN_ENABLED = /u);
+    expect(registrySource).not.toMatch(/SPECIMEN_ENABLED = /u);
   });
 
   it('reads the demo switch the same way lib/demoMode.js does', () => {
@@ -66,13 +66,13 @@ describe('the route registration in specimenRoute.js and App.jsx', () => {
   });
 
   it('renders the route only when the gate is open', () => {
-    expect(appSource).toContain('{SpecimenPage ? (');
+    expect(registrySource).toMatch(/loadSpecimenPage \? \[pageRoute\(SPECIMEN_PATH, loadSpecimenPage, 'specimen book'\)\] : \[\]/u);
   });
 
   it('imports the page exactly once, and only through that gate', () => {
-    const appImports = appSource.match(/import\('\.\/pages\/specimen\/Specimen\.jsx'\)/gu) ?? [];
+    const registryImports = registrySource.match(/import\('\.\/pages\/specimen\/Specimen\.jsx'\)/gu) ?? [];
     const routeImports = routeSource.match(/import\('\.\/Specimen\.jsx'\)/gu) ?? [];
-    expect(appImports).toHaveLength(0);
+    expect(registryImports).toHaveLength(0);
     expect(routeImports).toHaveLength(1);
   });
 });

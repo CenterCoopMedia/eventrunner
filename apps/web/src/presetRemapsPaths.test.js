@@ -30,7 +30,7 @@ const RESOLVERS = /\b(resolvePresetTokens|resolveComponentFonts|resolveFontRoles
 
 describe('the preset remaps reach every path that resolves a style', () => {
   it('loads them alongside the admin chunk, which resolves styles on every branding surface', () => {
-    const app = read('apps/web/src/App.jsx');
+    const app = read('apps/web/src/routes.jsx');
     expect(app).toMatch(/import\('\.\/admin\/AdminApp\.jsx'\),\s*loadPresetRemaps\(\)/u);
   });
 

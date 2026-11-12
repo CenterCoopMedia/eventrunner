@@ -186,15 +186,15 @@ test('every page a SystemPage route asks for is actually seeded', () => {
 
 test('a seeded system page sits at the path its React route is mounted at', () => {
   const routes = fs.readFileSync(
-    path.resolve(__dirname, '..', '..', 'apps', 'web', 'src', 'App.jsx'),
+    path.resolve(__dirname, '..', '..', 'apps', 'web', 'src', 'routes.jsx'),
     'utf8',
   );
   for (const page of defaultPages()) {
     if (!page.systemPage || page.path === '/') continue;
     assert.match(
       routes,
-      new RegExp(`path="${page.path.slice(1)}"`),
-      `${page.id} seeds ${page.path} but App.jsx mounts no such route`,
+      new RegExp(`pageRoute\\('${page.path.slice(1)}',`),
+      `${page.id} seeds ${page.path} but the route registry mounts no such route`,
     );
   }
 });

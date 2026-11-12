@@ -3,38 +3,18 @@
 // page, a page with no order, a system page whose feature is off, and the
 // hand-edited shapes the validator would refuse today but Firestore still
 // holds.
-import fs from 'node:fs';
-import nodePath from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { KNOWN_FEATURE_KEYS } from 'shared/config';
 import { RESERVED_PATH_SEGMENTS, firstPathSegment } from 'shared/routing';
 import { isPublicPage } from 'shared/page';
 import { SYSTEM_PAGES, buildNavItems } from './siteNavigation.js';
+import { prefetchRoutes } from '../routes.jsx';
 
-const here = nodePath.dirname(fileURLToPath(import.meta.url));
-const APP_JSX = nodePath.join(here, '..', 'App.jsx');
-
-/**
- * Every route App.jsx statically mounts, as an absolute path.
- *
- * Read out of the source rather than imported, because the list lives in JSX
- * that only React can evaluate — and reading it is the whole point: three
- * lists kept by hand (the routes, SYSTEM_PAGES, and RESERVED_PATH_SEGMENTS)
- * are exactly what drifts, silently, the next time someone adds a route.
- *
- * `<Route index>` is the home page and carries no `path`, so '/' is added
- * here. `admin/*` is a subtree: the splat is dropped and the prefix stands.
- * The bare `*` is the catch-all, which is not a mounted route at all — it is
- * what ContentPage renders when none of these matched.
- */
+// Inspect the same route objects that render pages and match prefetch intent.
 function mountedRoutes() {
-  const source = fs.readFileSync(APP_JSX, 'utf8');
-  const declared = [...source.matchAll(/path="([^"]+)"/g)].map((match) => match[1]);
-  const routes = declared
-    .filter((route) => route !== '*')
-    .map((route) => `/${route.replace(/\/\*$/, '')}`);
-  return ['/', ...routes];
+  return prefetchRoutes
+    .filter(({ path }) => path !== '*')
+    .map(({ path }) => path === '/' ? path : '/' + (path.endsWith('/*') ? path.slice(0, -2) : path));
 }
 
 const HOME = { id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true };
@@ -56,7 +36,7 @@ describe('the system page routes', () => {
   it('is keyed by the seeded document id, never by an editable path', () => {
     // The whole point of keying by id: the key is the document's identity,
     // which nothing in the editor can change, while `path` on a system page
-    // is a copy of a fact that lives in App.jsx.
+    // is a copy of a fact that lives in the route registry.
     for (const [id, system] of Object.entries(SYSTEM_PAGES)) {
       expect(id).toMatch(/^[a-z]+$/);
       expect(system.to.startsWith('/')).toBe(true);
@@ -82,11 +62,11 @@ describe('the system page routes', () => {
     }
   });
 
-  // Every route here becomes an <a href>. A route App.jsx does not mount is
+  // Every route here becomes an <a href>. A path absent from the registry is
   // a link into the catch-all, and the catch-all 404s a system page — the
   // same dead end buildNavItems drops hand-edited data to avoid, arrived at
   // through code instead of through data.
-  it('names only routes App.jsx actually mounts', () => {
+  it('names only mounted routes', () => {
     const mounted = mountedRoutes();
     expect(mounted).toContain('/');
     for (const system of Object.values(SYSTEM_PAGES)) {
@@ -96,8 +76,8 @@ describe('the system page routes', () => {
 
   // `children` decides whether the item keeps prefix matching, so a wrong
   // answer either loses the marker inside a section or marks two items at
-  // once. Read the child routes out of App.jsx rather than trusting the map.
-  it('marks a route as having children only when App.jsx mounts some', () => {
+  // once. Read the child routes out of the route registry rather than trusting the map.
+  it('marks a route as having children only when the registry mounts some', () => {
     const mounted = mountedRoutes();
     for (const system of Object.values(SYSTEM_PAGES)) {
       const hasChildren = mounted.some(
@@ -217,7 +197,7 @@ describe('buildNavItems', () => {
 
   // The defect this replaced: SYSTEM_PAGE_FEATURES was keyed by path, so a
   // system page whose Path an operator had edited fell out of the
-  // navigation while App.jsx went on mounting /schedule.
+  // navigation while the route registry went on mounting /schedule.
   it('links a system page to its mounted route whatever its stored path says', () => {
     const items = buildNavItems([HOME, { ...SCHEDULE, path: '/agenda' }], ALL_ON);
     expect(paths(items)).toEqual(['/', '/schedule']);
