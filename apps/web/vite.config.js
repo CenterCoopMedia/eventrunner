@@ -60,6 +60,8 @@ export default defineConfig({
       'shared/announcement',
       'shared/richText',
       'shared/config',
+      'shared/config/lifecycle',
+      'shared/config/socialAccounts',
       'shared/routing',
       'shared/page',
       'shared/profile',

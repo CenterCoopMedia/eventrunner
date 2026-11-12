@@ -1,7 +1,7 @@
 // The speaker dashboard's event status (M12 issue #211): the public event
 // countdown beside the next session assigned to this signed-in speaker.
 // Session identity comes only from the canonical speaker id on cmsSchedule.
-import { getEventPhase } from 'shared/config';
+import { getEventPhase } from 'shared/config/lifecycle';
 import EventCountdown from '../EventCountdown.jsx';
 import SectionHead from '../editorial/SectionHead.jsx';
 import { useEventClock } from '../../hooks/useEventClock.js';

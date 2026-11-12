@@ -18,7 +18,7 @@
 // Both are computed on the EVENT's wall clock, never the reader's: a
 // visitor in another timezone must see the same programme as a visitor
 // standing in the hall.
-import { getEventPhase } from 'shared/config';
+import { getEventPhase } from 'shared/config/lifecycle';
 import { zonedDateTime } from './eventTime.js';
 
 /** The last minute of a day, or null where the day cannot be resolved. */

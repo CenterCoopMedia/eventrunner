@@ -6,6 +6,13 @@ const assert = require('node:assert/strict');
 const { listSocialAccounts } = require('./socialAccounts.cjs');
 const { MAX_SOCIAL_LABEL_LENGTH } = require('./schema.cjs');
 
+test('the social-account package entry shares the canonical renderer in both module formats', async () => {
+  const esm = await import('shared/config/socialAccounts');
+  const cjs = require('shared/config/socialAccounts');
+  assert.equal(esm.listSocialAccounts, listSocialAccounts);
+  assert.equal(cjs.listSocialAccounts, listSocialAccounts);
+});
+
 test('lists safe accounts with the canonical link and drops the rest', () => {
   assert.deepEqual(
     listSocialAccounts({

@@ -15,7 +15,7 @@
  * with them.
  */
 
-const { httpsUrlHref } = require('./config/schema.cjs');
+const { httpsUrlHref } = require('./config/values.cjs');
 
 /** The four registration statuses, in lifecycle order. */
 const REGISTRATION_STATUSES = ['pending', 'ticketed', 'approved', 'revoked'];

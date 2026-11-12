@@ -46,7 +46,7 @@
 // only by an operator's own edit, which already re-renders this component
 // through a changed `eventConfig` prop.
 import { useEffect, useId, useState } from 'react';
-import { getEventPhase } from 'shared/config';
+import { getEventPhase } from 'shared/config/lifecycle';
 import SectionHead from './editorial/SectionHead.jsx';
 import { countdownParts, resolveEventStart } from '../lib/eventTime.js';
 
