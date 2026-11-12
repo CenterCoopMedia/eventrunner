@@ -33,11 +33,14 @@ async function reverseThrough(page, region) {
   const count = await controls.count();
   expect(count).toBeGreaterThan(3);
   await controls.last().focus();
-  for (let step = 0; step < count; step += 1) {
-    if (!await region.evaluate((element) => element !== document.activeElement && element.contains(document.activeElement))) break;
+  let reachedFirst = false;
+  // Native time fields have several keyboard stops inside one input.
+  while (await region.evaluate((element) => element !== document.activeElement && element.contains(document.activeElement))) {
+    if (await controls.first().evaluate((element) => element === document.activeElement)) reachedFirst = true;
     await expect.poll(() => focusIsClear(page), { message: 'The focused control stays clear of sticky heads' }).toBe(true);
     await page.keyboard.press('Shift+Tab');
   }
+  expect(reachedFirst).toBe(true);
   expect(await region.evaluate((element) => element !== document.activeElement && element.contains(document.activeElement))).toBe(false);
 }
 
@@ -51,7 +54,7 @@ for (const kind of ['page', 'invoice', 'session']) {
         await page.goto('/admin/pages/home');
         await page.getByLabel('Navigation label').fill('A guide to attending the local news and information summit with your community');
       } else if (kind === 'invoice') {
-        await page.goto('/admin/invoices/new');
+        await page.goto('/admin/invoices/new/invoice');
         await page.getByLabel('Name to bill').fill('Example local news and information summit partner organization '.repeat(4).slice(0, 200));
         await page.getByLabel('Line 1 description').fill('Synthetic focus check');
         await page.getByLabel('Line 1 unit price').fill('10.00');
