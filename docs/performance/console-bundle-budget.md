@@ -73,7 +73,9 @@ return-path and signup decisions are unchanged.
 
 The hosted `console-routes` browser fixture builds the real route code with a
 synthetic identity and API. It checks applicant/setup requests without staff
-review chunks, a held setup import with heading focus, navigation away from a
-missing Team chunk and a successful reload, and writes JSON network attachments.
+review chunks, a held setup import that keeps main focus while its data loads,
+navigation away from a missing Team chunk and a successful reload, and writes
+JSON network attachments. The App unit test separately checks heading focus
+when deferred route code commits with a heading already available.
 The normal bundle
 measurements above include the real Auth SDK and do not use that replacement.
