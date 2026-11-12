@@ -583,7 +583,7 @@ describe('the Unpublished changes page', () => {
     expect(within(updates).getByText('An update')).toBeInTheDocument();
   });
 
-  it('lets a reader read a name cut at 80 characters in full, with or without an editor link', async () => {
+  it('shows a long name in full, with or without an editor link', async () => {
     unowned.add('/admin/updates');
     await renderAt('/admin/unpublished');
     const long = `A long update title ${'that keeps going '.repeat(8)}until the end`;
@@ -596,9 +596,8 @@ describe('the Unpublished changes page', () => {
     const updates = screen.getByRole('table', { name: /^Updates with unpublished changes/ });
     const [row] = within(updates).getAllByRole('row').slice(1);
     expect(within(row).queryByRole('link')).toBeNull();
-    const shown = within(row).getByText(`${long.slice(0, 79)}…`);
-    expect(shown).toHaveAttribute('title', long);
-    expect(within(row).getByText(long)).toHaveClass('sr-only');
+    expect(within(row).getByText(long)).not.toHaveClass('sr-only');
+    expect(within(row).queryByText(`${long.slice(0, 79)}…`)).toBeNull();
     // A linked row is named in full too.
     const sessions = screen.getByRole('table', { name: /^Sessions with unpublished changes/ });
     expect(within(sessions).getByRole('link', { name: session })).toHaveAttribute('href', '/admin/sessions/s-long');

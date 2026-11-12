@@ -642,7 +642,7 @@ export default function AdminVersionHistory() {
   return (
     <div className="flex flex-col gap-md">
       <AdminPageHeader
-        title={versionRecordName(choice.id, row?.current ?? entries[0]?.fields)}
+        title={versionRecordName(choice.id, row?.current ?? entries[0]?.fields, { full: true })}
         state={recordState}
         description="Newest first. A version is added each time this record is published."
         actions={

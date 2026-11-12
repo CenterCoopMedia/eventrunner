@@ -412,7 +412,7 @@ export default function AdminAttendees() {
                       ) : null}
                       {row.speakerId ? <StatusBadge tone="info">Speaker</StatusBadge> : null}
                     </div>
-                    <p className={`mt-3xs truncate ${rowMetaClass}`}>{row.email}</p>
+                    <p className={`mt-3xs break-all ${rowMetaClass}`}>{row.email}</p>
                     {Array.isArray(row.pastAttendance) && row.pastAttendance.length > 0 ? (
                       <p className={`mt-3xs ${rowMetaClass}`}>
                         Past attendance: {row.pastAttendance.filter((entry) => typeof entry === 'string').join('; ')}

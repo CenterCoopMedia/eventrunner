@@ -46,13 +46,16 @@ const row = (overrides = {}) => ({
 
 describe('AdminAttendees', () => {
   it('lists accounts with their registration status', () => {
+    const email = `${'long.synthetic.address.'.repeat(4)}reader@example.test`;
     render(<MemoryRouter><AdminAttendees /></MemoryRouter>);
-    pushRows([row(), row({ id: 'uid-bob', displayName: 'Bob Grace', email: 'bob@example.com', registrationStatus: 'approved', approvalSource: 'ticket' })]);
+    pushRows([row({ email }), row({ id: 'uid-bob', displayName: 'Bob Grace', email: 'bob@example.com', registrationStatus: 'approved', approvalSource: 'ticket' })]);
 
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(items[0]).toContain('Ada Lovelace');
     expect(items[0]).toContain('Pending');
     expect(items[1]).toContain('Approved');
+    expect(screen.getByText(email)).toBeVisible();
+    expect(callMock).not.toHaveBeenCalled();
   });
 
   it('approves a pending account through approveUser', async () => {

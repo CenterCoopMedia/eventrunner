@@ -246,7 +246,7 @@ export default function AdminSpeakersList() {
                           <StatusBadge tone="caution">Changes pending review</StatusBadge>
                         ) : null}
                       </div>
-                      <p className={`mt-3xs truncate ${rowMetaClass}`}>
+                      <p className={`mt-3xs break-words ${rowMetaClass}`}>
                         {[speaker.jobTitle, speaker.organization].filter(Boolean).join(', ') || '—'}
                         {note ? ` · ${note}` : ''}
                       </p>
