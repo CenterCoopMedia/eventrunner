@@ -366,6 +366,16 @@ The brief names exactly two exceptions, both narrow: A bento grid that passes al
 - Empty states orient the reader and offer exactly one next action.
 - Address readers as "you", not "the user".
 
+### Error messages
+
+State what happened and what the person can do next. Name the operation and use the control's actual label when it helps. Keep what the person typed in place. Do not blame the person, add apology filler, or use "Oops".
+
+Before: "Something went wrong."
+
+After: "The materials archive could not be downloaded. Try again."
+
+Preserve a server message's useful facts and recovery steps, including a result that could not be confirmed or a change that saved only in part. Do not say that nothing changed unless that is known. Keep field names and the `field: message` format so forms can still mark the input. For a server failure without a known recovery, keep the page open and direct the person to support for help.
+
 
 ### Event hero and demo preview
 

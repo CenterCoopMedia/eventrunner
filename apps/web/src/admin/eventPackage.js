@@ -76,7 +76,7 @@ export async function downloadEventPackage({ getIdToken, sections, includeStaffN
     throw new AdminApiError({
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
-      message: typeof error.message === 'string' && error.message ? error.message : 'Something went wrong. Try again.',
+      message: typeof error.message === 'string' && error.message ? error.message : 'The event data package could not be downloaded. Try again.',
     });
   }
 

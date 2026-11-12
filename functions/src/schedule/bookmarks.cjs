@@ -130,7 +130,7 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
       if (err instanceof SessionNotFoundError) return notFound(res, 'Session not found.');
       if (err instanceof AccountGoneError) return sendError(res, 403, 'forbidden', 'Attendee access required.');
       log.error('bookmarkSession failed', err);
-      return internal(res, 'The bookmark could not be saved.');
+      return internal(res, 'The bookmark could not be saved. Try again.');
     }
     res.status(200).json(result);
   };

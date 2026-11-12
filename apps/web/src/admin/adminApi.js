@@ -130,7 +130,7 @@ export async function callAdminEndpoint(name, body, getIdToken) {
       message:
         typeof error.message === 'string' && error.message
           ? error.message
-          : 'Something went wrong. Try again.',
+          : 'The request could not be completed. Try again.',
       queueId: typeof payload?.queueId === 'string' ? payload.queueId : null,
       usage: Array.isArray(payload?.usage) ? payload.usage : null,
     });

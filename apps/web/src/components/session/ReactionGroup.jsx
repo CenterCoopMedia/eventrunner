@@ -73,7 +73,7 @@ export default function ReactionGroup({ session }) {
         await setSessionReaction({ user, sessionId: session.id, emoji: next });
       } catch (err) {
         setOptimistic(undefined);
-        showToast(err.message || 'The reaction could not be saved.', { tone: 'error' });
+        showToast(err.message || 'The reaction could not be saved. Try again.', { tone: 'error' });
       } finally {
         setPending(false);
       }

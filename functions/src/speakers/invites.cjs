@@ -936,7 +936,7 @@ function createValidateSpeakerInviteHandler({ db, now = Date.now, log = console 
       resolved = await resolveInvite({ db, token: req.body?.token, now });
     } catch (err) {
       log.error('validateSpeakerInvite failed', err);
-      return internal(res, 'The invitation could not be checked.');
+      return internal(res, 'The invitation could not be checked. Try again.');
     }
     if (!resolved.ok) {
       // 200 with `{ valid: false }`, not a 4xx: the page renders a state
@@ -984,7 +984,7 @@ function createAcceptSpeakerInviteHandler({ db, auth, getConfig, sendEmail, now 
       });
     } catch (err) {
       log.error('acceptSpeakerInvite failed', err);
-      return internal(res, 'The invitation could not be accepted.');
+      return internal(res, 'Your response to the invitation could not be confirmed. Try again.');
     }
     if (!result.ok) {
       // The mismatch refusal carries the masked invited address, so the

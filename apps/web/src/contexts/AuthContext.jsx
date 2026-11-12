@@ -128,7 +128,7 @@ async function postJson(name, body) {
       message:
         typeof error.message === 'string'
           ? error.message
-          : 'Something went wrong. Try again.',
+          : 'The sign-in request could not be confirmed. Try again.',
       retryAfterSeconds:
         typeof error.retryAfterSeconds === 'number'
           ? error.retryAfterSeconds

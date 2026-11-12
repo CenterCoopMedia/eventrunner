@@ -167,7 +167,7 @@ function createDownloadSessionMaterialHandler({
       }
       if (err instanceof accessErrors.EmbargoedError) return forbidden(res, err.message);
       log.error('downloadSessionMaterial failed', err);
-      return internal(res, 'The material could not be retrieved.');
+      return internal(res, 'The material could not be retrieved. Try again.');
     }
 
     if (material.type !== 'file') {
@@ -187,11 +187,11 @@ function createDownloadSessionMaterialHandler({
       }
       if (err instanceof MaterialFileSizeUnavailableError) {
         log.error('downloadSessionMaterial: Storage did not state a valid file size', err);
-        return internal(res, 'The file size could not be checked.');
+        return internal(res, 'The file size could not be checked. Try again.');
       }
       if (!res.headersSent) {
         log.error('downloadSessionMaterial: Storage could not be read', err);
-        return internal(res, 'The underlying file could not be read.');
+        return internal(res, 'The underlying file could not be read. Try again.');
       }
       // streamMaterialFile already ended a response whose stream failed.
       return;

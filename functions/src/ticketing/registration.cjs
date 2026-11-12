@@ -304,7 +304,7 @@ function createTicketingVerifyOrderHandler({ db, provider, auth, now = () => new
         }
       } catch (err) {
         log.error('ticketing: lookup budget unavailable', err);
-        res.status(503).json({ error: { code: 'unavailable', message: 'Ticket lookup is temporarily unavailable.' } });
+        res.status(503).json({ error: { code: 'unavailable', message: 'Ticket lookup is temporarily unavailable. Try again later.' } });
         return;
       }
     }
@@ -315,7 +315,7 @@ function createTicketingVerifyOrderHandler({ db, provider, auth, now = () => new
     } catch (err) {
       log.error('ticketing: order lookup failed', err);
       res.status(502).json({
-        error: { code: 'provider-error', message: 'The ticketing provider could not be reached.' },
+        error: { code: 'provider-error', message: 'The ticketing provider could not be reached. Try again later.' },
       });
       return;
     }

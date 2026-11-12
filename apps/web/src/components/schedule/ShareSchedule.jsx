@@ -89,7 +89,7 @@ export default function ShareSchedule({ uid }) {
         scheduleVisibility: result?.scheduleVisibility ?? next,
       }));
     } catch (err) {
-      setError(err.message || 'The schedule visibility could not be saved.');
+      setError(err.message || 'The schedule visibility could not be saved. Try again.');
     } finally {
       setSaving(false);
     }

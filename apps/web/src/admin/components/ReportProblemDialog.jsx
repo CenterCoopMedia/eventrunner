@@ -36,7 +36,7 @@ async function sendReport(body) {
   }
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const error = new Error(typeof payload?.error?.message === 'string' ? payload.error.message : 'Something went wrong. Try again.');
+    const error = new Error(typeof payload?.error?.message === 'string' ? payload.error.message : 'The report could not be confirmed. Keep this page open and try again.');
     error.field = payload?.error?.field;
     throw error;
   }

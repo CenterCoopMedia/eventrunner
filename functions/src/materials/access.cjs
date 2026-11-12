@@ -227,7 +227,7 @@ function buildHandlers() {
             }
             if (err instanceof EmbargoedError) return forbidden(res, err.message);
             console.error('getSessionMaterialUrl failed', err);
-            return internal(res, 'The material could not be retrieved.');
+            return internal(res, 'The material could not be retrieved. Try again.');
           }
         }),
       ),
@@ -246,7 +246,7 @@ function buildHandlers() {
           } catch (err) {
             if (err instanceof SessionNotFoundError) return notFound(res, 'Session not found.');
             console.error('listSessionMaterials failed', err);
-            return internal(res, 'Materials could not be listed.');
+            return internal(res, 'Materials could not be listed. Try again.');
           }
         }),
       ),

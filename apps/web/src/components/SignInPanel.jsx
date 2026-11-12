@@ -130,7 +130,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
       message:
         err instanceof OtpRequestError
           ? err.message
-          : 'Something went wrong. Try again.',
+          : 'Sign-in could not be confirmed. Try again.',
     });
   }, []);
 

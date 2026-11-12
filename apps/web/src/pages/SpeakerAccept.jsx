@@ -142,7 +142,7 @@ export default function SpeakerAccept() {
         message:
           err instanceof SpeakerInviteError
             ? err.message
-            : 'Something went wrong. Try again.',
+            : 'Your response to the invitation could not be confirmed. Try again.',
         invitedEmailMasked:
           err instanceof SpeakerInviteError ? err.invitedEmailMasked : null,
       });

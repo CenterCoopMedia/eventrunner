@@ -79,7 +79,7 @@ export async function submitFeedback(payload, deps = {}) {
       }
       if (!response.ok) {
         const message = typeof body?.error?.message === 'string' ? body.error.message : null;
-        return { ok: false, error: message || 'Something went wrong. Try again.' };
+        return { ok: false, error: message || UNCONFIRMED_RECEIPT };
       }
       return { ok: true, id: typeof body?.id === 'string' ? body.id : undefined };
     } catch {

@@ -55,7 +55,7 @@ export async function downloadInvoicePdf({ getIdToken, invoiceId, number }) {
     throw new AdminApiError({
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
-      message: typeof error.message === 'string' && error.message ? error.message : 'Something went wrong. Try again.',
+      message: typeof error.message === 'string' && error.message ? error.message : 'The invoice PDF could not be downloaded. Try again.',
     });
   }
 

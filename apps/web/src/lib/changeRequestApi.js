@@ -17,8 +17,8 @@ import { IS_DEMO } from './demoMode.js';
  * @param {string} name the endpoint
  * @param {object} payload
  * @param {{ user: object|null, env?: object, fetchImpl?: typeof fetch,
- *           words: { signedOut: string, noBrowser: string, noServer: string } }} deps
- *   `words` are the refusals for no user, no fetch, and no endpoint origin
+ *           words: { signedOut: string, noBrowser: string, noServer: string, unconfirmed: string } }} deps
+ *   `words` name each refusal and an unconfirmed or failed request
  * @returns {Promise<{ ok: true, body: object|null } | { ok: false, error: string }>}
  */
 async function post(name, payload, deps) {
@@ -67,7 +67,7 @@ async function post(name, payload, deps) {
   }
   if (!response.ok) {
     const message = typeof body?.error?.message === 'string' ? body.error.message : null;
-    return { ok: false, error: message || 'Something went wrong. Try again.' };
+    return { ok: false, error: message || words.unconfirmed };
   }
   return { ok: true, body };
 }
@@ -88,6 +88,7 @@ export async function submitChangeRequest(payload, deps = {}) {
       signedOut: 'Sign in to send a change request.',
       noBrowser: 'This browser cannot send a change request right now.',
       noServer: 'Your request could not be sent. Try again later.',
+      unconfirmed: 'Your change request could not be confirmed. Try again.',
     },
   });
   if (!result.ok) return result;
@@ -110,6 +111,7 @@ export async function listMyChangeRequests(deps = {}) {
       signedOut: 'Sign in to see your change requests.',
       noBrowser: 'This browser cannot load your change requests right now.',
       noServer: 'Your change requests could not be loaded. Try again later.',
+      unconfirmed: 'Your change requests could not be loaded. Try again.',
     },
   });
   if (!result.ok) return result;
