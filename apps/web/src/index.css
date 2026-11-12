@@ -2883,9 +2883,12 @@
   }
 
   .admin-room .admin-format-button[aria-pressed='true'] {
+    /* Automatic text backplates can hide the label on this system pair. */
+    forced-color-adjust: none;
     background-color: Highlight;
     border-color: Highlight;
     color: HighlightText;
+    outline-color: Highlight;
     font-weight: 700;
   }
 
