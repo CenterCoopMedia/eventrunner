@@ -84,6 +84,8 @@ test('Tab follows a media deletion consequence instead of returning to the dialo
     await expect(dialog.getByRole('button', { name: 'Delete this file', exact: true })).toBeFocused();
     await consequence.focus();
     await page.keyboard.press('Shift+Tab');
+    await expect(dialog.getByRole('button', { name: 'Help with Where this is used', exact: true })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
     await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await consequence.focus();
     await page.keyboard.press('Escape');

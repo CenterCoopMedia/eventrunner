@@ -207,7 +207,10 @@ describe('speaker editor', () => {
     const account = within(layout).getByRole('heading', { name: 'Linked attendee account' })
       .closest('.admin-object-row');
     expect(account).toHaveTextContent('This speaker has an attendee account.');
-    expect(account.querySelector('input, select, textarea, button, a')).toBeNull();
+    expect(account.querySelector('input, select, textarea, a')).toBeNull();
+    expect(within(account).getAllByRole('button')).toEqual([
+      within(account).getByRole('button', { name: 'Help with Linked attendee account' }),
+    ]);
     expect(form).not.toHaveTextContent('linked-attendee');
     expect(fetch).not.toHaveBeenCalled();
   });

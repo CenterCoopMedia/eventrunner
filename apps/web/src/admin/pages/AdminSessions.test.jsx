@@ -631,7 +631,8 @@ describe('admin Sessions workspace', () => {
       const create = names.indexOf('Create a session');
       const region = names.indexOf('Sessions by saves, most first.');
       expect(create).toBeGreaterThanOrEqual(0);
-      expect(region).toBe(create + 1);
+      expect(names.slice(create + 1, region)).toEqual(['Help with Most saved']);
+      expect(region).toBe(create + 2);
       expect(names[region + 1]).toBe('Keynote');
       // Then the day groups, whose first row link is Keynote again.
       expect(names.slice(region + 2)).toContain('Keynote');

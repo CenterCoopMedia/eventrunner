@@ -134,7 +134,7 @@ test.describe.serial('the updates editor', () => {
     expect(CATEGORY).toHaveLength(24);
     const category = page.getByLabel('Category', { exact: true });
     await category.fill(CATEGORY);
-    await page.getByLabel('Feature this update at the head of the list').check();
+    await page.getByLabel('Feature this update at the head of the list', { exact: true }).check();
     // Enter in a one-line field saves a draft.
     await category.press('Enter');
     const draftRef = adminDb().collection('cmsUpdates_drafts').doc(updateId);
@@ -143,7 +143,7 @@ test.describe.serial('the updates editor', () => {
 
     await page.reload();
     await expect(page.getByLabel('Category', { exact: true })).toHaveValue(CATEGORY);
-    await expect(page.getByLabel('Feature this update at the head of the list')).toBeChecked();
+    await expect(page.getByLabel('Feature this update at the head of the list', { exact: true })).toBeChecked();
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title);
     await expect(page.getByLabel('Date', { exact: true })).toHaveValue(day);
   });

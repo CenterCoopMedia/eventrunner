@@ -238,7 +238,7 @@ export default function AdminTimelineEditor({ mode }) {
       noValidate
       onSubmit={(event) => { event.preventDefault(); save(); }}
     >
-      <AdminPageHeader help="Describe a past edition of the event and publish it to the public timeline."
+      <AdminPageHeader help="Describe a past event and publish it to the public timeline."
         title={creating ? 'New entry' : form.title.trim() || 'Untitled entry'}
         recentTitle={row?.current?.title}
         state={!creating && row ? <RecordState state={row.state} /> : null}
@@ -268,9 +268,9 @@ export default function AdminTimelineEditor({ mode }) {
 
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
-      <Panel help="Describe one past edition of the event for the public timeline." title="Entry">
+      <Panel help="Describe one past event for the public timeline." title="Entry">
         <div className="flex flex-col gap-sm">
-          <TextField help="Enter the year of this past edition of the event."
+          <TextField help="Enter the year of this past event."
             label="Year"
             inputMode="numeric"
             autoComplete="off"

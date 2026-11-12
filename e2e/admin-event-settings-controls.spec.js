@@ -101,7 +101,16 @@ test('event days, tracks, and the time zone use labelled compact controls that f
       };
       const essentials = document.querySelector('.admin-settings-grid--essentials');
       const controls = [...essentials.querySelectorAll('input, button, [role="listbox"]')].filter((element) => element.getClientRects().length > 0);
-      const buttons = [...essentials.querySelectorAll('button')].filter((element) => element.getClientRects().length > 0);
+      const buttons = [...essentials.querySelectorAll('button:not(.admin-help-trigger)')].filter((element) => element.getClientRects().length > 0);
+      // Help uses a quiet 16px glyph with an expanded pointer target.
+      const helpTargets = [...essentials.querySelectorAll('.admin-help-trigger')].filter((element) => element.getClientRects().length > 0).map((element) => {
+        const box = element.getBoundingClientRect();
+        const target = getComputedStyle(element, '::after');
+        return {
+          width: box.width - parseFloat(target.left) - parseFloat(target.right),
+          height: box.height - parseFloat(target.top) - parseFloat(target.bottom),
+        };
+      });
       return {
         pageFits: document.documentElement.scrollWidth <= window.innerWidth + 1,
         controlsInCards: controls.every((element) => inside(element, element.closest('.admin-settings-row-card, .admin-panel'))),
@@ -109,6 +118,7 @@ test('event days, tracks, and the time zone use labelled compact controls that f
         // Compact never means smaller: every add and remove control keeps one height.
         buttonHeights: [...new Set(buttons.map((element) => Math.round(element.getBoundingClientRect().height)))],
         minButtonHeight: Math.min(...buttons.map((element) => element.getBoundingClientRect().height)),
+        helpTargets,
       };
     });
     expect(geometry.pageFits, `no sideways scroll at ${name}`).toBe(true);
@@ -116,6 +126,11 @@ test('event days, tracks, and the time zone use labelled compact controls that f
     expect(geometry.cardsFit, `cards hold their content at ${name}`).toBe(true);
     expect(geometry.minButtonHeight, `buttons keep a full target at ${name}`).toBeGreaterThanOrEqual(24);
     expect(geometry.buttonHeights.length, `buttons share one height at ${name}`).toBe(1);
+    expect(geometry.helpTargets.length, `help is available at ${name}`).toBeGreaterThan(0);
+    for (const target of geometry.helpTargets) {
+      expect(target.width, `help keeps a full pointer target at ${name}`).toBeGreaterThanOrEqual(24);
+      expect(target.height, `help keeps a full pointer target at ${name}`).toBeGreaterThanOrEqual(24);
+    }
     if (EVIDENCE) {
       await fs.mkdir(EVIDENCE, { recursive: true });
       await page.evaluate(() => document.fonts.ready);
