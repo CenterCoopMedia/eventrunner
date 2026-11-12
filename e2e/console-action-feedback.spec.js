@@ -208,8 +208,9 @@ for (const width of [1440, 390, 320]) {
 test('console waiting stages remain readable and current-step focus stays distinct at 390px', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
-  // Install before application timers exist, let the first page load, then
-  // pause before navigating to the held read. Only elapsed time is simulated.
+  // Install before application timers exist, let the first page load and
+  // open the folded steps, then pause before navigating to the held read.
+  // Only elapsed time is simulated.
   await page.clock.install({ time: new Date('2026-11-01T12:00:00.000Z') });
   const pending = deferred();
   let reads = 0;
@@ -221,8 +222,10 @@ test('console waiting stages remain readable and current-step focus stays distin
   try {
     await page.goto(`${origin}${APP_PATH}/organization`);
     await expect(page.getByLabel('Website (optional)')).toBeVisible();
-    await page.clock.pauseAt(new Date('2026-11-01T12:10:00.000Z'));
     const steps = page.getByRole('navigation', { name: 'Setup steps' });
+    await steps.getByText('Show all 8 steps', { exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await page.clock.pauseAt(new Date('2026-11-01T12:10:00.000Z'));
     const teamLink = steps.getByRole('link', { name: /Your team/ });
     // Keyboard activation does not require animation-frame stability while
     // the application clock is paused, and exercises the actual step link.
@@ -271,6 +274,10 @@ test('console waiting stages remain readable and current-step focus stays distin
 
     await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
     await page.getByRole('heading', { name: 'Your team', exact: true }).focus();
+    // A completed step move closes the narrow list. Open it before testing
+    // the selected link's keyboard focus, as a reader does.
+    await steps.getByText('Show all 8 steps', { exact: true }).focus();
+    await page.keyboard.press('Enter');
     const current = steps.locator('a[aria-current="step"]');
     await expect(current).toHaveAttribute('href', `${APP_PATH}/team`);
     const selectedOffset = await current.evaluate((element) => Number.parseFloat(globalThis.getComputedStyle(element).outlineOffset));
