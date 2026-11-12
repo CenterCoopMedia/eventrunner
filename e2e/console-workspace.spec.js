@@ -23,6 +23,7 @@ function application(status = 'ready') {
     address: 'community-gathering.example.test',
     acceptance: status === 'draft' ? null : { name: 'Alex Organizer', at: '2026-11-01T12:00:00.000Z' },
     myRole: 'owner', operator: true, canEdit: status === 'draft', canWithdraw: status === 'draft',
+    progress: { organization: false },
     errors: {}, build: status === 'building' ? { failed: false, current: 'web-address', done: 3, total: 13, step: 4,
       phrase: 'Setting up your web address', startedAt: '2026-11-04T15:00:00.000Z', delayed: false } : null,
     connections: { canChange: false, canDisconnect: false, stripe: { connected: false }, eventbrite: { connected: false } },
