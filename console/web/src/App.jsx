@@ -59,7 +59,7 @@ function useFocusHeadingOnNavigate() {
     const observer = new MutationObserver(() => {
       const destination = main?.querySelector('h1');
       if (destination) {
-        destination.focus();
+        if (document.activeElement === main) destination.focus();
         observer.disconnect();
       }
     });

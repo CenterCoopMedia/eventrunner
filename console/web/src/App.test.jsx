@@ -96,6 +96,24 @@ describe('AppRoutes', () => {
     }
   });
 
+  it('keeps focus on a control the reader chose while the destination data loads', async () => {
+    let finishTeam;
+    serveApi({
+      listOrganizations: { operator: false, organizations: [{ id: 'o1', name: 'Org', role: 'owner' }] },
+      listApplications: { applications: [] },
+      getTeam: () => new Promise((resolve) => { finishTeam = resolve; }),
+    });
+    renderApp('/');
+    fireEvent.click(await screen.findByRole('link', { name: 'Org' }));
+    await screen.findByText('Loading the organization.');
+    expect(screen.getByRole('main')).toHaveFocus();
+    const signOut = screen.getByRole('button', { name: 'Sign out' });
+    signOut.focus();
+    await act(async () => finishTeam({ organization: { id: 'o1', name: 'Org' } }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Org' })).toBeInTheDocument();
+    expect(signOut).toHaveFocus();
+  });
+
   it('sends a signed-out reader to sign in and remembers the page, invite token included', () => {
     renderApp('/invite/i1#token=abc', fakeAuth({ user: null }));
     expect(screen.getByRole('heading', { level: 1, name: 'Sign in to Event Runner' })).toBeInTheDocument();
