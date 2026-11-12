@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import useAdminHeaderPadding from './useAdminHeaderPadding.js';
 
 function Editor({ dialog, position }) {
@@ -19,7 +19,9 @@ describe('focus below the admin title band', () => {
     { name: 'preserves the position within a tall editor', height: 1200, dialog: false, position: 'sticky', scrolls: false },
     { name: 'leaves modal scrolling to the dialog', height: 100, dialog: true, position: 'sticky', scrolls: false },
     { name: 'leaves scrolling headers alone', height: 100, dialog: false, position: 'static', scrolls: false },
-  ])('$name', ({ height, dialog, position, scrolls }) => {
+    { name: 'keeps a pointer press in place through release', height: 100, dialog: false, position: 'sticky', pointer: 'during', scrolls: false },
+    { name: 'reveals validation focus after a pointer release', height: 100, dialog: false, position: 'sticky', pointer: 'after', scrolls: true },
+  ])('$name', ({ height, dialog, position, pointer, scrolls }) => {
     vi.stubGlobal('innerHeight', 900);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
       return this.tagName === 'HEADER'
@@ -32,7 +34,13 @@ describe('focus below the admin title band', () => {
     render(<Editor dialog={dialog} position={position} />);
     const field = screen.getByRole('textbox', { name: 'Notes' });
     field.scrollIntoView = vi.fn();
-    act(() => { field.focus(); frame(); });
+    act(() => {
+      if (pointer) fireEvent.pointerDown(field);
+      if (pointer === 'after') fireEvent.pointerUp(field);
+      field.focus();
+      if (pointer === 'during') fireEvent.pointerUp(field);
+      frame?.();
+    });
     expect(field.scrollIntoView).toHaveBeenCalledTimes(scrolls ? 1 : 0);
   });
 });
