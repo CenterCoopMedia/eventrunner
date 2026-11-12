@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { callApi } from '../../api.js';
 import { application, callsTo, emptyAnswers, serveApi } from '../../test/application.js';
@@ -9,6 +9,16 @@ vi.mock('../../api.js', () => ({ callApi: vi.fn() }));
 beforeEach(() => {
   serveApi();
 });
+
+function setupViewport(wide) {
+  const query = new EventTarget();
+  query.matches = wide;
+  vi.stubGlobal('matchMedia', () => query);
+  return (next) => {
+    query.matches = next;
+    query.dispatchEvent(new Event('change'));
+  };
+}
 
 describe('Setup', () => {
   it('shows one step per page with a step list, its progress and the current step', async () => {
@@ -28,6 +38,51 @@ describe('Setup', () => {
     expect(links[0]).toHaveTextContent('(done)');
     expect(links[2]).toHaveAttribute('href', '/organizations/o1/applications/a1/web-address');
     expect(callApi).toHaveBeenCalledWith('getApplication', { orgId: 'o1', appId: 'a1' });
+  });
+
+  it('folds the single step list behind a native disclosure on a narrow screen', async () => {
+    setupViewport(false);
+    renderSetup('event');
+    await screen.findByRole('heading', { level: 1, name: 'Your event' });
+    expect(screen.getByText('Step 2 of 8')).toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Setup steps' });
+    const summary = within(nav).getByText('Show all 8 steps');
+    expect(summary.tagName).toBe('SUMMARY');
+    expect(summary.parentElement).not.toHaveAttribute('open');
+    expect(within(nav).getAllByRole('list', { hidden: true })).toHaveLength(1);
+    fireEvent.click(summary);
+    const links = within(nav).getAllByRole('link');
+    expect(links).toHaveLength(8);
+    expect(links[1]).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('keeps the current step and draft when the layout changes across the breakpoint', async () => {
+    const resize = setupViewport(false);
+    renderSetup('organization');
+    const name = await screen.findByLabelText('Organization name');
+    fireEvent.change(name, { target: { value: 'Edited organization' } });
+    act(() => resize(true));
+    expect(screen.queryByText('Show all 8 steps')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('navigation', { name: 'Setup steps' })).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /Your organization/ })).toHaveAttribute('aria-current', 'step');
+    expect(name).toHaveValue('Edited organization');
+    act(() => resize(false));
+    expect(screen.getByText('Show all 8 steps').parentElement).not.toHaveAttribute('open');
+    expect(screen.getByText('Step 1 of 8')).toBeInTheDocument();
+    expect(name).toHaveValue('Edited organization');
+  });
+
+  it('saves a draft through a folded step link and closes the list on the next step', async () => {
+    setupViewport(false);
+    renderSetup('organization');
+    const name = await screen.findByLabelText('Organization name');
+    fireEvent.change(name, { target: { value: 'Edited organization' } });
+    fireEvent.click(screen.getByText('Show all 8 steps'));
+    fireEvent.click(screen.getByRole('link', { name: /Your event/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Your event' });
+    expect(callsTo('saveApplicationStep')[0].answers.name).toBe('Edited organization');
+    expect(screen.getByText('Show all 8 steps').parentElement).not.toHaveAttribute('open');
+    expect(screen.getByText('Step 2 of 8')).toBeInTheDocument();
   });
 
   it('Next and Back move between steps at their own addresses', async () => {
