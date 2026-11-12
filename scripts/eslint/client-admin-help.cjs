@@ -10,6 +10,7 @@ module.exports = {
   create(context) {
     const source = context.sourceCode;
     const fields = new Set(['input', 'select', 'textarea', 'RichTextEditor', 'ImagePicker', 'PlannerSwitch', 'ReminderScheduleSwitch', 'Checkbox', 'Radio']);
+    const plainFields = new Set(['input', 'select', 'textarea', 'Checkbox', 'Radio']);
     const operatorFunctions = new Set(['PitchEmailSettings', 'ConnectionSettings']);
     function supplied(attribute) {
       if (!attribute?.value) return false;
@@ -32,7 +33,7 @@ module.exports = {
         })) return;
         const attrs = new Map(node.attributes.filter(a => a.type === 'JSXAttribute').map(a => [a.name.name, a]));
         if (name === 'input' && attrs.get('type')?.value?.value === 'hidden') return;
-        if (supplied(attrs.get('help')) || supplied(attrs.get('data-help-skip'))) return;
+        if ((!plainFields.has(name) && supplied(attrs.get('help'))) || supplied(attrs.get('data-help-skip'))) return;
         context.report({ node, messageId: 'missing' });
       },
     };

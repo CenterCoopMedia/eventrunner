@@ -17,6 +17,9 @@ new RuleTester({ languageOptions: { parserOptions: { ecmaFeatures: { jsx: true }
     { code: '<TextField label="Track" help=" " />', errors: [{ messageId: 'missing' }] },
     { code: '<TextField label="Track" help={undefined} />', errors: [{ messageId: 'missing' }] },
     { code: '<input aria-label="Upload" />', errors: [{ messageId: 'missing' }] },
+    ...['input', 'select', 'textarea', 'Checkbox', 'Radio'].map(name => ({
+      code: `<${name} help="This component does not render help." />`, errors: [{ messageId: 'missing' }],
+    })),
     { code: 'isOperator ? null : <TextField label="Staff field" />', errors: [{ messageId: 'missing' }] },
   ],
 });
