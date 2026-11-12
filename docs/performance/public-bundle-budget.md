@@ -52,6 +52,22 @@ See [the current bundle report](public-bundle-report.md) for measured results.
 - Do not duplicate Firebase or shared application state across chunks.
 - Do not change caching or chunk names only to suppress Vite's warning.
 
+## Route intent
+
+The shell prepares a route's JavaScript and CSS after 100 ms of mouse hover, keyboard focus,
+or a touch or pen press on an internal link. `src/routes.jsx` supplies both the router and the
+intent matcher, including demo hash links. Route parameters and the CMS catch-all follow
+React Router's path ranking. Downloads start only after intent, once per route module.
+The route table stays in the entry bundle, so a direct link starts the matched page's import
+without a separate registry download or an extra loading placeholder.
+The optional intent handler loads on the first link interaction; a quick mouse sweep still
+cancels the page download. Save-Data and 2G connections also skip that handler download.
+
+Save-Data and slow-2g/2g connections skip prefetch. This prepares code only; page data,
+images and fonts still load when the page renders. A failed prefetch stays silent and leaves
+the tab's reload budget unchanged. Navigation can retry that import and retains the chunk
+error boundary's recovery. A successful prefetch avoids the route loading placeholder.
+
 ## Acceptance
 
 The public entry graph stays within its CI limit in both build modes. Direct navigation, client navigation, loading, chunk failure recovery, and demo hash routes continue to work.

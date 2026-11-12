@@ -99,11 +99,15 @@ export function clearReloadFlag(storage = safeStorage()) {
  * left to propagate to ErrorBoundary.
  *
  * @param {EventTarget} [target]
- * @param {{ reload?: () => void }} [options]
+ * @param {{ reload?: () => void, isPrefetching?: () => boolean }} [options]
  * @returns {() => void} removes the listener
  */
-export function installChunkReload(target = globalThis, { reload } = {}) {
+export function installChunkReload(target = globalThis, { reload, isPrefetching = () => false } = {}) {
   const onPreloadError = (event) => {
+    // Speculative imports catch their own rejection. Do not preventDefault:
+    // Vite must reject rather than return an undefined module. A concurrent
+    // real navigation still reaches ErrorBoundary and its reloadOnce.
+    if (isPrefetching()) return;
     if (reloadOnce({ reload })) event.preventDefault();
   };
   target.addEventListener('vite:preloadError', onPreloadError);
