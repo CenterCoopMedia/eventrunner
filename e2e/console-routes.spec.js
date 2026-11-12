@@ -12,7 +12,7 @@ const ORG = { id: 'route-newsroom', name: 'Synthetic newsroom', role: 'owner' };
 const APPLICATION = {
   id: 'route-event', orgId: ORG.id, status: 'draft', myRole: 'owner', operator: false,
   canEdit: true, canWithdraw: false, canAccept: false, errors: {}, ownersNeeded: 0,
-  progress: { organization: true, event: true, webAddress: true, tickets: true, email: true, team: true },
+  progress: { organization: false, event: true, webAddress: true, tickets: true, email: true, team: true },
   answers: {
     organization: { name: ORG.name, website: '', address: '' },
     event: { name: 'Synthetic gathering' }, tickets: { choice: 'none' },

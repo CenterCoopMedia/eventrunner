@@ -20,16 +20,39 @@ describe('Review step', () => {
     expect(within(screen.getByRole('region', { name: 'Tickets' })).getByText('NC Local')).toBeInTheDocument();
     expect(screen.getByText('NC Local <hello@nclocal.eventrunner.org>')).toBeInTheDocument();
     expect(screen.getByText('Your team has at least two owners.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Edit your event' })).toHaveAttribute('href', '/organizations/o1/applications/a1/event');
+    for (const [title, path] of [
+      ['your organization', 'organization'], ['your event', 'event'], ['your web address', 'web-address'],
+      ['your team', 'team'], ['tickets', 'tickets'], ['email', 'email'],
+    ]) {
+      expect(screen.getByRole('link', { name: `Edit ${title}` })).toHaveAttribute('href', `/organizations/o1/applications/a1/${path}?from=review`);
+    }
   });
 
-  it.each(['', undefined])('marks an unset sender as Not added (%s)', async (senderName) => {
+  it.each(['', undefined])('marks an unset sender as Not answered (%s)', async (senderName) => {
     const answers = fullAnswers();
     answers.email.senderName = senderName;
     serveApi({ getApplication: { application: application({ answers }) } });
     renderSetup('review');
     const email = await screen.findByRole('region', { name: 'Email' });
-    expect(within(email).getByText('From').closest('.summary-row')).toHaveTextContent('Not added');
+    expect(within(email).getByText('From').closest('.summary-row')).toHaveTextContent('Not answered');
+  });
+
+  it.each(['', '  \n  '])('distinguishes optional and required blank answers (%j)', async (blank) => {
+    const answers = fullAnswers();
+    answers.organization = { name: blank, website: blank, address: blank };
+    answers.event.tagline = blank;
+    answers.event.venue = { name: blank, address: blank };
+    serveApi({ getApplication: { application: application({ answers }) } });
+    renderSetup('review');
+    const organization = await screen.findByRole('region', { name: 'Your organization' });
+    const event = screen.getByRole('region', { name: 'Your event' });
+    for (const label of ['Name', 'Mailing address']) {
+      expect(within(organization).getByText(label).closest('.summary-row')).toHaveTextContent('Not answered');
+    }
+    expect(within(organization).getByText('Website').closest('.summary-row')).toHaveTextContent('Not provided');
+    for (const label of ['Description', 'Venue']) {
+      expect(within(event).getByText(label).closest('.summary-row')).toHaveTextContent('Not provided');
+    }
   });
 
   it('moves on with Next, and says what comes next', async () => {
@@ -45,7 +68,7 @@ describe('Review step', () => {
     renderSetup('review');
     const title = await screen.findByRole('heading', { name: 'Answers that need attention' });
     const problems = within(title.closest('section'));
-    expect(problems.getByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/organizations/o1/applications/a1/tickets?check=1');
+    expect(problems.getByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/organizations/o1/applications/a1/tickets?check=1&from=review');
     expect(problems.getByText(/Choose how you sell tickets\./)).toBeInTheDocument();
     expect(screen.queryByText(/Add a second Owner/)).not.toBeInTheDocument();
     expect(screen.getByText(/A second owner can help manage your team/)).toBeInTheDocument();

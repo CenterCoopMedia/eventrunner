@@ -36,8 +36,8 @@ export function isProviderUrl(url, provider) {
 }
 
 const RETURN_KEY = 'console.connectReturn';
-// Only the status page or the tickets step of a request.
-const RETURN_PATH = /^\/organizations\/[\w-]+\/applications\/[\w-]+(\/tickets)?$/;
+// Only status or Tickets, with Tickets' two known UI markers in either order.
+const RETURN_PATH = /^\/organizations\/[\w-]+\/applications\/[\w-]+(?:\/tickets(?:\?(?:from=review(?:&check=1)?|check=1(?:&from=review)?))?)?$/;
 
 /** Where to come back to from the provider's page. */
 export function rememberConnectReturn(path) {

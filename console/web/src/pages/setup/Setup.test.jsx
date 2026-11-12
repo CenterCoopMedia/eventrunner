@@ -95,6 +95,70 @@ describe('Setup', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
   });
 
+  it.each(['your organization', 'your event', 'your web address', 'your team', 'tickets', 'email'])('returns from editing %s without saving when nothing changed', async (title) => {
+    renderSetup('review');
+    fireEvent.click(await screen.findByRole('link', { name: `Edit ${title}` }));
+    const back = await screen.findByRole('button', { name: 'Back to Review' });
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    fireEvent.click(back);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
+    expect(callsTo('saveApplicationStep')).toHaveLength(0);
+  });
+
+  it('waits for the changed answer to save, then returns to Review with its remaining problems', async () => {
+    let finish;
+    serveApi({ saveApplicationStep: (body) => new Promise((resolve) => {
+      finish = () => resolve({ step: body.step, saved: true, errors: { 'organization.website': 'Use a complete website address.' } });
+    }) });
+    renderSetup('review');
+    fireEvent.click(await screen.findByRole('link', { name: 'Edit your organization' }));
+    fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'nclocal.org' } });
+    const back = screen.getByRole('button', { name: 'Back to Review' });
+    fireEvent.click(back);
+    await waitFor(() => expect(callsTo('saveApplicationStep')).toHaveLength(1));
+    expect(back).toBeDisabled();
+    expect(screen.getByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
+    finish();
+    await screen.findByRole('heading', { level: 1, name: 'Review' });
+    expect(screen.getByText('nclocal.org')).toBeInTheDocument();
+    expect(callsTo('saveApplicationStep')[0].answers.website).toBe('nclocal.org');
+    const problems = screen.getByRole('region', { name: 'Answers that need attention' });
+    expect(problems).toHaveTextContent('Use a complete website address.');
+    fireEvent.click(within(problems).getByRole('link', { name: 'Your organization' }));
+    await screen.findByLabelText('Website (optional)');
+    const stepProblems = screen.getByRole('region', { name: 'Answers that need attention' });
+    expect(within(stepProblems).getByRole('link', { name: 'Your organization' }))
+      .toHaveAttribute('href', '/organizations/o1/applications/a1/organization?check=1&from=review');
+    expect(screen.getByRole('button', { name: 'Back to Review' })).toBeInTheDocument();
+  });
+
+  it.each(['transport failure', 'refused answer'])('stays on a Review edit after a %s, then returns after a successful save', async (outcome) => {
+    let fail = true;
+    const SHORT = 'Use 3 to 27 lowercase letters, numbers and hyphens.';
+    serveApi({ saveApplicationStep: (body) => {
+      if (fail && outcome === 'transport failure') throw new Error('We could not reach the server. Try again.');
+      return { step: body.step, saved: !fail, errors: fail ? { 'webAddress.name': SHORT } : {} };
+    } });
+    renderSetup('web-address', { query: '?from=review' });
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: outcome === 'refused answer' ? 'ab' : 'nclocal2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
+    expect(await screen.findByText(/Not saved\./)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    if (outcome === 'refused answer') {
+      await waitFor(() => expect(screen.getByLabelText('Name')).toHaveAccessibleDescription(new RegExp(SHORT.replaceAll('.', '\\.'))));
+      expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByRole('region', { name: 'Answers that need attention' })).toHaveTextContent(SHORT);
+      expect(screen.getByRole('button', { name: 'Back to Review' })).toBeInTheDocument();
+    }
+    fail = false;
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'nclocal3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
+    await screen.findByRole('heading', { level: 1, name: 'Review' });
+    expect(screen.getByText('nclocal3.eventrunner.org')).toBeInTheDocument();
+    expect(callsTo('saveApplicationStep')).toHaveLength(2);
+  });
+
   it('Back, the step list and Close move without checking field errors', async () => {
     serveApi({ getApplication: { application: application({ errors: {
       'organization.address': 'Enter the mailing address.', 'event.name': 'Enter the event name.', 'email.replyTo': 'Enter a reply address.',
@@ -178,6 +242,8 @@ describe('Setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     const problems = await screen.findByRole('region', { name: 'Answers that need attention' });
     expect(within(problems).getByRole('listitem')).toHaveTextContent('Use at least 10 characters.');
+    expect(within(problems).getByRole('link', { name: 'Your organization' }))
+      .toHaveAttribute('href', '/organizations/o1/applications/a1/organization?check=1');
     await waitFor(() => expect(field).toHaveFocus());
     expect(field).toHaveAttribute('aria-invalid', 'true');
     expect(field.getAttribute('aria-describedby')).toContain('f-organization-address-error');
@@ -295,10 +361,14 @@ describe('Setup', () => {
     const held = screen.getByText(/is not saved/);
     expect(held).toHaveTextContent('Your web address is not saved. Fix it before you continue.');
     expect(within(held).getByRole('link', { name: 'Your web address' }))
-      .toHaveAttribute('href', '/organizations/o1/applications/a1/web-address?check=1');
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Setup steps' })).getByRole('link', { name: /Your web address/ }));
+      .toHaveAttribute('href', '/organizations/o1/applications/a1/web-address?check=1&from=review');
+    fireEvent.click(within(held).getByRole('link', { name: 'Your web address' }));
+    await screen.findByLabelText('Name');
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveFocus());
+    expect(screen.getByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'nclocal2' } });
-    fireEvent.click(screen.getByRole('link', { name: /Review/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
     await screen.findByRole('heading', { level: 1, name: 'Review' });
     expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
     expect(screen.queryByText(/is not saved/)).not.toBeInTheDocument();
