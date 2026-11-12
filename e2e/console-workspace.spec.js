@@ -23,7 +23,8 @@ function application(status = 'ready') {
     address: 'community-gathering.example.test',
     acceptance: status === 'draft' ? null : { name: 'Alex Organizer', at: '2026-11-01T12:00:00.000Z' },
     myRole: 'owner', operator: true, canEdit: status === 'draft', canWithdraw: status === 'draft',
-    errors: {}, build: status === 'building' ? { failed: false, current: 'web-address' } : null,
+    errors: {}, build: status === 'building' ? { failed: false, current: 'web-address', done: 3, total: 13, step: 4,
+      phrase: 'Setting up your web address', startedAt: '2026-11-04T15:00:00.000Z', delayed: false } : null,
     connections: { canChange: false, canDisconnect: false, stripe: { connected: false }, eventbrite: { connected: false } },
   };
 }
@@ -141,9 +142,21 @@ test('console directories and application progress are readable across widths an
   await page.goto(`${origin}${APPLICATION_PATH}`);
   await expect(page.getByText('You can close this page')).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Setup progress' }).locator('[aria-current="step"]')).toHaveText('We are building your siteNow');
-  await expect(page.getByRole('status')).toHaveText('Now: Setting up your web address. Next: Setting up email and tickets.');
+  await expect(page.getByRole('status')).toHaveText('Step 4 of 13. Now: Setting up your web address. Next: Setting up email and tickets.');
+  const progress = page.getByRole('progressbar', { name: 'Build progress' });
+  await expect(progress).toHaveAttribute('value', '3');
+  await expect(progress).toHaveAttribute('max', '13');
   await expect(page.locator('.build-note .wb-body')).toHaveCSS('animation-name', 'none');
-  await page.screenshot({ path: path.join(EVIDENCE, 'console-building-320-dark-reduced-motion.png'), fullPage: true });
+  for (const colorScheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 320);
+    const bounds = await progress.boundingBox();
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(320);
+    await expect(progress).toHaveCSS('animation-name', 'none');
+    await expect(progress).toHaveCSS('transition-duration', '0s');
+    await page.screenshot({ path: path.join(EVIDENCE, `console-building-320-${colorScheme}-reduced-motion.png`), fullPage: true });
+  }
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await expect(page.locator('.build-note .wb-body')).toHaveCSS('animation-name', 'wb-bob');
   currentApplication = { ...application('building'), build: { failed: true, needsReconnect: false } };

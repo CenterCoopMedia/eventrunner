@@ -366,6 +366,7 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 .build-note { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-lg); }
 .build-note .wait-buddy { width: 6rem; height: 6.75rem; margin-inline: var(--space-xs); }
 .build-note { align-items: start; }
+.build-progress { display: block; width: 100%; height: 0.75rem; accent-color: rgb(var(--accent)); }
 .build-steps { list-style: none; margin: var(--space-xs) 0 0; padding: 0; display: grid; gap: 0.35rem; }
 .build-step { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr); gap: var(--space-xs); align-items: start; color: rgb(var(--ink-muted)); }
 .build-step.now { color: rgb(var(--ink)); font-weight: 700; }

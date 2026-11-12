@@ -212,8 +212,12 @@ test('a client hears only that the build failed and whether the ticket account i
   assert.deepEqual(buildForClient(failed, { state: 'failed', failedStep: 'tickets', error: 'x' }, NOW), { failed: true, needsReconnect: true });
   assert.deepEqual(buildForClient(failed, { state: 'failed', failedStep: 'domain' }, NOW), { failed: true, needsReconnect: false });
   assert.deepEqual(buildForClient({ ...failed, buildStart: { state: 'failed', at: new Date(NOW) } }, { state: 'queued', failedStep: 'tickets' }, NOW), { failed: true, needsReconnect: true }, 'a retry whose dispatch failed keeps the way to reconnect');
-  assert.deepEqual(buildForClient(failed, { state: 'running', failedStep: 'tickets' }, NOW), { failed: false, needsReconnect: false });
-  assert.deepEqual(buildForClient(failed, { state: 'running', steps: [{ id: 'email', detail: 'secret', state: 'done' }, { id: 'tickets', detail: null, state: 'running' }] }, NOW), { failed: false, needsReconnect: false, current: 'tickets' });
+  assert.deepEqual(buildForClient(failed, { state: 'running', failedStep: 'tickets' }, NOW), { failed: false, needsReconnect: false,
+    current: null, done: 0, total: 13, step: 0, phrase: 'Starting the build', startedAt: null, delayed: false });
+  assert.deepEqual(buildForClient(failed, { state: 'running', steps: [{ id: 'email', detail: 'secret', state: 'done' }, { id: 'tickets', detail: null, state: 'running' }] }, NOW), {
+    failed: false, needsReconnect: false, current: 'tickets', done: 1, total: 13, step: 7,
+    phrase: 'Setting up email and tickets', startedAt: null, delayed: false,
+  });
   assert.deepEqual(buildForClient({ status: 'approved', buildStart: { state: 'failed', at: new Date(NOW) } }, null, NOW), { failed: true, needsReconnect: false });
   const rehearsed = {
     status: 'approved',
@@ -223,6 +227,36 @@ test('a client hears only that the build failed and whether the ticket account i
   };
   assert.equal(buildForClient(rehearsed, null, NOW).needsReconnect, true, 'a retry would refuse this account, so the page offers Reconnect');
   assert.equal(buildForClient(rehearsed, null, NOW, { testMode: true }).needsReconnect, false);
+});
+
+test('client progress counts known completed steps once and distinguishes a delay from failure', () => {
+  const app = { status: 'building', buildStart: { state: 'started', at: new Date(NOW) } };
+  const startedAt = new Date(NOW - 2 * 60 * 60_000);
+  const build = { state: 'running', startedAt, steps: [
+    { id: 'project', state: 'done' }, { id: 'project', state: 'done' },
+    { id: 'operator-private-step', state: 'done', detail: 'operator-only detail' },
+    { id: 'web-address', state: 'running', at: new Date(NOW - 60 * 60_000 - 1) },
+  ] };
+  const progress = buildForClient(app, build, NOW);
+  assert.equal(progress.done, 1);
+  assert.equal(progress.total, 13);
+  assert.equal(progress.step, 4);
+  assert.equal(progress.delayed, true);
+  assert.equal(progress.failed, false, 'display delay does not change the retry/failure threshold');
+  assert.ok(!JSON.stringify(progress).includes('operator-'));
+  build.steps.at(-1).state = 'done';
+  assert.equal(buildForClient(app, build, NOW).delayed, false);
+  build.steps.push({ id: 'operator-private-step', state: 'running' });
+  assert.equal(buildForClient(app, build, NOW).current, null);
+});
+
+test('a queued retry has no completed work from the old run and a new safe observation time', () => {
+  const at = new Date(NOW);
+  const progress = buildForClient({ status: 'building', buildStart: { state: 'pending', at } }, {
+    state: 'queued', startedAt: new Date(NOW - 60_000), steps: [{ id: 'project', state: 'done' }],
+  }, NOW);
+  assert.deepEqual(progress, { failed: false, needsReconnect: false, current: null, done: 0, total: 13, step: 0,
+    phrase: 'Starting the build', startedAt: at.toISOString(), delayed: false });
 });
 
 test('the review page gets the record and whether it can be retried', async () => {

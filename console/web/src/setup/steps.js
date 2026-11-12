@@ -78,16 +78,5 @@ export const TICKET_CHOICES = Object.freeze([
 /** What the client reads in place of the status while a build has failed. */
 export const BUILD_FAILED_LABEL = 'We did not finish building your site';
 
-/** The build's steps (scripts/provision-client.cjs), grouped in the client's words. */
-export const BUILD_PHASES = Object.freeze([
-  { steps: ['project', 'firebase', 'deploy-identity'], label: 'Setting up your hosting' },
-  { steps: ['web-address', 'sign-in'], label: 'Setting up your web address', detail: 'This step can take up to an hour.' },
-  { steps: ['email', 'tickets'], label: 'Setting up email and tickets' },
-  { steps: ['environment', 'first-deploy', 'mail-webhooks'], label: 'Installing your site' },
-  { steps: ['seed'], label: 'Adding your event details and team' },
-  { steps: ['full-deploy'], label: 'Publishing your site' },
-  { steps: ['ready'], label: 'Emailing the link to your site' },
-]);
-
 /** The client's words for each request status (shared/consoleRequest). */
 export const STATUS_LABELS = CONSOLE_REQUEST_CLIENT_LABELS;

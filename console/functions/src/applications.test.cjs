@@ -131,7 +131,8 @@ test('a failed build says only that: never the error, the run or the step detail
     'console_builds/a1': { state: 'running' },
   });
   const quiet = await read(running);
-  assert.deepEqual(quiet.build, { failed: false, needsReconnect: false });
+  assert.deepEqual(quiet.build, { failed: false, needsReconnect: false, current: null, done: 0, total: 13, step: 0,
+    phrase: 'Starting the build', startedAt: null, delayed: false });
   assert.equal(quiet.connections.canChange, false);
 });
 
@@ -143,6 +144,28 @@ test('listApplications says when a build failed, so an Owner opens the request a
   const { body } = await listApplications(deps(db), { body: { orgId: 'o1' }, user: ben });
   assert.equal(body.applications[0].buildFailed, true);
   assert.ok(!JSON.stringify(body).includes('secret detail'));
+});
+
+test('a running build exposes factual client progress without operator metadata for every role', async () => {
+  const startedAt = new Date(NOW - 60_000);
+  const db = seededDb({
+    'applications/a1': applicationDoc({ status: 'building', buildStart: { state: 'started', at: startedAt } }),
+    'console_builds/a1': {
+      state: 'running', startedAt, error: 'operator-only failure', runUrl: 'https://github.example/private-run',
+      steps: ['project', 'firebase', 'deploy-identity', 'web-address'].map((id, index) => ({
+        id, label: 'operator-only label', detail: 'operator-only detail', state: index < 3 ? 'done' : 'running', at: startedAt,
+      })),
+    },
+  });
+  for (const user of [ana, ben, ops]) {
+    const app = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user })).body.application;
+    assert.deepEqual(app.build, {
+      failed: false, needsReconnect: false, current: 'web-address', done: 3, total: 13, step: 4,
+      phrase: 'Setting up your web address', startedAt: startedAt.toISOString(), delayed: false,
+    });
+    const text = JSON.stringify(app);
+    for (const hidden of ['operator-only failure', 'operator-only label', 'operator-only detail', 'private-run']) assert.ok(!text.includes(hidden));
+  }
 });
 
 test('listApplications lists the organization\'s own requests, newest first', async () => {

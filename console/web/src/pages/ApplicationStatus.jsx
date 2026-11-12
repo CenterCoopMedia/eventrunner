@@ -1,5 +1,5 @@
 import PageHeading from '../PageHeading.jsx';
-import { CONSOLE_REQUEST_GROUPS } from 'shared/consoleRequest';
+import { CONSOLE_BUILD_PHASES, CONSOLE_REQUEST_GROUPS } from 'shared/consoleRequest';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
@@ -8,10 +8,12 @@ import WaitingBuddy from '../WaitingBuddy.jsx';
 import IconControl from '../IconControl.jsx';
 import ConnectionPanel, { ConnectionNotice } from '../setup/ConnectionPanel.jsx';
 import { PROVIDER_COPY } from '../setup/connections.js';
-import { BUILD_FAILED_LABEL, BUILD_PHASES, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
-import { HostName, formatDate, hostName } from '../text.js';
+import { BUILD_FAILED_LABEL, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
+import { formatDate, hostName } from '../text.js';
 
 const REFRESH_MS = 30000;
+const BUILD_REFRESH_MS = 5000;
+const BUILD_TOTAL = CONSOLE_BUILD_PHASES.flatMap((phase) => phase.steps).length;
 
 /** The plain steps (ADR 0007, amendment 2026-11-04), and the statuses that reach each one. */
 const STAGES = [
@@ -51,11 +53,14 @@ function Stages({ app }) {
 }
 
 /** A build takes a while, so this says the client can leave, then what is happening and what comes next. */
-function BuildUnderway({ app }) {
+function BuildUnderway({ app, restarted }) {
   const current = app.build?.current;
-  const at = current ? BUILD_PHASES.findIndex((phase) => phase.steps.includes(current)) : -1;
-  const now = current ? BUILD_PHASES[at]?.label : 'Starting the build';
-  const next = !current || at >= 0 ? BUILD_PHASES[at + 1]?.label : null;
+  const at = current ? CONSOLE_BUILD_PHASES.findIndex((phase) => phase.steps.includes(current)) : -1;
+  const now = app.build?.phrase || 'Starting the build';
+  const next = !current || at >= 0 ? CONSOLE_BUILD_PHASES[at + 1]?.label : null;
+  const total = app.build?.total ?? BUILD_TOTAL;
+  const done = app.build?.done ?? 0;
+  const step = app.build?.step ?? 0;
   return (
     <aside className="note build-note" role="note">
       <WaitingBuddy />
@@ -63,10 +68,14 @@ function BuildUnderway({ app }) {
         <p className="note-title">You can close this page</p>
         <p>Most sites take about an hour and a half to build. Setting up your web address takes the longest.</p>
         <p>{app.myRole === 'owner' ? 'You' : 'Your team owners'} will receive an email when your site is ready, with a link to finish setting it up.</p>
-        <p role="status" aria-atomic="true" className="visually-hidden">{now ? <>Now: {now}.{next ? ` Next: ${next}.` : ''}</> : 'The build is in progress.'}</p>
+        {restarted ? <p>The build started again. Completed setup is being checked again, so the count starts again.</p> : null}
+        <p role="status" aria-atomic="true">{step > 0 ? `Step ${step} of ${total}. ` : `0 of ${total} steps done. `}Now: {now}.{next ? ` Next: ${next}.` : ''}</p>
+        <progress className="build-progress" aria-label="Build progress" value={done} max={total} />
+        {app.build?.delayed ? <p role="status">This step is taking longer than usual. You can leave this page and check back later.</p> : null}
         <ol className="build-steps" aria-label="Build steps">
-          {BUILD_PHASES.map((phase, i) => {
-            const state = i < at ? 'done' : i === at ? 'now' : 'later';
+          {CONSOLE_BUILD_PHASES.map((phase, i) => {
+            const phaseEnd = CONSOLE_BUILD_PHASES.slice(0, i + 1).flatMap((item) => item.steps).length;
+            const state = done >= phaseEnd ? 'done' : i === at ? 'now' : 'later';
             return (
               <li key={phase.label} className={`build-step ${state}`} aria-current={state === 'now' ? 'step' : undefined}>
                 <svg className="build-step-mark" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -156,7 +165,6 @@ function BuildFailed({ app, provider, retrying, onRetry, disabled }) {
     <aside className="note stack" role="note">
       <p className="note-title">The build did not finish</p>
       <p>{words}</p>
-      <p>{HostName()} is told about every build that does not finish.</p>
       {mayRetry && !waitsForAccount ? (
         <div>
           <button type="button" className="button primary" disabled={retrying || disabled} aria-busy={retrying || undefined} onClick={onRetry}>
@@ -180,24 +188,57 @@ export default function ApplicationStatus() {
   const [connectionResults, setConnectionResults] = useState({});
   const [refreshing, setRefreshing] = useState('');
   const [retrying, setRetrying] = useState(false);
+  const readSequence = useRef(0);
+  const observedRun = useRef(null);
+  const [restarted, setRestarted] = useState(false);
 
   const load = useCallback(async ({ quiet = false } = {}) => {
+    const sequence = ++readSequence.current;
     try {
-      setApp((await callApi('getApplication', { orgId, appId })).application);
-      setError('');
+      const next = (await callApi('getApplication', { orgId, appId })).application;
+      if (sequence === readSequence.current) {
+        setApp(next);
+        setError('');
+      }
       return '';
     } catch (err) {
-      if (!quiet) setError(err.message);
+      if (!quiet && sequence === readSequence.current) setError(err.message);
       return err.message;
     }
   }, [orgId, appId]);
 
-  // Live state: read again while the page is open.
   useEffect(() => {
     load();
-    const timer = setInterval(load, REFRESH_MS);
-    return () => clearInterval(timer);
+    return () => { readSequence.current += 1; };
   }, [load]);
+
+  const status = app?.status;
+  const buildFailed = app?.build?.failed === true;
+  // A failed build can recover externally; only terminal request statuses stop.
+  useEffect(() => {
+    if (!status || [...CONSOLE_REQUEST_GROUPS.built, ...CONSOLE_REQUEST_GROUPS.closed, 'archived'].includes(status)) return undefined;
+    const delay = !buildFailed && CONSOLE_REQUEST_GROUPS.building.includes(status) ? BUILD_REFRESH_MS : REFRESH_MS;
+    let live = true;
+    const poll = async () => {
+      await load();
+      if (live) timer = setTimeout(poll, delay);
+    };
+    let timer = setTimeout(poll, delay);
+    return () => { live = false; clearTimeout(timer); };
+  }, [load, status, buildFailed]);
+
+  const runStartedAt = app?.build?.startedAt;
+  const hasBuildProgress = Boolean(app?.build?.current || app?.build?.done);
+  const requestId = app?.id;
+  useEffect(() => {
+    if (observedRun.current?.id !== requestId) {
+      observedRun.current = null;
+      setRestarted(false);
+    }
+    if (!runStartedAt || (!observedRun.current && !hasBuildProgress)) return;
+    if (observedRun.current && observedRun.current.startedAt !== runStartedAt) setRestarted(true);
+    observedRun.current = { id: requestId, startedAt: runStartedAt };
+  }, [requestId, runStartedAt, hasBuildProgress]);
 
   async function withdraw() {
     if (withdrawResult?.kind === 'success') return false;
@@ -281,7 +322,7 @@ export default function ApplicationStatus() {
           {state?.copyFailed ? <p className="message error">We could not email your copy of the agreement. Your acceptance is saved, and you can read it below.</p> : null}
           {app.build?.failed ? <BuildFailed app={app} provider={reconnectProvider} retrying={retrying} onRetry={retry} disabled={Boolean(retryResult?.refreshError)} /> : null}
           <ActionNotice result={retryResult} onRefresh={() => refreshResult('retry')} refreshing={refreshing === 'retry'} />
-          {underway ? <BuildUnderway app={app} /> : null}
+          {underway ? <BuildUnderway app={app} restarted={restarted} /> : null}
           {app.status === 'declined' && app.note ? (
             <aside className="note" role="note">
               <p className="note-title">Note from {hostName()}</p>
