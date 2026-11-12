@@ -23,42 +23,14 @@
  * test the pipeline without sending wrong-event mail to a real inbox.
  */
 
-const { wrap, TEXT_FOOTER } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
+const { buildSpeakerWording } = require('./speakerWordingFields.cjs');
 
-const html = wrap(
-  [
-    '<p style="margin:0 0 16px 0;">Hi {{speaker_name}},</p>',
-    '<p style="margin:0 0 16px 0;">You are invited to take part in {{event_name}} ({{event_dates}}) as a {{invite_type}}.</p>',
-    '<p style="margin:0 0 16px 0;">Use the link below to accept. You will be asked to sign in — with Google, or with a code we email you — so we can connect this invitation to your account.</p>',
-    '<p style="margin:0 0 16px 0;text-align:center;">',
-    '<a href="{{invite_url}}" style="display:inline-block;padding:12px 24px;background-color:{{brand_primary}};color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:bold;text-decoration:none;">Accept your invitation</a>',
-    '</p>',
-    '<p style="margin:0 0 16px 0;font-size:13px;color:#777777;">If the button does not work, paste this address into your browser:<br>{{invite_url}}</p>',
-    '<p style="margin:0;">Questions, or the wrong person? Reply to this message or write to <a href="mailto:{{admin_contact_email}}">{{admin_contact_email}}</a>.</p>',
-  ].join('\n')
-);
-
-const text = [
-  'Hi {{speaker_name}},',
-  '',
-  'You are invited to take part in {{event_name}} ({{event_dates}}) as a {{invite_type}}.',
-  '',
-  'Accept your invitation:',
-  '{{invite_url}}',
-  '',
-  'You will be asked to sign in — with Google, or with a code we email you — so we can connect this invitation to your account.',
-  '',
-  'Questions, or the wrong person? Reply to this message or write to {{admin_contact_email}}.',
-  '',
-  TEXT_FOOTER,
-].join('\n');
+const source = buildSpeakerWording('speaker.invite');
 
 module.exports = {
   id: 'speaker.invite',
-  subject: 'You are invited to speak at {{event_name}}',
-  html,
-  text,
+  ...source,
   // The full §6.2 global vocabulary is declared so admin overrides may
   // reference any global token without tripping the unknown-token check.
   tokens: [...GLOBAL_TOKEN_NAMES, 'speaker_name', 'invite_url', 'invite_type', 'admin_contact_email'],

@@ -20,6 +20,7 @@ const {
 } = require('./invites.cjs');
 const { makeSpeakersDb: makeBareSpeakersDb } = require('./speakersFake.cjs');
 const { getDefaultTemplate, resetTemplateCacheForTest, loadTemplate } = require('../email/templates.cjs');
+const { defaultSpeakerWordingFields } = require('../email/templates/speakerWordingFields.cjs');
 
 const STAFF = { uid: 'staff-1', email: 'staff@example.org' };
 const T0 = Date.parse('2026-10-20T12:00:00Z');
@@ -112,6 +113,8 @@ test('templates returns the shipped wording, no saved wording, and the tokens of
   assert.deepEqual(invite.shipped, { subject: shipped.subject, html: shipped.html, text: shipped.text });
   assert.equal(invite.saved, null);
   assert.deepEqual(invite.savedErrors, []);
+  assert.equal(invite.editor.kind, 'plain');
+  assert.equal(invite.editor.fields.buttonLabel, 'Accept your invitation');
   assert.deepEqual(invite.requiredTokens, ['invite_url']);
   assert.deepEqual(invite.tokens, ['speaker_name', 'invite_url', 'invite_type', 'admin_contact_email']);
   assert.ok(invite.globalTokens.includes('event_name'));
@@ -165,6 +168,25 @@ test('save stores only the wording fields, records who saved, and writes an admi
   assert.equal(logs[0].action, 'saveEmailTemplate');
   assert.equal(logs[0].docPath, 'email_templates/speaker.invite');
   assert.equal(logs[0].email, STAFF.email);
+});
+
+test('plain fields save fixed links, brand structure and matching text', async () => {
+  const db = makeDb();
+  const fields = {
+    ...defaultSpeakerWordingFields('speaker.invite'),
+    greeting: 'Hello {{speaker_name}} & friends,',
+    buttonLabel: 'Join the event',
+  };
+  const res = await call(db, { action: 'saveTemplate', templateId: 'speaker.invite', fields });
+  assert.equal(res.statusCode, 200);
+  const stored = db.read('email_templates', 'speaker.invite');
+  assert.ok(stored.html.includes('href="{{invite_url}}"'));
+  assert.ok(stored.html.includes('Hello {{speaker_name}} &amp; friends,'));
+  assert.ok(stored.html.includes('>Join the event</a>'));
+  assert.ok(stored.html.includes('{{postal_address_html}}'));
+  assert.ok(stored.text.includes('Hello {{speaker_name}} & friends,'));
+  assert.ok(stored.text.includes('Join the event:\n{{invite_url}}'));
+  assert.deepEqual(res.body.template.editor, { kind: 'plain', fields });
 });
 
 test('a save of one field keeps the shipped copy for the others', async () => {
@@ -237,6 +259,7 @@ test('preview of saved wording that fails its check says the shipped wording is 
   const db = makeDb({ 'email_templates/speaker.invite': { text: 'No link here.' } });
   const list = await call(db, { action: 'templates' });
   assert.match(list.body.templates[0].savedErrors.join(' '), /missing required token \{\{invite_url\}\}/);
+  assert.equal(list.body.templates[0].editor.kind, 'unsupported');
   const res = await call(db, { action: 'preview', templateId: 'speaker.invite' });
   assert.equal(res.body.preview.source, 'shipped');
   assert.equal(res.body.preview.usedFallback, true);

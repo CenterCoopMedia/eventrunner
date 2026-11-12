@@ -12,12 +12,17 @@
  * anything is stored. Save and reset refuse on a historical demo
  * (core/demoWrites.cjs) and write an admin_logs row.
  *
- * The speaker mail endpoint (speakers/mailTemplates.cjs) uses this. The
- * reminder editor in speakers/reminders.cjs predates it and keeps its own
- * copy of the same steps.
+ * The speaker mail and reminder endpoints use this service.
  */
 
 const { getDefaultTemplate, loadTemplate, validateOverridePayload } = require('./templates.cjs');
+const { validateTemplateBody } = require('./render.cjs');
+const {
+  SpeakerWordingFieldsError,
+  buildSpeakerWording,
+  parseSpeakerWording,
+  readSpeakerWordingFields,
+} = require('./templates/speakerWordingFields.cjs');
 
 const TEMPLATES = 'email_templates';
 const WORDING_FIELDS = Object.freeze(['subject', 'html', 'text']);
@@ -51,6 +56,21 @@ function storedWording(data) {
   return out;
 }
 
+function wordingEditor(id, source) {
+  let fields;
+  try {
+    fields = parseSpeakerWording(id, source);
+  } catch (err) {
+    if (err instanceof SpeakerWordingFieldsError) return null;
+    throw err;
+  }
+  if (fields) return { kind: 'plain', fields };
+  return {
+    kind: 'unsupported',
+    reason: 'The saved wording changes the email structure. Use the shipped wording before you edit these fields.',
+  };
+}
+
 /**
  * The shipped and the saved wording of one template, and its tokens.
  * `savedErrors` lists why saved wording fails its check; the renderer then
@@ -79,6 +99,7 @@ async function readWording({ db, id }) {
     shipped: { subject: template.subject, html: template.html, text: template.text },
     saved,
     savedErrors,
+    editor: wordingEditor(id, saved ?? template),
     tokens: template.tokens.filter((name) => !GLOBAL_TOKEN_NAMES.includes(name)),
     globalTokens: [...GLOBAL_TOKEN_NAMES],
     requiredTokens: [...template.requiredTokens],
@@ -90,9 +111,25 @@ async function readWording({ db, id }) {
  * @returns {object|null} the payload, or null when the body names no field
  */
 function readDraft(id, body, { required = true } = {}) {
-  const payload = {};
-  for (const key of WORDING_FIELDS) {
-    if (body?.[key] !== undefined) payload[key] = body[key];
+  const hasFields = body?.fields !== undefined;
+  const hasSource = WORDING_FIELDS.some((key) => body?.[key] !== undefined);
+  if (hasFields && hasSource) fail(400, 'bad-request', 'fields: Send plain fields without raw template source.');
+  let payload = {};
+  if (hasFields) {
+    try {
+      const fields = readSpeakerWordingFields(id, body.fields);
+      const template = getDefaultTemplate(id);
+      const fieldCheck = validateTemplateBody({ tokens: template.tokens, requiredTokens: [] }, fields);
+      if (!fieldCheck.ok) fail(400, 'bad-request', fieldCheck.errors.join('; '));
+      payload = buildSpeakerWording(id, fields);
+    } catch (err) {
+      if (err instanceof SpeakerWordingFieldsError) fail(400, 'bad-request', err.message);
+      throw err;
+    }
+  } else {
+    for (const key of WORDING_FIELDS) {
+      if (body?.[key] !== undefined) payload[key] = body[key];
+    }
   }
   if (!required && Object.keys(payload).length === 0) return null;
   for (const key of Object.keys(payload)) {

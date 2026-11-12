@@ -7,13 +7,17 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
 const callMock = vi.fn();
 const saveTextFile = vi.fn();
-vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
+vi.mock('../adminApi.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useAdminApi: () => callMock,
+}));
 vi.mock('../downloadFile.js', () => ({ saveTextFile: (...args) => saveTextFile(...args) }));
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig: { timezone: 'UTC' } }),
 }));
 
 import AdminSpeakerReminders from './AdminSpeakerReminders.jsx';
+import { AdminApiError } from '../adminApi.js';
 
 function row(id, name, missing, extra = {}) {
   return {
@@ -67,6 +71,22 @@ const TEMPLATE = {
   id: 'speaker.reminder',
   shipped: { subject: 'Items we still need for {{event_name}}', html: '<p>{{dashboard_url}}</p>', text: '{{dashboard_url}}' },
   saved: null,
+  editor: {
+    kind: 'plain',
+    fields: {
+      subject: 'Items we still need for {{event_name}}',
+      greeting: 'Hi {{speaker_name}},',
+      introduction: 'We still need these items:',
+      biographyItem: 'Add a biography.',
+      headshotItem: 'Add a headshot.',
+      sessionDescriptionItem: 'Send a description for {{description_sessions}}.',
+      materialsItem: 'Send materials for {{materials_sessions}}.',
+      dueDateLine: 'Please send them by {{due_date}}.',
+      buttonLabel: 'Open your speaker dashboard',
+      backupLinkInstructions: 'If the button does not work, paste this address into your browser:',
+      contactInstructions: 'Questions? Write to',
+    },
+  },
   reminderTokens: ['speaker_name', 'dashboard_url', 'materials_sessions'],
   globalTokens: ['event_name'],
   requiredTokens: ['dashboard_url'],
@@ -280,15 +300,19 @@ describe('reminder wording', () => {
     let finish;
     serve({ saveTemplate: () => new Promise((resolve) => { finish = resolve; }) });
     renderPage();
-    const text = await screen.findByLabelText('Plain text body');
-    fireEvent.change(text, { target: { value: 'Open {{dashboard_url}}' } });
+    const item = await screen.findByLabelText('Materials item');
+    fireEvent.change(item, { target: { value: 'Upload materials for {{materials_sessions}}.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save wording' }));
     await waitFor(() => expect(callsFor('saveTemplate')).toHaveLength(1));
-    expect(text).toBeDisabled();
-    await act(async () => finish({ ...TEMPLATE, saved: { ...TEMPLATE.shipped, text: 'Open {{dashboard_url}}' } }));
-    expect(text).not.toBeDisabled();
+    expect(item).toBeDisabled();
+    await act(async () => finish({
+      ...TEMPLATE,
+      saved: { ...TEMPLATE.shipped, updatedAt: '2026-10-19T12:00:00.000Z', updatedBy: 'staff@example.test' },
+      editor: { kind: 'plain', fields: { ...TEMPLATE.editor.fields, materialsItem: 'Upload materials for {{materials_sessions}}.' } },
+    }));
+    expect(item).not.toBeDisabled();
     expect(await screen.findByText('Wording saved. The next preview and send use it.')).toBeInTheDocument();
-    fireEvent.change(text, { target: { value: 'New wording: {{dashboard_url}}' } });
+    fireEvent.change(item, { target: { value: 'New materials wording.' } });
     expect(screen.queryByText('Wording saved. The next preview and send use it.')).not.toBeInTheDocument();
   });
 
@@ -298,33 +322,55 @@ describe('reminder wording', () => {
     const retry = await screen.findByRole('button', { name: 'Try again' });
     serve();
     fireEvent.click(retry);
-    expect(await screen.findByLabelText('Plain text body')).toHaveValue(TEMPLATE.shipped.text);
+    expect(await screen.findByLabelText('Greeting')).toHaveValue(TEMPLATE.editor.fields.greeting);
     expect(callsFor('template')).toHaveLength(2);
   });
   it('shows the server refusal of an unknown token and saves valid wording', async () => {
     serve({
       saveTemplate: (body) => {
-        if (body.text.includes('{{nope}}')) throw new Error('text: unknown token {{nope}}');
-        return { ...TEMPLATE, saved: { ...body, updatedAt: '2026-10-19T12:00:00.000Z', updatedBy: 'staff@example.test' } };
+        if (body.fields.materialsItem.includes('{{nope}}')) {
+          throw new AdminApiError({ code: 'bad-request', status: 400, message: 'materialsItem: unknown token {{nope}}' });
+        }
+        return {
+          ...TEMPLATE,
+          saved: { ...TEMPLATE.shipped, updatedAt: '2026-10-19T12:00:00.000Z', updatedBy: 'staff@example.test' },
+          editor: { kind: 'plain', fields: body.fields },
+        };
       },
     });
     renderPage();
-    const text = await screen.findByLabelText('Plain text body');
+    const item = await screen.findByLabelText('Materials item');
     expect(screen.getByText('The shipped wording is in use.')).toBeInTheDocument();
-    fireEvent.change(text, { target: { value: '{{dashboard_url}} {{nope}}' } });
+    fireEvent.change(item, { target: { value: 'Send {{materials_sessions}} {{nope}}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save wording' }));
-    expect(await screen.findByText('text: unknown token {{nope}}')).toBeInTheDocument();
+    expect(await screen.findByText('materialsItem: unknown token {{nope}}')).toBeInTheDocument();
+    expect(item).toHaveAttribute('aria-invalid', 'true');
+    await waitFor(() => expect(item).toHaveFocus());
 
-    fireEvent.change(text, { target: { value: 'Open {{dashboard_url}}' } });
+    fireEvent.change(item, { target: { value: 'Send {{materials_sessions}}.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save wording' }));
     expect(await screen.findByText('Wording saved. The next preview and send use it.')).toBeInTheDocument();
     expect(screen.getByText(/Saved wording, last changed Oct 19, 2026, 12:00 PM \(UTC\) by staff@example.test\./)).toBeInTheDocument();
     expect(callsFor('saveTemplate').at(-1)).toEqual({
       action: 'saveTemplate',
-      subject: TEMPLATE.shipped.subject,
-      html: TEMPLATE.shipped.html,
-      text: 'Open {{dashboard_url}}',
+      fields: { ...TEMPLATE.editor.fields, materialsItem: 'Send {{materials_sessions}}.' },
     });
     expect(screen.getByRole('button', { name: 'Use the shipped wording' })).toBeInTheDocument();
+  });
+
+  it('keeps a structurally custom template read-only until staff reset it', async () => {
+    const unsupported = {
+      ...TEMPLATE,
+      saved: { ...TEMPLATE.shipped, updatedAt: '2026-10-19T12:00:00.000Z', updatedBy: 'staff@example.test' },
+      editor: { kind: 'unsupported', reason: 'The saved wording changes the email structure. Use the shipped wording before you edit these fields.' },
+    };
+    serve({ template: unsupported, resetTemplate: TEMPLATE });
+    renderPage();
+    expect(await screen.findByText(/changes the email structure/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Subject')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save wording' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Use the shipped wording' }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Use the shipped wording' })).getByRole('button', { name: 'Delete the saved wording' }));
+    expect(await screen.findByLabelText('Subject')).toHaveValue(TEMPLATE.editor.fields.subject);
   });
 });

@@ -28,6 +28,17 @@ describe('parseCsv', () => {
   it('does not emit a phantom trailing row for a trailing newline', () => {
     expect(parseCsv('a,b\n1,2\n')).toEqual([['a', 'b'], ['1', '2']]);
   });
+
+  it('keeps a final empty quoted field and accepts a BOM before quoted headers', () => {
+    expect(parseCsv('""')).toEqual([['']]);
+    expect(parseCsv('\uFEFF"a",b\n1,""')).toEqual([['a', 'b'], ['1', '']]);
+  });
+
+  it('refuses malformed quotes instead of merging or shifting source data', () => {
+    expect(() => parseCsv('a,b\n1,"unfinished\n2,next')).toThrow(/unclosed quoted field/);
+    expect(() => parseCsv('a,b\n1,"closed"tail')).toThrow(/must end at a comma or line break/);
+    expect(() => parseCsv('a,b\n1,un"quoted"')).toThrow(/enclose the whole field/);
+  });
 });
 
 describe('parseCsvFile', () => {

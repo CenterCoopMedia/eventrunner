@@ -32,39 +32,14 @@
  * credential, so the ordinary `sent_emails` audit applies.
  */
 
-const { wrap, TEXT_FOOTER } = require('./layout.cjs');
 const { GLOBAL_TOKEN_NAMES } = require('../render.cjs');
+const { buildSpeakerWording } = require('./speakerWordingFields.cjs');
 
-const html = wrap(
-  [
-    '<p style="margin:0 0 16px 0;">Hi {{speaker_name}},</p>',
-    '<p style="margin:0 0 16px 0;">Thank you — your place at {{event_name}} is confirmed, and this invitation is now linked to your account.</p>',
-    '<p style="margin:0 0 16px 0;">Next, write your speaker profile — your biography, photograph, and organization — for the public programme:</p>',
-    '<p style="margin:0 0 16px 0;text-align:center;">',
-    '<a href="{{profile_wizard_url}}" style="display:inline-block;padding:12px 24px;background-color:{{brand_primary}};color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:bold;text-decoration:none;">Write your speaker profile</a>',
-    '</p>',
-    '<p style="margin:0;">Your speaker profile appears publicly once an organizer has reviewed it.</p>',
-  ].join('\n')
-);
-
-const text = [
-  'Hi {{speaker_name}},',
-  '',
-  'Thank you — your place at {{event_name}} is confirmed, and this invitation is now linked to your account.',
-  '',
-  'Next, write your speaker profile — your biography, photograph, and organization — for the public programme:',
-  '{{profile_wizard_url}}',
-  '',
-  'Your speaker profile appears publicly once an organizer has reviewed it.',
-  '',
-  TEXT_FOOTER,
-].join('\n');
+const source = buildSpeakerWording('speaker.accepted');
 
 module.exports = {
   id: 'speaker.accepted',
-  subject: 'You are confirmed for {{event_name}}',
-  html,
-  text,
+  ...source,
   tokens: [...GLOBAL_TOKEN_NAMES, 'speaker_name', 'profile_wizard_url', 'deadline'],
   requiredTokens: ['profile_wizard_url'],
   storeRendered: true,
