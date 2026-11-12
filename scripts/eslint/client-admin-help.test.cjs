@@ -9,6 +9,7 @@ new RuleTester({ languageOptions: { parserOptions: { ecmaFeatures: { jsx: true }
     '<SelectField label={label} help={field.help} />',
     '<input type="hidden" value="unchanged" />',
     'isOperator ? <TextField label="Price" /> : null',
+    { code: 'canEditLifecycle ? <EventDateTimeField label="Announced" /> : null', filename: '/apps/web/src/admin/pages/AdminEventSettings.jsx' },
     'function ConnectionSettings() { return <TextField label="Base" />; }',
   ],
   invalid: [
@@ -21,5 +22,6 @@ new RuleTester({ languageOptions: { parserOptions: { ecmaFeatures: { jsx: true }
       code: `<${name} help="This component does not render help." />`, errors: [{ messageId: 'missing' }],
     })),
     { code: 'isOperator ? null : <TextField label="Staff field" />', errors: [{ messageId: 'missing' }] },
+    { code: 'canEditLifecycle ? <TextField label="Staff field" /> : null', filename: '/apps/web/src/admin/pages/Other.jsx', errors: [{ messageId: 'missing' }] },
   ],
 });

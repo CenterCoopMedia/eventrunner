@@ -1,4 +1,3 @@
-import HelpTooltip from '../components/HelpTooltip.jsx';
 // Live updates admin form (issue #28, spec §9 "Live updates card") — compose,
 // edit, and delete entries in the `live_updates` feed. Wired to
 // saveLiveUpdate/deleteLiveUpdate; no draft/publish step, unlike the CMS
