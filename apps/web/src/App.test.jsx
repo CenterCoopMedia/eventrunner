@@ -80,8 +80,9 @@ vi.mock('firebase/auth', () => ({
 // means "not admin". Default to resolving so a signed-in user is treated as
 // admin unless a test overrides it.
 let adminProbeShouldSucceed = true;
+const sdkSubscriptions = new Map();
 vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(() => ({})),
+  collection: vi.fn((_db, ...path) => ({ path: path.join('/') })),
   query: vi.fn(() => ({})),
   where: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
@@ -90,10 +91,13 @@ vi.mock('firebase/firestore', () => ({
       ? Promise.resolve({ docs: [] })
       : Promise.reject(new Error('permission denied')),
   ),
-  // AuthProvider's attendee-profile subscription (users/{uid}) — the smoke
-  // test never drives it, so a no-op unsubscribe with no snapshot is enough.
-  doc: vi.fn(() => ({})),
-  onSnapshot: vi.fn(() => () => {}),
+  // Record ancillary public listeners too: announcements and bookmark counts
+  // are outside the providers' original 11-stream budget.
+  doc: vi.fn((_db, ...path) => ({ path: path.join('/') })),
+  onSnapshot: vi.fn((reference) => {
+    sdkSubscriptions.set(reference, reference.path);
+    return () => sdkSubscriptions.delete(reference);
+  }),
 }));
 // ProfileProvider's one seam to Firebase (issue #17): capture the own-profile
 // subscription so a test can push an account document, and keep the directory
@@ -129,10 +133,26 @@ function renderAt(path) {
 beforeEach(() => {
   renderFailure = null;
   contentSubscriptions.clear();
+  configSubscriptions.clear();
+  sdkSubscriptions.clear();
   adminProbeShouldSucceed = true;
 });
 
 describe('app shell', () => {
+  it.each([
+    ['/', siteContent.hero__title.value, ['cmsContent', 'cmsPages', 'cmsOrganizations', 'cmsTimeline'], ['announcements_public/current', 'config/pitch_call'], 10],
+    ['/speakers', 'Speakers', ['cmsContent', 'cmsPages', 'speakers_public'], ['announcements_public/current'], 8],
+    ['/schedule', 'Program', ['cmsContent', 'cmsPages', 'cmsSchedule', 'speakers_public'], ['announcements_public/current', 'sessionBookmarks'], 10],
+  ])('scopes a direct anonymous visit to %s, including existing shell and route listeners', async (path, heading, expected, sdkNames, total) => {
+    renderAt(path);
+    await screen.findByRole('heading', { level: 1, name: heading });
+    expect([...configSubscriptions.keys()].sort()).toEqual(['event', 'features', 'launch', 'theme']);
+    expect([...contentSubscriptions.keys()].sort()).toEqual(expected.sort());
+    expect([...sdkSubscriptions.values()].sort()).toEqual(sdkNames);
+    expect(configSubscriptions.size + contentSubscriptions.size + sdkSubscriptions.size).toBe(total);
+    expect(total).toBeLessThan(11);
+  });
+
   for (const [failure, path] of [['home', '/'], ['schedule', '/schedule']]) {
     it(`keeps the header and recovers through navigation after a ${failure} render failure`, async () => {
       const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});

@@ -1,8 +1,8 @@
 // The Router wraps the providers in main.jsx (tests use MemoryRouter).
 // ProfileProvider subscribes to the signed-in account inside AuthProvider.
 import { useEffect } from 'react';
-import { useRoutes, useSearchParams } from 'react-router';
-import { EventConfigProvider } from './contexts/EventConfigContext.jsx';
+import { useLocation, useRoutes, useSearchParams } from 'react-router';
+import { EventConfigProvider, useEventConfig } from './contexts/EventConfigContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ContentProvider } from './contexts/ContentContext.jsx';
 import { ProfileProvider } from './contexts/ProfileContext.jsx';
@@ -48,17 +48,24 @@ export function AppRoutes() {
 // Signing out with ?preview=1 must also stop draft reads. Firestore rules
 // enforce access; this gate selects which source ContentProvider requests.
 function ContentGate({ children }) {
+  const { pathname, search } = useLocation();
   const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
+  const { features } = useEventConfig();
   const readSource =
     searchParams.get('preview') === '1' && isAdmin ? 'draft' : 'published';
 
-  return <ContentProvider readSource={readSource}>{children}</ContentProvider>;
+  return (
+    <ContentProvider readSource={readSource} pathname={pathname} search={search} publicTools={IS_DEMO || features.webmcpPublic === true}>
+      {children}
+    </ContentProvider>
+  );
 }
 
 export default function App() {
+  const { pathname, search } = useLocation();
   return (
-    <EventConfigProvider>
+    <EventConfigProvider pathname={pathname} search={search}>
       <AuthProvider>
         <ProfileProvider>
           <ContentGate>

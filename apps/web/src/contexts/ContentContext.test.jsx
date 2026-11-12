@@ -66,9 +66,74 @@ function Probe() {
 beforeEach(() => {
   subscriptions.clear();
   subscribeContentCollection.mockClear();
+  subscribeSpeakersPublic.mockClear();
 });
 
 describe('ContentProvider', () => {
+  it('adds new route streams once, keeps them on return, and receives a publish without a reload', () => {
+    const view = (pathname) => <ContentProvider pathname={pathname} publicTools={false}><Probe /></ContentProvider>;
+    const { rerender, unmount } = render(view('/'));
+    expect([...subscriptions.keys()].sort()).toEqual(['cmsContent', 'cmsOrganizations', 'cmsPages', 'cmsTimeline']);
+    const original = new Map(subscriptions);
+    rerender(view('/schedule'));
+    expect(subscriptions.size).toBe(6);
+    for (const [name, listener] of original) expect(subscriptions.get(name)).toBe(listener);
+    const schedule = subscriptions.get('cmsSchedule');
+    rerender(view('/'));
+    rerender(view('/schedule'));
+    expect(subscriptions.get('cmsSchedule')).toBe(schedule);
+    expect(subscribeContentCollection.mock.calls.filter(([name]) => name === 'cmsSchedule')).toHaveLength(1);
+    expect(subscribeSpeakersPublic).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('schedule-first-title')).toHaveTextContent(snapshotScheduleData[0].title);
+    act(() => schedule.onNext([{ id: 'published-now', title: 'Published while this page is open', visible: true }]));
+    expect(screen.getByTestId('schedule-first-title')).toHaveTextContent('Published while this page is open');
+    act(() => schedule.onNext([]));
+    expect(screen.getByTestId('schedule-count')).toHaveTextContent('0');
+    unmount();
+    expect(subscriptions.size).toBe(0);
+  });
+
+  it('activates the public schedule stream when the existing tool feature becomes enabled', () => {
+    const view = (publicTools) => <ContentProvider pathname="/signin" publicTools={publicTools}><Probe /></ContentProvider>;
+    const { rerender } = render(view(false));
+    expect(subscriptions.has('cmsSchedule')).toBe(false);
+    rerender(view(true));
+    const schedule = subscriptions.get('cmsSchedule');
+    expect(schedule).toBeDefined();
+    rerender(view(false));
+    expect(subscriptions.get('cmsSchedule')).toBe(schedule);
+  });
+
+  it('rebinds the session streams on a source change and ignores stopped draft callbacks', () => {
+    const rendered = [];
+    function SourceProbe() {
+      const { readSource, scheduleData } = useContent();
+      rendered.push({ readSource, title: scheduleData[0]?.title });
+      return <Probe />;
+    }
+    const view = (readSource) => (
+      <ContentProvider pathname="/schedule" search={readSource === 'draft' ? '?preview=1' : ''} readSource={readSource} publicTools={false}>
+        <SourceProbe />
+      </ContentProvider>
+    );
+    const { rerender } = render(view('draft'));
+    expect(subscriptions.size).toBe(7);
+    const draft = new Map(subscriptions);
+    act(() => draft.get('cmsSchedule').onNext([{ id: 'private', title: 'Private draft', visible: true }]));
+    const afterDraft = rendered.length;
+    rerender(view('published'));
+    expect(subscriptions.size).toBe(7);
+    expect(rendered.slice(afterDraft).some(({ title }) => title === 'Private draft')).toBe(false);
+    for (const [name, listener] of subscriptions) {
+      expect(listener).not.toBe(draft.get(name));
+      expect(listener.readSource).toBe('published');
+    }
+    act(() => draft.get('cmsSchedule').onNext([{ id: 'late', title: 'Late private draft', visible: true }]));
+    expect(screen.getByTestId('schedule-first-title')).toHaveTextContent(snapshotScheduleData[0].title);
+    act(() => subscriptions.get('cmsSchedule').onNext([{ id: 'public', title: 'Current public program', visible: true }]));
+    expect(screen.getByTestId('schedule-first-title')).toHaveTextContent('Current public program');
+  });
+
   it('reports content readiness only after the content listener delivers', () => {
     const { rerender } = render(<ContentProvider><Probe /></ContentProvider>);
     expect(screen.getByTestId('content-source')).toHaveTextContent('snapshot');

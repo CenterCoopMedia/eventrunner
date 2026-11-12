@@ -6,6 +6,8 @@
 // points the subscriptions at the *_drafts sibling collections for admin
 // preview; firestore.rules — not this prop — enforce who may read drafts
 // (?preview=1 is convenience only, wired in App.jsx).
+// publicSubscriptions.js selects streams by route. First-needed streams stay
+// attached for this provider session; a source switch replaces every handle.
 //
 // Overlay semantics, per collection:
 //   - cmsContent / cmsPages / cmsSchedule / cmsOrganizations / cmsTimeline:
@@ -45,6 +47,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { isStarterContent, publicContentDoc } from 'shared/seed';
@@ -55,17 +58,15 @@ import snapshotTimelineData from '@generated/timelineData.js';
 import snapshotPages from '@generated/pagesData.js';
 import { isPublicPage } from 'shared/page';
 import { subscribeContentCollection, subscribeSpeakersPublic } from '../lib/contentSource.js';
+import { IS_DEMO } from '../lib/demoMode.js';
+import { publicSubscriptionsForRoute, RUNTIME_COLLECTIONS } from '../lib/publicSubscriptions.js';
 
 const ContentContext = createContext(null);
 
-const RUNTIME_COLLECTIONS = [
-  'cmsContent',
-  'cmsPages',
-  'cmsUpdates',
-  'cmsSchedule',
-  'cmsOrganizations',
-  'cmsTimeline',
-];
+const EMPTY_OVERLAY = {
+  cmsContent: null, cmsPages: null, cmsUpdates: null, cmsSchedule: null,
+  cmsOrganizations: null, cmsTimeline: null, speakers: null,
+};
 
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 
@@ -154,49 +155,50 @@ function prepareTimelineDocs(docs) {
     );
 }
 
-export function ContentProvider({ readSource = 'published', children }) {
+export function ContentProvider({ readSource = 'published', pathname, search = '', publicTools = IS_DEMO, children }) {
   // One overlay slot per collection; null = no runtime result yet, so the
   // committed snapshot stands (spec §2.4 fail-soft first paint).
-  const [overlay, setOverlay] = useState({
-    cmsContent: null,
-    cmsPages: null,
-    cmsUpdates: null,
-    cmsSchedule: null,
-    cmsOrganizations: null,
-    cmsTimeline: null,
-    speakers: null,
-  });
+  const [storedOverlay, setOverlay] = useState({ readSource, ...EMPTY_OVERLAY });
+  const overlay = storedOverlay.readSource === readSource ? storedOverlay : EMPTY_OVERLAY;
+  const sessionRef = useRef(null);
+  const requestedRef = useRef(new Set());
+  const neededCollections = useMemo(
+    () => publicSubscriptionsForRoute(pathname, search, publicTools)
+      .filter((name) => RUNTIME_COLLECTIONS.includes(name)),
+    [pathname, search, publicTools],
+  );
 
   useEffect(() => {
     // Switching between published and draft re-subscribes from scratch;
     // stale overlay from the other source must not linger.
-    setOverlay({
-      cmsContent: null,
-      cmsPages: null,
-      cmsUpdates: null,
-      cmsSchedule: null,
-      cmsOrganizations: null,
-      cmsTimeline: null,
-      speakers: null,
-    });
-    const unsubscribers = [
-      ...RUNTIME_COLLECTIONS.map((name) =>
-        subscribeContentCollection(name, readSource, (docs) => {
-          setOverlay((prev) => ({ ...prev, [name]: docs }));
-        }),
-      ),
-      // Speakers have no draft revision, so this subscription is the same
-      // in preview as in published mode.
-      subscribeSpeakersPublic((docs) => {
-        setOverlay((prev) => ({ ...prev, speakers: docs }));
-      }),
-    ];
+    setOverlay({ readSource, ...EMPTY_OVERLAY });
+    const session = { active: true, subscriptions: new Map() };
+    sessionRef.current = session;
     return () => {
-      for (const unsubscribe of unsubscribers) {
+      session.active = false;
+      for (const unsubscribe of session.subscriptions.values()) {
         if (typeof unsubscribe === 'function') unsubscribe();
       }
     };
   }, [readSource]);
+
+  useEffect(() => {
+    const session = sessionRef.current;
+    for (const name of neededCollections) requestedRef.current.add(name);
+    // A source switch rebinds every stream already needed in this session.
+    for (const name of requestedRef.current) {
+      if (session.subscriptions.has(name)) continue;
+      const key = name === 'speakers_public' ? 'speakers' : name;
+      const onNext = (docs) => {
+        if (session.active) setOverlay((prev) => ({ ...prev, [key]: docs }));
+      };
+      const unsubscribe = name === 'speakers_public'
+        ? subscribeSpeakersPublic(onNext)
+        : subscribeContentCollection(name, readSource, onNext);
+      session.subscriptions.set(name, unsubscribe);
+    }
+    // Route changes only add streams. The source lifecycle owns cleanup.
+  }, [readSource, neededCollections]);
 
   const value = useMemo(() => {
     // cmsContent docs are keyed `<section>__<field>` — same shape as the
