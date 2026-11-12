@@ -772,7 +772,7 @@ describe('paying an invoice by card (issue 519)', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     const panel = screen.getByRole('region', { name: 'A card payment needs review' });
     expect(within(panel).getByText(/Stripe took \$4,500\.00 for this invoice after it was voided\./)).toBeInTheDocument();
-    expect(within(panel).queryByText(/pi_test_0001/)).toBeNull();
+    expect(within(panel).getByText(/Stripe payment reference: pi_test_0001\. Received /)).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole('button', { name: 'Mark reviewed' }));
     const note = await within(panel).findByLabelText('Review note', { exact: false });
     await waitFor(() => expect(note).toHaveFocus());
@@ -798,6 +798,7 @@ describe('paying an invoice by card (issue 519)', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     const panel = screen.getByRole('region', { name: 'A card payment needs review' });
     expect(within(panel).getByText(/in a different currency/)).toBeInTheDocument();
+    expect(within(panel).getByText(/Stripe payment reference: pi_test_0001\. Received /)).toBeInTheDocument();
     expect(within(panel).queryByRole('button', { name: 'Mark reviewed' })).toBeNull();
     expect(within(panel).getByText(/An operator reviews it\./)).toBeInTheDocument();
   });
