@@ -1,4 +1,3 @@
-import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerMessage } from '../plannerErrors.js';
 import '../plannerFields.css';
 // Import records: staff CSV import for speakers, sessions and organizations

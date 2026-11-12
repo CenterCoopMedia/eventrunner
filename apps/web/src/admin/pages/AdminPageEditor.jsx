@@ -503,6 +503,9 @@ export default function AdminPageEditor({ mode }) {
   }
 
   const isSystemPage = page.systemPage === true;
+  const pathHelp = isSystemPage
+    ? 'This built-in page has a fixed web address.'
+    : 'The page’s web address, such as /scholarships.';
   // "Existing" = a document the server has already written: an edited page,
   // or one this form just created.
   const isExisting = mode === 'edit' || savedId !== null;
@@ -612,11 +615,8 @@ export default function AdminPageEditor({ mode }) {
             onChange={(value) => update({ path: value })}
             error={errorFor('path')}
             readOnly={isSystemPage}
-            help={
-              isSystemPage
-                ? 'This built-in page has a fixed web address.'
-                : 'The page’s web address, such as /scholarships.'
-            }
+            help={pathHelp}
+            hint={pathHelp}
           />
           <div className="flex flex-col justify-center gap-xs">
             <CheckboxField help="Include this content on the public site after publishing."

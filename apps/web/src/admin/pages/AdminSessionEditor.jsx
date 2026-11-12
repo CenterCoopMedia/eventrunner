@@ -443,7 +443,7 @@ export default function AdminSessionEditor({ mode }) {
                 onChange={(value) => set({ endTime: value })}
                 error={errorFor('endTime')}
               />
-              <SelectField help="Choose the parallel schedule line for this session. Leave empty to use the parent session’s track."
+                <SelectField help="Choose the parallel schedule line for this session."
                 label="Track"
                 hint="Leave empty to use the parent session’s track."
                 value={form.track}
