@@ -310,7 +310,7 @@ export default function AdminAttendees() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader help="Manage attendance and access. Organizer approvals stay in place after refunds. Downloads include private registration answers; keep these files secure."
+      <AdminPageHeader help="Manage attendance and access; refunds do not remove organizer approvals. Downloads include private registration answers, so keep them secure."
         title="Attendees"
         identifiers={rows ? `${shown.length} of ${rows.length} account${rows.length === 1 ? '' : 's'}` : undefined}
         description="Manage attendance and access. Organizer approvals stay in place after refunds. Downloads include private registration answers; keep these files secure."

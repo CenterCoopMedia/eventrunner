@@ -312,7 +312,7 @@ export default function AdminSpeakerMail() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader help="Change the words of the invitation and of the acceptance confirmation. The links, and the tokens each message may use, stay fixed. The next email uses the saved wording."
+      <AdminPageHeader help="Edit the speaker invitation and acceptance emails. The next email uses the saved wording; links and supported placeholders stay fixed."
         title="Speaker email wording"
         description="Change the words of the invitation and of the acceptance confirmation. The links, and the tokens each message may use, stay fixed. The next email uses the saved wording."
         actions={<Link to="/admin/speakers" className={linkButtonClass}>Back to speakers</Link>}

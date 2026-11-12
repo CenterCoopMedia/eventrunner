@@ -249,7 +249,7 @@ function ReviewForm({ busy, onSubmit, onCancel }) {
   return (
     <div ref={sectionRef} className="flex flex-col gap-xs">
       <ServerErrorSummary error={serverError} title="The review was not saved" />
-      <TextField hint="Required. What was done, such as a refund in the Stripe Dashboard. Kept with the payment and in the audit log." help="Required. What was done, such as a refund in the Stripe Dashboard. Kept with the payment and in the audit log."
+      <TextField hint="Required. What was done, such as a refund in the Stripe Dashboard. Kept with the payment and in the audit log." help="Explain why this payment needed review and what you did to resolve it."
         label="Review note"
         
         value={note}

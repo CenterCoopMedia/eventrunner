@@ -530,7 +530,7 @@ export default function AdminSpeakerReminders() {
         <Notice tone="caution" message={`The list did not refresh: ${list.error}`} />
       ) : null}
 
-      <Panel help="The list shows speakers who accepted an invitation. Published sessions count. A pending or approved material counts, and a rejected one does not. A pending material also shows as waiting for review. A session marked as needing no materials never asks for them." title="Choose speakers" description="The list shows speakers who accepted an invitation. Published sessions count. A pending or approved material counts, and a rejected one does not. A pending material also shows as waiting for review. A session marked as needing no materials never asks for them.">
+      <Panel help="Choose accepted speakers who still owe profile details, session descriptions or materials. Preview their individual reminders before sending." title="Choose speakers" description="The list shows speakers who accepted an invitation. Published sessions count. A pending or approved material counts, and a rejected one does not. A pending material also shows as waiting for review. A session marked as needing no materials never asks for them.">
         {list.status === 'loading' ? (
           <AdminLoadingState label="Loading speakers…" />
         ) : list.status === 'error' ? (

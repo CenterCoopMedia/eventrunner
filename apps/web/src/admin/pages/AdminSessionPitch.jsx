@@ -213,7 +213,7 @@ function PitchReview({ initial, current, call, settings }) {
         )}
       </Panel>
 
-      <Panel help="Staff only. Each note shows who wrote it. You can edit your own notes. Notes never go to the submitter or into public drafts." title="Private notes" description="Staff only. Each note shows who wrote it. You can edit your own notes. Notes never go to the submitter or into public drafts.">
+      <Panel help="Write private notes that only event staff can read, and edit your own notes. Notes are never sent to the submitter or copied into public drafts." title="Private notes" description="Staff only. Each note shows who wrote it. You can edit your own notes. Notes never go to the submitter or into public drafts.">
         <PitchNotes pitch={current ?? baseline} call={call} />
       </Panel>
 
