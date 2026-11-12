@@ -21,7 +21,7 @@ test.afterEach(async () => {
   for (const docPath of extraPaths) await db.doc(docPath).delete();
 });
 
-async function fixture(kind, { published = true } = {}) {
+async function fixture(kind) {
   const db = adminDb();
   let id = `undo655-${kind}-${Date.now()}`;
   const title = `Published ${id}`;
@@ -50,11 +50,9 @@ async function fixture(kind, { published = true } = {}) {
   // Two real publishes prove Undo selects the latest published fields,
   // rather than either the original version or the deleted dirty draft.
   await store.writeDraft({ db, collection: record.collection, docId: id, fields: { ...record.fields, [record.key]: `Original ${id}` }, actor });
-  if (published) {
-    await store.publishDocs({ db, collection: record.collection, docIds: [id], actor });
-    await store.writeDraft({ db, collection: record.collection, docId: id, fields: record.fields, actor });
-    await store.publishDocs({ db, collection: record.collection, docIds: [id], actor });
-  }
+  await store.publishDocs({ db, collection: record.collection, docIds: [id], actor });
+  await store.writeDraft({ db, collection: record.collection, docId: id, fields: record.fields, actor });
+  await store.publishDocs({ db, collection: record.collection, docIds: [id], actor });
   record.dirtyTitle = `Unpublished ${id}`;
   await store.writeDraft({ db, collection: record.collection, docId: id, fields: { ...record.fields, [record.key]: record.dirtyTitle }, actor });
   if (kind === 'update') extraPaths.push(`cmsUpdates_deleted/${id}`);
