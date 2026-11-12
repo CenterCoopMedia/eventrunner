@@ -166,7 +166,7 @@ Each one is keyboard-first, reads the tier-2 tokens, and lives in `apps/web/src/
 | Control | One job | The rule |
 |---|---|---|
 | `Switch` | A setting that is on or off | `role="switch"`, `aria-checked`, the state as a word beside the label. The label names the ENABLED state. No sliding knob. |
-| `SegmentedControl` | One choice from a short set | A `role="radiogroup"` set as one ruled row. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill. |
+| `SegmentedControl` | One choice from a short set | A `role="radiogroup"` set as one ruled row, with at least `--space-xs` (8px) between adjacent touch targets inside the group. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill. |
 | `Tabs` | One panel from a short set | The ARIA tab pattern with a roving tab index. Selection follows focus. The selected tab carries the strong rule. Never a pill, never a filled tab. |
 | `Checkbox`, `Radio` | Pick any; pick one | A real input with `appearance: none`, redrawn from the tokens: the boundary in `--color-border-control`, the checked fill in the accent, the mark an inline SVG reading `currentColor`. The keyboard, the label and the group stay the platform's. |
 | `SearchField` | Narrow a list by words | A labelled `type="search"` input, a stated clear control, and the result count in a `role="status"` line the caller feeds. |
@@ -221,7 +221,7 @@ These checks support source review; they do not prove screen-reader behavior, re
 - Store copy in natural case; control presentation with `text-transform`. (This matches the email rule in spec §6 — content and presentation stay separate.)
 - Smart punctuation: Curly quotes, en dashes for ranges, em dashes for asides, the single ellipsis character.
 - `text-underline-position: from-font` with `text-decoration-skip-ink: auto`.
-- Truncated text stays fully accessible via tooltip or an expanded view.
+- The full text of truncated content must be reachable by touch and keyboard through an expanded view or a link to the record. A tooltip may repeat the text, but must not be the only route to it.
 
 **Editor action stability.** Content record editors keep Save and Publish in position when work starts or feedback appears. `AdminPageHeader` puts editor feedback in its own full-width row outside the action toolbar and top-aligns desktop actions beside the title. Feedback wraps normally and keeps its existing live-region behavior. `ActionLabel` reserves the width of both idle and pending wording while exposing only the active label. The Page, content-block, Update, Timeline, Session, Speaker and Organization editors and the content-section header use these owners; inline image-editor feedback stays with its image controls.
 
@@ -293,7 +293,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 - Never block paste — especially not on the OTP code field.
 - Tooltips on disabled controls don't open via keyboard or touch; use visible text or `aria-disabled="true"`.
 - Keep submit buttons enabled until the request starts; validate on submit with `aria-invalid="true"` and move focus to the error.
-- Hit areas: Meet the WCAG 2.2 24×24 CSS pixel minimum or its stated spacing exception. Use 44×44px on touch and for shared buttons. Keep compact visual controls inside comfortable targets.
+- Hit areas: Meet the WCAG 2.2 24×24 CSS pixel minimum or its stated spacing exception. Use 44×44px on touch and for shared buttons. Adjacent touch targets keep at least `--space-xs` (8px) between them and never overlap. Keep compact visual controls inside comfortable targets.
 - `pointer-events: none` on decorative elements (glows, texture overlays).
 - Wrap hover styles in `@media (hover: hover)`; wrap motion in `@media (prefers-reduced-motion: no-preference)`.
 - `role="status"` for routine updates, `role="alert"` for urgent errors only.
