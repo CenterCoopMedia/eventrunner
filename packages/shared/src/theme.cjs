@@ -654,17 +654,14 @@ function deriveMoreContrastColors(palette) {
   const black = [0, 0, 0];
   const white = [255, 255, 255];
   const target = score(black) >= score(white) ? black : white;
-  for (const [name, rgb] of Object.entries(colors)) {
-    const minimum = { hairline: 3, strong: 4.5, control: 4.5 }[name] || 7;
-    let value = [...rgb];
-    // Opposed Advanced grounds can make a target impossible. Keep the better ink.
-    if (score(value) < minimum && score(target) > score(value)) {
-      for (let step = 1; step <= 200; step += 1) {
-        value = mixRgb(rgb, target, step / 200);
-        if (score(value) >= minimum) break;
-      }
+  for (const name in colors) {
+    const rgb = colors[name];
+    // Opposed Advanced grounds can make the requested target impossible.
+    const requested = { hairline: 3, strong: 4.5, control: 4.5 }[name] || 7;
+    const minimum = Math.min(requested, Math.max(score(rgb), score(target)));
+    for (let step = 1; step <= 200 && score(colors[name]) < minimum; step += 1) {
+      colors[name] = mixRgb(rgb, target, step / 200);
     }
-    colors[name] = value;
   }
   return colors;
 }
