@@ -1,12 +1,15 @@
 // EventConfigProvider — outermost provider (spec §2.4).
 //
 // First paint serves the committed snapshot (via the @generated alias);
-// onSnapshot subscriptions to config/{event,features,theme,badges} overlay it
+// onSnapshot subscriptions to config/{event,features,theme} overlay it
 // at runtime, so feature toggles, lifecycle dates, and theme changes take
 // effect without a rebuild. The provider owns <style id="event-theme-runtime">
 // (spec §7.2): when config/theme arrives, its hex colors — data, never
 // literals in this source — are converted to RGB-triple custom-property
 // overrides of the same :root properties generated/theme.css defined.
+// config/badges attaches on its first consuming route and stays for the
+// provider session. publicSubscriptions.js also selects all streams for
+// admin, preview, and unknown routes.
 import {
   createContext,
   useContext,
@@ -27,6 +30,7 @@ import { loadPresetRemaps, presetRemapsLoaded } from '../lib/presetRemaps.js';
 import { startModeSync } from '../lib/modeRuntime.js';
 import { getRouteTitlePart, subscribeRouteTitle } from '../lib/useDocumentTitle.js';
 import { resolveShape, themePresetId } from 'shared/theme';
+import { publicSubscriptionsForRoute } from '../lib/publicSubscriptions.js';
 
 /** Pauses before a failed remaps load is tried again, in milliseconds. */
 const REMAPS_RETRY_DELAYS = Object.freeze([2_000, 4_000, 8_000]);
@@ -34,7 +38,7 @@ const REMAPS_RETRY_DELAYS = Object.freeze([2_000, 4_000, 8_000]);
 const EventConfigContext = createContext(null);
 
 const RUNTIME_STYLE_ID = 'event-theme-runtime';
-const CONFIG_DOC_IDS = ['event', 'features', 'theme', 'badges'];
+const CONFIG_DOC_IDS = ['event', 'features', 'theme'];
 
 // Every known config/features flag, defaulted false. A live config/features
 // doc is authoritative (backend contract: an omitted flag means disabled), so
@@ -53,7 +57,7 @@ function ensureRuntimeStyleElement() {
   return styleEl;
 }
 
-export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
+export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, search = '' }) {
   // One overlay slot per config doc; null = no runtime doc received yet, so
   // the committed snapshot value stands (spec §2.4 fail-soft first paint).
   const [overlay, setOverlay] = useState({
@@ -73,10 +77,13 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // values either way (fail soft for every other consumer); a consumer that
   // must fail closed reads `available` instead.
   const [status, setStatus] = useState({ event: null, features: null, theme: null, badges: null });
+  const subscriptionsRef = useRef(new Map());
+  const needsBadges = publicSubscriptionsForRoute(pathname, search).includes('badges');
 
   useEffect(() => {
-    const unsubscribers = CONFIG_DOC_IDS.map((docId) =>
-      subscribeConfigDoc(
+    const subscriptions = subscriptionsRef.current;
+    for (const docId of CONFIG_DOC_IDS) {
+      subscriptions.set(docId, subscribeConfigDoc(
         docId,
         (data) => {
           setOverlay((prev) => ({ ...prev, [docId]: data }));
@@ -84,14 +91,26 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
         (next) => {
           setStatus((prev) => (prev[docId] === next ? prev : { ...prev, [docId]: next }));
         },
-      ),
-    );
+      ));
+    }
     return () => {
-      for (const unsubscribe of unsubscribers) {
+      for (const unsubscribe of subscriptions.values()) {
         if (typeof unsubscribe === 'function') unsubscribe();
       }
+      subscriptions.clear();
     };
   }, []);
+
+  useEffect(() => {
+    const subscriptions = subscriptionsRef.current;
+    if (!needsBadges || subscriptions.has('badges')) return;
+    subscriptions.set('badges', subscribeConfigDoc(
+      'badges',
+      (data) => setOverlay((prev) => ({ ...prev, badges: data })),
+      (next) => setStatus((prev) => (prev.badges === next ? prev : { ...prev, badges: next })),
+    ));
+    // Keep this stream on later routes; the provider owns its cleanup.
+  }, [needsBadges]);
 
   const effectiveDemoTheme = useMemo(
     () =>

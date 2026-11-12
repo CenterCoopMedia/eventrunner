@@ -25,18 +25,18 @@ the committed **synthetic snapshot** in `src/generated/`:
 | `theme.css` | `:root` custom properties — brand/semantic colors as space-separated RGB triples, font stacks, radius, texture |
 | `siteContent.js` | published CMS blocks/sections |
 | `pagesData.js` | pages-as-data, routed at each page's own root-level `path` |
-| `scheduleData.js` | schedule days/sessions |
-| `organizationsData.js` | speakers/sponsors |
+| `scheduleData.js` | schedule sessions and public speakers |
+| `organizationsData.js` | sponsors |
 | `timelineData.js` | past editions for the home page's History section |
 
 Four providers then overlay live Firestore data on top of that snapshot,
 outermost first:
 
 ```
-EventConfigProvider          — subscribes to config/{event,features,theme,badges}
+EventConfigProvider          — config/{event,features,theme}; badges on first use
   AuthProvider                — Firebase Auth state + Google/OTP sign-in
     ProfileProvider           — subscribes to the signed-in user's own users/{uid}
-      ContentProvider         — subscribes to published (or draft) CMS collections
+      ContentProvider         — route-needed published (or draft) CMS collections
         ToastProvider
           <Routes>             — Home, Schedule (/schedule, /schedule/mine,
                                  /schedule/:sessionId), Speakers, Sponsors
@@ -54,6 +54,26 @@ that overrides the same custom properties `theme.css` defines, so a live
 `ContentProvider` takes a `readSource` of `'published'` or `'draft'`.
 `App.jsx` derives it from the `?preview=1` query param — convenience only;
 `firestore.rules` is the actual control on who may read `*_drafts`.
+
+`src/lib/publicSubscriptions.js` owns the collection-to-route table for both
+providers. `cmsContent` and `cmsPages` serve every route. Home also needs
+organizations and timeline; the directories, schedule, account pages and
+updates attach their own streams. An enabled public schedule tool keeps
+`cmsSchedule` live on every route. Admin, `?preview=1`, custom pages and
+unknown paths select all streams. The first route that needs a stream starts
+it; navigation keeps it until provider unmount. Returning to a route does
+not attach it again. Changing the content source clears its overlay and
+rebinds every previously needed content stream. Late callbacks from the
+previous source cannot restore its data.
+
+On a fresh anonymous client visit with public tools disabled, the providers
+attach 7 listeners on `/`, 6 on `/speakers`, and 7 on `/schedule`. The shell
+also has its existing `config/launch` and public-announcement listeners;
+home reads the pitch-call setting and the schedule has public bookmark
+counts. Including those streams gives application totals of 10, 8 and 10.
+The static demo disables remote content overlays; these counts
+describe a client deployment with the same fixture data. Account-specific
+and live-update subscriptions have separate lifecycles.
 
 Section edit links (issue #198) are convenience too.
 `components/SectionEditLink.jsx` draws "Edit section" beside each section a
