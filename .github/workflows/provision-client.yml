@@ -13,8 +13,12 @@ name: Provision client
 # It dispatches deploy.yml with GITHUB_TOKEN, which is why this job holds
 # `actions: write`. That token cannot create an Environment, so
 # scripts/provision-client.cjs uses the provisioner's App for that.
+#
+# The schedule runs the team sync instead (issue #839): console team changes
+# after a build reach each built site's operator and staff lists. It lives in
+# this workflow because the provisioner's Workload Identity condition names it.
 
-run-name: Provision ${{ inputs.application_id }}
+run-name: ${{ inputs.application_id && format('Provision {0}', inputs.application_id) || 'Sync client teams' }}
 
 on:
   workflow_dispatch:
@@ -28,11 +32,14 @@ on:
         required: false
         type: boolean
         default: false
+  schedule:
+    - cron: '*/15 * * * *'
 
 permissions:
   contents: read
 
 # Two runs for one request would race on its cloud project. A retry waits.
+# Scheduled runs share one group, and each site write is one transaction.
 concurrency:
   group: provision-${{ inputs.application_id }}
   cancel-in-progress: false
@@ -43,6 +50,7 @@ env:
 jobs:
   guard:
     name: Guard the run
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Refuse to run on a forked repository
@@ -136,3 +144,36 @@ jobs:
           CONSOLE_MAIL_FROM: ${{ vars.CONSOLE_MAIL_FROM }}
           CONSOLE_POSTMARK_TOKEN: ${{ secrets.CONSOLE_POSTMARK_TOKEN }}
         run: node scripts/provision-client.cjs --application "$APPLICATION_ID" --mark-stopped
+
+  sync-teams:
+    name: Sync console teams to sites
+    if: github.event_name == 'schedule' && !github.event.repository.fork
+    runs-on: ubuntu-latest
+    environment: provisioning
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # google-github-actions/auth (WIF)
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Pack packages/shared and copy it to every functions vendor folder
+        run: |
+          npm run prepare:functions
+          node scripts/prepare-functions.cjs --copy
+      - run: npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Sync teams
+        env:
+          EVENT_SUPPORT_ADMIN_EMAILS: ${{ vars.EVENT_SUPPORT_ADMIN_EMAILS || 'jamditis@gmail.com,amditisjunk@gmail.com' }}
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+        run: node scripts/provision-client.cjs --sync-teams

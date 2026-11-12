@@ -52,10 +52,10 @@ const ROLE_ORDER = { owner: 0, editor: 1 };
 /** The team as the Team page shows it: members, then invites still open. */
 async function readTeam(db, orgId, at) {
   const orgRef = db.collection('organizations').doc(orgId);
-  const [memberSnap, inviteSnap] = await Promise.all([
-    orgRef.collection('members').get(),
-    db.collection('invites').where('orgId', '==', orgId).where('status', '==', 'pending').get(),
-  ]);
+  // Invites first: an acceptance writes the member and the invite together,
+  // so this order sees the person on one side or the other.
+  const inviteSnap = await db.collection('invites').where('orgId', '==', orgId).where('status', '==', 'pending').get();
+  const memberSnap = await orgRef.collection('members').get();
   const members = memberSnap.docs
     .map((doc) => ({ uid: doc.id, email: doc.data().email, role: doc.data().role, joinedAt: toIso(doc.data().joinedAt) }))
     .sort((a, b) => (ROLE_ORDER[a.role] - ROLE_ORDER[b.role]) || String(a.email).localeCompare(String(b.email)));

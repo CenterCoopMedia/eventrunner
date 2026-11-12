@@ -15,7 +15,9 @@ const { fakeMailer, quietLog } = require('../console/functions/src/testData.cjs'
 const { application, seeded, NOW } = require('../console/functions/src/fakeReview.cjs');
 const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs');
 const { resolveAdminTier } = require('../functions/src/core/auth.cjs');
-const { SERVICES, STEPS, brandingProblem, main, markStopped, parseArgs, provision } = require('./provision-client.cjs');
+const { acceptInvite, inviteMember } = require('../console/functions/src/invites.cjs');
+const { changeMemberRole, removeMember } = require('../console/functions/src/members.cjs');
+const { SERVICES, STEPS, brandingProblem, main, markStopped, parseArgs, provision, syncTeams } = require('./provision-client.cjs');
 const { STEPS: DECOMMISSION_STEPS } = require('./decommission-client.cjs');
 
 const { privateKey } = generateKeyPairSync('rsa', {
@@ -727,6 +729,122 @@ test('a provisioning retry preserves client operators and configured support acc
   }
 });
 
+const ANA = { uid: 'ana', email: 'ana@example.org' };
+
+/** An Owner invites through the console; returns the token from the email. */
+async function invite(fake, email, role) {
+  const deps = { db: fake.db, mailer: fake.mailer, now: fake.deps.now, publicUrl: 'https://console.example' };
+  await inviteMember(deps, { body: { orgId: 'o1', email, role }, user: ANA });
+  const link = fake.mailer.sent.filter((m) => m.kind === 'invite').at(-1).link;
+  return { inviteId: link.split('/invite/')[1].split('#')[0], token: link.split('#token=')[1] };
+}
+
+const tierOn = (fake, email) => resolveAdminTier(fake.clientFirestore.read('config/bootstrap'), email, fake.state.clock);
+
+test('an Owner invite still pending at build time gets operator access on the site', async () => {
+  const fake = setup();
+  await invite(fake, 'cara@example.org', 'owner');
+  await invite(fake, 'dee@example.org', 'editor');
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), 'operator');
+  assert.equal(tierOn(fake, 'dee@example.org'), 'staff');
+});
+
+test('console team changes after the build reach the site without a rebuild', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), null);
+  // A site operator's own Access page grant is not the console's to undo.
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  await ref.update({ adminEmails: [...(await ref.get()).data().adminEmails, 'local@example.org'] });
+
+  const sent = await invite(fake, 'cara@example.org', 'owner');
+  await acceptInvite({ db: fake.db, now: fake.deps.now }, { body: sent, user: { uid: 'cara', email: 'cara@example.org' } });
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), 'operator');
+
+  await changeMemberRole({ db: fake.db }, { body: { orgId: 'o1', uid: 'cara', role: 'editor' }, user: ANA });
+  const logged = fake.clientFirestore.paths('admin_logs/');
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), 'staff');
+  // The admin log has one row for the change, by the system actor (docs/ADMIN_GUIDE.md).
+  const rows = fake.clientFirestore.paths('admin_logs/').filter((path) => !logged.includes(path)).map((path) => fake.clientFirestore.read(path));
+  assert.deepEqual(rows.map(({ action, uid, details }) => ({ action, uid, details })), [
+    { action: 'syncConsoleTeam', uid: 'system', details: { email: 'cara@example.org', tier: 'staff', previousTier: 'operator' } },
+  ]);
+
+  await removeMember({ db: fake.db }, { body: { orgId: 'o1', uid: 'cara' }, user: ANA });
+  await removeMember({ db: fake.db }, { body: { orgId: 'o1', uid: 'ben' }, user: ANA });
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), null);
+  assert.equal(tierOn(fake, 'ben@example.org'), null);
+  for (const email of ['ana@example.org', 'local@example.org', 'jamditis@gmail.com', 'amditisjunk@gmail.com']) {
+    assert.equal(tierOn(fake, email), 'operator', email);
+  }
+});
+
+test('an expired invite never takes an address off the operator list', async () => {
+  const fake = setup();
+  await invite(fake, 'cara@example.org', 'owner');
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  // An operator granted by hand while the invite is open, as on NC Local.
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  await invite(fake, 'dee@example.org', 'owner');
+  await ref.update({ adminEmails: [...(await ref.get()).data().adminEmails, 'dee@example.org'] });
+
+  fake.state.clock += 8 * 24 * 3600000;
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), 'operator');
+  assert.equal(tierOn(fake, 'dee@example.org'), 'operator');
+});
+
+test('the first sync on an older site does not undo an Access page removal', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  // A site built before #839: no console record, and an operator took Bo off.
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  const { consoleAdminEmails, consoleStaffEmails, ...older } = (await ref.get()).data();
+  await ref.set({ ...older, adminEmails: older.adminEmails.filter((email) => email !== 'bo@example.org') });
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'bo@example.org'), null);
+  assert.ok(fake.clientFirestore.read('config/bootstrap').consoleAdminEmails.includes('bo@example.org'));
+});
+
+test('a team sync keeps a staffExpiry that is not a plain map', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  // The fake store keeps a Date where Firestore keeps a Timestamp.
+  await ref.update({ staffEmails: ['old@example.org'], staffExpiry: new Date(NOW) });
+  assert.equal(tierOn(fake, 'old@example.org'), null);
+  await invite(fake, 'dee@example.org', 'editor');
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(fake.clientFirestore.read('config/bootstrap').staffExpiry.getTime(), NOW);
+  assert.equal(tierOn(fake, 'old@example.org'), null);
+});
+
+test('a team sync skips a site with no project and still succeeds', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  // A ready application whose build record names no project, as the rehearsal organization.
+  await fake.db.doc('applications/a2').set({ ...fake.db.read('applications/a1'), status: 'ready' });
+  const warnings = [];
+  fake.deps.log = { ...fake.deps.log, warn: (line) => warnings.push(line) };
+  await invite(fake, 'cara@example.org', 'owner');
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), 'operator');
+  assert.deepEqual(warnings, ['team sync: a2 skipped: the build record has no project']);
+});
+
+test('a team sync never removes the last client operator or a support account', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const before = fake.clientFirestore.read('config/bootstrap');
+  for (const uid of ['ana', 'bo']) await fake.db.doc(`organizations/o1/members/${uid}`).delete();
+  assert.equal(await syncTeams({ deps: fake.deps }), 1);
+  assert.deepEqual(fake.clientFirestore.read('config/bootstrap'), before);
+});
+
 test('a dead token fails clearly, keeps the console copy, and says nothing the provider said', async () => {
   const fake = setup({ cloud: { stripeToken: 'someone-else' } });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
@@ -1315,7 +1433,8 @@ test('--mark-stopped leaves a finished request alone', async () => {
 
 test('the id is checked before anything reads it', async () => {
   assert.deepEqual(parseArgs(['--application', 'app_1-A', '--test-mode']), { appId: 'app_1-A', testMode: true, markStopped: false });
-  for (const argv of [[], ['--application'], ['--application', 'a;rm -rf /'], ['--application', '../x'], ['--application', 'a', '--nope']]) {
+  assert.deepEqual(parseArgs(['--sync-teams']), { syncTeams: true });
+  for (const argv of [[], ['--sync-teams', '--application', 'a1'], ['--application'], ['--application', 'a;rm -rf /'], ['--application', '../x'], ['--application', 'a', '--nope']]) {
     assert.equal(parseArgs(argv), null, argv.join(' '));
   }
   const original = console.error;

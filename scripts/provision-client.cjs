@@ -8,6 +8,7 @@
  *
  *   node scripts/provision-client.cjs --application <id> [--test-mode]
  *   node scripts/provision-client.cjs --application <id> --mark-stopped
+ *   node scripts/provision-client.cjs --sync-teams
  *
  * Each step reads the current state and does nothing when it is already right,
  * so a failed run is repaired by running it again. Each step writes to the
@@ -35,6 +36,7 @@ const { reviewedAnswers, siteNameOf } = require('../console/functions/src/review
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
 const { stripeErrorDetails } = require('../functions/src/ticketing/stripeErrors.cjs');
 const { historyEntry } = require('../console/functions/src/applications.cjs');
+const { readTeam } = require('../console/functions/src/organizations.cjs');
 const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
 const { BUILD_COLLECTION } = require('../console/functions/src/buildRetry.cjs');
 const { GITHUB_HEADERS, installationToken } = require('../console/functions/src/buildDispatch.cjs');
@@ -1144,18 +1146,19 @@ function brandingProblem(output) {
   return `branding uploads failed or their result was missing (${line.trim()})`;
 }
 
+const normalizeEmails = (list) => [...new Set((Array.isArray(list) ? list : [])
+  .filter((email) => typeof email === 'string')
+  .map((email) => email.trim().toLowerCase()).filter(Boolean))];
+
 /** Merge the configured support operators without removing client access. */
 async function seedSupportAdmins(ctx, db) {
   const emails = supportAdminEmails(ctx);
   if (emails.length === 0) return false;
   const ref = db.collection('config').doc('bootstrap');
-  const normalize = (list) => [...new Set((Array.isArray(list) ? list : [])
-    .filter((email) => typeof email === 'string')
-    .map((email) => email.trim().toLowerCase()).filter(Boolean))];
   return db.runTransaction(async (tx) => {
     const bootstrap = (await tx.get(ref)).data() || {};
-    const adminEmails = [...new Set([...normalize(bootstrap.adminEmails), ...emails])];
-    const supportAdminEmails = [...new Set([...normalize(bootstrap.supportAdminEmails), ...emails])];
+    const adminEmails = [...new Set([...normalizeEmails(bootstrap.adminEmails), ...emails])];
+    const supportAdminEmails = [...new Set([...normalizeEmails(bootstrap.supportAdminEmails), ...emails])];
     if (JSON.stringify(bootstrap.adminEmails) === JSON.stringify(adminEmails)
       && JSON.stringify(bootstrap.supportAdminEmails) === JSON.stringify(supportAdminEmails)) return false;
     tx.set(ref, {
@@ -1170,6 +1173,98 @@ async function seedSupportAdmins(ctx, db) {
 }
 
 /**
+ * The console team's Owners and Editors, open invites included. A member's
+ * role wins over an invite. `expired` lists pending invites past their end
+ * time: they grant nothing new, and they take nothing away.
+ */
+async function consoleTeam(db, orgId, at) {
+  const { members, invites } = await readTeam(db, orgId, 0);
+  const roles = new Map();
+  const expired = new Set();
+  for (const person of [...invites, ...members]) {
+    const [email] = normalizeEmails([person.email]);
+    if (!email) continue;
+    roles.set(email, person.role);
+    if (person.expiresAt && Date.parse(person.expiresAt) <= at) expired.add(email);
+    else expired.delete(email);
+  }
+  const holding = (role) => [...roles].filter(([email, held]) => held === role && !expired.has(email)).map(([email]) => email);
+  return { owners: holding('owner'), editors: holding('editor'), expired: [...expired] };
+}
+
+/**
+ * Apply console team changes to the site's operator and staff lists (#839).
+ * `consoleAdminEmails` and `consoleStaffEmails` hold what the console granted
+ * at the last sync, so only console changes are applied: an address a site
+ * operator changed on the Access page stays as they left it until its console
+ * role changes. A person removed from the team, or whose invite was
+ * withdrawn, loses both tiers. An expired invite keeps what the last sync
+ * granted. Support accounts are never added or removed. A change that would
+ * leave no operator outside the support accounts is not written. A site's
+ * first sync only records the console team: an earlier Access page removal
+ * cannot be told apart from a late console change, so it is not undone.
+ * @returns {Promise<'changed'|'unchanged'|'no-site'|'last-operator'>}
+ */
+async function syncTeamAccess({ db, team, support, now }) {
+  const ref = db.collection('config').doc('bootstrap');
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return 'no-site';
+    const stored = snap.data();
+    const supportSet = new Set([...support, ...normalizeEmails(stored.supportAdminEmails)]);
+    const client = (list) => list.filter((email) => !supportSet.has(email));
+    const without = (list, drop) => list.filter((email) => !drop.includes(email));
+    const first = !Array.isArray(stored.consoleAdminEmails) && !Array.isArray(stored.consoleStaffEmails);
+    const prev = { admin: client(normalizeEmails(stored.consoleAdminEmails)), staff: client(normalizeEmails(stored.consoleStaffEmails)) };
+    const held = (list) => list.filter((email) => team.expired.includes(email));
+    const next = { admin: client([...team.owners, ...held(prev.admin)]), staff: client([...team.editors, ...held(prev.staff)]) };
+    if (first) Object.assign(prev, next);
+    const gone = without([...prev.admin, ...prev.staff], [...next.admin, ...next.staff]);
+    const addAdmin = without(next.admin, prev.admin);
+    const addStaff = without(next.staff, prev.staff);
+    const dropAdmin = [...without(prev.admin, next.admin), ...gone];
+    const dropStaff = [...without(prev.staff, next.staff), ...gone];
+
+    const admins = normalizeEmails(stored.adminEmails);
+    const adminEmails = [...new Set([...without(admins, dropAdmin), ...addAdmin])];
+    const staffEmails = without([...new Set([...without(normalizeEmails(stored.staffEmails), dropStaff), ...addStaff])], adminEmails);
+    if (client(adminEmails).length === 0 && client(admins).length > 0) return 'last-operator';
+
+    // A console Editor's access has no end time. Anything but a plain map
+    // (core/auth.cjs refuses all staff for it) is left as it is.
+    const expiry = stored.staffExpiry;
+    const proto = expiry && typeof expiry === 'object' && !Array.isArray(expiry) ? Object.getPrototypeOf(expiry) : undefined;
+    const isMap = proto === Object.prototype || proto === null;
+    const staffExpiry = isMap ? Object.fromEntries(Object.entries(expiry).filter(([email]) => !addStaff.includes(email))) : expiry;
+    const fields = { adminEmails, staffEmails, consoleAdminEmails: next.admin, consoleStaffEmails: next.staff, staffExpiry };
+    if (Object.entries(fields).every(([field, value]) => JSON.stringify(stored[field]) === JSON.stringify(value))) return 'unchanged';
+    const written = { ...stored, ...fields, updatedAt: new Date(now()), updatedBy: SEED_ACTOR.email };
+    if (staffExpiry === undefined || (isMap && Object.keys(staffExpiry).length === 0)) delete written.staffExpiry;
+    tx.set(ref, written);
+    // One admin_logs row per changed address, as the expiry sweep in
+    // functions/src/admin/access.cjs writes, so the admin log shows it.
+    const staff = normalizeEmails(stored.staffEmails);
+    const tierIn = (operators, staffList, email) => (operators.includes(email) ? 'operator' : staffList.includes(email) ? 'staff' : null);
+    for (const email of new Set([...admins, ...staff, ...adminEmails, ...staffEmails])) {
+      const previousTier = tierIn(admins, staff, email);
+      const tier = tierIn(adminEmails, staffEmails, email);
+      const cleared = isMap && Object.hasOwn(expiry, email) && !Object.hasOwn(staffExpiry, email);
+      if (tier === previousTier && !cleared) continue;
+      const ms = cleared ? toMillis(expiry[email]) : Number.NaN;
+      tx.set(db.collection('admin_logs').doc(), {
+        action: 'syncConsoleTeam',
+        docPath: 'config/bootstrap',
+        uid: 'system',
+        email: null,
+        at: written.updatedAt,
+        details: { email, tier, previousTier, ...(cleared ? { previousExpiresAt: Number.isFinite(ms) ? new Date(ms).toISOString() : null } : {}) },
+      });
+    }
+    return 'changed';
+  });
+}
+
+/**
  * ADR §6.8, the middle: seed the site. It needs config/event, so it records
  * the sender verification and registers the ticket webhook here, after the
  * order in ADR §6.5 and §6.6. The stamp is the last write, so a site without
@@ -1179,15 +1274,15 @@ async function stepSeed(ctx) {
   const { frozen, name, domain, deps: { clientDb, runCommand, writeAnswers } } = ctx;
   const db = clientDb(ctx.projectId);
   const notes = [];
+  // Open invites count, so an invited Owner who accepts after the build already has access.
+  const team = await consoleTeam(ctx.deps.db, ctx.app.orgId, ctx.deps.now());
   const event = await db.collection('config').doc('event').get();
   if (event.data()?.sender?.domainVerified !== true) {
-    const members = await ctx.deps.db.collection('organizations').doc(ctx.app.orgId).collection('members').get();
-    const emailsOf = (role) => members.docs.map((doc) => doc.data()).filter((member) => member.role === role).map((member) => member.email);
     const answers = toInitAnswers(frozen);
     if (answers.event.sender.email !== senderAddress(name)) throw new Error('the sender address does not match the web address');
     // init-event prints its operator checklist into public Actions logs.
     if (ctx.deps.env.GITHUB_ACTIONS === 'true') {
-      for (const email of [...emailsOf('owner'), ...emailsOf('editor')]) console.log(`::add-mask::${email}`);
+      for (const email of [...team.owners, ...team.editors]) console.log(`::add-mask::${email}`);
     }
     const file = await writeAnswers({ ...answers, providers: {
       email: { announcementStream: ANNOUNCEMENT_STREAM },
@@ -1197,8 +1292,8 @@ async function stepSeed(ctx) {
     } });
     const args = [
       'scripts/init-event.cjs', '--answers', file,
-      ...emailsOf('owner').flatMap((email) => ['--admin', email]),
-      ...emailsOf('editor').flatMap((email) => ['--staff', email]),
+      ...team.owners.flatMap((email) => ['--admin', email]),
+      ...team.editors.flatMap((email) => ['--staff', email]),
       ...(event.exists ? ['--force'] : []),
     ];
     const { code, output } = await runCommand('node', args, { env: childEnv(ctx) });
@@ -1211,6 +1306,9 @@ async function stepSeed(ctx) {
   }
 
   if (await seedSupportAdmins(ctx, db)) notes.push('added CCM support operators');
+  const synced = await syncTeamAccess({ db, team, support: supportAdminEmails(ctx), now: ctx.deps.now });
+  if (synced === 'changed') notes.push('updated the site team');
+  if (synced === 'last-operator') notes.push('kept the site operators, because the console team has no Owner');
 
   const provider = ctx.ticketVars.EVENT_TICKETING_PROVIDER;
   if (PROVIDERS.includes(provider)) {
@@ -1509,11 +1607,47 @@ async function markStopped({ appId, runId, deps }) {
   return 0;
 }
 
+/**
+ * The scheduled team sync (#839): each built site gets its console team's
+ * changes since the build, without a rebuild. A site with no project or no
+ * config/bootstrap is skipped with a warning. Any other failure does not
+ * stop the others, and fails the run so an operator sees it.
+ * @returns {Promise<number>} the exit code
+ */
+async function syncTeams({ deps }) {
+  const { db, clientDb, log, now } = deps;
+  const support = supportAdminEmails({ deps });
+  const built = await Promise.all(CONSOLE_REQUEST_GROUPS.built.map((status) => db.collection('applications').where('status', '==', status).get()));
+  let failed = 0;
+  for (const app of built.flatMap((snap) => snap.docs)) {
+    try {
+      const projectId = (await db.collection(BUILD_COLLECTION).doc(app.id).get()).data()?.resources?.projectId;
+      if (!projectId) {
+        log.warn(`team sync: ${app.id} skipped: the build record has no project`);
+        continue;
+      }
+      const team = await consoleTeam(db, app.data().orgId, now());
+      const result = await syncTeamAccess({ db: clientDb(projectId), team, support, now });
+      if (result === 'no-site') {
+        log.warn(`team sync: ${app.id} skipped: the site has no config/bootstrap`);
+        continue;
+      }
+      if (result === 'last-operator') throw new Error('not synced: it would remove the last operator');
+      log.log(`team sync: ${app.id} ${result}`);
+    } catch (err) {
+      failed += 1;
+      log.error(`team sync: ${app.id} failed:`, err.message);
+    }
+  }
+  return failed > 0 ? 1 : 0;
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
+  if (argv.length === 1 && argv[0] === '--sync-teams') return { syncTeams: true };
   const args = { appId: '', testMode: false, markStopped: false };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--application') {
@@ -1575,10 +1709,11 @@ function realDeps(env) {
 async function main(argv = process.argv.slice(2), env = process.env, makeDeps = realDeps) {
   const args = parseArgs(argv);
   if (!args) {
-    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped]');
+    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped] | --sync-teams');
     return 2;
   }
   const deps = makeDeps(env);
+  if (args.syncTeams) return syncTeams({ deps });
   if (args.markStopped) return markStopped({ appId: args.appId, runId: env.GITHUB_RUN_ID, deps });
   return provision({ appId: args.appId, testMode: args.testMode, deps });
 }
@@ -1593,4 +1728,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { INVOKER_PERMISSIONS, SERVICES, STEPS, brandingProblem, deployVariables, main, markStopped, parseArgs, provision, requiredRecords };
+module.exports = { INVOKER_PERMISSIONS, SERVICES, STEPS, brandingProblem, deployVariables, main, markStopped, parseArgs, provision, requiredRecords, syncTeams };
