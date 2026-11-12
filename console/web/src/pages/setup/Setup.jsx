@@ -1,6 +1,6 @@
 import PageHeading from '../../PageHeading.jsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
 import {
   ANSWER_STEPS, STEPS, errorsOfStep, openStepIds, setupPath, statusPath, stepById, stepByPath,
@@ -17,6 +17,7 @@ import TicketsStep from './TicketsStep.jsx';
 import WebAddressStep from './WebAddressStep.jsx';
 import LoadingState from '../../LoadingState.jsx';
 import IconControl from '../../IconControl.jsx';
+import StepList from '../../setup/StepList.jsx';
 
 const STEP_VIEWS = {
   organization: OrganizationStep,
@@ -25,46 +26,6 @@ const STEP_VIEWS = {
   tickets: TicketsStep,
   email: EmailStep,
 };
-
-/** The step list: where the reader is, which steps are done, and which are open now. */
-function StepList({ step, progress, open, orgId, appId, onGo, disabled }) {
-  const done = STEPS.filter((s) => progress[s.id]).length;
-  return (
-    <nav aria-label="Setup steps" className="step-nav">
-      <p className="muted" id="step-progress">{done} of {STEPS.length} steps done</p>
-      <ol className="steps" aria-describedby="step-progress">
-        {STEPS.map((s, i) => {
-          const current = s.id === step.id;
-          if (!open.includes(s.id)) {
-            return (
-              <li key={s.id}>
-                <span className="step-locked">
-                  <span className="step-number" aria-hidden="true">{progress[s.id] ? '✓' : i + 1}</span>
-                  <span>{s.title}</span>
-                  <span className="visually-hidden"> {progress[s.id] ? '(done)' : '(not open yet)'}</span>
-                </span>
-              </li>
-            );
-          }
-          return (
-            <li key={s.id} className={current ? 'current' : undefined}>
-              <Link
-                to={setupPath(orgId, appId, s)}
-                aria-current={current ? 'step' : undefined}
-                aria-disabled={disabled || undefined}
-                onClick={(e) => onGo(e, s)}
-              >
-                <span className="step-number" aria-hidden="true">{progress[s.id] ? '✓' : i + 1}</span>
-                <span>{s.title}</span>
-                {progress[s.id] ? <span className="visually-hidden"> (done)</span> : null}
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
-  );
-}
 
 function useApplication(orgId, appId) {
   const [app, setApp] = useState(null);

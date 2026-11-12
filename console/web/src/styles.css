@@ -238,12 +238,13 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
 .tag { font-size: 0.85rem; font-weight: 600; padding: 0.1rem 0.5rem; border: 1px solid rgb(var(--control-border)); border-radius: 999px; }
 
 /* The guided setup (ADR 0007 §3): the step list beside the step on a wide
-   screen, above it on a narrow one. */
+   screen, folded above it on a narrow one. */
 .setup { display: grid; gap: var(--space-lg); }
 @media (min-width: 52rem) {
   .setup { grid-template-columns: 15rem minmax(0, 1fr); align-items: start; }
 }
 .step-nav p { margin: 0 0 var(--space-xs); font-size: 0.9rem; }
+.step-nav-fold summary { min-height: 44px; padding-block: var(--space-xs); cursor: pointer; }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
 .steps a {
   display: flex;

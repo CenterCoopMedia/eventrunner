@@ -121,6 +121,8 @@ The base is what a deployment renders before its theme states anything, and it i
 
 A flow with three or more groups of work is a stepper, not one long page: setup, registration, checkout, a session pitch, a speaker profile ([ADR 0008](adr/0008-registration-and-pitch-steppers.md) §1). One form with one or two groups stays one form. Build it from `components/forms/Stepper.jsx`; do not draw a second stepper.
 
+The isolated client console owns `setup/StepList.jsx` and follows the same list pattern. Below 52rem its eight setup steps fold into a native disclosure; wider screens keep the sidebar. Changing the layout keeps the current step and draft. Opening another step closes the disclosure.
+
 - **One step per page, at its own address** (`/pitch/presenters`). Back, reload and a link from an email land on that step.
 - **The step list** gives every step its number (a tick when done), its title and its state as a word: **Done**, **To do** or **Not started**. The open step carries `aria-current="step"`, the leading-edge marker and the bold weight, never colour alone. A step that cannot open yet is text, not a link. On a wide screen the list sits beside the step; on a narrow one it folds into one line, "Show all 5 steps", above the step; the step heading keeps "Step 2 of 5". Only one list is in the document.
 - **The step heading** is an `h2` under the line "Step 2 of 5". A move to another step puts the focus on it; the first load does not move the focus.
