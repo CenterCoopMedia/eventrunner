@@ -9,7 +9,9 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'rea
 
 const listeners = new Map();
 const subscribed = [];
+const readVersions = vi.fn();
 vi.mock('../adminSource.js', () => ({
+  readAdminVersions: (...args) => readVersions(...args),
   subscribeAdminCollection: (name, onNext, onError) => {
     const entry = { onNext, onError };
     listeners.set(name, entry);
@@ -89,6 +91,7 @@ const figure = () => document.querySelector('p[role="status"]:not([aria-label])'
 beforeEach(() => {
   listeners.clear();
   subscribed.length = 0;
+  readVersions.mockReset().mockReturnValue(new Promise(() => {}));
 });
 
 describe('the record list', () => {
@@ -218,7 +221,7 @@ describe('the record list', () => {
     renderPage('/admin/versions?collection=cmsUpdates');
     report('cmsUpdates', []);
     report('cmsUpdates_drafts', []);
-    expect(screen.getByRole('heading', { name: 'No updates yet' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No current updates' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Records' })).toBeNull();
   });
 
@@ -249,6 +252,53 @@ describe('the record list', () => {
     expect(screen.queryByRole('region', { name: 'Records' })).toBeNull();
     expect(screen.queryByRole('heading', { name: /No content blocks/ })).toBeNull();
     expect(screen.queryByRole('status', { name: 'Loading the records…' })).toBeNull();
+  });
+});
+
+describe('removed records', () => {
+  it('renders the current list before history answers, finds a removed record without admin logs, and removes it after draft restoration', async () => {
+    let answer;
+    readVersions.mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    renderPage('/admin/versions?collection=cmsPages');
+    expect(readVersions).not.toHaveBeenCalled();
+    report('cmsPages', [{ id: 'live', title: 'Current page' }]);
+    expect(readVersions).not.toHaveBeenCalled();
+    report('cmsPages_drafts', []);
+    expect(recordLinks()).toEqual(['Current page']);
+    expect(screen.getByRole('status', { name: 'Loading removed records…' })).toBeInTheDocument();
+    expect(readVersions).toHaveBeenCalledExactlyOnceWith('cmsPages');
+    expect(subscribed).toEqual(['cmsPages', 'cmsPages_drafts']);
+    await act(async () => answer([
+      { docPath: 'cmsPages/gone id', revision: 2, fields: { title: 'Newest page name' } },
+      { docPath: 'cmsPages/gone id', revision: 1, fields: { title: 'Old page name' } },
+      { docPath: 'cmsPages/live', revision: 1, fields: { title: 'Published current' } },
+      { docPath: 'cmsSchedule/session', revision: 1, fields: { title: 'Other collection' } },
+    ]));
+    const removed = screen.getByRole('region', { name: 'Removed records' });
+    expect(within(removed).getAllByRole('link')).toHaveLength(1);
+    expect(within(removed).getByRole('link', { name: 'Newest page name' })).toHaveAttribute('href', '/admin/versions/cmsPages/gone%20id');
+    report('cmsPages_drafts', [{ id: 'gone id', title: 'Restored page', status: 'dirty' }]);
+    expect(within(removed).queryByRole('link')).toBeNull();
+    expect(recordLinks()).toContain('Restored page');
+    expect(readVersions).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops an old collection answer and keeps current records when the new history read fails', async () => {
+    let oldAnswer;
+    readVersions.mockReturnValueOnce(new Promise((resolve) => { oldAnswer = resolve; }));
+    renderPage();
+    reportContent();
+    readVersions.mockRejectedValueOnce(new Error('Unavailable'));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Content type' }), { target: { value: 'cmsPages' } });
+    report('cmsPages', [{ id: 'live', title: 'Current page' }]);
+    await act(async () => report('cmsPages_drafts', []));
+    expect(screen.getByText('Removed records did not load. Current records remain available.')).toBeInTheDocument();
+    await act(async () => oldAnswer([{ docPath: 'cmsContent/gone', revision: 1, fields: { value: 'Old collection' } }]));
+    expect(screen.queryByRole('link', { name: 'Old collection' })).toBeNull();
+    expect(recordLinks()).toEqual(['Current page']);
+    readVersions.mockResolvedValueOnce([]);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try again' })));
+    expect(screen.getByText(/0 removed records with published versions/)).toBeInTheDocument();
   });
 });
 

@@ -32,6 +32,7 @@ import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import RecordRecovery from '../components/RecordRecovery.jsx';
 import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
 import {
@@ -965,7 +966,7 @@ export default function AdminPageEditor({ mode }) {
               consequence={`The live page and its draft both go, and ${
                 page.path || 'its path'
               } stops resolving on the public site. The content blocks inside it are not deleted.`}
-              permanence="This cannot be undone."
+              permanence={<RecordRecovery collection="cmsPages" docId={page.id} />}
               onConfirm={remove}
             />
           )

@@ -457,16 +457,20 @@ describe('the timeline entry editor', () => {
   it('deletes after the confirmation names what goes', async () => {
     await openEntry('edition-2024');
     await screen.findByDisplayValue('The first meeting');
+    fetch.mockResolvedValueOnce(response({ entries: [{ revision: 1 }], nextCursor: null }));
     fetch.mockResolvedValueOnce(response({ deleted: ['cmsTimeline/edition-2024', 'cmsTimeline_drafts/edition-2024'] }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete this entry' }));
     const moment = screen.getByRole('region', { name: 'Delete The first meeting' });
-    expect(moment).toHaveTextContent('The live entry and its draft are removed together. Its version history stays. This cannot be undone.');
+    expect(moment).toHaveTextContent('The live entry and its draft are removed together. Its version history stays.');
+    await waitFor(() => expect(moment).toHaveTextContent('Published versions can be restored as a draft'));
+    expect(moment).toHaveTextContent('Unpublished edits are lost.');
     fireEvent.click(within(moment).getByRole('button', { name: 'Delete this entry' }));
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(endpointOf(0)).toBe('cmsDeleteContent');
-    expect(bodyOf(0)).toEqual({ collection: 'cmsTimeline', docId: 'edition-2024' });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(endpointOf(0)).toBe('cmsGetVersionHistory');
+    expect(endpointOf(1)).toBe('cmsDeleteContent');
+    expect(bodyOf(1)).toEqual({ collection: 'cmsTimeline', docId: 'edition-2024' });
     await waitFor(() => expect(currentPath).toBe('/admin/timeline'));
   });
 });

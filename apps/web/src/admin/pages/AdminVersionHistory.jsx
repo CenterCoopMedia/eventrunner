@@ -44,6 +44,7 @@ import AdminIconControl from '../components/AdminIconControl.jsx';
 import { versionAuthor, versionFieldLabel, versionRecordName, versionValue } from './versionDisplay.js';
 import { deadMatter } from '../recordState.js';
 import { useAdminRecords } from '../useAdminRecords.js';
+import { restoreLimitFor } from '../components/RecordRecovery.jsx';
 import {
   collectionChoice,
   formatClock,
@@ -144,7 +145,7 @@ function ChangeTable({ entry, timeZone }) {
 }
 
 /** A non-destructive restore confirmation when no unpublished work is lost. */
-function RestoreConfirm({ entry, removed, busy, disabled, error, onConfirm, onCancel, headingRef, errorRef }) {
+function RestoreConfirm({ entry, removed, collection, busy, disabled, error, onConfirm, onCancel, headingRef, errorRef }) {
   const headingId = useId();
   return (
     <section
@@ -158,6 +159,7 @@ function RestoreConfirm({ entry, removed, busy, disabled, error, onConfirm, onCa
         {`Version ${entry.revision} becomes the draft of this record.`}
         {removed ? ' The record is saved again as a draft.' : ''}
         {' The site does not change until you publish.'}
+        {removed ? ` ${restoreLimitFor(collection)}` : ''}
       </p>
       {error ? (
         <div ref={errorRef} tabIndex={-1}>
@@ -603,6 +605,7 @@ export default function AdminVersionHistory() {
                   <RestoreConfirm
                     entry={entry}
                     removed={!row}
+                    collection={choice.id}
                     busy={restoringRevision === entry.revision}
                     disabled={publishing || (restoringRevision !== null && restoringRevision !== entry.revision)}
                     error={restoreError?.revision === entry.revision ? restoreError.error : null}

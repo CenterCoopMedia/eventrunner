@@ -22,6 +22,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import { useAdminApi } from '../adminApi.js';
+import RecordRecovery from '../components/RecordRecovery.jsx';
 import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminUpdates } from '../useAdminUpdates.js';
@@ -410,7 +411,7 @@ export default function AdminUpdateEditor({ mode }) {
             busy={action === 'delete'}
             disabled={saving}
             consequence="The live update and its draft are removed together. Its version history stays."
-            permanence="This cannot be undone."
+            permanence={<RecordRecovery collection="cmsUpdates" docId={id} />}
             onConfirm={remove}
           />
         ) : null}

@@ -531,16 +531,20 @@ describe('the organization editor', () => {
     await waitFor(() => expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true));
     pushOrganizations(LIVE, DRAFTS);
     await screen.findByDisplayValue('Tide Media Collective');
+    fetch.mockResolvedValueOnce(response({ entries: [{ revision: 1 }], nextCursor: null }));
     fetch.mockResolvedValueOnce(response({ deleted: ['cmsOrganizations/tide-media', 'cmsOrganizations_drafts/tide-media'] }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete this organization' }));
     const moment = screen.getByRole('region', { name: 'Delete Tide Media Collective' });
     expect(moment).toHaveTextContent('Its page address is free again. The logo stays in the media library.');
+    await waitFor(() => expect(moment).toHaveTextContent('Published versions can be restored as a draft'));
+    expect(moment).toHaveTextContent('Restoring the organization does not restore representative access or an edit that was waiting for review.');
     fireEvent.click(within(moment).getByRole('button', { name: 'Delete this organization' }));
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(endpointOf(0)).toBe('cmsDeleteContent');
-    expect(bodyOf(0)).toEqual({ collection: 'cmsOrganizations', docId: 'tide-media' });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(endpointOf(0)).toBe('cmsGetVersionHistory');
+    expect(endpointOf(1)).toBe('cmsDeleteContent');
+    expect(bodyOf(1)).toEqual({ collection: 'cmsOrganizations', docId: 'tide-media' });
     await waitFor(() => expect(currentPath).toBe('/admin/organizations'));
   });
 });

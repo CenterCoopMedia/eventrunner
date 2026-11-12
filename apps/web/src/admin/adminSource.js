@@ -8,9 +8,16 @@
 // and its `_drafts` sibling (a non-admin's listener simply errors, which is
 // the fail-soft path below). Errors do not blank the UI — the caller keeps
 // its last-known rows and the retry wrapper re-attaches a fresh listener.
-import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { subscribeWithRetry } from '../lib/retrySubscription.js';
+
+/** Read the chosen collection's versions after its current records render. */
+export async function readAdminVersions(name) {
+  const snapshot = await getDocs(query(collection(db, 'cmsVersionHistory'),
+    where('docPath', '>=', `${name}/`), where('docPath', '<', `${name}0`)));
+  return snapshot.docs.map((entry) => entry.data());
+}
 
 /**
  * Subscribe to one admin-readable collection, unfiltered.

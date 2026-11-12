@@ -23,6 +23,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import RecordRecovery from '../components/RecordRecovery.jsx';
 import { summarizePublish } from '../publishResult.js';
 import {
   nextOrganizationOrder,
@@ -433,7 +434,7 @@ export default function AdminOrganizationEditor({ mode }) {
               busy={action === 'delete'}
               disabled={saving}
               consequence="The live organization and its draft are removed. Its page address is free again. The logo stays in the media library. Its representatives lose access, and an edit waiting for review is removed."
-              permanence="This cannot be undone."
+              permanence={<RecordRecovery collection="cmsOrganizations" docId={docId} />}
               onConfirm={remove}
             />
           ) : null}

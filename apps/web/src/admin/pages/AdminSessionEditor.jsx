@@ -8,6 +8,7 @@ import { isSafeUrl } from 'shared/urlSafety';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import RecordRecovery from '../components/RecordRecovery.jsx';
 import { summarizePublish } from '../publishResult.js';
 import {
   lockSessionId,
@@ -506,7 +507,7 @@ export default function AdminSessionEditor({ mode }) {
             busy={action === 'delete'}
             disabled={saving}
             consequence="The live session and its draft are removed. A parent session cannot be deleted while it has children."
-            permanence="This cannot be undone."
+            permanence={<RecordRecovery collection="cmsSchedule" docId={currentId} />}
             onConfirm={remove}
           />
         ) : null}

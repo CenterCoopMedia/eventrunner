@@ -1,12 +1,9 @@
 // Version history, the record list (issue #195): pick a collection, then a
 // record, to read what changed in each publish.
 //
-// cmsGetVersionHistory answers for one record at a time (a docPath), so this
-// page lists the records a collection holds now, from the live collection
-// and its drafts (the rules admit both tiers to both), and each name links
-// to that record's versions. A record deleted since it was published has
-// neither document, so it is not listed; its versions are kept, and its
-// route still opens them.
+// Current records render from live and draft listeners first. A separate
+// history read then finds removed records, named from their newest version.
+// The existing rules admit both admin tiers to all three collections.
 //
 // ONE COLLECTION AT A TIME. The collection is a required choice, kept in the
 // URL with the search text and the order, so a reload or a shared link
@@ -16,7 +13,7 @@
 //
 // THE FIGURE SENTENCE, NOT A TILE. One stated line says how many records
 // are shown and in what order.
-import { useMemo, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import AdminPageHeader, {
@@ -34,11 +31,13 @@ import {
 } from '../components/formControls.jsx';
 import RuledTable from '../components/RuledTable.jsx';
 import { useAdminRecords } from '../useAdminRecords.js';
+import { readAdminVersions } from '../adminSource.js';
 import {
   COLLECTION_CHOICES,
   DEFAULT_COLLECTION,
   collectionChoice,
   formatPublishedAt,
+  removedVersionRecords,
   toMillis,
 } from '../versionHistory.js';
 
@@ -84,6 +83,27 @@ export default function AdminVersionRecords() {
   const formRef = useRef(null);
 
   const records = useAdminRecords(collection);
+  const removedHeadingId = useId();
+  const [history, setHistory] = useState(null);
+  const [historyAttempt, setHistoryAttempt] = useState(0);
+  useEffect(() => {
+    if (!records.ready) return undefined;
+    let active = true;
+    setHistory({ collection, entries: null, error: null });
+    readAdminVersions(collection).then(
+      (entries) => { if (active) setHistory({ collection, entries, error: null }); },
+      (error) => { if (active) setHistory({ collection, entries: null, error }); },
+    );
+    return () => { active = false; };
+  }, [collection, records.ready, historyAttempt]);
+  const ownHistory = history?.collection === collection ? history : null;
+  const removed = useMemo(() => removedVersionRecords(collection, ownHistory?.entries ?? [], records.rows)
+    .map((entry) => ({ ...entry, name: versionRecordName(collection, entry.fields), publishedMs: toMillis(entry.publishedAt) }))
+    .filter((entry) => !needle || entry.name.toLowerCase().includes(needle))
+    .sort(sort === 'name' ? byName : byPublished), [collection, ownHistory?.entries, records.rows, needle, sort]);
+  const removedCount = `${count(removed.length)} removed ${removed.length === 1 ? 'record' : 'records'}`;
+  const matchWord = removed.length === 1 ? 'matches' : 'match';
+  const removedSummary = needle ? `${removedCount} ${matchWord} this search.` : `${removedCount} with published versions.`;
 
   const all = useMemo(
     () =>
@@ -128,8 +148,8 @@ export default function AdminVersionRecords() {
   } else if (all.length === 0) {
     body = (
       <AdminEmptyState
-        title={`No ${choice.plural} yet`}
-        description="Save content to start its version history."
+        title={`No current ${choice.plural}`}
+        description="Removed records with published versions appear below."
         action={<Link to={choice.id === 'cmsContent' ? '/admin/content' : ({ cmsPages: '/admin/pages', cmsSchedule: '/admin/sessions', cmsOrganizations: '/admin/organizations', cmsUpdates: '/admin/updates', cmsTimeline: '/admin/timeline' })[choice.id]} className={secondaryButtonClass}>Manage {choice.plural}</Link>}
       />
     );
@@ -257,6 +277,32 @@ export default function AdminVersionRecords() {
       ) : null}
 
       {body}
+
+      {records.ready ? (
+        <section aria-labelledby={removedHeadingId} className="flex flex-col gap-sm">
+          <h2 id={removedHeadingId} className="font-admin-ui text-admin-lg font-bold text-admin-ink">Removed records</h2>
+          {ownHistory?.error ? (
+            <div className="flex flex-col items-start gap-xs">
+              <Notice tone="error" message="Removed records did not load. Current records remain available." />
+              <button type="button" className={secondaryButtonClass} onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>Try again</button>
+            </div>
+          ) : !ownHistory?.entries ? <AdminLoadingState label="Loading removed records…" /> : (
+            <>
+              <p role="status" className="text-admin-sm text-admin-ink-secondary">
+                {`${removedSummary} Open a record to restore a version as a draft.`}
+              </p>
+              <ul className="divide-y divide-admin-rule-hairline">
+                {removed.map((entry) => (
+                  <li key={entry.id} className="flex flex-wrap items-baseline justify-between gap-xs py-sm">
+                    <Link to={`/admin/versions/${collection}/${encodeURIComponent(entry.id)}`} className={`${rowTitleLinkClass} min-w-0 wrap-anywhere`}>{entry.name}</Link>
+                    <span className="text-admin-sm text-admin-ink-secondary">{`Version ${entry.revision} · ${formatPublishedAt(entry.publishedMs, timeZone) ?? 'Publish time not recorded'}`}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }
