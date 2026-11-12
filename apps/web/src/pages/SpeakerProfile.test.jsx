@@ -237,7 +237,9 @@ describe('SpeakerProfile', () => {
     fireEvent.change(await screen.findByLabelText('Travel (optional)'), { target: { value: 'Car' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
     await waitFor(() => expect(saveOwnSpeakerLogisticsMock).toHaveBeenCalledTimes(1));
-    fireEvent.click(await screen.findByRole('link', { name: 'Back' }));
+    // Every step after the first has a Back link, so reach Review before using it.
+    expect(await screen.findByRole('heading', { level: 2, name: 'Review' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Back' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Next: Review' }));
     expect(await screen.findByRole('heading', { level: 2, name: 'Review' })).toBeInTheDocument();
     expect(saveOwnSpeakerLogisticsMock).toHaveBeenCalledTimes(1);
