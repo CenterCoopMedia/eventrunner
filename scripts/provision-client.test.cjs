@@ -764,8 +764,14 @@ test('console team changes after the build reach the site without a rebuild', as
   assert.equal(tierOn(fake, 'cara@example.org'), 'operator');
 
   await changeMemberRole({ db: fake.db }, { body: { orgId: 'o1', uid: 'cara', role: 'editor' }, user: ANA });
+  const logged = fake.clientFirestore.paths('admin_logs/');
   assert.equal(await syncTeams({ deps: fake.deps }), 0);
   assert.equal(tierOn(fake, 'cara@example.org'), 'staff');
+  // The admin log has one row for the change, by the system actor (docs/ADMIN_GUIDE.md).
+  const rows = fake.clientFirestore.paths('admin_logs/').filter((path) => !logged.includes(path)).map((path) => fake.clientFirestore.read(path));
+  assert.deepEqual(rows.map(({ action, uid, details }) => ({ action, uid, details })), [
+    { action: 'syncConsoleTeam', uid: 'system', details: { email: 'cara@example.org', tier: 'staff', previousTier: 'operator' } },
+  ]);
 
   await removeMember({ db: fake.db }, { body: { orgId: 'o1', uid: 'cara' }, user: ANA });
   await removeMember({ db: fake.db }, { body: { orgId: 'o1', uid: 'ben' }, user: ANA });

@@ -1241,6 +1241,25 @@ async function syncTeamAccess({ db, team, support, now }) {
     const written = { ...stored, ...fields, updatedAt: new Date(now()), updatedBy: SEED_ACTOR.email };
     if (staffExpiry === undefined || (isMap && Object.keys(staffExpiry).length === 0)) delete written.staffExpiry;
     tx.set(ref, written);
+    // One admin_logs row per changed address, as the expiry sweep in
+    // functions/src/admin/access.cjs writes, so the admin log shows it.
+    const staff = normalizeEmails(stored.staffEmails);
+    const tierIn = (operators, staffList, email) => (operators.includes(email) ? 'operator' : staffList.includes(email) ? 'staff' : null);
+    for (const email of new Set([...admins, ...staff, ...adminEmails, ...staffEmails])) {
+      const previousTier = tierIn(admins, staff, email);
+      const tier = tierIn(adminEmails, staffEmails, email);
+      const cleared = isMap && Object.hasOwn(expiry, email) && !Object.hasOwn(staffExpiry, email);
+      if (tier === previousTier && !cleared) continue;
+      const ms = cleared ? toMillis(expiry[email]) : Number.NaN;
+      tx.set(db.collection('admin_logs').doc(), {
+        action: 'syncConsoleTeam',
+        docPath: 'config/bootstrap',
+        uid: 'system',
+        email: null,
+        at: written.updatedAt,
+        details: { email, tier, previousTier, ...(cleared ? { previousExpiresAt: Number.isFinite(ms) ? new Date(ms).toISOString() : null } : {}) },
+      });
+    }
     return 'changed';
   });
 }
