@@ -1,9 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import HelpTooltip from './HelpTooltip.jsx';
+import AdminIconControl from './AdminIconControl.jsx';
+import EventDateTimeField from './EventDateTimeField.jsx';
 import { TextField } from './formControls.jsx';
 
 describe('staff help tooltips', () => {
+  it('keeps date and time names separate from their help', () => {
+    render(<EventDateTimeField label="Deadline" value="" timeZone="UTC" onChange={() => {}} help="Choose when proposals close." />);
+    expect(screen.getByRole('group', { name: 'Deadline' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Deadline Date')).toHaveAccessibleDescription(expect.stringContaining('Choose when proposals close.'));
+    expect(screen.getByLabelText('Deadline Time')).toBeInTheDocument();
+  });
+
+  it('dismisses an ordinary label tooltip after mouse focus leaves the trigger', () => {
+    render(<AdminIconControl label="Refresh" icon="refresh" />);
+    const button = screen.getByRole('button', { name: 'Refresh' });
+    fireEvent.focus(button);
+    fireEvent.click(button);
+    fireEvent.pointerEnter(button);
+    expect(screen.getByRole('tooltip')).not.toHaveClass('admin-help-tooltip');
+    fireEvent.pointerLeave(button);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
   it('describes the field and help button while closed, then opens on focus and dismisses with Escape', () => {
     render(<TextField label="Track" value="" onChange={() => {}} help="Choose a program topic." hint="Saving…" error="Choose one." />);
     expect(screen.getByRole('textbox', { name: 'Track' })).toHaveAccessibleDescription('Choose a program topic. Saving… Choose one.');

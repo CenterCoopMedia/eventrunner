@@ -21,8 +21,11 @@ const AdminIconControl = forwardRef(function AdminIconControl({
   };
   const leave = () => {
     hovered.current = false;
+    if (!tooltip) {
+      if (!controlRef.current?.matches(':focus-visible')) setVisible(false);
+      return;
+    }
     if (focused.current) return;
-    if (!tooltip) { setVisible(false); return; }
     closeTimer.current = setTimeout(() => setVisible(false), 150);
   };
   useEffect(() => () => clearTimeout(closeTimer.current), []);
@@ -82,7 +85,7 @@ const AdminIconControl = forwardRef(function AdminIconControl({
         aria-labelledby={visible && !tooltip ? tooltipId : undefined}
         className={`admin-icon-control ${className}`}
         onFocus={() => { focused.current = true; keepOpen(); }}
-        onBlur={() => { focused.current = false; if (!hovered.current) setVisible(false); }}
+        onBlur={() => { focused.current = false; if (!tooltip || !hovered.current) setVisible(false); }}
         onPointerEnter={() => { hovered.current = true; keepOpen(); }}
         onPointerLeave={leave}
         onKeyDown={(event) => {
@@ -98,7 +101,7 @@ const AdminIconControl = forwardRef(function AdminIconControl({
         {busy ? <span className="admin-busy-mark" aria-hidden="true" /> : <AdminIcon name={icon} />}
       </Control>
       {visible ? createPortal(
-        <span ref={tooltipRef} id={tooltipId} role="tooltip" aria-hidden={tooltip ? true : undefined} className="admin-control-tooltip" style={position} onPointerEnter={() => { hovered.current = true; keepOpen(); }} onPointerLeave={leave}>{tooltip ?? label}</span>,
+        <span ref={tooltipRef} id={tooltipId} role="tooltip" aria-hidden={tooltip ? true : undefined} className={`admin-control-tooltip ${tooltip ? 'admin-help-tooltip' : ''}`} style={position} onPointerEnter={() => { hovered.current = true; keepOpen(); }} onPointerLeave={leave}>{tooltip ?? label}</span>,
         // A native modal's top layer must also contain its tooltip.
         controlRef.current?.closest('dialog[open]') ?? document.body,
       ) : null}

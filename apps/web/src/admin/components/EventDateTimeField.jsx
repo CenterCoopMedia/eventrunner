@@ -127,8 +127,8 @@ export default function EventDateTimeField({
     : !fields.date && !fields.time ? emptySummary : 'Not set until the date and time are complete.';
 
   return (
-    <fieldset className="flex min-w-0 flex-col gap-3xs" disabled={disabled}>
-      <legend id={legendId} className={`${fieldLabelClass} mb-3xs`}>{label} <HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></legend>
+    <fieldset className="flex min-w-0 flex-col gap-3xs" disabled={disabled} aria-labelledby={legendId}>
+      <legend className={`${fieldLabelClass} mb-3xs`}><span id={legendId}>{label}</span> <HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></legend>
       {hint ? <p id={hintId} className={`${fieldHintClass} text-pretty`}>{hint}</p> : null}
       <div className="flex flex-wrap items-end gap-sm">
         <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-3xs">
