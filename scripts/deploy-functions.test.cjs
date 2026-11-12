@@ -84,9 +84,7 @@ async function runDeploy({
   return { calls, code, messages, errors, waits, discoveredAfter, inventoryRead };
 }
 
-// Every Firebase call that carries --force must name functions one by one.
-// A bare `--only functions` with --force could approve deletions and unsafe
-// migrations of existing functions; only the verified-empty bootstrap may.
+// Every forced deploy uses isolated selectors; broad force could approve deletions and migrations.
 function assertNoBareForce(calls) {
   for (const { args } of calls) {
     if (!args.includes('--force')) continue;
@@ -417,11 +415,13 @@ test('a bootstrap over a partial deploy creates the absent retry handlers first'
 });
 
 test('bootstrap deploys use force only after a successful complete empty inventory', async () => {
-  const { calls, code, discoveredAfter } = await runDeploy({ bootstrap: true });
+  const { calls, code, discoveredAfter } = await runDeploy({ bootstrap: true, localFunctions: [local('firstHandler', true)] });
   assert.equal(code, 0);
-  // The forced bootstrap reads the local functions only to verify the deploy.
-  assert.deepEqual(discoveredAfter, [1]);
-  assert.deepEqual(calls.map((call) => call.args), [[...FULL_DEPLOY, '--force']]);
+  assert.deepEqual(discoveredAfter, [0], 'the complete create plan is known before any writes');
+  assert.deepEqual(calls.map((call) => call.args), [[
+    'firebase', 'deploy', '--only', 'functions:firstHandler', '--project', PROJECT, '--non-interactive', '--force',
+  ]]);
+  assertNoBareForce(calls);
 });
 
 test('bootstrap deploys with existing functions retain the normal safeguards', async () => {
@@ -432,6 +432,136 @@ test('bootstrap deploys with existing functions retain the normal safeguards', a
   assert.equal(code, 0);
   assert.equal(calls.length, 1);
   assert.doesNotMatch(calls[0].args.join(' '), /--force/);
+});
+
+test('a fresh deploy stays within every rolling v1 and v2 write-quota window', async () => {
+  const config = [{ codebase: 'default', source: 'functions' }];
+  const localFunctions = Array.from({ length: 140 }, (_, index) => ({
+    ...local(`handler${String(index).padStart(3, '0')}`, index % 7 === 0,
+      index % 11 === 0 ? [REGION, 'us-east1'] : [REGION]),
+    platform: index < 2 ? 'gcfv1' : 'gcfv2',
+  }));
+  const desired = localFunctions.flatMap((fn) => fn.regions.map((region) => ({
+    ...deployed(fn.id, region), platform: fn.platform,
+    ...(fn.retry ? { eventTrigger: eventTrigger(true) } : {}),
+  })));
+  const backendOf = (endpoints) => {
+    const endpointsByRegion = {};
+    for (const fn of endpoints) (endpointsByRegion[fn.region] ??= {})[fn.id] = fn;
+    return { endpoints: endpointsByRegion };
+  };
+  let inventory = [];
+  let clock = 0;
+  const writes = [];
+  const calls = [];
+  const code = await main({
+    env: { EVENT_FIREBASE_PROJECT_ID: PROJECT, EVENT_BOOTSTRAP: 'true' }, log: quiet,
+    readConfig: () => config, discoverFunctions: async () => localFunctions,
+    verifyCompleteInventory: async () => inventory,
+    wait: async (milliseconds) => { clock += milliseconds; },
+    run: (args) => {
+      calls.push(args);
+      const plan = createDeploymentPlan({
+        wantBackend: backendOf(desired), haveBackend: backendOf(inventory), codebase: 'default',
+        filters: getEndpointFilters({ only: args[args.indexOf('--only') + 1] }, config), deleteAll: false,
+      });
+      for (const change of Object.values(plan)) {
+        assert.deepEqual(change.endpointsToDelete, []);
+        assert.deepEqual(change.endpointsToUpdate, [], 'initial batches must not redeploy previous batches');
+        for (const fn of change.endpointsToCreate) writes.push({ ...fn, at: clock });
+        inventory = [...inventory, ...change.endpointsToCreate];
+      }
+      return { status: 0 };
+    },
+  });
+  assert.equal(code, 0);
+  assert.equal(writes.length, desired.length);
+  for (const write of writes) {
+    const window = write.platform === 'gcfv1' ? 100_000 : 60_000;
+    const limit = write.platform === 'gcfv1' ? 80 : 60;
+    const inWindow = writes.filter((other) => other.platform === write.platform
+      && (write.platform === 'gcfv1' || other.region === write.region)
+      && other.at >= write.at && other.at < write.at + window);
+    assert.ok(inWindow.length <= limit, `${write.platform} ${write.region}: ${inWindow.length} writes in ${window} ms`);
+  }
+  assert.ok(calls.length > 1, 'a fresh site must not create all functions in one burst');
+  assert.ok(calls.every((args) => args[args.indexOf('--only') + 1] !== 'functions'));
+});
+
+test('the complete initial plan rejects unknown regions and selector expansion before any writes', async () => {
+  for (const [localFunctions, reason] of [
+    [[...Array.from({ length: 51 }, (_, index) => local(`handler${index}`, false)), { ...local('unknownRegion', false), regions: null }], 'FUNCTIONS_INITIAL_REGIONS'],
+    [[local('group', false), local('group-child', false)], 'FUNCTIONS_INITIAL_SELECTORS'],
+  ]) {
+    const { code, calls, waits, errors } = await runDeploy({ bootstrap: true, localFunctions });
+    assert.equal(code, 1);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(waits, []);
+    assert.match(errors[0], new RegExp(`"code":"${reason}"`));
+  }
+});
+
+test('a paced initial deploy recovers a missing create through a later unforced deploy', async () => {
+  const config = [{ codebase: 'default', source: 'functions' }];
+  const localFunctions = Array.from({ length: 51 }, (_, index) => local(`handler${String(index).padStart(3, '0')}`, false));
+  const desired = localFunctions.map((fn) => deployed(fn.id));
+  const backendOf = (endpoints) => {
+    const endpointsByRegion = {};
+    for (const fn of endpoints) (endpointsByRegion[fn.region] ??= {})[fn.id] = fn;
+    return { endpoints: endpointsByRegion };
+  };
+  let inventory = [];
+  const calls = [];
+  const waits = [];
+  const code = await main({
+    env: { EVENT_FIREBASE_PROJECT_ID: PROJECT, EVENT_BOOTSTRAP: 'true' }, log: quiet,
+    readConfig: () => config, discoverFunctions: async () => localFunctions,
+    verifyCompleteInventory: async () => inventory,
+    wait: async (milliseconds) => waits.push(milliseconds),
+    run: (args) => {
+      calls.push({ args });
+      const plan = createDeploymentPlan({
+        wantBackend: backendOf(desired), haveBackend: backendOf(inventory), codebase: 'default',
+        filters: getEndpointFilters({ only: args[args.indexOf('--only') + 1] }, config), deleteAll: false,
+      });
+      for (const change of Object.values(plan)) {
+        assert.deepEqual(change.endpointsToDelete, []);
+        assert.deepEqual(change.endpointsToUpdate, []);
+        const created = change.endpointsToCreate.filter((fn) => calls.length !== 1 || fn.id !== 'handler000');
+        inventory = [...inventory, ...created];
+      }
+      return { status: 0 };
+    },
+  });
+  assert.equal(code, 0);
+  assert.equal(inventory.length, 51);
+  assert.equal(new Set(inventory.map((fn) => fn.id)).size, 51);
+  assert.equal(calls.length, 3);
+  assert.ok(calls[0].args.includes('--force'));
+  assert.ok(calls[1].args.includes('--force'));
+  assert.deepEqual(calls[2].args, FULL_DEPLOY);
+  assertNoBareForce(calls);
+  assert.deepEqual(waits, [105_000, 105_000]);
+});
+
+test('later forced initial groups stop on an unknown inventory or an already deployed target', async () => {
+  const localFunctions = Array.from({ length: 51 }, (_, index) => local(`handler${String(index).padStart(3, '0')}`, false));
+  for (const deployedInventory of [new Error('unreachable'), [deployed('handler050')]]) {
+    const { code, calls, waits } = await runDeploy({ bootstrap: true, localFunctions, deployedInventory });
+    assert.equal(code, 1);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(waits, [105_000]);
+    assertNoBareForce(calls);
+  }
+});
+
+test('a failed initial group stops before waiting or creating the next group', async () => {
+  const { code, calls, waits } = await runDeploy({
+    bootstrap: true, localFunctions: Array.from({ length: 51 }, (_, index) => local(`handler${index}`, false)), status: () => 2,
+  });
+  assert.equal(code, 2);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(waits, []);
 });
 
 // firebase-tools 15.22.4 can exit 0 after a quota 429 on a create, with the
@@ -462,7 +592,11 @@ test('a partial fresh-client bootstrap waits for quota and succeeds through a fr
     inventoryReads: [[], [existing], [existing], complete],
   });
   assert.equal(code, 0);
-  assert.deepEqual(calls.map((call) => call.args), [[...FULL_DEPLOY, '--force'], FULL_DEPLOY]);
+  assert.deepEqual(calls.map((call) => call.args), [
+    ['firebase', 'deploy', '--only', 'functions:downloadEventPackage,functions:existingHttp',
+      '--project', PROJECT, '--non-interactive', '--force'],
+    FULL_DEPLOY,
+  ]);
   assert.deepEqual(waits, [105_000]);
   assert.equal(inventoryRead, 4);
   assert.equal(errors.length, 0);
@@ -480,7 +614,10 @@ test('an incomplete inventory read during quota recovery stops before another de
     inventoryReads: [[], [existing], unavailable],
   });
   assert.equal(code, 1);
-  assert.deepEqual(calls.map((call) => call.args), [[...FULL_DEPLOY, '--force']]);
+  assert.deepEqual(calls.map((call) => call.args), [[
+    'firebase', 'deploy', '--only', 'functions:downloadEventPackage,functions:existingHttp',
+    '--project', PROJECT, '--non-interactive', '--force',
+  ]]);
   assert.deepEqual(waits, [105_000]);
   assert.equal(inventoryRead, 3);
   assert.match(errors[0], /"phase":"quota-recovery-inventory"/);
@@ -533,12 +670,14 @@ test('a forced bootstrap deploy never reuses broad force after inventory becomes
   });
   assert.equal(code, 1);
   assert.deepEqual(calls.map((call) => call.args), [
-    [...FULL_DEPLOY, '--force'],
+    ['firebase', 'deploy', '--only', 'functions:downloadEventPackage,functions:onUserCreated',
+      '--project', PROJECT, '--non-interactive', '--force'],
     FULL_DEPLOY,
     FULL_DEPLOY,
   ]);
   assert.deepEqual(waits, [105_000, 105_000]);
   assert.equal(calls.filter((call) => call.args.includes('--force')).length, 1);
+  assertNoBareForce(calls);
   assert.match(errors[0], /not deployed: downloadEventPackage\(us-central1\)/);
 });
 
@@ -621,14 +760,14 @@ test('inventory diagnostics stop at four wrappers instead of logging arbitrary d
   assert.equal((errors[0].match(/"type":"FirebaseError"/g) || []).length, 4);
 });
 
-test('a post-deploy local discovery failure is distinguished from the inventory read', async () => {
+test('an initial local discovery failure stops before deployment and is distinguished from the inventory read', async () => {
   const { code, calls, errors } = await runDeploy({
     bootstrap: true,
     discover: async () => { throw new Error('private discovery details'); },
   });
   assert.equal(code, 1);
-  assert.equal(calls.length, 1);
-  assert.match(errors[0], /"phase":"post-deploy-discovery"/);
+  assert.equal(calls.length, 0);
+  assert.match(errors[0], /"phase":"pre-deploy-discovery"/);
   assert.doesNotMatch(errors[0], /private/);
 });
 
@@ -785,7 +924,7 @@ test('local discovery fails closed on a retry flag or region it cannot read', as
   );
 });
 
-test('both local discovery phases preserve fixed validation reasons and the function identifier', async () => {
+test('bootstrap and ordinary discovery preserve fixed validation reasons and the function identifier', async () => {
   for (const [reason, endpoint] of [
     ['FUNCTIONS_RETRY_VALUE', { platform: 'gcfv2', region: [REGION], eventTrigger: eventTrigger('{{ params.RETRY }}') }],
     ['FUNCTIONS_RETRY_REGIONS', { platform: 'gcfv2', eventTrigger: eventTrigger(true) }],
@@ -798,7 +937,7 @@ test('both local discovery phases preserve fixed validation reasons and the func
     for (const bootstrap of [false, true]) {
       const { code, errors } = await runDeploy({ bootstrap, discover: async () => { throw failure; } });
       assert.equal(code, 1);
-      assert.match(errors[0], new RegExp(`"phase":"${bootstrap ? 'post' : 'pre'}-deploy-discovery"`));
+      assert.match(errors[0], /"phase":"pre-deploy-discovery"/);
       assert.match(errors[0], new RegExp(`"code":"${reason}"`));
       assert.match(errors[0], /"function":"onRetry"/);
     }
@@ -828,7 +967,7 @@ test('local discovery fails closed when the functions source does not load', asy
   );
 });
 
-test('script-owned discovery config errors retain fixed reasons in both discovery phases', async () => {
+test('script-owned discovery config errors retain fixed reasons before bootstrap and ordinary deploys', async () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'functions-config-'));
   try {
     for (const [reason, config] of [
@@ -844,8 +983,8 @@ test('script-owned discovery config errors retain fixed reasons in both discover
       for (const bootstrap of [false, true]) {
         const { code, calls, errors } = await runDeploy({ bootstrap, discover: async () => { throw failure; } });
         assert.equal(code, 1);
-        assert.equal(calls.length, bootstrap ? 1 : 0);
-        assert.match(errors[0], new RegExp(`"phase":"${bootstrap ? 'post' : 'pre'}-deploy-discovery"`));
+        assert.equal(calls.length, 0);
+        assert.match(errors[0], /"phase":"pre-deploy-discovery"/);
         assert.match(errors[0], new RegExp(`"code":"${reason}"`));
       }
     }
@@ -854,7 +993,7 @@ test('script-owned discovery config errors retain fixed reasons in both discover
   }
 });
 
-test('analysis failures retain only safe SDK body, stderr and debug-tail details in both discovery phases', async () => {
+test('analysis failures retain only safe SDK body, stderr and debug-tail details before deploy', async () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'functions-analysis-'));
   try {
     fs.writeFileSync(path.join(projectDir, 'firebase.json'), JSON.stringify({ functions: { source: 'functions', codebase: 'default' } }));
@@ -885,8 +1024,8 @@ test('analysis failures retain only safe SDK body, stderr and debug-tail details
     for (const bootstrap of [false, true]) {
       const { code, calls, errors } = await runDeploy({ bootstrap, discover: async () => { throw failure; } });
       assert.equal(code, 1);
-      assert.equal(calls.length, bootstrap ? 1 : 0);
-      assert.match(errors[0], new RegExp(`"phase":"${bootstrap ? 'post' : 'pre'}-deploy-discovery"`));
+      assert.equal(calls.length, 0);
+      assert.match(errors[0], /"phase":"pre-deploy-discovery"/);
       assert.match(errors[0], /"httpStatus":400/);
       assert.match(errors[0], /"type":"TypeError"/);
       assert.match(errors[0], /"code":"MODULE_NOT_FOUND"/);
