@@ -190,10 +190,11 @@ test('the admin set gets the first-paint block too, on the same policy', () => {
     assert.equal(blocks.length, 2, `${mode} emits one first-paint block per token set`);
   }
 
-  // Under 'system' both blocks sit inside the media query, so a reader whose
-  // setting is light never sees either of them.
+  // Under 'system' both ordinary blocks sit inside the media query. The
+  // public contrast preference has its own nested dark-scheme query below.
   const system = buildTokenCss({ ...THEME, mode: 'system' });
-  const queries = [...system.matchAll(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n\}/g)];
+  const ordinary = system.split('@media screen and (prefers-contrast: more)')[0];
+  const queries = [...ordinary.matchAll(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n\}/g)];
   assert.equal(queries.length, 2);
   assert.ok(queries.some((q) => q[1].includes(`${marker}:`)), 'the admin block is inside the query');
 });

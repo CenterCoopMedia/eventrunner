@@ -399,6 +399,7 @@ export function buildRuntimeThemeCss(themeDoc) {
   }
 
   const blocks = [];
+  const contrastBlocks = [];
   if (rootLines.length > 0) blocks.push(`:root {\n${rootLines.join('\n')}\n}`);
   for (const mode of THEME_MODES) {
     if (modeLines[mode].length === 0) continue;
@@ -406,14 +407,8 @@ export function buildRuntimeThemeCss(themeDoc) {
       ? [':root', ":root[data-mode='light']", ":root[data-theme][data-mode='light']"]
       : [":root[data-mode='dark']", ":root[data-theme][data-mode='dark']"];
     blocks.push(`${selectors.join(',\n')} {\n${modeLines[mode].join('\n')}\n}`);
-  }
-  const contrastBlocks = [];
-  for (const mode of THEME_MODES) {
     const colors = deriveMoreContrastTokens(palettes[mode]);
     if (Object.keys(colors).length === 0) continue;
-    const selectors = mode === 'light'
-      ? [':root', ":root[data-mode='light']", ":root[data-theme][data-mode='light']"]
-      : [":root[data-mode='dark']", ":root[data-theme][data-mode='dark']"];
     const selector = selectors.map((one) => `${one}:not(:has(.admin-room))`).join(',\n');
     const declarations = Object.entries(colors).map(([name, rgb]) => `  ${name}: ${rgb.join(' ')};`);
     contrastBlocks.push(`${selector} {\n${declarations.join('\n')}\n}`);
