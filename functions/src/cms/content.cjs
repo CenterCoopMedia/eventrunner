@@ -714,7 +714,7 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
           removeOrganizationAccess({
             db, tx, organizationId: target.docId, access, actor, at: new Date(now()),
           });
-          return deleted;
+          return { ...deleted, removedRepresentatives: access.grants.length, removedQueuedEdit: access.request.exists };
         });
       } else {
         paths = await deleteBoth({ db, collection: target.collection, docId: target.docId });
@@ -739,11 +739,20 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
     // scoping it to cmsSchedule keeps the intent explicit and skips the
     // query entirely for the collections that never have materials.
     if (target.collection === 'cmsSchedule') {
-      await deleteMaterialsForSession({ db, sessionId: target.docId });
+      const materials = await deleteMaterialsForSession({ db, sessionId: target.docId });
+      paths.removedMaterials = materials.deleted;
     }
 
     await logAdminAction({ db, action: 'cms-delete-content', docPath: livePath, actor, now, log });
-    res.status(200).json({ deleted: [livePath, draftPath] });
+    res.status(200).json({
+      deleted: [livePath, draftPath],
+      publishedRevision: paths.publishedRevision,
+      ...(target.collection === 'cmsSchedule' ? { removedMaterials: paths.removedMaterials } : {}),
+      ...(target.collection === ORGANIZATIONS_COLLECTION ? {
+        removedRepresentatives: paths.removedRepresentatives,
+        removedQueuedEdit: paths.removedQueuedEdit,
+      } : {}),
+    });
   };
 }
 

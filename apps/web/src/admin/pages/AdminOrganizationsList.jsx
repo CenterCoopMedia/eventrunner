@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminOrganizations } from '../useAdminOrganizations.js';
 import { useOrganizationRepresentatives } from '../useOrganizationRepresentatives.js';
@@ -202,6 +203,7 @@ export default function AdminOrganizationsList() {
         }
       />
 
+      <DeletedRecordResult />
       <OrderAnnouncement message={spoken} />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 

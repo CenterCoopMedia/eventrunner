@@ -19,11 +19,13 @@ export function useAdminContent() {
 
   useEffect(() => {
     const unsubscribers = [
-      subscribeAdminCollection('cmsContent', (docs) => {
+      subscribeAdminCollection('cmsContent', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setLive(docs);
         setLiveError(null);
       }, setLiveError),
-      subscribeAdminCollection('cmsContent_drafts', (docs) => {
+      subscribeAdminCollection('cmsContent_drafts', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setDrafts(docs);
         setDraftsError(null);
       }, setDraftsError),
@@ -41,9 +43,9 @@ export function useAdminContent() {
 
   return {
     rows,
-    // BOTH listeners must report before the list is trustworthy — see
-    // useAdminPages.js for why (a draft-only doc otherwise reads as absent,
-    // and a clean draft otherwise reads as never-published).
+    // Both server snapshots must arrive before an editor adopts a revision.
+    // A cached empty drafts query can otherwise make it adopt the published
+    // value once and miss the real draft when the server answers.
     loading: !ready && !error,
     ready,
     error,

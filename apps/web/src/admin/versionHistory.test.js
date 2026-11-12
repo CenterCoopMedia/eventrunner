@@ -152,6 +152,9 @@ describe('restoreRequestFor', () => {
   });
 
   it('sends a page and update through their whole-record save endpoints', () => {
+    expect(restoreRequestFor('cmsPages', 'about', entry({ id: 'about', label: 'About' }), null)).toEqual({
+      endpoint: 'cmsSavePage', body: { page: { id: 'about', label: 'About', visible: true }, create: true },
+    });
     expect(restoreRequestFor('cmsPages', 'about', entry({ id: 'about', label: 'About', seeded: true }, false), { id: 'about' })).toEqual({
       endpoint: 'cmsSavePage',
       body: { page: { id: 'about', label: 'About', visible: false } },

@@ -88,7 +88,7 @@ function fakeStore() {
     deletes,
     logs,
     async writeDraft(args) { writes.push(args); },
-    async deleteBoth(args) { deletes.push(args); },
+    async deleteBoth(args) { deletes.push(args); return { publishedRevision: null }; },
     async logAdminAction(args) { logs.push(args); },
   };
 }
@@ -342,6 +342,51 @@ test('cmsSaveUpdate records an admin_logs entry via the store', async () => {
 });
 
 // --------------------------------------------------------- cmsDeleteUpdate
+
+for (const collection of ['cmsUpdates', 'cmsUpdates_drafts']) {
+  test(`cmsSaveUpdate restore refuses a replacement in ${collection}`, async () => {
+    const replacement = { ...validUpdate({ title: 'Replacement record' }), visible: true, revision: 2, status: 'dirty' };
+    const db = makeFakeDb({
+      'config/bootstrap': BOOTSTRAP_DOC,
+      [`${collection}/u1`]: replacement,
+      'cmsUpdates_deleted/u1': { deletedBy: 'admin1' },
+    });
+    const res = fakeRes();
+    await createSaveUpdateHandler({ ...deps(), db, store: realStore })(adminReq({ id: 'u1', update: validUpdate({ title: 'Old published record' }), restore: true }), res);
+    assert.equal(res.statusCode, 409);
+    assert.deepEqual(db.read(collection, 'u1'), replacement);
+    assert.deepEqual(db.read('cmsUpdates_deleted', 'u1'), { deletedBy: 'admin1' });
+    assert.equal(db.writes.length, 0);
+  });
+}
+
+test('a deleted published update restores as a draft, clears its tombstone, and saves again', async () => {
+  const db = makeFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC });
+  const d = { ...deps(), db, store: realStore };
+  const saved = validUpdate({ title: 'Last published title' });
+  let res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'undo-update', update: saved, visible: true }), res);
+  assert.equal(res.statusCode, 200);
+  await realStore.publishDocs({ db, collection: 'cmsUpdates', docIds: ['undo-update'], actor: { uid: 'admin1', email: 'admin@example.org' } });
+  const published = db.read('cmsUpdates', 'undo-update');
+  res = fakeRes();
+  await createDeleteUpdateHandler(d)(adminReq({ id: 'undo-update' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.publishedRevision, published.revision);
+  assert.ok(db.read('cmsUpdates_deleted', 'undo-update'));
+  res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'undo-update', update: saved, visible: true, restore: true }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsUpdates_deleted', 'undo-update'), undefined);
+  assert.equal(db.read('cmsUpdates', 'undo-update'), undefined);
+  assert.equal(db.read('cmsUpdates_drafts', 'undo-update').title, 'Last published title');
+  assert.equal(db.read('cmsUpdates_drafts', 'undo-update').status, 'dirty');
+  res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'undo-update', update: validUpdate({ title: 'Edited restored draft' }) }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsUpdates_drafts', 'undo-update').title, 'Edited restored draft');
+  assert.equal(db.read('cmsUpdates', 'undo-update'), undefined);
+});
 
 test('cmsDeleteUpdate deletes both revisions and logs', async () => {
   const db = fakeDb({ 'cmsUpdates/u1': { title: 't' }, 'cmsUpdates_drafts/u1': { title: 't' } });

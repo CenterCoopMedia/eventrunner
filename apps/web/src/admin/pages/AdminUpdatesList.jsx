@@ -20,6 +20,7 @@ import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { publishDateLabel, toPublishDate } from '../../lib/updateDates.js';
 import { useAdminApi } from '../adminApi.js';
+import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminUpdates } from '../useAdminUpdates.js';
@@ -158,6 +159,7 @@ export default function AdminUpdatesList() {
         }
       />
 
+      <DeletedRecordResult />
       <FeatureSwitch featureKeys={['updates']} />
 
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}

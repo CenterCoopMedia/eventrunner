@@ -651,6 +651,7 @@ test('cmsDeleteContent removes live and draft in one transaction and logs the ac
   const db = makeFakeDb({
     'cmsContent/hero__title': { value: 'live', visible: true, revision: 1 },
     'cmsContent_drafts/hero__title': { value: 'draft', visible: true, status: 'clean', basedOnRevision: 1 },
+    'cmsVersionHistory/hero-title-v1': { docPath: 'cmsContent/hero__title', revision: 1, fields: { value: 'live' } },
   });
   const res = fakeRes();
   await createCmsDeleteContentHandler(deps(db))(
@@ -659,6 +660,7 @@ test('cmsDeleteContent removes live and draft in one transaction and logs the ac
   );
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.deleted, ['cmsContent/hero__title', 'cmsContent_drafts/hero__title']);
+  assert.equal(res.body.publishedRevision, 1);
   assert.equal(db.read('cmsContent', 'hero__title'), undefined);
   assert.equal(db.read('cmsContent_drafts', 'hero__title'), undefined);
   assert.equal(db.commitCount, 0, 'deleteBoth owns one transaction, not a write batch');
@@ -686,6 +688,8 @@ test('cmsDeleteContent on an organization removes its representatives and its qu
   assert.equal(db.read('cmsOrganizations', 'beacon-fund'), undefined);
   assert.deepEqual(db.ids('organization_representatives'), ['uid-bo']);
   assert.deepEqual(db.ids('organization_edit_requests'), ['tide-media']);
+  assert.equal(res.body.removedRepresentatives, 2);
+  assert.equal(res.body.removedQueuedEdit, true);
   const rows = db.ids('admin_logs').map((id) => db.read('admin_logs', id));
   const revoked = rows.filter((row) => row.action === 'revokeOrganizationRepresentative').map((row) => row.docPath).sort();
   assert.deepEqual(revoked, ['organization_representatives/uid-ada', 'organization_representatives/uid-cy']);
@@ -732,6 +736,7 @@ test('cmsDeleteContent on a cmsSchedule doc cascades: its materials and their pu
   assert.equal(db.read('session_materials', 'm1'), undefined);
   assert.equal(db.read('session_materials', 'm2'), undefined);
   assert.equal(db.read('session_materials_public', 'm1'), undefined);
+  assert.equal(res.body.removedMaterials, 2);
   assert.notEqual(db.read('session_materials', 'other'), undefined);
 });
 

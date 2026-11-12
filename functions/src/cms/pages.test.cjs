@@ -58,7 +58,7 @@ function fakeStore() {
     deletes,
     logs,
     async writeDraft(args) { writes.push(args); },
-    async deleteBoth(args) { deletes.push(args); },
+    async deleteBoth(args) { deletes.push(args); return { publishedRevision: null }; },
     async logAdminAction(args) { logs.push(args); },
   };
 }

@@ -174,7 +174,7 @@ export function restoreRequestFor(collection, docId, entry, current, { pageId = 
     : snapshot;
   const visible = entry?.visible !== false;
   if (collection === 'cmsPages') {
-    return { endpoint: 'cmsSavePage', body: { page: { ...fields, id: docId, visible } } };
+    return { endpoint: 'cmsSavePage', body: { page: { ...fields, id: docId, visible }, ...(!current ? { create: true } : {}) } };
   }
   if (collection === 'cmsUpdates') {
     // A deleted update has a tombstone. restore tells the save to clear

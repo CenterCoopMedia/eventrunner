@@ -32,7 +32,7 @@ export async function readAdminVersions(name, cursor = null) {
  * Subscribe to one admin-readable collection, unfiltered.
  *
  * @param {string} name e.g. 'cmsPages' or 'cmsPages_drafts'
- * @param {(docs: Array<object>) => void} onNext receives `{ id, ...data }`
+ * @param {(docs: Array<object>, metadata: object) => void} onNext receives `{ id, ...data }` and snapshot metadata
  * @param {(error: unknown) => void} [onError] fail-soft notification
  * @returns {() => void} unsubscribe
  */
@@ -41,8 +41,9 @@ export function subscribeAdminCollection(name, onNext, onError) {
     (handleError) =>
       onSnapshot(
         collection(db, name),
+        { includeMetadataChanges: true },
         (snapshot) => {
-          onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+          onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })), snapshot.metadata);
         },
         handleError,
       ),

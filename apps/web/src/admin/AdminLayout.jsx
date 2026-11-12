@@ -88,6 +88,7 @@ import {
   writeRailCollapsed,
 } from './layoutPreference.js';
 import { markTourDone, readTourDone } from './tourState.js';
+import { DeletionUndoProvider } from './deletionUndo.jsx';
 import { SOCIAL_FEED_RELEASED } from './socialFeedRelease.js';
 
 /** Every docket item is an ABSOLUTE path. A relative `to` resolves against
@@ -662,6 +663,7 @@ function AdminDesk() {
 
   return (
     <CommandMenuAccount.Provider value={commandAccount}>
+    <DeletionUndoProvider key={uid}>
     <div className="admin-room flex min-h-screen min-h-svh flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
       <a href="#admin-content" className="skip-link skip-link--admin">
         Skip to main content
@@ -871,6 +873,7 @@ function AdminDesk() {
       {reporting ? <ReportProblemDialog onClose={() => setReporting(false)} returnFocusRef={reportRef} /> : null}
       {commandOpen ? <AdminCommandMenu docket={docket} onClose={() => setCommandOpen(false)} returnFocusRef={mobileMenuRef} /> : null}
     </div>
+    </DeletionUndoProvider>
     </CommandMenuAccount.Provider>
   );
 }

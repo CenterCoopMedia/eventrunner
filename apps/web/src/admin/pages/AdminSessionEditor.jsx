@@ -8,6 +8,7 @@ import { isSafeUrl } from 'shared/urlSafety';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { summarizePublish } from '../publishResult.js';
 import {
@@ -111,6 +112,7 @@ export default function AdminSessionEditor({ mode }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const call = useAdminApi();
+  const reportDeleted = useDeletedRecord();
   const { showToast } = useToast();
   const { eventConfig } = useEventConfig();
   const { rows, ready, error: listenerError, findRow } = useAdminSessions();
@@ -275,9 +277,8 @@ export default function AdminSessionEditor({ mode }) {
     setError(null);
     setErrorTitle(undefined);
     try {
-      await call('cmsDeleteContent', { collection: 'cmsSchedule', docId: currentId });
-      showToast('Session deleted.');
-      navigate(SESSIONS_LIST);
+      const deleted = await call('cmsDeleteContent', { collection: 'cmsSchedule', docId: currentId });
+      reportDeleted({ ...deleted, collection: 'cmsSchedule', docId: currentId, editorPath: `${SESSIONS_LIST}/${encodeURIComponent(currentId)}` }, SESSIONS_LIST);
     } catch (err) {
       setErrorTitle('The session was not deleted');
       setError(plannerError(err));

@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminSessions } from '../useAdminSessions.js';
 import {
@@ -117,6 +118,7 @@ export default function AdminSessionsList() {
           </>
         }
       />
+      <DeletedRecordResult />
       <PlannerFeatureControls choices={[{ key: 'schedule', label: 'Public schedule' }, { key: 'sessionBookmarks', label: 'Save sessions' }]} />
 
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}

@@ -929,6 +929,46 @@ describe('server errors and publish skips', () => {
 
 
 describe('contextual block actions', () => {
+  it('keeps inline Undo and its result as the draft returns, preserving the unsaved reorder guard', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent = [BODY_BLOCK_DRAFT, CTA_BLOCK_DRAFT];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT, CTA_BLOCK_DRAFT];
+    await renderAt('/admin/content/scholarships/intro');
+    fireEvent.click(await screen.findByRole('button', { name: 'Move Apply now up' }));
+    const row = screen.getByRole('link', { name: 'Scholarships open in spring.', exact: true }).closest('li');
+    const fields = { section: 'intro', field: 'body', blockType: 'richtext', value: '<p>Published introduction.</p>', order: 1 };
+    const entry = { revision: 2, fields, visible: true };
+    fetch.mockResolvedValueOnce(okResponse({ entries: [entry], nextCursor: null }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete', exact: true }));
+    await within(row).findByText(/Published versions can be restored as a draft/);
+    fetch.mockResolvedValueOnce(okResponse({ publishedRevision: 2 }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete this block' }));
+    const undo = await within(row).findByRole('button', { name: 'Undo' });
+    expect(undo).toHaveFocus();
+    expect(screen.queryByRole('alertdialog', { name: 'Unsaved changes' })).toBeNull();
+    act(() => {
+      adminSubscriptions.get('cmsContent')([CTA_BLOCK_DRAFT]);
+      adminSubscriptions.get('cmsContent_drafts')([CTA_BLOCK_DRAFT]);
+    });
+    let finish;
+    fetch.mockResolvedValueOnce(okResponse({ entries: [entry] }));
+    fetch.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    fireEvent.click(undo);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
+    expect(bodyOf(3)).toEqual({ collection: 'cmsContent', pageId: 'scholarships', section: 'intro', field: 'body', fields, visible: true });
+    act(() => adminSubscriptions.get('cmsContent_drafts')([CTA_BLOCK_DRAFT, { ...fields, id: 'intro__body', status: 'dirty' }]));
+    expect(within(row).getByRole('button', { name: 'Restoring…' })).toBeDisabled();
+    await act(async () => finish(okResponse({ status: 'dirty' })));
+    const link = await within(row).findByRole('link', { name: 'Open draft' });
+    expect(link).toHaveFocus();
+    expect(within(row).getAllByRole('status')).toHaveLength(1);
+    expect(within(row).getByRole('link', { name: 'Edit Published introduction.' })).toBeInTheDocument();
+    fireEvent.click(link);
+    const guard = await screen.findByRole('alertdialog', { name: 'Unsaved changes' });
+    fireEvent.click(within(guard).getByRole('button', { name: 'Stay' }));
+    expect(link).toBeInTheDocument();
+  });
+
   it('keeps publishing feedback on its row and restores focus when the publish control leaves', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];

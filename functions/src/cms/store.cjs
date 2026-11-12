@@ -206,7 +206,7 @@ function isAlreadyExistsError(err) {
  *
  * @param {{ db: FirebaseFirestore.Firestore, tx?: FirebaseFirestore.Transaction,
  *           collection: string, docId: string, now?: () => number }} args
- * @returns {Promise<{ livePath: string, draftPath: string }>}
+ * @returns {Promise<{ livePath: string, draftPath: string, publishedRevision: number|null }>}
  */
 async function deleteBoth({ db, tx = null, collection, docId, now = Date.now }) {
   const draftCol = draftCollectionFor(collection);
@@ -217,12 +217,17 @@ async function deleteBoth({ db, tx = null, collection, docId, now = Date.now }) 
   }
   const liveRef = db.collection(collection).doc(docId);
   const draftRef = db.collection(draftCol).doc(docId);
+  // Undo must use the version published when this delete commits, even if
+  // another record later takes the same id and publishes another version.
+  const liveSnap = await tx.get(liveRef);
+  const revision = liveSnap.exists ? liveSnap.data()?.revision : null;
+  const publishedRevision = Number.isSafeInteger(revision) && revision > 0 ? revision : null;
   const draftSnap = await tx.get(draftRef);
   const wasDirty = draftSnap.exists && draftSnap.data()?.status === 'dirty';
   await writePendingDelta({ db, tx, collection, delta: wasDirty ? -1 : 0, now });
   tx.delete(liveRef);
   tx.delete(draftRef);
-  return { livePath: `${collection}/${docId}`, draftPath: `${draftCol}/${docId}` };
+  return { livePath: `${collection}/${docId}`, draftPath: `${draftCol}/${docId}`, publishedRevision };
 }
 
 
