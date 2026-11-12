@@ -866,6 +866,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Function deployment logs record each deployed function's runtime account and
+  secret binding names from the complete inventory, without secret values or
+  extra cloud reads (#816).
 - A completed site reaches ready when an Owner email cannot be delivered.
   The build records the notice failure and does not repeat the attempt (#820).
 - Both Auth lifecycle triggers run as the compute service account, with per-secret

@@ -13,6 +13,7 @@ const { getEndpointFilters } = require('firebase-tools/lib/deploy/functions/func
 const { promptForFailurePolicies } = require('firebase-tools/lib/deploy/functions/prompts.js');
 const { createDeploymentPlan } = require('firebase-tools/lib/deploy/functions/release/planner.js');
 const { endpointFromFunction } = require('firebase-tools/lib/gcp/cloudfunctionsv2.js');
+const { endpointFromFunction: v1EndpointFromFunction } = require('firebase-tools/lib/gcp/cloudfunctions.js');
 
 const {
   main,
@@ -163,6 +164,64 @@ const syncUserPublicSource = () => ({
     eventFilters: { database: '(default)', namespace: '(default)' },
     eventFilterPathPatterns: { document: 'users/{uid}' },
   },
+});
+
+test('the post-deploy inventory records pinned v1 and v2 runtime and secret-name metadata only', async () => {
+  const account = '123456789-compute@developer.gserviceaccount.com';
+  const apiAuth = (id, secretEnvironmentVariables) => ({
+    name: `projects/${PROJECT}/locations/${REGION}/functions/${id}`,
+    runtime: 'nodejs22', entryPoint: id, serviceAccountEmail: account,
+    eventTrigger: { eventType: `providers/firebase.auth/eventTypes/user.${id === 'onUserDeleted' ? 'delete' : 'create'}`, resource: `projects/${PROJECT}` },
+    environmentVariables: { PRIVATE_VALUE: 'private-environment-sentinel' },
+    secretEnvironmentVariables,
+    sourceUploadUrl: 'https://example.test/private-upload',
+  });
+  const created = v1EndpointFromFunction(apiAuth('onUserCreated', [{
+    key: 'EMAIL_PROVIDER_API_KEY', secret: 'EMAIL_PROVIDER_API_KEY', projectId: PROJECT, version: '7',
+    value: 'private-secret-sentinel',
+  }]));
+  const deleted = v1EndpointFromFunction(apiAuth('onUserDeleted', []));
+  const v2 = endpointFromFunction(syncUserPublicApi);
+  const after = [created, deleted, v2];
+  const before = after.map((fn) => ({ ...fn, serviceAccount: `${PROJECT}@appspot.gserviceaccount.com` }));
+  const { code, messages } = await runDeploy({
+    bootstrap: false, completeInventory: before,
+    localFunctions: after.map((fn) => local(fn.id, false)), deployedInventory: after,
+  });
+  assert.equal(code, 0);
+  const prefix = 'deploy-functions: inventory ';
+  const records = messages.filter((line) => line.startsWith(prefix)).map((line) => JSON.parse(line.slice(prefix.length)));
+  assert.deepEqual(records, [
+    { id: 'onUserCreated', region: REGION, platform: 'gcfv1', serviceAccountEmail: account,
+      secretEnvironmentVariables: [{ key: 'EMAIL_PROVIDER_API_KEY', secret: 'EMAIL_PROVIDER_API_KEY' }] },
+    { id: 'onUserDeleted', region: REGION, platform: 'gcfv1', serviceAccountEmail: account, secretEnvironmentVariables: [] },
+    { id: 'syncUserPublic', region: REGION, platform: 'gcfv2', serviceAccountEmail: account, secretEnvironmentVariables: [] },
+  ]);
+  assert.doesNotMatch(JSON.stringify(messages), /private-|example\.test|appspot|projectId|"version"/);
+});
+
+test('inventory metadata omits malformed runtime and secret fields without logging their contents', async () => {
+  const endpoint = {
+    ...deployed('existingHttp'), serviceAccount: 'https://example.test/?token=private-sentinel',
+    secretEnvironmentVariables: [
+      { key: 'TOKEN', secret: 'https://example.test/private-sentinel' },
+      { key: 'private-sentinel\nAuthorization: bearer', secret: 'TOKEN' },
+      { key: 'TOKEN', secret: 'TOKEN', value: 'private-sentinel' },
+      null,
+    ],
+    context: { headers: { Authorization: 'private-sentinel' } },
+  };
+  const { code, messages } = await runDeploy({
+    bootstrap: false, completeInventory: [endpoint],
+    localFunctions: [local('existingHttp', false)], deployedInventory: [endpoint],
+  });
+  assert.equal(code, 0);
+  const record = JSON.parse(messages.find((line) => line.startsWith('deploy-functions: inventory ')).slice('deploy-functions: inventory '.length));
+  assert.deepEqual(record, {
+    id: 'existingHttp', region: REGION, platform: 'gcfv2', serviceAccountEmail: null,
+    secretEnvironmentVariables: [{ key: 'TOKEN', secret: 'TOKEN' }],
+  });
+  assert.doesNotMatch(JSON.stringify(messages), /private-sentinel|Authorization|example\.test/);
 });
 
 test('an existing retry upgrade gets a targeted force and the pinned planner has no deletes or recreates', async () => {

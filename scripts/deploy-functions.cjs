@@ -189,6 +189,23 @@ async function readCompleteInventory(projectId, {
   return endpoints;
 }
 
+function inventoryMetadata(endpoint) {
+  const safeText = (value, pattern) => typeof value === 'string' && pattern.test(value) ? value : null;
+  const bindings = Array.isArray(endpoint.secretEnvironmentVariables) ? endpoint.secretEnvironmentVariables : [];
+  const secretEnvironmentVariables = bindings.flatMap((binding) => {
+    const key = safeText(binding?.key, /^[A-Za-z_][A-Za-z0-9_]{0,254}$/);
+    const secret = safeText(binding?.secret, /^[A-Za-z0-9_-]{1,255}$/);
+    return key && secret ? [{ key, secret }] : [];
+  });
+  return {
+    id: safeText(endpoint.id, /^[A-Za-z][A-Za-z0-9_-]{0,62}$/),
+    region: safeText(endpoint.region, /^[a-z]+(?:-[a-z]+)+\d{1,2}$/),
+    platform: ['gcfv1', 'gcfv2', 'run'].includes(endpoint.platform) ? endpoint.platform : null,
+    serviceAccountEmail: safeText(endpoint.serviceAccount, /^[A-Za-z0-9._-]{1,64}@[a-z0-9.-]{1,150}\.gserviceaccount\.com$/),
+    secretEnvironmentVariables,
+  };
+}
+
 function readFunctionsConfig(projectDir) {
   const firebaseJson = JSON.parse(fs.readFileSync(path.join(projectDir, 'firebase.json'), 'utf8'));
   const config = functionsProjectConfig.normalizeAndValidate(firebaseJson.functions);
@@ -444,6 +461,9 @@ async function main({
     log.error(`deploy-functions: Firebase deploy exited 0, but ${absent.length} function(s) are not deployed: `
       + `${absent.join(', ')}. Run the deploy again; unchanged functions are skipped.`);
     return 1;
+  }
+  for (const endpoint of deployed) {
+    log.log(`deploy-functions: inventory ${JSON.stringify(inventoryMetadata(endpoint))}`);
   }
   log.log(`deploy-functions: verified ${localFunctions.length} function(s) in the deployed inventory`);
   return 0;
