@@ -77,7 +77,7 @@ export default function StripeTicketingWorkspace({ call }) {
     {pause !== null ? <TicketingConfirmation title={pause ? 'Pause new ticket sales?' : 'Reopen new ticket sales?'} confirmLabel={pause ? 'Pause new sales' : 'Reopen new sales'} busy={busy} error={error} onClose={() => { setPause(null); setError(''); }} onConfirm={changeSales}>
       <p>{pause ? 'Attendees will not be able to start new purchases. Purchases already in progress can finish. Refunds and check-in remain available.' : 'Available ticket types will be offered for sale.'}</p>
       <p>{data.mode === 'live' ? 'These sales collect real payments.' : 'These sales use test payments.'}</p>
-      <TextAreaField label="Reason for changing sales" value={reason} onChange={setReason} required maxLength={500} />
+        <TextAreaField data-help-skip="Operator-only sales change; the label directly asks for its reason." label="Reason for changing sales" value={reason} onChange={setReason} required maxLength={500} />
     </TicketingConfirmation> : null}
   </div>;
 }

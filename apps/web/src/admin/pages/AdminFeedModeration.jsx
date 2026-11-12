@@ -70,7 +70,7 @@ function ReportedPost({ postId, reports, call, onAccessDenied }) {
       <div className="flex flex-col gap-sm">
         <div className="flex flex-wrap items-center gap-sm">
           <div className="flex items-center gap-2xs"><h2 ref={heading} tabIndex={-1} className="break-all font-admin-data text-admin-sm text-admin-ink">
-            Post {postId}</h2><HelpTooltip label="Post {postId}">Review this attendee post and decide whether it can appear in the event feed.</HelpTooltip></div>
+            Post {postId}</h2><HelpTooltip label={`Post ${postId}`}>Review this attendee post and decide whether it can appear in the event feed.</HelpTooltip></div>
           {post?.state === 'removed' ? <StatusBadge tone="dead">Removed</StatusBadge> : null}
           <span className={rowMetaClass}>{reports.length} {reports.length === 1 ? 'report' : 'reports'} in this list</span>
           {received ? <time dateTime={received.toISOString()} className={rowMetaClass}>{received.toLocaleString()}</time> : null}
