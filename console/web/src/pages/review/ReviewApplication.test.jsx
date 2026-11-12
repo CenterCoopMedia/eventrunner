@@ -76,6 +76,24 @@ describe('ReviewApplication', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'NC Local Summit' })).toBeInTheDocument();
   });
 
+  it('distinguishes the action-result refresh from the header without repeating a decision', async () => {
+    let reads = 0;
+    serve(() => {
+      reads += 1;
+      if (reads === 2) throw new Error('The network is down.');
+      return request({ status: reads > 2 ? 'launched' : 'ready' });
+    });
+    page();
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark as launched' }));
+    fireEvent.click(within(screen.getByRole('group', { name: 'Mark as launched' })).getByRole('button', { name: 'Mark as launched' }));
+    const refreshResult = await screen.findByRole('button', { name: 'Refresh request after action' });
+    expect(screen.getByRole('button', { name: 'Refresh request' })).not.toBe(refreshResult);
+    fireEvent.click(refreshResult);
+    await vi.waitFor(() => expect(screen.queryByRole('button', { name: 'Refresh request after action' })).not.toBeInTheDocument());
+    expect(reads).toBe(3);
+    expect(callApi.mock.calls.filter(([name]) => name === 'launchApplication')).toHaveLength(1);
+  });
+
   it('shows the frozen answers in plain words', async () => {
     page();
     expect(await screen.findByRole('heading', { level: 1, name: 'NC Local Summit' })).toBeInTheDocument();
@@ -114,6 +132,7 @@ describe('ReviewApplication', () => {
     page();
     fireEvent.click(await screen.findByRole('button', { name: 'Decline' }));
     const field = screen.getByLabelText('Note to the client');
+    expect(screen.getAllByRole('button', { name: 'Decline' })).toHaveLength(1);
     expect(field).toHaveFocus();
     fireEvent.click(within(screen.getByRole('form', { name: 'Decline this request' })).getByRole('button', { name: 'Decline' }));
     expect(await screen.findByText('Write a note to the client.')).toBeInTheDocument();
@@ -317,6 +336,10 @@ describe('ReviewApplication', () => {
       });
       page();
       fireEvent.click(await screen.findByRole('button', { name: 'Close request' }));
+      expect(screen.getAllByRole('button', { name: 'Close request' })).toHaveLength(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.getByRole('button', { name: 'Close request' })).toHaveFocus();
+      fireEvent.click(screen.getByRole('button', { name: 'Close request' }));
       expect(screen.getByText(/stays until you remove it/)).toBeInTheDocument();
       fireEvent.change(screen.getByLabelText('Note to the client'), { target: { value: 'Wrong person.' } });
       fireEvent.click(within(screen.getByRole('form', { name: 'Close this request' })).getByRole('button', { name: 'Close request' }));

@@ -35,12 +35,12 @@ describe('catalog save reconciliation', () => {
     render(<CatalogSurface call={call} />);
     fireEvent.change(screen.getByLabelText('Ticket name'), { target: { value: 'Saved version' } });
     fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '30' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await screen.findByText(message);
     expect(screen.getByLabelText('Ticket name')).toHaveValue('Saved version');
     fireEvent.change(screen.getByLabelText('Ticket name'), { target: { value: 'Unsaved later edit' } });
     fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '35' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     expect(saves).toBe(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Discard unsaved edits and reload catalog' }));
@@ -51,7 +51,7 @@ describe('catalog save reconciliation', () => {
     expect(screen.getByLabelText('Price (USD)')).toHaveValue(String(savedPrice / 100));
     expect(screen.queryByText(message)).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Ticket name'), { target: { value: 'New intentional edit' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await screen.findByText('Catalog saved. Existing orders keep the prices they were issued with.');
     const writes = call.mock.calls.filter(([, body]) => body.action === 'saveCatalog').map(([, body]) => body);
     expect(writes.map((body) => body.expectedRevision)).toEqual([1, 2]);
@@ -71,12 +71,12 @@ describe('catalog save reconciliation', () => {
     });
     render(<CatalogSurface call={call} />);
     fireEvent.change(screen.getByLabelText('Ticket name'), { target: { value: 'Retained draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await screen.findByText('The save outcome is unknown.');
     fireEvent.click(screen.getByRole('button', { name: 'Discard unsaved edits and reload catalog' }));
     await screen.findByText('The catalog reload failed.');
     expect(screen.getByLabelText('Ticket name')).toHaveValue('Retained draft');
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     expect(call.mock.calls.filter(([, body]) => body.action === 'saveCatalog')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Discard unsaved edits and reload catalog' }));
     await waitFor(() => expect(screen.getByLabelText('Ticket name')).toHaveValue('Latest server version'));
@@ -101,6 +101,6 @@ describe('catalog save reconciliation', () => {
     await waitFor(() => expect(screen.getByRole('switch', { name: 'Ticket sales' })).toBeChecked());
     expect(screen.getByText('The editor now shows the current saved catalog.')).toBeInTheDocument();
     expect(screen.queryByText(/The saved catalog has changed/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('button', { name: 'Save ticket settings' })).toHaveAttribute('aria-disabled', 'false');
   });
 });

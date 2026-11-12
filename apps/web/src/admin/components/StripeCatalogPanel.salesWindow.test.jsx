@@ -39,7 +39,7 @@ describe('catalog sales windows', () => {
     fireEvent.change(within(typeFieldset()).getByLabelText('Ticket sales end Date'), { target: { value: '2027-01-15' } });
     fireEvent.change(within(typeFieldset()).getByLabelText('Ticket sales end Time'), { target: { value: '23:59' } });
     expect(within(typeFieldset()).getByText('Sales end Friday, January 15, 2027 at 11:59 PM Eastern Standard Time (UTC−05:00).')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await screen.findByText('Catalog saved. Existing orders keep the prices they were issued with.');
     const sent = call.mock.calls.find(([, body]) => body.action === 'saveCatalog')[1].catalog;
     expect(sent.ticketTypes[0].salesEndAt).toBe('2027-01-16T04:59:00.000Z');
@@ -52,7 +52,7 @@ describe('catalog sales windows', () => {
     render(<Surface call={call} />);
     fireEvent.click(screen.getByRole('button', { name: 'Clear event sales start' }));
     expect(screen.getByText('No start restriction.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await waitFor(() => expect(call).toHaveBeenCalled());
     expect(call.mock.calls[0][1].catalog.salesStartAt).toBeNull();
   });
@@ -61,17 +61,17 @@ describe('catalog sales windows', () => {
     const call = saving();
     render(<Surface call={call} />);
     fireEvent.change(screen.getByLabelText('Event sales end Date'), { target: { value: '2027-03-14' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     expect(call).not.toHaveBeenCalled();
     expect(screen.getByText('Correct the marked sales times before saving.')).toBeInTheDocument();
     expect(screen.getByText('Enter a time.')).toBeInTheDocument();
     expect(screen.getByLabelText('Event sales end Time')).toHaveAttribute('aria-invalid', 'true');
     fireEvent.change(screen.getByLabelText('Event sales end Time'), { target: { value: '02:15' } });
     expect(screen.getByText(/2:15 AM does not exist on March 14, 2027/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     expect(call).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('Event sales end Time'), { target: { value: '03:15' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await waitFor(() => expect(call).toHaveBeenCalled());
     expect(call.mock.calls[0][1].catalog.salesEndAt).toBe('2027-03-14T07:15:00.000Z');
   });
@@ -85,14 +85,14 @@ describe('catalog sales windows', () => {
       return { catalog: { ...body.catalog, revision: 2 }, mode: 'test' };
     });
     render(<Surface call={call} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await screen.findByText('The save response was lost.');
     fireEvent.change(screen.getByLabelText('Event sales end Date'), { target: { value: '2027-03-14' } });
     fireEvent.click(screen.getByRole('button', { name: 'Discard unsaved edits and reload catalog' }));
     await screen.findByText('The current saved catalog is loaded. Review it before making more changes.');
     expect(screen.getByLabelText('Event sales end Date')).toHaveValue('');
     expect(screen.getByText('No end restriction.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await screen.findByText('Catalog saved. Existing orders keep the prices they were issued with.');
     expect(call.mock.calls.at(-1)[1].catalog.salesEndAt).toBeNull();
   });
@@ -102,7 +102,7 @@ describe('catalog sales windows', () => {
     render(<Surface call={call} />);
     fireEvent.change(screen.getByLabelText('Event sales end Date'), { target: { value: '2027-03-14' } });
     fireEvent.change(within(typeFieldset()).getByLabelText(/^Price/), { target: { value: '-1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     expect(call).not.toHaveBeenCalled();
     expect(screen.getByText('Correct the marked sales times and ticket prices before saving.')).toBeInTheDocument();
     expect(screen.getByText('Enter a time.')).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe('catalog sales windows', () => {
     const added = screen.getAllByRole('group', { name: /Ticket type 2/ })[0];
     fireEvent.change(within(added).getByLabelText('Ticket sales start Date'), { target: { value: '2027-01-01' } });
     fireEvent.click(within(added).getByRole('button', { name: 'Remove ticket type' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     await waitFor(() => expect(call).toHaveBeenCalled());
   });
 

@@ -204,12 +204,12 @@ test.describe.serial('event-time fields', () => {
     // The repeated hour asks which one before the catalog can save.
     await page.getByRole('group', { name: 'Event sales end', exact: true }).getByLabel('Date', { exact: true }).fill('2027-11-07');
     await page.getByRole('group', { name: 'Event sales end', exact: true }).getByLabel('Time', { exact: true }).fill('01:30');
-    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save', exact: true }).click();
+    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save ticket settings', exact: true }).click();
     await expect(page.getByText('Correct the marked sales times before saving.')).toBeVisible();
     expect(saves).toHaveLength(0);
     await page.getByRole('radio', { name: /EST \(UTC−05:00\), after the clocks go back/ }).check();
     await typeGroup.getByRole('group', { name: 'Ticket sales end', exact: true }).getByLabel('Time', { exact: true }).fill('22:00');
-    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save', exact: true }).click();
+    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save ticket settings', exact: true }).click();
     await expect(page.getByText('Catalog saved. Existing orders keep the prices they were issued with.')).toBeVisible();
     expect(saves).toHaveLength(1);
     expect(saves[0]).toMatchObject({ salesStartAt: '2026-11-16T14:00:00.000Z', salesEndAt: '2027-11-07T06:30:00.000Z' });

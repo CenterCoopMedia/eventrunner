@@ -180,7 +180,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
           }}>{draft.ticketTypes.length >= 20 ? '20 ticket types maximum' : 'Add ticket type'}</button>
         </div>
         {notice ? <div ref={errorRef} tabIndex={-1}><Notice tone={notice.tone} message={notice.message} /></div> : null}
-        <button type="submit" className={primaryButtonClass} aria-busy={busy && !reloading} aria-disabled={busy || recoveryRequired || revisionChanged}>{busy && !reloading ? 'Saving catalog…' : 'Save'}</button>
+        <button type="submit" className={primaryButtonClass} aria-label={busy && !reloading ? 'Saving catalog…' : 'Save ticket settings'} aria-busy={busy && !reloading} aria-disabled={busy || recoveryRequired || revisionChanged}>{busy && !reloading ? 'Saving catalog…' : 'Save'}</button>
       </form>
     </Panel>
   );

@@ -176,7 +176,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByRole('status').filter({ hasText: 'The editor now shows the current saved catalog.' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Discard unsaved edits and reload catalog' })).toHaveCount(0);
     await screenshot(page, 'stripe-catalog-after-reopen', page.locator('form').filter({ hasText: 'Ticket types' }));
-    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save', exact: true }).click();
+    await page.locator('form').filter({ hasText: 'Ticket types' }).getByRole('button', { name: 'Save ticket settings', exact: true }).click();
     await expect(page.getByText('Catalog saved. Existing orders keep the prices they were issued with.')).toBeVisible();
     expect(writes).toHaveLength(1);
     expect(writes[0].expectedRevision).toBe(CATALOG.revision + 1);
@@ -230,7 +230,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await page.getByLabel('Code', { exact: true }).fill('early');
     await page.getByLabel('Percent off').fill('20');
     await page.getByLabel('Use limit (tickets)').fill('50');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('button', { name: 'Save promo code', exact: true }).click();
     await expect(page.getByText('Promo code saved.')).toBeVisible();
     await expect(page.getByRole('listitem', { name: 'EARLY' })).toContainText('20% off each ticket');
     for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }]]) {
@@ -298,7 +298,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByRole('heading', { name: 'Stripe sales', exact: true })).toBeVisible();
     const endTour = page.getByRole('button', { name: 'End tour', exact: true });
     if (await endTour.isVisible()) await endTour.click();
-    await page.getByRole('region', { name: 'Orders', exact: true }).getByRole('button', { name: 'View order', exact: true }).first().click();
+    await page.getByRole('region', { name: 'Orders', exact: true }).getByRole('button', { name: /^View order / }).first().click();
     await expect(page.getByRole('heading', { name: 'Order details', exact: true })).toBeVisible();
     for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }], ['narrow', { width: 320, height: 800 }]]) {
       await page.setViewportSize(viewport);

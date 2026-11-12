@@ -183,21 +183,22 @@ for (const width of [1440, 390, 320]) {
       if (name === 'closeApplication') { decisions += 1; await pending.promise; return { emailed: 2, mailFailed: false }; }
     });
     await page.goto(`${origin}/review/visual-gathering`);
-    await page.getByRole('button', { name: 'Close request' }).first().click();
+    await page.getByRole('button', { name: 'Close request' }).click();
     await page.getByLabel('Note to the client').fill('This request was replaced by a new event.');
-    await page.getByRole('button', { name: 'Close request' }).last().click();
+    await page.getByRole('form', { name: 'Close this request' }).getByRole('button', { name: 'Close request' }).click();
     await expect(page.getByRole('button', { name: 'Saving decision…' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     pending.resolve();
     const result = page.getByRole('status');
     await expect(result).toContainText('The decision is saved, but we could not refresh the request.');
     await expect(result).toBeInViewport();
-    await expect(page.getByRole('button', { name: 'Refresh request' }).last()).toBeInViewport();
-    await expect(page.getByRole('button', { name: 'Close request' }).first()).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Refresh request after action', exact: true })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Close request' })).toBeDisabled();
     await capture(page, 'decision-refresh', width);
-    await page.getByRole('button', { name: 'Refresh request' }).last().click();
+    await page.getByRole('button', { name: 'Refresh request after action', exact: true }).click();
     // The page heading keeps its own Refresh request button.
     await expect(page.getByRole('button', { name: 'Refresh request' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Refresh request after action', exact: true })).toHaveCount(0);
     expect(decisions).toBe(1);
     expect(reads).toBe(3);
     expect(errors).toEqual([]);
