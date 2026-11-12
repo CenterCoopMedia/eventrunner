@@ -669,7 +669,7 @@ test('the token is tested, moved, and deleted from the console, and the leftover
   assert.equal(fake.state.endpoints[0].url, `https://us-central1-${PROJECT}.cloudfunctions.net/ticketingWebhook`);
 });
 
-test('fresh provisioning grants both configured CCM support accounts and client Owners operator access', async () => {
+test('fresh provisioning grants CCM support site operator and project Editor access alongside client Owners', async () => {
   const fake = setup();
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   const bootstrap = fake.clientFirestore.read('config/bootstrap');
@@ -677,6 +677,11 @@ test('fresh provisioning grants both configured CCM support accounts and client 
     assert.equal(resolveAdminTier(bootstrap, email), 'operator', email);
   }
   assert.deepEqual(bootstrap.supportAdminEmails, ['jamditis@gmail.com', 'amditisjunk@gmail.com']);
+  const project = bindingsOf(fake, `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`);
+  for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com']) {
+    assert.ok(holds(project, 'roles/editor', `user:${email}`), email);
+  }
+  assert.equal(holds(project, 'roles/editor', 'user:ana@example.org'), false);
 });
 
 test('a provisioning retry preserves client operators and configured support access after seed', async () => {
@@ -689,6 +694,10 @@ test('a provisioning retry preserves client operators and configured support acc
     supportAdminEmails: ['Jamditis@Gmail.com', 'jamditis@gmail.com'],
     staffExpiry: { 'temp@example.org': 'preserved' },
   });
+  const project = bindingsOf(fake, `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`);
+  const editor = project.find((binding) => binding.role === 'roles/editor');
+  editor.members = editor.members.filter((member) => member !== 'user:amditisjunk@gmail.com');
+  editor.members.push('user:existing-operator@example.org');
   await fake.db.doc('applications/a1').update({ status: 'building' });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   const after = (await ref.get()).data();
@@ -698,6 +707,10 @@ test('a provisioning retry preserves client operators and configured support acc
   assert.deepEqual(after.supportAdminEmails, ['jamditis@gmail.com', 'amditisjunk@gmail.com']);
   assert.equal(after.adminEmails.includes('Added-by-client@Example.org'), false);
   assert.deepEqual(after.staffExpiry, { 'temp@example.org': 'preserved' });
+  const afterPolicy = bindingsOf(fake, `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`);
+  for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com', 'existing-operator@example.org']) {
+    assert.ok(holds(afterPolicy, 'roles/editor', `user:${email}`), email);
+  }
 });
 
 test('a dead token fails clearly, keeps the console copy, and says nothing the provider said', async () => {

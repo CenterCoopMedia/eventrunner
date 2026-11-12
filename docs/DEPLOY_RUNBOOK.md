@@ -1384,7 +1384,7 @@ Use placeholders from your own records. Nothing below belongs in the repository.
    | Variable | `CONSOLE_PROJECT_ID` | The console project |
    | Variable | `CONSOLE_PUBLIC_URL` | `https://console.eventrunner.org` |
    | Variable | `CONSOLE_MAIL_FROM` | The console's sender |
-   | Variable, optional | `EVENT_SUPPORT_ADMIN_EMAILS` | Comma-separated CCM support operators. The workflow supplies the default list when unset or empty. |
+   | Variable, optional | `EVENT_SUPPORT_ADMIN_EMAILS` | Comma-separated CCM support identities for site operator access and permanent project Editor access. The workflow supplies the default list when unset or empty. |
    | Variable | `CLOUDFLARE_ZONE_ID` | The `eventrunner.org` zone |
    | Variable | `PROVISIONER_APP_ID`, `PROVISIONER_INSTALLATION_ID` | The provisioner App |
    | Secret | `PROVISIONER_APP_PRIVATE_KEY` | The provisioner App's key |
@@ -1395,6 +1395,8 @@ Use placeholders from your own records. Nothing below belongs in the repository.
 9. **Settings.** Set the client folder, billing account and region at `/review/settings` in the console, with the agreement. No signup link can be created until all four are set.
 
 The `seed` step merges the configured support addresses into `config/bootstrap.adminEmails` alongside client Owners, and records `supportAdminEmails` for the Access page's CCM support label. A retry restores the configured support operators and keeps other operators. Clients can change or remove these accounts under the normal last-operator rule. Provisioning sends no access-instructions email to support accounts. Disclose their access during onboarding; see [Client onboarding](CLIENT_ONBOARDING.md#7-first-operator-then-a-second).
+
+The `deploy-identity` step also grants `roles/editor` to each `user:<support address>` on the client project, using that same setting. These permanent, unconditional IAM bindings are additive and restored on retry. They permit changes to project resources and access to project data. Site Access controls do not change project IAM; a support account removed from the site keeps its project grant. Decommissioning is unchanged. Disclose project access separately from the site role.
 
 10. **Check the organization's policies on the client folder.** `iam.allowedPolicyMemberDomains` can refuse the `allUsers` binding public functions need. Allow public invocation on the client folder where required, or the deploy fails. Provisioning grants the compute account its required roles explicitly; it does not depend on automatic Editor grants.
 

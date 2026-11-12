@@ -220,6 +220,8 @@ Explain that CCM support can access site content, attendee records and settings 
 
 CCM support does not satisfy the second-operator setup check and is excluded from the Owner-alert recipients. The configured platform contact still gets a copy of client alerts.
 
+The same support setting gives each listed identity permanent `roles/editor` access as a Google user on the client's Google Cloud/Firebase project. Provisioning adds these IAM bindings without removing existing bindings and restores a missing support grant on retry. This project access permits changes to resources and access to data, and is separate from site access: removing an account in **Settings → Access** does not remove its project IAM grant. Explain both levels during handoff; CCM reviews project access separately.
+
 The first operator (from `--admin` above, or `config/bootstrap.adminEmails`) signs in and confirms
 the admin panel loads. Point them at **Set up your event** on the rail: it shows every row of
 `--check` (§4) as a step, says which steps are theirs, and links to the screen for each. Then, from **admin Settings → Access**, grant a second operator — do not

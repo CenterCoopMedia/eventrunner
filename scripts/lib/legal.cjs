@@ -122,6 +122,7 @@ function buildPrivacyBlocks(ctx) {
       value: clause(
         `We share personal information with the service providers that run this site: ${processors.join(', ')}. ` +
         'If the Center for Cooperative Media (CCM) hosts this site, authorized CCM staff and its support account have full operator access to site content, attendee records and settings to provide support and diagnose problems. ' +
+        'For CCM-hosted sites, CCM support also keeps permanent Editor access to the Google Cloud/Firebase project to manage resources and inspect project data; removing site access does not remove this project access. Contact CCM to review project access separately. ' +
         'We do not sell personal information.',
       ),
     },

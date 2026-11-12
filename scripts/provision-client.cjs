@@ -298,6 +298,16 @@ const computeAccount = (ctx) => `${ctx.projectNumber}-compute@developer.gservice
 const summary = (notes) => (notes.length > 0 ? notes.join('; ') : 'already right');
 const functionUrl = (ctx, name) => `https://${ctx.region}-${ctx.projectId}.cloudfunctions.net/${name}`;
 
+/** One support identity list for project IAM and site operator access. */
+function supportAdminEmails(ctx) {
+  const emails = [...new Set((ctx.deps.env.EVENT_SUPPORT_ADMIN_EMAILS || '')
+    .split(',').map((email) => email.trim().toLowerCase()).filter(Boolean))];
+  if (emails.some((email) => email.length > 254 || !EMAIL_ADDRESS_RE.test(email))) {
+    throw new Error('EVENT_SUPPORT_ADMIN_EMAILS must contain comma-separated email addresses');
+  }
+  return emails;
+}
+
 // Keep resource identities for deletion, including DNS proof after a provider
 // stops returning its pending verification records. Never store credentials.
 async function rememberResources(ctx, patch) {
@@ -492,6 +502,7 @@ async function stepDeployIdentity(ctx) {
   const added = await grant(ctx, 'project roles', projectResource(ctx), [
     ...[...DEPLOY_ROLES, `projects/${projectId}/roles/${INVOKER_ROLE}`].map((name) => ({ role: name, member: deployMember })),
     ...COMPUTE_ROLES.map((role) => ({ role, member: serviceAccount(compute) })),
+    ...supportAdminEmails(ctx).map((email) => ({ role: 'roles/editor', member: `user:${email}` })),
     { role: 'roles/pubsub.publisher', member: storageAgent },
     { role: 'roles/iam.serviceAccountTokenCreator', member: pubsubAgent },
     { role: 'roles/firebaserules.firestoreServiceAgent', member: rulesAgent },
@@ -1114,12 +1125,8 @@ function brandingProblem(output) {
 
 /** Merge the configured support operators without removing client access. */
 async function seedSupportAdmins(ctx, db) {
-  const emails = [...new Set((ctx.deps.env.EVENT_SUPPORT_ADMIN_EMAILS || '')
-    .split(',').map((email) => email.trim().toLowerCase()).filter(Boolean))];
+  const emails = supportAdminEmails(ctx);
   if (emails.length === 0) return false;
-  if (emails.some((email) => email.length > 254 || !EMAIL_ADDRESS_RE.test(email))) {
-    throw new Error('EVENT_SUPPORT_ADMIN_EMAILS must contain comma-separated email addresses');
-  }
   const ref = db.collection('config').doc('bootstrap');
   const normalize = (list) => [...new Set((Array.isArray(list) ? list : [])
     .filter((email) => typeof email === 'string')
