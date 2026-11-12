@@ -130,9 +130,11 @@ test('real filter and sort resolve only the list, preserve focus, nodes and URL 
 test('rapid changes cancel the old effect and reduced motion stays instant, including empty search', async ({ page }) => {
   await openSchedule(page);
   const facet = page.getByRole('checkbox', { name: /^panel \(/ });
-  await facet.check();
+  await facet.click();
+  await expect(facet).toBeChecked();
   await expect.poll(() => resolveCount(page)).toBe(1);
-  await facet.uncheck();
+  await facet.click();
+  await expect(facet).not.toBeChecked();
   await expect.poll(() => resolveCount(page)).toBe(2);
   expect(await page.evaluate(() => globalThis.resolves.map(({ animation }) => animation.playState)))
     .toEqual(['idle', 'paused']);
@@ -166,7 +168,9 @@ test('the grid resolves its current results and a real mode swap cancels native 
     await event.set({ ...original, tracks: [{ letter: 'A', name: 'Resolve fixture' }] });
     await openSchedule(page, 1440);
     await expect(page.locator(`${RESULTS}.horizontal-scroll-region`)).toBeVisible();
-    await page.getByRole('checkbox', { name: /^panel \(/ }).check();
+    const facet = page.getByRole('checkbox', { name: /^panel \(/ });
+    await facet.click();
+    await expect(facet).toBeChecked();
     await checkResolve(page, 1);
     await page.getByLabel('Sort sessions').selectOption('saved');
     await expect(page.locator(`ul${RESULTS}`)).toBeVisible();
