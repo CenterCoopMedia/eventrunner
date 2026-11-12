@@ -20,6 +20,7 @@ import { MemoryRouter } from 'react-router';
 
 const configSubscriptions = new Map();
 const commandEditorRecords = new Map();
+const commandEditorSubscriptions = new Map();
 vi.mock('../lib/configSource.js', () => ({
   subscribeConfigDoc: (docId, onNext) => {
     configSubscriptions.set(docId, onNext);
@@ -33,8 +34,10 @@ vi.mock('../lib/contentSource.js', () => ({
 vi.mock('../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 vi.mock('./adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext) => {
+    if (!commandEditorSubscriptions.has(name)) commandEditorSubscriptions.set(name, new Set());
+    commandEditorSubscriptions.get(name).add(onNext);
     onNext(commandEditorRecords.get(name) ?? []);
-    return () => {};
+    return () => commandEditorSubscriptions.get(name)?.delete(onNext);
   },
 }));
 // The signed-in account. The tour's stored mark is per account, so the one
@@ -112,6 +115,15 @@ async function renderAdmin(path = '/admin/pages') {
   return result;
 }
 
+async function confirmCommandDraft(collection, docId, fields) {
+  const name = `${collection}_drafts`;
+  const docs = [{ id: docId, ...fields, status: 'dirty' }];
+  commandEditorRecords.set(name, docs);
+  await act(async () => {
+    for (const notify of commandEditorSubscriptions.get(name) ?? []) notify(docs);
+  });
+}
+
 /** The shell chrome only: the docket and its furniture, never the page. */
 function shellChrome(container) {
   const room = container.querySelector('.admin-room').cloneNode(true);
@@ -130,6 +142,7 @@ beforeEach(() => {
   signedInUid = 'admin-1';
   configSubscriptions.clear();
   commandEditorRecords.clear();
+  commandEditorSubscriptions.clear();
   window.localStorage.removeItem(RAIL_COLLAPSED_KEY);
   window.localStorage.removeItem(DOCKET_GROUPS_KEY);
   forgetLayoutMemory();
@@ -156,13 +169,22 @@ describe('the admin shell', () => {
     await screen.findByRole('button', { name: 'Save' });
     await waitFor(() => expect(screen.getByLabelText(field, { exact: true })).toHaveValue('Created command record'));
     expect(await screen.findAllByText('Draft saved. It is not live until you publish it.')).not.toHaveLength(0);
+    const created = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const to = `/admin/${section}/${encodeURIComponent(created.docId)}`;
+    expect(readCommandRecents(signedInUid).find((record) => record.to === to)).toBeUndefined();
+    await confirmCommandDraft(created.collection, created.docId, created.fields);
+    expect(readCommandRecents(signedInUid).find((record) => record.to === to)?.label).toBe('Created command record');
     fireEvent.change(screen.getByLabelText(field, { exact: true }), { target: { value: 'Updated command record' } });
+    expect(readCommandRecents(signedInUid).find((record) => record.to === to)?.label).toBe('Created command record');
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
     expect(String(globalThis.fetch.mock.calls[0][0])).toMatch(/\/cmsCreateContent$/);
     expect(String(globalThis.fetch.mock.calls[1][0])).toMatch(/\/cmsUpdateContent$/);
     expect(JSON.parse(globalThis.fetch.mock.calls[1][1].body).docId).toBe(JSON.parse(globalThis.fetch.mock.calls[0][1].body).docId);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    const updated = JSON.parse(globalThis.fetch.mock.calls[1][1].body);
+    await confirmCommandDraft(updated.collection, updated.docId, updated.fields);
+    expect(readCommandRecents(signedInUid).find((record) => record.to === to)?.label).toBe('Updated command record');
     fireEvent.click(screen.getByRole('button', { name: 'Find work' }));
     fireEvent.click(screen.getByRole('option', { name: 'Other command record Recent record' }));
     await waitFor(() => expect(screen.getByLabelText(field, { exact: true })).toHaveValue('Other command record'));
@@ -180,6 +202,11 @@ describe('the admin shell', () => {
     expect(screen.getByLabelText('Name', { exact: true })).toHaveValue('Command organization');
     await act(async () => finishPublish({ ok: false, status: 500, json: async () => ({ error: { message: 'Publishing is unavailable.' } }) }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The draft is saved, and it is not published');
+    expect(screen.getByRole('alert')).toHaveTextContent('Publishing is unavailable.');
+    expect(readCommandRecents(signedInUid)).toEqual([]);
+    const created = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    await confirmCommandDraft(created.collection, created.docId, created.fields);
+    expect(readCommandRecents(signedInUid)).toEqual([{ to: '/admin/organizations/command-organization', label: 'Command organization' }]);
     expect(screen.getByRole('alert')).toHaveTextContent('Publishing is unavailable.');
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));

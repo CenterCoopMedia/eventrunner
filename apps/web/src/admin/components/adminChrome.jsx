@@ -140,6 +140,7 @@ export function AdminLoadingState({ label }) {
  *
  * @param {object} props
  * @param {string} props.title the section or record name
+ * @param {string|null} [props.recentTitle] confirmed record title for Find work
  * @param {React.ReactNode} [props.state] the record's state badge
  * @param {React.ReactNode} [props.identifiers] ids, paths, counts — data face
  * @param {React.ReactNode} [props.description] what this surface does
@@ -149,6 +150,7 @@ export function AdminLoadingState({ label }) {
  */
 export default function AdminPageHeader({
   title,
+  recentTitle = null,
   state,
   identifiers,
   description,
@@ -157,7 +159,7 @@ export default function AdminPageHeader({
   as: Heading = 'h1',
 }) {
   const headerRef = useAdminHeaderPadding();
-  useCommandRecent(Heading === 'h1' ? title : null);
+  useCommandRecent(Heading === 'h1' ? recentTitle : null);
   return (
     <>
       <header ref={headerRef} className="admin-job-line flex flex-col gap-2xs border-admin-rule-header border-b-admin-header bg-admin-ground-raised">

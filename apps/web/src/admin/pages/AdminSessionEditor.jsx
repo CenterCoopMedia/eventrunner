@@ -316,6 +316,7 @@ export default function AdminSessionEditor({ mode }) {
     >
       <AdminPageHeader
         title={creating ? 'New session' : form.title || 'Session'}
+        recentTitle={row?.current?.title}
         state={(
           <>
             {mode === 'edit' ? <RecordState state={row?.state} /> : null}

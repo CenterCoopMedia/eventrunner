@@ -105,13 +105,15 @@ describe('admin command menu', () => {
   });
 
   it('records only a loaded publishable editor header, while standalone headers work without a router', () => {
-    const view = render(<CommandMenuAccount.Provider value={{ uid: 'header-one', pathname: '/admin/pages/home' }}><AdminPageHeader title="Home page" /></CommandMenuAccount.Provider>);
+    const view = render(<CommandMenuAccount.Provider value={{ uid: 'header-one', pathname: '/admin/pages/home' }}><AdminPageHeader title="New page" /></CommandMenuAccount.Provider>);
+    expect(readCommandRecents('header-one')).toEqual([]);
+    view.rerender(<CommandMenuAccount.Provider value={{ uid: 'header-one', pathname: '/admin/pages/home' }}><AdminPageHeader title="Home page" recentTitle="Home page" /></CommandMenuAccount.Provider>);
     expect(readCommandRecents('header-one')).toEqual([{ to: '/admin/pages/home', label: 'Home page' }]);
-    view.rerender(<CommandMenuAccount.Provider value={{ uid: 'header-one', pathname: '/admin/pages/home' }}><AdminPageHeader title="An unsaved title" /></CommandMenuAccount.Provider>);
+    view.rerender(<CommandMenuAccount.Provider value={{ uid: 'header-one', pathname: '/admin/pages/home' }}><AdminPageHeader title="An unsaved title" recentTitle="Home page" /></CommandMenuAccount.Provider>);
     expect(readCommandRecents('header-one')).toEqual([{ to: '/admin/pages/home', label: 'Home page' }]);
-    view.rerender(<CommandMenuAccount.Provider value={{ uid: 'header-one', pathname: '/admin/pages/home' }}><AdminPageHeader key="return-visit" title="Saved on a previous visit" /></CommandMenuAccount.Provider>);
-    expect(readCommandRecents('header-one')).toEqual([{ to: '/admin/pages/home', label: 'Saved on a previous visit' }]);
-    view.rerender(<CommandMenuAccount.Provider value={{ uid: 'header-two', pathname: '/admin/attendees/private' }}><AdminPageHeader title="Private attendee" /></CommandMenuAccount.Provider>);
+    view.rerender(<CommandMenuAccount.Provider value={{ uid: 'header-one', pathname: '/admin/pages/home' }}><AdminPageHeader title="Another unsaved edit" recentTitle="Confirmed saved title" /></CommandMenuAccount.Provider>);
+    expect(readCommandRecents('header-one')).toEqual([{ to: '/admin/pages/home', label: 'Confirmed saved title' }]);
+    view.rerender(<CommandMenuAccount.Provider value={{ uid: 'header-two', pathname: '/admin/attendees/private' }}><AdminPageHeader title="Private attendee" recentTitle="Private attendee" /></CommandMenuAccount.Provider>);
     expect(readCommandRecents('header-two')).toEqual([]);
     view.rerender(<AdminPageHeader title="Standalone heading" />);
     expect(screen.getByRole('heading', { name: 'Standalone heading' })).toBeInTheDocument();

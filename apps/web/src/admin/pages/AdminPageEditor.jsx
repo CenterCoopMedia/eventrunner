@@ -520,6 +520,7 @@ export default function AdminPageEditor({ mode }) {
     >
       <AdminPageHeader
         title={mode === 'create' ? 'New page' : page.label || 'Page'}
+        recentTitle={row?.current?.label}
         state={(
           <>
             {row ? <RecordState state={row.state} /> : null}

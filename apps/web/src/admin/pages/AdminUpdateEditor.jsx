@@ -285,6 +285,7 @@ export default function AdminUpdateEditor({ mode }) {
     >
       <AdminPageHeader
         title={mode === 'create' ? 'New update' : form.title.trim() || 'Untitled update'}
+        recentTitle={row?.current?.title}
         state={mode === 'edit' ? <RecordState state={row?.state} /> : null}
         feedback={status || error ? <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={
