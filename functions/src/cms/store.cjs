@@ -219,10 +219,8 @@ async function deleteBoth({ db, tx = null, collection, docId, now = Date.now }) 
   const draftRef = db.collection(draftCol).doc(docId);
   // Undo must use the version published when this delete commits, even if
   // another record later takes the same id and publishes another version.
-  const history = await tx.get(db.collection('cmsVersionHistory')
-    .where('docPath', '==', `${collection}/${docId}`)
-    .orderBy('revision', 'desc').limit(1));
-  const revision = history.docs[0]?.data()?.revision;
+  const liveSnap = await tx.get(liveRef);
+  const revision = liveSnap.exists ? liveSnap.data()?.revision : null;
   const publishedRevision = Number.isSafeInteger(revision) && revision > 0 ? revision : null;
   const draftSnap = await tx.get(draftRef);
   const wasDirty = draftSnap.exists && draftSnap.data()?.status === 'dirty';

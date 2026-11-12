@@ -137,9 +137,14 @@ for (const kind of ['page', 'update', 'timeline', 'session', 'organization', 'bl
 for (const exclusion of ['never-published', 'materials', 'representatives', 'queued-edit']) {
   test(`delete with ${exclusion} states the result without offering Undo`, async ({ page }) => {
     const kind = exclusion === 'materials' ? 'session' : exclusion === 'never-published' ? 'timeline' : 'organization';
-    const record = await fixture(kind, { published: exclusion !== 'never-published' });
+    const record = await fixture(kind);
     const db = adminDb();
-    if (exclusion === 'materials') {
+    if (exclusion === 'never-published') {
+      // A new draft may reuse an earlier deleted record's id. Its retained
+      // history must not make that new, unpublished record eligible.
+      await store.deleteBoth({ db, collection: record.collection, docId: record.id });
+      await store.writeDraft({ db, collection: record.collection, docId: record.id, fields: { ...record.fields, [record.key]: record.dirtyTitle }, actor });
+    } else if (exclusion === 'materials') {
       const material = { sessionId: record.id, type: 'link', filename: 'Slides', url: 'https://example.test/slides', reviewStatus: 'approved' };
       for (const collection of ['session_materials', 'session_materials_public']) {
         const docPath = `${collection}/${record.id}`;

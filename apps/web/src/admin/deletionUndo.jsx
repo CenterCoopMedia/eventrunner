@@ -16,7 +16,7 @@ export function DeletionUndoProvider({ children }) {
   const reportDeleted = useCallback((record, destination) => {
     if (!destination) {
       pending.current = null;
-      setResult({ ...record, key, inline: true });
+      setResult((current) => ({ ...record, key, inline: true, sequence: (current?.sequence ?? 0) + 1 }));
       return;
     }
     pending.current = { ...record, destination };
@@ -48,7 +48,7 @@ export function useDeletedRecord() {
 export function DeletedRecordResult({ owningPageId = null, docId = null, fallback = null }) {
   const { result } = useDeletion();
   const matches = result && (result.inline ? docId === result.docId : docId === null);
-  return matches ? <DeletionResult key={`${result.key}:${result.docId}`} record={result} owningPageId={owningPageId} fallback={docId === null ? null : fallback} /> : fallback;
+  return matches ? <DeletionResult key={`${result.key}:${result.docId}:${result.sequence ?? 0}`} record={result} owningPageId={owningPageId} fallback={docId === null ? null : fallback} /> : fallback;
 }
 
 function DeletionResult({ record, owningPageId, fallback }) {

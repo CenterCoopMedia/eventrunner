@@ -200,6 +200,18 @@ test('deleteBoth pins the new published revision when a competing publish commit
   assert.equal(db.read('cmsVersionHistory', 'second').fields.title, 'Second');
 });
 
+test('deleteBoth offers no published revision for a never-published draft reusing a deleted id', async () => {
+  const db = makeFakeDb();
+  await writeDraft({ db, collection: 'cmsTimeline', docId: 'reused', fields: { year: 2020, title: 'Earlier record' }, actor: ACTOR, now });
+  await publishDocs({ db, collection: 'cmsTimeline', docIds: ['reused'], actor: ACTOR, now });
+  assert.equal((await deleteBoth({ db, collection: 'cmsTimeline', docId: 'reused' })).publishedRevision, 1);
+  await writeDraft({ db, collection: 'cmsTimeline', docId: 'reused', fields: { year: 2026, title: 'Never published replacement' }, actor: ACTOR, now });
+  assert.equal((await deleteBoth({ db, collection: 'cmsTimeline', docId: 'reused' })).publishedRevision, null);
+  assert.equal(db.read('cmsTimeline', 'reused'), undefined);
+  assert.equal(db.read('cmsTimeline_drafts', 'reused'), undefined);
+  assert.equal(db.ids('cmsVersionHistory').length, 1);
+});
+
 test('deleteBoth removes live and draft in one transaction', async () => {
   const db = makeFakeDb({
     'cmsUpdates/post1': { title: 'x', visible: true, revision: 1 },
@@ -220,7 +232,7 @@ test('deleteBoth inside a transaction still removes the pair, or neither', async
   });
   const paths = await db.runTransaction((tx) =>
     deleteBoth({ db, tx, collection: 'cmsSchedule', docId: 's1' }));
-  assert.deepEqual(paths, { livePath: 'cmsSchedule/s1', draftPath: 'cmsSchedule_drafts/s1', publishedRevision: null });
+  assert.deepEqual(paths, { livePath: 'cmsSchedule/s1', draftPath: 'cmsSchedule_drafts/s1', publishedRevision: 1 });
   assert.equal(db.read('cmsSchedule', 's1'), undefined);
   assert.equal(db.read('cmsSchedule_drafts', 's1'), undefined);
   // The transaction owns the writes: no batch of its own was committed.

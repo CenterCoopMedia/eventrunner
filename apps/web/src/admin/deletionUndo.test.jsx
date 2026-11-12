@@ -146,4 +146,14 @@ describe('the result after a published delete', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
   });
+
+  it('starts a new result when the same restored row is deleted again without navigation', async () => {
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete here' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    await screen.findByRole('link', { name: 'Open draft' });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete here' }));
+    expect(screen.queryByRole('link', { name: 'Open draft' })).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Undo' })).toHaveFocus();
+  });
 });
