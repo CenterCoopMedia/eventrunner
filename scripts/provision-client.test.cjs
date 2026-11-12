@@ -777,6 +777,21 @@ test('console team changes after the build reach the site without a rebuild', as
   }
 });
 
+test('an expired invite never takes an address off the operator list', async () => {
+  const fake = setup();
+  await invite(fake, 'cara@example.org', 'owner');
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  // An operator granted by hand while the invite is open, as on NC Local.
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  await invite(fake, 'dee@example.org', 'owner');
+  await ref.update({ adminEmails: [...(await ref.get()).data().adminEmails, 'dee@example.org'] });
+
+  fake.state.clock += 8 * 24 * 3600000;
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), 'operator');
+  assert.equal(tierOn(fake, 'dee@example.org'), 'operator');
+});
+
 test('a team sync never removes the last client operator or a support account', async () => {
   const fake = setup();
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);

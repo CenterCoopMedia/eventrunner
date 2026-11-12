@@ -1172,16 +1172,24 @@ async function seedSupportAdmins(ctx, db) {
   });
 }
 
-/** The console team's Owners and Editors, open invites included. A member's role wins over an invite. */
+/**
+ * The console team's Owners and Editors, open invites included. A member's
+ * role wins over an invite. `expired` lists pending invites past their end
+ * time: they grant nothing new, and they take nothing away.
+ */
 async function consoleTeam(db, orgId, at) {
-  const { members, invites } = await readTeam(db, orgId, at);
+  const { members, invites } = await readTeam(db, orgId, 0);
   const roles = new Map();
+  const expired = new Set();
   for (const person of [...invites, ...members]) {
     const [email] = normalizeEmails([person.email]);
-    if (email) roles.set(email, person.role);
+    if (!email) continue;
+    roles.set(email, person.role);
+    if (person.expiresAt && Date.parse(person.expiresAt) <= at) expired.add(email);
+    else expired.delete(email);
   }
-  const holding = (role) => [...roles].filter(([, held]) => held === role).map(([email]) => email);
-  return { owners: holding('owner'), editors: holding('editor') };
+  const holding = (role) => [...roles].filter(([email, held]) => held === role && !expired.has(email)).map(([email]) => email);
+  return { owners: holding('owner'), editors: holding('editor'), expired: [...expired] };
 }
 
 /**
@@ -1189,9 +1197,10 @@ async function consoleTeam(db, orgId, at) {
  * `consoleAdminEmails` and `consoleStaffEmails` hold what the console granted
  * at the last sync, so only console changes are applied: an address a site
  * operator changed on the Access page stays as they left it until its console
- * role changes. A person who leaves the team loses both tiers. Support
- * accounts are never added or removed. A change that would leave no operator
- * outside the support accounts is not written.
+ * role changes. A person removed from the team, or whose invite was
+ * withdrawn, loses both tiers. An expired invite keeps what the last sync
+ * granted. Support accounts are never added or removed. A change that would
+ * leave no operator outside the support accounts is not written.
  * @returns {Promise<'changed'|'unchanged'|'no-site'|'last-operator'>}
  */
 async function syncTeamAccess({ db, team, support, now }) {
@@ -1203,8 +1212,9 @@ async function syncTeamAccess({ db, team, support, now }) {
     const supportSet = new Set([...support, ...normalizeEmails(stored.supportAdminEmails)]);
     const client = (list) => list.filter((email) => !supportSet.has(email));
     const without = (list, drop) => list.filter((email) => !drop.includes(email));
-    const next = { admin: client(team.owners), staff: client(team.editors) };
     const prev = { admin: client(normalizeEmails(stored.consoleAdminEmails)), staff: client(normalizeEmails(stored.consoleStaffEmails)) };
+    const held = (list) => list.filter((email) => (team.expired || []).includes(email));
+    const next = { admin: client([...team.owners, ...held(prev.admin)]), staff: client([...team.editors, ...held(prev.staff)]) };
     const gone = without([...prev.admin, ...prev.staff], [...next.admin, ...next.staff]);
     const addAdmin = without(next.admin, prev.admin);
     const addStaff = without(next.staff, prev.staff);
