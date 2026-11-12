@@ -109,7 +109,7 @@ export default function AdminOrganizationEditor({ mode }) {
   const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   const errorRef = useRef(null);
   const formRef = useRef(null);
-  const adoptedRef = useRef(false);
+  const adoptedRef = useRef(null);
   const orderDefaultedRef = useRef(false);
   const tierListId = useId();
 
@@ -117,14 +117,20 @@ export default function AdminOrganizationEditor({ mode }) {
   const docId = mode === 'edit' ? organizationId : createdId;
   const row = docId ? findRow(docId) : null;
 
-  // The form is filled once, and only after BOTH listeners have reported:
+  // Each record is adopted only after BOTH listeners have reported:
   // a row built before the drafts arrive is the live doc alone, and a form
   // filled from it and saved would replace the unpublished draft.
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current || !ready || !row) return;
-    adoptedRef.current = true;
+    if (mode !== 'edit' || adoptedRef.current === docId || !ready || !row) return;
+    adoptedRef.current = docId;
     setForm(toForm(row));
-  }, [mode, ready, row]);
+    setTouched(new Set());
+    setAttempted(false);
+    setError(null);
+    setErrorTitle(undefined);
+    setStatus('');
+    setFeedbackSnapshot(null);
+  }, [mode, docId, ready, row]);
 
   // A new organization joins the end of the wall unless the operator says
   // otherwise.
@@ -192,7 +198,7 @@ export default function AdminOrganizationEditor({ mode }) {
         await call('cmsCreateContent', { ...body, docId: id });
         // Created: this form never creates again, and the page moves to the
         // record's own address before the publish runs.
-        adoptedRef.current = true;
+        adoptedRef.current = id;
         setCreatedId(id);
         navigate(`${ORGANIZATIONS_LIST}/${encodeURIComponent(id)}`, { replace: true });
       } else {
@@ -234,7 +240,7 @@ export default function AdminOrganizationEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && !createdId && !ready) {
+  if (mode === 'edit' && createdId !== docId && !ready) {
     // A listener failed before both had reported. The form stays closed
     // rather than opening on one revision; the listener retries, and the
     // form opens when both are in.
@@ -248,7 +254,7 @@ export default function AdminOrganizationEditor({ mode }) {
     }
     return <AdminLoadingState label="Loading organization…" />;
   }
-  if (mode === 'edit' && !createdId && !row) {
+  if (mode === 'edit' && createdId !== docId && !row) {
     return (
       <AdminEmptyState
         title="No such organization"
@@ -256,6 +262,10 @@ export default function AdminOrganizationEditor({ mode }) {
         action={<Link to={ORGANIZATIONS_LIST} className={secondaryButtonClass}>Back to organizations</Link>}
       />
     );
+  }
+
+  if (mode === 'edit' && adoptedRef.current !== docId) {
+    return <AdminLoadingState label="Loading organization…" />;
   }
 
   const tiers = tiersInUse(rows);

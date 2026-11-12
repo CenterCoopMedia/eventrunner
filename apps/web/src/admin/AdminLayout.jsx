@@ -860,7 +860,7 @@ function AdminDesk() {
               <AdminTour key={tour} docket={docket} takeFocus={tour > 0} onEnd={endTour} />
             </Suspense>
           )}
-          {refused ? <TierRefusal /> : <Outlet key={pathname} />}
+          {refused ? <TierRefusal /> : <Outlet />}
         </div>
       </main>
       {/* Outside the main region, which is inert while the mobile menu is open. */}
