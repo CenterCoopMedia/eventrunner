@@ -102,6 +102,7 @@ export default function Schedule() {
   const filtersToggleRef = useRef(null);
   const searchRef = useRef(null);
   const resultsSectionRef = useRef(null);
+  const interruptedResolve = useRef(null);
   const [settledCompactFilters, setSettledCompactFilters] = useState(compactFilters);
   useLayoutEffect(() => {
     if (compactFilters === settledCompactFilters) return;
@@ -269,6 +270,8 @@ export default function Schedule() {
   const activeDayId = view.day ?? days[0]?.id ?? null;
 
   useLayoutEffect(() => {
+    const interrupted = interruptedResolve.current;
+    interruptedResolve.current = null;
     if (resolvedLocation.current === location.key) return undefined;
     resolvedLocation.current = location.key;
     if (navigationType === 'POP' || !location.state?.scheduleResolve || !features.schedule || !activeDayId) return undefined;
@@ -278,7 +281,8 @@ export default function Schedule() {
     if (!results || !media?.matches || results.ownerDocument.getElementById(SUPPRESS_STYLE_ID)) return undefined;
     const style = viewWindow.getComputedStyle(results);
     const time = style.getPropertyValue('--motion-base').trim();
-    const animation = results.animate([{ opacity: 0.5 }, { opacity: 1 }], {
+    const startOpacity = interrupted?.element === results ? interrupted.opacity : 0.5;
+    const animation = results.animate([{ opacity: startOpacity }, { opacity: 1 }], {
       duration: Number.parseFloat(time) * (time.endsWith('ms') ? 1 : 1000),
       easing: style.getPropertyValue('--motion-ease').trim(),
       fill: 'none',
@@ -289,6 +293,10 @@ export default function Schedule() {
     media.addEventListener('change', stop);
     return () => {
       media.removeEventListener('change', stop);
+      const opacity = Number.parseFloat(viewWindow.getComputedStyle(results).opacity);
+      // A new URL commit can interrupt the resolve on this same node.
+      // Continue from its painted opacity instead of dimming it again.
+      interruptedResolve.current = opacity < 1 ? { element: results, opacity } : null;
       animation.cancel();
     };
   }, [location.key, location.state, navigationType, features.schedule, activeDayId]);

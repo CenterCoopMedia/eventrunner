@@ -133,11 +133,17 @@ test('rapid changes cancel the old effect and reduced motion stays instant, incl
   await facet.click();
   await expect(facet).toBeChecked();
   await expect.poll(() => resolveCount(page)).toBe(1);
+  const interruptedOpacity = await page.locator(RESULTS).evaluate((element) => {
+    globalThis.resolves.at(-1).animation.currentTime = 80;
+    return Number(globalThis.getComputedStyle(element).opacity);
+  });
   await facet.click();
   await expect(facet).not.toBeChecked();
   await expect.poll(() => resolveCount(page)).toBe(2);
   expect(await page.evaluate(() => globalThis.resolves.map(({ animation }) => animation.playState)))
     .toEqual(['idle', 'paused']);
+  expect(await page.locator(RESULTS).evaluate((element) => Number(globalThis.getComputedStyle(element).opacity)))
+    .toBe(interruptedOpacity);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect.poll(() => page.evaluate(() => globalThis.resolves.at(-1).animation.playState)).toBe('idle');
   expect(await page.locator(RESULTS).evaluate((element) => ({
