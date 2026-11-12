@@ -131,6 +131,7 @@ async function renderAt(path) {
       expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Loading event settings…')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading badges…')).not.toBeInTheDocument();
     },
     // The admin chunk now pulls the whole public app in with it (the theme
     // editor's frame renders real pages), so the first mount in a file can
