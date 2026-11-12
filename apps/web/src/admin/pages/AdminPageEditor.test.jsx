@@ -721,7 +721,7 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'Invalid page: layout.navPlacement: choose a supported position'));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await screen.findByRole('alert');
-    expect(screen.getByLabelText('Navigation on this page')).toBeVisible();
+    expect(await screen.findByRole('combobox', { name: 'Navigation on this page' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Hide the individual settings' })).toHaveAttribute('aria-expanded', 'true');
   });
 
