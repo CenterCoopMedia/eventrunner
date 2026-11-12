@@ -305,7 +305,7 @@ export function PaymentReviews({ invoice, canResolve, busy, onResolve }) {
                 It was recorded here and not applied to the invoice. Check it in the Stripe Dashboard, then refund it or record it another way.
               </p>
               {entry.paymentIntentId ? (
-                <p className="font-admin-data">{`Received ${localTime(entry.at)}.`}</p>
+                <p className="wrap-anywhere font-admin-data">{`Stripe payment reference: ${entry.paymentIntentId}. Received ${localTime(entry.at)}.`}</p>
               ) : null}
               {canResolve ? (
                 open === entry.reviewId ? (
