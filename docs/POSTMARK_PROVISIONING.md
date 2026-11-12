@@ -267,16 +267,18 @@ A console build does this section itself in its `mail-webhooks` step (`docs/DEPL
 Postmark tests the address when a webhook is saved and refuses it unless the function answers `200`,
 so the function must be deployed first. That applies to these manual steps too.
 
-1. Generate a random `user:pass` pair for this deployment — never reused across deployments
-   (rotating it means updating the webhook below). For example:
+1. Use the deployment's existing `EMAIL_WEBHOOK_BASIC_AUTH`. The normal provisioner creates and
+   stores a unique random `user:pass` pair when it is missing. For an authorized manual setup
+   with no existing pair, create a record in the operator's existing password manager: Username
+   is this deployment's project ID; Password is a generated random 40-character password. Keep
+   the record private. Values may be entered in private credential fields, but must stay out of
+   terminal output, logs, screenshots and command arguments. A rotation also requires updating
+   this deployment's webhook auth fields.
 
-   ```sh
-   printf 'eventrunner-demo:%s\n' "$(openssl rand -hex 20)"
-   # → eventrunner-demo:9f2c...   (use the whole "user:pass" string as EMAIL_WEBHOOK_BASIC_AUTH)
-   ```
-
-2. Store it as the `EMAIL_WEBHOOK_BASIC_AUTH` GitHub Environment secret for `<CLIENT_ENV>`
-   (`docs/DEPLOY_RUNBOOK.md` §3), then in Secret Manager the same way as step 3 above.
+2. For a new manual setup, store the complete `username:password` pair as `EMAIL_WEBHOOK_BASIC_AUTH` in
+   the GitHub Environment `<CLIENT_ENV>` and the target project's Secret Manager. Use each
+   service's private secret-value field, taking both parts from the same password-manager record.
+   Apply the runtime accessor binding from §3. Record the store names, not the value.
 3. Before registering anything, confirm which stream sends actually use: check this deployment's
    `config/providers.email.messageStream` (Tier B) — if it's unset, sends use the Server's default
    `Outbound` stream; if it's set, they use that named stream instead (§2.4). Register the webhook
@@ -290,7 +292,7 @@ so the function must be deployed first. That applies to these manual steps too.
    https://<EVENT_FIREBASE_REGION>-<EVENT_FIREBASE_PROJECT_ID>.cloudfunctions.net/emailDeliveryWebhook
    ```
 
-   Enter `user` and `pass` in the webhook's HTTP auth username and password fields. Use the region
+   Enter the username and password from that stored pair in the webhook's HTTP auth fields. Use the region
    and project id that deployment's GitHub Environment variables actually name
    (`EVENT_FIREBASE_REGION`, `EVENT_FIREBASE_PROJECT_ID`) — copy those from the environment rather
    than guessing.
@@ -345,173 +347,89 @@ Before calling a deployment's Postmark setup done:
       recipient) produces a `sent_emails` row with `deliveryStatus` patched. This confirms the
       complete webhook round trip, including the Firestore update.
 
-## 7. Addendum: cutting a deployment over after account approval
+## 7. Acceptance on an approved writable target
 
-This section is a **continuation** of §1–6, to run once Postmark approves the CCM account for live
-sending (see issue #91). It assumes the account exists, `eventrunner.org`'s DKIM/Return-Path/DMARC
-are verified, and Cloudflare Email Routing is already forwarding `info@eventrunner.org` to the
-maintainer's real inbox (§4, and the operator handoff plan's results section).
+Use this procedure for issue #91 on an approved rehearsal or client deployment. The historical
+public demo keeps `EVENT_EMAIL_PROVIDER=console` and its persisted read-only policy.
 
-### 7.0. Prerequisite check
+### 7.0. Confirm the target and execution authority
 
-- [ ] Postmark has approved the account for live sending (an email/dashboard notice from Postmark —
-      not something a script can check).
-- [ ] Confirm the approved plan's Server capacity supports the "one Server per client" model (§0,
-      §1 item 3). Check Postmark's plan page or support: how many Servers does the approved tier
-      allow, and does that cover the demo Server plus the expected near-term client count? Record
-      the answer in the operator handoff doc's results section (plan name / Server limit), not
-      here.
+Record the approved GitHub Environment, Firebase project, deployed revision, normal Deploy run
+and site URL in the private operator handoff. Read that project's current `config/event` write
+policy: `historicalDemo` must not be true, and the document and flag must be valid. A build-time
+flag or Auth claim cannot override this server-owned policy.
 
-### 7.1. Create the `Event Runner` Server for the demo deployment (or confirm it exists)
+Confirm the permitted recipients, test messages and cleanup before any account or mail action.
+Account creation can send a welcome message; a new staff grant can send access instructions.
+Record the intended Server's outbound count before those actions. Keep recipient identities and
+credentials in the private operator record.
 
-Per §2, issue #91 already shows the `Event Runner` Server created and its tokens stored in operator
-storage — so this step is likely already done. Confirm:
+### 7.1. Recover the existing evidence and confirm capacity
 
-- Postmark → Servers → `Event Runner` exists, type **Live**.
-- Server → API Tokens tab has a Server Token already noted in operator storage.
+Read the target's existing Postmark Server, send records, webhook registrations and deployment
+results first. Reuse completed send evidence rather than sending another message for documentation.
+An accepted send is not proof of a delivered message or a Firestore webhook update.
 
-If it does not exist yet, create it now following §2 exactly.
+Confirm account approval for live sending and the current plan's maximum Server count. Record
+the plan name, Server limit and expected client count. The monthly message allowance and the
+number of existing Servers do not establish that limit.
 
-### 7.2. Store the Server token in the demo deployment
+### 7.2. Verify the deployed provider and credential boundaries
 
-The Server token is `EMAIL_PROVIDER_API_KEY` for the `eventrunner-demo` deployment specifically —
-**not** the Postmark Account Token, which stays operator-only (§7.7).
+Use the normal target setup in §2–5 and [the deployment runbook](DEPLOY_RUNBOOK.md). Automated
+clients use the existing Provision and Deploy workflows. A green run proves this release only
+when its target, revision and actual Functions, Hosting and smoke jobs match the approved action.
 
-```sh
-# GitHub Environment secret (Settings → Environments → demo → Secrets):
-#   EMAIL_PROVIDER_API_KEY = the "Event Runner" Server Token
+Confirm that the target selects `postmark` and uses its own Live Server. Its Server Token is
+`EMAIL_PROVIDER_API_KEY`; its webhook credentials are `EMAIL_WEBHOOK_BASIC_AUTH`. Verify their
+approved store names and runtime bindings without displaying their values. Use the existing
+per-secret compute-account grants and the normal deployment inventory for runtime metadata.
 
-# Secret Manager mirror, once for the eventrunner-demo project:
-echo -n "<server token>" | gcloud secrets create EMAIL_PROVIDER_API_KEY \
-  --project=eventrunner-demo --data-file=- --replication-policy=automatic
+`EMAIL_ACCOUNT_API_KEY` remains in operator-controlled storage. No deployed function binds it,
+and it must not be in a client's GitHub Environment or Secret Manager. Fetch credentials from
+§3's operator-controlled store only when needed for an authorized action; keep values out of
+command arguments, URLs and logs. Manual webhook credential entry follows §5.
 
-PROJECT_NUMBER=$(gcloud projects describe eventrunner-demo --format="value(projectNumber)")
-RUNTIME_SA_EMAIL="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-gcloud secrets add-iam-policy-binding EMAIL_PROVIDER_API_KEY \
-  --project=eventrunner-demo \
-  --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
-  --role="roles/secretmanager.secretAccessor"
-```
+### 7.3. Verify the sender, streams and authenticated webhooks
 
-**Success check:** `gh secret list --env demo` (or the GitHub UI) lists `EMAIL_PROVIDER_API_KEY`;
-`gcloud secrets list --project=eventrunner-demo` lists it too; `gcloud secrets get-iam-policy
-EMAIL_PROVIDER_API_KEY --project=eventrunner-demo` shows the runtime SA with
-`roles/secretmanager.secretAccessor`.
+Read the target's `config/event.sender` and its current sender-domain verification result. Use
+§4 for an authorized operator correction if needed; client editors cannot change the From address.
 
-### 7.3. Generate `EMAIL_WEBHOOK_BASIC_AUTH` — only once the function URL exists
+Identify the stream used by each approved test message. Transactional sends use
+`config/providers.email.messageStream`, falling back to the Server's default `outbound` stream.
+Announcements use their configured broadcast stream (§2a). The normal provisioner registers
+webhooks for both streams; the registration must match the stream that sent the message.
 
-This needs the deployed `emailDeliveryWebhook` function's real region/project (Tier A
-`EVENT_FIREBASE_REGION` / `EVENT_FIREBASE_PROJECT_ID` for the `demo` environment), so it can only
-happen after a functions deploy has landed for `eventrunner-demo`.
+Verify the deployed `emailDeliveryWebhook` URL for this target's actual project and region. Its
+HTTP Basic auth must match the target's stored `EMAIL_WEBHOOK_BASIC_AUTH`; use the webhook's auth
+fields, keeping credentials out of the URL. Confirm **Delivery**, **Bounce** and **SpamComplaint**
+triggers on the sending stream. Leave **Open** and **Click** off. The announcements broadcast
+stream also needs **SubscriptionChange** (§5); leave that trigger off on the transactional stream.
 
-```sh
-printf 'eventrunner-demo:%s\n' "$(openssl rand -hex 20)"
-# → eventrunner-demo:9f2c...   (use the whole "user:pass" string as EMAIL_WEBHOOK_BASIC_AUTH)
-```
+### 7.4. Prove delivery and bounce updates
 
-Store the whole string as the `EMAIL_WEBHOOK_BASIC_AUTH` GitHub Environment secret for `demo`, and
-mirror it into Secret Manager the same way as §7.2 above (same commands, different secret name).
+1. Match an existing successful send's Postmark message ID to its `sent_emails.providerMessageId`
+   in the approved project. Record the delivery event and the row's resulting `deliveryStatus`.
+2. If a new send is required, use the normal application path and only an approved recipient and
+   message. Count automatic welcome or access messages in the planned total.
+3. Under explicit send authority, use the single approved Postmark bounce-test address. Match its
+   provider message ID to the target's `sent_emails` row before and after the webhook event. Require
+   the bounce event to change that row's `deliveryStatus`.
+4. Record the Server's outbound count after the run and reconcile every new message with the
+   approved plan. Remove only fixtures created for this run and restore any temporarily changed
+   target settings to their recorded values.
 
-### 7.4. Move the demo sender onto the verified domain — do this before the switch
+Webhook registration and accepted sends alone do not complete #91. Successful delivery and a
+real bounce must each have a matching provider event and Firestore status update on the approved
+target.
 
-The demo's seeded sender is `summit@example.org` (`scripts/lib/demo-event.cjs`). That is a
-placeholder on a domain nobody here owns, and Postmark refuses to send from an unverified sender
-domain — so flipping the provider to `postmark` while that address is still in `config/event` turns
-every demo sign-in email into a rejected send. Fix the sender first:
+### 7.5. Record the result
 
-1. Set the demo's sender address to `info@eventrunner.org` — the address on the domain §4 already
-   verified. Either edit it in the admin panel (Settings → sender) for the running deployment, or
-   re-run the seed against the demo project with the refreshed value:
-
-   ```sh
-   EVENT_FIREBASE_PROJECT_ID=eventrunner-demo node scripts/seed-demo-event.cjs --force
-   ```
-
-   (`--force` is required: `writeConfigDocs` skips a `config/*` document that already exists.)
-
-2. Re-run the verification script so `config/event.sender.domainVerified` is stamped for the
-   address the demo will actually send from:
-
-   ```sh
-   EVENT_EMAIL_PROVIDER=postmark \
-   EMAIL_PROVIDER_API_KEY=<server token from §7.2> \
-   EMAIL_ACCOUNT_API_KEY=<account token from §1.2, operator storage> \
-   EVENT_FIREBASE_PROJECT_ID=eventrunner-demo \
-     node scripts/verify-sender-domain.cjs
-   ```
-
-   No `--domain` flag: the script reads the domain from `config/event.sender.email`, which is the
-   point of doing this after step 1. It must exit 0 before you go on.
-
-**Success check:** `config/event.sender.email` reads `info@eventrunner.org` and
-`config/event.sender.domainVerified` is `true`.
-
-### 7.5. Switch the provider from `console` to `postmark`
-
-The demo deployed with `EVENT_EMAIL_PROVIDER=console` (Postmark wasn't approved yet at the time).
-Now that §7.4 has put a verified sender in place:
-
-- Update the `demo` GitHub Environment variable `EVENT_EMAIL_PROVIDER` from `console` to
-  `postmark`.
-- Re-run the deploy dispatch (`deploy-client.yml` against `demo`) so the functions redeploy reading
-  the new provider and the two secrets from §7.2–7.3.
-
-### 7.6. Register the delivery webhook
-
-Before registering, confirm which stream sends actually use: check `config/providers.email.
-messageStream` for the demo deployment (unset → the Server's default `Outbound` stream). Register
-on that stream, in Postmark: `Event Runner` Server → the identified stream → **Webhooks** → add
-webhook:
-
-```
-https://<EVENT_FIREBASE_REGION>-eventrunner-demo.cloudfunctions.net/emailDeliveryWebhook
-```
-
-using this deployment's actual `EVENT_FIREBASE_REGION` GitHub Environment variable (do not guess the
-region). Enter the `user` and `pass` from §7.3 in the webhook's HTTP auth fields. Postmark tests the
-address when you save, so the function must already be deployed.
-
-Enable only the **Delivery**, **Bounce**, and **SpamComplaint** triggers. Leave **Open**, **Click**,
-and **SubscriptionChange** off on this stream. Nothing in this repo consumes Open/Click.
-
-**Success check:** the webhook shows registered in Postmark's Server → Webhooks list, on the
-correct stream, with exactly those three triggers enabled.
-
-### 7.7. Keep the Account Token out of the deployment, always
-
-`EMAIL_ACCOUNT_API_KEY` (the Postmark Account Token) stays in operator storage only — it is never a
-GitHub Environment secret or Secret Manager entry for `eventrunner-demo` (or any client project).
-It's only used locally, as an environment variable, when running `scripts/verify-sender-domain.cjs`
-by hand. Confirm this is still true after this addendum's changes:
-
-```sh
-gh secret list --env demo        # should NOT list EMAIL_ACCOUNT_API_KEY
-gcloud secrets list --project=eventrunner-demo   # should NOT list EMAIL_ACCOUNT_API_KEY
-```
-
-### 7.8. Verification round-trip: real OTP send + bounce, checked against `sent_emails`
-
-1. Trigger a real OTP sign-in against the `eventrunner-demo` deployment (sign in with an email
-   address you control) — confirm the message shows up in Postmark's `Event Runner` Server →
-   Activity tab, and that a corresponding row appears in the `sent_emails` Firestore collection for
-   this project with `deliveryStatus` reflecting the send.
-2. Send (or trigger) a message to an intentionally invalid recipient, or use a Postmark bounce-test
-   address, to produce a bounce.
-3. Confirm the bounce event lands on the registered webhook and **patches** the matching
-   `sent_emails` row's `deliveryStatus`. This update proves the round trip. Webhook registration
-   alone is not sufficient. Check via the Firebase console (Firestore → `sent_emails`) or `gcloud firestore`
-   read, comparing the row before and after the bounce event arrives.
-
-**Success check (mirrors issue #91's scope):** the account is approved, the demo sends through the
-`Event Runner` Server, the delivery webhook is authenticated and registered on the correct stream,
-and both a successful delivery and a bounce event visibly update the matching `sent_emails` row in
-Firestore.
-
-### 7.9. Update the operator handoff doc's results section
-
-Once done, update `docs/plans/2026-08-26-operator-handoff.md`'s results section (Workstream C
-checklist items — webhook registered, round-trip confirmed). Do not paste any token or secret
-value, only where it's stored.
+Update Workstream C in [the operator handoff](plans/2026-08-26-operator-handoff.md) and issue #91
+with the target/revision, deployment run, capacity result, webhook stream/triggers and the
+delivery/bounce result. Keep full provider/row references and recipient details in the private
+operator record. Report incomplete checks as incomplete; a source change or smoke pass is not
+live mail acceptance.
 
 ## Follow-up: manual account creation
 
