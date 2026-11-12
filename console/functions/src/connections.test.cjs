@@ -746,7 +746,7 @@ test('a test OAuth exchange is allowed while another live slot is held', async (
   const { connector, calls } = stripeHttp({ livemode: false });
   deps.connectors.stripe = connector;
   assert.equal((await complete(deps, { state: await start(deps) })).body.connected, true);
-  assert.ok(calls.includes('https://connect.stripe.com/oauth/token'));
+  assert.ok(calls.some((url) => url === 'https://connect.stripe.com/oauth/token'));
   assert.equal(privateRow(db).stripe.livemode, false);
 });
 
@@ -758,7 +758,7 @@ test('a competing live connection during exchange is refused and a failed deauth
   });
   deps.connectors.stripe = connector;
   await assert.rejects(complete(deps, { state: await start(deps) }), { status: 502, code: 'disconnect-failed' });
-  assert.ok(calls.includes('https://connect.stripe.com/oauth/deauthorize'));
+  assert.ok(calls.some((url) => url === 'https://connect.stripe.com/oauth/deauthorize'));
   assert.equal(secrets.store.size, 0);
   assert.equal(privateRow(db).stripe, undefined);
   assert.match(JSON.stringify(log.errors), /stripe revoke: HTTP 500 server_error/);
