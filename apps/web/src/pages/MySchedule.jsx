@@ -49,7 +49,8 @@ export default function MySchedule() {
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
   const { user, loading: authLoading } = useAuth();
-  const { attendeeAccess } = useProfile();
+  const { attendeeAccess, profileConfirmed, status } = useProfile();
+  const profileLoading = Boolean(user && (!profileConfirmed || status === 'pending-account'));
   const { bookmarkedIds: accountBookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
   const device = useDeviceBookmarks();
   const deviceOnly = !user || !attendeeAccess;
@@ -129,7 +130,7 @@ export default function MySchedule() {
     );
   }
 
-  if (authLoading) {
+  if (authLoading || profileLoading) {
     return (
       <div className="mt-lg">
         <LoadingState shape="schedule" label="Loading your schedule…" />

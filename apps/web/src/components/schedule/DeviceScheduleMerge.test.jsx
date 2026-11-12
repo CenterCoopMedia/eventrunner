@@ -6,13 +6,13 @@ import { DEVICE_BOOKMARK_KEY, getDeviceBookmarks, removeDeviceBookmarks,
   setDeviceBookmarked, setDeviceMergePending } from '../../lib/deviceBookmarks.js';
 
 const state = vi.hoisted(() => ({
-  user: { uid: 'account-one' }, access: true, confirmed: true,
+  user: { uid: 'account-one' }, access: true, confirmed: true, status: 'ready',
   features: { schedule: true, sessionBookmarks: true },
   read: vi.fn(), write: vi.fn(),
 }));
 vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ user: state.user }) }));
 vi.mock('../../contexts/ProfileContext.jsx', () => ({
-  useProfile: () => ({ attendeeAccess: state.access, profileConfirmed: state.confirmed }),
+  useProfile: () => ({ attendeeAccess: state.access, profileConfirmed: state.confirmed, status: state.status }),
 }));
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ features: state.features }) }));
 vi.mock('../../lib/bookmarksSource.js', () => ({
@@ -29,6 +29,7 @@ beforeEach(() => {
   state.user = { uid: 'account-one' };
   state.access = true;
   state.confirmed = true;
+  state.status = 'ready';
   state.features = { schedule: true, sessionBookmarks: true };
   state.read.mockReset().mockResolvedValue('private');
   state.write.mockReset().mockResolvedValue({ bookmarked: true, count: 1 });
@@ -61,6 +62,7 @@ describe('browser save import consent', () => {
 
   it('waits for confirmed eligibility and for each private import before clearing browser saves', async () => {
     state.confirmed = false;
+    state.status = 'pending-account';
     setDeviceBookmarked('one', true);
     setDeviceBookmarked('two', true);
     let finish;
@@ -68,6 +70,9 @@ describe('browser save import consent', () => {
     const { rerender } = render(view());
     expect(state.read).not.toHaveBeenCalled();
     state.confirmed = true;
+    rerender(view());
+    expect(state.read).not.toHaveBeenCalled();
+    state.status = 'ready';
     rerender(view());
     await waitFor(() => expect(state.write).toHaveBeenCalledTimes(1));
     expect(saved()).toEqual(['one', 'two']);

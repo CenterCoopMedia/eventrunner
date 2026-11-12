@@ -16,10 +16,11 @@ import { rowActionClass } from './sessionActionClass.js';
  */
 export default function BookmarkAction({ session, bookmarked = false }) {
   const { user } = useAuth();
-  const { attendeeAccess } = useProfile();
+  const { attendeeAccess, profileConfirmed, status } = useProfile();
   const { showToast } = useToast();
   const device = useDeviceBookmarks();
   const deviceOnly = !user || !attendeeAccess;
+  const profileLoading = Boolean(user && (!profileConfirmed || status === 'pending-account'));
   const deviceSaved = device.ids.includes(session.id);
   const importing = device.merging.includes(session.id);
   const [pending, setPending] = useState(false);
@@ -48,7 +49,7 @@ export default function BookmarkAction({ session, bookmarked = false }) {
   }, [deviceSaved]);
 
   const onClick = useCallback(async () => {
-    if (pending || importing) return;
+    if (pending || importing || profileLoading) return;
     const next = !isBookmarked;
     if (deviceOnly) {
       if (!setDeviceBookmarked(session.id, next)) {
@@ -75,9 +76,9 @@ export default function BookmarkAction({ session, bookmarked = false }) {
     } finally {
       setPending(false);
     }
-  }, [user, isBookmarked, session.id, showToast, pending, importing, deviceOnly, deviceSaved]);
+  }, [user, isBookmarked, session.id, showToast, pending, importing, profileLoading, deviceOnly, deviceSaved]);
 
-  if (deviceOnly && !device.available && !user) {
+  if (!profileLoading && deviceOnly && !device.available && !user) {
     return (
       <Link to="/signin" className={rowActionClass}>
         Sign in to save sessions
@@ -85,7 +86,7 @@ export default function BookmarkAction({ session, bookmarked = false }) {
     );
   }
 
-  if (deviceOnly && !device.available) return null;
+  if (!profileLoading && deviceOnly && !device.available) return null;
 
   // Keep focus while an account write or browser import is in flight.
   // The click guard prevents another request, and aria-busy states the wait.
@@ -94,12 +95,12 @@ export default function BookmarkAction({ session, bookmarked = false }) {
       type="button"
       className={rowActionClass}
       onClick={onClick}
-      aria-disabled={pending || importing || undefined}
-      aria-busy={pending || importing || undefined}
-      aria-pressed={isBookmarked}
+      aria-disabled={pending || importing || profileLoading || undefined}
+      aria-busy={pending || importing || profileLoading || undefined}
+      aria-pressed={profileLoading ? undefined : isBookmarked}
     >
-      <span aria-hidden="true">{isBookmarked ? '★' : '☆'}</span>
-      {isBookmarked ? 'Bookmarked' : 'Bookmark'}
+      {!profileLoading ? <span aria-hidden="true">{isBookmarked ? '★' : '☆'}</span> : null}
+      {profileLoading ? 'Checking your saved sessions…' : isBookmarked ? 'Bookmarked' : 'Bookmark'}
     </button>
   );
 }

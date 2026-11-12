@@ -56,10 +56,10 @@
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { hasSentChangeRequest } from '../lib/changeRequestMarker.js';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router';
-import DeviceScheduleMerge from './schedule/DeviceScheduleMerge.jsx';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config/socialAccounts';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useDeviceBookmarks } from '../hooks/useDeviceBookmarks.js';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
@@ -112,6 +112,8 @@ export function optionalOnDemand(importer, label) {
 const AccountMenu = optionalOnDemand(() => import('./AccountMenu.jsx'), 'account menu');
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
+// Import account code only when this signed-in reader has browser saves.
+const DeviceScheduleMerge = onDemand(() => import('./schedule/DeviceScheduleMerge.jsx'));
 // The public model tools are optional and render no interface. Keep their
 // definitions and registration machinery out of the initial site bundle,
 // then load them only for the demo or a deployment that enables the flag.
@@ -264,6 +266,7 @@ export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage, getSectionBlocks } = useContent();
   const { user, loading: authLoading } = useAuth();
+  const deviceBookmarks = useDeviceBookmarks();
   const { pathname, key: locationKey } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef(null);
@@ -503,7 +506,11 @@ export default function Layout() {
       }
     >
       <ErrorBoundary>
-        <DeviceScheduleMerge />
+        {features.schedule && features.sessionBookmarks && user && deviceBookmarks.available && deviceBookmarks.ids.length > 0 ? (
+          <ErrorBoundary appearance="inline" title="Your browser saves could not be added to your account">
+            <Suspense fallback={null}><DeviceScheduleMerge /></Suspense>
+          </ErrorBoundary>
+        ) : null}
         <Outlet context={accountViews} />
       </ErrorBoundary>
     </main>

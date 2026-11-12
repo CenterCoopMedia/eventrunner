@@ -123,7 +123,7 @@ function myScheduleElement({
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <AuthContext.Provider value={auth}>
-          <ProfileContext.Provider value={profile}>
+          <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), ...profile }}>
             <ToastProvider>
               <ContentContext.Provider
                 value={{
@@ -214,7 +214,12 @@ describe('MySchedule', () => {
   });
 
   it('renders only bookmarked sessions, grouped by day in day order', () => {
-    renderMySchedule({ bookmarkedIds: new Set(['fx-late', 'fx-d2']) });
+    const { rerender } = renderMySchedule({ bookmarkedIds: new Set(['fx-late', 'fx-d2']),
+      profile: { attendeeAccess: false, status: 'pending-account', profileConfirmed: false } });
+    expect(screen.queryByText(/does not have attendee access/)).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'No bookmarked sessions yet' })).toBeNull();
+    expect(screen.queryByText(/saved only in this browser/)).toBeNull();
+    rerender(myScheduleElement());
     expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Afternoon editing lab' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Day-two roundtable' })).toBeInTheDocument();
     expect(screen.queryByText('[Fixture] Morning kickoff')).toBeNull();

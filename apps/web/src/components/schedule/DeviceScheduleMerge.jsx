@@ -19,7 +19,7 @@ function enqueueImport(run) {
 
 export default function DeviceScheduleMerge() {
   const { user } = useAuth();
-  const { attendeeAccess, profileConfirmed } = useProfile();
+  const { attendeeAccess, profileConfirmed, status } = useProfile();
   const { features } = useEventConfig();
   const device = useDeviceBookmarks();
   const [plan, setPlan] = useState(null);
@@ -28,7 +28,7 @@ export default function DeviceScheduleMerge() {
   const keepForUid = useRef(null);
   const failedForUid = useRef(null);
   const uid = user?.uid;
-  const eligible = Boolean(uid && attendeeAccess && profileConfirmed
+  const eligible = Boolean(uid && attendeeAccess && profileConfirmed && status === 'ready'
     && features.schedule && features.sessionBookmarks && device.available && device.ids.length);
 
   useEffect(() => {

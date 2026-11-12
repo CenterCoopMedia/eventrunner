@@ -88,7 +88,7 @@ function actionsTree({
       initialEntries={initialEntries}
     >
       <AuthContext.Provider value={auth}>
-        <ProfileContext.Provider value={profile}>
+        <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), ...profile }}>
           <ToastProvider>
             <SessionActions
               surface={surface}
@@ -256,13 +256,24 @@ describe('BookmarkAction', () => {
 
   it('lets an approved attendee toggle the bookmark, optimistically', () => {
     setSessionBookmarkedMock.mockResolvedValue({ bookmarked: true, count: 1 });
-    renderActions({
+    const attendee = {
       features: { sessionBookmarks: true },
       auth: { user: { uid: 'u1' } },
       profile: { attendeeAccess: true },
       bookmarked: false,
-    });
+    };
+    const { rerenderActions } = renderActions({ ...attendee,
+      profile: { attendeeAccess: false, status: 'pending-account', profileConfirmed: false } });
+    const checking = screen.getByRole('button', { name: 'Checking your saved sessions…' });
+    checking.focus();
+    fireEvent.click(checking);
+    expect(checking).toHaveAttribute('aria-busy', 'true');
+    expect(checking).not.toHaveAttribute('aria-pressed');
+    expect(setSessionBookmarkedMock).not.toHaveBeenCalled();
+    expect(getDeviceBookmarks().ids).toEqual([]);
+    rerenderActions(attendee);
     const button = screen.getByRole('button', { name: /bookmark/i });
+    expect(button).toBeFocused();
     expect(button).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(button);
     expect(screen.getByRole('button', { name: /bookmarked/i })).toHaveAttribute(
