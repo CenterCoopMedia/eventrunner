@@ -24,6 +24,7 @@ test.beforeAll(async () => {
     ...appConfig,
     configFile: false,
     root: FIXTURE,
+    publicDir: path.join(ROOT, 'apps/web/public'),
     logLevel: 'error',
     css: { postcss: { plugins: [tailwindcss({
       ...tailwindConfig,
@@ -79,6 +80,7 @@ for (const [area, routePath, title] of [
     expect(reports[0].context.source).toBe('react-boundary');
     expect(reports[0].context.componentStack).toBeTruthy();
     expect(reports[0].message).toBe('Synthetic production render failure');
+    await page.evaluate(() => globalThis.document.fonts.ready);
     await page.screenshot({ path: path.join(EVIDENCE, `error-recovery-${area}-390.png`) });
     await page.getByRole('link', { name: 'Working page' }).click();
     await expect(page.getByRole('heading', { name: 'Working page content' })).toBeVisible();
@@ -92,6 +94,7 @@ test('production root and modal panels state the failed surface', async ({ page 
   await page.goto(`${origin}/layout-error`);
   await expect(page.getByRole('heading', { name: 'The site could not be shown' })).toBeVisible();
   await expect.poll(() => reports.length).toBe(1);
+  await page.evaluate(() => globalThis.document.fonts.ready);
   await page.screenshot({ path: path.join(EVIDENCE, 'error-recovery-root.png') });
   for (const [routePath, title] of [
     ['/feedback-error', 'The feedback form could not open.'],
