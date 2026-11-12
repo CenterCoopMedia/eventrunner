@@ -161,7 +161,7 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
                 <div className="admin-settings-row-heading">
                   <div className="flex items-center gap-2xs"><h3 id={headingId} className="min-w-0 break-words text-admin-base font-bold text-admin-ink">
                     Track {n}
-                    {trackName(track) ? <span className="font-normal text-admin-ink-secondary">: {trackName(track)}</span> : null}</h3><HelpTooltip label="Track {n} {trackName(track) ? : {trackName(track)} : null}">Name one program track so attendees can distinguish sessions running at the same time.</HelpTooltip></div>
+                    {trackName(track) ? <span className="font-normal text-admin-ink-secondary">: {trackName(track)}</span> : null}</h3><HelpTooltip label={`Track ${n}`}>Name one program track so attendees can distinguish sessions running at the same time.</HelpTooltip></div>
                   <RemoveItemButton
                     ref={(node) => {
                       if (node) removeRefs.current.set(track.key, node);

@@ -724,7 +724,7 @@ export default function AdminEventSettings() {
                     point at different places. Leaving the URL empty is a real
                     answer: no control is drawn anywhere. */}
                 <div className="admin-settings-field--wide">
-                  <TextField help="Must start with https://. Leave it empty and no register control is shown."
+                  <TextField hint="Must start with https://. Leave it empty and no register control is shown." help="Must start with https://. Leave it empty and no register control is shown."
                     label="External registration URL"
                     value={form.registration.externalUrl}
                     onChange={(value) => setGroup('registration', { externalUrl: value })}

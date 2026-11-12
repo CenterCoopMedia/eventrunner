@@ -1354,7 +1354,7 @@ describe('milestones and the registration goal', () => {
     const date = screen.getByLabelText('Milestone 1 date');
     await waitFor(() => expect(document.activeElement).toBe(date));
     expect(date).toHaveAttribute('aria-invalid', 'true');
-    expect(date).toHaveAccessibleDescription('Enter the date of this milestone.');
+    expect(date).toHaveAccessibleDescription('Enter the date of this milestone. Choose the date of this event milestone for the overview countdown.');
     expect(fetch).not.toHaveBeenCalled();
   });
 

@@ -1050,7 +1050,7 @@ describe('page editor', () => {
     expect(bodyOf(0).page).toMatchObject({ id: 'scholarships', icon: 'book-open', sections: [{ id: 'intro', allowedBlocks: [] }] });
   });
 
-  it('uses shared label, hint, and control rows for the page and section fields', async () => {
+  it('associates labels, help, descriptions and controls for page and section fields', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
     fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block' }));
@@ -1059,7 +1059,9 @@ describe('page editor', () => {
       const field = input.closest('.admin-field');
       expect(field.querySelector('.admin-field__label')).toHaveTextContent(label);
       expect(input).toHaveClass('admin-field__control');
-      if (input.getAttribute('aria-describedby')) expect(field.querySelector('.admin-field__hint')).toBeInTheDocument();
+      const descriptionIds = input.getAttribute('aria-describedby').split(' ');
+      for (const id of descriptionIds) expect(document.getElementById(id).textContent.trim()).not.toBe('');
+      expect(field.querySelector('.admin-help-trigger')).toHaveAccessibleName(`Help with ${label}`);
     }
     expect(screen.getByLabelText('Section 1 is reorderable').closest('.admin-field-toggle')).toBeInTheDocument();
   });

@@ -16,6 +16,7 @@
 // `Live`, and `Live with unpublished changes`. One term per flow (§8.5). The
 // state is always a word — set in a badge whose tinted ground and ink agree
 // with the word, and never colour alone (§8.1).
+import { useId } from 'react';
 import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
 import LoadingStatus from '../../components/LoadingStatus.jsx';
 import HelpTooltip from './HelpTooltip.jsx';
@@ -161,6 +162,7 @@ export default function AdminPageHeader({
   as: Heading = 'h1',
 }) {
   const headerRef = useAdminHeaderPadding();
+  const descriptionId = useId();
   useCommandRecent(Heading === 'h1' ? recentTitle : null);
   return (
     <>
@@ -177,7 +179,7 @@ export default function AdminPageHeader({
               <Heading className="min-w-0 break-words font-admin-ui text-admin-title font-bold text-admin-ink">
                 {title}
               </Heading>
-              <HelpTooltip label={title}>{help}</HelpTooltip>
+              <HelpTooltip label={title} descriptionId={help === description ? descriptionId : undefined}>{help}</HelpTooltip>
             </div>
             {state}
           </div>
@@ -197,7 +199,7 @@ export default function AdminPageHeader({
         ) : null}
       </header>
       {description ? (
-        <p className="w-full text-admin-sm text-admin-ink-secondary">{description}</p>
+        <p id={descriptionId} className="w-full text-admin-sm text-admin-ink-secondary">{description}</p>
       ) : null}
     </>
   );

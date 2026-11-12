@@ -606,13 +606,13 @@ export default function AdminPageEditor({ mode }) {
               would strand the document, so the field states the address
               and does not offer to change it. The server refuses the
               change too (functions/src/cms/pages.cjs). */}
-          <TextField help="Set the page’s web address, such as /travel. Built-in pages keep their fixed addresses."
+          <TextField
             label="Path"
             value={page.path}
             onChange={(value) => update({ path: value })}
             error={errorFor('path')}
             readOnly={isSystemPage}
-            hint={
+            help={
               isSystemPage
                 ? 'This built-in page has a fixed web address.'
                 : 'The page’s web address, such as /scholarships.'

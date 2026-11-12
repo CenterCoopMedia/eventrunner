@@ -86,7 +86,7 @@ export default function AdminSessionsList() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader help="Review the sessions linked to this speaker and their confirmations."
+      <AdminPageHeader help="Review sessions by event day and open a session to edit its schedule details."
         title="Sessions"
         identifiers={`${rows.length} session${rows.length === 1 ? '' : 's'}`}
         description="Sessions in schedule order, grouped by day."

@@ -137,7 +137,7 @@ export default function MilestonesEditor({ milestones, onChange, errorFor }) {
   };
 
   return (
-    <Panel help="See upcoming event dates entered in Event settings."
+    <Panel help="Add the public milestone dates the overview counts down to. Keep private planning notes out of these names."
       title="Milestones"
       description="Dates the overview counts down to, such as the day proposals close. Anyone can read these dates and names. Keep private notes out of them."
       actions={

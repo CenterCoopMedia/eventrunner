@@ -550,7 +550,7 @@ export default function AdminVersionHistory() {
                     tabIndex={-1}
                     className="font-admin-ui text-admin-lg font-bold text-admin-ink"
                   >
-                    Version <span className="font-admin-data">{entry.revision}</span></h2><HelpTooltip label="Version {entry.revision}">Review the content saved at this published version.</HelpTooltip></div>
+                    Version <span className="font-admin-data">{entry.revision}</span></h2><HelpTooltip label={`Version ${entry.revision}`}>Review the content saved at this published version.</HelpTooltip></div>
                   <p className="text-admin-sm text-admin-ink-secondary wrap-anywhere">
                     {'Published '}
                     {published ? (

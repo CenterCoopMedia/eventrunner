@@ -253,7 +253,7 @@ export default function AdminDataExport() {
             <fieldset aria-label={[" Parts to include (", (chosen.size), " of ", (PACKAGE_SECTIONS.length), " chosen) "].join('').trim()} className="flex flex-col gap-sm">
               <legend className={`${fieldLabelClass} mb-xs`}>
                 Parts to include ({chosen.size} of {PACKAGE_SECTIONS.length} chosen)
-               <HelpTooltip label="Parts to include ({chosen.size} of {PACKAGE_SECTIONS.length} chosen)">Choose which parts of the event to include in the download.</HelpTooltip></legend>
+               <HelpTooltip label="Parts to include">Choose which parts of the event to include in the download.</HelpTooltip></legend>
               {PACKAGE_SECTIONS.map((section) => (
                 <CheckboxField help="Include this part of the event in the download."
                   key={section.id}
@@ -264,7 +264,7 @@ export default function AdminDataExport() {
                 />
               ))}
             </fieldset>
-            <CheckboxField help="Reviewers’ private notes. Leave this off unless the client asked for them."
+            <CheckboxField hint="Reviewers’ private notes. Leave this off unless the client asked for them." help="Reviewers’ private notes. Leave this off unless the client asked for them."
               label="Include staff notes on session pitches"
               
               checked={includeStaffNotes}

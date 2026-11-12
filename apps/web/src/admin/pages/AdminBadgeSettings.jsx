@@ -113,7 +113,7 @@ export default function AdminBadgeSettings() {
 
   return (
     <form className="flex flex-col gap-md" onSubmit={submit}>
-      <AdminPageHeader help="Name the badges attendees can select in this category."
+      <AdminPageHeader help="Manage the badge categories and choices attendees can select for their profiles."
         title="Badges"
         description="The badge set attendees pick from, grouped into categories with a cap on how many each attendee may choose."
         identifiers={`${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}

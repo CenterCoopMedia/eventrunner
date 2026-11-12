@@ -669,7 +669,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
             error={errorFor('venue.map.image')}
           />
           {map.image ? (
-            <TextField help="What the map shows, in a sentence. Required, and the map does not publish without it."
+            <TextField hint="What the map shows, in a sentence. Required, and the map does not publish without it." help="What the map shows, in a sentence. Required, and the map does not publish without it."
               label="Map alt text"
               value={map.alt}
               onChange={(value) => changeMap({ alt: value })}

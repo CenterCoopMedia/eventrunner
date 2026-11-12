@@ -84,7 +84,7 @@ export default function AdminContentSections() {
                 <li key={section.id} className="admin-content-section">
                   <div className="admin-content-section__description">
                     <div className="flex items-center gap-2xs"><h2 className="font-admin-ui">
-                      <Link to={to} className={`${rowTitleLinkClass} admin-content-page-name`}>{sectionName}</Link></h2><HelpTooltip label="{sectionName}">Open this section to edit its content blocks.</HelpTooltip></div>
+                      <Link to={to} className={`${rowTitleLinkClass} admin-content-page-name`}>{sectionName}</Link></h2><HelpTooltip label={sectionName}>Open this section to edit its content blocks.</HelpTooltip></div>
                     {section.description ? <p>{section.description}</p> : null}
                     <p className="admin-content-section__types">
                       <span>Content: </span>{types.length ? types.join(', ') : 'Any content'}

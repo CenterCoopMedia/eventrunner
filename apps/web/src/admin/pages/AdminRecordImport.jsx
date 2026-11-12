@@ -286,8 +286,8 @@ export default function AdminRecordImport() {
         description="Add or update speakers, sessions, organizations and registrations from a CSV file. Speakers, sessions and organizations are saved as drafts only; registrations make tickets. The import publishes nothing and sends no email."
       />
 
-      <fieldset aria-label={["Import inputs "].join('').trim()} disabled={busy === 'import'} className="flex min-w-0 flex-col gap-md">
-      <legend className="sr-only">Import inputs <HelpTooltip label="Import inputs">Choose a file and match its columns before reviewing the import.</HelpTooltip></legend>
+      <fieldset  disabled={busy === 'import'} className="flex min-w-0 flex-col gap-md">
+      <legend className="sr-only">Import inputs </legend>
       <Panel help="Choose the record type and a CSV file with column names in its first row."
         title="File"
         description="Choose the record type, then the CSV file. The first row of the file names the columns."

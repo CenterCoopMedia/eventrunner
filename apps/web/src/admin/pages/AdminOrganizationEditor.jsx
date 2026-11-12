@@ -357,7 +357,7 @@ export default function AdminOrganizationEditor({ mode }) {
                 required
               />
               {creating ? (
-                <TextField help="Choose the end of the page link. This is fixed after the first save."
+                <TextField hint="Choose the end of the page link. This is fixed after the first save." help="Choose the end of the page link. This is fixed after the first save."
                   label="Page address"
                   
                   value={form.slug}
@@ -391,7 +391,7 @@ export default function AdminOrganizationEditor({ mode }) {
           </Panel>
 
           <div className="admin-editor-stack">
-            <Panel help="Choose where this update appears after publishing." title="Placement" description="Set the group and visibility here. The sponsors list sets the order.">
+            <Panel help="Choose the sponsor group and whether this organization appears after publishing." title="Placement" description="Set the group and visibility here. The sponsors list sets the order.">
               <div className="admin-editor-fields planner-fields grid gap-sm sm:grid-cols-2">
                 <div>
                   <TextField help="Choose an existing tier to group sponsors together."

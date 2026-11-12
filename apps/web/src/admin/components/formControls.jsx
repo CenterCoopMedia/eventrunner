@@ -143,14 +143,14 @@ export function TextField({
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const warningId = `${id}-warning`;
-  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, warning ? warningId : null, error ? errorId : null]
+  const describedBy = [hint ? hintId : null, warning ? warningId : null, error ? errorId : null, help && help !== hint ? `${id}-help` : null]
     .filter(Boolean)
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
       <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
-      </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
+      </label><HelpTooltip label={label} id={`${id}-help`} descriptionId={help === hint ? hintId : undefined}>{help}</HelpTooltip></div>
       {hint ? (
         <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
@@ -205,14 +205,14 @@ export function TextAreaField({
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, error ? errorId : null]
+  const describedBy = [hint ? hintId : null, error ? errorId : null, help && help !== hint ? `${id}-help` : null]
     .filter(Boolean)
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
       <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
-      </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
+      </label><HelpTooltip label={label} id={`${id}-help`} descriptionId={help === hint ? hintId : undefined}>{help}</HelpTooltip></div>
       {hint ? (
         <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
@@ -248,14 +248,14 @@ export function SelectField({
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, error ? errorId : null]
+  const describedBy = [hint ? hintId : null, error ? errorId : null, help && help !== hint ? `${id}-help` : null]
     .filter(Boolean)
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
       <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
-      </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
+      </label><HelpTooltip label={label} id={`${id}-help`} descriptionId={help === hint ? hintId : undefined}>{help}</HelpTooltip></div>
       {hint ? (
         <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
@@ -298,7 +298,7 @@ export function AddOneListField({ label, items, onChange, itemName, hint, help, 
   const [draft, setDraft] = useState('');
   const [heldRows, setHeldRows] = useState(null);
   const mouseIsDown = useRef(false);
-  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
+  const describedBy = [hint ? hintId : null, error ? errorId : null, help && help !== hint ? `${id}-help` : null].filter(Boolean).join(' ');
 
   // A click on Save blurs this input first. A new row drawn at that moment
   // would move Save away from the pointer and lose the click, so the row
@@ -331,7 +331,7 @@ export function AddOneListField({ label, items, onChange, itemName, hint, help, 
 
   return (
     <div className="flex min-w-0 flex-col gap-3xs">
-      <div className="flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>{label}</label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
+      <div className="flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>{label}</label><HelpTooltip label={label} id={`${id}-help`} descriptionId={help === hint ? hintId : undefined}>{help}</HelpTooltip></div>
       {hint ? <p id={hintId} className={fieldHintClass}>{hint}</p> : null}
       <div className="flex items-center gap-2xs">
         <input
@@ -391,13 +391,13 @@ export function CheckboxField({ label, checked, onChange, hint, help, ...rest })
           className="mt-3xs h-5 w-5 shrink-0 rounded-admin-small border-admin-rule-control bg-admin-ground-input accent-admin-action"
           checked={Boolean(checked)}
           onChange={(event) => onChange(event.target.checked)}
-          aria-describedby={[help ? `${id}-help` : null, hint ? hintId : null, rest['aria-describedby']].filter(Boolean).join(' ') || undefined}
+          aria-describedby={[hint ? hintId : null, rest['aria-describedby'], help && help !== hint ? `${id}-help` : null].filter(Boolean).join(' ') || undefined}
           {...Object.fromEntries(Object.entries(rest).filter(([key]) => key !== 'aria-describedby'))}
         />
         <div className="flex flex-col">
           <div className="flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
             {label}
-          </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
+          </label><HelpTooltip label={label} id={`${id}-help`} descriptionId={help === hint ? hintId : undefined}>{help}</HelpTooltip></div>
           {hint ? (
             <p id={hintId} className={fieldHintClass}>
               {hint}
@@ -640,6 +640,7 @@ export function Panel({
   className = '',
   flush = false,
 }) {
+  const descriptionId = useId();
   return (
     <section
       className={`admin-panel min-w-0 rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised ${
@@ -653,9 +654,9 @@ export function Panel({
           }admin-panel__heading mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-sm`}
         >
           <div className="min-w-0 flex-auto">
-            <div className="flex items-center gap-2xs"><h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2><HelpTooltip label={title}>{help}</HelpTooltip></div>
+            <div className="flex items-center gap-2xs"><h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2><HelpTooltip label={title} descriptionId={help === description ? descriptionId : undefined}>{help}</HelpTooltip></div>
             {description ? (
-              <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
+              <p id={descriptionId} className="mt-3xs text-admin-sm text-admin-ink-secondary">
                 {description}
               </p>
             ) : null}

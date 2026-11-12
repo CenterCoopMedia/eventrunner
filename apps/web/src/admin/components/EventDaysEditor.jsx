@@ -148,7 +148,7 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage, us
                 <div className="admin-settings-row-heading">
                   <div className="flex items-center gap-2xs"><h3 id={headingId} className="min-w-0 break-words text-admin-base font-bold text-admin-ink">
                     Day {n}
-                    {day.label.trim() ? <span className="font-normal text-admin-ink-secondary">: {day.label.trim()}</span> : null}</h3><HelpTooltip label="Day {n} {day.label.trim() ? : {day.label.trim()} : null}">Set this day’s public name, date and opening and closing times.</HelpTooltip></div>
+                    {day.label.trim() ? <span className="font-normal text-admin-ink-secondary">: {day.label.trim()}</span> : null}</h3><HelpTooltip label={`Day ${n}`}>Set this day’s public name, date and opening and closing times.</HelpTooltip></div>
                   <RemoveItemButton
                     ref={(node) => {
                       if (node) removeRefs.current.set(day.key, node);
