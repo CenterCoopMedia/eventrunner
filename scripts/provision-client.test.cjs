@@ -445,7 +445,7 @@ function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding
     getAccessToken: async () => ({ access_token: 'gcp-token' }),
     sleep: async () => {},
     now: () => fake.state.clock,
-    log: { ...quietLog(), log() {} },
+    log: { ...quietLog(), log() {}, warn() {} },
     db,
     clientDb: () => clientFirestore,
     consoleSecrets,
@@ -810,6 +810,44 @@ test('the first sync on an older site does not undo an Access page removal', asy
   assert.ok(fake.clientFirestore.read('config/bootstrap').consoleAdminEmails.includes('bo@example.org'));
 });
 
+test('the first sync on an older site lists console and site differences and changes no access', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  // A site built before #839, then changed in the console before its first sync (#848).
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  const { consoleAdminEmails, consoleStaffEmails, ...older } = (await ref.get()).data();
+  await ref.set({ ...older, adminEmails: [...older.adminEmails, 'local@example.org'] });
+  await changeMemberRole({ db: fake.db }, { body: { orgId: 'o1', uid: 'bo', role: 'editor' }, user: ANA });
+  await invite(fake, 'cara@example.org', 'owner');
+  const warnings = [];
+  fake.deps.log = { ...fake.deps.log, warn: (line) => warnings.push(line) };
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.deepEqual(warnings.sort(), [
+    'team sync: a1 review: bo@example.org console editor, site operator',
+    'team sync: a1 review: cara@example.org console owner, site none',
+    'team sync: a1 review: local@example.org console none, site operator',
+  ]);
+  assert.equal(tierOn(fake, 'bo@example.org'), 'operator');
+  assert.equal(tierOn(fake, 'cara@example.org'), null);
+  warnings.length = 0;
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.deepEqual(warnings, []);
+});
+
+test('the first sync on an older site lists a staff grant that core/auth.cjs refuses', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  const { consoleAdminEmails, consoleStaffEmails, ...older } = (await ref.get()).data();
+  // Ben is a console Editor on the staff list, which this staffExpiry refuses.
+  await ref.set({ ...older, staffExpiry: new Date(NOW) });
+  assert.ok(older.staffEmails.includes('ben@example.org'));
+  const warnings = [];
+  fake.deps.log = { ...fake.deps.log, warn: (line) => warnings.push(line) };
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.deepEqual(warnings, ['team sync: a1 review: ben@example.org console editor, site none']);
+});
+
 test('a team sync keeps a staffExpiry that is not a plain map', async () => {
   const fake = setup();
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
@@ -818,9 +856,29 @@ test('a team sync keeps a staffExpiry that is not a plain map', async () => {
   await ref.update({ staffEmails: ['old@example.org'], staffExpiry: new Date(NOW) });
   assert.equal(tierOn(fake, 'old@example.org'), null);
   await invite(fake, 'dee@example.org', 'editor');
+  const warnings = [];
+  fake.deps.log = { ...fake.deps.log, warn: (line) => warnings.push(line) };
   assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  // core/auth.cjs refuses all staff for it, so the new Editor is named (#849).
+  assert.deepEqual(warnings, ['team sync: a1 review: staffExpiry is not a map; new staff dee@example.org are refused']);
+  assert.equal(tierOn(fake, 'dee@example.org'), null);
   assert.equal(fake.clientFirestore.read('config/bootstrap').staffExpiry.getTime(), NOW);
   assert.equal(tierOn(fake, 'old@example.org'), null);
+});
+
+test('a provisioning retry names new staff that a staffExpiry which is not a plain map refuses', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  await fake.clientFirestore.doc('config/bootstrap').update({ staffExpiry: new Date(NOW) });
+  await invite(fake, 'dee@example.org', 'editor');
+  const warnings = [];
+  fake.deps.log = { ...fake.deps.log, warn: (line) => warnings.push(line) };
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  // Actions logs are public, so the warning there leaves the address out.
+  fake.deps.env.GITHUB_ACTIONS = 'true';
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.deepEqual(warnings, ['team sync: a1 review: staffExpiry is not a map; new staff *** are refused']);
+  assert.match(fake.db.read('console_builds/a1').steps.find((step) => step.id === 'seed').detail, /updated the site team/);
 });
 
 test('a team sync skips a site with no project and still succeeds', async () => {
