@@ -14,6 +14,7 @@ import { Link } from 'react-router';
 import { useContent } from '../../contexts/ContentContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminTimeline } from '../useAdminTimeline.js';
@@ -135,6 +136,7 @@ export default function AdminTimelineList() {
         }
       />
 
+      <DeletedRecordResult />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
       {hasHistorySection ? null : (

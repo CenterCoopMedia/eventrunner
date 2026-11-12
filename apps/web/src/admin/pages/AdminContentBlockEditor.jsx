@@ -18,13 +18,13 @@
 import { sectionBlockTypes } from 'shared/page';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { isStarterContent } from 'shared/seed';
-import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { leadsToNoPublicPage, switchedOffSectionFor } from '../../lib/linkTargets.js';
 import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
+import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
@@ -251,9 +251,8 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
 
 export default function AdminContentBlockEditor({ mode }) {
   const { pageId, sectionId, field: fieldParam } = useParams();
-  const navigate = useNavigate();
   const call = useAdminApi();
-  const { showToast } = useToast();
+  const reportDeleted = useDeletedRecord();
   const { features } = useEventConfig();
   const { rows: pageRows, findRow: findPage, loading: pagesLoading } = useAdminPages();
   const {
@@ -570,9 +569,9 @@ export default function AdminContentBlockEditor({ mode }) {
     setError(null);
     setErrorTitle(undefined);
     try {
-      await call('cmsDeleteContent', { section: sectionId, field: currentFieldId });
-      showToast('Block deleted.');
-      navigate('..', { relative: 'path' });
+      const deleted = await call('cmsDeleteContent', { section: sectionId, field: currentFieldId });
+      const listPath = `/admin/content/${encodeURIComponent(pageId)}/${encodeURIComponent(sectionId)}`;
+      reportDeleted({ ...deleted, collection: 'cmsContent', docId: `${sectionId}__${currentFieldId}`, pageId, editorPath: `${listPath}/${encodeURIComponent(currentFieldId)}` }, listPath);
     } catch (err) {
       setErrorTitle('Could not delete. Try again.');
       setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: Object.fromEntries(valueFieldsOf(content.blockType).map((field) => [field.id, editorialFieldLabel(content.blockType, field.id)])) }));

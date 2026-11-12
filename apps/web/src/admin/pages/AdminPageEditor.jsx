@@ -27,11 +27,11 @@
 // registry describes.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
-import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
@@ -181,9 +181,8 @@ function slotValue(slot) {
 
 export default function AdminPageEditor({ mode }) {
   const { pageId } = useParams();
-  const navigate = useNavigate();
   const call = useAdminApi();
-  const { showToast } = useToast();
+  const reportDeleted = useDeletedRecord();
   const { rows, ready, error: listenerError, findRow } = useAdminPages();
   const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
   // What the site is set to, so the "follow the site" option can say what
@@ -493,9 +492,8 @@ export default function AdminPageEditor({ mode }) {
     setError(null);
     setErrorTitle(undefined);
     try {
-      await call('cmsDeletePage', { id: page.id });
-      showToast('Page deleted.');
-      navigate('..', { relative: 'path' });
+      const deleted = await call('cmsDeletePage', { id: page.id });
+      reportDeleted({ ...deleted, collection: 'cmsPages', docId: page.id, editorPath: `/admin/pages/${encodeURIComponent(page.id)}` }, '/admin/pages');
     } catch (err) {
       setErrorTitle('The server refused the delete');
       setError(err);

@@ -23,6 +23,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { summarizePublish } from '../publishResult.js';
 import {
@@ -91,6 +92,7 @@ export default function AdminOrganizationEditor({ mode }) {
   const { organizationId } = useParams();
   const navigate = useNavigate();
   const call = useAdminApi();
+  const reportDeleted = useDeletedRecord();
   const { showToast } = useToast();
   const { rows, loading, ready, error: listenerError, findRow } = useAdminOrganizations();
   const representatives = useOrganizationRepresentatives();
@@ -229,9 +231,8 @@ export default function AdminOrganizationEditor({ mode }) {
     setError(null);
     setErrorTitle(undefined);
     try {
-      await call('cmsDeleteContent', { collection: COLLECTION, docId });
-      showToast('Organization deleted.');
-      navigate(ORGANIZATIONS_LIST);
+      const deleted = await call('cmsDeleteContent', { collection: COLLECTION, docId });
+      reportDeleted({ ...deleted, collection: COLLECTION, docId, editorPath: `${ORGANIZATIONS_LIST}/${encodeURIComponent(docId)}` }, ORGANIZATIONS_LIST);
     } catch (err) {
       setErrorTitle('The organization was not deleted');
       setError(plannerError(err));

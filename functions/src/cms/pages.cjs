@@ -474,8 +474,9 @@ function createDeletePageHandler({ db, auth, getConfig, store, now = Date.now, l
       (liveSnap.exists && liveSnap.data().systemPage === true);
     if (isSystem) return forbidden(res, 'System pages cannot be deleted.');
 
+    let deleted;
     try {
-      await store.deleteBoth({ db, collection: PAGES_COLLECTION, docId: id });
+      deleted = await store.deleteBoth({ db, collection: PAGES_COLLECTION, docId: id });
     } catch (err) {
       log.error('cmsDeletePage failed', err);
       return internal(res, 'The page could not be deleted. Keep this page open and contact support for help.');
@@ -486,7 +487,7 @@ function createDeletePageHandler({ db, auth, getConfig, store, now = Date.now, l
       uid: gate.uid,
       email: gate.email,
     });
-    res.status(200).json({ id, deleted: true });
+    res.status(200).json({ id, deleted: true, publishedRevision: deleted.publishedRevision });
   };
 }
 

@@ -22,6 +22,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
@@ -96,6 +97,7 @@ export default function AdminUpdateEditor({ mode }) {
   const { updateId } = useParams();
   const navigate = useNavigate();
   const call = useAdminApi();
+  const reportDeleted = useDeletedRecord();
   const { showToast } = useToast();
   const { features, eventConfig } = useEventConfig();
   const timeZone = eventConfig?.timezone;
@@ -224,9 +226,8 @@ export default function AdminUpdateEditor({ mode }) {
     setError(null);
     setErrorTitle(undefined);
     try {
-      await call('cmsDeleteUpdate', { id: updateId });
-      showToast('Update deleted.');
-      navigate(UPDATES_ROOT);
+      const deleted = await call('cmsDeleteUpdate', { id: updateId });
+      reportDeleted({ ...deleted, collection: 'cmsUpdates', docId: updateId, editorPath: `${UPDATES_ROOT}/${encodeURIComponent(updateId)}` }, UPDATES_ROOT);
     } catch (err) {
       setErrorTitle('Could not delete. Try again.');
       setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: { title: 'Title', body: 'Text', publishAt: 'Date', category: 'Category' } }));

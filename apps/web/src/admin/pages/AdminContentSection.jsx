@@ -11,6 +11,7 @@ import { Link, useParams } from 'react-router';
 import { isStarterContent } from 'shared/seed';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { DeletedRecordResult, useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
@@ -49,6 +50,7 @@ import AdminPageHeader, {
 export default function AdminContentSection() {
   const { pageId, sectionId } = useParams();
   const call = useAdminApi();
+  const reportDeleted = useDeletedRecord();
   const { showToast } = useToast();
   const { findRow: findPage, loading: pagesLoading, ready: pagesReady } = useAdminPages();
   const { rows: contentRows, loading: contentLoading, ready: contentReady, error: contentError } = useAdminContent();
@@ -213,8 +215,9 @@ export default function AdminContentSection() {
     const label = contentBlockTitle(row.current);
     const position = blocks.findIndex((block) => block.id === row.id);
     try {
-      await call('cmsDeleteContent', { section: sectionId, field: row.current.field });
+      const deleted = await call('cmsDeleteContent', { section: sectionId, field: row.current.field });
       setRowResult(row.id, { tone: 'ok', message: `${label} deleted. The live block and its draft were removed.`, removed: true, label, position });
+      reportDeleted({ ...deleted, collection: 'cmsContent', docId: row.id, pageId, message: `${label} deleted. The live block and its draft were removed.`, editorPath: `/admin/content/${encodeURIComponent(pageId)}/${encodeURIComponent(sectionId)}/${encodeURIComponent(row.current.field)}` });
     } catch (err) {
       setRowResult(row.id, { tone: 'error', message: err.message });
     } finally {
@@ -278,6 +281,7 @@ export default function AdminContentSection() {
         }
       />
 
+      <DeletedRecordResult owningPageId={section ? pageId : null} />
       <OrderAnnouncement message={spoken} />
       {contentError ? (
         <Notice
@@ -311,7 +315,7 @@ export default function AdminContentSection() {
               if (result?.removed) return (
                 <li key={row.id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
                   <div className={rowClass}><p className="font-admin-ui text-admin-base font-semibold text-admin-ink">{label}</p><StatusBadge tone="neutral">Deleted</StatusBadge></div>
-                  <div ref={actionFocus.resultRef(row.id)} tabIndex={-1} className="admin-row-result"><ActionFeedback {...result} /></div>
+                  <div ref={actionFocus.resultRef(row.id)} tabIndex={-1} className="admin-row-result"><DeletedRecordResult docId={row.id} owningPageId={section ? pageId : null} fallback={<ActionFeedback {...result} />} /></div>
                 </li>
               );
               return (
@@ -376,7 +380,7 @@ export default function AdminContentSection() {
                     />
                   </div>
                 </div>
-                <div ref={actionFocus.resultRef(row.id)} tabIndex={-1} className="admin-row-result"><ActionFeedback message={result?.message} tone={result?.tone} /></div>
+                <div ref={actionFocus.resultRef(row.id)} tabIndex={-1} className="admin-row-result"><DeletedRecordResult docId={row.id} owningPageId={section ? pageId : null} fallback={<ActionFeedback message={result?.message} tone={result?.tone} />} /></div>
               </li>
               );
             })}

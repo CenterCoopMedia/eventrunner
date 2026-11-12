@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
 import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
@@ -70,6 +71,7 @@ export default function AdminTimelineEditor({ mode }) {
   const { entryId } = useParams();
   const navigate = useNavigate();
   const call = useAdminApi();
+  const reportDeleted = useDeletedRecord();
   const { showToast } = useToast();
   const { ready, error: listenerError, findRow } = useAdminTimeline();
   const [form, setForm] = useState(EMPTY);
@@ -187,9 +189,8 @@ export default function AdminTimelineEditor({ mode }) {
     setError(null);
     setErrorTitle(undefined);
     try {
-      await call('cmsDeleteContent', { collection: COLLECTION, docId });
-      showToast('Timeline entry deleted.');
-      navigate(TIMELINE_LIST);
+      const deleted = await call('cmsDeleteContent', { collection: COLLECTION, docId });
+      reportDeleted({ ...deleted, collection: COLLECTION, docId, editorPath: `${TIMELINE_LIST}/${encodeURIComponent(docId)}` }, TIMELINE_LIST);
     } catch (err) {
       setErrorTitle('Could not delete. Try again.');
       setError(contentError(err, { fallback: 'This item could not be deleted. Try again.', labels: { year: 'Year', title: 'Title', description: 'Description' } }));

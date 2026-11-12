@@ -21,6 +21,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
+import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { toEditablePage, toPagePayload } from '../pageDoc.js';
@@ -314,6 +315,7 @@ export default function AdminPagesList() {
         }
       />
 
+      <DeletedRecordResult />
       <OrderAnnouncement message={spoken} />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 

@@ -34,6 +34,7 @@ const crypto = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { internals: pagesInternals } = require('./pages.cjs');
+const { isAlreadyExistsError } = require('./store.cjs');
 
 const { writeAdminLog, DOC_ID_RE } = pagesInternals;
 
@@ -181,6 +182,8 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
           visible,
           actor: { uid: gate.uid, email: gate.email },
           now,
+          createOnly: restore === true,
+          rejectLive: restore === true,
         });
         // After writeDraft's reads. A restore clears the tombstone in the
         // same commit as the new draft, or neither write lands.
@@ -188,6 +191,9 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
       });
     } catch (err) {
       if (err instanceof DeletedUpdate) return notFound(res, 'Update not found.');
+      if (restore === true && isAlreadyExistsError(err)) {
+        return sendError(res, 409, 'already-exists', 'This update already exists. Open its version history to choose a version to restore.');
+      }
       log.error('cmsSaveUpdate draft write failed', err);
       return internal(res, 'The update could not be saved. Keep this page open and contact support for help.');
     }
@@ -224,15 +230,17 @@ function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now,
     ]);
     if (!draftSnap.exists && !liveSnap.exists) return notFound(res, 'Update not found.');
 
+    let deleted;
     try {
       // Tombstone and both deletes commit together. A tombstone that lands
       // first can be followed by a save that already read the old docs.
-      await db.runTransaction(async (tx) => {
-        await store.deleteBoth({ db, tx, collection: UPDATES_COLLECTION, docId: id });
+      deleted = await db.runTransaction(async (tx) => {
+        const result = await store.deleteBoth({ db, tx, collection: UPDATES_COLLECTION, docId: id });
         tx.set(db.collection(UPDATES_DELETED).doc(id), {
           deletedAt: new Date(now()),
           deletedBy: gate.uid,
         });
+        return result;
       });
     } catch (err) {
       log.error('cmsDeleteUpdate failed', err);
@@ -244,7 +252,7 @@ function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now,
       uid: gate.uid,
       email: gate.email,
     });
-    res.status(200).json({ id, deleted: true });
+    res.status(200).json({ id, deleted: true, publishedRevision: deleted.publishedRevision });
   };
 }
 
