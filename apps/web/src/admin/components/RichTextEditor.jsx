@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import HelpTooltip from './HelpTooltip.jsx';
 import Quill, { Delta } from 'quill/core.js';
 import { BlockEmbed } from 'quill/blots/block.js';
 import Bold from 'quill/formats/bold.js';
@@ -121,7 +122,7 @@ function active(format, value, formats) {
  * A controlled editor for the registry's richtext fields. The parent still
  * owns the draft value and the ordinary content-block save flow.
  */
-export default function RichTextEditor({ label, value, onChange, error, required = false }) {
+export default function RichTextEditor({ label, value, onChange, error, help, required = false }) {
   const generatedId = useId();
   const editorId = `richtext-${generatedId}`;
   const labelId = `${editorId}-label`;
@@ -247,13 +248,13 @@ export default function RichTextEditor({ label, value, onChange, error, required
   useEffect(() => {
     const quill = quillRef.current;
     if (!quill) return;
-    const describedBy = [hintId, countId, notice ? noticeId : null, error ? errorId : null]
+    const describedBy = [help ? `${editorId}-help` : null, hintId, countId, notice ? noticeId : null, error ? errorId : null]
       .filter(Boolean)
       .join(' ');
     quill.root.setAttribute('aria-describedby', describedBy);
     if (error) quill.root.setAttribute('aria-invalid', 'true');
     else quill.root.removeAttribute('aria-invalid');
-  }, [countId, error, errorId, hintId, notice, noticeId]);
+  }, [countId, editorId, error, errorId, help, hintId, notice, noticeId]);
 
   useEffect(() => {
     if (linkOpen) linkInputRef.current?.focus();
@@ -343,9 +344,9 @@ export default function RichTextEditor({ label, value, onChange, error, required
 
   return (
     <div className="flex flex-col gap-3xs">
-      <label id={labelId} htmlFor={editorId} className={fieldLabelClass}>
+      <div className="flex items-center gap-2xs"><label id={labelId} htmlFor={editorId} className={fieldLabelClass}>
         {label}
-      </label>
+      </label><HelpTooltip label={label} id={`${editorId}-help`}>{help}</HelpTooltip></div>
       <p id={hintId} className={fieldHintClass}>
         Format selected text with the toolbar. Standard undo, redo, and text-formatting shortcuts also work.
       </p>
@@ -423,9 +424,7 @@ export default function RichTextEditor({ label, value, onChange, error, required
         {linkOpen ? (
           <div className="flex flex-wrap items-end gap-xs border-b-admin-hairline border-admin-rule-control bg-admin-ground-raised p-xs">
             <div className="min-w-64 flex-1">
-              <label htmlFor={`${editorId}-link`} className={fieldLabelClass}>
-                Link address
-              </label>
+              <div className="flex items-center gap-2xs"><label htmlFor={`${editorId}-link`} className={fieldLabelClass}>Link address</label><HelpTooltip label="Link address" id={`${editorId}-link-help`}>Enter the full web address or a page address such as /travel.</HelpTooltip></div>
               <input
                 ref={linkInputRef}
                 id={`${editorId}-link`}
@@ -433,7 +432,7 @@ export default function RichTextEditor({ label, value, onChange, error, required
                 className={inputClass}
                 value={linkValue}
                 aria-invalid={linkError ? 'true' : undefined}
-                aria-describedby={linkError ? `${editorId}-link-error` : undefined}
+                aria-describedby={[`${editorId}-link-help`, linkError ? `${editorId}-link-error` : null].filter(Boolean).join(' ')}
                 onChange={(event) => {
                   setLinkValue(event.target.value);
                   setLinkError('');

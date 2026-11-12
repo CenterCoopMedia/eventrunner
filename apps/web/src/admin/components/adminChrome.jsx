@@ -18,6 +18,7 @@
 // with the word, and never colour alone (§8.1).
 import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
 import LoadingStatus from '../../components/LoadingStatus.jsx';
+import HelpTooltip from './HelpTooltip.jsx';
 import useLoadingStage from '../../lib/useLoadingStage.js';
 import useAdminHeaderPadding from './useAdminHeaderPadding.js';
 import { useCommandRecent } from '../commandMenuRecents.js';
@@ -156,6 +157,7 @@ export default function AdminPageHeader({
   description,
   actions,
   feedback,
+  help,
   as: Heading = 'h1',
 }) {
   const headerRef = useAdminHeaderPadding();
@@ -174,6 +176,7 @@ export default function AdminPageHeader({
             <Heading className="min-w-0 break-words font-admin-ui text-admin-title font-bold text-admin-ink">
               {title}
             </Heading>
+            <HelpTooltip label={title}>{help}</HelpTooltip>
             {state}
           </div>
           {actions ? (
