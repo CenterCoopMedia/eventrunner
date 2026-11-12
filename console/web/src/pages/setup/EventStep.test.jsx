@@ -30,7 +30,7 @@ describe('Your event step', () => {
     renderSetup('event');
     const zone = browserTimeZone();
     await waitFor(() => expect(screen.getByLabelText('Time zone')).toHaveValue(zone));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your web address' }));
     await screen.findByRole('heading', { level: 1, name: 'Your web address' });
     expect(callsTo('saveApplicationStep').at(-1).answers.timezone).toBe(zone);
   });
@@ -43,7 +43,7 @@ describe('Your event step', () => {
     expect(screen.getByLabelText('Starts')).toHaveValue('09:00');
     expect(screen.getByLabelText('Ends')).toHaveValue('17:00');
     fireEvent.change(date, { target: { value: '2027-05-13' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your web address' }));
     await screen.findByRole('heading', { level: 1, name: 'Your web address' });
     expect(callsTo('saveApplicationStep').at(-1).answers.days).toEqual([
       { date: '2027-05-13', startTime: '09:00', endTime: '17:00' },

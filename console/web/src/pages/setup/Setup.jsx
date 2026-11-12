@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
 import {
-  ANSWER_STEPS, STEPS, errorsOfStep, openStepIds, setupPath, statusPath, stepById, stepByPath,
+  ANSWER_STEPS, STEPS, errorsOfStep, lockedReason, openStepIds, setupPath, statusPath, stepById, stepByPath,
 } from '../../setup/steps.js';
 import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
 import ActionFeedback from '../../ActionFeedback.jsx';
@@ -168,6 +168,8 @@ export default function Setup() {
         step={step}
         progress={app.progress}
         open={open}
+        ownersNeeded={app.ownersNeeded}
+        reason={lockedReason(app, refused)}
         orgId={orgId}
         appId={appId}
         disabled={navigating}
@@ -225,7 +227,7 @@ export default function Setup() {
           <div className="step-actions">
             {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous), 'leave')}>Back</button> : null}
             {fromReview ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, stepById('review')), 'review')}>Back to Review</button>
-              : next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next</button> : null}
+              : next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next: {next.title}</button> : null}
             {saveStatus === 'error' ? <button type="button" className="button" disabled={navigating} onClick={async () => { await flush(); actionArea.current?.focus(); }}>Save</button> : null}
           </div>
         </div>

@@ -30,9 +30,16 @@ export const SIGNUPS_CLOSED = 'This site is not taking sign-ups right now. We sa
  */
 export function openStepIds(app, refusedSteps = []) {
   const answers = STEPS.map((step) => step.id).filter((id) => id !== 'agreement');
-  const ready = app.status === 'draft' && app.signups?.open
-    && Object.keys(app.errors).length === 0 && refusedSteps.length === 0;
-  return ready ? [...answers, 'agreement'] : answers;
+  return lockedReason(app, refusedSteps) ? answers : [...answers, 'agreement'];
+}
+
+/** Why the Agreement cannot open yet; an empty reason means it can open. */
+export function lockedReason(app, refusedSteps = []) {
+  if (app.status !== 'draft') return 'Setup is closed for this request.';
+  if (!app.signups?.open) return 'This site is not taking sign-ups right now. Try again later.';
+  if (refusedSteps.length > 0) return 'Save the answers that have not been saved first.';
+  if (Object.keys(app.errors).length > 0) return 'Finish the answers that need attention first.';
+  return '';
 }
 
 export const SITE_DOMAIN = 'eventrunner.org';
