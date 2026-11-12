@@ -159,7 +159,7 @@ function createReactToSessionHandler({ db, auth, getConfig, now = Date.now, log 
     } catch (err) {
       if (err instanceof SessionNotFoundError) return notFound(res, 'Session not found.');
       log.error('reactToSession failed', err);
-      return internal(res, 'The reaction could not be saved.');
+      return internal(res, 'The reaction could not be saved. Try again.');
     }
     res.status(200).json(result);
   };

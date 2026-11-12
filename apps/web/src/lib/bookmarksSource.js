@@ -109,7 +109,7 @@ export async function setSessionBookmarked({ user, sessionId, bookmarked }) {
     throw new BookmarkRequestError({
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
-      message: typeof error.message === 'string' ? error.message : 'The bookmark could not be saved.',
+      message: typeof error.message === 'string' ? error.message : 'The bookmark could not be saved. Try again.',
     });
   }
   return payload;

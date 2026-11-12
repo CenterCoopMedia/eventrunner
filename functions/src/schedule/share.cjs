@@ -160,7 +160,7 @@ function createSetScheduleVisibilityHandler({ db, auth, getConfig, now = Date.no
       });
     } catch (err) {
       log.error('setScheduleVisibility failed', err);
-      internal(res, 'The schedule visibility could not be saved.');
+      internal(res, 'The schedule visibility could not be saved. Try again.');
     }
   };
 }

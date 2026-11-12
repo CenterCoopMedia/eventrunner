@@ -374,7 +374,7 @@ Before: "Something went wrong."
 
 After: "The materials archive could not be downloaded. Try again."
 
-Preserve a server message's useful facts, including a result that could not be confirmed or a change that saved only in part. Do not say that nothing changed unless that is known. Keep field names and the `field: message` format so forms can still mark the input. For a server failure without a known recovery, keep the page open and direct the person to the event team for help.
+Preserve a server message's useful facts and recovery steps, including a result that could not be confirmed or a change that saved only in part. Do not say that nothing changed unless that is known. Keep field names and the `field: message` format so forms can still mark the input. For a server failure without a known recovery, keep the page open and direct the person to support for help.
 
 
 ### Event hero and demo preview

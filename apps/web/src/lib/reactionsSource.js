@@ -148,7 +148,7 @@ export async function setSessionReaction({ user, sessionId, emoji }) {
     throw new ReactionRequestError({
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
-      message: typeof error.message === 'string' ? error.message : 'The reaction could not be saved.',
+      message: typeof error.message === 'string' ? error.message : 'The reaction could not be saved. Try again.',
     });
   }
   return payload;

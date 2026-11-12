@@ -7,7 +7,7 @@
 // gate (AdminGate in AdminApp.jsx) is convenience only.
 //
 // Failures normalize to AdminApiError retaining the server's `error.message`.
-// Server failures also name the event-team contact action. `fieldErrors`
+// Server failures without recovery text also name the support action. `fieldErrors`
 // splits that message into the per-field segments the server joined with '; ':
 // each keeps its field key in `field`, so a form can
 // mark the input, and its readable sentence, without the key, in `message`.
@@ -128,8 +128,9 @@ export async function callAdminEndpoint(name, body, getIdToken) {
     let message = typeof error.message === 'string' && error.message
       ? error.message
       : 'The request could not be completed. Try again.';
-    if (response.status >= 500) {
-      message += ' Keep this page open and contact the event team for help.';
+    const hasRecovery = /\b(?:try again|re-run|resume|contact|keep (?:this|your))\b/i.test(message);
+    if (response.status >= 500 && !hasRecovery) {
+      message += ' Keep this page open and contact support for help.';
     }
     throw new AdminApiError({
       code: typeof error.code === 'string' ? error.code : 'unknown',

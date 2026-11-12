@@ -65,7 +65,7 @@ export default function BookmarkAction({ session, bookmarked = false }) {
       await setSessionBookmarked({ user, sessionId: session.id, bookmarked: next });
     } catch (err) {
       setOptimistic(null);
-      showToast(err.message || 'The bookmark could not be saved.', { tone: 'error' });
+      showToast(err.message || 'The bookmark could not be saved. Try again.', { tone: 'error' });
     } finally {
       setPending(false);
     }

@@ -118,7 +118,7 @@ export async function setScheduleVisibility({ user, visibility }) {
       message:
         typeof error.message === 'string'
           ? error.message
-          : 'The schedule visibility could not be saved.',
+          : 'The schedule visibility could not be saved. Try again.',
     });
   }
   return payload;

@@ -64,7 +64,20 @@ describe('callAdminEndpoint', () => {
     await expect(callAdminEndpoint('deleteSpeaker', { speakerId: 'speaker-a' }, getIdToken)).rejects.toMatchObject({
       code: 'internal',
       status: 500,
-      message: 'The speaker could not be deleted. Keep this page open and contact the event team for help.',
+      message: 'The speaker could not be deleted. Keep this page open and contact support for help.',
+    });
+  });
+
+  it.each([
+    [500, 'Publish failed part-way. Re-run with { queueId } to resume.'],
+    [503, 'Ticketing is temporarily unavailable. Try again later.'],
+  ])('keeps an existing %s server recovery step: %s', async (status, message) => {
+    const usage = [{ id: 'asset-a', count: 1 }];
+    fetch.mockResolvedValueOnce(response(status, {
+      error: { code: 'internal', message }, queueId: 'queue-a', usage,
+    }));
+    await expect(callAdminEndpoint('cmsPublish', {}, getIdToken)).rejects.toMatchObject({
+      code: 'internal', status, message, queueId: 'queue-a', usage,
     });
   });
 
