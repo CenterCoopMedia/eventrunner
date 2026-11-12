@@ -14,7 +14,7 @@ import { subscribeWithRetry } from '../lib/retrySubscription.js';
 
 const VERSION_PAGE_SIZE = 25;
 
-/** Bound each history read; docPath/revision ordering keeps newest names first. */
+/** Bound each read; a docPath-only cursor skips older versions already represented. */
 export async function readAdminVersions(name, cursor = null) {
   const snapshot = await getDocs(query(collection(db, 'cmsVersionHistory'),
     where('docPath', '>=', `${name}/`), where('docPath', '<', `${name}0`),
@@ -22,7 +22,9 @@ export async function readAdminVersions(name, cursor = null) {
     ...(cursor ? [startAfter(cursor)] : []), limit(VERSION_PAGE_SIZE + 1)));
   return {
     entries: snapshot.docs.slice(0, VERSION_PAGE_SIZE).map((entry) => entry.data()),
-    nextCursor: snapshot.docs.length > VERSION_PAGE_SIZE ? snapshot.docs[VERSION_PAGE_SIZE - 1] : null,
+    // The first version for each docPath is its newest. Resume after the
+    // whole final record rather than paging through its older revisions.
+    nextCursor: snapshot.docs.length > VERSION_PAGE_SIZE ? snapshot.docs[VERSION_PAGE_SIZE - 1].data().docPath : null,
   };
 }
 

@@ -257,7 +257,7 @@ describe('the record list', () => {
 
 describe('removed records', () => {
   it('checks another history page only on request, retains newest names, and searches loaded results without another read', async () => {
-    const cursor = { id: 'cursor' };
+    const cursor = 'cmsPages/gone';
     readVersions.mockResolvedValueOnce({ entries: [{ docPath: 'cmsPages/gone', revision: 3, fields: { title: 'Newest name' } }], nextCursor: cursor });
     renderPage('/admin/versions?collection=cmsPages');
     report('cmsPages', []);
@@ -283,7 +283,7 @@ describe('removed records', () => {
   });
 
   it('retains loaded removed records on a page failure, retries that cursor and drops its answer after a collection change', async () => {
-    const cursor = { id: 'cursor' };
+    const cursor = 'cmsPages/gone';
     readVersions.mockResolvedValueOnce({ entries: [{ docPath: 'cmsPages/gone', revision: 1, fields: { title: 'Kept result' } }], nextCursor: cursor });
     renderPage('/admin/versions?collection=cmsPages');
     report('cmsPages', []);

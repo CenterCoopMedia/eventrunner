@@ -285,7 +285,7 @@ export default function AdminVersionRecords() {
                   </li>
                 ))}
               </ul>
-              {history.nextCursor ? <p className="text-admin-sm text-admin-ink-secondary">More published versions remain to check. Search includes the removed records loaded so far.</p> : null}
+              {history.nextCursor ? <p className="text-admin-sm text-admin-ink-secondary">Older versions of loaded records are skipped. Search includes the removed records loaded so far.</p> : null}
             </>
           ) : null}
           {history.nextCursor || history.error ? (
