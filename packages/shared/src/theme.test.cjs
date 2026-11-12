@@ -259,6 +259,14 @@ test('more contrast keeps the better ink when opposed Advanced grounds cannot me
   assert.deepEqual(deriveMoreContrastColors({}), {});
 });
 
+test('more contrast reaches a rule target between opposed grounds before the endpoint', () => {
+  const palette = { ink: [30, 30, 30], inkMuted: [30, 30, 30], surface: [30, 30, 30], surfaceAlt: [220, 220, 220] };
+  const colors = deriveMoreContrastColors(palette);
+  for (const ground of [palette.surface, palette.surfaceAlt]) {
+    assert.ok(contrastRatio(colors.hairline, ground) >= 3);
+  }
+});
+
 test('the contrast contract measures primaryDark on surface, in both directions', () => {
   // CtaBlock paints primaryDark as the hover BACKGROUND under a surface
   // label; LinkGroupBlock and SessionMaterialsList render it as TEXT on
