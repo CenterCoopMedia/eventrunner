@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Suspense } from 'react';
+import { MemoryRouter } from 'react-router';
 import { installRoutePrefetch, HOVER_DWELL_MS } from './routePrefetch.js';
 import { isRoutePrefetchPending, routePage } from './routePage.jsx';
 import { installChunkReload, RELOAD_FLAG } from './chunkReload.js';
-import ChunkErrorBoundary from '../components/ChunkErrorBoundary.jsx';
+import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import { installDeferredRoutePrefetch } from './deferredRoutePrefetch.js';
 
 let removeListeners;
@@ -156,7 +157,7 @@ describe('route import lifecycle', () => {
     let fail;
     const reload = vi.fn();
     const finalPage = routePage(() => new Promise((_resolve, reject) => { fail = reject; }));
-    render(<ChunkErrorBoundary reload={reload}><Suspense fallback={<p>Loading final page</p>}><finalPage.Component /></Suspense></ChunkErrorBoundary>);
+    render(<MemoryRouter><ErrorBoundary reload={reload}><Suspense fallback={<p>Loading final page</p>}><finalPage.Component /></Suspense></ErrorBoundary></MemoryRouter>);
     await act(async () => { fail(new Error('Failed to fetch dynamically imported module: /assets/final-page.js')); });
     expect(screen.getByRole('button', { name: 'Reload the page' })).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
@@ -180,7 +181,7 @@ describe('route import lifecycle', () => {
     const quietExpectedError = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       await act(async () => {
-        render(<ChunkErrorBoundary reload={reload}><Suspense fallback={<p>Loading route</p>}><navigation.Component /></Suspense></ChunkErrorBoundary>);
+        render(<MemoryRouter><ErrorBoundary reload={reload}><Suspense fallback={<p>Loading route</p>}><navigation.Component /></Suspense></ErrorBoundary></MemoryRouter>);
       });
       expect(reload).toHaveBeenCalledTimes(1);
       expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');

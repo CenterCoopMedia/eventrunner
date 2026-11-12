@@ -106,7 +106,7 @@ export function installChunkReload(target = globalThis, { reload, isPrefetching 
   const onPreloadError = (event) => {
     // Speculative imports catch their own rejection. Do not preventDefault:
     // Vite must reject rather than return an undefined module. A concurrent
-    // real navigation still reaches ChunkErrorBoundary and its reloadOnce.
+    // real navigation still reaches ErrorBoundary and its reloadOnce.
     if (isPrefetching()) return;
     if (reloadOnce({ reload })) event.preventDefault();
   };
