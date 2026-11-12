@@ -88,7 +88,7 @@ function actionsTree({
       initialEntries={initialEntries}
     >
       <AuthContext.Provider value={auth}>
-        <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), ...profile }}>
+        <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), profileReady: Boolean(auth.user), ...profile }}>
           <ToastProvider>
             <SessionActions
               surface={surface}
@@ -263,7 +263,7 @@ describe('BookmarkAction', () => {
       bookmarked: false,
     };
     const { rerenderActions } = renderActions({ ...attendee,
-      profile: { attendeeAccess: false, status: 'pending-account', profileConfirmed: false } });
+      profile: { attendeeAccess: false, status: 'pending-account', profileConfirmed: false, profileReady: false } });
     const checking = screen.getByRole('button', { name: 'Checking your saved sessions…' });
     checking.focus();
     fireEvent.click(checking);
@@ -272,6 +272,7 @@ describe('BookmarkAction', () => {
     expect(setSessionBookmarkedMock).not.toHaveBeenCalled();
     expect(getDeviceBookmarks().ids).toEqual([]);
     rerenderActions(attendee);
+    rerenderActions({ ...attendee, profile: { attendeeAccess: true, profileReady: true, profileConfirmed: false, status: 'ready' } });
     const button = screen.getByRole('button', { name: /bookmark/i });
     expect(button).toBeFocused();
     expect(button).toHaveAttribute('aria-pressed', 'false');

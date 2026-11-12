@@ -16,11 +16,11 @@ import { rowActionClass } from './sessionActionClass.js';
  */
 export default function BookmarkAction({ session, bookmarked = false }) {
   const { user } = useAuth();
-  const { attendeeAccess, profileConfirmed, status } = useProfile();
+  const { attendeeAccess, profileReady } = useProfile();
   const { showToast } = useToast();
   const device = useDeviceBookmarks();
   const deviceOnly = !user || !attendeeAccess;
-  const profileLoading = Boolean(user && (!profileConfirmed || status === 'pending-account'));
+  const profileLoading = Boolean(user && !profileReady);
   const deviceSaved = device.ids.includes(session.id);
   const importing = device.merging.includes(session.id);
   const [pending, setPending] = useState(false);

@@ -74,7 +74,7 @@ function renderCard({
     >
       <AuthContext.Provider value={auth}>
         <ContentContext.Provider value={content}>
-          <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), ...profile }}>
+          <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), profileReady: Boolean(auth.user), ...profile }}>
             <ToastProvider>
               <ul>
                 <SessionCard

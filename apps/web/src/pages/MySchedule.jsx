@@ -49,8 +49,8 @@ export default function MySchedule() {
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
   const { user, loading: authLoading } = useAuth();
-  const { attendeeAccess, profileConfirmed, status } = useProfile();
-  const profileLoading = Boolean(user && (!profileConfirmed || status === 'pending-account'));
+  const { attendeeAccess, profileReady } = useProfile();
+  const profileLoading = Boolean(user && !profileReady);
   const { bookmarkedIds: accountBookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
   const device = useDeviceBookmarks();
   const deviceOnly = !user || !attendeeAccess;

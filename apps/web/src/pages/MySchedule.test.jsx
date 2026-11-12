@@ -123,7 +123,7 @@ function myScheduleElement({
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <AuthContext.Provider value={auth}>
-          <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), ...profile }}>
+          <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), profileReady: Boolean(auth.user), ...profile }}>
             <ToastProvider>
               <ContentContext.Provider
                 value={{
@@ -215,11 +215,14 @@ describe('MySchedule', () => {
 
   it('renders only bookmarked sessions, grouped by day in day order', () => {
     const { rerender } = renderMySchedule({ bookmarkedIds: new Set(['fx-late', 'fx-d2']),
-      profile: { attendeeAccess: false, status: 'pending-account', profileConfirmed: false } });
+      profile: { attendeeAccess: false, status: 'pending-account', profileConfirmed: false, profileReady: false } });
     expect(screen.queryByText(/does not have attendee access/)).toBeNull();
     expect(screen.queryByRole('heading', { name: 'No bookmarked sessions yet' })).toBeNull();
     expect(screen.queryByText(/saved only in this browser/)).toBeNull();
     rerender(myScheduleElement());
+    const row = screen.getByRole('heading', { level: 3, name: '[Fixture] Afternoon editing lab' });
+    rerender(myScheduleElement({ profile: { attendeeAccess: true, profileReady: true, profileConfirmed: false, status: 'ready' } }));
+    expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Afternoon editing lab' })).toBe(row);
     expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Afternoon editing lab' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Day-two roundtable' })).toBeInTheDocument();
     expect(screen.queryByText('[Fixture] Morning kickoff')).toBeNull();
