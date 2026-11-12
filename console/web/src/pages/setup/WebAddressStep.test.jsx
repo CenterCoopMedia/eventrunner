@@ -59,7 +59,7 @@ describe('Your web address step', () => {
     expect(field).not.toHaveAttribute('aria-invalid');
     await screen.findByText('Not saved. Check the answer.');
     expect(field).not.toHaveAttribute('aria-invalid');
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your team' }));
     await waitFor(() => expect(field).toHaveFocus());
     expect(field).toHaveAccessibleDescription(new RegExp(message));
     expect(screen.getByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();

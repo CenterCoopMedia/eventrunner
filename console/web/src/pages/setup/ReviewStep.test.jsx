@@ -57,7 +57,7 @@ describe('Review step', () => {
 
   it('moves on with Next, and says what comes next', async () => {
     renderSetup('review');
-    expect(await screen.findByRole('button', { name: 'Next' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Next: Agreement' })).toBeInTheDocument();
     expect(screen.getByText(/Check your event details, then continue to the hosting agreement/)).toBeInTheDocument();
   });
 

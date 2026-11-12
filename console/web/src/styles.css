@@ -266,6 +266,8 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
   padding: 0.25rem var(--space-xs);
   color: rgb(var(--ink-muted));
 }
+.step-text { display: grid; min-width: 0; }
+.step-state, .step-reason { font-size: 0.85rem; font-weight: 400; }
 .agreement { max-width: 75ch; padding: var(--space-md); border: 1px solid rgb(var(--rule)); border-radius: var(--radius); overflow-wrap: anywhere; }
 .agreement h2 { margin-top: 0; }
 .agreement-text-field textarea { min-height: 20rem; }

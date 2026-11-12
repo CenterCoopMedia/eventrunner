@@ -31,7 +31,7 @@ describe('Email step', () => {
     renderSetup('email');
     fireEvent.change(await screen.findByLabelText('Sender name'), { target: { value: 'NC Local' } });
     fireEvent.change(screen.getByLabelText('Reply address'), { target: { value: 'ops@nclocal.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
     await screen.findByRole('heading', { level: 1, name: 'Review' });
     expect(callsTo('saveApplicationStep').at(-1)).toMatchObject({
       step: 'email', answers: { senderName: 'NC Local', replyTo: 'ops@nclocal.org' },

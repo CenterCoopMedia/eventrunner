@@ -23,7 +23,7 @@ describe('Your organization step', () => {
     renderSetup('organization');
     fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'NC Local News' } });
     fireEvent.change(screen.getByLabelText('Mailing address'), { target: { value: '1 Main Street' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your event' }));
     await screen.findByRole('heading', { level: 1, name: 'Your event' });
     expect(callsTo('saveApplicationStep').at(-1).answers).toEqual({ name: 'NC Local News', website: '', address: '1 Main Street' });
   });

@@ -23,21 +23,50 @@ function setupViewport(wide) {
 describe('Setup', () => {
   it('shows one step per page with a step list, its progress and the current step', async () => {
     serveApi({
-      getApplication: { application: application({ progress: { organization: true, event: true } }) },
+      getApplication: { application: application({ progress: { organization: true, event: true, team: true } }) },
     });
     renderSetup('event');
     expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
     expect(screen.getByText('Step 2 of 8')).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Setup steps' });
-    expect(within(nav).getByText('2 of 8 steps done')).toBeInTheDocument();
+    expect(within(nav).getByText('3 of 8 steps done')).toBeInTheDocument();
     const links = within(nav).getAllByRole('link');
-    expect(links.map((l) => l.textContent.replace(' (done)', '').replace(/^[✓\d]+/, ''))).toEqual([
-      'Your organization', 'Your event', 'Your web address', 'Your team', 'Tickets', 'Email', 'Review', 'Agreement',
+    expect(links.map((l) => l.textContent.replace(/^[✓\d]+/, ''))).toEqual([
+      'Your organizationDone', 'Your eventDone', 'Your web addressTo do', 'Your teamDone', 'TicketsTo do', 'EmailTo do', 'ReviewTo do', 'AgreementTo do',
     ]);
     expect(links[1]).toHaveAttribute('aria-current', 'step');
-    expect(links[0]).toHaveTextContent('(done)');
+    expect(links[0]).toHaveAccessibleName('Your organization Done');
+    expect(within(links[0]).getByText('Done')).not.toHaveClass('visually-hidden');
     expect(links[2]).toHaveAttribute('href', '/organizations/o1/applications/a1/web-address');
     expect(callApi).toHaveBeenCalledWith('getApplication', { orgId: 'o1', appId: 'a1' });
+  });
+
+  it('shows the optional team step as To do until there are two Owners without locking setup', async () => {
+    serveApi({ getApplication: { application: application({ ownersNeeded: 1 }) } });
+    renderSetup('review');
+    await screen.findByRole('heading', { level: 1, name: 'Review' });
+    const nav = screen.getByRole('navigation', { name: 'Setup steps' });
+    const team = within(nav).getByRole('link', { name: 'Your team To do' });
+    expect(within(team).getByText('To do')).not.toHaveClass('visually-hidden');
+    expect(within(nav).getByText('6 of 8 steps done')).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Agreement To do' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next: Agreement' })).toBeInTheDocument();
+    fireEvent.click(team);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your team' })).toBeInTheDocument();
+  });
+
+  it.each([
+    [{ errors: { 'event.name': 'Enter the event name.' } }, 'Finish the answers that need attention first.'],
+    [{ signups: { open: false } }, 'This site is not taking sign-ups right now. Try again later.'],
+  ])('explains a locked Agreement in visible words', async (overrides, reason) => {
+    serveApi({ getApplication: { application: application(overrides) } });
+    renderSetup('organization');
+    await screen.findByRole('heading', { level: 1, name: 'Your organization' });
+    const nav = screen.getByRole('navigation', { name: 'Setup steps' });
+    const row = within(nav).getByText('Agreement').closest('li');
+    expect(within(row).getByText('Not started')).not.toHaveClass('visually-hidden');
+    expect(within(row).getByText(reason)).toBeInTheDocument();
+    expect(within(row).queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('folds the single step list behind a native disclosure on a narrow screen', async () => {
@@ -89,7 +118,7 @@ describe('Setup', () => {
     renderSetup('organization');
     await screen.findByRole('heading', { level: 1, name: 'Your organization' });
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
@@ -99,7 +128,7 @@ describe('Setup', () => {
     renderSetup('review');
     fireEvent.click(await screen.findByRole('link', { name: `Edit ${title}` }));
     const back = await screen.findByRole('button', { name: 'Back to Review' });
-    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Next:/ })).not.toBeInTheDocument();
     fireEvent.click(back);
     expect(await screen.findByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
     expect(callsTo('saveApplicationStep')).toHaveLength(0);
@@ -144,7 +173,7 @@ describe('Setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
     expect(await screen.findByText(/Not saved\./)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Next:/ })).not.toBeInTheDocument();
     if (outcome === 'refused answer') {
       await waitFor(() => expect(screen.getByLabelText('Name')).toHaveAccessibleDescription(new RegExp(SHORT.replaceAll('.', '\\.'))));
       expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');
@@ -200,7 +229,7 @@ describe('Setup', () => {
     });
     renderSetup('organization');
     fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'nclocal.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     if (outcome === 'valid') await screen.findByRole('heading', { level: 1, name: 'Your event' });
     else {
       const problems = await screen.findByRole('region', { name: 'Answers that need attention' });
@@ -239,7 +268,7 @@ describe('Setup', () => {
     await screen.findByText('Saved.');
     expect(screen.queryByText('Use at least 10 characters.')).not.toBeInTheDocument();
     expect(field).not.toHaveAttribute('aria-invalid');
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     const problems = await screen.findByRole('region', { name: 'Answers that need attention' });
     expect(within(problems).getByRole('listitem')).toHaveTextContent('Use at least 10 characters.');
     expect(within(problems).getByRole('link', { name: 'Your organization' }))
@@ -252,7 +281,7 @@ describe('Setup', () => {
     await waitFor(() => expect(field).not.toHaveAttribute('aria-invalid'), { timeout: 2000 });
     expect(screen.queryByRole('region', { name: 'Answers that need attention' })).not.toBeInTheDocument();
     expect(callsTo('saveApplicationStep')).toHaveLength(2);
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     await screen.findByRole('heading', { level: 1, name: 'Your event' });
     expect(callsTo('saveApplicationStep')).toHaveLength(2);
   });
@@ -277,7 +306,7 @@ describe('Setup', () => {
     serveApi({ getApplication: { application: application({ answers: emptyAnswers(), errors: { 'event.days': 'Add at least one day.' } }) } });
     renderSetup('event');
     await screen.findByRole('heading', { level: 1, name: 'Your event' });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     await waitFor(() => expect(screen.getByText('Add at least one day.')).toHaveFocus());
     expect(callsTo('saveApplicationStep')).toHaveLength(0);
   });
@@ -341,7 +370,7 @@ describe('Setup', () => {
     });
     renderSetup('organization');
     fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'x.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     expect(await screen.findByText(/Not saved. Your site is being built/)).toBeInTheDocument();
   });
 
@@ -357,9 +386,10 @@ describe('Setup', () => {
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken' } });
     fireEvent.click(screen.getByRole('link', { name: /Review/ }));
     await screen.findByRole('heading', { level: 1, name: 'Review' });
-    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Next:/ })).not.toBeInTheDocument();
     const held = screen.getByText(/is not saved/);
     expect(held).toHaveTextContent('Your web address is not saved. Fix it before you continue.');
+    expect(within(screen.getByRole('navigation', { name: 'Setup steps' })).getByText('Save the answers that have not been saved first.')).toBeInTheDocument();
     expect(within(held).getByRole('link', { name: 'Your web address' }))
       .toHaveAttribute('href', '/organizations/o1/applications/a1/web-address?check=1&from=review');
     fireEvent.click(within(held).getByRole('link', { name: 'Your web address' }));
@@ -370,7 +400,7 @@ describe('Setup', () => {
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'nclocal2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
     await screen.findByRole('heading', { level: 1, name: 'Review' });
-    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Next:/ })).toBeInTheDocument();
     expect(screen.queryByText(/is not saved/)).not.toBeInTheDocument();
   });
 
@@ -382,7 +412,7 @@ describe('Setup', () => {
     });
     renderSetup('web-address');
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'x' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     expect(await screen.findByText('Not saved. Check the answer.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
   });
@@ -399,10 +429,10 @@ describe('Setup', () => {
     });
     renderSetup('organization');
     fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'x.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     expect(await screen.findByText(/Not saved. We could not reach the server/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
     expect(callsTo('saveApplicationStep').map((b) => b.answers.website)).toEqual(['x.org', 'x.org']);
   });
@@ -413,18 +443,18 @@ describe('Setup', () => {
     it('Next on Review opens the agreement', async () => {
       serveApi({ getAgreement: { agreement: { version: 1, title: 'Test agreement', body: 'Test text.' }, accepted: null } });
       renderSetup('review');
-      fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
+      fireEvent.click(await screen.findByRole('button', { name: /^Next:/ }));
       expect(await screen.findByRole('heading', { level: 1, name: 'Agreement' })).toBeInTheDocument();
       expect(screen.getByText('Step 8 of 8')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Next:/ })).not.toBeInTheDocument();
     });
 
     it('with an answer that needs attention, the agreement stays closed and its address goes to Review', async () => {
       serveApi({ getApplication: { application: application({ errors: { 'event.name': 'Enter the event name.' } }) } });
       renderSetup('agreement');
       expect(await screen.findByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Next:/ })).not.toBeInTheDocument();
       expect(within(screen.getByRole('navigation', NAV)).queryByRole('link', { name: /Agreement/ })).not.toBeInTheDocument();
     });
 
@@ -433,7 +463,7 @@ describe('Setup', () => {
       renderSetup('agreement');
       expect(await screen.findByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
       expect(screen.getByText('This site is not taking sign-ups right now. We saved your answers. Try again later.')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Next:/ })).not.toBeInTheDocument();
     });
 
     it('after acceptance every step goes to the status page, for a member too', async () => {
