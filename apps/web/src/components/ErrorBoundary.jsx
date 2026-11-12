@@ -9,11 +9,7 @@ import { IS_DEMO } from '../lib/demoMode.js';
 import './ErrorBoundary.css';
 
 class RenderErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { failed: false, chunk: false, resetKey: props.resetKey };
-    this.reload = this.reload.bind(this);
-  }
+  state = { failed: false, chunk: false, resetKey: this.props.resetKey };
 
   static getDerivedStateFromProps(props, state) {
     return props.resetKey === state.resetKey
@@ -38,46 +34,30 @@ class RenderErrorBoundary extends Component {
     if (isChunkLoadError(error)) reloadOnce({ reload: this.reload });
   }
 
-  reload() {
+  reload = () => {
     (this.props.reload || (() => globalThis.location.reload()))();
-  }
+  };
 
   render() {
     if (!this.state.failed) return this.props.children;
     const { appearance = 'public', title = 'This page could not be shown', description } = this.props;
     const admin = appearance === 'admin';
     const inline = appearance === 'inline';
+    const Heading = inline ? 'strong' : 'h1';
     const explanation = this.state.chunk
-      ? 'A file needed for this page did not load. Check your connection and reload to try again.'
-      : description || 'This page ran into a problem. Choose another page or reload to try again.';
-    const button = (
-      <button
-        type="button"
-        onClick={this.reload}
-        className={admin
-          ? 'error-boundary__reload'
-          : primaryActionClass}
-      >
-        Reload the page
-      </button>
-    );
-    if (inline) return (
-      <div role="alert" className="stage error-boundary--inline">
-        <p><strong>{title}.</strong> {explanation}</p>
-        {button}
-      </div>
-    );
+      ? 'A page file did not load. Check your connection and reload.'
+      : description || 'Choose another page or reload.';
     return (
-      <div role="alert" className={admin
-        ? 'admin-room error-boundary error-boundary--admin'
-        : 'error-boundary'}>
-        <h1 className="error-boundary__title">
-          {title}
-        </h1>
+      <div role="alert" className={inline
+        ? 'stage error-boundary--inline'
+        : admin ? 'admin-room error-boundary error-boundary--admin' : 'error-boundary'}>
+        <Heading className="error-boundary__title">{title}{inline ? '.' : null}</Heading>{' '}
         <p className="error-boundary__description">
           {explanation}
         </p>
-        <div className="error-boundary__actions">{button}</div>
+        <button type="button" onClick={this.reload} className={`error-boundary__reload ${admin ? '' : primaryActionClass}`}>
+          Reload the page
+        </button>
       </div>
     );
   }

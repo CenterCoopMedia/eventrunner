@@ -7,9 +7,6 @@
 .error-boundary__description {
   @apply mt-xs text-body text-text-secondary;
 }
-.error-boundary__actions {
-  @apply mt-lg flex justify-center;
-}
 .error-boundary--admin {
   @apply m-0 w-full max-w-none bg-admin-ground px-md py-lg text-left font-admin-ui text-admin-ink;
 }
@@ -20,8 +17,20 @@
   @apply text-admin-sm text-admin-ink-secondary;
 }
 .error-boundary__reload {
-  @apply inline-flex min-h-admin-control items-center justify-center rounded-admin border-admin-hairline border-admin-action bg-admin-action px-md py-xs font-admin-ui text-admin-base font-bold text-admin-ink-inverse;
+  @apply mx-auto mt-lg flex w-fit;
+}
+.error-boundary--admin .error-boundary__reload {
+  @apply min-h-admin-control items-center justify-center rounded-admin border-admin-hairline border-admin-action bg-admin-action px-md py-xs font-admin-ui text-admin-base font-bold text-admin-ink-inverse;
 }
 .error-boundary--inline {
   @apply flex flex-wrap items-center gap-xs py-md text-body text-text-primary;
+}
+.error-boundary--inline .error-boundary__title {
+  @apply font-body text-body font-bold text-text-primary;
+}
+.error-boundary--inline .error-boundary__description {
+  @apply mt-0 text-text-primary;
+}
+.error-boundary--inline .error-boundary__reload {
+  @apply mx-0 mt-0;
 }

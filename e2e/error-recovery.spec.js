@@ -23,6 +23,7 @@ test.beforeAll(async () => {
   const config = {
     ...appConfig,
     configFile: false,
+    mode: 'production',
     root: FIXTURE,
     publicDir: path.join(ROOT, 'apps/web/public'),
     logLevel: 'error',
@@ -31,17 +32,24 @@ test.beforeAll(async () => {
       content: [path.join(ROOT, 'apps/web/index.html'), path.join(ROOT, 'apps/web/src/**/*.{js,jsx}'), `!${path.join(ROOT, 'apps/web/src/**/*.test.{js,jsx}')}`],
     }), autoprefixer()] } },
     define: {
-      'process.env.NODE_ENV': JSON.stringify('production'),
-      'import.meta.env.PROD': 'true',
-      'import.meta.env.DEV': 'false',
       'import.meta.env.VITE_DEMO_MODE': JSON.stringify('false'),
       'import.meta.env.VITE_FUNCTIONS_ORIGIN': JSON.stringify('/telemetry'),
     },
     build: { outDir: output, emptyOutDir: true },
     preview: { host: '127.0.0.1', port: 0, strictPort: true },
   };
-  await build(config);
-  server = await preview(config);
+  // Earlier fixture dev servers can leave NODE_ENV=development in this
+  // worker. Vite must choose production JSX and a production env object
+  // together; replacing individual expressions leaves them inconsistent.
+  const previousNodeEnv = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = 'production';
+    await build(config);
+    server = await preview(config);
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  }
   origin = `http://127.0.0.1:${server.httpServer.address().port}`;
   await fs.mkdir(EVIDENCE, { recursive: true });
 });

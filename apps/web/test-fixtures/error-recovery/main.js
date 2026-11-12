@@ -47,7 +47,7 @@ function FailedForm({ title }) {
 
 createRoot(globalThis.document.getElementById('root')).render(
   h(BrowserRouter, null,
-    h(ErrorBoundary, { title: 'The site could not be shown', description: 'The site ran into a problem. Reload to try again.' },
+    h(ErrorBoundary, { title: 'The site could not be shown', description: 'Reload the page to try again.' },
       h(Routes, null,
         h(Route, { element: h(Shell) },
           h(Route, { path: '/working', element: h('h1', null, 'Working page content') }),

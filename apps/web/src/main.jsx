@@ -46,7 +46,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <Router>
       <ErrorBoundary
         title="The site could not be shown"
-        description="The site ran into a problem. Reload to try again."
+        description="Reload the page to try again."
       >
         <App />
       </ErrorBoundary>
