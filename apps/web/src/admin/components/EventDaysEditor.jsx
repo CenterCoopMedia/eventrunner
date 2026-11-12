@@ -121,7 +121,7 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage, us
   };
 
   return (
-    <Panel help="Listed in date order. Each day needs a date and start and end times. Sessions are placed on a day here."
+    <Panel help="Set a date and start and end times for each event day. Sessions are assigned to these days in the schedule."
       className="admin-settings-card"
       title="Days"
       description="Listed in date order. Each day needs a date and start and end times. Sessions are placed on a day here."

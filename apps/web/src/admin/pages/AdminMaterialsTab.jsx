@@ -463,7 +463,7 @@ function CoveragePanel({ materials, truncated, readAt, sessions, sessionsState, 
   }
 
   return (
-    <Panel help="A pending or approved material counts. A rejected one does not. Sessions with no speaker are left out."
+    <Panel help="Find sessions or speakers that still need materials. Pending or approved files count as supplied; rejected files do not."
       title="Coverage"
       description="A pending or approved material counts. A rejected one does not. Sessions with no speaker are left out."
     >

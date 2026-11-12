@@ -595,7 +595,7 @@ export default function AdminPageEditor({ mode }) {
               <p className={`${fieldHintClass} admin-field__hint`}>This built-in page sets its own heading.</p>
             </div>
           ) : (
-            <TextField help="Optional. The heading at the top of the page, when it differs from the navigation label. Leave blank to use the label."
+            <TextField help="Set the heading at the top of this page when it differs from the navigation label. Leave blank to use the navigation label."
               label="Page heading"
               value={page.title}
               onChange={(value) => update({ title: value })}

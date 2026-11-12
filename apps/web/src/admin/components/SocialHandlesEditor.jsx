@@ -139,7 +139,7 @@ export default function SocialHandlesEditor({ social, onChange, errorFor }) {
   };
 
   return (
-    <Panel help="The event’s own accounts. The site footer and the footer of every built-in email list them in this order. Leave the list empty and neither footer shows social links."
+    <Panel help="List the event’s social accounts in the order they should appear in the site and email footers. Leave empty to show no social links."
       title="Social accounts"
       description="The event’s own accounts. The site footer and the footer of every built-in email list them in this order. Leave the list empty and neither footer shows social links."
       actions={

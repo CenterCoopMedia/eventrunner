@@ -280,7 +280,7 @@ export default function AdminRecordImport() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader help="Add or update speakers, sessions, organizations and registrations from a CSV file. Speakers, sessions and organizations are saved as drafts only; registrations make tickets. The import publishes nothing and sends no email."
+      <AdminPageHeader help="Import speakers, sessions, organizations or registrations from a CSV file. Nothing is published or emailed; registration rows create tickets."
         title="Import records"
         description="Add or update speakers, sessions, organizations and registrations from a CSV file. Speakers, sessions and organizations are saved as drafts only; registrations make tickets. The import publishes nothing and sends no email."
       />

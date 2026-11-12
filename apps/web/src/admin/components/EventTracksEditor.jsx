@@ -132,7 +132,7 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
   };
 
   return (
-    <Panel help="Sessions that run at the same time, on separate lines. Each line has a letter and a name, and the schedule shows both. Leave this empty if everything happens in one room."
+    <Panel help="Name each parallel schedule line with a letter and a name. Leave this empty if sessions all use one room."
       className="admin-settings-card"
       title="Tracks"
       description="Sessions that run at the same time, on separate lines. Each line has a letter and a name, and the schedule shows both. Leave this empty if everything happens in one room."
