@@ -16,6 +16,7 @@ const { application, seeded, NOW } = require('../console/functions/src/fakeRevie
 const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs');
 const { resolveAdminTier } = require('../functions/src/core/auth.cjs');
 const { SERVICES, STEPS, brandingProblem, main, markStopped, parseArgs, provision } = require('./provision-client.cjs');
+const { STEPS: DECOMMISSION_STEPS } = require('./decommission-client.cjs');
 
 const { privateKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -1024,6 +1025,34 @@ test('a retry after the endpoint was made keeps its platform ownership on the re
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.state.endpoints.length, 1, 'the retry reuses the endpoint');
   assert.equal(fake.db.read('console_builds/a1').stripeEndpointOwner, 'platform');
+});
+
+test('a failed signing-secret write leaves the endpoint owner available for decommission', async () => {
+  const fake = setup();
+  const write = fake.clientSecrets.writeSecret.bind(fake.clientSecrets);
+  fake.clientSecrets.writeSecret = async (id, value) => {
+    if (id === 'TICKETING_WEBHOOK_SECRET') throw new Error('secret add: HTTP 500');
+    return write(id, value);
+  };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  const record = fake.db.read('console_builds/a1');
+  assert.equal(record.failedStep, 'tickets');
+  assert.equal(fake.state.endpoints.length, 1);
+  assert.equal(record.stripeEndpointId, null, 'the endpoint is not yet paired with a saved secret');
+  assert.equal(record.stripeEndpointOwner, 'platform');
+  assert.equal(fake.clientSecrets.store.has('TICKETING_WEBHOOK_SECRET'), false);
+  // The real cleanup consumes this partial record and the provider refuses client-token endpoint calls.
+  await DECOMMISSION_STEPS.find((step) => step.id === 'ticket-webhooks').run({
+    appId: 'a1', app: fake.db.read('applications/a1'), build: record, resources: record.resources, deps: fake.deps,
+  });
+  assert.equal(fake.state.endpoints.length, 0);
+  const removed = fake.calls.find((call) => call.method === 'DELETE' && call.url.includes('/v1/webhook_endpoints/'));
+  assert.equal(removed.headers.Authorization, `Bearer ${fake.state.platformKey}`);
+  // Retrying without a saved secret replaces the endpoint and records the new identity.
+  fake.clientSecrets.writeSecret = write;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.endpoints.length, 1);
+  assert.equal(fake.db.read('console_builds/a1').stripeEndpointId, fake.state.endpoints[0].id);
 });
 
 test('a signing secret that did not save is not paired with the new account\'s endpoint', async () => {

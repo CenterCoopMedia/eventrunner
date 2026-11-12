@@ -855,11 +855,11 @@ async function stripeEndpoint(ctx, token, notes, connection) {
   ));
   const owner = auth.connect ? 'platform' : 'account';
   if (good) {
-    await putClientSecret(ctx, WEBHOOK_SECRET, secret);
     if (ctx.stripeEndpointOwner !== owner) {
       ctx.stripeEndpointOwner = owner;
       await ctx.recordRef.update({ stripeEndpointOwner: owner });
     }
+    await putClientSecret(ctx, WEBHOOK_SECRET, secret);
     return;
   }
   for (const endpoint of existing) {
@@ -869,12 +869,14 @@ async function stripeEndpoint(ctx, token, notes, connection) {
   if (auth.connect) form.set('connect', 'true');
   for (const type of WEBHOOK_EVENTS) form.append('enabled_events[]', type);
   const created = await call(ctx, 'create the payment webhook', `${STRIPE}/webhook_endpoints`, { method: 'POST', headers, form, quiet: true });
-  if (!created.secret) throw new Error('create the payment webhook: the answer held no signing secret');
-  await putClientSecret(ctx, WEBHOOK_SECRET, created.secret);
-  ctx.stripeEndpointId = created.id;
   ctx.stripeEndpointOwner = owner;
   // Cleanup must use the credential that owns the endpoint.
-  await ctx.recordRef.update({ stripeEndpointId: created.id, stripeEndpointOwner: owner });
+  await ctx.recordRef.update({ stripeEndpointOwner: owner });
+  if (!created.secret) throw new Error('create the payment webhook: the answer held no signing secret');
+  await putClientSecret(ctx, WEBHOOK_SECRET, created.secret);
+  // An endpoint id is paired only with a signing secret that saved successfully.
+  ctx.stripeEndpointId = created.id;
+  await ctx.recordRef.update({ stripeEndpointId: created.id });
   notes.push('created the payment webhook');
 }
 

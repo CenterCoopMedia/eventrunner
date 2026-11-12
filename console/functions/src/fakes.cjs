@@ -302,6 +302,7 @@ function makeFakeSecrets(seed = {}) {
 function makeFakeConnector({ answer, events = [], revokes = true } = {}) {
   return {
     answer,
+    get livemode() { return this.answer?.details?.livemode; },
     exchanged: [],
     revoked: [],
     exchangeError: null,

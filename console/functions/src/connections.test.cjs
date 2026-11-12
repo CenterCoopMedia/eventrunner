@@ -11,7 +11,7 @@ const { getApplication } = require('./applications.cjs');
 const { acceptAgreement } = require('./agreementAcceptance.cjs');
 const { getApplicationForReview } = require('./reviewQueue.cjs');
 const { connectionsForClient, liveConnection } = require('./connectionState.cjs');
-const { connectionsAvailable } = require('./connectors.cjs');
+const { connectionsAvailable, createStripeConnector } = require('./connectors.cjs');
 const { makeFakeAuth, makeFakeConnector, makeFakeSecrets, makeReq, makeRes } = require('./fakes.cjs');
 const { postEndpoint } = require('./http.cjs');
 const { NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers } = require('./testData.cjs');
@@ -67,6 +67,25 @@ const complete = (deps, fields, user = ana) => completeConnection(deps, { body: 
 const stateRows = (db) => db.paths('console_connection_states/');
 const stored = (db) => db.read('applications/a1').connections;
 const privateRow = (db) => db.read('console_connections/a1');
+
+/** Stripe's OAuth boundary, including the mode selected by the platform key. */
+function stripeHttp({ livemode = true, onExchange = async () => {}, revokeStatus = 200 } = {}) {
+  const calls = [];
+  const connector = createStripeConnector({
+    clientId: 'ca_fixture', secretKey: `sk_${livemode ? 'live' : 'test'}_fixture`,
+    fetch: async (url) => {
+      calls.push(url);
+      if (url.endsWith('/oauth/token')) {
+        await onExchange();
+        return new Response(JSON.stringify({ stripe_user_id: 'acct_new', access_token: `sk_${livemode ? 'live' : 'test'}_client`, livemode, scope: 'read_write' }));
+      }
+      if (url.endsWith('/account')) return new Response(JSON.stringify({ id: 'acct_new' }));
+      assert.equal(url, 'https://connect.stripe.com/oauth/deauthorize');
+      return new Response(JSON.stringify({ error: 'server_error', error_description: 'private-provider-body' }), { status: revokeStatus });
+    },
+  });
+  return { connector, calls };
+}
 
 test('an Owner gets the provider page, and only the hash of the state is stored', async () => {
   const { db, deps } = setup();
@@ -125,7 +144,7 @@ test('completing stores the state in Firestore and the token only in Secret Mana
   assert.equal(stripe.exchanged[0].redirectUri, `${PUBLIC_URL}/connect/stripe/return`);
   const { connected, displayName, livemode } = stored(db).stripe;
   assert.deepEqual({ connected, displayName, livemode }, { connected: true, displayName: 'NC Local', livemode: true });
-  assert.deepEqual(privateRow(db).stripe, { accountId: 'acct_new', connectedBy: 'ana' });
+  assert.deepEqual(privateRow(db).stripe, { accountId: 'acct_new', connectedBy: 'ana', livemode: true });
 });
 
 test('no token reaches a response, a Firestore write or a log, through the HTTP wrapper', async () => {
@@ -347,6 +366,18 @@ test('a failed revoke does not stop a disconnect, and is logged without the toke
   assert.equal(stored(db).stripe, undefined);
   assert.equal(log.errors.length, 1);
   assert.ok(!JSON.stringify(log.errors).includes(TOKEN));
+});
+
+test('a reconnect stays successful when revoking the older account fails', async () => {
+  const { deps, db, stripe, log, secrets } = setup({ application: { connections: { stripe: stripeConnection() } } });
+  stripe.revokeError = new Error('stripe revoke: HTTP 500');
+  const { body } = await complete(deps, { state: await start(deps) });
+  assert.equal(body.connected, true);
+  assert.equal(stored(db).stripe.connected, true);
+  assert.equal(privateRow(db).stripe.accountId, 'acct_new');
+  assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+  assert.match(JSON.stringify(log.errors), /stripe revoke: HTTP 500/);
 });
 
 test('a failed token delete ends the connection and says so, and trying again ends the account', async () => {
@@ -681,7 +712,60 @@ test('a disconnected site that still holds a platform endpoint keeps the one liv
   });
 });
 
-test('a second live Stripe account is refused while another request holds one, and the new account is let go', async () => {
+test('test-mode private rows and existing test applications leave the live Stripe slot free', async () => {
+  for (const extra of [
+    { 'console_connections/test': { stripe: { accountId: 'acct_test', livemode: false } } },
+    {
+      'console_connections/test': { stripe: { accountId: 'acct_test' } },
+      'applications/test': applicationDoc({ connections: { stripe: stripeConnection({ livemode: false }) } }),
+    },
+  ]) {
+    const { db, deps } = setup({ extra });
+    const { connector } = stripeHttp();
+    deps.connectors.stripe = connector;
+    assert.equal((await complete(deps, { state: await start(deps) })).body.connected, true);
+    assert.equal(privateRow(db).stripe.livemode, true);
+  }
+});
+
+test('an account with unknown mode still reserves the live Stripe slot', async () => {
+  const { deps } = setup({ extra: { 'console_connections/orphan': { stripe: { accountId: 'acct_unknown' } } } });
+  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
+});
+
+test('a live OAuth code is refused before any Stripe request when another live slot is held', async () => {
+  const { deps } = sharing();
+  const { connector, calls } = stripeHttp();
+  deps.connectors.stripe = connector;
+  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
+  assert.deepEqual(calls, []);
+});
+
+test('a test OAuth exchange is allowed while another live slot is held', async () => {
+  const { deps, db } = sharing();
+  const { connector, calls } = stripeHttp({ livemode: false });
+  deps.connectors.stripe = connector;
+  assert.equal((await complete(deps, { state: await start(deps) })).body.connected, true);
+  assert.ok(calls.some((url) => url === 'https://connect.stripe.com/oauth/token'));
+  assert.equal(privateRow(db).stripe.livemode, false);
+});
+
+test('a competing live connection during exchange is refused and a failed deauthorization is reported', async () => {
+  const { db, deps, log, secrets } = setup();
+  const { connector, calls } = stripeHttp({
+    onExchange: () => db.doc('console_connections/other').set({ stripe: { accountId: 'acct_other', livemode: true } }),
+    revokeStatus: 500,
+  });
+  deps.connectors.stripe = connector;
+  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 502, code: 'disconnect-failed' });
+  assert.ok(calls.some((url) => url === 'https://connect.stripe.com/oauth/deauthorize'));
+  assert.equal(secrets.store.size, 0);
+  assert.equal(privateRow(db).stripe, undefined);
+  assert.match(JSON.stringify(log.errors), /stripe revoke: HTTP 500 server_error/);
+  assert.ok(!JSON.stringify(log.errors).includes('private-provider-body'));
+});
+
+test('a second live Stripe account is refused before the exchange while another request holds one', async () => {
   const { stripe, secrets, deps } = sharing();
   await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
     assert.equal(err.status, 409);
@@ -689,17 +773,19 @@ test('a second live Stripe account is refused while another request holds one, a
     return true;
   });
   assert.equal(secrets.store.get('connection-stripe-a1'), undefined);
-  assert.deepEqual(stripe.revoked, ['acct_new']);
+  assert.equal(stripe.exchanged.length, 0);
+  assert.deepEqual(stripe.revoked, []);
 });
 
 test('a half-made connection, a late refusal and a failed write all keep an account another request uses', async () => {
   const half = sharing();
+  half.stripe.answer = { ...stripeAnswer(), details: { livemode: false } };
   half.stripe.exchangeError = Object.assign(new Error('stripe exchange: no usable account token'), { accountId: 'acct_client1' });
   await assert.rejects(complete(half.deps, { state: await start(half.deps) }), { status: 502 });
   assert.deepEqual(half.stripe.revoked, []);
 
   const late = sharing();
-  late.stripe.answer = stripeAnswer('acct_client1');
+  late.stripe.answer = { ...stripeAnswer('acct_client1'), details: { livemode: false } };
   const state = await start(late.deps);
   // The status is checked before the exchange too, so move it during the exchange.
   const exchange = late.stripe.exchangeCode.bind(late.stripe);

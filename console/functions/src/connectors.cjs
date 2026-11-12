@@ -6,6 +6,7 @@
  * injected, so tests make no network call.
  *
  * A connector has:
+ *   livemode -> Stripe's configured OAuth mode, known before exchanging a code
  *   authorizeUrl({ state, redirectUri }) -> the provider's page to send the client to
  *   exchangeCode({ code, redirectUri }) -> { token, accountId, displayName, details }
  *   revoke(accountId) -> true when the provider ended the connection, false when it has no way to
@@ -74,6 +75,8 @@ function createStripeConnector({ clientId, secretKey, fetch }) {
   const unusable = (accountId, why) => Object.assign(new Error(`stripe exchange: ${why}`), { accountId });
 
   return {
+    // Stripe requires the exchange key to match the authorization code's mode.
+    livemode: STRIPE_KEY.exec(secretKey)?.[1] === 'live',
     authorizeUrl: ({ state, redirectUri }) => withQuery(`${STRIPE_CONNECT}/oauth/authorize`, {
       response_type: 'code', client_id: clientId, scope: 'read_write', redirect_uri: redirectUri, state,
     }),
