@@ -56,6 +56,7 @@
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { hasSentChangeRequest } from '../lib/changeRequestMarker.js';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router';
+import DeviceScheduleMerge from './schedule/DeviceScheduleMerge.jsx';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config/socialAccounts';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -502,6 +503,7 @@ export default function Layout() {
       }
     >
       <ErrorBoundary>
+        <DeviceScheduleMerge />
         <Outlet context={accountViews} />
       </ErrorBoundary>
     </main>

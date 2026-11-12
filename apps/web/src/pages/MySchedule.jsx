@@ -1,11 +1,5 @@
-// MySchedule — the personal ("my schedule") view at /schedule/mine (issue
-// #16, spec §9 personal schedule row). Filters the same published cmsSchedule
-// set Schedule.jsx renders down to the signed-in user's bookmarks, grouped
-// and sorted the same way. Requires config/features.{schedule,
-// sessionBookmarks} AND a signed-in user — bookmarking itself is further
-// gated to approved attendees (session/BookmarkAction.jsx), but a
-// signed-out visitor sees a sign-in prompt here rather than an empty list
-// that looks like "you have no bookmarks".
+// MySchedule renders account saves and any browser saves still awaiting
+// import. Signed-out and ineligible readers use only the device list.
 //
 // Editorial base restyle (design brief §2.1, §5.1): the day head is the same
 // folio-on-a-rule SectionHead device Schedule.jsx uses, and the page actions
@@ -15,8 +9,10 @@ import { Link } from 'react-router';
 import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useEventClock } from '../hooks/useEventClock.js';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
+import { useDeviceBookmarks } from '../hooks/useDeviceBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
@@ -53,7 +49,13 @@ export default function MySchedule() {
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
   const { user, loading: authLoading } = useAuth();
-  const { bookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
+  const { attendeeAccess } = useProfile();
+  const { bookmarkedIds: accountBookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
+  const device = useDeviceBookmarks();
+  const deviceOnly = !user || !attendeeAccess;
+  const bookmarkedIds = useMemo(() => new Set([
+    ...(deviceOnly ? [] : accountBookmarkedIds), ...device.ids,
+  ]), [deviceOnly, accountBookmarkedIds, device.ids]);
   // Same clock as the schedule list, so a page left open past the day end
   // drops bookmark and calendar controls without a reload.
   const now = useEventClock();
@@ -111,6 +113,7 @@ export default function MySchedule() {
   // (recomputed each render; keeping it out of this memo's deps avoids that
   // churn without needing its own memo).
   const mySessions = useMemo(() => Array.from(myByDay.values()).flat(), [myByDay]);
+  const accountSessions = useMemo(() => mySessions.filter((session) => accountBookmarkedIds.has(session.id)), [mySessions, accountBookmarkedIds]);
 
   if (!features.schedule || !features.sessionBookmarks) {
     return (
@@ -134,7 +137,7 @@ export default function MySchedule() {
     );
   }
 
-  if (!user) {
+  if (!user && !device.available) {
     return (
       <EmptyState
         title="Sign in to see your schedule"
@@ -154,8 +157,20 @@ export default function MySchedule() {
         <div>
           <h1 className="font-heading text-h1 font-semibold text-text-primary">My schedule</h1>
           <p className="mt-2xs font-data text-caption text-text-secondary">
-            Sessions you’ve bookmarked, across every day.
+            {deviceOnly ? 'These sessions are saved only in this browser. Browser settings may clear them.'
+              : 'Sessions you’ve bookmarked, across every day.'}
           </p>
+          {user && !attendeeAccess ? (
+            <p className="mt-2xs max-w-prose text-body text-text-secondary">
+              This account does not have attendee access. Your browser saves stay on this device.
+            </p>
+          ) : null}
+          {!deviceOnly && device.ids.length > 0 ? (
+            <p className="mt-2xs max-w-prose text-body text-text-secondary">
+              {device.ids.length} browser {device.ids.length === 1 ? 'save has' : 'saves have'} not been added to your account.
+              The PDF, sharing and calendar sync use sessions already saved to your account.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-xs">
           <Link to="/schedule" className={quietActionClass}>
@@ -173,7 +188,7 @@ export default function MySchedule() {
           {/* The personal PDF (issue #171): the server reads the caller's
               own bookmarks behind the verified token, so the button carries
               nothing but the request. The same flag gates the public PDF. */}
-          {features.schedulePdf && mySessions.length > 0 ? (
+          {features.schedulePdf && !deviceOnly && accountSessions.length > 0 ? (
             <button
               type="button"
               onClick={onDownloadPdf}
@@ -191,7 +206,7 @@ export default function MySchedule() {
         </div>
       </header>
 
-      {loading || bookmarksLoading ? (
+      {loading || (!deviceOnly && bookmarksLoading) ? (
         <div className="mt-lg">
           <LoadingState shape="schedule" label="Loading your schedule…" />
         </div>
@@ -259,7 +274,10 @@ export default function MySchedule() {
                         // The attendee's private note on this session
                         // (issue #170): the row is theirs, and so is the
                         // text under it. The public page passes nothing.
-                        noteSlot={<SessionNote uid={user.uid} sessionId={session.id} />}
+                        noteSlot={!deviceOnly && accountBookmarkedIds.has(session.id)
+                          ? <SessionNote uid={user.uid} sessionId={session.id} />
+                          : !deviceOnly && device.ids.includes(session.id)
+                            ? <p className="mt-xs font-data text-caption text-text-secondary">Saved in this browser; not yet in your account.</p> : null}
                       />
                     </Fragment>
                   );
@@ -278,8 +296,8 @@ export default function MySchedule() {
       {/* Optional Google Calendar sync (issue #177, ADR 0003): the flag
           gates the whole card, and the .ics download above it stays the
           answer whenever the grant is refused or the flag is off. */}
-      {features.calendarSync && user && !loading && !bookmarksLoading ? (
-        <CalendarSyncCard key={user.uid} sessions={mySessions} eventConfig={eventConfig} />
+      {features.calendarSync && !deviceOnly && !loading && !bookmarksLoading ? (
+        <CalendarSyncCard key={user.uid} sessions={accountSessions} eventConfig={eventConfig} />
       ) : null}
     </article>
   );

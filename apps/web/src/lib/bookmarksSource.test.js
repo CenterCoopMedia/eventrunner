@@ -1,18 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const onSnapshotMock = vi.fn();
+const getDocFromServerMock = vi.fn();
 const collectionMock = vi.fn((_db, path) => ({ __kind: 'collection', path }));
 
 vi.mock('firebase/firestore', () => ({
   collection: (...args) => collectionMock(...args),
   onSnapshot: (...args) => onSnapshotMock(...args),
+  doc: (_db, path) => ({ path }),
+  getDocFromServer: (...args) => getDocFromServerMock(...args),
 }));
 vi.mock('../firebase.js', () => ({ db: {} }));
 vi.mock('../contexts/AuthContext.jsx', () => ({
   functionsOrigin: () => 'https://fake-functions.example',
 }));
 
-const { BookmarkRequestError, setSessionBookmarked, subscribeMyBookmarks } = await import(
+const { BookmarkRequestError, readBookmarkImportVisibility, setSessionBookmarked, subscribeMyBookmarks } = await import(
   './bookmarksSource.js'
 );
 
@@ -120,6 +123,19 @@ describe('setSessionBookmarked', () => {
     expect(opts.method).toBe('POST');
     expect(opts.headers.Authorization).toBe('Bearer id-token');
     expect(JSON.parse(opts.body)).toEqual({ sessionId: 's1', bookmarked: true });
+  });
+
+  it('reads import visibility from the server and forwards its transactional precondition', async () => {
+    getDocFromServerMock.mockResolvedValue({ data: () => ({ scheduleVisibility: 'attendees_only' }) });
+    expect(await readBookmarkImportVisibility('u1')).toBe('attendees_only');
+    expect(getDocFromServerMock).toHaveBeenCalledWith({ path: 'schedule_shares/u1' });
+    globalThis.fetch.mockResolvedValue({ ok: true, json: async () => ({ bookmarked: true, count: 1 }) });
+    await setSessionBookmarked({ user: fakeUser(), sessionId: 's1', bookmarked: true,
+      expectedScheduleVisibility: 'attendees_only' });
+    expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body)).toEqual({ sessionId: 's1', bookmarked: true,
+      expectedScheduleVisibility: 'attendees_only' });
+    getDocFromServerMock.mockRejectedValue(new Error('offline'));
+    await expect(readBookmarkImportVisibility('u1')).rejects.toThrow('offline');
   });
 
   it('throws BookmarkRequestError with the server error code/message on a non-2xx response', async () => {

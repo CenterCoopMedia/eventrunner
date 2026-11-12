@@ -11,10 +11,9 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { pageHeading } from 'shared/page';
-import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
+import { functionsOrigin } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
-import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import { useBookmarkCounts } from '../hooks/useBookmarkCounts.js';
 import { useEventClock } from '../hooks/useEventClock.js';
@@ -80,8 +79,6 @@ export default function Schedule() {
   const { eventConfig, features, theme } = useEventConfig();
   const { scheduleData, speakers, loading, getSectionBlocks, getPage } = useContent();
   const page = getPage?.('schedule');
-  const { user } = useAuth();
-  const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
   // The public aggregate counts (issue #165): the figure beside each
   // session, the legend in the header, and the most-saved sort all read
@@ -500,7 +497,7 @@ export default function Schedule() {
               {/* Controls do not print: a button on paper is a lie. Print
                   uses the handout below; PDF asks the server for the same
                   programme behind its feature flag. */}
-                {features.sessionBookmarks && user && attendeeAccess ? (
+                {features.sessionBookmarks ? (
                   <Link to="/schedule/mine" className={quietActionClass}>
                     My schedule
                   </Link>

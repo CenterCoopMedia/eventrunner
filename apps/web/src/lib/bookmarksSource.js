@@ -8,7 +8,7 @@
 //
 // This is the one module that talks to Firestore/fetch for bookmarks; tests
 // mock this module rather than the SDK, matching lib/contentSource.js.
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { functionsOrigin } from '../contexts/AuthContext.jsx';
 import { subscribeWithRetry } from './retrySubscription.js';
@@ -54,6 +54,13 @@ export function subscribeMyBookmarks(uid, onNext, onError) {
   );
 }
 
+/** An import must never infer private consent from an old local cache. */
+export async function readBookmarkImportVisibility(uid) {
+  const snapshot = await getDocFromServer(doc(db, `schedule_shares/${uid}`));
+  const visibility = snapshot.data()?.scheduleVisibility;
+  return ['public', 'attendees_only'].includes(visibility) ? visibility : 'private';
+}
+
 /** Thrown by {@link setSessionBookmarked} on any non-2xx response. */
 export class BookmarkRequestError extends Error {
   constructor({ code, message, status }) {
@@ -69,10 +76,11 @@ export class BookmarkRequestError extends Error {
  * Cloud Function (functions/src/schedule/bookmarks.cjs). Idempotent on the
  * server, so a retried call after a network hiccup is safe.
  *
- * @param {{ user: import('firebase/auth').User, sessionId: string, bookmarked: boolean }} args
+ * @param {{ user: import('firebase/auth').User, sessionId: string, bookmarked: boolean,
+ *           expectedScheduleVisibility?: 'private'|'attendees_only'|'public' }} args
  * @returns {Promise<{ bookmarked: boolean, count: number }>}
  */
-export async function setSessionBookmarked({ user, sessionId, bookmarked }) {
+export async function setSessionBookmarked({ user, sessionId, bookmarked, expectedScheduleVisibility }) {
   if (!user) {
     throw new BookmarkRequestError({
       code: 'unauthorized',
@@ -89,7 +97,7 @@ export async function setSessionBookmarked({ user, sessionId, bookmarked }) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ sessionId, bookmarked }),
+      body: JSON.stringify({ sessionId, bookmarked, expectedScheduleVisibility }),
     });
   } catch {
     throw new BookmarkRequestError({

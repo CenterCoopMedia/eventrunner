@@ -250,9 +250,9 @@ describe('SessionDetail', () => {
     expect(screen.queryByText(/recording/i)).toBeNull();
   });
 
-  it('offers a signed-out visitor the sign-in path when features.sessionBookmarks is on', () => {
+  it('offers a signed-out visitor a browser save when features.sessionBookmarks is on', () => {
     renderDetail('fx-early', { features: { schedule: true, sessionBookmarks: true } });
-    expect(screen.getByRole('link', { name: 'Sign in to save sessions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Bookmark$/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('takes live controls off a past day and keeps the recording', () => {
