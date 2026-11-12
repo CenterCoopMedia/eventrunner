@@ -95,7 +95,7 @@ export default function StripePromoCodeEditor({ promo, creating, catalog, timezo
       </fieldset>
       <PlannerSwitch label="Code is active" checked={draft.active} onChange={(value) => change('active', value)} />
       <div className="flex flex-wrap gap-sm">
-        <button type="submit" className={primaryButtonClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Saving promo code…' : 'Save'}</button>
+        <button type="submit" className={primaryButtonClass} aria-label={busy ? 'Saving promo code…' : 'Save promo code'} aria-busy={busy} aria-disabled={busy}>{busy ? 'Saving promo code…' : 'Save'}</button>
         <button type="button" className={secondaryButtonClass} onClick={onCancel}>Cancel</button>
       </div>
     </form>

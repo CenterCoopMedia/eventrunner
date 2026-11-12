@@ -54,7 +54,7 @@ describe('catalog editor after a sales change', () => {
     expect(screen.queryByRole('button', { name: 'Discard unsaved edits and reload catalog' })).not.toBeInTheDocument();
     // The flipped checkbox is explained in a status line.
     expect(screen.getByText(REBASED)).toHaveAttribute('role', 'status');
-    const submit = screen.getByRole('button', { name: 'Save' });
+    const submit = screen.getByRole('button', { name: 'Save ticket settings' });
     expect(submit).toHaveAttribute('aria-disabled', 'false');
     // A save from the rebased editor keeps sales open and names the new revision.
     fireEvent.click(submit);
@@ -74,7 +74,7 @@ describe('catalog editor after a sales change', () => {
     expect(await screen.findByText(CHANGED)).toBeInTheDocument();
     expect(screen.getByLabelText('Ticket name')).toHaveValue('Unsaved early bird');
     expect(screen.queryByText(REBASED)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Save ticket settings' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('treats an edit typed back to the saved value as no edit', async () => {

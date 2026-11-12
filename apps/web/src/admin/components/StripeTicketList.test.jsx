@@ -3,6 +3,25 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import StripeTicketList from './StripeTicketList.jsx';
 
 describe('StripeTicketList order filters', () => {
+  it('names each order and ticket action even when the buyer and order repeat', async () => {
+    const onOpenOrder = vi.fn();
+    const call = vi.fn(async (_name, { action }) => action === 'orders' ? {
+      orders: ['ord-1', 'ord-2'].map((id) => ({ id, purchaserEmail: 'buyer@example.org' })),
+    } : {
+      tickets: ['seat-1', 'seat-2'].map((id) => ({ id, orderId: 'ord-1', email: 'buyer@example.org', status: 'valid', claimedByUid: 'holder' })),
+    });
+    render(<>
+      <StripeTicketList call={call} kind="orders" catalog={null} timezone="UTC" refreshToken={0} onOpenOrder={onOpenOrder} />
+      <StripeTicketList call={call} kind="tickets" catalog={null} timezone="UTC" refreshToken={0} onOpenOrder={onOpenOrder} />
+    </>);
+    for (const name of [
+      'View order ord-1 for buyer@example.org', 'View order ord-2 for buyer@example.org',
+      'View order for ticket seat-1', 'View order for ticket seat-2',
+    ]) fireEvent.click(await screen.findByRole('button', { name }));
+    expect(screen.getAllByRole('button', { name: /^View order / })).toHaveLength(4);
+    expect(onOpenOrder.mock.calls).toEqual([['ord-1'], ['ord-2'], ['ord-1'], ['ord-1']]);
+  });
+
   it('finds the orders that need organizer attention by order state', async () => {
     const call = vi.fn(async () => ({ orders: [], nextCursor: null }));
     render(<StripeTicketList call={call} kind="orders" catalog={null} timezone="UTC" refreshToken={0} onOpenOrder={vi.fn()} />);

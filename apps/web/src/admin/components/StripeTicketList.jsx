@@ -83,7 +83,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
         <thead><tr>{(isOrders ? ['Order', 'Purchaser', 'Payment', 'Refund', 'Total', 'Created'] : ['Ticket code', 'Attendee', 'Email', 'Type', 'Admission', 'Claim', 'Check-in', 'Order']).map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
         <tbody>{rows.map((row) => <tr key={row.orderId && isOrders ? row.orderId : row.externalId || row.id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
           {isOrders ? <>
-            <td className={dataCellClass}><button type="button" className={linkButtonClass} onClick={() => onOpenOrder(row.orderId || row.id)}>View order</button></td>
+            <td className={dataCellClass}><button type="button" className={linkButtonClass} aria-label={`View order ${row.orderId || row.id} for ${row.purchaserEmail || row.purchaser?.email || 'purchaser'}`} onClick={() => onOpenOrder(row.orderId || row.id)}>View order</button></td>
             <td className={dataCellClass}>{row.purchaserEmail || row.purchaser?.email || 'Not available'}</td>
             <td className={cellClass}><StatusBadge>{paymentStatusLabel(row.paymentStatus)}</StatusBadge></td>
             <td className={cellClass}>{refundStateLabel(row.refundStatus || 'none')}</td>
@@ -97,7 +97,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
             <td className={cellClass}><StatusBadge tone={row.status === 'valid' ? 'ok' : 'caution'}>{ticketStatusLabel(row.status)}</StatusBadge></td>
             <td className={cellClass}><div className="flex flex-wrap items-center gap-xs">{row.claimedByUid ? 'Claimed' : 'Unclaimed'}{canCreateAccountFromTicket(row) ? <CreateAccountFromTicket call={call} ticket={row} ticketId={row.externalId || row.id} onDone={onAccountDone} /> : null}</div></td>
             <td className={cellClass}>{row.checkedInAt ? 'Checked in' : 'Not checked in'}</td>
-            <td className={cellClass}><button type="button" className={linkButtonClass} onClick={() => onOpenOrder(row.orderId)}>View order</button></td>
+            <td className={cellClass}><button type="button" className={linkButtonClass} aria-label={`View order for ticket ${row.externalId || row.id}`} onClick={() => onOpenOrder(row.orderId)}>View order</button></td>
           </>}
         </tr>)}</tbody>
       </TicketingTable>

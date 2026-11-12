@@ -41,7 +41,7 @@ export default function ReviewActions({ status, canClose = false, onDecide, busy
     if (await onDecide(name, body) === true) setOpen(null);
   }
 
-  const opener = (name, label) => name === 'spam' ? (
+  const opener = (name, label) => open === name ? null : name === 'spam' ? (
     <IconControl icon="delete" label={label} className="danger" disabled={busy || disabled}
       ref={(node) => { openers.current[name] = node; }} aria-expanded={open === name}
       onClick={() => setOpen(name)} />
@@ -99,7 +99,7 @@ export default function ReviewActions({ status, canClose = false, onDecide, busy
           ) : opener('spam', 'Delete as spam')}
         </section>
       ) : null}
-      {!open ? <ActionResult result={result} focusRef={resultRef} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh request" /> : null}
+      {!open ? <ActionResult result={result} focusRef={resultRef} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh request after action" /> : null}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import StripeOrderDetail from './StripeOrderDetail.jsx';
 import StripeCompPanel from './StripeCompPanel.jsx';
 import StripeCheckInPanel from './StripeCheckInPanel.jsx';
 import StripeCatalogPanel from './StripeCatalogPanel.jsx';
+import StripePromoCodeEditor, { EMPTY_PROMO } from './StripePromoCodeEditor.jsx';
 
 const TYPE = { id: 'general', name: 'General admission', description: '', unitAmount: 2500, capacity: 100, active: true, visibility: 'public', minPerOrder: 1, maxPerOrder: 10, salesStartAt: null, salesEndAt: null };
 const CATALOG = { schemaVersion: 1, revision: 1, published: true, salesPaused: true, currency: 'usd', capacity: 100, maxPerOrder: 10, refundPolicy: 'Contact the organizer.', taxTreatment: 'inclusive', commercialTermsConfirmed: true, salesStartAt: null, salesEndAt: null, ticketTypes: [TYPE] };
@@ -122,10 +123,20 @@ describe('complimentary tickets and online check-in', () => {
 });
 
 describe('catalog precision and cursor isolation', () => {
+  it('distinguishes ticket settings and promo-code saves when both forms are open', () => {
+    render(<>
+      <StripeCatalogPanel call={call} data={{ catalog: CATALOG }} isOperator timezone="UTC" onSaved={vi.fn()} />
+      <StripePromoCodeEditor promo={EMPTY_PROMO} creating catalog={CATALOG} timezone="UTC" busy={false} onSave={vi.fn()} onCancel={vi.fn()} />
+    </>);
+    expect(screen.getByRole('button', { name: 'Save ticket settings' })).toHaveTextContent('Save');
+    expect(screen.getByRole('button', { name: 'Save promo code' })).toHaveTextContent('Save');
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+
   it('refuses a price with excessive precision instead of silently rounding money', () => {
     render(<StripeCatalogPanel call={call} data={{ catalog: CATALOG, mode: 'test' }} isOperator timezone="UTC" onSaved={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '12.345' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     expect(screen.getByLabelText('Price (USD)')).toHaveAttribute('aria-invalid', 'true');
     expect(call).not.toHaveBeenCalled();
   });
@@ -135,7 +146,7 @@ describe('catalog precision and cursor isolation', () => {
     fireEvent.change(screen.getByLabelText('Ticket name'), { target: { value: 'Local unsaved change' } });
     rerender(<StripeCatalogPanel {...props} data={{ catalog: { ...CATALOG, revision: 2, salesPaused: false } }} />);
     expect(screen.getByLabelText('Ticket name')).toHaveValue('Local unsaved change');
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket settings' }));
     expect(call).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Discard unsaved edits and reload catalog' })).toBeInTheDocument();
   });

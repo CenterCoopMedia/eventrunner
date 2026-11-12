@@ -872,6 +872,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ticket order actions name their record, and ticket settings and promo-code saves have distinct
+  screen-reader names. Console review hides the active form's opener and names result refreshes
+  separately from the page refresh; Cancel returns focus to the opener (#737).
 - Function deploys recover from a successful Firebase exit that leaves quota-limited creates
   unfinished. Three guarded attempts use fresh complete inventories and wait 105 seconds between
   attempts. Partial bootstraps cannot reuse full-deploy force; other errors still stop (#827).
