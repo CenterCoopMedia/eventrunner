@@ -506,13 +506,10 @@ async function deployAttempt({
   }
 
   let deployed;
-  let verificationPhase = 'post-deploy-discovery';
   try {
-    localFunctions ??= await discoverFunctions(projectId);
-    verificationPhase = 'post-deploy-inventory';
     deployed = await verifyCompleteInventory(projectId);
   } catch (error) {
-    log.error(diagnosticFailure('deploy-functions: could not verify the deployed functions', verificationPhase, error));
+    log.error(diagnosticFailure('deploy-functions: could not verify the deployed functions', 'post-deploy-inventory', error));
     return { code: 1 };
   }
   return incompleteDeployment(deployed, localFunctions);
