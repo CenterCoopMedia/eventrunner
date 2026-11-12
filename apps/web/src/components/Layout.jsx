@@ -401,7 +401,7 @@ export default function Layout() {
       id={accountActionsId}
       ref={accountActionsRef}
       hidden={readOnlyDemo}
-      className="site-header-account-actions no-print"
+      className={`site-header-account-actions no-print${compactHeader && menuOpen ? ' motion-enter' : ''}`}
       data-mobile-hidden={compactHeader && settledCompactHeader && !menuOpen}
       onKeyDown={closeMenuOnEscape}
       onClick={closeMenuOnLink}
@@ -436,11 +436,12 @@ export default function Layout() {
       }
     >
       <ul
-        className={
+        className={[
           navPlacement === 'side'
             ? 'flex flex-wrap items-center gap-x-md lg:flex-col lg:items-start lg:gap-x-0'
-            : 'flex flex-wrap items-center gap-x-md'
-        }
+            : 'flex flex-wrap items-center gap-x-md',
+          compactHeader && menuOpen ? 'motion-enter' : '',
+        ].filter(Boolean).join(' ')}
       >
         {primaryNavItems.map((item) => (
           <li key={item.to}>
@@ -451,7 +452,7 @@ export default function Layout() {
         ))}
         {moreNavItems.length ? (
           <li>
-            <details className="site-nav-more" onKeyDown={(event) => {
+            <details className="site-nav-more motion-disclosure" onKeyDown={(event) => {
               if (event.key !== 'Escape' || !event.currentTarget.open) return;
               event.stopPropagation();
               event.currentTarget.open = false;

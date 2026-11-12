@@ -72,7 +72,7 @@ export default function AccountMenu({ account }) {
     return (
       <>
         <button ref={trigger} type="button" className={quietActionClass} onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>Account</button>
-        {open && <dialog ref={dialog} aria-label="Account" aria-modal="true" className="public-dialog site-account-sheet" onCancel={(event) => { event.preventDefault(); close(); }} onKeyDown={(event) => {
+        {open && <dialog ref={dialog} aria-label="Account" aria-modal="true" className="public-dialog site-account-sheet motion-enter" onCancel={(event) => { event.preventDefault(); close(); }} onKeyDown={(event) => {
           if (event.key === 'Escape') { event.preventDefault(); close(); }
         }}>
           <div className="sticky top-0 flex items-center justify-between gap-sm bg-surface pb-sm">
@@ -86,7 +86,7 @@ export default function AccountMenu({ account }) {
   }
 
   return (
-    <details ref={menu} open={open} className="site-account-menu" onToggle={(event) => setOpen(event.currentTarget.open)} onKeyDown={(event) => {
+    <details ref={menu} open={open} className="site-account-menu motion-disclosure" onToggle={(event) => setOpen(event.currentTarget.open)} onKeyDown={(event) => {
       if (event.key === 'Escape') close();
     }}>
       <summary ref={trigger} className={`${quietActionClass} cursor-pointer`}>Account</summary>

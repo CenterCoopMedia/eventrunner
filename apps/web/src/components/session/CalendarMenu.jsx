@@ -79,7 +79,7 @@ export default function CalendarMenu({ eventConfig, session }) {
         <ul
           id={listId}
           aria-label={`Add ${session.title} to a calendar`}
-          className="mt-2xs flex flex-col items-start gap-2xs ps-sm"
+          className="motion-enter mt-2xs flex flex-col items-start gap-2xs ps-sm"
         >
           <li>
             <button type="button" className={rowActionClass} onClick={onDownload}>

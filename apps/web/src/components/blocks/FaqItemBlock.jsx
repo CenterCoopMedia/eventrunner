@@ -14,7 +14,7 @@ export default function FaqItemBlock({ block }) {
   if (!block?.question) return null;
   const answer = sanitizeHtml(block.answer);
   return (
-    <details className="rounded-brand-lg border-hairline border-rule-hairline bg-surface-alt">
+    <details className="motion-disclosure rounded-brand-lg border-hairline border-rule-hairline bg-surface-alt">
       <summary className="touch-target flex cursor-pointer items-center px-md py-sm font-heading text-lead text-text-primary">
         {block.question}
       </summary>
