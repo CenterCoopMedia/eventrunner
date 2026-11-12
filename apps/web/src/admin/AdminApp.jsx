@@ -187,8 +187,8 @@ export default function AdminApp() {
           <Route path="pitches/import" element={<DeferredAdminPage label="pitch import"><AdminPitchImport /></DeferredAdminPage>} />
           <Route path="pitches/:pitchId" element={<DeferredAdminPage label="session pitch"><AdminSessionPitch /></DeferredAdminPage>} />
           <Route path="pages" element={<AdminPagesList />} />
-          <Route path="pages/new" element={<DeferredAdminPage label="page"><AdminPageEditor mode="create" /></DeferredAdminPage>} />
-          <Route path="pages/:pageId" element={<DeferredAdminPage label="page"><AdminPageEditor mode="edit" /></DeferredAdminPage>} />
+          <Route path="pages/new" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="create" /></DeferredAdminPage>} />
+          <Route path="pages/:pageId" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="edit" /></DeferredAdminPage>} />
           <Route
             path="sessions"
             element={<DeferredAdminPage label="sessions"><AdminSessionsList /></DeferredAdminPage>}
