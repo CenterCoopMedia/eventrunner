@@ -165,11 +165,11 @@ describe('ApplicationStatus', () => {
     }
   });
 
-  it('does not overlap scheduled reads, says a slow step is delayed and stops after failure', async () => {
+  it('serializes reads, says a slow step is delayed and notices recovery from failure', async () => {
     vi.useFakeTimers();
     let finishRead;
     let reads = 0;
-    const running = application({ status: 'building', canEdit: false, canWithdraw: false, build: progressAt(3) });
+    const running = application({ status: 'building', myRole: 'editor', canEdit: false, canWithdraw: false, build: progressAt(3) });
     serveApi({ getApplication: () => {
       reads += 1;
       return reads === 1 ? { application: running } : new Promise((resolve) => { finishRead = resolve; });
@@ -189,9 +189,18 @@ describe('ApplicationStatus', () => {
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
       expect(screen.queryByText(/is told about every build/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
       const failedReads = reads;
-      await advanceClock(60_000);
+      await advanceClock(29_999);
       expect(reads).toBe(failedReads);
+      await advanceClock(1);
+      expect(reads).toBe(failedReads + 1);
+      await act(async () => finishRead({ application: { ...running, build: progressAt(0, '2026-11-04T17:00:00.000Z') } }));
+      expect(screen.queryByText('The build did not finish')).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Step 1 of 13.');
+      expect(screen.getByText(/The build started again/)).toBeInTheDocument();
+      await advanceClock(5000);
+      expect(reads).toBe(failedReads + 2);
     } finally {
       mounted.unmount();
       vi.useRealTimers();

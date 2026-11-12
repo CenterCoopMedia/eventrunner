@@ -214,10 +214,10 @@ export default function ApplicationStatus() {
 
   const status = app?.status;
   const buildFailed = app?.build?.failed === true;
-  // A scheduled read finishes before the next is scheduled; terminal builds stop.
+  // A failed build can recover externally; only terminal request statuses stop.
   useEffect(() => {
-    if (!status || buildFailed || [...CONSOLE_REQUEST_GROUPS.built, ...CONSOLE_REQUEST_GROUPS.closed, 'archived'].includes(status)) return undefined;
-    const delay = CONSOLE_REQUEST_GROUPS.building.includes(status) ? BUILD_REFRESH_MS : REFRESH_MS;
+    if (!status || [...CONSOLE_REQUEST_GROUPS.built, ...CONSOLE_REQUEST_GROUPS.closed, 'archived'].includes(status)) return undefined;
+    const delay = !buildFailed && CONSOLE_REQUEST_GROUPS.building.includes(status) ? BUILD_REFRESH_MS : REFRESH_MS;
     let live = true;
     const poll = async () => {
       await load();
