@@ -279,7 +279,7 @@ test.describe.serial('issued invoices', () => {
     expect(staffReopen.status).toBe(403);
     await page.getByRole('button', { name: 'Reopen this invoice' }).click();
     await page.getByLabel('Reason for reopening', { exact: true }).fill('Check bounced');
-    await page.getByRole('button', { name: 'Reopen INV-0001' }).click();
+    await page.getByRole('button', { name: 'Reopen INV-0001', exact: true }).click();
     await expect(page.locator('[data-invoice-status="issued"]')).toBeVisible();
     await expect(page.getByRole('list', { name: 'Earlier payments' })).toContainText('Reopened: Check bounced');
     const reopened = (await adminDb().collection('invoices').doc(FIRST).get()).data();
@@ -300,7 +300,7 @@ test.describe.serial('issued invoices', () => {
 
     await page.getByRole('button', { name: 'Void this invoice' }).click();
     await page.getByLabel('Reason', { exact: true }).fill('Wrong amount');
-    await page.getByRole('button', { name: 'Void INV-0001' }).click();
+    await page.getByRole('button', { name: 'Void INV-0001', exact: true }).click();
     await expect(page.locator('[data-invoice-status="void"]')).toBeVisible();
     await expect(page.getByText(/INV-0001 stays used/)).toBeVisible();
     const voided = (await adminDb().collection('invoices').doc(FIRST).get()).data();
@@ -464,7 +464,7 @@ test.describe.serial('issued invoices', () => {
     // A void closes the link. Stripe is not set up here, so the record says Stripe was not told.
     await page.getByRole('button', { name: 'Void this invoice' }).click();
     await page.getByLabel('Reason', { exact: true }).fill('Billed twice');
-    await page.getByRole('button', { name: `Void ${number}` }).click();
+    await page.getByRole('button', { name: `Void ${number}`, exact: true }).click();
     await expect(page.locator('[data-invoice-status="void"]')).toBeVisible();
     await expect(card).toContainText('Cancelled');
     await expect(card).toContainText('Stripe was not told');

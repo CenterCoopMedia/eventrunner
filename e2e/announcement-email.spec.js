@@ -197,7 +197,7 @@ test.describe.serial('announcement email', () => {
 
     // Remove it; the loaded copy stays in the form.
     await renamed.getByRole('button', { name: 'Remove' }).click();
-    await saved.getByRole('button', { name: `Remove "${RENAMED}"` }).click();
+    await saved.getByRole('button', { name: `Remove "${RENAMED}"`, exact: true }).click();
     await expect(saved.getByText(RENAMED)).toHaveCount(0);
     expect((await db.collection('announcement_messages').doc(savedId).get()).exists).toBe(false);
     await expect(page.getByLabel('Subject', { exact: true })).toHaveValue(SAVED_SUBJECT);
