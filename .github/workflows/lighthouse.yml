@@ -1,0 +1,88 @@
+name: Lighthouse
+
+on:
+  schedule:
+    - cron: '17 9 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/lighthouse.yml'
+      - 'scripts/ci/lighthouse*'
+      - 'scripts/build-demo.cjs'
+      - 'apps/web/index.html'
+      - 'apps/web/vite.config.js'
+      - 'apps/web/src/main.jsx'
+      - 'apps/web/src/App.jsx'
+      - 'apps/web/src/firebase.js'
+      - 'apps/web/src/contexts/**'
+      - 'apps/web/src/index.css'
+      - 'apps/web/src/generated/**'
+      - 'apps/web/src/components/**'
+      - 'apps/web/src/pages/Home.jsx'
+      - 'apps/web/src/pages/Schedule.jsx'
+      - 'apps/web/src/pages/Speakers.jsx'
+      - 'apps/web/public/**'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - '.github/workflows/lighthouse.yml'
+      - 'scripts/ci/lighthouse*'
+      - 'scripts/build-demo.cjs'
+      - 'apps/web/index.html'
+      - 'apps/web/vite.config.js'
+      - 'apps/web/src/main.jsx'
+      - 'apps/web/src/App.jsx'
+      - 'apps/web/src/firebase.js'
+      - 'apps/web/src/contexts/**'
+      - 'apps/web/src/index.css'
+      - 'apps/web/src/generated/**'
+      - 'apps/web/src/components/**'
+      - 'apps/web/src/pages/Home.jsx'
+      - 'apps/web/src/pages/Schedule.jsx'
+      - 'apps/web/src/pages/Speakers.jsx'
+      - 'apps/web/public/**'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lighthouse-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CHROME_PATH: /usr/bin/google-chrome
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.23.5'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --prefer-offline
+      - name: Build the demo at the root path
+        run: node scripts/build-demo.cjs --base / --out .lighthouse-site
+      - name: Collect three mobile runs per route
+        run: npm exec --yes --ignore-scripts --package=@lhci/cli@0.16.1 -- lhci collect --config=scripts/ci/lighthouserc.cjs
+      - name: Summarize route medians
+        if: always()
+        run: node scripts/ci/lighthouse-report.cjs
+      - name: Assert performance limits
+        run: npm exec --yes --ignore-scripts --package=@lhci/cli@0.16.1 -- lhci assert --config=scripts/ci/lighthouserc.cjs
+      - name: Keep reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .lighthouseci/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
