@@ -42,6 +42,8 @@ import { formatSessionStart } from '../lib/eventTime.js';
  */
 export default function CallingPoints({ parent, points, eventConfig, className = '' }) {
   const [open, setOpen] = useState(true);
+  // The initially visible programme is still; only a reader's reopening enters.
+  const [openedByReader, setOpenedByReader] = useState(false);
   const { search } = useLocation();
   if (!Array.isArray(points) || points.length === 0) return null;
   const listId = `calling-points-${parent.id}`;
@@ -52,7 +54,7 @@ export default function CallingPoints({ parent, points, eventConfig, className =
         type="button"
         aria-expanded={open}
         aria-controls={listId}
-        onClick={() => setOpen((was) => !was)}
+        onClick={() => { setOpenedByReader(true); setOpen((was) => !was); }}
         className="touch-target inline-flex items-center gap-2xs font-data text-caption text-text-secondary hover:text-text-primary"
       >
         <span aria-hidden="true" className="calling-points__marker" />
@@ -70,7 +72,7 @@ export default function CallingPoints({ parent, points, eventConfig, className =
         id={listId}
         hidden={!open}
         aria-label={`Calling points of ${parent.title}`}
-        className="mt-2xs"
+        className={`mt-2xs${open && openedByReader ? ' motion-enter' : ''}`}
       >
         {points.map((child) => {
           const range = formatSessionStart(eventConfig, child);

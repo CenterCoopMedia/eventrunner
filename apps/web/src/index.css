@@ -374,7 +374,9 @@
      not found in the app, and a dropped @keyframes would leave the classes
      below animating nothing. */
   @media (prefers-reduced-motion: no-preference) {
-    .motion-enter {
+    .motion-enter,
+    .motion-disclosure[open] > :not(summary),
+    .stepper-fold:not(.stepper--admin)[open] > .stepper-list {
       animation: motion-enter var(--motion-base) var(--motion-ease) both;
     }
     .motion-exit {

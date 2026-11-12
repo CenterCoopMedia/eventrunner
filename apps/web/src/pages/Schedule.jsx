@@ -510,7 +510,7 @@ export default function Schedule() {
                   filtersToggleRef.current?.focus();
                   setFiltersExpanded(false);
                 }}
-                className="schedule-facets"
+                className={`schedule-facets${compactFilters && filtersExpanded ? ' motion-enter' : ''}`}
                 hidden={compactFilters && settledCompactFilters && !filtersExpanded}
               >
                 {/* A group renders only when its facet has something to offer. */}
@@ -659,7 +659,7 @@ export default function Schedule() {
               keyboard path — the browser owns the toggle — and the text sits
               in the document, so a copy that will not happen can still be
               selected by hand. Controls do not print. */}
-          <details className="no-print mt-xl border-t-hairline border-t-rule-hairline pt-sm">
+          <details className="motion-disclosure no-print mt-xl border-t-hairline border-t-rule-hairline pt-sm">
               <summary className="touch-target inline-flex cursor-pointer items-center font-data text-caption font-semibold text-text-primary">
                 Plain text schedule
               </summary>
