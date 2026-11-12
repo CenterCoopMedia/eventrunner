@@ -27,7 +27,6 @@ import AdminContentPages from './pages/AdminContentPages.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
 import AdminContentSection from './pages/AdminContentSection.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
-import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
@@ -43,6 +42,7 @@ const AdminWebAddress = lazy(() => import('./pages/AdminWebAddress.jsx'));
 const AdminSessionPitch = lazy(() => import('./pages/AdminSessionPitch.jsx'));
 const AdminPitchSettings = lazy(() => import('./pages/AdminPitchSettings.jsx'));
 const AdminRegistrationForm = lazy(() => import('./pages/AdminRegistrationForm.jsx'));
+const AdminBadgeSettings = lazy(() => import('./pages/AdminBadgeSettings.jsx'));
 const AdminPitchImport = lazy(() => import('./pages/AdminPitchImport.jsx'));
 const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.jsx'));
 // Scheduled reminders (issue #518): one screen behind one link.
@@ -291,7 +291,7 @@ export default function AdminApp() {
             }
           />
           <Route path="features" element={<AdminFeatureSettings />} />
-          <Route path="badges" element={<AdminBadgeSettings />} />
+          <Route path="badges" element={<DeferredAdminPage label="badges"><AdminBadgeSettings /></DeferredAdminPage>} />
           <Route path="registration-form" element={<DeferredAdminPage label="registration form"><AdminRegistrationForm /></DeferredAdminPage>} />
           <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
           <Route path="media" element={<AdminMedia />} />
