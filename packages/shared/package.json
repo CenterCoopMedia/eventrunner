@@ -7,6 +7,8 @@
   "exports": {
     ".": { "require": "./src/index.cjs", "import": "./src/index.mjs" },
     "./config": { "require": "./src/config/index.cjs", "import": "./src/config/index.mjs" },
+    "./config/lifecycle": { "require": "./src/config/lifecycle.cjs", "import": "./src/config/lifecycle.mjs" },
+    "./config/socialAccounts": { "require": "./src/config/socialAccounts.cjs", "import": "./src/config/socialAccounts.mjs" },
     "./pitch": { "require": "./src/pitch.cjs", "import": "./src/pitch.mjs" },
     "./socialPost": { "require": "./src/socialPost.cjs", "import": "./src/socialPost.mjs" },
     "./delivery": { "require": "./src/delivery.cjs", "import": "./src/delivery.mjs" },

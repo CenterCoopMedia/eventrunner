@@ -57,7 +57,7 @@ import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, use
 import { hasSentChangeRequest } from '../lib/changeRequestMarker.js';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router';
 import { resolveHeader } from 'shared/theme';
-import { listSocialAccounts } from 'shared/config';
+import { listSocialAccounts } from 'shared/config/socialAccounts';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';

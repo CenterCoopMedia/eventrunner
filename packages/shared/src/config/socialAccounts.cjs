@@ -1,7 +1,7 @@
 'use strict';
 
 const { safeUrlHref } = require('../urlSafety.cjs');
-const { MAX_SOCIAL_LABEL_LENGTH } = require('./schema.cjs');
+const { MAX_SOCIAL_LABEL_LENGTH } = require('./values.cjs');
 
 /**
  * The event's social accounts as the site footer and the mail footer list

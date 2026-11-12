@@ -11,6 +11,7 @@
 
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
 const { safeUrlHref } = require('../urlSafety.cjs');
+const { MAX_SOCIAL_LABEL_LENGTH, httpsUrlHref, isHttpsUrl, isValidCalendarDate } = require('./values.cjs');
 // Deliberately loose (local@domain.tld) — deliverability is the sender
 // domain verification's job, not the schema's. This only refuses values
 // that cannot be a From address at all.
@@ -81,65 +82,9 @@ const SOCIAL_HANDLE_KEYS = Object.freeze(['platform', 'handle', 'url']);
 const SPEAKER_RESOURCE_KEYS = Object.freeze(['slideTemplate']);
 /** Keys one configured speaker resource link may carry. */
 const SPEAKER_RESOURCE_LINK_KEYS = Object.freeze(['label', 'url']);
-/**
- * The longest service name, and the longest handle, one social account may
- * carry: the same 40 speaker.cjs caps a speaker's social label at (a test
- * holds the two together). Declared here rather than required from there
- * because this module is in the public site's first paint and the speaker
- * module is not.
- */
-const MAX_SOCIAL_LABEL_LENGTH = 40;
 const MAX_SPEAKER_RESOURCE_LABEL_LENGTH = 80;
 // A hashtag is one word. A space would end it wherever it is posted.
 const HASHTAG_RE = /^\S+$/;
-
-/**
- * The canonical href of an https URL a browser may be sent to, or '' when
- * the value is not one.
- *
- * BUILT ON `safeUrlHref`, NOT ON A PARSE OF ITS OWN (Codex review of the
- * configured registration action: P2). The protocol test this used to run
- * — `new URL(v).protocol === 'https:'` — accepts `https:register.example.org`
- * and `https:/register.example.org`, because the WHATWG parser reads a
- * special scheme with no `//` as a relative reference. Put in an `href`,
- * that string does not go to register.example.org at all: it resolves
- * against the page it sits on, and a reader clicking Register lands on the
- * event's own domain. shared/urlSafety already refuses exactly that shape
- * for every other link that leaves the site, so the rule stays there and
- * this narrows it rather than restating it — one definition of what an
- * absolute http(s) URL looks like, not two that can drift.
- *
- * RETURNS THE PARSED HREF for the same reason `safeUrlHref` does: what a
- * reader clicks must be the exact string this function approved, so a value
- * cannot validate as one URL and resolve as another.
- *
- * Stricter than `isSafeUrl`, on purpose. That helper gates a link a person
- * typed into the CMS and allows http: as well, because refusing an
- * operator's own plain-http link would be refusing their own content. This
- * one gates a value the SITE renders as its own action — the registration
- * destination on the home lead and in the header — and a plain-http
- * destination there would send a reader off the event's own TLS-served site
- * to type their name and their email in clear. A provider that cannot serve
- * https is a provider this field refuses.
- *
- * @param {*} v
- * @returns {string} the canonical href, or '' when the value is not an
- *   absolute https URL
- */
-function httpsUrlHref(v) {
-  const href = safeUrlHref(v);
-  return href.startsWith('https://') ? href : '';
-}
-
-/**
- * True when the string is a URL a browser may be sent to over TLS.
- *
- * @param {*} v
- * @returns {boolean}
- */
-function isHttpsUrl(v) {
-  return httpsUrlHref(v) !== '';
-}
 
 // Every key config/features may carry (spec §2.2). Unknown keys are
 // rejected so a typo'd toggle fails loudly instead of silently defaulting.
@@ -163,32 +108,8 @@ function isNonEmptyString(v) {
 }
 
 /**
- * True when the string matches YYYY-MM-DD *and* names a real calendar date.
- * eventDateTime.cjs `isCalendarDate` is the same check. This module keeps
- * its own because it is in the public site's first paint and that one is
- * not.
- * `new Date(Date.UTC(...))` normalizes out-of-range components instead of
- * rejecting them (e.g. 2026-02-30 silently becomes 2026-03-02) — round-trip
- * the parsed components against the normalized result to catch that.
- *
- * @param {*} v
- * @returns {boolean}
- */
-function isValidCalendarDate(v) {
-  if (typeof v !== 'string' || !DATE_RE.test(v)) return false;
-  const [y, mo, d] = v.split('-').map(Number);
-  const normalized = new Date(Date.UTC(y, mo - 1, d));
-  return (
-    normalized.getUTCFullYear() === y &&
-    normalized.getUTCMonth() === mo - 1 &&
-    normalized.getUTCDate() === d
-  );
-}
-
-/**
  * True when the string names a real IANA timezone, probed via Intl.
- * eventDateTime.cjs `isKnownTimeZone` is the same probe, kept apart for the
- * same first-paint reason as isValidCalendarDate.
+ * A config timezone must be accepted by the browser's Intl implementation.
  *
  * @param {*} tz
  * @returns {boolean}

@@ -4,6 +4,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { getEventPhase } = require('./lifecycle.cjs');
 
+test('the lifecycle package entry shares the canonical clock in both module formats', async () => {
+  const esm = await import('shared/config/lifecycle');
+  const cjs = require('shared/config/lifecycle');
+  assert.equal(esm.getEventPhase, getEventPhase);
+  assert.equal(cjs.getEventPhase, getEventPhase);
+});
+
 // Fixture event in America/Chicago (UTC-6 winter / UTC-5 summer). All
 // config timestamps are event-local naive ISO.
 const FIXTURE = {
