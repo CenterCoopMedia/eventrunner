@@ -18,6 +18,7 @@ import { functionsOrigin, useAuth } from '../contexts/AuthContext.jsx';
 /** Leading context the server prepends before the joined field errors. */
 const MESSAGE_PREFIX_RE = /^[^:]*Invalid [a-z]+:\s*/i;
 const FIELD_SEGMENT_RE = /^([A-Za-z0-9_$[\].]+):\s*(.+)$/;
+const RECOVERY_STEP_RE = /(?:^|[.!?;]\s+)(?:try(?:ing)? again|retry|re-run|resume|contact|keep|check|reload|refresh|request|select|open|use|sign in|wait|ask|review)\b/i;
 
 export class AdminApiError extends Error {
   constructor({ code, message, status, queueId = null, usage = null }) {
@@ -128,8 +129,7 @@ export async function callAdminEndpoint(name, body, getIdToken) {
     let message = typeof error.message === 'string' && error.message
       ? error.message
       : 'The request could not be completed. Try again.';
-    const hasRecovery = /\b(?:try again|re-run|resume|contact|keep (?:this|your))\b/i.test(message);
-    if (response.status >= 500 && !hasRecovery) {
+    if (response.status >= 500 && !RECOVERY_STEP_RE.test(message)) {
       message += ' Keep this page open and contact support for help.';
     }
     throw new AdminApiError({

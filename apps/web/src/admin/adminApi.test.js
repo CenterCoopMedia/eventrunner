@@ -69,15 +69,18 @@ describe('callAdminEndpoint', () => {
   });
 
   it.each([
-    [500, 'Publish failed part-way. Re-run with { queueId } to resume.'],
-    [503, 'Ticketing is temporarily unavailable. Try again later.'],
-  ])('keeps an existing %s server recovery step: %s', async (status, message) => {
+    [500, 'internal', 'Publish failed part-way. Re-run with { queueId } to resume.'],
+    [503, 'ticketing-unavailable', 'Ticketing is temporarily unavailable. Try again later.'],
+    [502, 'delivery-unknown', 'We do not know if the email went out. Check the Email log before you send it again. The decision is still saved.'],
+    [502, 'delivery-failed', 'The email was not sent. The decision is still saved. Retry the email later.'],
+    [503, 'unavailable', 'Invoices could not complete this action. Reload the invoice before trying again.'],
+  ])('keeps an existing %s %s recovery step', async (status, code, message) => {
     const usage = [{ id: 'asset-a', count: 1 }];
     fetch.mockResolvedValueOnce(response(status, {
-      error: { code: 'internal', message }, queueId: 'queue-a', usage,
+      error: { code, message }, queueId: 'queue-a', usage,
     }));
     await expect(callAdminEndpoint('cmsPublish', {}, getIdToken)).rejects.toMatchObject({
-      code: 'internal', status, message, queueId: 'queue-a', usage,
+      code, status, message, queueId: 'queue-a', usage,
     });
   });
 
