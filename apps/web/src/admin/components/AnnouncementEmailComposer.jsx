@@ -194,7 +194,9 @@ function SendDetail({ send, state, regionId }) {
         </dl>
         <PreviewFrame html={detail.html} text={detail.text} />
         {detail.failures.length > 0 ? (
-          <HelpDisclosure title="Failed email addresses" help={"Review addresses where delivery failed. The email log has the full delivery history."} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
+          <HelpDisclosure title={failures.cut
+            ? `Failed addresses (first ${failures.shown} of ${failures.all.toLocaleString('en-US')})`
+            : `Failed addresses (${failures.shown})`} help="Review addresses where delivery failed. The email log has the full delivery history." className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
             {failures.cut ? (
               <p className="mt-2xs text-admin-ink-secondary">
                 {`This list keeps the first ${failures.shown} failures. The email log has every recipient message of this send.`}
