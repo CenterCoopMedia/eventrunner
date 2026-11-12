@@ -71,7 +71,10 @@ test('recognizes the missed review credit and named review or credit forms', () 
     }
   }
   for (const line of ['Codex reviewed this change.', 'Claude Opus 5.5 (high) reviewed this change.',
-    '### Independent full-diff review completed with Claude', 'first\r\nreview: opus\r\nlast']) {
+    '### Independent full-diff review completed with Claude', 'first\r\nreview: opus\r\nlast',
+    'Claude Code review: clean', 'Copilot code review: no comments',
+    'Claude Opus 5.5 cross-model review: clean', 'Cross-model review (Claude Opus 5.5): clean',
+    'Independent full-diff review (GPT-6.1): clean', 'Review: clean (Opus 5.5)']) {
     assert.equal(hasReviewCredit(line), true, line);
   }
 });

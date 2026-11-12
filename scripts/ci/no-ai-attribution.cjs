@@ -10,13 +10,15 @@ const attribution = new RegExp(RULESET_PATTERN.slice(5), 'im');
 const MODEL = String.raw`(?:claude|opus|sonnet|haiku|codex|gpt(?:[- ]?\d[\w.-]*)?|chatgpt|openai|anthropic|gemini|copilot|cursor|grok|kimi|qwen|deepseek|llama|windsurf|aider)`;
 const LINE_START = String.raw`^[ \t]*(?:(?:[-*+>]|\d+[.)]|#{1,6})[ \t]+)?[*_\[]*`;
 const namedModel = new RegExp(String.raw`^[ \t*_:\[(]*(?:(?:passed|completed|performed|provided|verified|by|with|using|via|the)[ \t:()_*\[]+)*${MODEL}\b`, 'i');
-const reviewLabel = new RegExp(String.raw`${LINE_START}(?:(?:independent|full[- ]diff|cross[- ](?:model|family)|local|code|security|final|peer|automated)[ \t]+)*(?:(?:review(?:er|ed)?|credits?|attribution)\b[^\r\n]*?(?::|=|-|\bby\b|\bwith\b|\busing\b)|(?:written|authored|generated|checked|approved)[ \t]+(?:by|with|using)\b|co[- ]authored[- ]by[ \t]*:)([^\r\n]*)`, 'i');
-const reviewerFirst = new RegExp(String.raw`${LINE_START}\b${MODEL}\b(?:[ \t]+(?:${MODEL}|v?\d[\w.-]*|\((?:low|medium|high|xhigh)\))){0,3}[*_\]]*[ \t]+(?:review(?:ed|er)?|authored|generated|wrote|checked|approved)\b`, 'i');
+const parenthesizedModel = new RegExp(String.raw`\([ \t]*${MODEL}\b[^\r\n)]*\)`, 'i');
+const reviewLabel = new RegExp(String.raw`${LINE_START}(?:(?:independent|full[- ]diff|cross[- ](?:model|family)|local|code|security|final|peer|automated)[ \t]+)*(?:(?:review(?:er|ed)?|credits?|attribution)\b([^\r\n]*?)(?::|=|[ \t]+-[ \t]+|\bby\b|\bwith\b|\busing\b)|(?:written|authored|generated|checked|approved)[ \t]+(?:by|with|using)\b|co[- ]authored[- ]by[ \t]*:)([^\r\n]*)`, 'i');
+const reviewerFirst = new RegExp(String.raw`${LINE_START}\b${MODEL}\b(?:[ \t]+(?:${MODEL}|v?\d[\w.-]*|\((?:low|medium|high|xhigh)\)|code|cross[- ](?:model|family)|full[- ]diff|security|independent|local)){0,6}[*_\]]*[ \t]+(?:review(?:ed|er)?|authored|generated|wrote|checked|approved)\b`, 'i');
 
 function hasReviewCredit(text) {
   return text.split(/\r\n|\r|\n/).some((line) => {
-    const tail = reviewLabel.exec(line)?.[1];
-    return (tail !== undefined && namedModel.test(tail)) || reviewerFirst.test(line);
+    const label = reviewLabel.exec(line);
+    if (label && (namedModel.test(label[2]) || parenthesizedModel.test(`${label[1] || ''} ${label[2]}`))) return true;
+    return reviewerFirst.test(line);
   });
 }
 
@@ -50,11 +52,10 @@ async function cleanText({ get, update, fields, needsBody, core }) {
     }
   }
   const { data: verified } = await get();
-  if (fields.some((field) => hasReviewCredit(verified[field] || ''))) {
-    core.setFailed('A named model/tool review credit remains; remove the credit line from the affected GitHub text.');
-  }
   if (fields.some((field) => attribution.test(verified[field] || ''))) {
     core.setFailed('AI attribution remains after cleanup; edit the affected text.');
+  } else if (fields.some((field) => hasReviewCredit(verified[field] || ''))) {
+    core.setFailed('A named model/tool review credit remains; remove the credit line from the affected GitHub text.');
   }
   return verified;
 }
