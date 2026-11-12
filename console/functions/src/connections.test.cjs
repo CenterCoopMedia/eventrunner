@@ -430,13 +430,15 @@ function failedBuild({ frozen = validAnswers(), connections = { stripe: stripeCo
 }
 
 test('after a failed build an Owner can reconnect the chosen account, and the answers stay frozen', async () => {
-  const { db, secrets, deps } = failedBuild();
+  const { db, secrets, stripe, deps } = failedBuild();
+  await db.doc('console_stripe_routes/acct_client1').set({ appId: 'a1', projectId: 'er-first', region: 'us-central1' });
   const frozen = db.read('applications/a1').frozen;
   await complete(deps, { state: await start(deps, 'stripe') });
   assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
   assert.equal(stored(db).stripe.connected, true);
   assert.deepEqual(db.read('applications/a1').frozen, frozen);
   assert.equal(db.read('applications/a1').status, 'building');
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
 });
 
 test('after a failed build only an Owner can reconnect, only the chosen account, and not disconnect it', async () => {
@@ -665,11 +667,15 @@ test('disconnecting one of two requests on an account keeps the connection for t
 });
 
 test('the last request on an account ends the connection', async () => {
-  const { db, stripe, deps } = sharing();
-  await db.doc('console_connections/a2').set({});
-  const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
-  assert.deepEqual(stripe.revoked, ['acct_client1']);
-  assert.equal(body.shared, false);
+  for (const routeOwner of [null, 'a1', 'a2']) {
+    const { db, stripe, deps } = sharing();
+    await db.doc('console_connections/a2').set({});
+    if (routeOwner) await db.doc('console_stripe_routes/acct_client1').set({ appId: routeOwner, projectId: 'er-first', region: 'us-central1' });
+    const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+    const otherSite = routeOwner === 'a2';
+    assert.deepEqual(stripe.revoked, otherSite ? [] : ['acct_client1']);
+    assert.equal(body.shared, otherSite);
+  }
 });
 
 test('a site whose application is gone still keeps the connection, through its private row', async () => {

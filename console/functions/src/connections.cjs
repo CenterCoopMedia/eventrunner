@@ -150,12 +150,15 @@ function connectionsReply({ connectionsAvailable: available, consoleTestMode: te
  *
  * @returns {Promise<{ revoked: boolean, shared: boolean }>}
  */
-async function revokeIfUnused({ db, connectors, log = console }, provider, accountId, { requireSuccess = false } = {}) {
+async function revokeIfUnused({ db, connectors, log = console }, provider, accountId, { requireSuccess = false, releasingAppId } = {}) {
   let users;
   try {
     users = await db.collection(ACCOUNT_COLLECTION).where(`${provider}.accountId`, '==', accountId).limit(1).get();
-    if (provider === 'stripe' && (await db.collection(STRIPE_ROUTE_COLLECTION).doc(accountId).get()).exists) {
-      return { revoked: false, shared: true };
+    if (provider === 'stripe') {
+      const route = await db.collection(STRIPE_ROUTE_COLLECTION).doc(accountId).get();
+      // A completed replacement or disconnect releases this app's old account.
+      // Failed connection attempts must still keep any site's authorization.
+      if (route.exists && route.data().appId !== releasingAppId) return { revoked: false, shared: true };
     }
   } catch (err) {
     log.error('console kept a connection because it could not check who uses it', provider, err.message);
@@ -295,9 +298,6 @@ async function completeConnection(deps, { body, user }) {
   const connector = requireConnector(deps, provider);
   const first = await readApplication((r) => r.get(), db, orgId, appId);
   await requireConnectable(deps, (r) => r.get(), { appId, data: first.data, provider });
-  if (provider === 'stripe' && connector.livemode === true) {
-    await db.runTransaction((tx) => requireOnlyLiveStripe(tx, db, appId));
-  }
 
   const answer = await exchange(deps, { connector, provider, code: body.code });
 
@@ -351,7 +351,7 @@ async function completeConnection(deps, { body, user }) {
 
   // Connecting a different account ends the older one, when nothing else uses it.
   const older = previous.account?.accountId;
-  if (older && older !== answer.accountId) await revokeIfUnused(deps, provider, older);
+  if (older && older !== answer.accountId) await revokeIfUnused(deps, provider, older, { releasingAppId: appId });
   return { body: { connected: true, provider, orgId, appId } };
 }
 
@@ -441,7 +441,7 @@ async function disconnectAccount(deps, { body, user }) {
   await finishChange(deps, { orgId, appId, provider, changeId, connection: null })
     .catch((err) => log.error('console could not finish a disconnect', provider, err.message));
   const ended = previous.account?.accountId
-    ? await revokeIfUnused(deps, provider, previous.account.accountId)
+    ? await revokeIfUnused(deps, provider, previous.account.accountId, { releasingAppId: appId })
     : { revoked: false, shared: false };
   return { body: { ...reply, ...ended } };
 }
