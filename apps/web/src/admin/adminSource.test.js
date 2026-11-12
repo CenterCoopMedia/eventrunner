@@ -15,8 +15,8 @@ import { readAdminVersions } from './adminSource.js';
 
 beforeEach(() => getDocs.mockReset());
 
-it('bounds a collection history read and carries the document cursor into the next query', async () => {
-  const cursor = { id: 'previous' };
+it('bounds a collection history read and carries the record cursor into the next query', async () => {
+  const cursor = 'cmsPages/previous';
   getDocs.mockResolvedValue({ docs: [{ data: () => ({ docPath: 'cmsPages/one', revision: 1 }) }] });
   const page = await readAdminVersions('cmsPages', cursor);
   const request = getDocs.mock.calls[0][0];
