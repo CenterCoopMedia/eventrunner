@@ -1316,11 +1316,13 @@ Each step reads the current state and does nothing when it is already right, so 
 | `environment` | The client's GitHub Environment, its `main`-only rule and its variables |
 | `first-deploy` | `deploy.yml` in bootstrap mode, up to three tries |
 | `mail-webhooks` | Postmark's delivery webhooks. Postmark tests the address when it creates one, so this follows the first deploy |
-| `seed` | `init-event.cjs` with the frozen answers and the team, the sender record, the ticket webhook |
+| `seed` | `init-event.cjs` with the frozen answers and the team (open invites included), the sender record, the team sync, the ticket webhook |
 | `full-deploy` | `deploy.yml`, up to three tries |
 | `ready` | Emails the Owners their admin panel link, sets `ready` |
 
 The order differs from ADR §6 in two places: the mail webhooks follow the first deploy, and the sender record and the ticket webhook's registration are written in `seed`, because they need `config/event` and the deployed functions.
+
+Every 15 minutes the same workflow's schedule runs `provision-client.cjs --sync-teams` (issue #839). For each `ready` or `launched` site it applies console team changes since the last sync: an invite or acceptance adds the address, a role change moves it between `adminEmails` and `staffEmails`, and a removal or an expired invite takes it off both. `consoleAdminEmails` and `consoleStaffEmails` on `config/bootstrap` record what the console granted, so an address an operator changed on the Access page stays as they left it until its console role changes. Support accounts are never added or removed, and a sync that would leave no client operator writes nothing and fails the run.
 
 ### 12.1 One-time setup
 
