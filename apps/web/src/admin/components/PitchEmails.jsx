@@ -1,3 +1,4 @@
+import HelpDisclosure from './HelpDisclosure.jsx';
 import HelpTooltip from './HelpTooltip.jsx';
 // Session pitch emails (issue #324): the operator's receipt mode and
 // wording, and the delivery state and send controls on one pitch.
@@ -206,14 +207,12 @@ export function PitchEmailDelivery({ pitch, notices, disabled, call }) {
     <div className="flex items-center gap-2xs"><h3 className="font-semibold">Emails to the submitter</h3><HelpTooltip label="Emails to the submitter">Review the messages sent to the person who submitted this proposal.</HelpTooltip></div>
     {records.length ? <ul className="space-y-xs">{records.map(([slot, record]) => <DeliveryState key={slot} slot={slot} record={record} />)}</ul>
       : <p className="text-admin-sm text-admin-ink-secondary">No email was sent for this pitch.</p>}
-    {canSendDecision ? <div className="flex min-w-0 items-start gap-2xs"><details className="min-w-0 flex-1">
-      <summary className="min-h-admin-control cursor-pointer font-semibold">Prepare the {slotNames[decisionSlot].toLowerCase()} </summary>
+    {canSendDecision ? <HelpDisclosure title={`Prepare the ${slotNames[decisionSlot].toLowerCase()}`} help={"Prepare and preview this proposal email before sending it to the submitter."} titleClassName="min-h-admin-control cursor-pointer font-semibold">
       <SendEmail key={`${decisionSlot}-${pitch.reviewRevision ?? 0}`} pitch={pitch} kind="decision" slot={decisionSlot} disabled={disabled} call={call} onSent={setResult} />
-    </details><HelpTooltip label={`Prepare the ${slotNames[decisionSlot].toLowerCase()}`}>Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></div> : null}
-    {canSendReceipt ? <div className="flex min-w-0 items-start gap-2xs"><details className="min-w-0 flex-1">
-      <summary className="min-h-admin-control cursor-pointer font-semibold">{notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'} </summary>
+    </HelpDisclosure> : null}
+    {canSendReceipt ? <HelpDisclosure title={notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'} help={"Prepare and preview this proposal email before sending it to the submitter."} titleClassName="min-h-admin-control cursor-pointer font-semibold">
       <SendEmail key={`receipt-${pitch.reviewRevision ?? 0}`} pitch={pitch} kind="receipt" slot="receipt" disabled={disabled} call={call} onSent={setResult} />
-    </details><HelpTooltip label={notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'}>Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></div> : null}
+    </HelpDisclosure> : null}
     {result ? <SaveStatus message={result} /> : null}
   </section>;
 }

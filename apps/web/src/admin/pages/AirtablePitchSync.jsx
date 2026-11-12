@@ -1,4 +1,4 @@
-import HelpTooltip from '../components/HelpTooltip.jsx';
+import HelpDisclosure from '../components/HelpDisclosure.jsx';
 import { plannerError } from '../plannerErrors.js';
 import '../plannerFields.css';
 // Airtable connection for session pitches: the refresh status and the
@@ -94,13 +94,12 @@ function RunStatus({ status, timeZone }) {
       <dl className="grid grid-cols-2 gap-x-md gap-y-3xs text-admin-sm sm:grid-cols-3">
         {COUNTS.map(([key, label]) => <div key={key} className="flex justify-between gap-sm border-b-admin-hairline border-admin-rule-hairline py-3xs"><dt>{label}</dt><dd className="font-admin-data">{run.counts?.[key] ?? 0}</dd></div>)}
       </dl>
-      {run.counts?.skipped ? <div className="flex min-w-0 items-start gap-2xs"><details className="min-w-0 flex-1">
-        <summary className="min-h-admin-control cursor-pointer text-admin-sm font-semibold">Why records were skipped </summary>
+      {run.counts?.skipped ? <HelpDisclosure title="Why records were skipped" help={"Review the reasons some source records were not imported."} titleClassName="min-h-admin-control cursor-pointer text-admin-sm font-semibold">
         <ul className="mt-xs space-y-3xs text-admin-sm">
           {Object.entries(run.skippedReasons || {}).map(([reason, count]) => <li key={reason}>{REASONS[reason] || 'Check required answers'}: {count}</li>)}
         </ul>
 
-      </details><HelpTooltip label="Why records were skipped">Review the reasons some source records were not imported.</HelpTooltip></div> : null}
+      </HelpDisclosure> : null}
       {run.error ? <Notice tone="caution" message="The last refresh failed. Check the Airtable connection and try again." /> : null}
     </>}
   </div>;
@@ -219,8 +218,7 @@ export default function AirtablePitchSync({ call, isOperator }) {
   // deployment without Airtable shows them no Airtable controls. Operators
   // always see it, because they set the connection up.
   if (!isOperator && !status && !statusFailed) return null;
-  return <div className="flex min-w-0 items-start gap-2xs"><details className="border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md min-w-0 flex-1">
-    <summary className="min-h-admin-control cursor-pointer font-semibold">Refresh pitches from Airtable </summary>
+  return <HelpDisclosure title="Refresh pitches from Airtable" help={"Check the last import and bring in new or changed proposals. Existing decisions and notes are kept."} className="border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md" titleClassName="min-h-admin-control cursor-pointer font-semibold">
     <div className="mt-sm space-y-md">
       <p className="text-admin-sm text-admin-ink-secondary">Import new proposals and update changed proposals. Decisions and private notes are kept.</p>
       {statusFailed ? <Notice tone="caution" message="Cannot load the refresh status. Reconnecting…" /> : <RunStatus status={status} timeZone={timeZone} />}
@@ -228,5 +226,5 @@ export default function AirtablePitchSync({ call, isOperator }) {
       {isOperator && settingsFailed ? <Notice tone="caution" message="Cannot load the Airtable settings. Reconnecting…" /> : null}
       {isOperator && settings !== undefined && !settingsFailed ? <ConnectionSettings stored={settings} call={call} /> : null}
     </div>
-  </details><HelpTooltip label="Refresh pitches from Airtable">Check the last import and bring in new or changed proposals. Existing decisions and notes are kept.</HelpTooltip></div>;
+  </HelpDisclosure>;
 }

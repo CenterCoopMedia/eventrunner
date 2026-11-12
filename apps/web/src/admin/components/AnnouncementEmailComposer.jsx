@@ -1,3 +1,4 @@
+import HelpDisclosure from './HelpDisclosure.jsx';
 import HelpTooltip from './HelpTooltip.jsx';
 // Announcement email (issues #202, #203, #490, #496, #497): write, preview,
 // test, confirm, send, saved messages, and the send history, on the
@@ -142,12 +143,11 @@ function PreviewFrame({ html, text }) {
       ) : (
         <p className="text-admin-sm text-admin-ink">The formatted preview is unavailable. The text preview is shown below.</p>
       )}
-      <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview </summary>
+      <HelpDisclosure title="Text preview" help={"Read the email as plain text, without images or page styling."} defaultOpen={!srcDoc} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
         <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {text}
         </pre>
-      </details><HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></div>
+      </HelpDisclosure>
     </div>
   );
 }
@@ -194,12 +194,7 @@ function SendDetail({ send, state, regionId }) {
         </dl>
         <PreviewFrame html={detail.html} text={detail.text} />
         {detail.failures.length > 0 ? (
-          <div className="flex min-w-0 items-start gap-2xs"><details className="text-admin-sm min-w-0 flex-1">
-            <summary className="admin-target cursor-pointer font-semibold text-admin-ink">
-              {failures.cut
-                ? `Failed addresses (first ${failures.shown} of ${failures.all.toLocaleString('en-US')})`
-                : `Failed addresses (${failures.shown})`}
-             </summary>
+          <HelpDisclosure title="Failed email addresses" help={"Review addresses where delivery failed. The email log has the full delivery history."} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
             {failures.cut ? (
               <p className="mt-2xs text-admin-ink-secondary">
                 {`This list keeps the first ${failures.shown} failures. The email log has every recipient message of this send.`}
@@ -213,7 +208,7 @@ function SendDetail({ send, state, regionId }) {
                 </li>
               ))}
             </ul>
-          </details><HelpTooltip label="Failed email addresses">Review addresses where delivery failed. The email log has the full delivery history.</HelpTooltip></div>
+          </HelpDisclosure>
         ) : null}
       </>
     );

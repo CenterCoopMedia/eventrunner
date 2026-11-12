@@ -681,7 +681,7 @@ export default function AdminInvoiceEditor({ mode }) {
               maxLength={INVOICE_LIMITS.name}
               required
             />
-            <TextField help="Optional."
+            <TextField help="The person at the billed organization who handles this invoice. Leave blank if no contact is needed."
               label="Contact name"
               
               value={form.billTo.contactName}

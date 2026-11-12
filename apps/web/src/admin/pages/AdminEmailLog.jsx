@@ -1,3 +1,4 @@
+import HelpDisclosure from '../components/HelpDisclosure.jsx';
 import HelpTooltip from '../components/HelpTooltip.jsx';
 // The email log (issue #183): every message the site sent, newest first,
 // with search, two filters, and a preview of the stored body.
@@ -286,12 +287,11 @@ function StoredBody({ message }) {
         </p>
       ) : null}
       {text ? (
-        <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
-          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview </summary>
+        <HelpDisclosure title="Text preview" help={"Read the email as plain text, without images or page styling."} defaultOpen={!srcDoc} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
           <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
             {text}
           </pre>
-        </details><HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></div>
+        </HelpDisclosure>
       ) : null}
       {!html && !text ? <p className="text-admin-sm text-admin-ink">This message has no preview available.</p> : null}
       {bodyTruncated ? (

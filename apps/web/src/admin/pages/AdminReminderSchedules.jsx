@@ -1,3 +1,4 @@
+import HelpDisclosure from '../components/HelpDisclosure.jsx';
 import HelpTooltip from '../components/HelpTooltip.jsx';
 // Scheduled reminders (issue #518, ADR 0006): reminders that go out on
 // their own, on a schedule staff set, with wording staff approved.
@@ -95,12 +96,11 @@ function SampleMessage({ sample, timeZone }) {
           className="block h-[20rem] w-full rounded-admin border-admin-hairline border-admin-rule-hairline [color-scheme:light]"
         />
       ) : null}
-      <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview </summary>
+      <HelpDisclosure title="Text preview" help={"Read the email as plain text, without images or page styling."} defaultOpen={!srcDoc} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
         <pre data-testid={`schedule-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {sample.text}
         </pre>
-      </details><HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></div>
+      </HelpDisclosure>
     </section>
   );
 }

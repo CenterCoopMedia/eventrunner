@@ -1,3 +1,4 @@
+import HelpDisclosure from '../components/HelpDisclosure.jsx';
 import HelpTooltip from '../components/HelpTooltip.jsx';
 // Speaker mail wording (issue #204): staff change the words of the speaker
 // invitation and the acceptance confirmation
@@ -119,21 +120,19 @@ function MessagePreview({ preview, title }) {
       ) : (
         <p className="text-admin-sm text-admin-ink">This message’s HTML cannot be shown safely. The plain text version is below.</p>
       )}
-      <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version </summary>
+      <HelpDisclosure title="Plain text version" help={"Read the wording people receive when their email app displays plain text."} defaultOpen={!srcDoc} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
         <pre
           data-testid="mail-preview-text"
           className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data"
         >
           {preview.text}
         </pre>
-      </details><HelpTooltip label="Plain text version">Read the wording people receive when their email app displays plain text.</HelpTooltip></div>
-      <div className="flex min-w-0 items-start gap-2xs"><details className="text-admin-sm min-w-0 flex-1">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">HTML source </summary>
+      </HelpDisclosure>
+      <HelpDisclosure title="HTML source" help={"Review the saved email markup if you need to check its formatting."} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
         <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
           {preview.html}
         </pre>
-      </details><HelpTooltip label="HTML source">Review the saved email markup if you need to check its formatting.</HelpTooltip></div>
+      </HelpDisclosure>
     </section>
   );
 }
