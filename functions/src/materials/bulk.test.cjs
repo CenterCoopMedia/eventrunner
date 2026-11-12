@@ -614,7 +614,7 @@ test('listAllSessionMaterials: 405 on GET, 401 with no token, 403 for an address
   res = fakeRes();
   await createListAllSessionMaterialsHandler({ db: failing, auth, getConfig, log: QUIET })(req('staff', {}), res);
   assert.equal(res.statusCode, 500);
-  assert.equal(res.body.error.message, 'Materials could not be listed.');
+  assert.equal(res.body.error.message, 'Materials could not be listed. Keep this page open and contact support for help.');
 });
 
 test('a caller listed only in staffEmails passes both endpoints, and so does an operator', STREAMED, async () => {
@@ -781,7 +781,7 @@ test('a failed audit commit is a 500 and not one byte of the archive', STREAMED,
     const response = await post(server.port, { materialIds: ['m1'] });
     assert.equal(response.status, 500);
     assert.deepEqual(JSON.parse(response.body.toString('utf8')), {
-      error: { code: 'internal', message: 'The archive could not be recorded, so it was not built.' },
+      error: { code: 'internal', message: 'The archive could not be recorded, so it was not built. Keep this page open and contact support for help.' },
     });
     assert.deepEqual(bucket.state.reads, []);
     assert.deepEqual(db.logs, []);

@@ -603,6 +603,13 @@ export default function AnnouncementEmailComposer() {
   }
 
   const channel = history?.channel;
+  // A stopped send has its own recovery. Keep log and history fallbacks separate.
+  const hasServerMessage = Number.isInteger(error?.status) && error.status >= 400 && error.status < 600 &&
+    typeof error.code === 'string' && error.code.trim() && error.code !== 'unknown' &&
+    typeof error.message === 'string' && error.message.trim();
+  const actionErrorMessage = hasServerMessage
+    ? error.message
+    : 'The email action could not be confirmed. Keep this page open and contact support for help.';
   const providerManaged = channel?.mode === 'provider';
   const audienceOptions = audiences.map((audience) => ({ value: audience.id, label: audience.label }));
   const audienceHint = audiences.find((audience) => audience.id === selectedAudience)?.description;
@@ -621,7 +628,7 @@ export default function AnnouncementEmailComposer() {
           {channel && !channel.canSend ? <Notice tone="caution" message="Email is not available. Ask an event administrator to check the email settings." /> : null}
           {history ? (
             <form className="mt-sm flex flex-col gap-sm" onSubmit={runPreview} noValidate>
-              <ServerErrorSummary error={error ? { message: communicationsError(error, 'The email could not be prepared or sent. Check the message and preview it again.') } : null} errorRef={errorRef} title="This email was not sent" />
+              <ServerErrorSummary error={error ? { message: communicationsError(error, actionErrorMessage) } : null} errorRef={errorRef} title="The email action did not finish" />
               {retry ? (
                 <div className="flex flex-col gap-2xs">
                   <Notice

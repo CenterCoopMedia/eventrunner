@@ -861,7 +861,7 @@ async function runInviteSend({ db, getConfig, sendEmail, now, log, req, res, act
     });
   } catch (err) {
     log.error(`${mode === 'send' ? 'sendSpeakerInvite' : 'resendSpeakerInvite'} failed`, err);
-    return internal(res, 'The invitation could not be created.');
+    return internal(res, 'The invitation could not be created. Keep this page open and contact support for help.');
   }
   if (!result.ok) {
     if (result.status === 404) return notFound(res, result.message);
@@ -888,7 +888,7 @@ function createCancelSpeakerInviteHandler({ db, auth, getConfig, now = Date.now,
       result = await applyCancelInvite({ db, speakerId: req.body?.speakerId, actor, now });
     } catch (err) {
       log.error('cancelSpeakerInvite failed', err);
-      return internal(res, 'The invitation could not be cancelled.');
+      return internal(res, 'The invitation could not be cancelled. Keep this page open and contact support for help.');
     }
     if (!result.ok) {
       return result.status === 404
@@ -921,7 +921,7 @@ function createListSpeakerInvitesHandler({ db, auth, getConfig, log = console })
       invites = await listInvites({ db, speakerId: speakerId ?? null });
     } catch (err) {
       log.error('listSpeakerInvites failed', err);
-      return internal(res, 'The invitations could not be listed.');
+      return internal(res, 'The invitations could not be listed. Keep this page open and contact support for help.');
     }
     res.status(200).json({ invites });
   };

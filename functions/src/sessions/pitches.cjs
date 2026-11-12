@@ -422,7 +422,7 @@ function createUpdatePitchCallHandler({ db, auth, getConfig, now = Date.now, log
       });
     } catch (err) {
       log.error('updatePitchCall failed', err);
-      return internal(res, 'The session pitch call could not be saved.');
+      return internal(res, 'The session pitch call could not be saved. Keep this page open and contact support for help.');
     }
     return res.status(200).json({ enabled, closesAt, externalFormUrl });
   };
@@ -460,7 +460,7 @@ function createUpdatePitchFormOptionsHandler({ db, auth, getConfig, now = Date.n
       });
     } catch (err) {
       log.error('updatePitchFormOptions failed', err);
-      return internal(res, 'The pitch form options could not be saved.');
+      return internal(res, 'The pitch form options could not be saved. Keep this page open and contact support for help.');
     }
     return res.status(200).json({ formOptions });
   };
@@ -568,7 +568,7 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
       });
     } catch (err) {
       log.error('editSessionPitch failed', err);
-      return internal(res, 'The session pitch edit could not be saved.');
+      return internal(res, 'The session pitch edit could not be saved. Keep this page open and contact support for help.');
     }
     if (outcome.outcome === 'missing') return notFound(res, 'No such session pitch.');
     if (outcome.outcome === 'conflict') {
@@ -658,7 +658,7 @@ function createReviewSessionPitchHandler({ db, auth, getConfig, now = Date.now, 
       });
     } catch (err) {
       log.error('reviewSessionPitch failed', err);
-      return internal(res, 'The session pitch review could not be saved.');
+      return internal(res, 'The session pitch review could not be saved. Keep this page open and contact support for help.');
     }
 
     if (outcome.outcome === 'missing') return notFound(res, 'No such session pitch.');

@@ -249,7 +249,7 @@ function createApprovalHandler({ action, apply, notify }, { db, auth, getConfig,
       result = await apply({ db, uid, now });
     } catch (err) {
       log.error(`${action} failed`, err);
-      return internal(res, 'The registration status could not be updated.');
+      return internal(res, 'The registration status could not be updated. Keep this page open and contact support for help.');
     }
     if (!result.ok) {
       return result.status === 404

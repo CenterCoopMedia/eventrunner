@@ -453,7 +453,7 @@ function createSavePitchNoticeSettingsHandler({ db, auth, getConfig, now = Date.
       });
     } catch (err) {
       log.error('savePitchNoticeSettings failed', err);
-      return internal(res, 'The email settings could not be saved.');
+      return internal(res, 'The email settings could not be saved. Keep this page open and contact support for help.');
     }
     if (!stored) {
       return sendError(res, 409, 'settings-conflict', 'Another operator changed the email settings. Load the current settings and try again.');

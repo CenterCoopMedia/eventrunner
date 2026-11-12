@@ -94,7 +94,7 @@ function createRemoveUserCustomBadgeHandler({ db, auth, getConfig, now = () => n
       result = await applyRemoveCustomBadge({ db, uid, badge });
     } catch (err) {
       log.error('removeUserCustomBadge failed', err);
-      return internal(res, 'The custom badge could not be removed.');
+      return internal(res, 'The custom badge could not be removed. Keep this page open and contact support for help.');
     }
     if (!result.ok) {
       return result.status === 404

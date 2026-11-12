@@ -211,7 +211,7 @@ test('mediaUpdateMetadata refuses staff when the usage scan fails, and lets an o
   const staffDb = broken();
   await createMediaUpdateMetadataHandler(deps(staffDb, { auth: staffAuth, getConfig: tiered }))(post({ assetId: ASSET_ID, alt: 'x' }), refused);
   assert.equal(refused.statusCode, 500);
-  assert.equal(refused.body.error.message, 'The asset could not be checked for usage.');
+  assert.equal(refused.body.error.message, 'The asset could not be checked for usage. Keep this page open and contact support for help.');
   assert.equal(staffDb.read('media_assets', ASSET_ID).alt, '');
 
   const allowed = fakeRes();

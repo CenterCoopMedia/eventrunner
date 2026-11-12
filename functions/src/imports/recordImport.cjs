@@ -485,7 +485,7 @@ function createImportRecordsCsvHandler({ db, auth, getConfig, importers, now = D
       outcome = await runImport({ db, importer, type, mapping, rows, dryRun, actor, now, log, newId });
     } catch (err) {
       log.error('importRecordsCsv failed', err);
-      return internal(res, dryRun ? 'The import could not be checked.' : 'The import could not be completed.');
+      return internal(res, dryRun ? 'The import could not be checked. Keep this page open and contact support for help.' : 'The import could not be completed. Keep this page open and contact support for help.');
     }
 
     if (auditRef) {

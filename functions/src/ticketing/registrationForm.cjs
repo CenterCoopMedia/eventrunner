@@ -53,7 +53,7 @@ function createUpdateRegistrationFormHandler({ db, auth, getConfig, now = Date.n
     } catch (err) {
       if (err?.conflict) return sendError(res, 409, 'revision-conflict', 'Someone saved the registration form after you opened it. Reload it, then make your changes again.');
       log.error('updateRegistrationForm failed', err);
-      return internal(res, 'The registration form could not be saved. Your changes are still on the page.');
+      return internal(res, 'The registration form could not be saved. Your changes are still on the page. Keep this page open and contact support for help.');
     }
     return res.status(200).json({ revision, form: checked.form });
   };

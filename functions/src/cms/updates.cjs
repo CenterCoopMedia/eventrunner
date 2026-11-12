@@ -189,7 +189,7 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
     } catch (err) {
       if (err instanceof DeletedUpdate) return notFound(res, 'Update not found.');
       log.error('cmsSaveUpdate draft write failed', err);
-      return internal(res, 'The update could not be saved.');
+      return internal(res, 'The update could not be saved. Keep this page open and contact support for help.');
     }
     await writeAdminLog({ db, store, now, log }, {
       action: 'cmsSaveUpdate',
@@ -236,7 +236,7 @@ function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now,
       });
     } catch (err) {
       log.error('cmsDeleteUpdate failed', err);
-      return internal(res, 'The update could not be deleted.');
+      return internal(res, 'The update could not be deleted. Keep this page open and contact support for help.');
     }
     await writeAdminLog({ db, store, now, log }, {
       action: 'cmsDeleteUpdate',

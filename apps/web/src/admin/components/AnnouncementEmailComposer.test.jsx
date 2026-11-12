@@ -316,6 +316,48 @@ describe('AnnouncementEmailComposer', () => {
     expect(screen.queryByRole('heading', { name: 'Preview' })).not.toBeInTheDocument();
   });
 
+  it.each([
+    [500, 'internal', 'Part of the send failed before it reached the email provider. Continue the send to try again.',
+      'Part of the send failed before it reached the email provider. Continue the send to try again.'],
+    [409, 'channel-changed', 'The announcement stream or its unsubscribe handling changed after this send started. Restore it, then continue the send.',
+      'The announcement stream or its unsubscribe handling changed after this send started. Restore it, then continue the send.'],
+    [500, 'unknown', 'The request could not be completed. Try again.',
+      'The email action could not be confirmed. Keep this page open and contact support for help.'],
+  ])('keeps safe recovery after a %s %s response and continues the same send', async (status, code, message, expected) => {
+    const partial = { ...SENT, id: PREVIEW.sendId, subject: PREVIEW.subject, audience: 'registered',
+      status: 'sending', total: 42, processed: 21, counts: { sent: 21 } };
+    let started = false;
+    let continuedBody;
+    respond({
+      listAnnouncementSends: () => listResponse(started ? [partial] : []),
+      previewAnnouncementEmail: PREVIEW,
+      sendAnnouncementEmail: (body) => {
+        if (!started) {
+          started = true;
+          throw Object.assign(new Error(message), { status, code });
+        }
+        continuedBody = body;
+        return { send: { ...partial, status: 'sent', processed: 42, counts: { sent: 42 } } };
+      },
+    });
+    await renderLoaded();
+    fillDraft();
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await screen.findByRole('heading', { name: 'Preview' });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to 42 recipients' }));
+    const confirm = await screen.findByRole('heading', { name: 'Send this email to 42 recipients?' });
+    await act(async () => {
+      fireEvent.click(within(confirm.closest('section')).getByRole('button', { name: 'Send to 42 recipients' }));
+    });
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(expected);
+    expect(alert).not.toHaveTextContent('This email was not sent');
+    expect(screen.getByLabelText('Subject')).toHaveValue(PREVIEW.subject);
+    await act(async () => { fireEvent.click(await screen.findByRole('button', { name: 'Continue sending' })); });
+    await screen.findByText(/The send is complete\. Sent to 42 recipients of 42 addresses\./);
+    expect(continuedBody).toEqual({ sendId: PREVIEW.sendId });
+  });
+
   it('loads a past send into the form with Use this message, through the audited detail', async () => {
     respond({ listAnnouncementSends: listResponse(), getAnnouncementSend: { send: DETAIL } });
     await renderLoaded();

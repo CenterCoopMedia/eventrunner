@@ -349,7 +349,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
           (liveSnap.exists && liveSnap.data().systemPage === true);
       } catch (err) {
         log.error('cmsSavePage systemPage check failed', err);
-        return internal(res, 'The page could not be saved.');
+        return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
       }
       if (isSystem) {
         return forbidden(res, 'systemPage: a system page cannot be changed into a regular page.');
@@ -379,7 +379,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
           || null;
       } catch (err) {
         log.error('cmsSavePage system path check failed', err);
-        return internal(res, 'The page could not be saved.');
+        return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
       }
       // No stored path is a page being created, or one written before the
       // field existed — there is nothing to drift from, so nothing to refuse.
@@ -407,7 +407,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
       }
     } catch (err) {
       log.error('cmsSavePage path uniqueness check failed', err);
-      return internal(res, 'The page could not be saved.');
+      return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
     }
 
     // `create: true` is a new page. The store then refuses an existing draft
@@ -433,7 +433,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
         return sendError(res, 409, 'already-exists', `id: '${page.id}' already belongs to a page`);
       }
       log.error('cmsSavePage draft write failed', err);
-      return internal(res, 'The page could not be saved.');
+      return internal(res, 'The page could not be saved. Keep this page open and contact support for help.');
     }
     await writeAdminLog({ db, store, now, log }, {
       action: 'cmsSavePage',
@@ -478,7 +478,7 @@ function createDeletePageHandler({ db, auth, getConfig, store, now = Date.now, l
       await store.deleteBoth({ db, collection: PAGES_COLLECTION, docId: id });
     } catch (err) {
       log.error('cmsDeletePage failed', err);
-      return internal(res, 'The page could not be deleted.');
+      return internal(res, 'The page could not be deleted. Keep this page open and contact support for help.');
     }
     await writeAdminLog({ db, store, now, log }, {
       action: 'cmsDeletePage',

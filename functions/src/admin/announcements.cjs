@@ -186,7 +186,7 @@ function createSaveAnnouncementHandler({ db, auth, getConfig, now = Date.now, lo
       });
     } catch (err) {
       log.error('saveAnnouncement write failed', err);
-      return internal(res, 'The announcement could not be saved.');
+      return internal(res, 'The announcement could not be saved. Keep this page open and contact support for help.');
     }
     await logAdminAction({
       db,
@@ -229,7 +229,7 @@ function createDeleteAnnouncementHandler({ db, auth, getConfig, now = Date.now, 
       });
     } catch (err) {
       log.error('deleteAnnouncement failed', err);
-      return internal(res, 'The announcement could not be deleted.');
+      return internal(res, 'The announcement could not be deleted. Keep this page open and contact support for help.');
     }
     if (outcome === 'missing') return notFound(res, 'Announcement not found.');
     await logAdminAction({

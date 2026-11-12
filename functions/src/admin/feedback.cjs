@@ -336,7 +336,7 @@ function createUpdateFeedbackStatusHandler({ db, auth, getConfig, now = Date.now
       await ref.update({ status, reviewedAt: at, reviewedBy: gate.email });
     } catch (err) {
       log.error('updateFeedbackStatus failed', err);
-      return internal(res, 'The feedback status could not be updated.');
+      return internal(res, 'The feedback status could not be updated. Keep this page open and contact support for help.');
     }
     await logAdminAction({
       db,

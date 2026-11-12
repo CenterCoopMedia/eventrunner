@@ -224,7 +224,7 @@ function createScanMediaUsageHandler({ db, auth, getConfig, now = Date.now, log 
       usage = await scanUsage({ db, paths: resolved.paths });
     } catch (err) {
       log.error('scanMediaUsage failed', err);
-      return internal(res, 'The media library could not be scanned.');
+      return internal(res, 'The media library could not be scanned. Keep this page open and contact support for help.');
     }
     res.status(200).json({ usage, scannedAt: new Date(now()).toISOString() });
   };

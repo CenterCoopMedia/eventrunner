@@ -136,7 +136,7 @@ function createProfilePhotoUploadHandler({ db, bucket, auth, render,
     } catch (err) {
       if (err.http) return sendError(res, err.http.status, err.http.code, err.http.message);
       log.error('profilePhotoUpload failed', err);
-      return internal(res, 'The photo could not be uploaded.');
+      return internal(res, 'The photo could not be uploaded. Keep this page open and contact support for help.');
     }
   };
 }

@@ -768,7 +768,7 @@ function createGetSiteContentHandler({ db, log = console }) {
       res.status(200).json({ content });
     } catch (err) {
       log.error('getSiteContent read failed', err);
-      internal(res, 'Content is temporarily unavailable.');
+      internal(res, 'Content is temporarily unavailable. Keep this page open and contact support for help.');
     }
   };
 }

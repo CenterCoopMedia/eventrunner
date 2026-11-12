@@ -176,7 +176,7 @@ function createSaveLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log 
       });
     } catch (err) {
       log.error('saveLiveUpdate write failed', err);
-      return internal(res, 'The live update could not be saved.');
+      return internal(res, 'The live update could not be saved. Keep this page open and contact support for help.');
     }
     res.status(200).json({ id });
   };
@@ -207,7 +207,7 @@ function createDeleteLiveUpdateHandler({ db, auth, getConfig, now = Date.now, lo
       await ref.delete();
     } catch (err) {
       log.error('deleteLiveUpdate failed', err);
-      return internal(res, 'The live update could not be deleted.');
+      return internal(res, 'The live update could not be deleted. Keep this page open and contact support for help.');
     }
     await logAdminAction({
       db,

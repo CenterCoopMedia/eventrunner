@@ -356,7 +356,7 @@ function createDeleteSpeakerHandler({ db, auth, getConfig, now = Date.now, log =
       });
     } catch (err) {
       log.error('deleteSpeaker failed', err);
-      return internal(res, 'The speaker could not be deleted.');
+      return internal(res, 'The speaker could not be deleted. Keep this page open and contact support for help.');
     }
     if (!result.ok) {
       return result.status === 404
