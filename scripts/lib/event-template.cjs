@@ -283,12 +283,15 @@ function pickTheme(theme) {
 }
 
 function pickFeatures(features) {
+  // Reader-data collection needs the receiving client's own privacy review.
+  // A template carries presentation choices, never this client's opt-in.
+  const portable = KNOWN_FEATURE_KEYS.filter((key) => key !== 'coreWebVitals');
   const value = {};
-  for (const key of KNOWN_FEATURE_KEYS) {
+  for (const key of portable) {
     if (typeof features?.[key] === 'boolean') value[key] = features[key];
   }
   const dropped = Object.keys(isPlainObject(features) ? features : {})
-    .filter((k) => !(KNOWN_FEATURE_KEYS.includes(k) && typeof features[k] === 'boolean'));
+    .filter((k) => !(portable.includes(k) && typeof features[k] === 'boolean'));
   return { value, dropped };
 }
 

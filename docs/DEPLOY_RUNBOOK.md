@@ -666,6 +666,7 @@ operator turns on **Field performance monitoring**, the client's counsel reviews
 performance notice and retention text on the Privacy policy page. On an existing site, init
 does not replace a client-edited privacy block. Add or update those clauses in the Content editor,
 complete the legal review, and then enable the feature.
+Event templates omit this opt-in, so a new client does not inherit collection from its source site.
 
 When enabled, the browser waits until after the first paint and samples 10% of documents. It keeps
 the first report for each metric and navigation in a sampled document. Chrome reports supported soft

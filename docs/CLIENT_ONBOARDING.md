@@ -249,6 +249,7 @@ after 29 to 30 days. The feature starts off. Counsel reviews those clauses befor
 it on. On an existing site, init does not replace a privacy block that the client edited. Review and
 add the current performance notice and retention text in the Content editor before activation. The
 code release and this onboarding step do not activate monitoring for a client.
+An event template does not carry another client's monitoring opt-in.
 
 ## 4. Readiness gating (`--check`)
 

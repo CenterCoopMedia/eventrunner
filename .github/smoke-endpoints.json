@@ -70,6 +70,7 @@
     "routeMeta",
     "reactToSession",
     "logClientError",
+    "logWebVitals",
     "listSystemErrors",
     "resolveSystemErrors",
     "saveLiveUpdate",

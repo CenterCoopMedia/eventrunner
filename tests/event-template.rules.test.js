@@ -84,6 +84,7 @@ beforeAll(async () => {
     await dbs[SOURCE].doc(path).set(data);
   }
   await dbs[SOURCE].doc('config/theme').update({ radius: 'round' });
+  await dbs[SOURCE].doc('config/features').update({ coreWebVitals: true });
 
   // Its template, then the next event from it, in a separate project.
   const out = join(dir, 'template.json');
@@ -111,6 +112,8 @@ describe('two event deployments from one template', () => {
     expect(event.name).toBe('Next Example Summit');
     expect(event.legal.operatorName).toBe('Example Newsroom Network');
     expect((await dbs[TARGET].doc('config/theme').get()).data().radius).toBe('round');
+    expect((await dbs[TARGET].doc('config/features').get()).data().coreWebVitals).toBe(false);
+    expect((await dbs[SOURCE].doc('config/features').get()).data().coreWebVitals).toBe(true);
     expect((await dbs[TARGET].doc('config/template').get()).data().status).toBe('applied');
     expect((await dbs[TARGET].doc('config/bootstrap').get()).data().adminEmails)
       .toEqual(['next-ops@example.test', 'next-owner@example.test']);
