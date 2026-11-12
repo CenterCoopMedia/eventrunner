@@ -54,7 +54,7 @@ test('admin workspaces fill desktop width and group readable cards without narro
       await page.locator('.admin-rail').evaluate((element) => { element.scrollTop = 0; });
       await page.locator('html').evaluate((element) => element.ownerDocument.fonts.ready);
       await page.screenshot({ path: path.join(evidenceDir, 'page-editor-collapsed-desktop-1920.png'), fullPage: true, animations: 'disabled' });
-      await page.locator('.admin-page-section-list > li > .admin-editor-disclosure > h3 > button').first().click();
+      await page.locator('.admin-page-section-list > li > .admin-editor-disclosure .admin-editor-disclosure__toggle').first().click();
     }
     for (const viewport of [
       { name: 'desktop', width: 1920, height: 1080 },
