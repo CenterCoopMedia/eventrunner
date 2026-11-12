@@ -56,6 +56,8 @@ const AdminIconControl = forwardRef(function AdminIconControl({
     const hide = () => setVisible(false);
     const dismiss = (event) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
         clearTimeout(closeTimer.current);
         setVisible(false);
       }
@@ -63,10 +65,10 @@ const AdminIconControl = forwardRef(function AdminIconControl({
     const outside = (event) => {
       if (!controlRef.current?.contains(event.target) && !tooltipRef.current?.contains(event.target)) hide();
     };
-    document.addEventListener('keydown', dismiss);
+    document.addEventListener('keydown', dismiss, true);
     document.addEventListener('pointerdown', outside);
     return () => {
-      document.removeEventListener('keydown', dismiss);
+      document.removeEventListener('keydown', dismiss, true);
       document.removeEventListener('pointerdown', outside);
     };
   }, [visible]);

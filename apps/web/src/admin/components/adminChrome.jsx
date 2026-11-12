@@ -173,10 +173,12 @@ export default function AdminPageHeader({
               aria-hidden="true"
               className="h-2.5 w-2.5 shrink-0 rounded-admin-small bg-admin-page-header-mark"
             />
-            <Heading className="min-w-0 break-words font-admin-ui text-admin-title font-bold text-admin-ink">
-              {title}
-            </Heading>
-            <HelpTooltip label={title}>{help}</HelpTooltip>
+            <div className="flex min-w-0 items-center gap-2xs">
+              <Heading className="min-w-0 break-words font-admin-ui text-admin-title font-bold text-admin-ink">
+                {title}
+              </Heading>
+              <HelpTooltip label={title}>{help}</HelpTooltip>
+            </div>
             {state}
           </div>
           {actions ? (

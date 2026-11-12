@@ -15,6 +15,7 @@
 .admin-rail-utilities > [data-admin-action='sign-out'] { grid-column: 1 / -1; }
 .admin-control-tooltip {
   position: fixed; z-index: 100; pointer-events: none;
+  width: max-content;
   max-width: min(15rem, calc(100vw - 1rem)); padding: var(--space-2xs) var(--space-xs);
   border: 1px solid rgb(var(--admin-rail-rule-rgb)); border-radius: var(--admin-radius);
   background: rgb(var(--admin-rail-ground-rgb)); color: rgb(var(--admin-rail-ink-rgb));

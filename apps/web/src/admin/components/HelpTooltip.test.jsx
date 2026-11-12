@@ -48,7 +48,7 @@ describe('staff help tooltips', () => {
       fireEvent.pointerEnter(tooltip);
       vi.advanceTimersByTime(200);
       expect(tooltip).toBeInTheDocument();
-      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(fireEvent.keyDown(document, { key: 'Escape' })).toBe(false);
       expect(screen.queryByRole('tooltip', { hidden: true })).not.toBeInTheDocument();
     } finally { vi.useRealTimers(); }
   });
