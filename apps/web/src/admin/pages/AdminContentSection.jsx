@@ -56,6 +56,8 @@ export default function AdminContentSection() {
   const [rowResults, setRowResults] = useState({});
   const blockedReasonId = useId();
   const [savingOrder, setSavingOrder] = useState(false);
+  const [heroEdit, setHeroEdit] = useState({ dirty: false, busy: false });
+  const [keepHeroEditor, setKeepHeroEditor] = useState(false);
   const [notice, setNotice] = useState(null);
   const [spoken, setSpoken] = useState('');
   // Blocks published in THIS session: their proof tint resolves to the base
@@ -66,6 +68,8 @@ export default function AdminContentSection() {
   const page = findPage(pageId);
   const section = (page?.current?.sections ?? []).find((candidate) => candidate.id === sectionId);
   const serverBlocks = byStoredOrder(contentRows.filter((row) => row.current?.section === sectionId));
+  const homeHeroSection = pageId === 'home' && sectionId === 'hero';
+  const hasHeroImage = serverBlocks.some((row) => row.current?.blockType === 'image');
   const draft = useDraftOrder(serverBlocks);
   const blocks = draft.rows;
   const actionFocus = useActionResultFocus(busy !== null || savingOrder);
@@ -75,7 +79,8 @@ export default function AdminContentSection() {
       displayed.splice(Math.min(result.position, displayed.length), 0, { row: { id }, result });
     }
   }
-  const leaveGuard = useUnsavedNavigation(draft.dirty, { blocked: savingOrder || busy !== null });
+  const writeBlocked = savingOrder || busy !== null || heroEdit.busy;
+  const leaveGuard = useUnsavedNavigation(draft.dirty || heroEdit.dirty || heroEdit.busy, { blocked: writeBlocked });
   const allowed = sectionBlockTypes(page?.current, section, BLOCK_TYPE_IDS);
   const maxBlocks = Number.isFinite(section?.maxBlocks) ? section.maxBlocks : Infinity;
   // While either cmsContent revision is still loading, `blocks` can be an
@@ -89,6 +94,12 @@ export default function AdminContentSection() {
     ? 'Waiting for this section and its draft blocks…'
     : atMax ? `This section already has its maximum of ${maxBlocks} blocks.` : '';
   const setRowResult = (id, result) => setRowResults((current) => ({ ...current, [id]: result }));
+
+  // The first draft listener must not unmount this session's action result.
+  useEffect(() => {
+    if (!homeHeroSection) setKeepHeroEditor(false);
+    else if (pagesReady && contentReady && !hasHeroImage) setKeepHeroEditor(true);
+  }, [homeHeroSection, pagesReady, contentReady, hasHeroImage]);
 
   useEffect(() => {
     if (!contentReady) return;
@@ -118,7 +129,7 @@ export default function AdminContentSection() {
   }, [leaveGuard.pending]);
 
   function moveRow(from, to) {
-    if (!contentReady || savingOrder || busy !== null) return false;
+    if (!contentReady || writeBlocked) return false;
     const label = contentBlockTitle(blocks[from]?.current);
     const count = blocks.length;
     const moved = draft.move(from, to);
@@ -132,7 +143,7 @@ export default function AdminContentSection() {
   }
 
   async function saveOrder() {
-    if (!contentReady || requestPending.current) return;
+    if (!contentReady || requestPending.current || heroEdit.busy) return;
     requestPending.current = true;
     const writes = ordersToWrite(blocks);
     setSavingOrder(true);
@@ -174,7 +185,7 @@ export default function AdminContentSection() {
   }
 
   async function publishOne(row) {
-    if (requestPending.current) return;
+    if (requestPending.current || heroEdit.busy) return;
     requestPending.current = true;
     actionFocus.remember(row.id);
     setBusy({ id: row.id, action: 'publish' });
@@ -193,7 +204,7 @@ export default function AdminContentSection() {
   }
 
   async function remove(row) {
-    if (requestPending.current) return;
+    if (requestPending.current || heroEdit.busy) return;
     requestPending.current = true;
     actionFocus.remember(row.id);
     setBusy({ id: row.id, action: 'delete' });
@@ -254,7 +265,7 @@ export default function AdminContentSection() {
             <OrderDraftButtons
               dirty={draft.dirty}
               saving={savingOrder}
-              saveDisabled={!contentReady || busy !== null}
+              saveDisabled={!contentReady || busy !== null || heroEdit.busy}
               onSave={saveOrder}
               onCancel={cancelOrder}
             />
@@ -274,12 +285,13 @@ export default function AdminContentSection() {
         />
       ) : null}
 
-      {pageId === 'home' && sectionId === 'hero' && !serverBlocks.some((row) => row.current?.blockType === 'image') ? (
+      {homeHeroSection && (!hasHeroImage || keepHeroEditor) ? (
         <HomeHeroImageEditor
           page={page}
           rows={contentRows}
           ready={pagesReady && contentReady}
           disabled={savingOrder || busy !== null || draft.dirty}
+          onEditStateChange={setHeroEdit}
         />
       ) : null}
 
@@ -335,14 +347,14 @@ export default function AdminContentSection() {
                       count={blocks.length}
                       dragToken={`content:${index}`}
                       onMove={moveRow}
-                      disabled={!contentReady || savingOrder || busy !== null}
+                      disabled={!contentReady || writeBlocked}
                     />
                     {row.state.id !== 'live' && !draft.dirty ? (
                       <button
                         type="button"
                         className={secondaryButtonClass}
-                        disabled={savingOrder || (busy !== null && !(busy.id === row.id && busy.action === 'publish'))}
-                        aria-disabled={busy !== null || savingOrder || undefined}
+                        disabled={savingOrder || heroEdit.busy || (busy !== null && !(busy.id === row.id && busy.action === 'publish'))}
+                        aria-disabled={writeBlocked || undefined}
                         aria-busy={busy?.id === row.id && busy.action === 'publish' || undefined}
                         onClick={() => publishOne(row)}
                       >
@@ -356,7 +368,7 @@ export default function AdminContentSection() {
                       confirmLabel="Delete this block"
                       busyLabel="Deleting…"
                       busy={busy?.id === row.id && busy.action === 'delete'}
-                      disabled={busy !== null || savingOrder}
+                      disabled={writeBlocked}
                       consequence="The live revision and its draft both go, and the section renders without this block."
                       permanence="This cannot be undone."
                       onConfirm={() => remove(row)}

@@ -191,13 +191,20 @@ const HERO_TEXT = ['title', 'subtitle'].map((field, order) => ({
   id: `hero__${field}`, section: 'hero', field, blockType: 'text', value: field, order,
 }));
 
+function heroUnloadBlocked() {
+  const event = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
 describe('the Home hero image slot', () => {
   beforeEach(() => {
     sources.cmsPages = [HOME_PAGE];
     sources.cmsContent = HERO_TEXT;
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
-  it('shows a labelled image slot and creates a draft without a block type choice', async () => {
+  it('creates a draft without a block type choice and can replace it after deletion', async () => {
     fetch.mockResolvedValue(okResponse({ docId: 'hero__image', status: 'dirty' }));
     await renderAt('/admin/content/home/hero');
     expect(await screen.findByRole('heading', { name: 'Hero image' })).toBeInTheDocument();
@@ -213,12 +220,93 @@ describe('the Home hero image slot', () => {
       pageId: 'home', section: 'hero', field: 'image', visible: true,
       fields: { blockType: 'image', url: 'cms-images/hero.jpg', alt: 'People at the event', order: 2 },
     });
-    // The listener hands the created image back to the normal block editor.
+    // Keep this session's editor/result as the listener adds the normal row.
     act(() => adminSubscriptions.get('cmsContent_drafts')([
       { id: 'hero__image', section: 'hero', field: 'image', blockType: 'image', url: 'cms-images/hero.jpg', alt: 'People at the event' },
     ]));
-    expect(screen.queryByLabelText('Hero image')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Hero image')).toHaveValue('cms-images/hero.jpg');
+    expect(screen.getByText('Draft saved. Publish to show it on your site.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'People at the event' })).toHaveAttribute('href', '/admin/content/home/hero/image');
+    const imageRow = screen.getByRole('link', { name: 'People at the event' }).closest('li');
+    fireEvent.click(within(imageRow).getByRole('button', { name: 'Delete', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this block' }));
+    await screen.findByText(/deleted. The live block and its draft were removed/);
+    act(() => adminSubscriptions.get('cmsContent_drafts')([]));
+    expect(screen.getByLabelText('Hero image')).toHaveValue('');
+    expect(screen.getByLabelText('Alt text')).toHaveValue('');
+    expect(heroUnloadBlocked()).toBe(false);
+    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/replacement.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'A replacement picture' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. Publish to show it on your site.');
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(urlOf(1)).toMatch(/\/cmsDeleteContent$/);
+    expect(urlOf(2)).toMatch(/\/cmsCreateContent$/);
+    expect(bodyOf(2).fields).toMatchObject({ url: 'cms-images/replacement.jpg', alt: 'A replacement picture' });
+  });
+
+  it.each(['success', 'failure'])('keeps a delayed publish %s after the draft listener adds the image', async (outcome) => {
+    let finishPublish;
+    const publication = new Promise((resolve) => { finishPublish = resolve; });
+    fetch.mockResolvedValueOnce(okResponse({ docId: 'hero__image' }))
+      .mockImplementationOnce(() => publication);
+    await renderAt('/admin/content/home/hero');
+    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/hero.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'People at the event' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    act(() => adminSubscriptions.get('cmsContent_drafts')([
+      { id: 'hero__image', section: 'hero', field: 'image', blockType: 'image', url: 'cms-images/hero.jpg', alt: 'People at the event', visible: true, order: 2 },
+    ]));
+    const stayedMounted = screen.queryByLabelText('Hero image') !== null;
+    const reloadWhilePublishing = heroUnloadBlocked();
+    await act(async () => finishPublish(okResponse({ results: { cmsContent: outcome === 'success'
+      ? { published: ['hero__image'], skipped: [] }
+      : { published: [], skipped: [{ docId: 'hero__image', reason: 'conflict' }] } } })));
+    expect(stayedMounted).toBe(true);
+    expect(reloadWhilePublishing).toBe(true);
+    if (outcome === 'success') expect(await screen.findByText('Published. The public site picks it up live.')).toBeInTheDocument();
+    else expect(await screen.findByText(/The image draft is saved, but it was not published\./)).toBeInTheDocument();
+    expect(screen.getByLabelText('Hero image')).toHaveValue('cms-images/hero.jpg');
+  });
+
+  it.each([['Hero image', 'cms-images/unsaved.jpg'], ['Alt text', 'Unsaved description']])('guards route navigation and reload for local %s edits', async (label, value) => {
+    await renderAt('/admin/content/home/hero');
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    expect(heroUnloadBlocked()).toBe(true);
+    const editTitle = screen.getAllByRole('link').find((link) => link.getAttribute('href') === '/admin/content/home/hero/title');
+    fireEvent.click(editTitle);
+    const dialog = screen.getByRole('alertdialog', { name: 'Unsaved changes' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    expect(screen.getByLabelText(label)).toHaveValue(value);
+    fireEvent.click(editTitle);
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Discard changes' }));
+    await waitFor(() => expect(screen.queryByLabelText('Hero image')).not.toBeInTheDocument());
+    expect(heroUnloadBlocked()).toBe(false);
+  });
+
+  it('keeps edits dirty through listener readback and a failed save, clearing only after confirmation', async () => {
+    let finishSave;
+    fetch.mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; }));
+    await renderAt('/admin/content/home/hero');
+    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/hero.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'People at the event' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    act(() => adminSubscriptions.get('cmsContent_drafts')([
+      { id: 'hero__image', section: 'hero', field: 'image', blockType: 'image', url: 'cms-images/hero.jpg', alt: 'People at the event', visible: true, order: 2 },
+    ]));
+    const dirtyDuringSave = heroUnloadBlocked();
+    await act(async () => finishSave({ ok: false, json: async () => ({ error: { message: 'Save could not be confirmed.' } }) }));
+    expect(dirtyDuringSave).toBe(true);
+    expect(await screen.findByText(/Save could not be confirmed/)).toBeInTheDocument();
+    expect(heroUnloadBlocked()).toBe(true);
+    fetch.mockResolvedValueOnce(okResponse({ docId: 'hero__image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. Publish to show it on your site.');
+    await waitFor(() => expect(heroUnloadBlocked()).toBe(false));
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'A newer local edit' } });
+    expect(heroUnloadBlocked()).toBe(true);
   });
 
   it('requires non-empty alt text before it creates an image', async () => {

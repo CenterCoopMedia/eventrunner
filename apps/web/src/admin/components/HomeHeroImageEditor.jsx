@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isDrawable } from '../../contexts/ContentContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { toEditableContent, validateRequiredContent } from '../contentDoc.js';
 import { uniqueEditorialId } from '../editorialId.js';
@@ -10,19 +11,23 @@ import ImagePicker from './media/ImagePicker.jsx';
 
 // Both entry points edit cmsContent/hero__<field>. Theme configuration never
 // holds a second copy. Read merged live/draft rows, as the content editor does.
-export default function HomeHeroImageEditor({ page, rows, ready, disabled = false, branding = false }) {
+export default function HomeHeroImageEditor({ page, rows, ready, disabled = false, branding = false, onEditStateChange }) {
   const call = useAdminApi();
   const section = page?.current?.sections?.find((item) => item.id === 'hero');
   const blocks = byStoredOrder(rows.filter((row) => row.current?.section === 'hero'));
-  const image = blocks.find((row) => row.current?.blockType === 'image');
+  const image = blocks.find((row) => row.current?.blockType === 'image' && isDrawable(row.current));
+  const imageId = image?.id ?? null;
   const [edit, setEdit] = useState(null);
+  const [baseline, setBaseline] = useState(null);
   const [savedField, setSavedField] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('');
   const pending = useRef(false);
+  const observedImage = useRef(null);
   const errorRef = useRef(null);
   const values = edit ?? toEditableContent(image?.current, 'image').values;
+  const dirty = edit !== null && (edit.url !== baseline?.url || edit.alt !== baseline?.alt);
   const maxBlocks = Number.isFinite(section?.maxBlocks) ? section.maxBlocks : Infinity;
   const full = !image && !savedField && blocks.length >= maxBlocks;
   const unavailable = !ready || !section || (!image && !section.allowedBlocks?.includes('image')) || full;
@@ -32,8 +37,29 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
     if (error) errorRef.current?.focus();
   }, [error]);
 
+  useEffect(() => {
+    onEditStateChange({ dirty, busy });
+  }, [dirty, busy, onEditStateChange]);
+
+  useEffect(() => () => onEditStateChange({ dirty: false, busy: false }), [onEditStateChange]);
+
+  useEffect(() => {
+    if (!ready || busy) return;
+    if (observedImage.current && !imageId) {
+      setSavedField(null);
+      if (!dirty) {
+        setEdit(null);
+        setBaseline(null);
+      }
+      setError(null);
+      setStatus('');
+    }
+    observedImage.current = imageId;
+  }, [ready, busy, imageId, dirty]);
+
   function change(name, value) {
-    setEdit({ ...values, [name]: value });
+    if (edit === null) setBaseline(values);
+    setEdit((current) => ({ ...(current ?? values), [name]: value }));
     setStatus('');
   }
 
@@ -61,6 +87,8 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
         ...(!existingField ? { pageId: page.id, visible: true } : {}),
       });
       setSavedField(field);
+      setBaseline(fields);
+      setEdit((current) => current === values ? fields : current);
       draftSaved = true;
       if (!publish) {
         setStatus('Draft saved. Publish to show it on your site.');
