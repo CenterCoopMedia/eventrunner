@@ -10,6 +10,7 @@ import AuthContext from '../../contexts/AuthContext.jsx';
 import ProfileContext from '../../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../../contexts/ToastContext.jsx';
 import SessionActions from './SessionActions.jsx';
+import { getDeviceBookmarks, removeDeviceBookmarks, setDeviceBookmarked } from '../../lib/deviceBookmarks.js';
 
 const setSessionBookmarkedMock = vi.fn();
 vi.mock('../../lib/bookmarksSource.js', () => ({
@@ -87,7 +88,7 @@ function actionsTree({
       initialEntries={initialEntries}
     >
       <AuthContext.Provider value={auth}>
-        <ProfileContext.Provider value={profile}>
+        <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), profileReady: Boolean(auth.user), ...profile }}>
           <ToastProvider>
             <SessionActions
               surface={surface}
@@ -125,6 +126,7 @@ const twoMaterials = (sessionId, onNext) => {
 };
 
 beforeEach(() => {
+  removeDeviceBookmarks(getDeviceBookmarks().ids);
   setSessionBookmarkedMock.mockReset();
   subscribeSessionMaterialsMock.mockReset().mockImplementation((sessionId, onNext) => {
     onNext([]);
@@ -218,36 +220,61 @@ describe('which controls each surface gets', () => {
 });
 
 describe('BookmarkAction', () => {
-  it('offers a signed-out visitor the path that makes them eligible', () => {
+  it('lets a signed-out visitor save in this browser without a server write', () => {
     renderActions({ features: { sessionBookmarks: true }, auth: { user: null } });
-    expect(screen.getByRole('link', { name: 'Sign in to save sessions' })).toHaveAttribute(
-      'href',
-      '/signin',
-    );
+    fireEvent.click(screen.getByRole('button', { name: /^Bookmark$/i }));
+    expect(screen.getByRole('button', { name: /bookmarked/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(getDeviceBookmarks().ids).toEqual(['fx-1']);
+    expect(setSessionBookmarkedMock).not.toHaveBeenCalled();
   });
 
-  it('renders no control at all for a signed-in visitor who cannot bookmark', () => {
-    // The old pill drew a dead, greyed-out rectangle here — an offer the
-    // page had already refused, repeated under every session.
+  it('keeps an ineligible account’s saves in this browser without a server write', () => {
     renderActions({
       features: { sessionBookmarks: true },
       auth: { user: { uid: 'u1' } },
       profile: { attendeeAccess: false },
     });
-    expect(screen.queryByText(/bookmark/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^Bookmark$/i }));
+    expect(screen.getByRole('button', { name: /bookmarked/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(getDeviceBookmarks().ids).toEqual(['fx-1']);
+    expect(setSessionBookmarkedMock).not.toHaveBeenCalled();
     expect(screen.queryByText(/sign in/i)).toBeNull();
     expect(document.querySelector('[aria-disabled="true"]')).toBeNull();
   });
 
+  it('keeps the sign-in fallback when browser storage refuses writes', () => {
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage blocked'); });
+    try {
+      removeDeviceBookmarks([]);
+      renderActions({ features: { sessionBookmarks: true }, auth: { user: null } });
+      expect(screen.getByRole('link', { name: 'Sign in to save sessions' })).toHaveAttribute('href', '/signin');
+      expect(setSessionBookmarkedMock).not.toHaveBeenCalled();
+    } finally {
+      write.mockRestore();
+    }
+  });
+
   it('lets an approved attendee toggle the bookmark, optimistically', () => {
     setSessionBookmarkedMock.mockResolvedValue({ bookmarked: true, count: 1 });
-    renderActions({
+    const attendee = {
       features: { sessionBookmarks: true },
       auth: { user: { uid: 'u1' } },
       profile: { attendeeAccess: true },
       bookmarked: false,
-    });
+    };
+    const { rerenderActions } = renderActions({ ...attendee,
+      profile: { attendeeAccess: false, status: 'pending-account', profileConfirmed: false, profileReady: false } });
+    const checking = screen.getByRole('button', { name: 'Checking your saved sessions…' });
+    checking.focus();
+    fireEvent.click(checking);
+    expect(checking).toHaveAttribute('aria-busy', 'true');
+    expect(checking).not.toHaveAttribute('aria-pressed');
+    expect(setSessionBookmarkedMock).not.toHaveBeenCalled();
+    expect(getDeviceBookmarks().ids).toEqual([]);
+    rerenderActions(attendee);
+    rerenderActions({ ...attendee, profile: { attendeeAccess: true, profileReady: true, profileConfirmed: false, status: 'ready' } });
     const button = screen.getByRole('button', { name: /bookmark/i });
+    expect(button).toHaveFocus();
     expect(button).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(button);
     expect(screen.getByRole('button', { name: /bookmarked/i })).toHaveAttribute(
@@ -261,15 +288,12 @@ describe('BookmarkAction', () => {
     });
   });
 
-  // The control leaves the tab order for the length of the write. Without
-  // `aria-busy` that is the busy state of the grammar rendered as an
-  // unavailable one: a reader is dropped out of the control and told
-  // nothing about why (expansion record §2.1).
-  it('says it is busy while the write is in flight, and stops when it lands', async () => {
+  it.each([false, true])('keeps focus and the desired state during an account write (browser save: %s)', async (fromDevice) => {
+    if (fromDevice) setDeviceBookmarked('fx-1', true);
     let settle;
     setSessionBookmarkedMock.mockReturnValue(
       new Promise((resolve) => {
-        settle = () => resolve({ bookmarked: true, count: 1 });
+        settle = () => resolve({ bookmarked: !fromDevice, count: fromDevice ? 0 : 1 });
       }),
     );
     renderActions({
@@ -278,14 +302,20 @@ describe('BookmarkAction', () => {
       profile: { attendeeAccess: true },
       bookmarked: false,
     });
+    screen.getByRole('button', { name: /bookmark/i }).focus();
     fireEvent.click(screen.getByRole('button', { name: /bookmark/i }));
     // The word is already there: the label flipped optimistically.
-    const busy = screen.getByRole('button', { name: /bookmarked/i, hidden: true });
+    const label = fromDevice ? /^Bookmark$/i : /^Bookmarked$/i;
+    const busy = screen.getByRole('button', { name: label });
     expect(busy).toHaveAttribute('aria-busy', 'true');
+    expect(busy).toHaveAttribute('aria-pressed', String(!fromDevice));
+    expect(busy).toHaveFocus();
     await act(async () => {
       settle();
     });
-    expect(screen.getByRole('button', { name: /bookmarked/i })).not.toHaveAttribute('aria-busy');
+    expect(screen.getByRole('button', { name: label })).not.toHaveAttribute('aria-busy');
+    expect(screen.getByRole('button', { name: label })).toHaveFocus();
+    expect(getDeviceBookmarks().ids).toEqual([]);
   });
 
   it('reverts the optimistic toggle when the request fails', async () => {

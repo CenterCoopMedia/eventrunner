@@ -58,7 +58,7 @@ function sharedTree({ share, error = false, auth = { user: null, isAdmin: false,
         <Route path="schedule/user/:uid" element={
           <EventConfigContext.Provider value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}>
             <AuthContext.Provider value={auth}>
-              <ProfileContext.Provider value={profile}>
+              <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), profileReady: Boolean(auth.user), ...profile }}>
                 <ToastContext.Provider value={{ showToast: () => {}, dismiss: () => {} }}>
                   <ContentContext.Provider
                     value={{

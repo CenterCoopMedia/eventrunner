@@ -10,6 +10,7 @@ import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import MySchedule from './MySchedule.jsx';
+import { getDeviceBookmarks, removeDeviceBookmarks, setDeviceBookmarked } from '../lib/deviceBookmarks.js';
 
 const useMyBookmarksMock = vi.fn();
 vi.mock('../hooks/useMyBookmarks.js', () => ({
@@ -122,7 +123,7 @@ function myScheduleElement({
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <AuthContext.Provider value={auth}>
-          <ProfileContext.Provider value={profile}>
+          <ProfileContext.Provider value={{ status: auth.user ? 'ready' : 'signed-out', profileConfirmed: Boolean(auth.user), profileReady: Boolean(auth.user), ...profile }}>
             <ToastProvider>
               <ContentContext.Provider
                 value={{
@@ -156,6 +157,7 @@ function renderMySchedule({
 
 describe('MySchedule', () => {
   beforeEach(() => {
+    removeDeviceBookmarks(getDeviceBookmarks().ids);
     clockHolder.now = new Date('2099-10-15T16:00:00Z');
   });
 
@@ -192,10 +194,18 @@ describe('MySchedule', () => {
     expect(screen.getByRole('button', { name: /sync my sessions/i })).toBeInTheDocument();
   });
 
-  it('prompts a signed-out visitor to sign in, rather than showing an empty list', () => {
-    renderMySchedule({ auth: { user: null, loading: false }, profile: { attendeeAccess: false } });
-    expect(screen.getByRole('heading', { name: 'Sign in to see your schedule' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/signin');
+  it('shows a signed-out reader’s browser saves without private account controls', () => {
+    setDeviceBookmarked('fx-late', true);
+    renderMySchedule({ auth: { user: null, loading: false }, profile: { attendeeAccess: false },
+      features: { schedule: true, sessionBookmarks: true, schedulePdf: true, calendarSync: true, icsExport: true } });
+    expect(screen.getByRole('heading', { name: 'My schedule' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '[Fixture] Afternoon editing lab' })).toBeInTheDocument();
+    expect(screen.getByText(/saved only in this browser/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Private note')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Share your schedule' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /PDF/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Google Calendar' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Download my schedule (.ics)' })).toBeInTheDocument();
   });
 
   it('shows a designed empty state for a signed-in user with no bookmarks', () => {
@@ -204,7 +214,15 @@ describe('MySchedule', () => {
   });
 
   it('renders only bookmarked sessions, grouped by day in day order', () => {
-    renderMySchedule({ bookmarkedIds: new Set(['fx-late', 'fx-d2']) });
+    const { rerender } = renderMySchedule({ bookmarkedIds: new Set(['fx-late', 'fx-d2']),
+      profile: { attendeeAccess: false, status: 'pending-account', profileConfirmed: false, profileReady: false } });
+    expect(screen.queryByText(/does not have attendee access/)).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'No bookmarked sessions yet' })).toBeNull();
+    expect(screen.queryByText(/saved only in this browser/)).toBeNull();
+    rerender(myScheduleElement());
+    const row = screen.getByRole('heading', { level: 3, name: '[Fixture] Afternoon editing lab' });
+    rerender(myScheduleElement({ profile: { attendeeAccess: true, profileReady: true, profileConfirmed: false, status: 'ready' } }));
+    expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Afternoon editing lab' })).toBe(row);
     expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Afternoon editing lab' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Day-two roundtable' })).toBeInTheDocument();
     expect(screen.queryByText('[Fixture] Morning kickoff')).toBeNull();

@@ -6,8 +6,8 @@ import { act, render, screen } from '@testing-library/react';
 const subscriptions = new Map();
 const saveOwnProfileMock = vi.fn(() => Promise.resolve());
 vi.mock('../lib/profileSource.js', () => ({
-  subscribeOwnProfile: (uid, onNext) => {
-    subscriptions.set(uid, onNext);
+  subscribeOwnProfile: (uid, onNext, onConfirmed) => {
+    subscriptions.set(uid, { onNext, onConfirmed });
     return () => subscriptions.delete(uid);
   },
   saveOwnProfile: (...args) => saveOwnProfileMock(...args),
@@ -21,12 +21,14 @@ vi.mock('./AuthContext.jsx', () => ({
 const { ProfileProvider, useProfile } = await import('./ProfileContext.jsx');
 
 function Probe() {
-  const { status, attendeeAccess, needsProfileSetup } = useProfile();
+  const { status, attendeeAccess, needsProfileSetup, profileConfirmed, profileReady } = useProfile();
   return (
     <ul>
       <li>status:{status}</li>
       <li>access:{String(attendeeAccess)}</li>
       <li>setup:{String(needsProfileSetup)}</li>
+      <li>confirmed:{String(profileConfirmed)}</li>
+      <li>ready:{String(profileReady)}</li>
     </ul>
   );
 }
@@ -42,7 +44,7 @@ function renderProvider() {
 /** Push an account document through the captured subscription. */
 function pushProfile(uid, profile) {
   act(() => {
-    subscriptions.get(uid)(profile);
+    subscriptions.get(uid).onNext(profile);
   });
 }
 
@@ -53,6 +55,43 @@ beforeEach(() => {
 });
 
 describe('ProfileProvider', () => {
+  it('keeps resolved account readiness offline while live confirmation and identity remain separate', () => {
+    const profile = { displayName: 'Rae', profileVisibility: 'private', registrationStatus: 'approved' };
+    authValue = { user: { uid: 'u1' }, isAdmin: false };
+    const { rerender } = renderProvider();
+    pushProfile('u1', profile);
+    expect(screen.getByText('ready:false')).toBeInTheDocument();
+    act(() => subscriptions.get('u1').onConfirmed(true));
+    expect(screen.getByText('ready:true')).toBeInTheDocument();
+    expect(screen.getByText('confirmed:true')).toBeInTheDocument();
+    pushProfile('u1', profile);
+    act(() => subscriptions.get('u1').onConfirmed(false));
+    expect(screen.getByText('ready:true')).toBeInTheDocument();
+    expect(screen.getByText('confirmed:false')).toBeInTheDocument();
+    expect(screen.getByText('access:true')).toBeInTheDocument();
+    pushProfile('u1', null);
+    act(() => subscriptions.get('u1').onConfirmed(true));
+    expect(screen.getByText('ready:false')).toBeInTheDocument();
+    pushProfile('u1', profile);
+    act(() => subscriptions.get('u1').onConfirmed(true));
+    const old = subscriptions.get('u1');
+    authValue = { user: { uid: 'u2' }, isAdmin: false };
+    rerender(<ProfileProvider><Probe /></ProfileProvider>);
+    act(() => { old.onNext(profile); old.onConfirmed(true); });
+    expect(screen.getByText('ready:false')).toBeInTheDocument();
+    expect(screen.getByText('confirmed:false')).toBeInTheDocument();
+    expect(screen.getByText('access:false')).toBeInTheDocument();
+    pushProfile('u2', profile);
+    act(() => subscriptions.get('u2').onConfirmed(false));
+    expect(screen.getByText('ready:false')).toBeInTheDocument();
+    act(() => subscriptions.get('u2').onConfirmed(true));
+    expect(screen.getByText('ready:true')).toBeInTheDocument();
+    authValue = { user: null, isAdmin: false };
+    rerender(<ProfileProvider><Probe /></ProfileProvider>);
+    expect(screen.getByText('ready:false')).toBeInTheDocument();
+    expect(screen.getByText('confirmed:false')).toBeInTheDocument();
+  });
+
   it('is signed-out with no subscription when nobody is signed in', () => {
     renderProvider();
     expect(screen.getByText('status:signed-out')).toBeInTheDocument();

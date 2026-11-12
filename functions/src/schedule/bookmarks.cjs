@@ -44,13 +44,15 @@ class AccountGoneError extends Error {
   }
 }
 
+class ScheduleVisibilityChangedError extends Error {}
+
 /**
  * @param {{ db: FirebaseFirestore.Firestore, uid: string, sessionId: string,
  *           bookmarked: boolean, now?: () => number }} args
  * @returns {Promise<{ bookmarked: boolean, count: number }>}
  * @throws {SessionNotFoundError} the session does not exist or is hidden
  */
-async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, requireAccount = false, now = Date.now }) {
+async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount = false, now = Date.now }) {
   const sessionRef = db.collection('cmsSchedule').doc(sessionId);
   const membershipRef = db.collection(`users/${uid}/bookmarks`).doc(sessionId);
   const aggregateRef = db.collection('sessionBookmarks').doc(sessionId);
@@ -63,6 +65,12 @@ async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, requireAc
     // commits before it (and is swept) or finds the account gone and writes
     // nothing; none can land after the sweep (connector review of PR 274).
     if (requireAccount && !(await tx.get(accountRef)).exists) throw new AccountGoneError(uid);
+    if (expectedScheduleVisibility !== undefined) {
+      const share = await tx.get(db.collection('schedule_shares').doc(uid));
+      const stored = share.data()?.scheduleVisibility;
+      const visibility = ['public', 'attendees_only'].includes(stored) ? stored : 'private';
+      if (visibility !== expectedScheduleVisibility) throw new ScheduleVisibilityChangedError();
+    }
     const sessionSnap = await tx.get(sessionRef);
     if (!sessionSnap.exists || sessionSnap.data()?.visible !== true) {
       throw new SessionNotFoundError(sessionId);
@@ -113,22 +121,26 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
     const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
-    const { sessionId, bookmarked } = req.body || {};
+    const { sessionId, bookmarked, expectedScheduleVisibility } = req.body || {};
     if (typeof sessionId !== 'string' || !sessionId) {
       return badRequest(res, 'sessionId: must be a non-empty string');
     }
     if (typeof bookmarked !== 'boolean') {
       return badRequest(res, 'bookmarked: must be a boolean');
     }
+    if (expectedScheduleVisibility !== undefined && !['private', 'attendees_only', 'public'].includes(expectedScheduleVisibility)) {
+      return badRequest(res, 'expectedScheduleVisibility: must be private, attendees_only or public');
+    }
 
     let result;
     try {
       result = await toggleSessionBookmark({
-        db, uid: gate.uid, sessionId, bookmarked, requireAccount: gate.viaAccount === true, now,
+        db, uid: gate.uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount: gate.viaAccount === true, now,
       });
     } catch (err) {
-      if (err instanceof SessionNotFoundError) return notFound(res, 'Session not found.');
+      if (err instanceof SessionNotFoundError) return sendError(res, 404, 'session-unavailable', 'Session not found.');
       if (err instanceof AccountGoneError) return sendError(res, 403, 'forbidden', 'Attendee access required.');
+      if (err instanceof ScheduleVisibilityChangedError) return sendError(res, 409, 'visibility-changed', 'Your schedule visibility changed. Review it before adding browser saves.');
       log.error('bookmarkSession failed', err);
       return internal(res, 'The bookmark could not be saved. Try again.');
     }
@@ -176,5 +188,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { toggleSessionBookmark, SessionNotFoundError, AccountGoneError },
+  internals: { toggleSessionBookmark, SessionNotFoundError, AccountGoneError, ScheduleVisibilityChangedError },
 };

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   createBookmarkSessionHandler,
-  internals: { toggleSessionBookmark, SessionNotFoundError },
+  internals: { toggleSessionBookmark, SessionNotFoundError, ScheduleVisibilityChangedError },
 } = require('./bookmarks.cjs');
 
 // ---------------------------------------------------------------- fixtures
@@ -64,6 +64,21 @@ const NOW = Date.UTC(2026, 9, 15, 12, 0, 0);
 const now = () => NOW;
 
 // ------------------------------------------------------- toggleSessionBookmark
+
+test('browser imports require the reviewed visibility in the membership transaction', async () => {
+  for (const visibility of ['public', 'attendees_only']) {
+    const db = fakeDb({ ...seedSession('s1'), 'schedule_shares/u1': { scheduleVisibility: visibility } });
+    await assert.rejects(() => toggleSessionBookmark({ db, uid: 'u1', sessionId: 's1', bookmarked: true,
+      expectedScheduleVisibility: 'private', now }), ScheduleVisibilityChangedError);
+    assert.equal(db.docs.has('users/u1/bookmarks/s1'), false);
+    assert.equal(db.docs.has('sessionBookmarks/s1'), false);
+    await toggleSessionBookmark({ db, uid: 'u1', sessionId: 's1', bookmarked: true,
+      expectedScheduleVisibility: visibility, now });
+    await toggleSessionBookmark({ db, uid: 'u1', sessionId: 's1', bookmarked: true,
+      expectedScheduleVisibility: visibility, now });
+    assert.equal(db.docs.get('sessionBookmarks/s1').count, 1);
+  }
+});
 
 test('toggleSessionBookmark: bookmarking a session creates the membership and starts the count at 1', async () => {
   const db = fakeDb(seedSession('s1'));
@@ -246,6 +261,20 @@ test('handler: 404 for an unknown session', async () => {
     res,
   );
   assert.equal(res.statusCode, 404);
+  assert.equal(res.body.error.code, 'session-unavailable');
+});
+
+test('handler: a stale private import precondition returns 409 with no membership or count write', async () => {
+  const db = fakeDb({ ...seedSession('s1'), 'users/u1': { registrationStatus: 'approved' },
+    'schedule_shares/u1': { scheduleVisibility: 'public', sessionIds: [] } });
+  const handler = createBookmarkSessionHandler({ db, auth: fakeAuth({ good: ATTENDEE_TOKEN }), getConfig: fakeGetConfig(), now });
+  const res = fakeRes();
+  await handler({ method: 'POST', headers: { authorization: 'Bearer good' },
+    body: { sessionId: 's1', bookmarked: true, expectedScheduleVisibility: 'private' } }, res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'visibility-changed');
+  assert.equal(db.docs.has('users/u1/bookmarks/s1'), false);
+  assert.equal(db.docs.has('sessionBookmarks/s1'), false);
 });
 
 test('handler: approved attendee bookmarks a session end-to-end → 200', async () => {
