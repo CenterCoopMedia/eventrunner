@@ -58,6 +58,7 @@ describe('UpdateDetail', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Please use lot B starting Thursday.')).toBeInTheDocument();
     expect(screen.getByText('October 1, 2026')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy update link' })).toBeInTheDocument();
   });
 
   it('dates the update on the event’s clock, not the reader’s', () => {

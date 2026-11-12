@@ -2,7 +2,7 @@
 // No Firebase, no network (spec §8.1); context providers only, same pattern
 // as Schedule.test.jsx.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { fireEvent, render, screen, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
@@ -128,6 +128,19 @@ function detailElement(
 function renderDetail(sessionId, options) {
   return render(detailElement(sessionId, options));
 }
+
+it('shares the session title and public route without the current query', async () => {
+  const share = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('navigator', { share });
+  try {
+    renderDetail('fx-early', { search: '?day=one' });
+    fireEvent.click(screen.getByRole('button', { name: 'Share session' }));
+    expect(share).toHaveBeenCalledWith({ title: fixtureSessions[0].title, url: 'http://localhost:3000/schedule/fx-early' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Share session' })).not.toHaveAttribute('aria-busy', 'true'));
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
 
 describe('SessionDetail', () => {
   it('renders the session title, time, location, and description', () => {

@@ -1,7 +1,7 @@
 // ShareSchedule — the owner's consent panel (issue #172). The source module
 // is mocked; the panel's own behaviour is what is under test: the choice,
 // the double press before widening, and the honest copy link.
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AuthContext from '../../contexts/AuthContext.jsx';
 import ShareSchedule from './ShareSchedule.jsx';
@@ -36,6 +36,7 @@ function renderPanel({ user = { uid: 'u1' }, share = null } = {}) {
 }
 
 beforeEach(() => {
+  copyMock.lastText = '';
   subscribeMock.mockReset();
   subscribeMock.mockImplementation(() => () => {});
   setVisibilityMock.mockReset();
@@ -44,6 +45,7 @@ beforeEach(() => {
     sessionIds: [],
   }));
 });
+afterEach(() => vi.unstubAllGlobals());
 
 describe('ShareSchedule', () => {
   it('opens on private for an owner who has never saved anything', () => {
@@ -86,11 +88,24 @@ describe('ShareSchedule', () => {
     ).toBeInTheDocument();
   });
 
-  it('offers the copy link at every level, and it names the public page, not the owner doc', async () => {
-    renderPanel({ share: { scheduleVisibility: 'private', sessionIds: ['s1'] } });
+  it.each(['private', 'attendees_only', 'public'])('keeps the public link at %s visibility without changing consent', async (scheduleVisibility) => {
+    renderPanel({ share: { scheduleVisibility, sessionIds: ['s1'] } });
     fireEvent.click(screen.getByRole('button', { name: 'Copy your schedule link' }));
     await waitFor(() => expect(copyMock.lastText).toBe('http://localhost:3000/schedule/user/u1'));
-    expect(await screen.findByText('Copied.')).toBeInTheDocument();
+    expect(await screen.findByText('Link copied.')).toBeInTheDocument();
+    expect(setVisibilityMock).not.toHaveBeenCalled();
+  });
+
+  it('sharing a private schedule invokes the sheet without widening its visibility', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { share });
+    renderPanel({ share: { scheduleVisibility: 'private', sessionIds: ['s1'] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Share your schedule link' }));
+    expect(share).toHaveBeenCalledWith({ title: 'My schedule', url: 'http://localhost:3000/schedule/user/u1' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Share your schedule link' })).not.toHaveAttribute('aria-busy', 'true'));
+    expect(setVisibilityMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('radio', { name: /Nobody/ })).toBeChecked();
+    expect(copyMock.lastText).toBe('');
   });
 
   it('a refusal from the server is stated, not swallowed', async () => {
