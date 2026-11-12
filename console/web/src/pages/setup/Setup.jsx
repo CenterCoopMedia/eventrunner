@@ -11,7 +11,7 @@ import AgreementStep from './AgreementStep.jsx';
 import EmailStep from './EmailStep.jsx';
 import EventStep from './EventStep.jsx';
 import OrganizationStep from './OrganizationStep.jsx';
-import ReviewStep from './ReviewStep.jsx';
+import ReviewStep, { Problems } from './ReviewStep.jsx';
 import TeamStep from './TeamStep.jsx';
 import TicketsStep from './TicketsStep.jsx';
 import WebAddressStep from './WebAddressStep.jsx';
@@ -66,12 +66,6 @@ function StepList({ step, progress, open, orgId, appId, onGo, disabled }) {
   );
 }
 
-/** Errors to show: for fields the reader touched, or all of them when asked to check. */
-function visibleErrors(errors, touched, showAll) {
-  if (showAll) return errors;
-  return Object.fromEntries(Object.entries(errors).filter(([path]) => touched.has(path)));
-}
-
 function useApplication(orgId, appId) {
   const [app, setApp] = useState(null);
   const [error, setError] = useState('');
@@ -116,7 +110,8 @@ export default function Setup() {
   const location = useLocation();
   const step = stepByPath(stepPath);
   const { app, setApp, error, reload } = useApplication(orgId, appId);
-  const [touched, setTouched] = useState(() => new Set());
+  const applicationNow = useRef(app);
+  applicationNow.current = app;
   const [navigating, setNavigating] = useState(false);
   const navigationPending = useRef(false);
   const actionArea = useRef(null);
@@ -134,24 +129,17 @@ export default function Setup() {
       const others = refusedNow.current.filter((id) => id !== result.step);
       refusedNow.current = result.saved === false ? [...others, result.step] : others;
       setRefused(refusedNow.current);
+      // go() needs the save response before React renders the new errors.
+      applicationNow.current = withStepErrors(applicationNow.current, result.step, result.errors);
       setApp((prev) => withStepErrors(prev, result.step, result.errors));
     },
   });
 
-  const touch = useCallback((path) => {
-    setTouched((prev) => (prev.has(path) ? prev : new Set(prev).add(path)));
-  }, []);
-
-  const onChange = useCallback((value, path) => {
+  const onChange = useCallback((value) => {
     if (!step || !ANSWER_STEPS.includes(step.id)) return;
-    touch(path);
-    // The field's old error no longer applies. The save brings the current ones.
-    setApp((prev) => {
-      const { [path]: _edited, ...errors } = prev.errors;
-      return { ...prev, errors, answers: { ...prev.answers, [step.id]: value } };
-    });
+    setApp((prev) => ({ ...prev, answers: { ...prev.answers, [step.id]: value } }));
     queue({ step: step.id, answers: value });
-  }, [step, touch, setApp, queue]);
+  }, [step, setApp, queue]);
 
   const onConnections = useCallback(({ connections, errors }) => {
     setApp((prev) => ({ ...withStepErrors(prev, 'tickets', errors), connections }));
@@ -171,10 +159,8 @@ export default function Setup() {
     first?.focus?.();
   }, [showAll, app, location.key]);
 
-  // Next stays on a step whose answer the server refused (for example a web
-  // address that is too short), with the field's error beside it. Back, the
-  // step list and Leave still work; the review holds the request until a
-  // new answer saves.
+  // Next checks the latest server errors after saving. Other navigation
+  // saves without checking; Review still holds a refused answer.
   const go = useCallback(async (target, { leaving = false } = {}) => {
     if (navigationPending.current) return;
     navigationPending.current = true;
@@ -182,13 +168,21 @@ export default function Setup() {
     const saved = await flush();
     navigationPending.current = false;
     setNavigating(false);
-    if (!saved || (!leaving && refusedNow.current.includes(step?.id))) {
+    if (!saved) {
       // A top step link can be far from the save result on a long form.
       actionArea.current?.focus();
       return;
     }
+    if (!leaving && Object.keys(errorsOfStep(applicationNow.current?.errors, step?.id)).length > 0) {
+      navigate(`${setupPath(orgId, appId, step)}?check=1`);
+      return;
+    }
+    if (!leaving && refusedNow.current.includes(step?.id)) {
+      actionArea.current?.focus();
+      return;
+    }
     navigate(target);
-  }, [flush, navigate, step?.id]);
+  }, [flush, navigate, orgId, appId, step]);
 
   const stepErrors = useMemo(() => (app && step ? errorsOfStep(app.errors, step.id) : {}), [app, step]);
 
@@ -203,7 +197,7 @@ export default function Setup() {
   const previous = open.includes(STEPS[index - 1]?.id) ? STEPS[index - 1] : null;
   const next = open.includes(STEPS[index + 1]?.id) ? STEPS[index + 1] : null;
   const View = STEP_VIEWS[step.id];
-  const shownErrors = visibleErrors(stepErrors, touched, showAll);
+  const shownErrors = showAll ? stepErrors : {};
 
   return (
     <div className="setup">
@@ -224,6 +218,7 @@ export default function Setup() {
             onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId), { leaving: true }); }} />
         </div>
         {error ? <ActionFeedback kind="error"><p>{error}</p><IconControl icon="refresh" label="Reload setup" onClick={() => reload().catch(() => {})} /></ActionFeedback> : null}
+        {View && showAll ? <Problems fields={shownErrors} orgId={orgId} appId={appId} /> : null}
         <fieldset disabled={navigating} className="console-feedback-fields">
         {View ? (
           <View
@@ -231,7 +226,6 @@ export default function Setup() {
             answers={app.answers}
             errors={shownErrors}
             onChange={onChange}
-            onBlur={touch}
             app={app}
             orgId={orgId}
             appId={appId}

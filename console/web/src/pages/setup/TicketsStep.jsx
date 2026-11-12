@@ -38,7 +38,7 @@ export default function TicketsStep({ value, errors, onChange, app, orgId, appId
                 value={choice.value}
                 checked={value.choice === choice.value}
                 disabled={unavailable && value.choice !== choice.value}
-                onChange={() => onChange({ choice: choice.value }, 'tickets.choice')}
+                onChange={() => onChange({ choice: choice.value })}
               />
               <span><strong>{choice.label}</strong>: {choice.help}{unavailable ? ' Not available yet.' : ''}</span>
             </label>

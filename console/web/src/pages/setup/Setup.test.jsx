@@ -40,11 +40,19 @@ describe('Setup', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
   });
 
-  it('a step-list link moves to that step', async () => {
-    renderSetup('organization');
+  it('Back, the step list and Close move without checking field errors', async () => {
+    serveApi({ getApplication: { application: application({ errors: {
+      'organization.address': 'Enter the mailing address.', 'event.name': 'Enter the event name.', 'email.replyTo': 'Enter a reply address.',
+    } }) } });
+    renderSetup('event', { query: '?check=1' });
+    await screen.findByRole('heading', { level: 1, name: 'Your event' });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     await screen.findByRole('heading', { level: 1, name: 'Your organization' });
     fireEvent.click(screen.getByRole('link', { name: /Email/ }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Email' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Close setup' }));
+    expect(await screen.findByText('Status page')).toBeInTheDocument();
+    expect(callsTo('saveApplicationStep')).toHaveLength(0);
   });
 
   it('saves as the reader types, after a pause, and says Saved quietly', async () => {
@@ -64,12 +72,23 @@ describe('Setup', () => {
     expect(await screen.findByText('Saved.')).toHaveAttribute('role', 'status');
   });
 
-  it('Next sends a waiting save first', async () => {
-    serveApi({ getApplication: { application: application({ answers: emptyAnswers() }) } });
+  it.each(['valid', 'invalid'])('Next checks the %s result of a waiting save', async (outcome) => {
+    const message = 'Use a complete website address.';
+    serveApi({
+      getApplication: { application: application({ answers: emptyAnswers() }) },
+      saveApplicationStep: (body) => ({ step: body.step, saved: true, answers: body.answers,
+        errors: outcome === 'invalid' ? { 'organization.website': message } : {} }),
+    });
     renderSetup('organization');
     fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'nclocal.org' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await screen.findByRole('heading', { level: 1, name: 'Your event' });
+    if (outcome === 'valid') await screen.findByRole('heading', { level: 1, name: 'Your event' });
+    else {
+      const problems = await screen.findByRole('region', { name: 'Answers that need attention' });
+      expect(within(problems).getByRole('listitem')).toHaveTextContent(message);
+      expect(screen.getByRole('heading', { level: 1, name: 'Your organization' })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByLabelText('Website (optional)')).toHaveFocus());
+    }
     expect(callsTo('saveApplicationStep')[0].answers.website).toBe('nclocal.org');
   });
 
@@ -82,24 +101,39 @@ describe('Setup', () => {
     expect(callsTo('saveApplicationStep')[0].answers.website).toBe('nclocal.org');
   });
 
-  it('shows an error by field once the reader has touched the field', async () => {
+  it('waits for Next to show errors and keeps them until a save confirms validity', async () => {
     serveApi({
       getApplication: { application: application({ answers: emptyAnswers(), errors: { 'organization.address': 'Enter the mailing address.' } }) },
       saveApplicationStep: (body) => ({
-        step: body.step, saved: true, answers: body.answers, errors: { 'organization.address': 'Use at least 10 characters.' },
+        step: body.step, saved: true, answers: body.answers,
+        errors: body.answers.address === '1 Main Street, Raleigh' ? {} : { 'organization.address': 'Use at least 10 characters.' },
       }),
     });
     renderSetup('organization');
     const field = await screen.findByLabelText('Mailing address');
     expect(screen.queryByText('Enter the mailing address.')).not.toBeInTheDocument();
     fireEvent.blur(field);
-    expect(screen.getByText('Enter the mailing address.')).toBeInTheDocument();
+    expect(screen.queryByText('Enter the mailing address.')).not.toBeInTheDocument();
     fireEvent.change(field, { target: { value: '1 Main' } });
     expect(screen.queryByText('Enter the mailing address.')).not.toBeInTheDocument();
     await waitFor(() => expect(callsTo('saveApplicationStep')).toHaveLength(1), { timeout: 2000 });
-    expect(await screen.findByText('Use at least 10 characters.')).toBeInTheDocument();
+    await screen.findByText('Saved.');
+    expect(screen.queryByText('Use at least 10 characters.')).not.toBeInTheDocument();
+    expect(field).not.toHaveAttribute('aria-invalid');
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    const problems = await screen.findByRole('region', { name: 'Answers that need attention' });
+    expect(within(problems).getByRole('listitem')).toHaveTextContent('Use at least 10 characters.');
+    await waitFor(() => expect(field).toHaveFocus());
     expect(field).toHaveAttribute('aria-invalid', 'true');
     expect(field.getAttribute('aria-describedby')).toContain('f-organization-address-error');
+    fireEvent.change(field, { target: { value: '1 Main Street, Raleigh' } });
+    expect(field).toHaveAccessibleDescription(/Use at least 10 characters/);
+    await waitFor(() => expect(field).not.toHaveAttribute('aria-invalid'), { timeout: 2000 });
+    expect(screen.queryByRole('region', { name: 'Answers that need attention' })).not.toBeInTheDocument();
+    expect(callsTo('saveApplicationStep')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your event' });
+    expect(callsTo('saveApplicationStep')).toHaveLength(2);
   });
 
   it('with ?check=1 shows every error and focuses the first field with one', async () => {
@@ -113,9 +147,18 @@ describe('Setup', () => {
     });
     renderSetup('organization', { query: '?check=1' });
     const field = await screen.findByLabelText('Mailing address');
-    expect(screen.getByText('Enter the mailing address.')).toBeInTheDocument();
+    expect(field).toHaveAccessibleDescription(/Enter the mailing address/);
     expect(screen.queryByText('Enter the event name.')).not.toBeInTheDocument();
     await waitFor(() => expect(field).toHaveFocus());
+  });
+
+  it('Next focuses a group error when no individual field has an error', async () => {
+    serveApi({ getApplication: { application: application({ answers: emptyAnswers(), errors: { 'event.days': 'Add at least one day.' } }) } });
+    renderSetup('event');
+    await screen.findByRole('heading', { level: 1, name: 'Your event' });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(screen.getByText('Add at least one day.')).toHaveFocus());
+    expect(callsTo('saveApplicationStep')).toHaveLength(0);
   });
 
   it('with ?check=1 the focus stays where the reader types after the first focus', async () => {
