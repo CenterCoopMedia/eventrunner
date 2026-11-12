@@ -64,7 +64,7 @@ function SampleMessage({ sample, timeZone }) {
   const name = `Attendee reminder, ${dayCount(sample.offsetDays)} before`;
   return (
     <section aria-label={name} className="flex flex-col gap-xs border-admin-rule-hairline border-t-admin-hairline pt-sm">
-      <div className="flex items-center gap-2xs"><h4 className="text-admin-base font-bold text-admin-ink">{name}</h4><HelpTooltip label="this section">Review this reminder’s date and message before enabling the schedule.</HelpTooltip></div>
+      <div className="flex items-center gap-2xs"><h4 className="text-admin-base font-bold text-admin-ink">{name}</h4><HelpTooltip label={name}>Review this reminder’s date and message before enabling the schedule.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">
         Sends from {eventTime(sample.opensAt, timeZone)}.
         {sample.state === 'closed' ? ' This reminder date has passed, so it will not send.' : ''}
@@ -83,12 +83,12 @@ function SampleMessage({ sample, timeZone }) {
           className="block h-[20rem] w-full rounded-admin border-admin-hairline border-admin-rule-hairline [color-scheme:light]"
         />
       ) : null}
-      <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview <HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></summary>
+      <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview </summary>
         <pre data-testid={`attendee-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {sample.text}
         </pre>
-      </details>
+      </details><HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></div>
     </section>
   );
 }

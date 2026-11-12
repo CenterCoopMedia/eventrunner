@@ -112,15 +112,15 @@ function RecipientMessage({ message }) {
       {srcDoc ? <PreviewFrame srcDoc={srcDoc} to={message.to} /> : (
         <p className="text-admin-sm text-admin-ink">This message’s HTML cannot be shown safely. The plain text version is below.</p>
       )}
-      <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version <HelpTooltip label="Plain text version">Read the wording people receive when their email app displays plain text.</HelpTooltip></summary>
+      <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version </summary>
         <pre
           data-testid="reminder-preview-text"
           className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data"
         >
           {message.text}
         </pre>
-      </details>
+      </details><HelpTooltip label="Plain text version">Read the wording people receive when their email app displays plain text.</HelpTooltip></div>
     </div>
   );
 }

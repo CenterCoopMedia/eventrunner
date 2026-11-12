@@ -193,7 +193,7 @@ function ReasonForm({ title, explanation, label, hint, maxLength, validate, conf
         ? 'flex flex-col gap-xs rounded-admin-panel border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm'
         : 'flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-raised px-md py-sm'}
     >
-      <div className="flex items-center gap-2xs"><h3 id={headingId} className={`text-admin-base font-bold ${alarm ? 'text-admin-state-error' : 'text-admin-ink'}`}>{title}</h3><HelpTooltip label="this section">Record the reason for this invoice change so staff can review it later.</HelpTooltip></div>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className={`text-admin-base font-bold ${alarm ? 'text-admin-state-error' : 'text-admin-ink'}`}>{title}</h3><HelpTooltip label={title}>Record the reason for this invoice change so staff can review it later.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">{explanation}</p>
       <ServerErrorSummary error={serverError} title={errorTitle} />
       <TextField help="Explain this invoice change. The reason stays with the invoice history."

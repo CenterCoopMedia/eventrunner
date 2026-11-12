@@ -42,7 +42,7 @@ function RowQuestion({ title, children, headingRef }) {
       className="mt-xs flex flex-col gap-xs rounded-admin-panel border-admin-strong border-admin-rule-strong px-md py-sm"
     >
       <div className="flex items-center gap-2xs"><h3 ref={headingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
-        {title}</h3><HelpTooltip label="this section">Review this saved message before reusing, renaming or removing it.</HelpTooltip></div>
+        {title}</h3><HelpTooltip label={title}>Review this saved message before reusing, renaming or removing it.</HelpTooltip></div>
       {children}
     </section>
   );

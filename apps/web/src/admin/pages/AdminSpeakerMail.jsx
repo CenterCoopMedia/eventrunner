@@ -119,21 +119,21 @@ function MessagePreview({ preview, title }) {
       ) : (
         <p className="text-admin-sm text-admin-ink">This message’s HTML cannot be shown safely. The plain text version is below.</p>
       )}
-      <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version <HelpTooltip label="Plain text version">Read the wording people receive when their email app displays plain text.</HelpTooltip></summary>
+      <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version </summary>
         <pre
           data-testid="mail-preview-text"
           className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data"
         >
           {preview.text}
         </pre>
-      </details>
-      <details className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">HTML source <HelpTooltip label="HTML source">Review the saved email markup if you need to check its formatting.</HelpTooltip></summary>
+      </details><HelpTooltip label="Plain text version">Read the wording people receive when their email app displays plain text.</HelpTooltip></div>
+      <div className="flex min-w-0 items-start gap-2xs"><details className="text-admin-sm min-w-0 flex-1">
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">HTML source </summary>
         <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
           {preview.html}
         </pre>
-      </details>
+      </details><HelpTooltip label="HTML source">Review the saved email markup if you need to check its formatting.</HelpTooltip></div>
     </section>
   );
 }

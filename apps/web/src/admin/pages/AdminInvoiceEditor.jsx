@@ -730,7 +730,7 @@ export default function AdminInvoiceEditor({ mode }) {
             <FieldErrorLine message={errorFor('lines')} />
             {form.lines.map((line, index) => (
               <fieldset aria-label={[(lineName(index)), " "].join('').trim()} key={line.key} className="flex min-w-0 flex-col gap-xs border-admin-rule-hairline border-b-admin-hairline pb-sm">
-                <legend className="text-admin-base font-bold text-admin-ink">{lineName(index)} <HelpTooltip label="this section">Describe this billed item and set its quantity and price.</HelpTooltip></legend>
+                <legend className="text-admin-base font-bold text-admin-ink">{lineName(index)} <HelpTooltip label={lineName(index)}>Describe this billed item and set its quantity and price.</HelpTooltip></legend>
                 <TextField help="Describe the item or service as it should appear on the invoice."
                   label="Description"
                   value={line.description}
@@ -791,7 +791,7 @@ export default function AdminInvoiceEditor({ mode }) {
             <FieldErrorLine message={errorFor('adjustments')} />
             {form.adjustments.map((row, index) => (
               <fieldset aria-label={[(adjustmentName(row, index)), " "].join('').trim()} key={row.key} className="flex min-w-0 flex-col gap-xs border-admin-rule-hairline border-b-admin-hairline pb-sm">
-                <legend className="text-admin-base font-bold text-admin-ink">{adjustmentName(row, index)} <HelpTooltip label="this section">Name this discount or tax and set the amount it changes the total by.</HelpTooltip></legend>
+                <legend className="text-admin-base font-bold text-admin-ink">{adjustmentName(row, index)} <HelpTooltip label={adjustmentName(row, index)}>Name this discount or tax and set the amount it changes the total by.</HelpTooltip></legend>
                 <div className="flex flex-wrap items-start gap-sm">
                   <SelectField help="Choose whether this adjustment adds to or subtracts from the invoice total."
                     label="Kind"

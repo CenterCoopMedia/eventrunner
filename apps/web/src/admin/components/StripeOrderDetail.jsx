@@ -167,7 +167,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
 
   const selectedSummary = <ul className="space-y-xs">{selectedTickets.map((ticket) => <li key={ticket.externalId || ticket.id} className="wrap-anywhere"><span className="font-semibold">{ticket.firstName} {ticket.lastName}</span> — <span className="font-admin-data">{ticket.email || 'No email'}</span>{ticket.checkedInAt ? ' — already checked in' : ''}</li>)}</ul>;
   return <Panel help="Review the purchaser, payment and tickets in this order." title="Order details" actions={<AdminIconControl label="Close order details" icon="close" className={secondaryButtonClass} onClick={onClose} />}>
-    <div className="flex items-center gap-2xs"><h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{order?.purchaserEmail || order?.purchaser?.email || 'Order'}</h3><HelpTooltip label="this section">Review the purchaser and payment details for this order.</HelpTooltip></div>
+    <div className="flex items-center gap-2xs"><h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{order?.purchaserEmail || order?.purchaser?.email || 'Order'}</h3><HelpTooltip label={order?.purchaserEmail || order?.purchaser?.email || "Order"}>Review the purchaser and payment details for this order.</HelpTooltip></div>
     {!order && !error ? <AdminLoadingState label="Loading order details…" /> : null}
     {error && !confirm ? <Notice tone="error" message={error} /> : null}
     {notice && confirm !== 'cancel' ? <Notice tone={notice.tone} message={notice.message} /> : null}

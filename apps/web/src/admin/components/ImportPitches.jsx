@@ -94,10 +94,10 @@ export default function ImportPitches({ call }) {
           <p className="break-words text-admin-sm">{file.name} · {file.count} {file.count === 1 ? 'proposal' : 'proposals'}</p>
           <p className="text-admin-sm text-admin-ink-secondary">Check each match. A file column can be used once. Organization and format can be left out.</p>
           <ColumnMatches fields={PITCH_IMPORT_FIELDS.filter(({ id }) => PITCH_COLUMNS.includes(id))} headers={file.headers} mapping={mapping} onChange={changeMapping} />
-          <details className="text-admin-sm">
-            <summary className="admin-target cursor-pointer font-semibold">Other proposal answers <HelpTooltip label="Other proposal answers">Choose which extra source answers to keep with the imported proposal.</HelpTooltip></summary>
+          <div className="flex min-w-0 items-start gap-2xs"><details className="text-admin-sm min-w-0 flex-1">
+            <summary className="admin-target cursor-pointer font-semibold">Other proposal answers </summary>
             <div className="pt-sm"><ColumnMatches fields={PITCH_IMPORT_FIELDS.filter(({ id }) => !PITCH_COLUMNS.includes(id))} headers={file.headers} mapping={mapping} onChange={changeMapping} /></div>
-          </details>
+          </details><HelpTooltip label="Other proposal answers">Choose which extra source answers to keep with the imported proposal.</HelpTooltip></div>
         </section> : null}
         {rows ? <>
           <p>{rows.length} {rows.length === 1 ? 'proposal' : 'proposals'} ready for review.</p>

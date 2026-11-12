@@ -286,12 +286,12 @@ function StoredBody({ message }) {
         </p>
       ) : null}
       {text ? (
-        <details open={!srcDoc} className="text-admin-sm">
-          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview <HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></summary>
+        <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
+          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview </summary>
           <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
             {text}
           </pre>
-        </details>
+        </details><HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></div>
       ) : null}
       {!html && !text ? <p className="text-admin-sm text-admin-ink">This message has no preview available.</p> : null}
       {bodyTruncated ? (

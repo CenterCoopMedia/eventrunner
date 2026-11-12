@@ -142,12 +142,12 @@ function PreviewFrame({ html, text }) {
       ) : (
         <p className="text-admin-sm text-admin-ink">The formatted preview is unavailable. The text preview is shown below.</p>
       )}
-      <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview <HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></summary>
+      <div className="flex min-w-0 items-start gap-2xs"><details open={!srcDoc} className="text-admin-sm min-w-0 flex-1">
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview </summary>
         <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {text}
         </pre>
-      </details>
+      </details><HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></div>
     </div>
   );
 }
@@ -194,12 +194,12 @@ function SendDetail({ send, state, regionId }) {
         </dl>
         <PreviewFrame html={detail.html} text={detail.text} />
         {detail.failures.length > 0 ? (
-          <details className="text-admin-sm">
+          <div className="flex min-w-0 items-start gap-2xs"><details className="text-admin-sm min-w-0 flex-1">
             <summary className="admin-target cursor-pointer font-semibold text-admin-ink">
               {failures.cut
                 ? `Failed addresses (first ${failures.shown} of ${failures.all.toLocaleString('en-US')})`
                 : `Failed addresses (${failures.shown})`}
-             <HelpTooltip label="this section">Review addresses where delivery failed. The email log has the full delivery history.</HelpTooltip></summary>
+             </summary>
             {failures.cut ? (
               <p className="mt-2xs text-admin-ink-secondary">
                 {`This list keeps the first ${failures.shown} failures. The email log has every recipient message of this send.`}
@@ -213,7 +213,7 @@ function SendDetail({ send, state, regionId }) {
                 </li>
               ))}
             </ul>
-          </details>
+          </details><HelpTooltip label="Failed email addresses">Review addresses where delivery failed. The email log has the full delivery history.</HelpTooltip></div>
         ) : null}
       </>
     );
@@ -750,7 +750,7 @@ export default function AnnouncementEmailComposer() {
                   className="flex flex-col gap-xs rounded-admin-panel border-admin-strong border-admin-rule-strong px-md py-sm"
                 >
                   <div className="flex items-center gap-2xs"><h3 id="announcement-email-confirm" ref={confirmHeadingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
-                    {`Send this email to ${recipients(count)}?`}</h3><HelpTooltip label="this section">Confirm the recipient count and preview before sending. Sending delivers real email.</HelpTooltip></div>
+                    {`Send this email to ${recipients(count)}?`}</h3><HelpTooltip label="Send confirmation">Confirm the recipient count and preview before sending. Sending delivers real email.</HelpTooltip></div>
                   <p className="text-admin-sm text-admin-ink">
                     Each recipient gets one copy. A sent email cannot be recalled.
                   </p>

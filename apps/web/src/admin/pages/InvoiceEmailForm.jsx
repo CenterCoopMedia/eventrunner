@@ -190,7 +190,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
 
   return (
     <section ref={sectionRef} aria-labelledby={headingId} className="flex flex-col gap-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
-      <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-ink">{`Email ${invoice.number}`}</h3><HelpTooltip label="this section">Review who will receive this invoice email before sending.</HelpTooltip></div>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-ink">{`Email ${invoice.number}`}</h3><HelpTooltip label={`Email ${invoice.number}`}>Review who will receive this invoice email before sending.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">
         {'The PDF goes to the billing email on the invoice: '}
         <strong className="font-semibold">{to}</strong>

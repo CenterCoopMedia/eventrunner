@@ -206,14 +206,14 @@ export function PitchEmailDelivery({ pitch, notices, disabled, call }) {
     <div className="flex items-center gap-2xs"><h3 className="font-semibold">Emails to the submitter</h3><HelpTooltip label="Emails to the submitter">Review the messages sent to the person who submitted this proposal.</HelpTooltip></div>
     {records.length ? <ul className="space-y-xs">{records.map(([slot, record]) => <DeliveryState key={slot} slot={slot} record={record} />)}</ul>
       : <p className="text-admin-sm text-admin-ink-secondary">No email was sent for this pitch.</p>}
-    {canSendDecision ? <details>
-      <summary className="min-h-admin-control cursor-pointer font-semibold">Prepare the {slotNames[decisionSlot].toLowerCase()} <HelpTooltip label="this section">Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></summary>
+    {canSendDecision ? <div className="flex min-w-0 items-start gap-2xs"><details className="min-w-0 flex-1">
+      <summary className="min-h-admin-control cursor-pointer font-semibold">Prepare the {slotNames[decisionSlot].toLowerCase()} </summary>
       <SendEmail key={`${decisionSlot}-${pitch.reviewRevision ?? 0}`} pitch={pitch} kind="decision" slot={decisionSlot} disabled={disabled} call={call} onSent={setResult} />
-    </details> : null}
-    {canSendReceipt ? <details>
-      <summary className="min-h-admin-control cursor-pointer font-semibold">{notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'} <HelpTooltip label="this section">Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></summary>
+    </details><HelpTooltip label="this section">Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></div> : null}
+    {canSendReceipt ? <div className="flex min-w-0 items-start gap-2xs"><details className="min-w-0 flex-1">
+      <summary className="min-h-admin-control cursor-pointer font-semibold">{notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'} </summary>
       <SendEmail key={`receipt-${pitch.reviewRevision ?? 0}`} pitch={pitch} kind="receipt" slot="receipt" disabled={disabled} call={call} onSent={setResult} />
-    </details> : null}
+    </details><HelpTooltip label="this section">Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></div> : null}
     {result ? <SaveStatus message={result} /> : null}
   </section>;
 }
