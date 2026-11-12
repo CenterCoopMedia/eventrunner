@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { CommandMenuAccount, readCommandRecents } from '../commandMenuRecents.js';
@@ -96,11 +97,11 @@ export default function AdminCommandMenu({ docket, onClose, returnFocusRef }) {
       style={{ animation: 'none', transition: 'none' }}
       onCancel={(event) => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
       <div className="flex items-center justify-between gap-sm">
-        <h2 id={`${id}-title`} className="text-admin-xl font-bold">Find work</h2>
+        <div className="flex items-center gap-2xs"><h2 id={`${id}-title`} className="text-admin-xl font-bold">Find work</h2><HelpTooltip label="Find work">Search for an admin page or a record and open it from these results.</HelpTooltip></div>
         <button type="button" className={secondaryButtonClass} onClick={onClose}>Close</button>
       </div>
       <label id={labelId} htmlFor={`${id}-search`} className={`${fieldLabelClass} mt-sm`}>Search sections and recent records</label>
-      <input ref={inputRef} id={`${id}-search`} role="combobox" type="text" className={inputClass}
+      <input data-help-skip="Search field; its visible prompt names the search action." ref={inputRef} id={`${id}-search`} role="combobox" type="text" className={inputClass}
         value={query} autoComplete="off" spellCheck={false} aria-autocomplete="list"
         aria-expanded={options.length > 0} aria-controls={listId} aria-activedescendant={activeId}
         onKeyDown={onKeyDown} onChange={(event) => { setQuery(event.target.value); setActive(0); }} />

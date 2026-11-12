@@ -179,7 +179,7 @@ export default function AdminSpeakersList() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Choose when speakers receive reminders about missing items."
         title="Speakers"
         identifiers={`${speakers.length} record${speakers.length === 1 ? '' : 's'}`}
         description="Edit a speaker here and every session shows the change."

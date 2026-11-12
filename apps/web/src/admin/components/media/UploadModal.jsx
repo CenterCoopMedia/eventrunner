@@ -86,7 +86,7 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
           <label htmlFor="media-upload-file" className={fieldLabelClass}>
             File
           </label>
-          <input
+          <input data-help-skip="File chooser; its existing file type and size guidance describes the upload."
             id="media-upload-file"
             type="file"
             accept={accepted.join(',')}
@@ -103,15 +103,15 @@ export default function UploadModal({ folder, onClose, onUploaded, upload, retur
           ) : null}
         </div>
 
-        <TextAreaField
+        <TextAreaField help="What the image shows, for someone who cannot see it. Leave blank for a purely decorative image."
           label="Image description"
           value={alt}
           onChange={setAlt}
           rows={2}
           disabled={busy}
-          hint="What the image shows, for someone who cannot see it. Leave blank for a purely decorative image."
+          
         />
-        <TextField
+        <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
           label="Title (optional)"
           value={title}
           disabled={busy}

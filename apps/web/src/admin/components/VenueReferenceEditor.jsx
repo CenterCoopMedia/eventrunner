@@ -478,7 +478,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
   return (
     <>
       {notice ? <p role="status" className="text-admin-sm text-admin-ink-secondary">{notice}</p> : null}
-      <Panel
+      <Panel help="Stable room references for sessions and transfer routes. Names and floors can change without changing an id."
         title="Places"
         description="Stable room references for sessions and transfer routes. Names and floors can change without changing an id."
         actions={
@@ -507,7 +507,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                   className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
                 >
                   <div className="grid gap-sm sm:grid-cols-3">
-                    <TextField
+                    <TextField help="Use the room name attendees should look for at the venue."
                       label={`Place ${index + 1} name`}
                       value={place.name}
                       onChange={(value) => {
@@ -522,15 +522,15 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                       }}
                       error={errorFor(`venue.places[${index}].name`)}
                     />
-                    <TextField
+                    <TextField help="Lowercase letters, digits, and single hyphens. Keep a saved id stable."
                       label={`Place ${index + 1} id`}
                       value={place.id}
                       onChange={(value) => changePlace(index, { id: value, idTouched: true })}
                       error={errorFor(`venue.places[${index}].id`) ?? errorFor('venue.places')}
-                      hint="Lowercase letters, digits, and single hyphens. Keep a saved id stable."
+                      
                       className="font-admin-data"
                     />
-                    <TextField
+                    <TextField help="Enter the floor where attendees will find this room."
                       label={`Place ${index + 1} floor`}
                       value={place.floor}
                       onChange={(value) => changePlace(index, { floor: value })}
@@ -559,7 +559,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
         )}
       </Panel>
 
-      <Panel
+      <Panel help="One recorded, one-way route between two places. Zero minutes means across the corridor."
         title="Movements"
         description="One recorded, one-way route between two places. Zero minutes means across the corridor."
         actions={
@@ -583,21 +583,21 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                 className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
               >
                 <div className="grid gap-sm sm:grid-cols-2">
-                  <SelectField
+                  <SelectField help="Choose the room where this one-way walking route starts."
                     label={`Movement ${index + 1} from`}
                     value={movement.from}
                     onChange={(value) => changeMovement(index, { from: value })}
                     options={options}
                     error={errorFor(`venue.movements[${index}].from`)}
                   />
-                  <SelectField
+                  <SelectField help="Choose the room where this one-way walking route ends."
                     label={`Movement ${index + 1} to`}
                     value={movement.to}
                     onChange={(value) => changeMovement(index, { to: value })}
                     options={options}
                     error={errorFor(`venue.movements[${index}].to`)}
                   />
-                  <TextField
+                  <TextField help="A whole number from 0 to 120."
                     label={`Movement ${index + 1} walking minutes`}
                     type="number"
                     min="0"
@@ -606,14 +606,14 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                     value={movement.walkingMinutes}
                     onChange={(value) => changeMovement(index, { walkingMinutes: value })}
                     error={errorFor(`venue.movements[${index}].walkingMinutes`)}
-                    hint="A whole number from 0 to 120."
+                    
                   />
-                  <TextField
+                  <TextField help="Optional step-free route guidance."
                     label={`Movement ${index + 1} accessible route`}
                     value={movement.accessibleRoute}
                     onChange={(value) => changeMovement(index, { accessibleRoute: value })}
                     error={errorFor(`venue.movements[${index}].accessibleRoute`)}
-                    hint="Optional step-free route guidance."
+                    
                   />
                 </div>
                 <button
@@ -635,7 +635,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
           picture is the places list, not this one — a marker only says where
           a room already named sits, so a room is never named twice and a
           venue with no markers still publishes a readable room list. */}
-      <Panel
+      <Panel help="An uploaded map of the building. The public travel page prints the room list beside it, so a reader who cannot see the image still gets every room name."
         title="Venue map"
         description="An uploaded map of the building. The public travel page prints the room list beside it, so a reader who cannot see the image still gets every room name."
         actions={
@@ -652,7 +652,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
         }
       >
         <div className="flex flex-col gap-sm">
-          <ImagePicker
+          <ImagePicker help="Choose or upload the map. Clearing this removes the map from the travel page."
             label="Map image"
             value={map.image}
             // CLEARING THE PICTURE CLEARS WHAT BELONGED TO IT. The alt text
@@ -665,16 +665,16 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
             onChange={(value) =>
               changeMap(value ? { image: value } : { image: '', alt: '', markers: [] })
             }
-            hint="Choose or upload the map. Clearing this removes the map from the travel page."
+            
             error={errorFor('venue.map.image')}
           />
           {map.image ? (
-            <TextField
+            <TextField help="What the map shows, in a sentence. Required, and the map does not publish without it."
               label="Map alt text"
               value={map.alt}
               onChange={(value) => changeMap({ alt: value })}
               error={errorFor('venue.map.alt')}
-              hint="What the map shows, in a sentence. Required, and the map does not publish without it."
+              
             />
           ) : null}
         </div>
@@ -694,7 +694,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                     className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
                   >
                     <div className="grid gap-sm sm:grid-cols-3">
-                      <SelectField
+                      <SelectField help="Choose which room this marker identifies on the venue map."
                         label={`Marker ${index + 1} room`}
                         value={marker.placeId}
                         onChange={(value) => changeMarker(index, { placeId: value })}
@@ -703,7 +703,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                       />
                       {/* Typed, not dragged: a number is the coordinate a
                           keyboard can reach, and it is the stored value. */}
-                      <TextField
+                      <TextField help="0 is the left edge, 100 the right."
                         label={`Marker ${index + 1} across (%)`}
                         type="number"
                         min="0"
@@ -712,9 +712,9 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                         value={marker.x}
                         onChange={(value) => changeMarker(index, { x: value })}
                         error={errorFor(`venue.map.markers[${index}].x`)}
-                        hint="0 is the left edge, 100 the right."
+                        
                       />
-                      <TextField
+                      <TextField help="0 is the top edge, 100 the bottom."
                         label={`Marker ${index + 1} down (%)`}
                         type="number"
                         min="0"
@@ -723,7 +723,7 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
                         value={marker.y}
                         onChange={(value) => changeMarker(index, { y: value })}
                         error={errorFor(`venue.map.markers[${index}].y`)}
-                        hint="0 is the top edge, 100 the bottom."
+                        
                       />
                     </div>
                     <button

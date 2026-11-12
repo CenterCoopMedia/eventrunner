@@ -92,7 +92,7 @@ export default function AdminOverview() {
 
   return (
     <div className="admin-overview admin-overview-workspace flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Review event progress, upcoming dates and content that needs attention."
         title="Overview"
         identifiers={readAt ? `Read at ${readAt}` : null}
         description={`${eventConfig.shortName || eventConfig.name || 'Your event'} at a glance. Check attendance, tickets, and event progress.`}

@@ -560,7 +560,7 @@ export default function AdminEventSettings() {
     // with a bubble, so this form's check never runs and nothing is marked.
     // The fields keep their types for the keyboard each one brings up.
     <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit} noValidate>
-      <AdminPageHeader
+      <AdminPageHeader help="Name, dates, venue, milestones, social accounts, and the addresses the site and its email use."
         title="Event"
         description="Name, dates, venue, milestones, social accounts, and the addresses the site and its email use."
         actions={
@@ -585,23 +585,23 @@ export default function AdminEventSettings() {
             <p>The name, event days, and session tracks that shape the schedule.</p>
           </div>
           <div className="admin-settings-grid admin-settings-grid--essentials">
-            <Panel className="admin-settings-card" title="Identity" description="The event name and time zone used on the site and in email.">
+            <Panel help="Set the event name and the local clock used across the site." className="admin-settings-card" title="Identity" description="The event name and time zone used on the site and in email.">
               <div className="admin-settings-fields">
-                <TextField
+                <TextField help="Use the full name attendees should see on the site and in event emails."
                   label="Event name"
                   value={form.name}
                   onChange={(value) => setForm((c) => ({ ...c, name: value }))}
                   error={errorFor('name')}
                 />
-                <TextField
+                <TextField help="Used in the header and in email subjects."
                   label="Short name"
                   value={form.shortName}
                   onChange={(value) => setForm((c) => ({ ...c, shortName: value }))}
                   error={errorFor('shortName')}
-                  hint="Used in the header and in email subjects."
+                  
                 />
                 <div className="admin-settings-field--wide">
-                  <TextField
+                  <TextField help="Write a short phrase that explains the event beside its name."
                     label="Tagline"
                     value={form.tagline}
                     onChange={(value) => setForm((c) => ({ ...c, tagline: value }))}
@@ -609,7 +609,7 @@ export default function AdminEventSettings() {
                   />
                 </div>
                 <div className="admin-settings-field--wide">
-                  <TimeZoneField
+                  <TimeZoneField help="Choose the city or region whose local clock the event follows. Event dates and send times use this zone."
                     value={form.timezone}
                     onChange={(value) => setForm((c) => ({ ...c, timezone: value }))}
                     error={errorFor('timezone')}
@@ -640,45 +640,45 @@ export default function AdminEventSettings() {
             <p>Address, rooms, walking routes, and the venue map.</p>
           </div>
           <div className="admin-settings-grid">
-            <Panel className="admin-settings-card" title="Venue" description="The main event location and its street address.">
+            <Panel help="Set the main event location and its mailing address." className="admin-settings-card" title="Venue" description="The main event location and its street address.">
               <div className="admin-settings-fields">
-                <TextField
+                <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                   label="Venue name"
                   value={form.venue.name}
                   onChange={(value) => setGroup('venue', { name: value })}
                   error={errorFor('venue.name')}
                 />
-                <TextField
+                <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                   label="Address line 1"
                   value={form.venue.addressLine1}
                   onChange={(value) => setGroup('venue', { addressLine1: value })}
                 />
-                <TextField
+                <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                   label="Address line 2"
                   value={form.venue.addressLine2}
                   onChange={(value) => setGroup('venue', { addressLine2: value })}
                 />
-                <TextField
+                <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                   label="City"
                   value={form.venue.city}
                   onChange={(value) => setGroup('venue', { city: value })}
                 />
-                <TextField
+                <TextField help="Enter the state, province or region for the venue address."
                   label="Region"
                   value={form.venue.region}
                   onChange={(value) => setGroup('venue', { region: value })}
                 />
-                <TextField
+                <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                   label="Postal code"
                   value={form.venue.postalCode}
                   onChange={(value) => setGroup('venue', { postalCode: value })}
                 />
-                <TextField
+                <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                   label="Country"
                   value={form.venue.country}
                   onChange={(value) => setGroup('venue', { country: value })}
                 />
-                <TextField
+                <TextField help="Link to directions or a map for the main venue."
                   label="Map URL"
                   value={form.venue.mapUrl}
                   onChange={(value) => setGroup('venue', { mapUrl: value })}
@@ -699,19 +699,19 @@ export default function AdminEventSettings() {
             <p>Registration links, goals, and the dates your team is working toward.</p>
           </div>
           <div className="admin-settings-grid">
-            <Panel className="admin-settings-card"
+            <Panel help="Set when registration is open and where attendees go to register. Dates and times use the event’s local clock." className="admin-settings-card"
               title="Registration"
-              description="Dates are naive local datetimes (YYYY-MM-DDTHH:MM) in the event’s timezone. The URL and label below are the register control the site shows."
+              description="Dates and times use the event’s local clock. The link and label below set the registration button on the site."
             >
               <div className="admin-settings-fields">
-                <TextField
+                <TextField help="Choose when registration starts, using the event’s local date and time."
                   label="Registration opens"
                   type="datetime-local"
                   value={form.registration.opensAt}
                   onChange={(value) => setGroup('registration', { opensAt: value })}
                   error={errorFor('registration.opensAt') ?? errorFor('registration')}
                 />
-                <TextField
+                <TextField help="Choose when registration ends, using the event’s local date and time."
                   label="Registration closes"
                   type="datetime-local"
                   value={form.registration.closesAt}
@@ -724,21 +724,21 @@ export default function AdminEventSettings() {
                     point at different places. Leaving the URL empty is a real
                     answer: no control is drawn anywhere. */}
                 <div className="admin-settings-field--wide">
-                  <TextField
+                  <TextField help="Must start with https://. Leave it empty and no register control is shown."
                     label="External registration URL"
                     value={form.registration.externalUrl}
                     onChange={(value) => setGroup('registration', { externalUrl: value })}
                     error={errorFor('registration.externalUrl')}
-                    hint="Must start with https://. Leave it empty and no register control is shown."
+                    
                   />
                 </div>
                 <div className="admin-settings-field--wide">
-                  <TextField
+                  <TextField help="What the register control says. Empty means it says Register."
                     label="Register button label"
                     value={form.registration.actionLabel}
                     onChange={(value) => setGroup('registration', { actionLabel: value })}
                     error={errorFor('registration.actionLabel')}
-                    hint="What the register control says. Empty means it says Register."
+                    
                   />
                 </div>
                 {/* The goal (issue #180): the overview sets the approved count
@@ -746,7 +746,7 @@ export default function AdminEventSettings() {
                     type="number", because a number field reads an entry it cannot
                     parse as empty, and an empty goal is sent as null, which would
                     clear the stored goal instead of refusing the entry. */}
-                <TextField
+                <TextField help="Set the number of approved attendees you hope to reach. Leave empty for no goal."
                   label="Registration goal"
                   inputMode="numeric"
                   value={form.registration.goal}
@@ -760,7 +760,7 @@ export default function AdminEventSettings() {
             {/* The lifecycle dates (ADR 0001 §2.5, audit 07 #1). Nothing else
                 sets them, and without an announce date the site stays in
                 draft for good. */}
-            <Panel className="admin-settings-card"
+            <Panel help="Check when the site becomes public and when it changes to an archived event." className="admin-settings-card"
               title="Announce and archive"
               description="These dates move the site from draft to public, and from public to archived."
             >
@@ -831,7 +831,7 @@ export default function AdminEventSettings() {
             <p>The sender details and contact addresses used across the event.</p>
           </div>
           <div className="admin-settings-grid">
-            <Panel className="admin-settings-card"
+            <Panel help="Check the sender details used for event email. An operator manages these settings." className="admin-settings-card"
               title="Sender"
               description="The sender details used for your event emails."
             >
@@ -843,6 +843,7 @@ export default function AdminEventSettings() {
                 </div>
                 <TextField
                   label="Sender name"
+                  help="The name recipients see beside the event’s email address. An operator can change it."
                   value={form.sender.name}
                   onChange={(value) => setGroup('sender', { name: value })}
                   error={errorFor('sender.name')}
@@ -850,6 +851,7 @@ export default function AdminEventSettings() {
                 />
                 <TextField
                   label="Reply-to"
+                  help="Replies to event emails go to this address. An operator can change it."
                   type="email"
                   value={form.sender.replyTo}
                   onChange={(value) => setGroup('sender', { replyTo: value })}
@@ -865,22 +867,22 @@ export default function AdminEventSettings() {
                 </p>
               </div>
             </Panel>
-            <Panel className="admin-settings-card" title="Operator contacts" description="Who runs the event and where attendees can ask for help.">
+            <Panel help="Set who runs the event and where attendees can ask for help." className="admin-settings-card" title="Operator contacts" description="Who runs the event and where attendees can ask for help.">
               <div className="admin-settings-fields">
-                <TextField
+                <TextField help="Name the organization responsible for running the event."
                   label="Operator name"
                   value={form.legal.operatorName}
                   onChange={(value) => setGroup('legal', { operatorName: value })}
                   error={errorFor('legal.operatorName')}
                 />
-                <TextField
+                <TextField help="Attendees use this address for event questions and help."
                   label="Support email"
                   type="email"
                   value={form.legal.supportEmail}
                   onChange={(value) => setGroup('legal', { supportEmail: value })}
                   error={errorFor('legal.supportEmail')}
                 />
-                <TextField
+                <TextField help="Use the address attendees should contact about safety or conduct concerns."
                   label="Conduct email"
                   type="email"
                   value={form.legal.conductEmail}
@@ -897,45 +899,45 @@ export default function AdminEventSettings() {
             <p>Search details, speaker materials, and the event’s social accounts.</p>
           </div>
           <div className="admin-settings-grid admin-settings-grid--essentials">
-            <Panel className="admin-settings-card" title="Search presence" description="The event description and organizer links used by search engines.">
+            <Panel help="Describe the event and its organizer for search results." className="admin-settings-card" title="Search presence" description="The event description and organizer links used by search engines.">
               <div className="admin-settings-fields">
                 <div className="admin-settings-field--wide">
-                  <TextField
+                  <TextField help="Summarize the event in a short sentence for search results."
                     label="Search description"
                     value={form.seo.description}
                     onChange={(value) => setGroup('seo', { description: value })}
                   />
                 </div>
-                <TextField
+                <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                   label="Organizer name"
                   value={form.seo.organizerName}
                   onChange={(value) => setGroup('seo', { organizerName: value })}
                 />
-                <TextField
+                <TextField help="Link to the event organizer’s website."
                   label="Organizer URL"
                   value={form.seo.organizerUrl}
                   onChange={(value) => setGroup('seo', { organizerUrl: value })}
                 />
               </div>
             </Panel>
-            <Panel className="admin-settings-card"
+            <Panel help="Share the slide template speakers should use for this event." className="admin-settings-card"
               title="Speaker resources"
               description="Set the external slide template link shown on the speaker dashboard. Leave both fields empty to omit it."
             >
               <div className="admin-settings-fields">
-                <TextField
+                <TextField help="Name the slide template link speakers see on their dashboard."
                   label="Slide template label"
                   value={form.speakerResources.slideTemplate.label}
                   onChange={(value) => setSlideTemplate({ label: value })}
                   error={errorFor('speakerResources.slideTemplate.label')}
                 />
-                <TextField
+                <TextField help="Use an absolute http:// or https:// link."
                   label="Slide template URL"
                   type="url"
                   value={form.speakerResources.slideTemplate.url}
                   onChange={(value) => setSlideTemplate({ url: value })}
                   error={errorFor('speakerResources.slideTemplate.url')}
-                  hint="Use an absolute http:// or https:// link."
+                  
                 />
               </div>
             </Panel>

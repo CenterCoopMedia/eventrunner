@@ -47,7 +47,7 @@ export default function FunnelPanel({ funnel, revoked = 0 }) {
   const stages = Array.isArray(funnel) ? funnel : [];
   const total = stages[0]?.count ?? 0;
   return (
-    <Panel
+    <Panel help="See how many attendees have signed up, got tickets, and been approved."
       title="Registration funnel"
       description="See how many attendees have signed up, got tickets, and been approved."
     >

@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 import { useRef, useState } from 'react';
 import { formatCalendarDate } from '../../lib/eventDateTime.js';
 import { FieldError, Panel, TextField } from './formControls.jsx';
@@ -120,7 +121,7 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage, us
   };
 
   return (
-    <Panel
+    <Panel help="Listed in date order. Each day needs a date and start and end times. Sessions are placed on a day here."
       className="admin-settings-card"
       title="Days"
       description="Listed in date order. Each day needs a date and start and end times. Sessions are placed on a day here."
@@ -145,10 +146,9 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage, us
             return (
               <li key={day.key} className="admin-settings-row-card" aria-labelledby={headingId}>
                 <div className="admin-settings-row-heading">
-                  <h3 id={headingId} className="min-w-0 break-words text-admin-base font-bold text-admin-ink">
+                  <div className="flex items-center gap-2xs"><h3 id={headingId} className="min-w-0 break-words text-admin-base font-bold text-admin-ink">
                     Day {n}
-                    {day.label.trim() ? <span className="font-normal text-admin-ink-secondary">: {day.label.trim()}</span> : null}
-                  </h3>
+                    {day.label.trim() ? <span className="font-normal text-admin-ink-secondary">: {day.label.trim()}</span> : null}</h3><HelpTooltip label="Day {n} {day.label.trim() ? : {day.label.trim()} : null}">Set this day’s public name, date and opening and closing times.</HelpTooltip></div>
                   <RemoveItemButton
                     ref={(node) => {
                       if (node) removeRefs.current.set(day.key, node);
@@ -160,14 +160,14 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage, us
                   />
                 </div>
                 <div className="admin-settings-fields">
-                  <TextField
+                  <TextField help="Name this day as attendees should see it in the schedule."
                     label={`Day ${n} label`}
                     value={day.label}
                     onChange={(value) => setDay(index, { label: value })}
                     error={errorFor(`days[${index}].label`)}
                     data-row-key={day.key}
                   />
-                  <TextField
+                  <TextField help="Choose this event day’s date on the event’s local calendar."
                     label={`Day ${n} date`}
                     type="date"
                     value={day.date}
@@ -175,14 +175,14 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage, us
                     error={errorFor(`days[${index}].date`) ?? errorFor(`days[${index}]`)}
                   />
                   <div className="admin-settings-field--wide admin-settings-time-fields">
-                    <TextField
+                    <TextField help="Enter the first time on this day’s event schedule."
                       label={`Day ${n} start`}
                       type="time"
                       value={day.startTime}
                       onChange={(value) => setDay(index, { startTime: value })}
                       error={errorFor(`days[${index}].startTime`)}
                     />
-                    <TextField
+                    <TextField help="Enter when this day’s event schedule ends."
                       label={`Day ${n} end`}
                       type="time"
                       value={day.endTime}

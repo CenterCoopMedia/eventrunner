@@ -31,11 +31,9 @@ import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import {
   BLOCK_TYPE_IDS,
-  FACT_HINTS,
-  STAT_CONTRACT_HINTS,
   blockTypeFor,
 } from '../blockTypes.js';
-import { SPONSOR_PACKAGE_HINTS } from '../sponsorPackageHints.js';
+import { contentFieldHelp } from '../contentFieldHelp.js';
 import {
   blankContent,
   contentBlockTitle,
@@ -80,24 +78,6 @@ import AdminPageHeader, {
 // text, which keeps the existing public and lazy-chunk budgets intact.
 const RichTextEditor = lazy(() => import('../components/RichTextEditor.jsx'));
 
-/**
- * What to write in this field, where the system has something to say. The
- * stat contract (design brief §2.1.1) has four parts required on write, so
- * the editor states what each one is for rather than leaving an operator to
- * guess from the field name; a fact (#234) and a quote name their parts
- * `label`, `value` and `text`, which are the registry's words and not the
- * operator's, so those say what the part is too.
- */
-const FIELD_HINTS = Object.freeze({
-  stat: STAT_CONTRACT_HINTS,
-  fact: FACT_HINTS,
-  quote: { text: 'Use the speaker’s exact words, without quotation marks.', attribution: 'Who said it, and in what role.' },
-  sponsor_package: SPONSOR_PACKAGE_HINTS,
-});
-
-function hintFor(blockTypeId, fieldId) {
-  return FIELD_HINTS[blockTypeId]?.[fieldId];
-}
 
 /**
  * What the public site does with a link that leads nowhere a reader can
@@ -158,11 +138,11 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
         const label = field.required ? name : `${name} (optional)`;
         const value = values[field.id];
         const error = errorFor(field.id);
-        const hint = hintFor(blockTypeId, field.id);
+        const hint = contentFieldHelp(blockTypeId, field.id);
         if (field.type === 'boolean') {
           return (
             <div key={field.id} className="flex items-center">
-              <CheckboxField
+              <CheckboxField help={hint}
                 label={label}
                 checked={Boolean(value)}
                 onChange={(checked) => onChange(field.id, checked)}
@@ -180,7 +160,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
                   </p>
                 )}
               >
-                <RichTextEditor
+                <RichTextEditor help={hint}
                   label={label}
                   value={value}
                   onChange={(next) => onChange(field.id, next)}
@@ -193,14 +173,13 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
         }
         if (field.type === 'number') {
           return (
-            <TextField
+            <TextField help={hint}
               key={field.id}
               label={label}
               type="number"
               value={value}
               onChange={(next) => onChange(field.id, next)}
               error={error}
-              hint={hint}
             />
           );
         }
@@ -212,7 +191,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
           if (blockTypeId === 'image' && field.id === 'url') {
             return (
               <div key={field.id} className="sm:col-span-2">
-                <ImagePicker
+                <ImagePicker help={hint}
                   label={label}
                   folder="cms-images"
                   value={value}
@@ -223,7 +202,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
             );
           }
           return (
-            <TextField
+            <TextField help={hint}
               key={field.id}
               label={label}
               type="url"
@@ -235,13 +214,12 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
           );
         }
         return (
-          <TextField
+          <TextField help={hint}
             key={field.id}
             label={label}
             value={value}
             onChange={(next) => onChange(field.id, next)}
             error={error}
-            hint={hint}
           />
         );
       })}
@@ -587,7 +565,7 @@ export default function AdminContentBlockEditor({ mode }) {
   ).map((id) => ({ value: id, label: blockTypeFor(id)?.label ?? 'Content block' }));
 
   const settingsPanel = (
-    <Panel
+    <Panel help="Choose this block’s content type and whether it appears after publishing."
       key="settings"
       title={isExisting ? 'Block settings' : 'Content type'}
       className="admin-content-settings"
@@ -608,7 +586,7 @@ export default function AdminContentBlockEditor({ mode }) {
       ) : null}
       <div id="admin-content-block-settings" hidden={isExisting && !settingsOpen}>
         <div className="mt-sm grid items-end gap-sm sm:grid-cols-2">
-          <SelectField
+          <SelectField help="Choose the kind of content to add, such as text, an image or a link."
             label="Block type"
             value={content.blockType}
             options={options}
@@ -616,7 +594,7 @@ export default function AdminContentBlockEditor({ mode }) {
             error={errorFor('blockType')}
           />
           <div className="flex items-center">
-            <CheckboxField
+            <CheckboxField help="Include this content on the public site after publishing."
               label="Visible"
               checked={content.visible}
               onChange={(checked) => setContent((current) => ({ ...current, visible: checked }))}
@@ -627,7 +605,7 @@ export default function AdminContentBlockEditor({ mode }) {
     </Panel>
   );
   const valuePanel = (
-    <Panel key="value" title="Content" className="admin-content-value">
+    <Panel help="Write the content attendees should see in this block." key="value" title="Content" className="admin-content-value">
       <BlockValueFields
         blockTypeId={content.blockType}
         values={content.values}
@@ -649,7 +627,7 @@ export default function AdminContentBlockEditor({ mode }) {
         save({ publish: false });
       }}
     >
-      <AdminPageHeader
+      <AdminPageHeader help="Edit one block of page content. Save a draft to keep working or publish to update the site."
         title={mode === 'create'
           ? 'New content block'
           : contentBlockTitle({ ...content.values, blockType: content.blockType })}

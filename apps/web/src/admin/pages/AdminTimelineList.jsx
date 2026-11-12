@@ -103,7 +103,7 @@ export default function AdminTimelineList() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Past editions of the event, oldest first."
         title="Timeline"
         identifiers={`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'}`}
         description="Past editions of the event, oldest first."

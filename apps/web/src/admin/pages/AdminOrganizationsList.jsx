@@ -163,7 +163,7 @@ export default function AdminOrganizationsList() {
 
   return (
     <div ref={frameRef} className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Manage sponsors and partners in the order they appear on the site."
         title="Organizations"
         identifiers={`${rows.length} organization${rows.length === 1 ? '' : 's'}`}
         description="Manage sponsors and partners in the order they appear on the site."

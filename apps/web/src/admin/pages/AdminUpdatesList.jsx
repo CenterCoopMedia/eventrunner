@@ -126,7 +126,7 @@ export default function AdminUpdatesList() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="News and announcements for the Updates page."
         title="Updates"
         description="News and announcements for the Updates page."
         identifiers={loading ? null : `${rows.length} update${rows.length === 1 ? '' : 's'}`}

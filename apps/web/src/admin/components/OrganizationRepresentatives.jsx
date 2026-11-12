@@ -96,7 +96,7 @@ function EditReview({ organizationId, request, current, isUnsaved, onApplied, on
 
   return (
     <div role="region" aria-label="Edit waiting for review">
-      <Panel
+      <Panel help="Review the representative’s suggested changes. Applying them updates the draft; publish separately to update the site."
         title="Edit waiting for review"
         description={`From ${sender}${sentAt ? `, ${sentAt}` : ''}. Apply copies it into the draft. It reaches the site when you publish.`}
       >
@@ -239,9 +239,9 @@ function RepresentativeList({ organizationId, grants, request, onResult }) {
       )}
       <form id={formId} className="mt-sm flex flex-wrap items-end gap-xs" onSubmit={add} noValidate>
         <div className="min-w-[16rem] flex-1">
-          <TextField
+          <TextField help="The address they sign in with. They must have signed in to the site once."
             label="Account address"
-            hint="The address they sign in with. They must have signed in to the site once."
+            
             type="email"
             autoComplete="off"
             value={email}
@@ -293,7 +293,7 @@ export default function OrganizationRepresentatives({
         />
       ) : null}
       <div role="region" aria-label="Representatives">
-        <Panel
+        <Panel help="Representatives can suggest changes to the organization’s description and website. You review each change before publishing."
           title="Representatives"
           description="Representatives can suggest changes to the organization’s description and website. You review each change before publishing."
         >

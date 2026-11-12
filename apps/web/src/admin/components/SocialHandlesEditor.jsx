@@ -139,7 +139,7 @@ export default function SocialHandlesEditor({ social, onChange, errorFor }) {
   };
 
   return (
-    <Panel
+    <Panel help="The event’s own accounts. The site footer and the footer of every built-in email list them in this order. Leave the list empty and neither footer shows social links."
       title="Social accounts"
       description="The event’s own accounts. The site footer and the footer of every built-in email list them in this order. Leave the list empty and neither footer shows social links."
       actions={
@@ -150,12 +150,12 @@ export default function SocialHandlesEditor({ social, onChange, errorFor }) {
     >
       <div className="flex flex-col gap-sm">
         <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
+          <TextField help="One word, such as #EventName. The site and its email do not show it."
             label="Social hashtag"
             value={social.hashtag}
             onChange={(value) => onChange({ hashtag: value })}
             error={errorFor('social.hashtag')}
-            hint="One word, such as #EventName. The site and its email do not show it."
+            
           />
         </div>
         {notice ? (
@@ -173,7 +173,7 @@ export default function SocialHandlesEditor({ social, onChange, errorFor }) {
                 className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
               >
                 <div className="grid gap-sm sm:grid-cols-3">
-                  <TextField
+                  <TextField help="The name readers see, such as Mastodon."
                     label={`Account ${index + 1} service`}
                     value={entry.platform}
                     onChange={(value) => changeHandle(index, { platform: value })}
@@ -182,23 +182,23 @@ export default function SocialHandlesEditor({ social, onChange, errorFor }) {
                       ?? errorFor(`social.handles[${index}]`)
                     }
                     maxLength={MAX_SOCIAL_LABEL_LENGTH}
-                    hint="The name readers see, such as Mastodon."
+                    
                   />
-                  <TextField
+                  <TextField help="Optional, such as @eventname. It tells two accounts on one service apart."
                     label={`Account ${index + 1} handle`}
                     value={entry.handle}
                     onChange={(value) => changeHandle(index, { handle: value })}
                     error={errorFor(`social.handles[${index}].handle`)}
                     maxLength={MAX_SOCIAL_LABEL_LENGTH}
-                    hint="Optional, such as @eventname. It tells two accounts on one service apart."
+                    
                   />
-                  <TextField
+                  <TextField help="The full address of the account, starting with https://."
                     label={`Account ${index + 1} link`}
                     type="url"
                     value={entry.url}
                     onChange={(value) => changeHandle(index, { url: value })}
                     error={errorFor(`social.handles[${index}].url`)}
-                    hint="The full address of the account, starting with https://."
+                    
                     className="font-admin-data"
                   />
                 </div>

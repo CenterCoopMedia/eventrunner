@@ -315,7 +315,7 @@ export default function AdminSessionEditor({ mode }) {
       className="flex flex-col gap-md"
       onSubmit={(event) => { event.preventDefault(); save(); }}
     >
-      <AdminPageHeader
+      <AdminPageHeader help="Edit session details for the public schedule."
         title={creating ? 'New session' : form.title || 'Session'}
         recentTitle={row?.current?.title}
         state={(
@@ -376,20 +376,20 @@ export default function AdminSessionEditor({ mode }) {
       ) : null}
 
       <div className="admin-editor-layout admin-editor-layout--session">
-        <Panel
+        <Panel help="The title, description, and recording attendees see."
           title="Public session"
           description="The title, description, and recording attendees see."
           className="admin-editor-card--primary"
         >
           <div className="flex flex-col gap-sm">
-            <TextField
+            <TextField help="Use the session name attendees should see in the schedule."
               label="Public title"
               value={form.title}
               onChange={(value) => set({ title: value })}
               error={errorFor('title')}
               required
             />
-            <TextAreaField
+            <TextAreaField help="Explain what attendees will learn or do in this session."
               label="Public description"
               rows={5}
               value={form.description}
@@ -397,10 +397,10 @@ export default function AdminSessionEditor({ mode }) {
               error={errorFor('description')}
               required
             />
-            <TextField
+            <TextField help="Add the public recording when it is ready to watch."
               label="Recording link"
               type="url"
-              hint="Add the public recording when it is ready to watch."
+              
               value={form.recordingUrl}
               onChange={(value) => set({ recordingUrl: value })}
               error={errorFor('recordingUrl')}
@@ -409,41 +409,41 @@ export default function AdminSessionEditor({ mode }) {
         </Panel>
 
         <div className="admin-editor-stack">
-          <Panel
+          <Panel help="Place this session in the event day and programme."
             title="Time and structure"
             description="Place this session in the event day and programme."
           >
             <div className="admin-editor-fields planner-fields grid gap-sm sm:grid-cols-2">
-              <SelectField
+              <SelectField help="Place this session on one of the days set up in Event settings."
                 label="Event day"
                 value={form.dayId}
                 onChange={(value) => set({ dayId: value, parentId: '' })}
                 options={dayOptions}
                 error={errorFor('dayId')}
               />
-              <SelectField
+              <SelectField help="Choose the session this belongs to."
                 label="Parent session"
-                hint="Choose the session this belongs to."
+                
                 value={form.parentId}
                 onChange={(value) => set({ parentId: value })}
                 options={parentOptions}
                 error={errorFor('parentId')}
               />
-              <TextField
+              <TextField help="Enter when the session begins on the event’s local clock."
                 label="Start time"
                 type="time"
                 value={form.startTime}
                 onChange={(value) => set({ startTime: value })}
                 error={errorFor('startTime')}
               />
-              <TextField
+              <TextField help="Enter when the session ends on the event’s local clock."
                 label="End time"
                 type="time"
                 value={form.endTime}
                 onChange={(value) => set({ endTime: value })}
                 error={errorFor('endTime')}
               />
-              <SelectField
+              <SelectField help="Choose the program topic that best fits this proposal."
                 label="Track"
                 hint="Leave empty to use the parent session’s track."
                 value={form.track}
@@ -454,9 +454,9 @@ export default function AdminSessionEditor({ mode }) {
             </div>
           </Panel>
 
-          <Panel title="Location" description="Choose a room and the location attendees see.">
+          <Panel help="Choose a room and the location attendees see." title="Location" description="Choose a room and the location attendees see.">
             <div className="flex flex-col gap-sm">
-              <SelectField
+              <SelectField help="Choose a place set up in Event settings so attendees can find this session."
                 label="Room"
                 value={form.placeId}
                 onChange={(value) => set({ placeId: value })}
@@ -464,9 +464,9 @@ export default function AdminSessionEditor({ mode }) {
                 error={errorFor('placeId')}
               />
               <div>
-                <TextField
+                <TextField help="For example: Main hall, second floor."
                   label="Location label"
-                  hint="For example: Main hall, second floor."
+                  
                   value={form.location}
                   onChange={(value) => set({ location: value })}
                   error={errorFor('location')}
@@ -475,20 +475,20 @@ export default function AdminSessionEditor({ mode }) {
             </div>
           </Panel>
 
-          <Panel
+          <Panel help="Most sessions need slides or other materials from their speakers."
             title="Speaker materials"
             description="Most sessions need slides or other materials from their speakers."
           >
-            <PlannerSwitch
+            <PlannerSwitch help="Turn off for sessions that do not need slides or other files."
               label="Request speaker materials"
-              hint="Turn off for sessions that do not need slides or other files."
+              
               checked={!form.materialsNotNeeded}
               onChange={(value) => set({ materialsNotNeeded: !value })}
             />
           </Panel>
 
-          <Panel title="Publishing" description="Visibility takes effect when this draft is published.">
-            <PlannerSwitch
+          <Panel help="Visibility takes effect when this draft is published." title="Publishing" description="Visibility takes effect when this draft is published.">
+            <PlannerSwitch help="Include this session on the public schedule after publishing."
               label="Show on the schedule"
               checked={form.visible}
               onChange={(value) => set({ visible: value })}

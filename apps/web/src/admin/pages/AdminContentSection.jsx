@@ -252,7 +252,7 @@ export default function AdminContentSection() {
 
   return (
     <div ref={frameRef} className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Add, edit and reorder the content blocks in this page section."
         title={section?.label || sectionId}
         identifiers={`${page?.current?.label || pageId} · ${section?.label || sectionId} · ${blocks.length} block${
           blocks.length === 1 ? '' : 's'

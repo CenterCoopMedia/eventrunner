@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 // The Sessions panel on the speaker editor: the published sessions that
 // name this speaker, and the confirmation email for each one (owner
 // decision, 2026-11-08).
@@ -110,7 +111,7 @@ function SessionConfirmation({ session, speakerId, record, call, disabled }) {
   const name = `the confirmation for ${session.title}`;
   return (
     <li className="space-y-xs border-t-admin-hairline border-admin-rule-hairline pt-sm first:border-t-0 first:pt-0">
-      <h3 className="font-semibold [overflow-wrap:anywhere]">{session.title}</h3>
+      <div className="flex items-center gap-2xs"><h3 className="font-semibold [overflow-wrap:anywhere]">{session.title}</h3><HelpTooltip label="this section">Review this speaker’s session and the confirmation email before sending it.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink-secondary">{session.when} · {session.room}</p>
       <ConfirmationState record={record} />
       <ServerErrorSummary error={error} errorRef={errorRef} title="The confirmation was not sent" />
@@ -173,7 +174,7 @@ export default function SpeakerSessionConfirmations({ speakerId, call, disabled 
   }, [records, speakerId]);
 
   return (
-    <Panel title="Sessions" description="Published sessions that name this speaker. Send each one a confirmation after you preview it.">
+    <Panel help="Review the sessions linked to this speaker and their confirmations." title="Sessions" description="Published sessions that name this speaker. Send each one a confirmation after you preview it.">
       {sessionsError || recordsError ? <Notice tone="caution" message="Cannot load the sessions or their confirmations. Reconnecting." /> : null}
       {loading ? <p className="text-admin-sm text-admin-ink-secondary">Loading sessions…</p> : null}
       {!loading && sessions.length === 0 ? (

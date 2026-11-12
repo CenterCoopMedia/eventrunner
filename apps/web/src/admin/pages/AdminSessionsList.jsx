@@ -86,7 +86,7 @@ export default function AdminSessionsList() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Review the sessions linked to this speaker and their confirmations."
         title="Sessions"
         identifiers={`${rows.length} session${rows.length === 1 ? '' : 's'}`}
         description="Sessions in schedule order, grouped by day."
@@ -148,7 +148,7 @@ export default function AdminSessionsList() {
               day groups, from the public bookmark counts. */}
           <SessionPopularityPanel groups={groups} />
           {groups.map((group) => (
-            <Panel key={group.dayId} title={group.label} flush>
+            <Panel help="Review the sessions on this event day in schedule order." key={group.dayId} title={group.label} flush>
               <ul>
                 {group.rows.map((row) => {
                   const session = row.current;

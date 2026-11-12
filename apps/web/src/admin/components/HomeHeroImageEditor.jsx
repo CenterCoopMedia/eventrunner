@@ -108,7 +108,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
   }
 
   return (
-    <Panel title={branding ? 'Homepage hero image' : 'Hero image'}>
+    <Panel help="Choose the picture shown at the top of the home page." title={branding ? 'Homepage hero image' : 'Hero image'}>
       <fieldset
         disabled={busy || disabled || unavailable}
         className="flex min-w-0 flex-col gap-sm"
@@ -118,7 +118,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
           if (event.key === 'Enter' && event.target.tagName === 'INPUT') event.preventDefault();
         }}
       >
-        <ImagePicker
+        <ImagePicker help="Choose or upload a picture for the top of the home page."
           label={branding ? 'Homepage hero image' : 'Hero image'}
           folder="cms-images"
           value={values.url}
@@ -126,12 +126,12 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
           hint={branding ? 'The picture at the top of your home page.' : null}
           error={fieldErrors.get('url')}
         />
-        <TextField
+        <TextField help="Describe the picture for people who can’t see it."
           label="Alt text"
           value={values.alt}
           onChange={(value) => change('alt', value)}
           aria-required="true"
-          hint="Describe the picture for people who can’t see it."
+          
           error={fieldErrors.get('alt')}
         />
         <div className="flex flex-wrap gap-xs">

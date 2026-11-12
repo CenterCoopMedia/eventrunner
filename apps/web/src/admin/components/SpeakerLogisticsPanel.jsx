@@ -29,7 +29,7 @@ export default function SpeakerLogisticsPanel({ speakerId, submittedAt, timeZone
     })
     : null;
   return (
-    <Panel title="Logistics" description="The speaker's own answers. Staff only: never published.">
+    <Panel help="The speaker's own answers. Staff only: never published." title="Logistics" description="The speaker's own answers. Staff only: never published.">
       <p className="text-admin-sm text-admin-ink-secondary">
         {submitted ? `Profile submitted ${submitted}.` : 'The speaker has not submitted the profile steps yet.'}
       </p>
