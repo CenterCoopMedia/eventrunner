@@ -127,7 +127,7 @@ export function AdminGate({ children }) {
   // flash "you don't have admin access" at every admin on every load.
   if (loading || (user && adminStatus === 'unknown')) {
     return (
-      <div className="admin-room min-h-screen bg-admin-ground font-admin-ui text-admin-ink">
+      <div className="admin-room min-h-screen min-h-svh bg-admin-ground font-admin-ui text-admin-ink">
         <div className="w-full px-md py-lg">
           <AdminLoadingState label="Checking your access…" />
         </div>
@@ -149,7 +149,7 @@ export function AdminGate({ children }) {
   }
   if (adminStatus !== 'admin') {
     return (
-      <div className="admin-room min-h-screen bg-admin-ground font-admin-ui text-admin-ink">
+      <div className="admin-room min-h-screen min-h-svh bg-admin-ground font-admin-ui text-admin-ink">
         <div className="w-full px-md py-lg">
           <AdminEmptyState
             title="You don’t have admin access"
