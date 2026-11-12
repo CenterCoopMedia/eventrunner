@@ -526,7 +526,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: admin-visual-evidence-${{ matrix.shard }}
-          path: test-results/admin-visual-evidence/*.png
+          path: |
+            test-results/admin-visual-evidence/*.png
+            test-results/admin-visual-evidence/app-boot-*.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload Playwright report

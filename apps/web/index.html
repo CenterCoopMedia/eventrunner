@@ -20,7 +20,43 @@
     <title>Event site</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="app-boot">
+        <style>
+          #app-boot { position: fixed; inset: 0; box-sizing: border-box; padding: 24px; color-scheme: light dark; color: CanvasText; background: Canvas; font: 16px/1.5 system-ui, sans-serif; }
+          #app-boot p { max-width: 36em; margin: 0 0 16px; }
+          #app-boot button { color: inherit; background: transparent; border: 1px solid; padding: 6px 12px; font: inherit; cursor: pointer; }
+        </style>
+        <p role="status" aria-live="polite" aria-atomic="true"></p>
+        <button type="button" hidden>Reload this page</button>
+        <script>
+          (() => {
+            const root = document.getElementById('root');
+            const boot = document.getElementById('app-boot');
+            const status = boot.querySelector('[role="status"]');
+            const reload = boot.querySelector('button');
+            const update = () => {
+              const elapsed = performance.now();
+              status.textContent = elapsed >= 10000
+                ? 'This site is taking longer than usual to open. You can keep waiting or reload this page.'
+                : elapsed >= 1000 ? 'Opening this site…' : '';
+              reload.hidden = elapsed < 10000;
+            };
+            update();
+            const timers = [1000, 10000].filter((at) => at > performance.now())
+              .map((at) => setTimeout(update, Math.max(0, Math.ceil(at - performance.now()))));
+            reload.addEventListener('click', () => location.reload());
+            const observer = new MutationObserver(() => {
+              if (!boot.isConnected) {
+                timers.forEach(clearTimeout);
+                observer.disconnect();
+              }
+            });
+            observer.observe(root, { childList: true });
+          })();
+        </script>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
