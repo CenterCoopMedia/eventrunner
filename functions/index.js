@@ -111,7 +111,7 @@ module.exports = {
   ...announcementSuppression.handlers,
   ...adminFeedback.handlers,
   ...adminChangeRequests.handlers,
-  ...socialFeed.handlers, // createSocialPost, reportSocialPost, removeSocialPost
+  ...socialFeed.handlers, // Posts, moderation and private notification read state.
   ...adminAccess.handlers,
   ...adminEventStats.handlers,
   ...webMcpDiagnostics.handlers,

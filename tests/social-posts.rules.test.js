@@ -116,6 +116,8 @@ beforeEach(async () => {
     });
   }
   batch.set(db.collection('users_public').doc(TOKENS.public.uid), { profileVisibility: 'public', displayName: 'A visitor' });
+  // A live root author is required before a reply can create its private notice.
+  batch.set(db.collection('users').doc(ROOT.authorUid), { registrationStatus: 'approved' });
   batch.set(db.collection('social_posts').doc('root'), ROOT);
   batch.set(db.collection('social_posts').doc('other-root'), ROOT);
   batch.set(db.collection('social_posts').doc('reply'), { ...ROOT, parentPostId: 'root' });
