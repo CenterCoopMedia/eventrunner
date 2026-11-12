@@ -360,7 +360,7 @@ function createMediaUploadHandler({
       });
     } catch (err) {
       log.error('mediaUpload failed', err);
-      return internal(res, 'The file could not be uploaded.');
+      return internal(res, 'The file could not be uploaded. Keep this page open and contact support for help.');
     }
 
     await logAdminAction({
@@ -400,7 +400,7 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
       snap = await ref.get();
     } catch (err) {
       log.error('mediaDelete could not read the asset', err);
-      return internal(res, 'The file could not be deleted.');
+      return internal(res, 'The file could not be deleted. Keep this page open and contact support for help.');
     }
     if (!snap.exists) return notFound(res, 'That asset is not in the media library.');
     const stored = snap.data() || {};
@@ -419,7 +419,7 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
         // first. Only --force gets past it, and only for an operator — a
         // staff member cannot prove the asset is not a theme slot's.
         log.error('mediaDelete usage scan failed', err);
-        if (!force || !operator) return internal(res, 'The file could not be checked for usage.');
+        if (!force || !operator) return internal(res, 'The file could not be checked for usage. Keep this page open and contact support for help.');
       }
     }
     // A theme slot's asset is branding whatever folder it sits in, and
@@ -448,7 +448,7 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
       await ref.delete();
     } catch (err) {
       log.error('mediaDelete failed', err);
-      return internal(res, 'The file could not be deleted.');
+      return internal(res, 'The file could not be deleted. Keep this page open and contact support for help.');
     }
 
     await logAdminAction({
@@ -610,7 +610,7 @@ function createSpeakerPhotoUploadHandler({
       });
     } catch (err) {
       log.error('speakerPhotoUpload failed', err);
-      return internal(res, 'The photo could not be uploaded.');
+      return internal(res, 'The photo could not be uploaded. Keep this page open and contact support for help.');
     }
     res.status(200).json({ path: stored.path });
   };
@@ -749,7 +749,7 @@ function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = co
           log.error('speakerPhotoDelete claim release failed', clearErr);
         }
       }
-      return internal(res, 'The photo could not be deleted.');
+      return internal(res, 'The photo could not be deleted. Keep this page open and contact support for help.');
     }
     res.status(200).json({ path, deleted: true });
   };

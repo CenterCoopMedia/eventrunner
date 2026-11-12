@@ -906,7 +906,7 @@ test('mediaDelete with force while the usage scan fails: 500 and nothing deleted
   const staffDb = libraryWithBrokenScan();
   await createMediaDeleteHandler(staffDeps(staffDb, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), staffRes);
   assert.equal(staffRes.statusCode, 500);
-  assert.equal(staffRes.body.error.message, 'The file could not be checked for usage.');
+  assert.equal(staffRes.body.error.message, 'The file could not be checked for usage. Keep this page open and contact support for help.');
   assert.deepEqual(staffDb.ids('media_assets'), [ASSET_ID]);
 
   const opsRes = fakeRes();

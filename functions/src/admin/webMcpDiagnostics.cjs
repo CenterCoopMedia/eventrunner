@@ -126,7 +126,7 @@ function createDiagnosticHandler({ db, auth, getConfig, log = console }, name, r
         return sendError(res, error.status, error.code, error.message);
       }
       log.error('WebMCP diagnostic failed', error);
-      return internal(res, 'The diagnostic is temporarily unavailable.');
+      return internal(res, 'The diagnostic is temporarily unavailable. Keep this page open and contact support for help.');
     }
   };
 }

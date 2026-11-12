@@ -276,7 +276,7 @@ test('cmsGetVersionHistory shapes an infra query failure as a core/errors 500', 
   })(req({ body: { docPath: 'cmsContent/hero__title' } }), res);
   assert.equal(res.statusCode, 500);
   assert.equal(res.body.error.code, 'internal');
-  assert.equal(res.body.error.message, 'Version history is temporarily unavailable.');
+  assert.equal(res.body.error.message, 'Version history is temporarily unavailable. Keep this page open and contact support for help.');
 });
 
 test('cmsGetVersionHistory answers a staff caller: version history is staff work', async () => {

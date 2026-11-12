@@ -640,7 +640,7 @@ function sendStoreError(res, err, log) {
     return sendError(res, 413, 'too-large', `storagePath: ${err.message}`);
   }
   log.error('materials store operation failed', err);
-  return internal(res, 'The material could not be saved.');
+  return internal(res, 'The material could not be saved. Keep this page open and contact support for help.');
 }
 
 /**

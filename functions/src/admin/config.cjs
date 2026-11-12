@@ -649,7 +649,7 @@ function createConfigWriteHandler({ docId, action }, { db, auth, getConfig, now 
       result = await applyConfigWrite({ db, docId, payload, actor, now });
     } catch (err) {
       log.error(`${action} write failed`, err);
-      return internal(res, 'The configuration could not be saved.');
+      return internal(res, 'The configuration could not be saved. Keep this page open and contact support for help.');
     }
     if (!result.ok) return sendError(res, result.status, result.code, result.message);
 

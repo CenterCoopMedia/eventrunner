@@ -6,6 +6,8 @@
  * Every error body has the same shape: `{ error: { code, message } }`.
  * `message` must be safe for the caller's eyes — no stack traces, no
  * provider payloads, no internal identifiers.
+ * The server owns the complete failure fact and next action. Clients keep
+ * that message intact, including partial-success and delivery instructions.
  */
 
 function sendError(res, status, code, message) {
@@ -33,7 +35,7 @@ function methodNotAllowed(res, allowed) {
   sendError(res, 405, 'method-not-allowed', `Use ${allowed.join(' or ')}.`);
 }
 
-function internal(res, message = 'Internal error.') {
+function internal(res, message = 'The request could not be completed. Keep this page open and contact support for help.') {
   sendError(res, 500, 'internal', message);
 }
 

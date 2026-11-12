@@ -243,7 +243,7 @@ function createListSentEmailsHandler({ db, auth, getConfig, log = console }) {
       snap = await query.select(...LIST_FIELDS).limit(asked).get();
     } catch (err) {
       log.error('listSentEmails query failed', err);
-      return internal(res, 'The email log is temporarily unavailable.');
+      return internal(res, 'The email log is temporarily unavailable. Keep this page open and contact support for help.');
     }
     const all = snap.docs.map(toRow);
 
@@ -286,7 +286,7 @@ function createGetSentEmailHandler({ db, auth, getConfig, now = Date.now, log = 
       snap = await db.collection(COLLECTION).doc(id).get();
     } catch (err) {
       log.error('getSentEmail read failed', err);
-      return internal(res, 'The email log is temporarily unavailable.');
+      return internal(res, 'The email log is temporarily unavailable. Keep this page open and contact support for help.');
     }
     if (!snap.exists) return notFound(res, 'This message is not in the email log.');
 

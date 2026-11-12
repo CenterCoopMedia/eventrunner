@@ -847,7 +847,7 @@ function createGetOwnSpeakerProfileHandler({ db, auth, getConfig, log = console 
       });
     } catch (err) {
       log.error('getOwnSpeakerProfile failed', err);
-      return internal(res, 'Your speaker profile could not be loaded.');
+      return internal(res, 'Your speaker profile could not be loaded. Keep this page open and contact support for help.');
     }
     if (!result.ok) return sendError(res, result.status, result.code, result.message);
     res.status(200).json({ speaker: result.speaker, logistics: result.logistics });
@@ -878,7 +878,7 @@ function createUpdateOwnSpeakerProfileHandler({ db, auth, getConfig, now = Date.
       });
     } catch (err) {
       log.error('updateOwnSpeakerProfile failed', err);
-      return internal(res, 'Your speaker profile could not be saved.');
+      return internal(res, 'Your speaker profile could not be saved. Keep this page open and contact support for help.');
     }
     if (!result.ok) {
       return result.status === 404
@@ -911,7 +911,7 @@ function createApplySpeakerPendingEditsHandler({ db, bucket, auth, getConfig, no
       });
     } catch (err) {
       log.error('applySpeakerPendingEdits failed', err);
-      return internal(res, 'The pending changes could not be applied.');
+      return internal(res, 'The pending changes could not be applied. Keep this page open and contact support for help.');
     }
     if (!result.ok) {
       return result.status === 404
@@ -939,7 +939,7 @@ function createDiscardSpeakerPendingEditsHandler({ db, auth, getConfig, now = Da
       result = await applyDiscardSpeakerPendingEdits({ db, speakerId: req.body?.speakerId });
     } catch (err) {
       log.error('discardSpeakerPendingEdits failed', err);
-      return internal(res, 'The pending changes could not be discarded.');
+      return internal(res, 'The pending changes could not be discarded. Keep this page open and contact support for help.');
     }
     if (!result.ok) {
       return result.status === 404
@@ -970,7 +970,7 @@ function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log =
       });
     } catch (err) {
       log.error('createSpeaker failed', err);
-      return internal(res, 'The speaker could not be saved.');
+      return internal(res, 'The speaker could not be saved. Keep this page open and contact support for help.');
     }
     if (!result.ok) return sendError(res, result.status, result.code, result.message);
     await logAdminAction({ db, action: 'createSpeaker', docPath: result.docPath, actor, now, log });
@@ -998,7 +998,7 @@ function createUpdateSpeakerHandler({ db, bucket = null, auth, getConfig, now = 
       });
     } catch (err) {
       log.error('updateSpeaker failed', err);
-      return internal(res, 'The speaker could not be saved.');
+      return internal(res, 'The speaker could not be saved. Keep this page open and contact support for help.');
     }
     if (!result.ok) {
       return result.status === 404

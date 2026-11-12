@@ -117,7 +117,7 @@ function buildHandlers() {
       } catch (err) {
         if (err instanceof MaterialNotFoundError) return notFound(res, 'Material not found.');
         console.error('setMaterialReviewStatus failed', err);
-        return internal(res, 'The review status could not be saved.');
+        return internal(res, 'The review status could not be saved. Keep this page open and contact support for help.');
       }
     }),
   };

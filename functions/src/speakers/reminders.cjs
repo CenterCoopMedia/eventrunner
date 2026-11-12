@@ -413,7 +413,7 @@ function createSpeakerRemindersHandler({ db, auth, getConfig, sendEmail, now = D
       return badRequest(res, `action: Must be one of ${REQUEST_ACTIONS.join(', ')}.`);
     }
     if (action === 'send' && typeof sendEmail !== 'function') {
-      return internal(res, 'Email is not configured.');
+      return internal(res, 'Email is not configured. Keep this page open and contact support for help.');
     }
     const actor = { uid: verdict.uid, email: verdict.email };
     try {

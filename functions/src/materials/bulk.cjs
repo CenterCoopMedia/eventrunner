@@ -500,7 +500,7 @@ function createListAllSessionMaterialsHandler({ db, auth, getConfig, log = conso
       snap = await db.collection(MATERIALS).limit(MAX_LIST_ROWS + 1).get();
     } catch (err) {
       log.error('listAllSessionMaterials failed', err);
-      return internal(res, 'Materials could not be listed.');
+      return internal(res, 'Materials could not be listed. Keep this page open and contact support for help.');
     }
     const docs = snap.docs.slice(0, MAX_LIST_ROWS);
     res.set('Cache-Control', 'private, max-age=0, no-store');
@@ -551,7 +551,7 @@ function createDownloadSessionMaterialsArchiveHandler({ db, auth, getConfig, buc
       await recordArchive({ db, entries: plan.entries, actor: gate, at: new Date(now()) });
     } catch (err) {
       log.error('downloadSessionMaterialsArchive: the admin_logs rows could not be written; nothing was sent', err);
-      return internal(res, 'The archive could not be recorded, so it was not built.');
+      return internal(res, 'The archive could not be recorded, so it was not built. Keep this page open and contact support for help.');
     }
     if (gone()) {
       log.info?.('downloadSessionMaterialsArchive: the admin left before the archive was built');

@@ -279,7 +279,7 @@ function createGetVersionHistoryHandler({ db, auth, getConfig, log = console }) 
       // Shape infra failures (e.g. FAILED_PRECONDITION on a missing index)
       // as a core/errors body instead of an unshaped 500.
       log.error('cmsGetVersionHistory query failed', err);
-      return internal(res, 'Version history is temporarily unavailable.');
+      return internal(res, 'Version history is temporarily unavailable. Keep this page open and contact support for help.');
     }
 
     const entries = [];
@@ -304,7 +304,7 @@ function createGetVersionHistoryHandler({ db, auth, getConfig, log = console }) 
         // Fail closed for malformed imports instead of sending an oversized body.
         if (envelopeBytes + bytes > MAX_RESPONSE_BYTES) {
           log.error('Version snapshot exceeds response budget', { docPath, revision: entry.revision });
-          return internal(res, 'This version is too large to load.');
+          return internal(res, 'This version is too large to load. Keep this page open and contact support for help.');
         }
       }
       if (envelopeBytes + entryBytes + bytes + entries.length > MAX_RESPONSE_BYTES) break;

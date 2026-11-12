@@ -270,7 +270,7 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, now = Date.now, 
       preview = await buildImportPreview({ db, mapping, rows });
     } catch (err) {
       log.error('ticketingImportCsv preview failed', err);
-      return internal(res, 'The import could not be checked.');
+      return internal(res, 'The import could not be checked. Keep this page open and contact support for help.');
     }
 
     if (dryRun) {
@@ -289,7 +289,7 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, now = Date.now, 
       });
     } catch (err) {
       log.error('ticketingImportCsv commit failed', err);
-      return internal(res, 'The import could not be committed.');
+      return internal(res, 'The import could not be committed. Keep this page open and contact support for help.');
     }
 
     await logAdminAction({
@@ -345,7 +345,7 @@ function createTicketingListTicketsHandler({ db, auth, getConfig, log = console 
         snap = await db.collection(TICKETS).doc(externalId).get();
       } catch (err) {
         log.error('ticketingListTickets lookup failed', err);
-        return internal(res, 'The ticket could not be looked up.');
+        return internal(res, 'The ticket could not be looked up. Keep this page open and contact support for help.');
       }
       res.status(200).json({ tickets: snap.exists ? [{ id: snap.id, ...rowOf(snap.data()) }] : [], nextCursor: null });
       return;
@@ -373,7 +373,7 @@ function createTicketingListTicketsHandler({ db, auth, getConfig, log = console 
       snap = await query.get();
     } catch (err) {
       log.error('ticketingListTickets query failed', err);
-      return internal(res, 'The tickets could not be listed.');
+      return internal(res, 'The tickets could not be listed. Keep this page open and contact support for help.');
     }
 
     const tickets = snap.docs.map((doc) => ({ id: doc.id, ...rowOf(doc.data()) }));

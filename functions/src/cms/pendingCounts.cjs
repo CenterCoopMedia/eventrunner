@@ -127,7 +127,7 @@ function createEnsurePendingCountsHandler({ db, auth, getConfig, now = Date.now,
       await ensurePendingCounts({ db, now, force: force === true });
     } catch (err) {
       log.error('cmsEnsurePendingCounts failed', err);
-      return internal(res, 'The unpublished count could not be prepared.');
+      return internal(res, 'The unpublished count could not be prepared. Keep this page open and contact support for help.');
     }
     res.status(200).json({ ok: true });
   };

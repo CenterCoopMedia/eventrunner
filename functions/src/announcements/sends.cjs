@@ -238,7 +238,7 @@ function createListAnnouncementSendsHandler(deps) {
       });
     } catch (err) {
       log.error('listAnnouncementSends failed', err);
-      return internal(res, 'The send history is temporarily unavailable.');
+      return internal(res, 'The send history is temporarily unavailable. Keep this page open and contact support for help.');
     }
   };
 }
@@ -273,7 +273,7 @@ function createGetAnnouncementSendHandler(deps) {
       if (data) config = await getConfig();
     } catch (err) {
       log.error('getAnnouncementSend read failed', err);
-      return internal(res, 'The send history is temporarily unavailable.');
+      return internal(res, 'The send history is temporarily unavailable. Keep this page open and contact support for help.');
     }
     if (!data) return notFound(res, 'This send is not in the history. The history keeps a send for 90 days.');
 
@@ -361,7 +361,7 @@ function createPreviewAnnouncementEmailHandler(deps) {
       if (err instanceof AudienceError) return badRequest(res, `Invalid announcement: ${err.message}`);
       if (err instanceof RetryError) return sendError(res, 409, err.code, err.message);
       log.error('previewAnnouncementEmail failed', err);
-      return internal(res, 'The preview could not be built.');
+      return internal(res, 'The preview could not be built. Keep this page open and contact support for help.');
     }
   };
 }
@@ -398,7 +398,7 @@ function createSendAnnouncementTestHandler(deps) {
       });
     } catch (err) {
       log.error('sendAnnouncementTest failed', err);
-      return internal(res, 'The test email could not be sent.');
+      return internal(res, 'The test email could not be sent. Keep this page open and contact support for help.');
     }
     await logAdminAction({
       db,
@@ -511,7 +511,7 @@ function createSendAnnouncementEmailHandler(deps) {
       lease = await takeLease({ db, sendId, nowMs: now() });
     } catch (err) {
       log.error('sendAnnouncementEmail start failed', err);
-      return internal(res, 'The send could not start.');
+      return internal(res, 'The send could not start. Keep this page open and contact support for help.');
     }
     if (lease.missing) return sendError(res, 404, 'not-found', 'This send does not exist.');
     if (lease.done || lease.busy) return res.status(200).json({ send: summarize(sendId, lease.data, now()) });

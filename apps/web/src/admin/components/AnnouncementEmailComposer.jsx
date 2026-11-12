@@ -621,7 +621,7 @@ export default function AnnouncementEmailComposer() {
           {channel && !channel.canSend ? <Notice tone="caution" message="Email is not available. Ask an event administrator to check the email settings." /> : null}
           {history ? (
             <form className="mt-sm flex flex-col gap-sm" onSubmit={runPreview} noValidate>
-              <ServerErrorSummary error={error ? { message: communicationsError(error, 'The email could not be prepared or sent. Check the message and preview it again.') } : null} errorRef={errorRef} title="This email was not sent" />
+              <ServerErrorSummary error={error ? { message: communicationsError(error, 'The email could not be prepared or sent. Check the message and preview it again.') } : null} errorRef={errorRef} title="The email action did not finish" />
               {retry ? (
                 <div className="flex flex-col gap-2xs">
                   <Notice

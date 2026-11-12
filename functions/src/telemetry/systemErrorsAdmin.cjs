@@ -130,7 +130,7 @@ function createListSystemErrorsHandler({ db, auth, getConfig, log = console }) {
       snap = await query.limit(pageSize + 1).get();
     } catch (err) {
       log.error('listSystemErrors query failed', err);
-      return internal(res, 'The error log is temporarily unavailable.');
+      return internal(res, 'The error log is temporarily unavailable. Keep this page open and contact support for help.');
     }
 
     const docs = snap.docs.slice(0, pageSize);
@@ -194,7 +194,7 @@ function createResolveSystemErrorsHandler({ db, auth, getConfig, now = Date.now,
         result = await resolveOne({ db, id, expectedLastSeenAt, actor, now });
       } catch (err) {
         log.error('resolveSystemErrors failed', err);
-        return internal(res, 'The error could not be resolved.');
+        return internal(res, 'The error could not be resolved. Keep this page open and contact support for help.');
       }
       if (result.missing) return sendError(res, 404, 'not-found', `system_errors/${id} does not exist.`);
       try {
@@ -229,7 +229,7 @@ function createResolveSystemErrorsHandler({ db, auth, getConfig, now = Date.now,
         snap = await query.limit(KIND_SWEEP_PAGE_SIZE + 1).get();
       } catch (err) {
         log.error('resolveSystemErrors (kind) query failed', err);
-        return internal(res, 'The error could not be resolved.');
+        return internal(res, 'The error could not be resolved. Keep this page open and contact support for help.');
       }
 
       const docs = snap.docs.slice(0, KIND_SWEEP_PAGE_SIZE);

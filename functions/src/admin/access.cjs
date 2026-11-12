@@ -342,7 +342,7 @@ function createListAdminAccessHandler({ db, auth, getConfig, now = Date.now, log
       snap = await db.collection(BOOTSTRAP.collection).doc(BOOTSTRAP.doc).get();
     } catch (err) {
       log.error('listAdminAccess read failed', err);
-      return internal(res, 'The access list is temporarily unavailable.');
+      return internal(res, 'The access list is temporarily unavailable. Keep this page open and contact support for help.');
     }
     res.status(200).json({
       accounts: accountsOf(snap.exists ? snap.data() : null, now()),
@@ -376,7 +376,7 @@ function createSetAdminAccessHandler({ db, auth, getConfig, refreshConfig, sendE
       result = await applyAccessChange({ db, email, tier, expiresAtMs: expiry.expiresAtMs });
     } catch (err) {
       log.error('setAdminAccess write failed', err);
-      return internal(res, 'The access change could not be saved.');
+      return internal(res, 'The access change could not be saved. Keep this page open and contact support for help.');
     }
     if (!result.ok) return sendError(res, result.status, result.code, result.message);
 
@@ -451,7 +451,7 @@ function createResendAdminAccessInstructionsHandler({ db, auth, getConfig, sendE
       const account = await activeAccount({ db, email, now });
       if (!account.tier) return sendError(res, 409, 'inactive-access', 'This account no longer has active access. No instructions were sent.');
     } catch {
-      return internal(res, 'Active access could not be checked. No instructions were sent.');
+      return internal(res, 'Active access could not be checked. No instructions were sent. Keep this page open and contact support for help.');
     }
     try {
       const budget = await takeResendBudget({ db, uid: gate.uid, email, sendId, now });
@@ -460,7 +460,7 @@ function createResendAdminAccessInstructionsHandler({ db, auth, getConfig, sendE
         return sendError(res, 429, 'rate-limited', 'Too many instruction emails. Try again later.');
       }
     } catch {
-      return internal(res, 'Email sending limits could not be checked. No instructions were sent.');
+      return internal(res, 'Email sending limits could not be checked. No instructions were sent. Keep this page open and contact support for help.');
     }
     const addressKey = createHash('sha256').update(email).digest('hex');
     const emailResult = await sendAccessInstructions({

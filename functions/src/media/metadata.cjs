@@ -84,7 +84,7 @@ function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now,
       stored = snap.data() || {};
     } catch (err) {
       log.error('mediaUpdateMetadata could not read the asset', err);
-      return internal(res, 'The asset could not be updated.');
+      return internal(res, 'The asset could not be updated. Keep this page open and contact support for help.');
     }
     if (gate.tier !== 'operator') {
       // A branding asset's words are the operator's too (upload.cjs), and
@@ -103,7 +103,7 @@ function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now,
           references = usage[path] ?? [];
         } catch (err) {
           log.error('mediaUpdateMetadata usage scan failed', err);
-          return internal(res, 'The asset could not be checked for usage.');
+          return internal(res, 'The asset could not be checked for usage. Keep this page open and contact support for help.');
         }
       }
       if (referencedByBranding(references)) return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
@@ -112,7 +112,7 @@ function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now,
       await ref.update({ ...verdict.patch, updatedAt: at, updatedBy: actor.email });
     } catch (err) {
       log.error('mediaUpdateMetadata failed', err);
-      return internal(res, 'The asset could not be updated.');
+      return internal(res, 'The asset could not be updated. Keep this page open and contact support for help.');
     }
 
     await logAdminAction({

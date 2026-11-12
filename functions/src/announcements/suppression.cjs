@@ -329,7 +329,7 @@ function createRemoveEmailSuppressionHandler({ db, auth, getConfig, now = Date.n
       }
     } catch (err) {
       log.error('removeEmailSuppression failed', err);
-      return internal(res, 'The address could not be restored.');
+      return internal(res, 'The address could not be restored. Keep this page open and contact support for help.');
     }
     if (removed) {
       await logAdminAction({

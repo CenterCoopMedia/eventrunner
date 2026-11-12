@@ -639,7 +639,7 @@ describe('AnnouncementEmailComposer saved messages', () => {
 
   it('shows a refusal from the server next to the save', async () => {
     const refused = Object.assign(new Error('Invalid message: name: must contain text'), {
-      code: 'bad-request', fieldErrors: [{ field: 'name', message: 'must contain text' }],
+      status: 400, code: 'bad-request', fieldErrors: [{ field: 'name', message: 'must contain text' }],
     });
     respond({
       listAnnouncementSends: listResponse([]),
@@ -649,6 +649,6 @@ describe('AnnouncementEmailComposer saved messages', () => {
     fillDraft();
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save new message' })); });
     const alert = within(savedPanel()).getByRole('alert');
-    expect(alert).toHaveTextContent('The message could not be saved. Check the message and try again.');
+    expect(alert).toHaveTextContent('Invalid message: name: must contain text');
   });
 });
