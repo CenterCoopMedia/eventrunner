@@ -164,7 +164,7 @@ function PreviewPanel({ preview, onSend }) {
               onChange={setShownId}
               options={preview.recipients.map((row) => ({ value: row.speakerId, label: `${row.name} (${row.to})` }))}
             />
-            <RecipientMessage message={shown} />
+            <RecipientMessage key={shown.speakerId} message={shown} />
             <div>
               <button type="button" className={primaryButtonClass} onClick={onSend}>
                 {sendLabel(count)}
