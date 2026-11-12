@@ -57,6 +57,7 @@ const reminderSchedules = require('./src/reminders/schedules.cjs');
 const reminderScheduleRun = require('./src/reminders/run.cjs');
 const speakersMailTemplates = require('./src/speakers/mailTemplates.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
+const webVitals = require('./src/telemetry/webVitals.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
 const systemErrorsAdmin = require('./src/telemetry/systemErrorsAdmin.cjs');
 const materialsStore = require('./src/materials/store.cjs');
@@ -138,6 +139,7 @@ module.exports = {
   ...reminderScheduleRun.handlers,
   ...speakersMailTemplates.handlers,
   ...clientErrors.handlers,
+  ...webVitals.handlers,
   ...systemErrors.handlers,
   ...systemErrorsAdmin.handlers,
   ...materialsStore.handlers,

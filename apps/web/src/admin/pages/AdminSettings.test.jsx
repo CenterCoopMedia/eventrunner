@@ -1129,7 +1129,8 @@ describe('feature flags', () => {
     for (const heading of ['Public content', 'Attendees and access', 'Session tools', 'Feedback and browser tools']) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
     }
-    expect(screen.getByText('1 of 20 features on. Changes take effect after you save.')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Field performance monitoring' })).not.toBeChecked();
+    expect(screen.getByText('1 of 21 features on. Changes take effect after you save.')).toBeInTheDocument();
 
     const schedule = screen.getByRole('switch', { name: 'Public schedule' });
     fireEvent.click(screen.getByText('Show the public schedule.'));
@@ -1158,6 +1159,7 @@ describe('feature flags', () => {
     expect(payload.schedule).toBe(true);
     // Flags never touched are still present, explicitly false.
     expect(payload.badges).toBe(false);
+    expect(payload.coreWebVitals).toBe(false);
     expect(Object.keys(payload).sort()).toEqual([...KNOWN_FEATURE_KEYS].sort());
     expect(Object.values(payload).every((v) => typeof v === 'boolean')).toBe(true);
   });

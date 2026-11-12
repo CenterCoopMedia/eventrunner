@@ -22,6 +22,7 @@ export const FEATURE_CHOICES = {
   updates: { label: 'Written updates', hint: 'Publish written updates.' },
   autoApproveTicketHolders: { label: 'Automatic ticket approval', hint: 'Approve ticket holders without review. Free Stripe tickets still need your review. Turn this off if you offer free tickets through another provider.' },
   publicAttendeeProfiles: { label: 'Public attendee profiles', hint: 'Make attendee profiles publicly visible.' },
+  coreWebVitals: { label: 'Field performance monitoring', hint: 'Measure Core Web Vitals and long waits from a 10% browser sample using anonymous daily aggregates.' },
   webmcpPublic: { label: 'Public browser tools', hint: 'Expose bounded public read-only site tools in supported browsers.' },
   webmcpAdmin: { label: 'Admin browser tools', hint: 'Expose authenticated read-only admin diagnostics in supported browsers.' },
   changeRequests: { label: 'Change requests', hint: 'Let signed-in visitors and staff send change requests.' },

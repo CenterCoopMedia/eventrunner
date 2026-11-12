@@ -94,6 +94,7 @@ const KNOWN_FEATURE_KEYS = [
   'badges', 'customBadges', 'liveUpdates', 'feedbackInbox',
   'schedulePdf', 'icsExport', 'calendarSync', 'updates',
   'autoApproveTicketHolders', 'publicAttendeeProfiles',
+  'coreWebVitals',
   'webmcpPublic',
   'webmcpAdmin',
   'changeRequests',

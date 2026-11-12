@@ -93,6 +93,37 @@ test('jurisdiction-dependent clauses carry the review marker', () => {
   assert.ok(liability.value.includes(REVIEW_MARKER), liability.value);
 });
 
+test('a fresh privacy template describes optional anonymous field performance monitoring', () => {
+  const legal = build({ ticketing: { provider: 'none' }, email: { provider: 'console' } });
+  const collection = legal.privacy.find((b) => b.section === 'privacy_data' && b.field === 'performance');
+  const retention = legal.privacy.find((b) => b.section === 'privacy_retention' && b.field === 'performance');
+
+  assert.ok(collection && retention);
+  assert.match(collection.value, /When field performance monitoring is on/);
+  assert.match(collection.value, /10% of browser documents/);
+  assert.match(collection.value, /site’s own Event Runner function/);
+  assert.match(collection.value, /metric name and value, a categorical route pattern/);
+  assert.match(collection.value, /anonymous daily aggregate value buckets/);
+  for (const excluded of [
+    'full page URLs',
+    'page-element selectors',
+    'account identifiers',
+    'cookie identifiers',
+    'session identifiers',
+    'IP addresses',
+    'IP address hashes',
+  ]) {
+    assert.match(collection.value, new RegExp(excluded));
+  }
+  assert.match(collection.value, /Standard platform HTTP request logs are separate/);
+  assert.match(collection.value, /use no third-party analytics endpoint/);
+  assert.match(retention.value, /expires 30 days after the start of its UTC day/);
+  assert.match(retention.value, /expire after 29 to 30 days/);
+  assert.match(retention.value, /Cleanup runs every 30 minutes/);
+  assert.ok(collection.value.includes(REVIEW_MARKER));
+  assert.ok(retention.value.includes(REVIEW_MARKER));
+});
+
 test('a missing operator name degrades to a [Replace] marker, never a blank assertion', () => {
   const legal = buildLegalContent({
     event: { legal: {} },

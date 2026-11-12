@@ -27,6 +27,7 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
+import { reportHeldUp } from '../lib/fieldVitals.js';
 
 const Panel = ({ children }) => (
   <div className="mt-lg space-y-md border-hairline border-rule-hairline bg-surface-alt p-lg">
@@ -39,7 +40,10 @@ const Panel = ({ children }) => (
 function PreparingAccount({ retryPath }) {
   const [takingLonger, setTakingLonger] = useState(false);
   useEffect(() => {
-    const timer = setTimeout(() => setTakingLonger(true), 15_000);
+    const timer = setTimeout(() => {
+      setTakingLonger(true);
+      reportHeldUp();
+    }, 15_000);
     return () => clearTimeout(timer);
   }, []);
   return (

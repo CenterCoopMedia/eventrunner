@@ -149,6 +149,14 @@ test('the demo settings panel and style descriptions load only after the disclos
   }
 });
 
+test('the performance observer library and histogram reporting stay outside the first paint', () => {
+  const { files, packages } = eagerSourceGraph(path.join(WEB_SRC, 'main.jsx'));
+  assert.equal(files.has(path.join(WEB_SRC, 'lib', 'fieldVitals.js')), true);
+  assert.equal(files.has(path.join(WEB_SRC, 'lib', 'fieldVitalsReporter.js')), false);
+  assert.equal([...packages].some((name) => name === 'web-vitals' || name.startsWith('web-vitals/')), false);
+  assert.equal(packages.has('shared/webVitals'), false);
+});
+
 // The editor tour is its own chunk, fetched only while it is open, so the
 // admin entry chunk every admin screen waits on carries only its button.
 test('the admin entry graph does not reach the editor tour', () => {

@@ -659,6 +659,48 @@ client already past step 3 never needs it again.
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
   run's log against what the binding names.
 
+### Field performance monitoring
+
+Every site starts with `config/features.coreWebVitals` off. A deploy does not activate it. Before an
+operator turns on **Field performance monitoring**, the client's counsel reviews the conditional
+performance notice and retention text on the Privacy policy page. On an existing site, init
+does not replace a client-edited privacy block. Add or update those clauses in the Content editor,
+complete the legal review, and then enable the feature.
+
+When enabled, the browser waits until after the first paint and samples 10% of documents. It keeps
+the first report for each metric and navigation in a sampled document. Chrome reports supported soft
+navigations. Other browsers use hard-navigation measurements. A total boot failure that never starts
+the application cannot report a held-up state.
+
+The browser reports Core Web Vitals and counts of waits that show the site's taking-longer message to
+its own function. The application payload contains only a categorical route pattern, mobile or
+desktop, a metric name, and a numeric value. The daily aggregate store contains the UTC day, route
+pattern, device class, count maps keyed by metric and value bucket, and expiry time. Neither contains
+a full URL, page-element selector, account identifier, cookie identifier, session identifier, IP
+address, or IP address hash. Standard platform HTTP request logs are separate from the aggregate
+store and are unchanged. The measurements use no third-party analytics endpoint.
+
+The function stores only daily aggregate value buckets. Each bucket expires 30 days after the start
+of its UTC day, so one observation is scheduled to expire after 29 to 30 days. The existing
+maintenance job checks for expired aggregates every 30 minutes. A record can remain until the next
+check. Browser support and the 10% sample can leave a route with few or no observations. The report
+prints the upper edge of the bucket that contains the 75th percentile, so it is an approximation.
+Anonymous input can be falsified by a hostile client. Use these results as field guidance, not as an
+audit record.
+
+Use the reporting script to read aggregates from a project or from a saved JSON fixture. It also
+accepts a fixture on standard input. The script prints LCP, INP, CLS, the four LCP timing parts, and
+held-up counts by route pattern and mobile or desktop class.
+
+```sh
+node scripts/report-web-vitals.cjs --project example-project-id
+node scripts/report-web-vitals.cjs --input saved-web-vitals.json
+node scripts/report-web-vitals.cjs --input - < saved-web-vitals.json
+```
+
+The project form uses Application Default Credentials. Run it only with an identity authorized to
+read that client's aggregate collection.
+
 ### Recover tickets after missed provider webhooks
 
 Staff select **Sync all tickets** in admin **Ticketing**. One `ticketingSync` run lasts at most 540 seconds. It starts no new page after 7 minutes or 50 pages and answers 200 with `truncated: true`, `stoppedReason` (`time-limit`, `page-limit` or `provider-error`) and `nextCursor`. To go on, POST `{ "cursor": "<nextCursor>" }`; the admin page does this with **Continue sync**. The cursor is the provider's page token and is not stored. A cursor the provider refuses answers 400 `bad-cursor`: start again with `{}`. Each ticket write is idempotent, so a repeated page or a new run is safe.
