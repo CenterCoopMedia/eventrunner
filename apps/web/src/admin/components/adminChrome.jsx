@@ -20,6 +20,7 @@ import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
 import LoadingStatus from '../../components/LoadingStatus.jsx';
 import useLoadingStage from '../../lib/useLoadingStage.js';
 import useAdminHeaderPadding from './useAdminHeaderPadding.js';
+import { useCommandRecent } from '../commandMenuRecents.js';
 import './adminLoading.css';
 import './actionFeedback.css';
 
@@ -156,6 +157,7 @@ export default function AdminPageHeader({
   as: Heading = 'h1',
 }) {
   const headerRef = useAdminHeaderPadding();
+  useCommandRecent(Heading === 'h1' ? title : null);
   return (
     <>
       <header ref={headerRef} className="admin-job-line flex flex-col gap-2xs border-admin-rule-header border-b-admin-header bg-admin-ground-raised">

@@ -116,7 +116,7 @@ export default function AdminSessionEditor({ mode }) {
   const { rows, ready, error: listenerError, findRow } = useAdminSessions();
   const [createdId, setCreatedId] = useState(null);
   const creating = mode === 'create' && !createdId;
-  const currentId = createdId ?? sessionId;
+  const currentId = mode === 'edit' ? sessionId : createdId;
   const row = !creating ? findRow(currentId) : null;
   const [form, setForm] = useState(EMPTY);
   const [savedSnapshot, setSavedSnapshot] = useState(() => (
@@ -129,17 +129,20 @@ export default function AdminSessionEditor({ mode }) {
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
-  const adoptedRef = useRef(false);
+  const adoptedRef = useRef(null);
   const unsaved = savedSnapshot !== null && editorSnapshot(form) !== savedSnapshot;
   const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving });
 
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current || !ready || !row) return;
-    adoptedRef.current = true;
+    if (mode !== 'edit' || adoptedRef.current === currentId || !ready || !row) return;
+    adoptedRef.current = currentId;
     const next = toForm(row);
     setForm(next);
     setSavedSnapshot(editorSnapshot(next));
-  }, [mode, ready, row]);
+    setError(null);
+    setErrorTitle(undefined);
+    setStatus('');
+  }, [mode, currentId, ready, row]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -237,7 +240,7 @@ export default function AdminSessionEditor({ mode }) {
         visible: nextForm.visible,
       });
       if (creating) {
-        adoptedRef.current = true;
+        adoptedRef.current = docId;
         setCreatedId(docId);
       }
       setSavedSnapshot(editorSnapshot(nextForm));
@@ -283,7 +286,7 @@ export default function AdminSessionEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && ready && !row) {
+  if (mode === 'edit' && createdId !== currentId && ready && !row) {
     return (
       <AdminEmptyState
         title="No such session"
@@ -293,7 +296,7 @@ export default function AdminSessionEditor({ mode }) {
     );
   }
 
-  if (mode === 'edit' && !adoptedRef.current) {
+  if (mode === 'edit' && adoptedRef.current !== currentId) {
     if (!ready && listenerError) {
       return (
         <Notice

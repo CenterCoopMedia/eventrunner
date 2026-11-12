@@ -19,6 +19,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router';
 
 const configSubscriptions = new Map();
+const commandEditorRecords = new Map();
 vi.mock('../lib/configSource.js', () => ({
   subscribeConfigDoc: (docId, onNext) => {
     configSubscriptions.set(docId, onNext);
@@ -31,8 +32,8 @@ vi.mock('../lib/contentSource.js', () => ({
 }));
 vi.mock('../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 vi.mock('./adminSource.js', () => ({
-  subscribeAdminCollection: (_name, onNext) => {
-    onNext([]);
+  subscribeAdminCollection: (name, onNext) => {
+    onNext(commandEditorRecords.get(name) ?? []);
     return () => {};
   },
 }));
@@ -79,6 +80,7 @@ import {
 // Mocked for every file in src/test/setup.js; steered here for the banner.
 import { subscribePendingCounts } from './pendingCountsSource.js';
 import { markTourDone, readTourDone } from './tourState.js';
+import { readCommandRecents, rememberCommandRecord } from './commandMenuRecents.js';
 
 async function renderAdmin(path = '/admin/pages') {
   const result = render(
@@ -125,7 +127,9 @@ function openEveryGroup() {
 }
 
 beforeEach(() => {
+  signedInUid = 'admin-1';
   configSubscriptions.clear();
+  commandEditorRecords.clear();
   window.localStorage.removeItem(RAIL_COLLAPSED_KEY);
   window.localStorage.removeItem(DOCKET_GROUPS_KEY);
   forgetLayoutMemory();
@@ -134,6 +138,102 @@ beforeEach(() => {
 });
 
 describe('the admin shell', () => {
+  it.each([
+    ['sessions', 'new/session', 'Public title', [['Public description', 'Welcome.'], ['Event day', 'day-1'], ['Start time', '09:00'], ['End time', '10:00']]],
+    ['timeline', 'new/entry', 'Title', [['Year', '2026']]],
+  ])('keeps a newly created %s form before its listener reports the row', async (section, createPath, field, otherFields) => {
+    signedInUid = `command-create-${section}`;
+    commandEditorRecords.set(section === 'sessions' ? 'cmsSchedule' : 'cmsTimeline', [
+      { id: 'other-command-record', title: 'Other command record', year: 2025, dayId: 'day-1', description: 'Other.', startTime: '11:00', endTime: '12:00' },
+    ]);
+    rememberCommandRecord(signedInUid, { to: `/admin/${section}/other-command-record`, label: 'Other command record' });
+    await renderAdmin(`/admin/${section}/${createPath}`);
+    await act(async () => configSubscriptions.get('event')?.({ days: [{ id: 'day-1', label: 'Day one' }] }));
+    fireEvent.change(await screen.findByLabelText(field, { exact: true }), { target: { value: 'Created command record' } });
+    for (const [label, value] of otherFields) fireEvent.change(screen.getByLabelText(label, { exact: true }), { target: { value } });
+    globalThis.fetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('button', { name: 'Save' });
+    await waitFor(() => expect(screen.getByLabelText(field, { exact: true })).toHaveValue('Created command record'));
+    expect(await screen.findAllByText('Draft saved. It is not live until you publish it.')).not.toHaveLength(0);
+    fireEvent.change(screen.getByLabelText(field, { exact: true }), { target: { value: 'Updated command record' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+    expect(String(globalThis.fetch.mock.calls[0][0])).toMatch(/\/cmsCreateContent$/);
+    expect(String(globalThis.fetch.mock.calls[1][0])).toMatch(/\/cmsUpdateContent$/);
+    expect(JSON.parse(globalThis.fetch.mock.calls[1][1].body).docId).toBe(JSON.parse(globalThis.fetch.mock.calls[0][1].body).docId);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Find work' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Other command record Recent record' }));
+    await waitFor(() => expect(screen.getByLabelText(field, { exact: true })).toHaveValue('Other command record'));
+  });
+
+  it('keeps the organization publish error across create-to-edit before the created row arrives', async () => {
+    signedInUid = 'command-create-organization';
+    await renderAdmin('/admin/organizations/new/organization');
+    fireEvent.change(await screen.findByLabelText('Name', { exact: true }), { target: { value: 'Command organization' } });
+    let finishPublish;
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishPublish = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+    expect(screen.getByLabelText('Name', { exact: true })).toHaveValue('Command organization');
+    await act(async () => finishPublish({ ok: false, status: 500, json: async () => ({ error: { message: 'Publishing is unavailable.' } }) }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The draft is saved, and it is not published');
+    expect(screen.getByRole('alert')).toHaveTextContent('Publishing is unavailable.');
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(3));
+    expect(String(globalThis.fetch.mock.calls[2][0])).toMatch(/\/cmsUpdateContent$/);
+    expect(JSON.parse(globalThis.fetch.mock.calls[2][1].body)).toMatchObject({ docId: 'command-organization', fields: { name: 'Command organization' } });
+  });
+
+  it.each([
+    ['sessions', 'cmsSchedule', 'Public title', { dayId: 'day-1', startTime: '09:00', endTime: '10:00', description: '' }, 'title'],
+    ['organizations', 'cmsOrganizations', 'Name', { tier: 'partner', order: 0, visible: true }, 'name'],
+    ['timeline', 'cmsTimeline', 'Title', { year: 2026, description: '', visible: true }, 'title'],
+  ])('loads the destination record when Find work switches between two %s editors', async (section, collection, field, values, labelField) => {
+    signedInUid = `command-editor-${section}`;
+    commandEditorRecords.set(collection, [
+      { id: 'command-first', ...values, [labelField]: 'First command record' },
+      { id: 'command-second', ...values, [labelField]: 'Second command record' },
+    ]);
+    rememberCommandRecord(signedInUid, { to: `/admin/${section}/command-second`, label: 'Second command record' });
+    await renderAdmin(`/admin/${section}/command-first`);
+    expect(await screen.findByLabelText(field, { exact: true })).toHaveValue('First command record');
+    fireEvent.click(screen.getByRole('button', { name: 'Find work' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Second command record Recent record' }));
+    await waitFor(() => expect(screen.getByLabelText(field, { exact: true })).toHaveValue('Second command record'));
+    expect(screen.getByRole('heading', { level: 1, name: 'Second command record' })).toBeInTheDocument();
+    expect(readCommandRecents(signedInUid).find((record) => record.to === `/admin/${section}/command-first`)?.label).toBe('First command record');
+    expect(readCommandRecents(signedInUid)[0]).toEqual({ to: `/admin/${section}/command-second`, label: 'Second command record' });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('opens Find work from the rail and a text-field shortcut, and leaves an existing dialog alone', async () => {
+    await renderAdmin('/admin/pages');
+    const trigger = screen.getByRole('button', { name: 'Find work' });
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: 'Find work' });
+    expect(within(dialog).getByRole('option', { name: /Pages Content/ })).toHaveAttribute('href', '/admin/pages');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    const text = document.createElement('textarea');
+    document.querySelector('#admin-content').append(text);
+    text.focus();
+    const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    fireEvent.keyDown(text, { key: 'k', metaKey: mac, ctrlKey: !mac });
+    expect(screen.getByRole('dialog', { name: 'Find work' })).toHaveAttribute('open');
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Search sections and recent records' }), { key: 'Escape' });
+    expect(text).toHaveFocus();
+    const other = document.createElement('dialog');
+    document.body.append(other);
+    other.showModal();
+    fireEvent.keyDown(other, { key: 'k', metaKey: mac, ctrlKey: !mac });
+    expect(screen.queryByRole('dialog', { name: 'Find work' })).not.toBeInTheDocument();
+    other.close();
+    other.remove();
+  });
+
   it('opens the docket at the same pixel breakpoint that hides Menu', () => {
     expect(ADMIN_DESKTOP_VIEWPORT).toBe('(min-width: 1024px)');
   });

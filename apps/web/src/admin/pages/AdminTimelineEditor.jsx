@@ -88,20 +88,26 @@ export default function AdminTimelineEditor({ mode }) {
   const [feedbackSnapshot, setFeedbackSnapshot] = useState(null);
   const errorRef = useRef(null);
   const formRef = useRef(null);
-  const adoptedRef = useRef(false);
+  const adoptedRef = useRef(null);
 
   const creating = mode === 'create' && !createdId;
   const docId = mode === 'edit' ? entryId : (createdId ?? newId);
   const row = mode === 'edit' || createdId ? findRow(docId) : null;
 
-  // The form is filled once, from the merged row, and only after both the
+  // Each record is adopted from the merged row only after both the
   // live and the draft listener have reported: filled from the live
   // revision alone, a save would replace the unpublished draft.
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current || !ready || !row) return;
-    adoptedRef.current = true;
+    if (mode !== 'edit' || adoptedRef.current === docId || !ready || !row) return;
+    adoptedRef.current = docId;
     setForm(toForm(row));
-  }, [mode, ready, row]);
+    setTouched(new Set());
+    setAttempted(false);
+    setError(null);
+    setErrorTitle(undefined);
+    setStatus('');
+    setFeedbackSnapshot(null);
+  }, [mode, docId, ready, row]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -148,7 +154,7 @@ export default function AdminTimelineEditor({ mode }) {
       if (creating) {
         await call('cmsCreateContent', body);
         // Created: this form never creates again.
-        adoptedRef.current = true;
+        adoptedRef.current = docId;
         setCreatedId(docId);
       } else {
         await call('cmsUpdateContent', body);
@@ -192,7 +198,7 @@ export default function AdminTimelineEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && !createdId && !ready) {
+  if (mode === 'edit' && createdId !== docId && !ready) {
     // A listener failed before both had reported. The form stays closed
     // rather than opening on one revision; the listener retries, and the
     // form opens when both are in.
@@ -206,7 +212,7 @@ export default function AdminTimelineEditor({ mode }) {
     }
     return <AdminLoadingState label="Loading entry…" />;
   }
-  if (mode === 'edit' && !createdId && !row) {
+  if (mode === 'edit' && createdId !== docId && !row) {
     return (
       <AdminEmptyState
         title="No such entry"
@@ -218,6 +224,10 @@ export default function AdminTimelineEditor({ mode }) {
         }
       />
     );
+  }
+
+  if (mode === 'edit' && adoptedRef.current !== docId) {
+    return <AdminLoadingState label="Loading entry…" />;
   }
 
   return (
