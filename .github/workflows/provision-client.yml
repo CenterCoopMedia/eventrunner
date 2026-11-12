@@ -105,6 +105,7 @@ jobs:
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
       - name: Build the site
         env:
+          EVENT_SUPPORT_ADMIN_EMAILS: ${{ vars.EVENT_SUPPORT_ADMIN_EMAILS || 'jamditis@gmail.com,amditisjunk@gmail.com' }}
           APPLICATION_ID: ${{ inputs.application_id }}
           TEST_MODE: ${{ inputs.test_mode }}
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}

@@ -28,6 +28,10 @@ Announcements reach only your event's attendees and speakers. Each one has an un
 
 ## Set up your event
 
+CCM support staff and its support account receive full operator access to your site's content, attendee records and settings to provide support and diagnose problems. They appear as **CCM support** in **Settings → Access**. You can change or remove their access under the same rules as other operators; at least one operator must remain. A build retry adds the configured support accounts again and keeps your existing operators.
+
+CCM also keeps permanent Editor access to your site's Google Cloud/Firebase project to manage hosting, inspect project data and diagnose problems. Removing a support account in **Settings → Access** changes site access only. It does not remove project access; ask CCM to review that access separately.
+
 Your first admin signs in to the admin panel and opens **Set up your event**. The numbered steps include your tasks and tasks you share with the Event Runner team, such as a second admin, your logos, event email, and a review of the privacy policy and terms.
 
 **Hosting status** is a separate, read-only area. It shows the checks the Event Runner team manages as **Ready** or **Awaiting Event Runner setup**. You do not need to turn on Google sign-in yourself.

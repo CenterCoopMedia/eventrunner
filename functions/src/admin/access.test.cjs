@@ -110,6 +110,22 @@ test('accountsOf lists operators first, then staff, each sorted, and never an ad
 
 // ------------------------------------------------------------- listAdminAccess
 
+test('support labels come from bootstrap metadata and do not grant or preserve access by themselves', async () => {
+  const bootstrap = {
+    adminEmails: ['client@example.org', 'support@example.org'],
+    supportAdminEmails: ['Support@Example.org', 'removed@example.org'],
+  };
+  assert.deepEqual(accountsOf(bootstrap), [
+    { email: 'client@example.org', tier: 'operator' },
+    { email: 'support@example.org', tier: 'operator', support: true },
+  ]);
+  const { db } = world(bootstrap);
+  const result = await applyAccessChange({ db, email: 'support@example.org', tier: 'none' });
+  assert.equal(result.changed, true);
+  const after = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(accountsOf(after), [{ email: 'client@example.org', tier: 'operator' }]);
+});
+
 test('listAdminAccess: an operator reads every account with its tier, and their own address', async () => {
   const { deps } = world();
   const res = makeRes();

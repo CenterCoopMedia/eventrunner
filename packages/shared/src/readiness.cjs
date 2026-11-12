@@ -67,13 +67,16 @@ function evaluateReadiness({
   );
 
   // Operators only (issue #186): a staff account cannot restore anyone's
-  // access, so it does not count against the single-point-of-failure row.
-  const admins = Array.isArray(bootstrap?.adminEmails) ? bootstrap.adminEmails : [];
+  // access. CCM support does not replace a second client organizer.
+  const normalize = (list) => (Array.isArray(list) ? list : [])
+    .filter((email) => typeof email === 'string').map((email) => email.trim().toLowerCase()).filter(Boolean);
+  const support = new Set(normalize(bootstrap?.supportAdminEmails));
+  const admins = [...new Set(normalize(bootstrap?.adminEmails))].filter((email) => !support.has(email));
   row(
     'admins',
     'First admin',
     admins.length >= MIN_ADMINS,
-    `${admins.length} operator account${admins.length === 1 ? '' : 's'} configured`,
+    `${admins.length} operator account${admins.length === 1 ? '' : 's'} configured${support.size ? ' (CCM support excluded)' : ''}`,
     `Grant a second operator (admin Settings → Access) so config/bootstrap is not a single point of failure (at least ${MIN_ADMINS}).`,
   );
 
@@ -132,4 +135,3 @@ module.exports = {
   allReady,
   formatReadinessTable,
 };
-

@@ -102,11 +102,14 @@ function createOperatorNotifier({
       }
       const sink = createEmailSink({ sendEmail });
       const { operatorEmail } = config?.providers?.notifier || {};
-      const ownerEmails = config?.bootstrap?.adminEmails || [];
+      const normalize = (list) => (Array.isArray(list) ? list : [])
+        .filter((email) => typeof email === 'string').map((email) => email.trim().toLowerCase()).filter(Boolean);
+      const support = new Set(normalize(config?.bootstrap?.supportAdminEmails));
+      const ownerEmails = normalize(config?.bootstrap?.adminEmails).filter((email) => !support.has(email));
       const recipients = [...new Set([
-        operatorEmail,
-        ...(CLIENT_KINDS.has(event.kind) && Array.isArray(ownerEmails) ? ownerEmails : []),
-      ].filter((email) => typeof email === 'string' && email.trim()).map((email) => email.trim().toLowerCase()))];
+        ...normalize([operatorEmail]),
+        ...(CLIENT_KINDS.has(event.kind) ? ownerEmails : []),
+      ])];
       if (!recipients.length) return await sink.deliver(payload);
       const outcomes = await Promise.all(recipients.map((email) => sink.deliver(payload, { operatorEmail: email })));
       return { delivered: outcomes.every((result) => result.delivered), sink: name,

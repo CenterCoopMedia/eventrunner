@@ -106,7 +106,10 @@ test('dispatches to the email sink with operatorEmail from config/providers', as
 test('client-actionable alerts reach owners and platform; platform faults stay with the operator', async () => {
   const sendEmail = fakeSendEmail();
   const notifier = createOperatorNotifier({ env: EMAIL_ENV, sendEmail,
-    getConfig: fakeGetConfig({ bootstrap: { adminEmails: ['owner@example.com', 'OPS@example.com'] }, providers: { notifier: {
+    getConfig: fakeGetConfig({ bootstrap: {
+      adminEmails: ['owner@example.com', 'OPS@example.com', 'support@example.com', 'agent@example.com'],
+      supportAdminEmails: ['Ops@Example.com', 'Support@Example.com', 'agent@example.com'],
+    }, providers: { notifier: {
       operatorEmail: 'ops@example.com',
     } } }),
   });

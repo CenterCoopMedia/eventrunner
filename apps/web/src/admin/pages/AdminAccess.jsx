@@ -741,6 +741,9 @@ export default function AdminAccess() {
                           {isSelf ? (
                             <span className="ms-xs text-admin-xs text-admin-ink-secondary">(you)</span>
                           ) : null}
+                          {account.support ? (
+                            <span className="ms-xs text-admin-xs text-admin-ink-secondary">CCM support</span>
+                          ) : null}
                         </td>
                         <td className="px-md py-sm align-top">
                           <StatusBadge tone={word.tone}>{word.label}</StatusBadge>

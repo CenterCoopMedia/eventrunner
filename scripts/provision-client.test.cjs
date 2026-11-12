@@ -14,6 +14,7 @@ const { makeFakeDb, makeFakeSecrets } = require('../console/functions/src/fakes.
 const { fakeMailer, quietLog } = require('../console/functions/src/testData.cjs');
 const { application, seeded, NOW } = require('../console/functions/src/fakeReview.cjs');
 const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs');
+const { resolveAdminTier } = require('../functions/src/core/auth.cjs');
 const { SERVICES, STEPS, brandingProblem, main, markStopped, parseArgs, provision } = require('./provision-client.cjs');
 
 const { privateKey } = generateKeyPairSync('rsa', {
@@ -31,6 +32,7 @@ const STRIPE_TOKEN = 'rk_live_fixture';
 const TEST_TOKEN = 'rk_test_fixture';
 const EVENTBRITE_TOKEN = 'eventbrite-fixture';
 const ENV = {
+  EVENT_SUPPORT_ADMIN_EMAILS: 'jamditis@gmail.com,amditisjunk@gmail.com',
   CONSOLE_MAIL_FROM: 'console@example.org',
   CONSOLE_POSTMARK_TOKEN: 'console-mail',
   CONSOLE_PROJECT_ID: 'console-project',
@@ -442,6 +444,13 @@ function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding
       if (args[0] === 'scripts/init-event.cjs') {
         if (initCode !== 0) return { code: initCode, output: '' };
         await clientFirestore.collection('config').doc('event').set({ sender: answersWritten.at(-1).event.sender });
+        const bootstrap = clientFirestore.collection('config').doc('bootstrap');
+        const existing = (await bootstrap.get()).data() || {};
+        const flagged = (flag) => args.flatMap((arg, i) => arg === flag ? [args[i + 1]] : []);
+        await bootstrap.set({ ...existing,
+          adminEmails: [...new Set([...(existing.adminEmails || []), ...flagged('--admin')])],
+          staffEmails: [...new Set([...(existing.staffEmails || []), ...flagged('--staff')])],
+        });
         return { code: 0, output: `init-event\n${branding}\n` };
       }
       // The real script merges field by field; this fake's merge stops at the top level.
@@ -658,6 +667,50 @@ test('the token is tested, moved, and deleted from the console, and the leftover
   assert.ok(holds(secretPolicy, 'roles/secretmanager.secretAccessor', `serviceAccount:${COMPUTE}`));
   assert.ok(fake.calls.some((c) => c.url.endsWith('/v1/account')));
   assert.equal(fake.state.endpoints[0].url, `https://us-central1-${PROJECT}.cloudfunctions.net/ticketingWebhook`);
+});
+
+test('fresh provisioning grants CCM support site operator and project Editor access alongside client Owners', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const bootstrap = fake.clientFirestore.read('config/bootstrap');
+  for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com', 'ana@example.org', 'bo@example.org']) {
+    assert.equal(resolveAdminTier(bootstrap, email), 'operator', email);
+  }
+  assert.deepEqual(bootstrap.supportAdminEmails, ['jamditis@gmail.com', 'amditisjunk@gmail.com']);
+  const project = bindingsOf(fake, `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`);
+  for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com']) {
+    assert.ok(holds(project, 'roles/editor', `user:${email}`), email);
+  }
+  assert.equal(holds(project, 'roles/editor', 'user:ana@example.org'), false);
+});
+
+test('a provisioning retry preserves client operators and configured support access after seed', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const ref = fake.clientFirestore.doc('config/bootstrap');
+  const bootstrap = (await ref.get()).data();
+  await ref.update({
+    adminEmails: [...bootstrap.adminEmails.filter((email) => email !== 'amditisjunk@gmail.com'), 'Added-by-client@Example.org'],
+    supportAdminEmails: ['Jamditis@Gmail.com', 'jamditis@gmail.com'],
+    staffExpiry: { 'temp@example.org': 'preserved' },
+  });
+  const project = bindingsOf(fake, `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`);
+  const editor = project.find((binding) => binding.role === 'roles/editor');
+  editor.members = editor.members.filter((member) => member !== 'user:amditisjunk@gmail.com');
+  editor.members.push('user:existing-operator@example.org');
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const after = (await ref.get()).data();
+  for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com', 'ana@example.org', 'added-by-client@example.org']) {
+    assert.equal(resolveAdminTier(after, email), 'operator', email);
+  }
+  assert.deepEqual(after.supportAdminEmails, ['jamditis@gmail.com', 'amditisjunk@gmail.com']);
+  assert.equal(after.adminEmails.includes('Added-by-client@Example.org'), false);
+  assert.deepEqual(after.staffExpiry, { 'temp@example.org': 'preserved' });
+  const afterPolicy = bindingsOf(fake, `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`);
+  for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com', 'existing-operator@example.org']) {
+    assert.ok(holds(afterPolicy, 'roles/editor', `user:${email}`), email);
+  }
 });
 
 test('a dead token fails clearly, keeps the console copy, and says nothing the provider said', async () => {

@@ -45,6 +45,8 @@ const { siteAddress } = require('../console/functions/src/siteNames.cjs');
 const { internals: { WEBHOOK_EVENTS } } = require('../functions/src/ticketing/providers/stripe.cjs');
 const { internals: { stampVerification } } = require('./verify-sender-domain.cjs');
 const { internals: { stampWebhookRegistration } } = require('./register-ticketing-webhook.cjs');
+const { EMAIL_ADDRESS_RE } = require('shared/email');
+const { SEED_ACTOR } = require('shared/seed');
 
 const CRM = 'https://cloudresourcemanager.googleapis.com/v3';
 const BILLING = 'https://cloudbilling.googleapis.com/v1';
@@ -296,6 +298,16 @@ const computeAccount = (ctx) => `${ctx.projectNumber}-compute@developer.gservice
 const summary = (notes) => (notes.length > 0 ? notes.join('; ') : 'already right');
 const functionUrl = (ctx, name) => `https://${ctx.region}-${ctx.projectId}.cloudfunctions.net/${name}`;
 
+/** One support identity list for project IAM and site operator access. */
+function supportAdminEmails(ctx) {
+  const emails = [...new Set((ctx.deps.env.EVENT_SUPPORT_ADMIN_EMAILS || '')
+    .split(',').map((email) => email.trim().toLowerCase()).filter(Boolean))];
+  if (emails.some((email) => email.length > 254 || !EMAIL_ADDRESS_RE.test(email))) {
+    throw new Error('EVENT_SUPPORT_ADMIN_EMAILS must contain comma-separated email addresses');
+  }
+  return emails;
+}
+
 // Keep resource identities for deletion, including DNS proof after a provider
 // stops returning its pending verification records. Never store credentials.
 async function rememberResources(ctx, patch) {
@@ -490,6 +502,7 @@ async function stepDeployIdentity(ctx) {
   const added = await grant(ctx, 'project roles', projectResource(ctx), [
     ...[...DEPLOY_ROLES, `projects/${projectId}/roles/${INVOKER_ROLE}`].map((name) => ({ role: name, member: deployMember })),
     ...COMPUTE_ROLES.map((role) => ({ role, member: serviceAccount(compute) })),
+    ...supportAdminEmails(ctx).map((email) => ({ role: 'roles/editor', member: `user:${email}` })),
     { role: 'roles/pubsub.publisher', member: storageAgent },
     { role: 'roles/iam.serviceAccountTokenCreator', member: pubsubAgent },
     { role: 'roles/firebaserules.firestoreServiceAgent', member: rulesAgent },
@@ -1110,6 +1123,31 @@ function brandingProblem(output) {
   return `branding uploads failed or their result was missing (${line.trim()})`;
 }
 
+/** Merge the configured support operators without removing client access. */
+async function seedSupportAdmins(ctx, db) {
+  const emails = supportAdminEmails(ctx);
+  if (emails.length === 0) return false;
+  const ref = db.collection('config').doc('bootstrap');
+  const normalize = (list) => [...new Set((Array.isArray(list) ? list : [])
+    .filter((email) => typeof email === 'string')
+    .map((email) => email.trim().toLowerCase()).filter(Boolean))];
+  return db.runTransaction(async (tx) => {
+    const bootstrap = (await tx.get(ref)).data() || {};
+    const adminEmails = [...new Set([...normalize(bootstrap.adminEmails), ...emails])];
+    const supportAdminEmails = [...new Set([...normalize(bootstrap.supportAdminEmails), ...emails])];
+    if (JSON.stringify(bootstrap.adminEmails) === JSON.stringify(adminEmails)
+      && JSON.stringify(bootstrap.supportAdminEmails) === JSON.stringify(supportAdminEmails)) return false;
+    tx.set(ref, {
+      ...bootstrap,
+      adminEmails,
+      supportAdminEmails,
+      updatedAt: new Date(ctx.deps.now()),
+      updatedBy: SEED_ACTOR.email,
+    });
+    return true;
+  });
+}
+
 /**
  * ADR §6.8, the middle: seed the site. It needs config/event, so it records
  * the sender verification and registers the ticket webhook here, after the
@@ -1150,6 +1188,8 @@ async function stepSeed(ctx) {
     if (stamped === false) throw new Error('the sender domain could not be recorded');
     notes.push('seeded the site');
   }
+
+  if (await seedSupportAdmins(ctx, db)) notes.push('added CCM support operators');
 
   const provider = ctx.ticketVars.EVENT_TICKETING_PROVIDER;
   if (PROVIDERS.includes(provider)) {

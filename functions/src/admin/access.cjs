@@ -5,7 +5,7 @@
  * (issue #187). Operator-only POST endpoints, following admin/config.cjs's
  * gate + audit conventions:
  *
- *   listAdminAccess {}  → { accounts: [{ email, tier, expiresAt?, expiryState? }], callerEmail }
+ *   listAdminAccess {}  → { accounts: [{ email, tier, support?, expiresAt?, expiryState? }], callerEmail }
  *   setAdminAccess  { email, tier, expiresAt? }
  *                       → { ok, email, tier, previousTier, changed, expiresAt?, previousExpiresAt? }
  *   resendAdminAccessInstructions { email, sendId } → { ok, email, emailResult }
@@ -186,23 +186,25 @@ function readEmail(value) {
  *
  * @param {object|null|undefined} bootstrap
  * @param {number} [nowMs]
- * @returns {Array<{ email: string, tier: 'operator'|'staff',
+ * @returns {Array<{ email: string, tier: 'operator'|'staff', support?: true,
  *                   expiresAt?: string|null, expiryState?: 'active'|'expired'|'invalid' }>}
  */
 function accountsOf(bootstrap, nowMs = Date.now()) {
   const operators = normalizeList(bootstrap?.adminEmails).sort();
+  const support = new Set(normalizeList(bootstrap?.supportAdminEmails));
   const staff = normalizeList(bootstrap?.staffEmails)
     .filter((email) => !operators.includes(email))
     .sort();
   return [
-    ...operators.map((email) => ({ email, tier: 'operator' })),
+    ...operators.map((email) => ({ email, tier: 'operator', ...(support.has(email) ? { support: true } : {}) })),
     ...staff.map((email) => {
+      const identity = { email, tier: 'staff', ...(support.has(email) ? { support: true } : {}) };
       const expiry = staffExpiryOf(bootstrap, email);
-      if (!expiry.temporary) return { email, tier: 'staff' };
+      if (!expiry.temporary) return identity;
       const expiryState = expiry.expiresAtMs === null
         ? 'invalid'
         : nowMs < expiry.expiresAtMs ? 'active' : 'expired';
-      return { email, tier: 'staff', expiresAt: isoOf(expiry.expiresAtMs), expiryState };
+      return { ...identity, expiresAt: isoOf(expiry.expiresAtMs), expiryState };
     }),
   ];
 }

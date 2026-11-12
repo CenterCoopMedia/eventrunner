@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New Console-built sites include configured CCM support operators alongside the client's
+  operators. Settings → Access labels them **CCM support** and uses the normal change, removal
+  and last-operator rules. Provisioning retries preserve client operators and restore configured
+  support access. The same identities receive permanent Editor access to the client Firebase/GCP
+  project, separate from the site's Access controls. Onboarding and privacy text disclose both
+  access levels (#837).
 - The post composer and thread view of the private feed (#511). An approved attendee or a speaker
   writes a post on the Attendees page and replies on the post's thread page
   (`/attendees/posts/:postId`); a staff grant alone reads, reports and removes but cannot post. A

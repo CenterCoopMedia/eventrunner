@@ -214,6 +214,14 @@ after debugging a cryptic failure.
 
 ### 7. First operator, then a second
 
+Console-built sites also include CCM's configured support accounts as full operators. The builder reads `EVENT_SUPPORT_ADMIN_EMAILS`, merges those addresses into `config/bootstrap.adminEmails`, and identifies them through `config/bootstrap.supportAdminEmails`. The default list is set once in `provision-client.yml`; a repository or Environment variable can override it. A build retry preserves client operators and adds the configured support accounts again. No support sign-in email is sent by provisioning.
+
+Explain that CCM support can access site content, attendee records and settings for diagnosis and support. **Settings → Access** labels these accounts **CCM support**. Clients can change or remove them under the existing last-operator rule. Give another organizer operator access so the client team can manage access independently.
+
+CCM support does not satisfy the second-operator setup check and is excluded from the Owner-alert recipients. The configured platform contact still gets a copy of client alerts.
+
+The same support setting gives each listed identity permanent `roles/editor` access as a Google user on the client's Google Cloud/Firebase project. Provisioning adds these IAM bindings without removing existing bindings and restores a missing support grant on retry. This project access permits changes to resources and access to data, and is separate from site access: removing an account in **Settings → Access** does not remove its project IAM grant. Explain both levels during handoff; CCM reviews project access separately.
+
 The first operator (from `--admin` above, or `config/bootstrap.adminEmails`) signs in and confirms
 the admin panel loads. Point them at **Set up your event** on the rail: it shows every row of
 `--check` (§4) as a step, says which steps are theirs, and links to the screen for each. Then, from **admin Settings → Access**, grant a second operator — do not
