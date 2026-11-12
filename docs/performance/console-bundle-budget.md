@@ -7,17 +7,19 @@ required code to another file does not hide its weight.
 
 ## Measurement
 
-Measured on main `6a16023a` before the route split and the same source with the
-split, using Vite 8.3.4 and the existing checker (gzip level 9). Public client
+Measured before the route split on main `6a16023a`, and after integrating the
+split/focus recovery on main `15dbc6be`, using Vite 8.3.4 and the existing checker
+(gzip level 9). The integrated build also includes main's build-progress changes.
+Public client
 settings used fixed CI dummies; no credentials, backend or browser were needed.
 Vite's printed gzip figure uses different compression settings, so the table
 uses the checker consistently.
 
 | Graph | Before raw bytes | Before gzip bytes | After raw bytes | After gzip bytes |
 | --- | ---: | ---: | ---: | ---: |
-| Initial JavaScript | 414,059 | 122,698 | 312,787 | 98,088 |
-| Initial CSS | 25,217 | 5,492 | 23,634 | 5,282 |
-| Largest deferred JavaScript | — | — | 18,052 | 5,644 |
+| Initial JavaScript | 414,059 | 122,698 | 312,759 | 98,053 |
+| Initial CSS | 25,217 | 5,492 | 23,721 | 5,300 |
+| Largest deferred JavaScript | — | — | 18,053 | 5,648 |
 
 The initial graph shrank 24.5% raw and 20.1% gzip. It contains the entry plus a
 599-byte shared runtime. The largest deferred file is setup; staff review has
@@ -49,7 +51,7 @@ silently returning to first load or a deferred page growing without review.
 Do not raise a limit without recording new measurements and their cause.
 
 The unchanged checker was also run against a throwaway copy of the budget with
-initial gzip set to 98,087. It exited 1 with `98088 > 98087`; the committed budget
+initial gzip set to 98,052. It exited 1 with `98053 > 98052`; the committed budget
 passes the same build. No temporary limit is committed.
 
 ## Loading and recovery
@@ -67,7 +69,8 @@ automatically or discard unsaved input without an action. Existing auth,
 return-path and signup decisions are unchanged.
 
 The hosted `console-routes` browser fixture builds the real route code with a
-synthetic identity and API. Its JSON network attachments show applicant/setup
-requests without staff review chunks, a held setup import with heading focus,
-and a missing Team chunk followed by a successful reload. The normal bundle
+synthetic identity and API. It checks applicant/setup requests without staff
+review chunks, a held setup import with heading focus, navigation away from a
+missing Team chunk and a successful reload, and writes JSON network attachments.
+The normal bundle
 measurements above include the real Auth SDK and do not use that replacement.
