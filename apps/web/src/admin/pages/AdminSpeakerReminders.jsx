@@ -18,13 +18,14 @@
 // that the server checks against the template's tokens. A save or a reset
 // pauses scheduled reminders (AdminReminderSchedules.jsx) until staff
 // approve the new wording there.
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { READINESS_ITEMS, READINESS_ITEM_LABELS } from 'shared/speakerReadiness';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { buildPreviewDoc } from '../emailPreview.js';
 import { saveTextFile } from '../downloadFile.js';
+import { focusFirstError } from '../../lib/focusFirstError.js';
 import {
   REMINDER_GROUPS,
   describeMissing,
@@ -56,6 +57,28 @@ import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from
 import TicketingConfirmation from '../components/TicketingConfirmation.jsx';
 
 const STATUS_WORDS = { accepted: 'Accepted', approved: 'Approved' };
+const REMINDER_WORDING_FIELDS = [
+  { name: 'subject', label: 'Subject', singleLine: true },
+  { name: 'greeting', label: 'Greeting' },
+  { name: 'introduction', label: 'Introduction' },
+  { name: 'biographyItem', label: 'Biography item' },
+  { name: 'headshotItem', label: 'Headshot item' },
+  { name: 'sessionDescriptionItem', label: 'Session-description item' },
+  { name: 'materialsItem', label: 'Materials item' },
+  { name: 'dueDateLine', label: 'Due-date line' },
+  { name: 'buttonLabel', label: 'Button label', singleLine: true },
+  { name: 'backupLinkInstructions', label: 'Backup-link instructions' },
+  { name: 'contactInstructions', label: 'Contact instructions' },
+];
+const REMINDER_WORDING_FIELD_NAMES = new Set(REMINDER_WORDING_FIELDS.map(({ name }) => name));
+
+function wordingFieldErrors(err) {
+  const errors = {};
+  for (const { field, message } of err?.fieldErrors ?? []) {
+    if (REMINDER_WORDING_FIELD_NAMES.has(field)) errors[field] = message;
+  }
+  return errors;
+}
 
 /** The sandboxed frame for a rendered message (admin/emailPreview.js). */
 function PreviewFrame({ srcDoc, to }) {
@@ -191,13 +214,21 @@ function WordingEditor({ call, timeZone }) {
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState(null);
   const [result, setResult] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [focusRequest, setFocusRequest] = useState(0);
+  const formRef = useRef(null);
+
+  useEffect(() => {
+    if (focusRequest > 0) focusFirstError(formRef.current);
+  }, [focusRequest]);
 
   const load = useCallback(async () => {
     setState((current) => ({ ...current, status: 'loading', error: null }));
     try {
       const data = await call('speakerReminders', { action: 'template' });
       setState({ status: 'ready', data, error: null });
-      setDraft(data.saved ?? data.shipped);
+      setDraft(data.editor?.kind === 'plain' ? data.editor.fields : null);
+      setFieldErrors({});
     } catch (err) {
       setState({ status: 'error', data: null, error: err.message });
     }
@@ -207,16 +238,20 @@ function WordingEditor({ call, timeZone }) {
 
   async function save(event) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !draft) return;
     setBusy('save');
     setResult(null);
+    setFieldErrors({});
     try {
-      const data = await call('speakerReminders', { action: 'saveTemplate', ...draft });
+      const data = await call('speakerReminders', { action: 'saveTemplate', fields: draft });
       setState({ status: 'ready', data, error: null });
-      setDraft(data.saved ?? data.shipped);
+      setDraft(data.editor.fields);
       setResult({ tone: 'ok', message: 'Wording saved. The next preview and send use it.' });
     } catch (err) {
       setResult({ tone: 'error', message: err.message });
+      const errors = wordingFieldErrors(err);
+      setFieldErrors(errors);
+      if (Object.keys(errors).length > 0) setFocusRequest((value) => value + 1);
     } finally {
       setBusy(null);
     }
@@ -229,7 +264,8 @@ function WordingEditor({ call, timeZone }) {
     try {
       const data = await call('speakerReminders', { action: 'resetTemplate' });
       setState({ status: 'ready', data, error: null });
-      setDraft(data.shipped);
+      setDraft(data.editor.fields);
+      setFieldErrors({});
       setResult({ tone: 'ok', message: 'The shipped wording applies again.' });
     } catch (err) {
       setResult({ tone: 'error', message: err.message });
@@ -243,8 +279,9 @@ function WordingEditor({ call, timeZone }) {
   else if (state.status === 'error') body = <div className="flex flex-col gap-xs"><Notice tone="error" message={state.error} /><button type="button" className={secondaryButtonClass} onClick={load}>Try again</button></div>;
   else {
     const { data } = state;
+    const supported = data.editor?.kind === 'plain';
     body = (
-      <form className="flex flex-col gap-md" onSubmit={save} onChangeCapture={() => setResult(null)} noValidate>
+      <form ref={formRef} className="flex flex-col gap-md" onSubmit={save} onChangeCapture={() => setResult(null)} noValidate>
         <fieldset disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
         <legend className="sr-only">Reminder wording</legend>
         <p className="text-admin-sm text-admin-ink">
@@ -252,7 +289,8 @@ function WordingEditor({ call, timeZone }) {
             ? `Saved wording, last changed ${formatWhen(data.saved.updatedAt, timeZone)} by ${data.saved.updatedBy ?? 'an admin'}.`
             : 'The shipped wording is in use.'}
         </p>
-        <div className="text-admin-sm text-admin-ink-secondary">
+        {!supported ? <Notice tone="caution" message={data.editor.reason} /> : null}
+        {supported ? <div className="text-admin-sm text-admin-ink-secondary">
           <p>
             Reminder tokens:{' '}
             <span className="font-admin-data text-admin-ink-data">
@@ -260,34 +298,44 @@ function WordingEditor({ call, timeZone }) {
             </span>
           </p>
           <p className="mt-3xs">
-            Both bodies must keep <span className="font-admin-data">{'{{dashboard_url}}'}</span>.
-            Use <span className="font-admin-data">{'{{#if materials_sessions}}…{{/if}}'}</span> to show a line only when the speaker owes that item.
-            Event tokens such as <span className="font-admin-data">{'{{event_name}}'}</span> also work. The server refuses any other token.
+            Event tokens such as <span className="font-admin-data">{'{{event_name}}'}</span> work in these fields.
+            The item conditions, dashboard links, button, layout and branded footer stay fixed.
           </p>
-        </div>
-        <TextField label="Subject" value={draft.subject} onChange={(value) => setDraft({ ...draft, subject: value })} />
-        <TextAreaField
-          label="HTML body"
-          rows={10}
-          className="font-admin-data"
-          value={draft.html}
-          onChange={(value) => setDraft({ ...draft, html: value })}
-        />
-        <TextAreaField
-          label="Plain text body"
-          rows={10}
-          className="font-admin-data"
-          value={draft.text}
-          onChange={(value) => setDraft({ ...draft, text: value })}
-        />
+        </div> : null}
+        {supported ? REMINDER_WORDING_FIELDS.map(({ name, label, singleLine }) => (singleLine ? (
+          <TextField
+            key={name}
+            label={label}
+            value={draft[name]}
+            error={fieldErrors[name]}
+            onChange={(value) => {
+              setDraft({ ...draft, [name]: value });
+              setFieldErrors((current) => ({ ...current, [name]: undefined }));
+            }}
+          />
+        ) : (
+          <TextAreaField
+            key={name}
+            label={label}
+            rows={3}
+            value={draft[name]}
+            error={fieldErrors[name]}
+            onChange={(value) => {
+              setDraft({ ...draft, [name]: value });
+              setFieldErrors((current) => ({ ...current, [name]: undefined }));
+            }}
+          />
+        ))) : null}
         {result ? <Notice tone={result.tone} message={result.message} /> : null}
         <p className="text-admin-sm font-medium text-admin-state-caution">
-          Saving pauses scheduled reminders until you approve them again.
+          Saving or resetting the wording pauses scheduled reminders until you approve them again.
         </p>
         <div className="flex flex-wrap items-center gap-xs">
-          <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
-            {busy === 'save' ? 'Saving…' : 'Save wording'}
-          </button>
+          {supported ? (
+            <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
+              {busy === 'save' ? 'Saving…' : 'Save wording'}
+            </button>
+          ) : null}
           {data.saved ? (
             <DestructiveConfirm
               trigger="Use the shipped wording"

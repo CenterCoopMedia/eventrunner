@@ -19,11 +19,13 @@ export function parseCsv(text) {
   let row = [];
   let field = '';
   let inQuotes = false;
-  const src = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  let closedQuote = false;
+  const src = String(text ?? '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
   const endField = () => {
     row.push(field);
     field = '';
+    closedQuote = false;
   };
   const endRow = () => {
     endField();
@@ -40,6 +42,7 @@ export function parseCsv(text) {
           i += 1;
         } else {
           inQuotes = false;
+          closedQuote = true;
         }
       } else {
         field += c;
@@ -47,18 +50,21 @@ export function parseCsv(text) {
       continue;
     }
     if (c === '"') {
+      if (field || closedQuote) throw new SyntaxError('CSV quotes must enclose the whole field.');
       inQuotes = true;
     } else if (c === ',') {
       endField();
     } else if (c === '\n') {
       endRow();
     } else {
+      if (closedQuote) throw new SyntaxError('CSV quoted fields must end at a comma or line break.');
       field += c;
     }
   }
   // A trailing newline leaves nothing to flush; anything else (including a
   // file with no trailing newline) is one more row/field to close out.
-  if (field.length > 0 || row.length > 0) endRow();
+  if (inQuotes) throw new SyntaxError('CSV has an unclosed quoted field.');
+  if (field.length > 0 || row.length > 0 || closedQuote) endRow();
 
   return rows;
 }

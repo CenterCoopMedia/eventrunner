@@ -17,8 +17,8 @@
  *   export         the readiness list as CSV for the organizer's own mail
  *                  tool (issue #332); written to admin_logs before it leaves.
  *                  One group lists materials waiting for staff review
- *   template       the shipped and the saved reminder wording
- *   saveTemplate   save new wording, checked against the template's tokens
+ *   template       the shipped and saved wording, with its plain fields
+ *   saveTemplate   build and save plain fields in the fixed message shape
  *   resetTemplate  delete the saved wording; the shipped copy applies again
  *
  * Saving or resetting the wording pauses the reminder schedule
@@ -74,6 +74,12 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
+const {
+  WordingError,
+  readWording,
+  saveWording,
+  resetWording,
+} = require('../email/templateWording.cjs');
 const crypto = require('node:crypto');
 const { logAdminAction, isValidDocId } = require('../cms/store.cjs');
 const { speakerDisplayName } = require('shared/speaker');
@@ -105,13 +111,10 @@ const {
   sendOne,
 } = require('./reminderCore.cjs');
 
-const TEMPLATES = 'email_templates';
 const ADMIN_LOGS = 'admin_logs';
 
 /** Most speakers one preview or send may name. */
 const MAX_RECIPIENTS = 200;
-/** Longest saved subject, html or text body, in characters. */
-const MAX_TEMPLATE_FIELD_LENGTH = 100 * 1024;
 const BATCH_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const RECEIPT_RE = /^[0-9a-f]{64}$/;
 
@@ -367,64 +370,26 @@ function pauseScheduleOnWordingChange(deps) {
   return require('../reminders/speakerSchedule.cjs').pauseIfWordingChanged(deps);
 }
 
-function templateFields(source) {
-  return { subject: source.subject, html: source.html, text: source.text };
-}
-
 async function templateAction({ db }) {
-  const { getDefaultTemplate } = require('../email/templates.cjs');
-  const { GLOBAL_TOKEN_NAMES } = require('../email/render.cjs');
-  const template = getDefaultTemplate(TEMPLATE_ID);
-  const snap = await db.collection(TEMPLATES).doc(TEMPLATE_ID).get();
-  const saved = snap.exists ? snap.data() : null;
+  const { tokens, ...template } = await readWording({ db, id: TEMPLATE_ID });
   return {
-    id: TEMPLATE_ID,
-    shipped: templateFields(template),
-    saved: saved
-      ? {
-        subject: typeof saved.subject === 'string' ? saved.subject : template.subject,
-        html: typeof saved.html === 'string' ? saved.html : template.html,
-        text: typeof saved.text === 'string' ? saved.text : template.text,
-        updatedAt: isoOrNull(saved.updatedAt),
-        updatedBy: typeof saved.updatedBy === 'string' ? saved.updatedBy : null,
-      }
-      : null,
-    reminderTokens: template.tokens.filter((name) => !GLOBAL_TOKEN_NAMES.includes(name)),
-    globalTokens: [...GLOBAL_TOKEN_NAMES],
-    requiredTokens: [...template.requiredTokens],
+    ...template,
+    reminderTokens: tokens,
   };
 }
 
 async function saveTemplateAction({ db, now, log, actor, body }) {
-  const { validateOverridePayload } = require('../email/templates.cjs');
-  const payload = {};
-  for (const key of ['subject', 'html', 'text']) {
-    if (body?.[key] !== undefined) payload[key] = body[key];
-  }
-  for (const key of Object.keys(payload)) {
-    if (typeof payload[key] === 'string' && payload[key].length > MAX_TEMPLATE_FIELD_LENGTH) {
-      fail(400, 'bad-request', `${key}: Must be at most ${MAX_TEMPLATE_FIELD_LENGTH / 1024} KB.`);
-    }
-  }
-  const check = validateOverridePayload(TEMPLATE_ID, payload);
-  if (!check.ok) fail(400, 'bad-request', check.errors.join('; '));
-  await requireWritable(db);
-  await db.collection(TEMPLATES).doc(TEMPLATE_ID).set({
-    ...payload,
-    updatedAt: new Date(now()),
-    updatedBy: actor.email,
-  });
-  await logAdminAction({ db, action: 'saveEmailTemplate', docPath: `${TEMPLATES}/${TEMPLATE_ID}`, actor, now, log });
+  const wording = await saveWording({ db, id: TEMPLATE_ID, body, actor, now, log });
   await pauseScheduleOnWordingChange({ db, now, actor, log });
-  return templateAction({ db });
+  const { tokens, ...template } = wording;
+  return { ...template, reminderTokens: tokens };
 }
 
 async function resetTemplateAction({ db, now, log, actor }) {
-  await requireWritable(db);
-  await db.collection(TEMPLATES).doc(TEMPLATE_ID).delete();
-  await logAdminAction({ db, action: 'resetEmailTemplate', docPath: `${TEMPLATES}/${TEMPLATE_ID}`, actor, now, log });
+  const wording = await resetWording({ db, id: TEMPLATE_ID, actor, now, log });
   await pauseScheduleOnWordingChange({ db, now, actor, log });
-  return templateAction({ db });
+  const { tokens, ...template } = wording;
+  return { ...template, reminderTokens: tokens };
 }
 
 const ACTION_HANDLERS = {
@@ -458,7 +423,9 @@ function createSpeakerRemindersHandler({ db, auth, getConfig, sendEmail, now = D
       if (action === 'export') res.set('Cache-Control', 'no-store');
       res.status(200).json(result);
     } catch (err) {
-      if (err instanceof ReminderError) return sendError(res, err.status, err.code, err.message);
+      if (err instanceof ReminderError || err instanceof WordingError) {
+        return sendError(res, err.status, err.code, err.message);
+      }
       log.error(`speakerReminders ${action} failed`, err);
       return internal(res, 'The reminder request could not be completed. Try again.');
     }

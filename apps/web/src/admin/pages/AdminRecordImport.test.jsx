@@ -244,6 +244,27 @@ describe('AdminRecordImport', () => {
     expect(text).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['"unclosed', 'CSV has an unclosed quoted field.'],
+    ['John "JJ" Smith', 'CSV quotes must enclose the whole field.'],
+    ['"closed" tail', 'CSV quoted fields must end at a comma or line break.'],
+  ])('shows the CSV syntax refusal for %s without calling the server', async (name, message) => {
+    renderPage();
+    await chooseFile(`external_id,name,email\nSPK-1,${name},one@example.test`);
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.queryByRole('button', { name: 'Preview import' })).not.toBeInTheDocument();
+    expect(callMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the file-read refusal separate from CSV syntax errors', async () => {
+    renderPage();
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('CSV file'), { target: { files: [{ name: 'unreadable.csv', size: 100, text: async () => { throw new Error('Device read failed'); } }] } });
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('That file could not be read as text.');
+    expect(callMock).not.toHaveBeenCalled();
+  });
+
   it('refuses a file over the row limit before sending it', async () => {
     renderPage();
     const rows = Array.from({ length: 501 }, (_, i) => `S-${i},A,B`).join('\n');

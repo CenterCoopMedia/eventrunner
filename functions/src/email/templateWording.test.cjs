@@ -6,8 +6,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { readDraft, renderWording, WordingError } = require('./templateWording.cjs');
+const { readWording, readDraft, renderWording, WordingError } = require('./templateWording.cjs');
 const { resetTemplateCacheForTest, loadTemplate } = require('./templates.cjs');
+const { defaultSpeakerWordingFields } = require('./templates/speakerWordingFields.cjs');
 const { makeSpeakersDb } = require('../speakers/speakersFake.cjs');
 
 const CONFIG = {
@@ -23,6 +24,48 @@ test('readDraft returns null for a body with no wording only when a draft is opt
   assert.equal(readDraft('speaker.accepted', { action: 'preview' }, { required: false }), null);
   assert.throws(() => readDraft('speaker.accepted', {}), WordingError);
   assert.deepEqual(readDraft('speaker.accepted', { subject: 'Hi {{speaker_name}}', other: 1 }), { subject: 'Hi {{speaker_name}}' });
+});
+
+test('readDraft builds plain fields into the fixed source before validation', () => {
+  const fields = {
+    ...defaultSpeakerWordingFields('speaker.accepted'),
+    buttonLabel: 'Open your profile',
+  };
+  const draft = readDraft('speaker.accepted', { fields });
+  assert.equal(draft.subject, fields.subject);
+  assert.match(draft.html, /href="\{\{profile_wizard_url\}\}"[^>]*>Open your profile<\/a>/);
+  assert.ok(draft.html.includes('Questions? Write to'));
+  assert.ok(draft.text.includes('{{profile_wizard_url}}'));
+});
+
+test('readDraft reports blank, unknown and malformed plain fields by their visible names', () => {
+  const fields = defaultSpeakerWordingFields('speaker.invite');
+  assert.throws(
+    () => readDraft('speaker.invite', { fields: { ...fields, greeting: '  ' } }),
+    (err) => err instanceof WordingError && err.message === 'greeting: Enter wording for this field.',
+  );
+  assert.throws(
+    () => readDraft('speaker.invite', { fields: { ...fields, invitation: 'Welcome, {{unknown}}.' } }),
+    (err) => err instanceof WordingError && err.message === 'invitation: unknown token {{unknown}}',
+  );
+  assert.throws(
+    () => readDraft('speaker.invite', { fields: { ...fields, invitation: 'Welcome, {{event-name}}.' } }),
+    (err) => err instanceof WordingError && err.message === 'invitation: malformed placeholder {{event-name}}',
+  );
+});
+
+test('readWording marks valid custom structure as unsupported without changing it', async () => {
+  const db = makeSpeakersDb({
+    'email_templates/speaker.invite': {
+      subject: 'Custom {{event_name}}',
+      html: '<p><a href="{{invite_url}}">Custom invitation</a></p>',
+      text: 'Custom invitation: {{invite_url}}',
+    },
+  });
+  const wording = await readWording({ db, id: 'speaker.invite' });
+  assert.deepEqual(wording.savedErrors, []);
+  assert.equal(wording.saved.html, '<p><a href="{{invite_url}}">Custom invitation</a></p>');
+  assert.equal(wording.editor.kind, 'unsupported');
 });
 
 test('renderWording reads saved wording fresh, past a cached older copy', async () => {

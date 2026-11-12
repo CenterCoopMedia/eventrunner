@@ -373,16 +373,15 @@ One speaker record is the source of truth. If a name is wrong in three places on
 
 Change the words of two emails: the **Invitation** a speaker gets when you send or resend an invitation, and the **Acceptance confirmation** a speaker gets once, after they accept. Select **Edit email wording** at the top of the Speakers list. Staff and operators can use this page.
 
-Each message has its own panel with **Subject**, **HTML body**, and **Plain text body**. The panel says whether the shipped wording or saved wording is in use, and who saved it and when. It lists the tokens the message may use. Event tokens such as `{{event_name}}` also work. The links stay fixed:
+Each message has its own panel with a **Subject**, **Greeting**, message paragraphs and **Button label**. Edit plain words in these fields. The site makes both the HTML and plain text versions and keeps the links, email layout and branded footer. The panel says whether the shipped wording or saved wording is in use, and who saved it and when. It lists the tokens the message may use. Event tokens such as `{{event_name}}` also work. The invitation keeps its private acceptance link; the acceptance confirmation keeps its speaker-profile link.
 
-- The invitation's HTML body and plain text body must each keep `{{invite_url}}`, the private link that accepts the invitation.
-- The acceptance confirmation's two bodies must each keep `{{profile_wizard_url}}`, the link to the speaker's profile.
-
-**Save wording** checks the words on the server first. The server refuses a token the message does not know, a broken placeholder, an empty field, and a body without its link, and names the field. Nothing is saved, and the cursor moves to that field. The next invitation or acceptance email uses the saved wording; there is no delay.
+**Save wording** checks the words on the server first. The server refuses a token the message does not know, a broken placeholder, an empty field and template conditions entered as words, and names the field. Nothing is saved, and the cursor moves to that field. The next invitation or acceptance email uses the saved wording; there is no delay.
 
 **Preview** shows the exact subject, the HTML version in a safe frame, the plain text version, and the HTML source, with the legal footer the email gets. It uses the words in the form, saved or not, and says which. Sample values fill the tokens: the name "Sample Speaker", your own address as the contact, and a sample link in place of the private one. A change to the words clears the preview. The preview says so if the event has no public site address, because the links then do not work.
 
-**Shipped wording** shows the wording that ships with the product. **Copy the shipped wording into the form** puts it in the form without saving it. **Use the shipped wording** deletes the saved wording, so every later email uses the shipped wording.
+**Use the shipped wording** asks you to confirm deletion of the saved wording. Every later email then uses the shipped wording.
+
+If saved wording has a custom email structure, the panel keeps it intact and shows why the plain fields cannot edit it. **Preview** still shows the message. To edit plain wording, choose **Use the shipped wording** and confirm deletion of the custom wording first. The page never converts custom HTML or removes it without that confirmation.
 
 If saved wording fails its check (for example, someone removed the link outside this page), speakers get the shipped wording and the panel says why. Each save and each reset writes an admin log entry. A historical demo refuses save and reset; the preview still works.
 
@@ -415,7 +414,7 @@ Only published sessions that are not hidden count. Only speakers who accepted an
 
 Every reminder goes through the event's email provider and appears in the Email log with its body. Each send writes one admin log entry with your account, the items, and the speakers who got a reminder. If a send stops part way, the entry is still written, names the speakers emailed so far, and is marked incomplete. A historical demo refuses the send.
 
-**Reminder wording.** The **Reminder wording** panel edits the subject, the HTML body, and the plain text body. Each missing item is one line inside a condition, for example `{{#if materials_sessions}}…{{/if}}`, so a line appears only when the speaker owes that item. `{{description_sessions}}` and `{{materials_sessions}}` hold the session titles. Both bodies must keep `{{dashboard_url}}`, the link to the speaker's dashboard. The server refuses a token the template does not know and says which one. **Use the shipped wording** deletes the saved wording. Each save and each reset writes an admin log entry. Save, then preview, to read the new wording as each speaker gets it.
+**Reminder wording.** The panel has plain fields for the subject, greeting, introduction, each missing-item line, due-date line, button label and link/contact instructions. The site makes both email versions and keeps the item conditions, dashboard links, layout and branded footer. Each missing-item line appears only when the speaker owes that item. The due-date line appears only when a due date is set. `{{description_sessions}}` and `{{materials_sessions}}` hold the session titles. The server refuses unknown tokens and template conditions entered in a field. Saved wording with a custom structure stays intact and cannot be edited in the plain fields. **Use the shipped wording** asks you to confirm deletion of the saved wording before plain editing is available again. Each save and each reset writes an admin log entry. Save, then preview, to read the new wording as each speaker gets it.
 
 Saving or resetting the wording pauses scheduled reminders until you approve them again (see **Scheduled reminders** below). The panel says so above **Save wording**.
 
@@ -557,7 +556,7 @@ The workspace follows the deployment's configured provider ([`CLIENT_ONBOARDING.
 
 - **Stripe**: Native event-site selection, Stripe-hosted payment, and the organizer controls below. Merchant setup and opening live sales require the [Stripe launch and support runbook](operator/stripe-ticketing.md).
 - **Eventbrite**: Provider status shows webhook registration state and recent sync activity.
-- **Manual / CSV import**: Upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it.
+- **Manual / CSV import**: Upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it. A malformed quoted field shows the CSV syntax error; choose a corrected file before previewing.
 - **None**: Nothing to configure.
 
 Ticket records are server-only in Firestore. Every list, search, import, and commerce action goes through an authenticated endpoint; even an admin browser cannot read the commerce collections directly.
@@ -753,6 +752,8 @@ Add speakers, sessions, organizations (sponsors and partners) and registrations 
 5. Select **Import N speakers as drafts** (the words name the type and count). Rows with an error are skipped. The import checks each record again as it saves it, so a field someone edited after your preview keeps their edit, and a record deleted after your preview is not made again. The result lists what happened to each row, and the import writes one row to the audit log.
 
 If the file or the mapping changes after the preview, the import is refused. Preview again.
+
+**CSV quotes.** Enclose a cell with a comma, quote or line break in double quotes. Double each quote inside that cell: `"John ""JJ"" Smith"`. The import refuses an unclosed quote, a quote in an unquoted cell, or text after a closing quote, and shows the CSV syntax error. These rules also apply to ticket and proposal CSV imports. A file-read failure has a separate message.
 
 **The external ID.** Each row needs an ID from the source system that stays the same each time you export the file, for example a registration number. The import uses it to find the record it made the last time:
 

@@ -37,10 +37,27 @@ const MESSAGES = {
   'speaker.invite': {
     title: 'Invitation',
     description: 'The email a speaker gets when staff send or resend an invitation. It carries the private link that accepts it.',
+    fields: [
+      { name: 'subject', label: 'Subject', singleLine: true },
+      { name: 'greeting', label: 'Greeting' },
+      { name: 'invitation', label: 'Invitation' },
+      { name: 'signInInstructions', label: 'Sign-in instructions' },
+      { name: 'buttonLabel', label: 'Button label', singleLine: true },
+      { name: 'backupLinkInstructions', label: 'Backup-link instructions' },
+      { name: 'contactInstructions', label: 'Contact instructions' },
+    ],
   },
   'speaker.accepted': {
     title: 'Acceptance confirmation',
     description: 'The email a speaker gets once, after they accept the invitation. It links to their speaker profile.',
+    fields: [
+      { name: 'subject', label: 'Subject', singleLine: true },
+      { name: 'greeting', label: 'Greeting' },
+      { name: 'confirmation', label: 'Confirmation' },
+      { name: 'profileInstructions', label: 'Profile instructions' },
+      { name: 'buttonLabel', label: 'Button label', singleLine: true },
+      { name: 'reviewNote', label: 'Review note' },
+    ],
   },
 };
 
@@ -50,21 +67,16 @@ const SOURCE_WORDS = {
   shipped: 'The shipped wording',
 };
 
-function wordingOf(source) {
-  return { subject: source.subject, html: source.html, text: source.text };
+function sameFields(a, b, fields) {
+  return fields.every(({ name }) => a?.[name] === b?.[name]);
 }
 
-function sameWording(a, b) {
-  return a.subject === b.subject && a.html === b.html && a.text === b.text;
-}
-
-const FIELDS = ['subject', 'html', 'text'];
-
-/** The server's per-field refusals ("text: unknown token {{x}}"), by field. */
-function fieldErrorMap(err) {
+/** The server's per-field refusals ("greeting: unknown token {{x}}"), by field. */
+function fieldErrorMap(err, fields) {
+  const names = new Set(fields.map(({ name }) => name));
   const map = {};
   for (const { field, message } of err?.fieldErrors ?? []) {
-    if (!FIELDS.includes(field)) continue;
+    if (!names.has(field)) continue;
     map[field] = map[field] ? `${map[field]}; ${message}` : message;
   }
   return map;
@@ -127,8 +139,9 @@ function MessagePreview({ preview, title }) {
 
 function MessageEditor({ entry, call, timeZone, onChange }) {
   const { id } = entry;
-  const { title, description } = MESSAGES[id];
-  const [draft, setDraft] = useState(() => wordingOf(entry.saved ?? entry.shipped));
+  const { title, description, fields } = MESSAGES[id];
+  const supported = entry.editor?.kind === 'plain';
+  const [draft, setDraft] = useState(() => (supported ? entry.editor.fields : null));
   const [busy, setBusy] = useState(null); // 'save' | 'preview' | 'reset'
   const [result, setResult] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -140,7 +153,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
     if (focusRequest > 0) focusFirstError(formRef.current);
   }, [focusRequest]);
 
-  const changed = !sameWording(draft, entry.saved ? wordingOf(entry.saved) : entry.shipped);
+  const changed = supported && !sameFields(draft, entry.editor.fields, fields);
 
   function edit(field, value) {
     setDraft((previous) => ({ ...previous, [field]: value }));
@@ -158,7 +171,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
       await onDone(await call(ENDPOINT, { templateId: id, ...body }));
     } catch (err) {
       setResult({ tone: 'error', message: err.message });
-      const map = fieldErrorMap(err);
+      const map = fieldErrorMap(err, fields);
       setFieldErrors(map);
       if (Object.keys(map).length > 0) setFocusRequest((n) => n + 1);
     } finally {
@@ -168,9 +181,10 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
 
   function save(event) {
     event.preventDefault();
-    run('save', { action: 'saveTemplate', ...draft }, (data) => {
+    if (!supported) return;
+    run('save', { action: 'saveTemplate', fields: draft }, (data) => {
       onChange(data.template);
-      setDraft(wordingOf(data.template.saved ?? data.template.shipped));
+      setDraft(data.template.editor.fields);
       setPreview(null);
       setResult({ tone: 'ok', message: `${title} wording saved. The next email uses it.` });
     });
@@ -179,7 +193,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
   function runPreview() {
     // Unchanged words preview what the next email sends: the saved wording,
     // or the shipped wording, as the server reads it now.
-    run('preview', changed ? { action: 'preview', ...draft } : { action: 'preview' }, (data) => {
+    run('preview', changed ? { action: 'preview', fields: draft } : { action: 'preview' }, (data) => {
       setPreview(data.preview);
       setResult({ tone: 'ok', message: `Preview ready. It shows ${SOURCE_WORDS[data.preview.source].toLowerCase()}.` });
     });
@@ -188,7 +202,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
   function reset() {
     run('reset', { action: 'resetTemplate' }, (data) => {
       onChange(data.template);
-      setDraft(wordingOf(data.template.shipped));
+      setDraft(data.template.editor.fields);
       setPreview(null);
       setResult({ tone: 'ok', message: `${title} uses the shipped wording again.` });
     });
@@ -201,6 +215,8 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
   return (
     <Panel title={title} description={description}>
       <form ref={formRef} className="flex flex-col gap-md" onSubmit={save} noValidate aria-label={`${title} wording`}>
+        <fieldset disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
+        <legend className="sr-only">{title} wording</legend>
         <p className="text-admin-sm text-admin-ink">
           {savedLine}
           {changed ? ' The form has changes that are not saved.' : ''}
@@ -208,65 +224,44 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
         {entry.savedErrors.length > 0 ? (
           <Notice
             tone="caution"
-            message={`The saved wording fails its check, so speakers get the shipped wording: ${entry.savedErrors.join('; ')}. Fix the wording below, or use the shipped wording.`}
+            message={`The saved wording fails its check, so speakers get the shipped wording: ${entry.savedErrors.join('; ')}. ${supported ? 'Fix the fields below or use the shipped wording.' : 'Use the shipped wording to return to plain editing.'}`}
           />
         ) : null}
-        <div className="text-admin-sm text-admin-ink-secondary">
+        {!supported ? <Notice tone="caution" message={entry.editor.reason} /> : null}
+        {supported ? <div className="text-admin-sm text-admin-ink-secondary">
           <p>
             Message tokens: <span className="font-admin-data text-admin-ink-data">{tokenList(entry.tokens)}</span>
           </p>
           <p className="mt-3xs">
-            The HTML body and the plain text body must each keep{' '}
-            <span className="font-admin-data">{tokenList(entry.requiredTokens)}</span>.
-            Event tokens such as <span className="font-admin-data">{'{{event_name}}'}</span> also work.
-            The server refuses any other token.
+            Event tokens such as <span className="font-admin-data">{'{{event_name}}'}</span> work in these fields.
+            Links, layout, buttons and the branded footer stay fixed.
           </p>
-        </div>
-        <TextField label="Subject" value={draft.subject} error={fieldErrors.subject} onChange={(value) => edit('subject', value)} />
-        <TextAreaField
-          label="HTML body"
-          rows={10}
-          className="font-admin-data"
-          value={draft.html}
-          error={fieldErrors.html}
-          onChange={(value) => edit('html', value)}
-        />
-        <TextAreaField
-          label="Plain text body"
-          rows={10}
-          className="font-admin-data"
-          value={draft.text}
-          error={fieldErrors.text}
-          onChange={(value) => edit('text', value)}
-        />
-        <details className="text-admin-sm">
-          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Shipped wording</summary>
-          <div className="mt-2xs flex flex-col gap-xs">
-            <p className="text-admin-ink-secondary">The wording that ships with the product. Copy it into the form to start again from it.</p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-sm gap-y-3xs">
-              <dt className="font-semibold text-admin-ink">Subject</dt>
-              <dd className="wrap-anywhere font-admin-data text-admin-ink-data">{entry.shipped.subject}</dd>
-            </dl>
-            <div>
-              <button
-                type="button"
-                className={secondaryButtonClass}
-                onClick={() => {
-                  setDraft(wordingOf(entry.shipped));
-                  setPreview(null);
-                  setResult({ tone: 'ok', message: 'The form holds the shipped wording. Save to use it, or keep editing.' });
-                }}
-              >
-                Copy the shipped wording into the form
-              </button>
-            </div>
-          </div>
-        </details>
+        </div> : null}
+        {supported ? fields.map(({ name, label, singleLine }) => (singleLine ? (
+          <TextField
+            key={name}
+            label={label}
+            value={draft[name]}
+            error={fieldErrors[name]}
+            onChange={(value) => edit(name, value)}
+          />
+        ) : (
+          <TextAreaField
+            key={name}
+            label={label}
+            rows={3}
+            value={draft[name]}
+            error={fieldErrors[name]}
+            onChange={(value) => edit(name, value)}
+          />
+        ))) : null}
         {result ? <Notice tone={result.tone} message={result.message} /> : null}
         <div className="flex flex-wrap items-center gap-xs">
-          <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
-            {busy === 'save' ? 'Saving…' : 'Save wording'}
-          </button>
+          {supported ? (
+            <button type="submit" className={primaryButtonClass} aria-busy={busy === 'save'}>
+              {busy === 'save' ? 'Saving…' : 'Save wording'}
+            </button>
+          ) : null}
           <button type="button" className={secondaryButtonClass} onClick={runPreview} aria-busy={busy === 'preview'}>
             {busy === 'preview' ? 'Preparing the preview…' : 'Preview'}
           </button>
@@ -283,6 +278,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
             />
           ) : null}
         </div>
+        </fieldset>
       </form>
       {preview ? <MessagePreview preview={preview} title={title} /> : null}
     </Panel>

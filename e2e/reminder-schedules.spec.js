@@ -86,7 +86,7 @@ test.describe.serial('Scheduled reminders', () => {
     // New wording on the speaker reminders page pauses the schedule.
     await page.getByRole('link', { name: 'Speaker reminders' }).click();
     await expect(page).toHaveURL(/\/admin\/speakers\/reminders\/send$/);
-    await expect(page.getByText('Saving pauses scheduled reminders until you approve them again.')).toBeVisible();
+    await expect(page.getByText('Saving or resetting the wording pauses scheduled reminders until you approve them again.')).toBeVisible();
     await page.getByLabel('Subject').fill(`Still needed for {{event_name}} ${stamp}`);
     await page.getByRole('button', { name: 'Save wording' }).click();
     await expect(page.getByText('Wording saved. The next preview and send use it.')).toBeVisible();

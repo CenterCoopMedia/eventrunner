@@ -294,6 +294,32 @@ describe('AdminTicketing', () => {
     expect(screen.getByRole('button', { name: 'Import 1 tickets' })).toBeInTheDocument();
   });
 
+  it.each([
+    ['"unclosed', 'CSV has an unclosed quoted field.'],
+    ['John "JJ" Smith', 'CSV quotes must enclose the whole field.'],
+    ['"closed" tail', 'CSV quoted fields must end at a comma or line break.'],
+  ])('shows the CSV syntax refusal for %s and clears the previous file', async (name, message) => {
+    render(<AdminTicketing />);
+    await screen.findByText('Manual list');
+    const input = document.getElementById('ticketing-csv-file');
+    await act(async () => { fireEvent.change(input, { target: { files: [csvFile('Email,Order ID,Name\none@example.test,ord-1,Ada')] } }); });
+    expect(await screen.findByRole('button', { name: 'Preview import' })).toBeEnabled();
+    await act(async () => { fireEvent.change(input, { target: { files: [csvFile(`Email,Order ID,Name\none@example.test,ord-2,${name}`)] } }); });
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.queryByRole('button', { name: 'Preview import' })).not.toBeInTheDocument();
+    expect(callMock).not.toHaveBeenCalledWith('ticketingImportCsv', expect.anything());
+  });
+
+  it('keeps a file-read failure separate from CSV syntax errors', async () => {
+    render(<AdminTicketing />);
+    await screen.findByText('Manual list');
+    await act(async () => {
+      fireEvent.change(document.getElementById('ticketing-csv-file'), { target: { files: [{ name: 'unreadable.csv', text: async () => { throw new Error('Device read failed'); } }] } });
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('That file could not be read as text.');
+    expect(callMock).not.toHaveBeenCalledWith('ticketingImportCsv', expect.anything());
+  });
+
   it('commits after a preview, using dryRun: false, and reports the summary', async () => {
     render(<AdminTicketing />);
     await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());

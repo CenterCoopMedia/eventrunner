@@ -13,10 +13,9 @@
  *                  tokens each may use, and why saved wording fails its
  *                  check, if it does
  *   preview        the exact subject, html and text one message would have,
- *                  footer included, with sample values; the wording in the
- *                  request when it carries any (checked as a save is), else
- *                  the saved wording read fresh, else the shipped copy
- *   saveTemplate   save new wording, checked by validateOverridePayload
+ *                  footer included, with sample values; plain fields in the
+ *                  request are built and checked on the server
+ *   saveTemplate   build and save plain fields in the fixed message shape
  *   resetTemplate  delete the saved wording; the shipped copy applies again
  *
  * Every action but templates takes a `templateId`. The send paths in

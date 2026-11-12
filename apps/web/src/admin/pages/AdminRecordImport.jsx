@@ -212,9 +212,9 @@ export default function AdminRecordImport() {
       }
       setParsed({ headers, rows, fileName: file.name });
       setMapping(guessMapping(headers, type));
-    } catch {
+    } catch (err) {
       if (revision !== inputRevision.current) return;
-      setNotice({ tone: 'error', message: 'That file could not be read as text.' });
+      setNotice({ tone: 'error', message: err instanceof SyntaxError ? err.message : 'That file could not be read as text.' });
     }
   }
 
