@@ -878,8 +878,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Attendee email addresses, speaker invitation details and version record names stay readable
   in full, including unpublished or removed records without an editor link (#855).
 - Clients see confirmed build progress with a step count and native progress bar, a clear
-  explanation when a build starts again, and slow-step wording. Finished or failed builds
-  stop refreshing; operator-only build details stay private (#617).
+  explanation when a build starts again, and slow-step wording. Finished builds stop refreshing;
+  failed builds refresh every 30 seconds to notice recovery. Operator-only details stay private (#617).
 - Ticket order actions name their record, and ticket settings and promo-code saves have distinct
   screen-reader names. Console review hides the active form's opener and names result refreshes
   separately from the page refresh; Cancel returns focus to the opener (#737).
