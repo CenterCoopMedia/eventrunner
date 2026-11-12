@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 // Announcement email (issues #202, #203, #490, #496, #497): write, preview,
 // test, confirm, send, saved messages, and the send history, on the
 // Announcements page.
@@ -142,7 +143,7 @@ function PreviewFrame({ html, text }) {
         <p className="text-admin-sm text-admin-ink">The formatted preview is unavailable. The text preview is shown below.</p>
       )}
       <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview</summary>
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview <HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></summary>
         <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {text}
         </pre>
@@ -198,7 +199,7 @@ function SendDetail({ send, state, regionId }) {
               {failures.cut
                 ? `Failed addresses (first ${failures.shown} of ${failures.all.toLocaleString('en-US')})`
                 : `Failed addresses (${failures.shown})`}
-            </summary>
+             <HelpTooltip label="this section">Review addresses where delivery failed. The email log has the full delivery history.</HelpTooltip></summary>
             {failures.cut ? (
               <p className="mt-2xs text-admin-ink-secondary">
                 {`This list keeps the first ${failures.shown} failures. The email log has every recipient message of this send.`}
@@ -618,7 +619,7 @@ export default function AnnouncementEmailComposer() {
   return (
     <div className="admin-email-workspace flex flex-col gap-md">
       <div className="admin-email-workspace__compose">
-        <Panel
+        <Panel help="Write your message, then review it before sending."
           title="Write your email"
           className="admin-email-workspace__writer"
           description="Write your message, then review it before sending."
@@ -642,7 +643,7 @@ export default function AnnouncementEmailComposer() {
                   </div>
                 </div>
               ) : null}
-              <SelectField
+              <SelectField help="Choose the attendee group that should receive this email."
                 label="Audience"
                 value={selectedAudience}
                 options={audienceOptions}
@@ -650,7 +651,7 @@ export default function AnnouncementEmailComposer() {
                 onChange={(value) => edit('audience', value)}
               />
               <div ref={subjectRef}>
-                <TextField
+                <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                   label="Subject"
                   value={draft.subject}
                   maxLength={150}
@@ -658,7 +659,7 @@ export default function AnnouncementEmailComposer() {
                   onChange={(value) => edit('subject', value)}
                 />
               </div>
-              <TextAreaField
+              <TextAreaField help="Write the announcement recipients will receive. Review the preview before sending."
                 label="Email message"
                 value={draft.message}
                 rows={8}
@@ -667,14 +668,14 @@ export default function AnnouncementEmailComposer() {
                 onChange={(value) => edit('message', value)}
               />
               <div className="admin-email-workspace__link-fields">
-                <TextField
+                <TextField help="Add the full web address for the email’s main button. Leave empty for no button."
                   label="Button link (optional)"
                   type="url"
                   value={draft.linkUrl}
                   placeholder="https://example.org/schedule"
                   onChange={(value) => edit('linkUrl', value)}
                 />
-                <TextField
+                <TextField help="Use a short action phrase that explains where the email button leads."
                   label="Button label (optional)"
                   value={draft.linkLabel}
                   maxLength={80}
@@ -690,12 +691,11 @@ export default function AnnouncementEmailComposer() {
           ) : null}
         </Panel>
 
-        <Panel title="Review before sending" className="admin-email-workspace__review">
+        <Panel help="Check the audience and message preview before sending this email." title="Review before sending" className="admin-email-workspace__review">
           {preview ? (
             <section aria-labelledby="announcement-email-preview" className="flex flex-col gap-sm">
-              <h3 id="announcement-email-preview" ref={previewHeadingRef} tabIndex={-1} className="font-admin-ui text-admin-lg font-bold text-admin-ink focus:outline-none">
-                Preview
-              </h3>
+              <div className="flex items-center gap-2xs"><h3 id="announcement-email-preview" ref={previewHeadingRef} tabIndex={-1} className="font-admin-ui text-admin-lg font-bold text-admin-ink focus:outline-none">
+                Preview</h3><HelpTooltip label="Preview">Review what the recipient or attendee will see before continuing.</HelpTooltip></div>
               <dl className="admin-email-workspace__envelope grid grid-cols-[max-content_1fr] gap-x-sm gap-y-3xs text-admin-sm">
                 <dt className="font-semibold text-admin-ink">To</dt>
                 <dd className="text-admin-ink">{`${recipients(count)}: ${preview.audienceLabel}`}</dd>
@@ -749,9 +749,8 @@ export default function AnnouncementEmailComposer() {
                   aria-labelledby="announcement-email-confirm"
                   className="flex flex-col gap-xs rounded-admin-panel border-admin-strong border-admin-rule-strong px-md py-sm"
                 >
-                  <h3 id="announcement-email-confirm" ref={confirmHeadingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
-                    {`Send this email to ${recipients(count)}?`}
-                  </h3>
+                  <div className="flex items-center gap-2xs"><h3 id="announcement-email-confirm" ref={confirmHeadingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
+                    {`Send this email to ${recipients(count)}?`}</h3><HelpTooltip label="this section">Confirm the recipient count and preview before sending. Sending delivers real email.</HelpTooltip></div>
                   <p className="text-admin-sm text-admin-ink">
                     Each recipient gets one copy. A sent email cannot be recalled.
                   </p>
@@ -787,7 +786,7 @@ export default function AnnouncementEmailComposer() {
                 <path d="M40 4H12a8 8 0 0 0-8 8v56a8 8 0 0 0 8 8h40a8 8 0 0 0 8-8V24L40 4Z" />
                 <path d="M40 4v20h20M16 38h32M16 50h32M16 62h24" />
               </svg>
-              <h3 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Review your email</h3>
+              <div className="flex items-center gap-2xs"><h3 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Review your email</h3><HelpTooltip label="Review your email">Check the message and recipients before returning to send it.</HelpTooltip></div>
               <p className="text-admin-sm text-admin-ink-secondary">Write a message, then preview it before sending.</p>
               <button type="button" className={secondaryButtonClass} onClick={() => subjectRef.current?.querySelector('input')?.focus()}>Write email</button>
             </div>
@@ -824,7 +823,7 @@ export default function AnnouncementEmailComposer() {
         />
       ) : null}
 
-      <Panel
+      <Panel help="Announcement emails from the past 90 days, newest first."
         title="Email send history"
         description="Announcement emails from the past 90 days, newest first."
       >
@@ -856,7 +855,7 @@ export default function AnnouncementEmailComposer() {
           </div>
         ) : null}
         <form className="mt-md flex flex-col gap-xs border-t-admin-hairline border-admin-rule-hairline pt-sm" onSubmit={restore}>
-          <TextField
+          <TextField help="Restore announcements only when the person asks to receive them again. The email provider may also need to restore delivery."
             label="Restore an unsubscribed address"
             hint={providerManaged
               ? 'Restore only when the person asks to receive announcements again. Ask the event administrator to restore delivery with the email provider too.'

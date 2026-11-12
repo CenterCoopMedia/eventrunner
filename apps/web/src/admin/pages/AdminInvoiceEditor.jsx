@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerError } from '../plannerErrors.js';
 // Invoice editor (issue #208): write and save one invoice draft.
 //
@@ -556,7 +557,7 @@ export default function AdminInvoiceEditor({ mode }) {
         save();
       }}
     >
-      <AdminPageHeader
+      <AdminPageHeader help="Prepare an invoice for a sponsor or partner."
         title={title}
         state={
           <>
@@ -651,11 +652,11 @@ export default function AdminInvoiceEditor({ mode }) {
         />
       ) : null}
 
-      {!locked ? <fieldset disabled={busy !== null} className="flex min-w-0 flex-col gap-md">
-        <legend className="sr-only">Invoice details</legend>
-        <Panel title="Bill to" description="Who pays this invoice. Choose an organization to fill the name and its sponsor package.">
+      {!locked ? <fieldset aria-label={["Invoice details "].join('').trim()} disabled={busy !== null} className="flex min-w-0 flex-col gap-md">
+        <legend className="sr-only">Invoice details <HelpTooltip label="Invoice details">Choose the recipient and contact details printed on this invoice.</HelpTooltip></legend>
+        <Panel help="Who pays this invoice. Choose an organization to fill the name and its sponsor package." title="Bill to" description="Who pays this invoice. Choose an organization to fill the name and its sponsor package.">
           <div className="flex flex-col gap-sm">
-            <SelectField
+            <SelectField data-help-skip="The label directly names the requested detail; no further explanation needed."
               label="Organization"
               hint={organizations.loading ? 'Loading organizations…' : 'Optional. The name and the first line can still be edited.'}
               value={form.organizationId}
@@ -672,7 +673,7 @@ export default function AdminInvoiceEditor({ mode }) {
             <div aria-live="polite">
               {prefillStatus ? <p className="text-admin-sm text-admin-ink-secondary">{prefillStatus}</p> : null}
             </div>
-            <TextField
+            <TextField help="Use the person or organization that should appear as the invoice recipient."
               label="Name to bill"
               value={form.billTo.name}
               onChange={(value) => setBillTo({ name: value })}
@@ -680,17 +681,17 @@ export default function AdminInvoiceEditor({ mode }) {
               maxLength={INVOICE_LIMITS.name}
               required
             />
-            <TextField
+            <TextField help="Optional."
               label="Contact name"
-              hint="Optional."
+              
               value={form.billTo.contactName}
               onChange={(value) => setBillTo({ contactName: value })}
               error={errorFor('billTo.contactName')}
               maxLength={INVOICE_LIMITS.contactName}
             />
-            <TextField
+            <TextField help="Optional. The invoice is sent to this address."
               label="Billing email"
-              hint="Optional. The invoice is sent to this address."
+              
               type="email"
               inputMode="email"
               autoComplete="off"
@@ -700,18 +701,18 @@ export default function AdminInvoiceEditor({ mode }) {
               maxLength={INVOICE_LIMITS.email}
               className="sm:max-w-[28rem]"
             />
-            <TextAreaField
+            <TextAreaField help="Optional. One part of the address on each line."
               label="Billing address"
-              hint="Optional. One part of the address on each line."
+              
               rows={4}
               value={form.billTo.address}
               onChange={(value) => setBillTo({ address: value })}
               error={errorFor('billTo.address')}
               maxLength={INVOICE_LIMITS.address}
             />
-            <TextField
+            <TextField help="Optional. A purchase order number or the payer's own reference."
               label="Reference"
-              hint="Optional. A purchase order number or the payer's own reference."
+              
               value={form.reference}
               onChange={(value) => set({ reference: value })}
               error={errorFor('reference')}
@@ -721,16 +722,16 @@ export default function AdminInvoiceEditor({ mode }) {
           </div>
         </Panel>
 
-        <Panel
+        <Panel help="List the items or services being billed, with quantities and unit prices."
           title="Lines"
           description={`Up to ${INVOICE_LIMITS.lines} lines. Type prices in ${currency?.toUpperCase()}, such as 1250.00. A blank line is left out when you save.`}
         >
           <div className="flex flex-col gap-sm">
             <FieldErrorLine message={errorFor('lines')} />
             {form.lines.map((line, index) => (
-              <fieldset key={line.key} className="flex min-w-0 flex-col gap-xs border-admin-rule-hairline border-b-admin-hairline pb-sm">
-                <legend className="text-admin-base font-bold text-admin-ink">{lineName(index)}</legend>
-                <TextField
+              <fieldset aria-label={[(lineName(index)), " "].join('').trim()} key={line.key} className="flex min-w-0 flex-col gap-xs border-admin-rule-hairline border-b-admin-hairline pb-sm">
+                <legend className="text-admin-base font-bold text-admin-ink">{lineName(index)} <HelpTooltip label="this section">Describe this billed item and set its quantity and price.</HelpTooltip></legend>
+                <TextField help="Describe the item or service as it should appear on the invoice."
                   label="Description"
                   value={line.description}
                   onChange={(value) => setLine(index, { description: value })}
@@ -740,7 +741,7 @@ export default function AdminInvoiceEditor({ mode }) {
                   aria-label={`${lineName(index)} description`}
                 />
                 <div className="flex flex-wrap items-start gap-sm">
-                  <TextField
+                  <TextField help="Enter how many units of this item you are billing for."
                     label="Quantity"
                     inputMode="numeric"
                     value={line.quantity}
@@ -749,7 +750,7 @@ export default function AdminInvoiceEditor({ mode }) {
                     aria-label={`${lineName(index)} quantity`}
                     className="w-28"
                   />
-                  <TextField
+                  <TextField help="Enter the price for one unit in the invoice’s currency."
                     label="Unit price"
                     inputMode="decimal"
                     value={line.unitPrice}
@@ -782,17 +783,17 @@ export default function AdminInvoiceEditor({ mode }) {
           </div>
         </Panel>
 
-        <Panel
+        <Panel help="Add any discounts or tax that change the invoice total."
           title="Discounts and tax"
           description={`Type each amount by hand. A discount subtracts and a tax adds. Up to ${INVOICE_LIMITS.adjustments} rows.`}
         >
           <div className="flex flex-col gap-sm">
             <FieldErrorLine message={errorFor('adjustments')} />
             {form.adjustments.map((row, index) => (
-              <fieldset key={row.key} className="flex min-w-0 flex-col gap-xs border-admin-rule-hairline border-b-admin-hairline pb-sm">
-                <legend className="text-admin-base font-bold text-admin-ink">{adjustmentName(row, index)}</legend>
+              <fieldset aria-label={[(adjustmentName(row, index)), " "].join('').trim()} key={row.key} className="flex min-w-0 flex-col gap-xs border-admin-rule-hairline border-b-admin-hairline pb-sm">
+                <legend className="text-admin-base font-bold text-admin-ink">{adjustmentName(row, index)} <HelpTooltip label="this section">Name this discount or tax and set the amount it changes the total by.</HelpTooltip></legend>
                 <div className="flex flex-wrap items-start gap-sm">
-                  <SelectField
+                  <SelectField help="Choose whether this adjustment adds to or subtracts from the invoice total."
                     label="Kind"
                     value={row.kind}
                     onChange={(value) => setAdjustment(index, { kind: value })}
@@ -803,7 +804,7 @@ export default function AdminInvoiceEditor({ mode }) {
                     data-row-focus={`adjustments.${index}`}
                     aria-label={`${adjustmentName(row, index)} kind`}
                   />
-                  <TextField
+                  <TextField help="Name this adjustment as it should appear on the invoice."
                     label="Label"
                     value={row.label}
                     onChange={(value) => setAdjustment(index, { label: value })}
@@ -811,7 +812,7 @@ export default function AdminInvoiceEditor({ mode }) {
                     maxLength={INVOICE_LIMITS.label}
                     aria-label={`${adjustmentName(row, index)} label`}
                   />
-                  <TextField
+                  <TextField help="Enter the value for this adjustment using its selected kind."
                     label="Amount"
                     inputMode="decimal"
                     value={row.amount}
@@ -846,7 +847,7 @@ export default function AdminInvoiceEditor({ mode }) {
           </div>
         </Panel>
 
-        <Panel title="Totals" description="Review the total before issuing the invoice.">
+        <Panel help="Review the total before issuing the invoice." title="Totals" description="Review the total before issuing the invoice.">
           {preview ? (
             <div className="flex flex-col gap-xs">
               <dl className="grid max-w-[28rem] grid-cols-[1fr_auto] gap-x-md gap-y-3xs text-admin-base">
@@ -884,20 +885,20 @@ export default function AdminInvoiceEditor({ mode }) {
           ) : null}
         </Panel>
 
-        <Panel title="Due date and notes">
+        <Panel help="Set the payment deadline and any notes printed on the invoice." title="Due date and notes">
           <div className="flex flex-col gap-sm">
-            <TextField
+            <TextField help="Optional. When payment is due."
               label="Due date"
               type="date"
-              hint="Optional. When payment is due."
+              
               value={form.dueDate}
               onChange={(value) => set({ dueDate: value })}
               error={errorFor('dueDate')}
               className="sm:max-w-[16rem]"
             />
-            <TextAreaField
+            <TextAreaField help="Optional. Printed under the lines, such as a thank-you or what the package includes."
               label="Notes"
-              hint="Optional. Printed under the lines, such as a thank-you or what the package includes."
+              
               rows={4}
               value={form.notes}
               onChange={(value) => set({ notes: value })}
@@ -959,7 +960,7 @@ function IssueConfirm({ confirm, busy, onIssue, onCancel }) {
       aria-labelledby={headingId}
       className="flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-raised px-md py-sm"
     >
-      <h2 id={headingId} className="text-admin-base font-bold text-admin-ink">Issue this invoice?</h2>
+      <div className="flex items-center gap-2xs"><h2 id={headingId} className="text-admin-base font-bold text-admin-ink">Issue this invoice?</h2><HelpTooltip label="Issue this invoice?">Issuing assigns an invoice number and fixes the billed details. Review the total and recipient before continuing.</HelpTooltip></div>
       {confirm.unsaved ? (
         <>
           <p className="text-admin-sm text-admin-ink">Save your changes before issuing this invoice.</p>

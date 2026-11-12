@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 // The attendee panel of the Scheduled reminders page (issue #518, ADR
 // 0006): "the event is in N days", with the time, the place and the ticket
 // link, to registered attendees before the event starts.
@@ -63,7 +64,7 @@ function SampleMessage({ sample, timeZone }) {
   const name = `Attendee reminder, ${dayCount(sample.offsetDays)} before`;
   return (
     <section aria-label={name} className="flex flex-col gap-xs border-admin-rule-hairline border-t-admin-hairline pt-sm">
-      <h4 className="text-admin-base font-bold text-admin-ink">{name}</h4>
+      <div className="flex items-center gap-2xs"><h4 className="text-admin-base font-bold text-admin-ink">{name}</h4><HelpTooltip label="this section">Review this reminder’s date and message before enabling the schedule.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">
         Sends from {eventTime(sample.opensAt, timeZone)}.
         {sample.state === 'closed' ? ' This reminder date has passed, so it will not send.' : ''}
@@ -83,7 +84,7 @@ function SampleMessage({ sample, timeZone }) {
         />
       ) : null}
       <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview</summary>
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview <HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></summary>
         <pre data-testid={`attendee-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {sample.text}
         </pre>
@@ -96,7 +97,7 @@ function NextRun({ data, headingId }) {
   const { nextRun, timeZone, state } = data;
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-xs">
-      <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Next run</h3>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Next run</h3><HelpTooltip label="Next run">Check when the schedule will next look for people who need a reminder.</HelpTooltip></div>
       {state !== 'on' ? (
         <p className="text-admin-sm text-admin-ink">Nothing sends while the schedule is {state === 'paused' ? 'paused' : 'off'}. This is what it would do when on.</p>
       ) : null}
@@ -178,7 +179,7 @@ export default function AttendeeReminderSchedule({ call }) {
   })();
   if (body) {
     return (
-      <Panel title="Attendees" description="Email registered attendees before the event starts.">
+      <Panel help="Email registered attendees before the event starts." title="Attendees" description="Email registered attendees before the event starts.">
         {body}
       </Panel>
     );
@@ -295,13 +296,13 @@ export default function AttendeeReminderSchedule({ call }) {
   const zone = timeZone ? describeTimeZone(timeZone) : 'the event’s time zone';
 
   return (
-    <Panel
+    <Panel help="Remind attendees before the event, with the date, venue and their ticket link."
       title="Attendees"
       description="Remind attendees before the event, with the date, venue and their ticket link."
       actions={<StatusBadge tone={STATE_TONES[data.state]}>{STATE_LABELS[data.state]}</StatusBadge>}
     >
       <div className="flex flex-col gap-md">
-        <ReminderScheduleSwitch label="Scheduled attendee reminders" checked={data.state !== 'off'} disabled={Boolean(busy)} onChange={(enabled) => { if (!enabled) turnOff(); else if (preview && !dirty && preview.canSend) approve(); else runPreview(); }} />
+        <ReminderScheduleSwitch help="Send attendee reminders automatically on the days chosen below." label="Scheduled attendee reminders" checked={data.state !== 'off'} disabled={Boolean(busy)} onChange={(enabled) => { if (!enabled) turnOff(); else if (preview && !dirty && preview.canSend) approve(); else runPreview(); }} />
         <p className="text-admin-base font-semibold text-admin-ink" data-testid="attendee-schedule-state">
           {attendeeStateWords(data.state)}
           {data.state !== 'off' && data.approval?.at ? ` Approved ${eventTime(data.approval.at, timeZone)}.` : ''}
@@ -322,16 +323,16 @@ export default function AttendeeReminderSchedule({ call }) {
 
         {loadError ? <div className="flex flex-col gap-xs"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading}>{loading ? 'Trying again…' : 'Try again'}</button></div> : null}
         <form className="flex flex-col gap-md" onSubmit={save} noValidate>
-          <fieldset disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
-          <legend className="sr-only">Attendee reminder settings</legend>
-          <fieldset aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
-            <legend className="text-admin-base font-semibold text-admin-ink">Days before the event</legend>
+          <fieldset aria-label={["Attendee reminder settings "].join('').trim()} disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
+          <legend className="sr-only">Attendee reminder settings <HelpTooltip label="Attendee reminder settings">Choose when attendees receive reminders and what each message says.</HelpTooltip></legend>
+          <fieldset aria-label={["Days before the event "].join('').trim()} aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
+            <legend className="text-admin-base font-semibold text-admin-ink">Days before the event <HelpTooltip label="Days before the event">Choose how many days before the event each reminder is due.</HelpTooltip></legend>
             <p id={`${offsetsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
               Choose how many days before the event to send each reminder.
             </p>
             {form.offsets.map((value, index) => (
               <div key={index} className="flex flex-wrap items-end gap-xs">
-                <TextField
+                <TextField help="Enter a whole number of days before the event for this reminder."
                   label={`Attendee reminder ${index + 1}, days before`}
                   type="number"
                   inputMode="numeric"
@@ -355,7 +356,7 @@ export default function AttendeeReminderSchedule({ call }) {
             <FieldError message={offsetsProblem} />
           </fieldset>
 
-          <TextField
+          <TextField help="Choose a send time on the event’s local clock. Reminders due overnight wait until 8:00 AM."
             label="Attendee send time"
             type="time"
             value={form.sendTime}
@@ -363,22 +364,22 @@ export default function AttendeeReminderSchedule({ call }) {
             hint={`On the event clock, ${zone}. Nothing sends from 8:00 PM to 8:00 AM; a reminder due then waits for 8:00 AM.`}
           />
 
-          <TextField
+          <TextField help="[Days until event] adds the time left, such as “7 days” or “1 day”."
             label="Attendee reminder subject"
             value={form.subject}
             onChange={(value) => update({ subject: value })}
             maxLength={data.limits.maxSubjectLength}
             error={wordingProblems.subject}
-            hint="[Days until event] adds the time left, such as “7 days” or “1 day”."
+            
           />
-          <TextAreaField
+          <TextAreaField help="Use [Days until event] to add the time left."
             label="Attendee reminder message"
             rows={5}
             value={form.message}
             onChange={(value) => update({ message: value })}
             maxLength={data.limits.maxMessageLength}
             error={wordingProblems.message}
-            hint="Use [Days until event] to add the time left."
+            
           />
 
           <div className="flex flex-wrap items-center gap-xs">
@@ -394,16 +395,15 @@ export default function AttendeeReminderSchedule({ call }) {
 
         {result ? (
           <section aria-labelledby={resultId} className="flex flex-col gap-2xs">
-            <h3 id={resultId} ref={resultRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink">
-              Result
-            </h3>
+            <div className="flex items-center gap-2xs"><h3 id={resultId} ref={resultRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink">
+              Result</h3><HelpTooltip label="Result">Review the outcome of the last action and any items that need attention.</HelpTooltip></div>
             <Notice tone={result.tone} message={result.message} />
           </section>
         ) : null}
 
         {preview ? (
           <section aria-labelledby={previewId} className="flex flex-col gap-sm">
-            <h3 id={previewId} className="text-admin-base font-bold text-admin-ink">Attendee reminder preview</h3>
+            <div className="flex items-center gap-2xs"><h3 id={previewId} className="text-admin-base font-bold text-admin-ink">Attendee reminder preview</h3><HelpTooltip label="Attendee reminder preview">Review the message registered attendees will receive.</HelpTooltip></div>
             <p className="text-admin-sm text-admin-ink">
               {preview.recipientCount === null
                 ? ''

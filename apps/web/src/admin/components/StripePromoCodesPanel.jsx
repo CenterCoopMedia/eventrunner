@@ -76,7 +76,7 @@ export default function StripePromoCodesPanel({ call, catalog, timezone }) {
   });
 
   return (
-    <Panel title="Promo codes" description="Offer a discount on selected ticket types.">
+    <Panel help="Offer a discount on selected ticket types." title="Promo codes" description="Offer a discount on selected ticket types.">
       <div className="space-y-md">
         {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
         {codes === null && !notice ? <AdminLoadingState label="Loading promo codes…" /> : null}

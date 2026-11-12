@@ -310,7 +310,7 @@ export default function AdminAttendees() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Manage attendance and access. Organizer approvals stay in place after refunds. Downloads include private registration answers; keep these files secure."
         title="Attendees"
         identifiers={rows ? `${shown.length} of ${rows.length} account${rows.length === 1 ? '' : 's'}` : undefined}
         description="Manage attendance and access. Organizer approvals stay in place after refunds. Downloads include private registration answers; keep these files secure."
@@ -361,7 +361,7 @@ export default function AdminAttendees() {
 
       <div className="flex flex-wrap items-end gap-sm">
         <div className="min-w-0 flex-1">
-          <TextField
+          <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
             label="Search"
             value={search}
             onChange={setSearch}
@@ -370,7 +370,7 @@ export default function AdminAttendees() {
           />
         </div>
         <div className="w-full max-w-xs sm:w-auto">
-          <SelectField label="Status" value={filter} onChange={setFilter} options={STATUS_FILTERS} />
+          <SelectField help="Choose which records to show in this list." label="Status" value={filter} onChange={setFilter} options={STATUS_FILTERS} />
         </div>
       </div>
 

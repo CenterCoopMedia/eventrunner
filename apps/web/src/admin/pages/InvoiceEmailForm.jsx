@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerError } from '../plannerErrors.js';
 // Email an issued or paid invoice (issue #208, part 4).
 //
@@ -58,7 +59,7 @@ function EmailPreview({ preview }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground px-md py-sm">
-      <h4 id={headingId} className="text-admin-base font-bold text-admin-ink">Email preview</h4>
+      <div className="flex items-center gap-2xs"><h4 id={headingId} className="text-admin-base font-bold text-admin-ink">Email preview</h4><HelpTooltip label="Email preview">Review the message and invoice link the recipient will receive.</HelpTooltip></div>
       <dl className="grid max-w-[40rem] grid-cols-[minmax(6rem,auto)_1fr] gap-x-md gap-y-3xs text-admin-sm">
         <dt className={termClass}>To</dt>
         <dd className={valueClass}>{preview.to}</dd>
@@ -189,25 +190,25 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
 
   return (
     <section ref={sectionRef} aria-labelledby={headingId} className="flex flex-col gap-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
-      <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">{`Email ${invoice.number}`}</h3>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-ink">{`Email ${invoice.number}`}</h3><HelpTooltip label="this section">Review who will receive this invoice email before sending.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">
         {'The PDF goes to the billing email on the invoice: '}
         <strong className="font-semibold">{to}</strong>
         {'. Preview the email before you send it.'}
       </p>
       <ServerErrorSummary error={serverError} title="The invoice was not emailed" />
-      <TextField
+      <TextField help="Optional. One more address that gets the same email, such as your finance team."
         label="Copy to"
         type="email"
         autoComplete="off"
-        hint="Optional. One more address that gets the same email, such as your finance team."
+        
         value={input.cc}
         onChange={(value) => change({ cc: value })}
         error={errors.get('cc')}
         maxLength={INVOICE_LIMITS.email}
         className="sm:max-w-[28rem]"
       />
-      <TextAreaField
+      <TextAreaField help="Add a note to the recipient below the invoice details in this email."
         label="Note"
         hint={`Optional. Shown in the email under the line that names the invoice. Up to ${INVOICE_LIMITS.sendNote} characters.`}
         value={input.note}
@@ -239,7 +240,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
                 tone="caution"
                 message={`${invoice.number} was emailed to ${preview.recentSend.to} less than ${preview.resendWindowMinutes} minutes ago.`}
               />
-              <CheckboxField
+              <CheckboxField help="Send another copy even though an earlier email may already have been delivered."
                 label="Send it again anyway"
                 checked={confirm}
                 onChange={(value) => {

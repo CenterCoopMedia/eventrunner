@@ -139,13 +139,13 @@ export function ChangeRequestEmailSettings({ settings, call }) {
             </>
           ) : null}
           <ServerErrorSummary error={error} errorRef={errorRef} title="The email settings were not saved" />
-          <SelectField label="Acknowledgement email" value={acknowledgement} onChange={(value) => { setAcknowledgement(value); setResult(''); }} options={ACKNOWLEDGEMENT_OPTIONS} />
-          <SelectField
+          <SelectField help="Choose whether to email people when their change request is received." label="Acknowledgement email" value={acknowledgement} onChange={(value) => { setAcknowledgement(value); setResult(''); }} options={ACKNOWLEDGEMENT_OPTIONS} />
+          <SelectField help="One email for each outcome. Marking a request done again sends nothing more."
             label="Outcome email"
             value={outcome}
             onChange={(value) => { setOutcome(value); setResult(''); }}
             options={OUTCOME_OPTIONS}
-            hint="One email for each outcome. Marking a request done again sends nothing more."
+            
           />
           <div className="flex flex-wrap items-center gap-sm">
             <button type="submit" className={primaryButtonClass} disabled={busy || conflict} aria-busy={busy || undefined}>
@@ -229,7 +229,7 @@ function DeliveryLine({ row, slot, record, settings, call }) {
       {canRetry ? (
         <div className="flex basis-full flex-wrap items-center gap-xs">
           {unsure ? (
-            <CheckboxField label="I checked the Email log. The earlier email was not delivered." checked={checkedLog} onChange={setCheckedLog} />
+            <CheckboxField help="Confirm the earlier message failed before sending another copy." label="I checked the Email log. The earlier email was not delivered." checked={checkedLog} onChange={setCheckedLog} />
           ) : null}
           <button
             type="button"
@@ -328,25 +328,25 @@ export function OutcomeDetails({ row, call }) {
       {open ? (
         <form onSubmit={save} className="mt-xs flex flex-col gap-sm" noValidate>
           <ServerErrorSummary error={error} errorRef={errorRef} title="This was not saved" />
-          <TextAreaField
+          <TextAreaField help="The requester reads this on their change requests page. It is not emailed."
             label="Reply to the requester (optional)"
             value={reply}
             onChange={(value) => { setReply(value); setResult(''); }}
             rows={3}
             maxLength={MAX_REPLY_LENGTH}
-            hint="The requester reads this on their change requests page. It is not emailed."
+            
           />
           {done ? (
             <>
-              <TextField
+              <TextField help="A page on this site that shows the change."
                 label="Result link (optional)"
                 value={link}
                 onChange={(value) => { setLink(value); setChecked(false); setResult(''); }}
                 inputMode="url"
-                hint="A page on this site that shows the change."
+                
               />
               {needsCheck ? (
-                <CheckboxField
+                <CheckboxField help="Verify the requester can see the completed change at this address."
                   label="I opened this link and it shows the change."
                   checked={checked}
                   onChange={(value) => { setChecked(value); if (value) setCheckError(null); }}

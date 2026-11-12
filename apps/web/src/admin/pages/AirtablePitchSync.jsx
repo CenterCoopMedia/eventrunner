@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerError } from '../plannerErrors.js';
 import '../plannerFields.css';
 // Airtable connection for session pitches: the refresh status and the
@@ -94,7 +95,7 @@ function RunStatus({ status, timeZone }) {
         {COUNTS.map(([key, label]) => <div key={key} className="flex justify-between gap-sm border-b-admin-hairline border-admin-rule-hairline py-3xs"><dt>{label}</dt><dd className="font-admin-data">{run.counts?.[key] ?? 0}</dd></div>)}
       </dl>
       {run.counts?.skipped ? <details>
-        <summary className="min-h-admin-control cursor-pointer text-admin-sm font-semibold">Why records were skipped</summary>
+        <summary className="min-h-admin-control cursor-pointer text-admin-sm font-semibold">Why records were skipped <HelpTooltip label="Why records were skipped">Review the reasons some source records were not imported.</HelpTooltip></summary>
         <ul className="mt-xs space-y-3xs text-admin-sm">
           {Object.entries(run.skippedReasons || {}).map(([reason, count]) => <li key={reason}>{REASONS[reason] || 'Check required answers'}: {count}</li>)}
         </ul>
@@ -219,7 +220,7 @@ export default function AirtablePitchSync({ call, isOperator }) {
   // always see it, because they set the connection up.
   if (!isOperator && !status && !statusFailed) return null;
   return <details className="border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md">
-    <summary className="min-h-admin-control cursor-pointer font-semibold">Refresh pitches from Airtable</summary>
+    <summary className="min-h-admin-control cursor-pointer font-semibold">Refresh pitches from Airtable <HelpTooltip label="Refresh pitches from Airtable">Check the last import and bring in new or changed proposals. Existing decisions and notes are kept.</HelpTooltip></summary>
     <div className="mt-sm space-y-md">
       <p className="text-admin-sm text-admin-ink-secondary">Import new proposals and update changed proposals. Decisions and private notes are kept.</p>
       {statusFailed ? <Notice tone="caution" message="Cannot load the refresh status. Reconnecting…" /> : <RunStatus status={status} timeZone={timeZone} />}

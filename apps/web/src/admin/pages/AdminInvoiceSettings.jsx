@@ -128,9 +128,9 @@ export default function AdminInvoiceSettings() {
   }
 
   if (!canEdit) return <div className="flex flex-col gap-md">
-    <AdminPageHeader title="Invoice settings" description="Billing details for new invoices." actions={<Link to={INVOICES_ROOT} className={secondaryButtonClass}>Back to invoices</Link>} />
+    <AdminPageHeader help="Billing details for new invoices." title="Invoice settings" description="Billing details for new invoices." actions={<Link to={INVOICES_ROOT} className={secondaryButtonClass}>Back to invoices</Link>} />
     <Notice message="An operator can update billing and bank details." />
-    <Panel title="Billing details"><dl className="grid gap-x-md gap-y-xs sm:grid-cols-[12rem_1fr]">
+    <Panel help="Review the issuer, currency and payment instructions used for new invoices." title="Billing details"><dl className="grid gap-x-md gap-y-xs sm:grid-cols-[12rem_1fr]">
       {[
         ['Next invoice number', data.nextNumber], ['Currency', data.invoiceCurrency?.toUpperCase()],
         ['From', form.issuerName], ['Address', form.issuerAddress], ['Email', form.issuerEmail],

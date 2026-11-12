@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -68,9 +69,8 @@ function ReportedPost({ postId, reports, call, onAccessDenied }) {
     <li className="border-b-admin-hairline border-admin-rule-hairline px-md py-md last:border-b-0">
       <div className="flex flex-col gap-sm">
         <div className="flex flex-wrap items-center gap-sm">
-          <h2 ref={heading} tabIndex={-1} className="break-all font-admin-data text-admin-sm text-admin-ink">
-            Post {postId}
-          </h2>
+          <div className="flex items-center gap-2xs"><h2 ref={heading} tabIndex={-1} className="break-all font-admin-data text-admin-sm text-admin-ink">
+            Post {postId}</h2><HelpTooltip label="Post {postId}">Review this attendee post and decide whether it can appear in the event feed.</HelpTooltip></div>
           {post?.state === 'removed' ? <StatusBadge tone="dead">Removed</StatusBadge> : null}
           <span className={rowMetaClass}>{reports.length} {reports.length === 1 ? 'report' : 'reports'} in this list</span>
           {received ? <time dateTime={received.toISOString()} className={rowMetaClass}>{received.toLocaleString()}</time> : null}
@@ -142,7 +142,7 @@ function ModerationReports({ cursor, onOlder, onNewest }) {
   }
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader title="Feed moderation" description="Review private attendee reports and remove reported posts. Cleanup stays available when the attendee feed or directory is off." />
+      <AdminPageHeader help="Review private attendee reports and remove reported posts. Cleanup stays available when the attendee feed or directory is off." title="Feed moderation" description="Review private attendee reports and remove reported posts. Cleanup stays available when the attendee feed or directory is off." />
       <p className="text-admin-sm text-admin-ink-secondary">Showing up to {REPORT_LIMIT} {cursor ? 'older' : 'most recent'} reports, grouped by post. Reporter identities are not shown.</p>
       {error ? <Notice tone="error" message={error} /> : reports === null ? (
         <AdminLoadingState label="Loading private reports…" />

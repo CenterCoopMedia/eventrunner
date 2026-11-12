@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Speaker mail wording (issue #204): staff change the words of the speaker
 // invitation and the acceptance confirmation
 // (functions/src/speakers/mailTemplates.cjs, one staff endpoint with
@@ -90,7 +91,7 @@ function MessagePreview({ preview, title }) {
   const srcDoc = useMemo(() => (preview.html ? buildPreviewDoc(preview.html) : null), [preview.html]);
   return (
     <section aria-label={`${title} preview`} className="flex flex-col gap-xs border-admin-hairline border-t-admin-rule-hairline pt-md">
-      <h3 className="text-admin-base font-semibold text-admin-ink">Preview</h3>
+      <div className="flex items-center gap-2xs"><h3 className="text-admin-base font-semibold text-admin-ink">Preview</h3><HelpTooltip label="Preview">Review what the recipient or attendee will see before continuing.</HelpTooltip></div>
       {preview.usedFallback ? (
         <Notice tone="caution" message="The saved wording fails its check, so speakers get the shipped wording, shown here." />
       ) : null}
@@ -119,7 +120,7 @@ function MessagePreview({ preview, title }) {
         <p className="text-admin-sm text-admin-ink">This message’s HTML cannot be shown safely. The plain text version is below.</p>
       )}
       <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version</summary>
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version <HelpTooltip label="Plain text version">Read the wording people receive when their email app displays plain text.</HelpTooltip></summary>
         <pre
           data-testid="mail-preview-text"
           className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data"
@@ -128,7 +129,7 @@ function MessagePreview({ preview, title }) {
         </pre>
       </details>
       <details className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">HTML source</summary>
+        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">HTML source <HelpTooltip label="HTML source">Review the saved email markup if you need to check its formatting.</HelpTooltip></summary>
         <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
           {preview.html}
         </pre>
@@ -213,10 +214,10 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
     : 'The shipped wording is in use.';
 
   return (
-    <Panel title={title} description={description}>
+    <Panel help="Edit this speaker email and review a preview before saving its wording." title={title} description={description}>
       <form ref={formRef} className="flex flex-col gap-md" onSubmit={save} noValidate aria-label={`${title} wording`}>
-        <fieldset disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
-        <legend className="sr-only">{title} wording</legend>
+        <fieldset aria-label={[(title), " wording "].join('').trim()} disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
+        <legend className="sr-only">{title} wording <HelpTooltip label="this section">Set the subject and message used for this speaker email.</HelpTooltip></legend>
         <p className="text-admin-sm text-admin-ink">
           {savedLine}
           {changed ? ' The form has changes that are not saved.' : ''}
@@ -238,7 +239,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
           </p>
         </div> : null}
         {supported ? fields.map(({ name, label, singleLine }) => (singleLine ? (
-          <TextField
+          <TextField help="Write the subject line speakers see in their inbox."
             key={name}
             label={label}
             value={draft[name]}
@@ -246,7 +247,7 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
             onChange={(value) => edit(name, value)}
           />
         ) : (
-          <TextAreaField
+          <TextAreaField help="Write the message speakers receive, keeping the supported bracketed placeholders."
             key={name}
             label={label}
             rows={3}
@@ -311,7 +312,7 @@ export default function AdminSpeakerMail() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Change the words of the invitation and of the acceptance confirmation. The links, and the tokens each message may use, stay fixed. The next email uses the saved wording."
         title="Speaker email wording"
         description="Change the words of the invitation and of the acceptance confirmation. The links, and the tokens each message may use, stay fixed. The next email uses the saved wording."
         actions={<Link to="/admin/speakers" className={linkButtonClass}>Back to speakers</Link>}

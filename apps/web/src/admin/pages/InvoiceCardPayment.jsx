@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerError } from '../plannerErrors.js';
 // Card payment through a Stripe pay link (issue #519), in the invoice record.
 //
@@ -146,7 +147,7 @@ export function PayByCard({ invoice, cardPayments, timeZone, busy, onCreatePayLi
   const total = formatMoney(invoice.totals?.total ?? 0, invoice.currency);
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-xs border-admin-rule-hairline border-t-admin-hairline pt-sm">
-      <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Pay by card</h3>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Pay by card</h3><HelpTooltip label="Pay by card">Review the invoice’s card payment options and current payment status.</HelpTooltip></div>
       {issued && !available ? (
         <p className="text-admin-sm text-admin-ink-secondary">{cardPayments?.reason || NO_STRIPE}</p>
       ) : null}
@@ -203,7 +204,7 @@ function EarlierLinks({ links, timeZone }) {
   const headingId = useId();
   return (
     <div className="flex flex-col gap-3xs">
-      <h4 id={headingId} className="text-admin-sm font-bold text-admin-ink">Earlier card payment links</h4>
+      <div className="flex items-center gap-2xs"><h4 id={headingId} className="text-admin-sm font-bold text-admin-ink">Earlier card payment links</h4><HelpTooltip label="Earlier card payment links">Review payment links already created for this invoice and whether they can still be used.</HelpTooltip></div>
       <ul aria-labelledby={headingId} className="flex list-disc flex-col gap-3xs ps-5 text-admin-sm text-admin-ink">
         {[...links].reverse().map((link, index) => (
           <li key={link.linkId ?? index}>{linkHistoryText(link, timeZone)}</li>
@@ -248,9 +249,9 @@ function ReviewForm({ busy, onSubmit, onCancel }) {
   return (
     <div ref={sectionRef} className="flex flex-col gap-xs">
       <ServerErrorSummary error={serverError} title="The review was not saved" />
-      <TextField
+      <TextField help="Required. What was done, such as a refund in the Stripe Dashboard. Kept with the payment and in the audit log."
         label="Review note"
-        hint="Required. What was done, such as a refund in the Stripe Dashboard. Kept with the payment and in the audit log."
+        
         value={note}
         onChange={setNote}
         error={error}
@@ -295,9 +296,8 @@ export function PaymentReviews({ invoice, canResolve, busy, onResolve }) {
           aria-labelledby={headingId}
           className="flex flex-col gap-xs rounded-admin-panel border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm"
         >
-          <h3 id={headingId} className="text-admin-base font-bold text-admin-state-error">
-            {waiting.length === 1 ? 'A card payment needs review' : `${waiting.length} card payments need review`}
-          </h3>
+          <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-state-error">
+            {waiting.length === 1 ? 'A card payment needs review' : `${waiting.length} card payments need review`}</h3><HelpTooltip label="this section">Review these card payments before deciding how they affect the invoice balance.</HelpTooltip></div>
           {waiting.map((entry) => (
             <div key={entry.reviewId} className="flex flex-col gap-3xs text-admin-sm text-admin-ink">
               <p className="font-bold">{`Stripe took ${money(entry)} for this invoice ${reviewPhrase(entry)}.`}</p>
@@ -333,7 +333,7 @@ export function PaymentReviews({ invoice, canResolve, busy, onResolve }) {
       ) : null}
       {done.length ? (
         <div className="flex flex-col gap-3xs">
-          <h3 id={doneId} className="text-admin-base font-bold text-admin-ink">Reviewed card payments</h3>
+          <div className="flex items-center gap-2xs"><h3 id={doneId} className="text-admin-base font-bold text-admin-ink">Reviewed card payments</h3><HelpTooltip label="Reviewed card payments">Review the decisions recorded for earlier card payments.</HelpTooltip></div>
           <ul aria-labelledby={doneId} className="flex list-disc flex-col gap-3xs ps-5 text-admin-sm text-admin-ink">
             {done.map((entry) => (
               <li key={entry.reviewId}>{`${money(entry)}, ${reviewPhrase(entry)}. Reviewed: ${entry.note || 'no note'}`}</li>

@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerError } from '../plannerErrors.js';
 // The record of an issued invoice (issue #209), and what staff can do with
 // it: email it as a PDF (part 4, InvoiceEmailForm), make a Stripe card
@@ -105,19 +106,19 @@ function MarkPaidForm({ timeZone, busy, onSubmit, onCancel }) {
   const set = (patch) => setPayment((current) => ({ ...current, ...patch }));
   return (
     <section ref={sectionRef} aria-labelledby={headingId} className="flex flex-col gap-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
-      <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Record a payment</h3>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Record a payment</h3><HelpTooltip label="Record a payment">Record a payment received outside the site and how it was paid.</HelpTooltip></div>
       <ServerErrorSummary error={serverError} title="The payment was not recorded" />
       <div className="flex flex-wrap items-start gap-sm">
-        <TextField
+        <TextField help="The date the payment arrived."
           label="Date paid"
           type="date"
-          hint="The date the payment arrived."
+          
           value={payment.paidOn}
           onChange={(value) => set({ paidOn: value })}
           error={errors.get('paidOn')}
           className="sm:max-w-[16rem]"
         />
-        <SelectField
+        <SelectField help="Choose how the payment arrived, such as a check or bank transfer."
           label="Method"
           value={payment.method}
           onChange={(value) => set({ method: value })}
@@ -125,9 +126,9 @@ function MarkPaidForm({ timeZone, busy, onSubmit, onCancel }) {
           options={PAYMENT_METHODS.map((method) => ({ value: method, label: PAYMENT_METHOD_WORDS[method] }))}
         />
       </div>
-      <TextField
+      <TextField help="Optional. Such as a check number or a bank reference."
         label="Payment note"
-        hint="Optional. Such as a check number or a bank reference."
+        
         value={payment.note}
         onChange={(value) => set({ note: value })}
         error={errors.get('note')}
@@ -192,10 +193,10 @@ function ReasonForm({ title, explanation, label, hint, maxLength, validate, conf
         ? 'flex flex-col gap-xs rounded-admin-panel border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm'
         : 'flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-raised px-md py-sm'}
     >
-      <h3 id={headingId} className={`text-admin-base font-bold ${alarm ? 'text-admin-state-error' : 'text-admin-ink'}`}>{title}</h3>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className={`text-admin-base font-bold ${alarm ? 'text-admin-state-error' : 'text-admin-ink'}`}>{title}</h3><HelpTooltip label="this section">Record the reason for this invoice change so staff can review it later.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">{explanation}</p>
       <ServerErrorSummary error={serverError} title={errorTitle} />
-      <TextField
+      <TextField help="Explain this invoice change. The reason stays with the invoice history."
         label={label}
         hint={hint}
         value={reason}
@@ -221,7 +222,7 @@ function PaymentHistory({ history }) {
   if (!history?.length) return null;
   return (
     <div className="flex flex-col gap-3xs">
-      <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Earlier payments</h3>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Earlier payments</h3><HelpTooltip label="Earlier payments">Review payments already recorded against this invoice.</HelpTooltip></div>
       <ul aria-labelledby={headingId} className="flex list-disc flex-col gap-3xs ps-5 text-admin-sm text-admin-ink">
         {history.map((entry, index) => (
           <li key={`${entry.paidOn}-${index}`}>
@@ -259,7 +260,7 @@ function EmailHistory({ sends }) {
   if (!sends?.length) return null;
   return (
     <div className="flex flex-col gap-3xs">
-      <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Emails sent</h3>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Emails sent</h3><HelpTooltip label="Emails sent">Review invoice email delivery before sending another copy.</HelpTooltip></div>
       <ul aria-labelledby={headingId} className="flex list-disc flex-col gap-3xs ps-5 text-admin-sm text-admin-ink">
         {[...sends].reverse().map((entry, index) => (
           <li key={entry.sendId ?? index}>
@@ -291,7 +292,7 @@ export default function InvoiceRecord({
   return (
     <section aria-labelledby={headingId} className={panelClass}>
       <div className="mb-sm border-admin-rule-hairline border-b-admin-hairline pb-sm">
-        <h2 id={headingId} className="font-admin-ui text-admin-lg font-bold text-admin-ink">Invoice record</h2>
+        <div className="flex items-center gap-2xs"><h2 id={headingId} className="font-admin-ui text-admin-lg font-bold text-admin-ink">Invoice record</h2><HelpTooltip label="Invoice record">Review invoice payments and email history.</HelpTooltip></div>
         <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
           Fixed when the invoice was issued. Later changes to the invoice settings do not change it.
         </p>

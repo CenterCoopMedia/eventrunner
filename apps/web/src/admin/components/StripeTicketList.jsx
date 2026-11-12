@@ -61,18 +61,18 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
   const setFilter = (key, value) => setFilters((previous) => ({ ...previous, [key]: value }));
   const options = (values, words) => [{ value: '', label: 'Any' }, ...values.map((value) => ({ value, label: words(value) }))];
 
-  return <Panel title={label} description={isOrders ? 'Find orders by purchaser email.' : 'Search attendee email or ticket code. Each row represents one seat.'}>
+  return <Panel help="Find orders and individual tickets, then open one to review its details." title={label} description={isOrders ? 'Find orders by purchaser email.' : 'Search attendee email or ticket code. Each row represents one seat.'}>
     <form className="mb-md grid items-end gap-sm sm:grid-cols-2 lg:grid-cols-3" onSubmit={(event) => { event.preventDefault(); setSubmitted({ ...filters }); }}>
-      <TextField label={isOrders ? 'Find a purchaser or order' : 'Find an attendee or ticket'} type="search" value={filters.search} onChange={(value) => setFilter('search', value.trimStart())} />
+      <TextField help="Search using an email address, order reference or ticket code for this list." label={isOrders ? 'Find a purchaser or order' : 'Find an attendee or ticket'} type="search" value={filters.search} onChange={(value) => setFilter('search', value.trimStart())} />
       {isOrders ? <>
-        <SelectField label="Payment state" value={filters.paymentStatus} onChange={(value) => setFilter('paymentStatus', value)} options={options(PAYMENT_STATUSES, paymentStatusLabel)} />
-        <SelectField label="Refund state" value={filters.refundStatus} onChange={(value) => setFilter('refundStatus', value)} options={options(REFUND_STATUSES, refundStateLabel)} />
-        <SelectField label="Order state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(ORDER_STATUSES, orderStatusLabel)} />
+        <SelectField help="Show orders with the selected payment result." label="Payment state" value={filters.paymentStatus} onChange={(value) => setFilter('paymentStatus', value)} options={options(PAYMENT_STATUSES, paymentStatusLabel)} />
+        <SelectField help="Show orders with the selected refund status." label="Refund state" value={filters.refundStatus} onChange={(value) => setFilter('refundStatus', value)} options={options(REFUND_STATUSES, refundStateLabel)} />
+        <SelectField help="Show orders that are open, completed or cancelled." label="Order state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(ORDER_STATUSES, orderStatusLabel)} />
       </> : <>
-        <SelectField label="Ticket type filter" value={filters.ticketTypeId} onChange={(value) => setFilter('ticketTypeId', value)} options={[{ value: '', label: 'Any ticket type' }, ...(catalog?.ticketTypes || []).map((type) => ({ value: type.id, label: type.name }))]} />
-        <SelectField label="Admission state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(TICKET_STATUSES, ticketStatusLabel)} />
-        <SelectField label="Claim state" value={filters.claimState} onChange={(value) => setFilter('claimState', value)} options={[{ value: '', label: 'Any' }, { value: 'claimed', label: 'Claimed' }, { value: 'unclaimed', label: 'Unclaimed' }]} />
-        <SelectField label="Check-in state" value={filters.checkInState} onChange={(value) => setFilter('checkInState', value)} options={[{ value: '', label: 'Any' }, { value: 'checked_in', label: 'Checked in' }, { value: 'not_checked_in', label: 'Not checked in' }]} />
+        <SelectField help="Show tickets for one admission type, or leave this on all types." label="Ticket type filter" value={filters.ticketTypeId} onChange={(value) => setFilter('ticketTypeId', value)} options={[{ value: '', label: 'Any ticket type' }, ...(catalog?.ticketTypes || []).map((type) => ({ value: type.id, label: type.name }))]} />
+        <SelectField help="Show tickets by whether they currently allow entry." label="Admission state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(TICKET_STATUSES, ticketStatusLabel)} />
+        <SelectField help="Show tickets by whether an attendee has claimed them." label="Claim state" value={filters.claimState} onChange={(value) => setFilter('claimState', value)} options={[{ value: '', label: 'Any' }, { value: 'claimed', label: 'Claimed' }, { value: 'unclaimed', label: 'Unclaimed' }]} />
+        <SelectField help="Show tickets by whether an arrival has been recorded." label="Check-in state" value={filters.checkInState} onChange={(value) => setFilter('checkInState', value)} options={[{ value: '', label: 'Any' }, { value: 'checked_in', label: 'Checked in' }, { value: 'not_checked_in', label: 'Not checked in' }]} />
       </>}
       <button type="submit" className={secondaryButtonClass} aria-busy={busy}>{isOrders ? 'Search' : 'Search'}</button>
     </form>

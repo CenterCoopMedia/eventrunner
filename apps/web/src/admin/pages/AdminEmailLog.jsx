@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // The email log (issue #183): every message the site sent, newest first,
 // with search, two filters, and a preview of the stored body.
 //
@@ -286,7 +287,7 @@ function StoredBody({ message }) {
       ) : null}
       {text ? (
         <details open={!srcDoc} className="text-admin-sm">
-          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview</summary>
+          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview <HelpTooltip label="Text preview">Read the email as plain text, without images or page styling.</HelpTooltip></summary>
           <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
             {text}
           </pre>
@@ -666,7 +667,7 @@ export default function AdminEmailLog() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Emails from the past 90 days, newest first. Sign-in codes and private invitation links are hidden."
         title="Email log"
         description="Emails from the past 90 days, newest first. Sign-in codes and private invitation links are hidden."
         actions={
@@ -698,7 +699,7 @@ export default function AdminEmailLog() {
             className="flex flex-wrap items-end gap-sm"
           >
             <div className="min-w-0 grow basis-64">
-              <TextField
+              <TextField help="Find delivery records by recipient email address or message subject."
                 label="Search recipient or subject"
                 type="search"
                 value={draft.q}
@@ -708,18 +709,18 @@ export default function AdminEmailLog() {
                 maxLength={200}
               />
             </div>
-            <fieldset className="min-w-0 grow basis-80">
+            <fieldset aria-label={[" ", (activeFilters ? `Filters, ${activeFilters} active` : 'Filters'), " "].join('').trim()} className="min-w-0 grow basis-80">
               <legend className={`${fieldLabelClass} mb-3xs`}>
                 {activeFilters ? `Filters, ${activeFilters} active` : 'Filters'}
-              </legend>
+               <HelpTooltip label="this section">Narrow the delivery records by message source and delivery status.</HelpTooltip></legend>
               <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
-                <SelectField
+                <SelectField help="Show messages sent by a particular event feature."
                   label="Source"
                   value={draft.source}
                   onChange={(source) => setDraft((current) => ({ ...current, source }))}
                   options={sourceOptions}
                 />
-                <SelectField
+                <SelectField help="Choose which records to show in this list."
                   label="Status"
                   value={draft.status}
                   onChange={(status) => setDraft((current) => ({ ...current, status }))}

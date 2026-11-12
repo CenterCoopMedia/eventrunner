@@ -241,7 +241,7 @@ function SyncAllTickets({ call, providerLabel, onSynced }) {
 
 function StatusCard({ status, error, onRefresh, busy, call }) {
   return (
-    <Panel
+    <Panel help="Connection and recent ticket updates."
       title="Ticket updates"
       description="Connection and recent ticket updates."
       actions={
@@ -306,7 +306,7 @@ function MappingForm({ headers, mapping, onChange }) {
   return (
     <div className="planner-fields grid grid-cols-1 gap-sm sm:grid-cols-2">
       {MAPPING_FIELDS.map((field) => (
-        <SelectField
+        <SelectField help="Choose the CSV column that supplies this ticket detail."
           key={field.id}
           label={field.required ? `${field.label} (required)` : field.label}
           value={mapping[field.id] ?? ''}
@@ -439,7 +439,7 @@ function ImportPanel({ call, onImported }) {
   }
 
   return (
-    <Panel
+    <Panel help="Choose a CSV file and match its columns, then review the tickets before importing."
       title="Import tickets from a CSV"
       description="Choose a CSV file and match its columns, then review the tickets before importing."
     >
@@ -448,7 +448,7 @@ function ImportPanel({ call, onImported }) {
           <label htmlFor="ticketing-csv-file" className={fieldLabelClass}>
             CSV file
           </label>
-          <input
+          <input data-help-skip="File chooser; the import section describes the CSV and column-matching step."
             id="ticketing-csv-file"
             type="file"
             accept=".csv,text/csv"
@@ -547,7 +547,7 @@ function TicketList({ call, refreshToken }) {
   }, [refreshToken]);
 
   return (
-    <Panel title="Tickets" description="Find tickets by email address and status.">
+    <Panel help="Find tickets by email address and status." title="Tickets" description="Find tickets by email address and status.">
       <form
         className="mb-md flex flex-wrap items-end gap-sm"
         onSubmit={(event) => {
@@ -560,7 +560,7 @@ function TicketList({ call, refreshToken }) {
           <label htmlFor="ticketing-search-email" className={fieldLabelClass}>
             Email
           </label>
-          <input
+          <input data-help-skip="Search field; its label names the email search."
             id="ticketing-search-email"
             type="email"
             value={email}
@@ -569,7 +569,7 @@ function TicketList({ call, refreshToken }) {
             placeholder="attendee@example.com"
           />
         </div>
-        <SelectField
+        <SelectField help="Choose which records to show in this list."
           label="Status"
           value={status}
           onChange={setStatus}
@@ -666,7 +666,7 @@ export default function AdminTicketing() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Manage ticket sales, registration records, and attendee admission."
         title="Ticketing"
         description="Manage ticket sales, registration records, and attendee admission."
       />

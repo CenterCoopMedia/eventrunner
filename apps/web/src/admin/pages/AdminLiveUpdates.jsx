@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Live updates admin form (issue #28, spec §9 "Live updates card") — compose,
 // edit, and delete entries in the `live_updates` feed. Wired to
 // saveLiveUpdate/deleteLiveUpdate; no draft/publish step, unlike the CMS
@@ -177,7 +178,7 @@ export default function AdminLiveUpdates() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Short posts shown on the live updates card. No approval step — posting here is live immediately."
         title="Live updates"
         description="Short posts shown on the live updates card. No approval step — posting here is live immediately."
         identifiers={rows ? `${ordered.length} update${ordered.length === 1 ? '' : 's'}` : null}
@@ -192,12 +193,12 @@ export default function AdminLiveUpdates() {
         />
       ) : null}
 
-      <Panel title={editingId ? 'Edit update' : 'Post an update'}>
+      <Panel help="Write an update attendees can read during the event and choose its audience." title={editingId ? 'Edit update' : 'Post an update'}>
         <form ref={composerRef} className="flex flex-col gap-sm" onSubmit={submit} onChangeCapture={() => setOutcome(null)}>
-          <fieldset disabled={saving || Boolean(deletingId)} className="admin-live-composer min-w-0">
-          <legend className="sr-only">Update details</legend>
+          <fieldset aria-label={["Update details "].join('').trim()} disabled={saving || Boolean(deletingId)} className="admin-live-composer min-w-0">
+          <legend className="sr-only">Update details <HelpTooltip label="Update details">Set the message, topic and audience for this live update.</HelpTooltip></legend>
           <div className="admin-live-composer__message min-w-0">
-          <TextAreaField
+          <TextAreaField help="Write the live update attendees should see during the event."
             label="Message"
             value={form.message}
             onChange={(value) => setForm((f) => ({ ...f, message: value }))}
@@ -205,23 +206,23 @@ export default function AdminLiveUpdates() {
           />
           </div>
           <div className="flex min-w-0 flex-col gap-sm">
-          <TextField
+          <TextField help="One or two words shown as a tag beside the update. Leave it empty for none."
             label="Category"
-            hint="One or two words shown as a tag beside the update. Leave it empty for none."
+            
             value={form.category}
             onChange={(value) => setForm((f) => ({ ...f, category: value }))}
             maxLength={UPDATE_CATEGORY_MAX}
           />
-          <SelectField
+          <SelectField help="Choose which attendees can open this live update."
             label="Who can read it"
             hint="The database enforces this. A reader outside the audience cannot load the update, not only cannot see it."
             value={form.audience}
             onChange={(value) => setForm((f) => ({ ...f, audience: value }))}
             options={AUDIENCE_OPTIONS}
           />
-          <CheckboxField
+          <CheckboxField help="Pinned entries show first, above newer unpinned entries."
             label="Pinned"
-            hint="Pinned entries show first, above newer unpinned entries."
+            
             checked={form.pinned}
             onChange={(checked) => setForm((f) => ({ ...f, pinned: checked }))}
           />

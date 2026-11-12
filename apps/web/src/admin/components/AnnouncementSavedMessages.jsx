@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 // Saved announcement messages (issue #496), listed beside the email
 // composer on the Announcements page.
 //
@@ -40,9 +41,8 @@ function RowQuestion({ title, children, headingRef }) {
       aria-label={title}
       className="mt-xs flex flex-col gap-xs rounded-admin-panel border-admin-strong border-admin-rule-strong px-md py-sm"
     >
-      <h3 ref={headingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
-        {title}
-      </h3>
+      <div className="flex items-center gap-2xs"><h3 ref={headingRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink focus:outline-none">
+        {title}</h3><HelpTooltip label="this section">Review this saved message before reusing, renaming or removing it.</HelpTooltip></div>
       {children}
     </section>
   );
@@ -225,7 +225,7 @@ export default function AnnouncementSavedMessages({
 
   return (
     <div ref={wrapRef}>
-      <Panel
+      <Panel help="Save messages you send often and reuse them in a new email."
         title="Saved messages"
         description="Save messages you send often and reuse them in a new email."
       >
@@ -236,7 +236,7 @@ export default function AnnouncementSavedMessages({
               {`Using “${loaded.name}”. Save changes to update the saved message.`}
             </p>
           ) : null}
-          <TextField
+          <TextField help="Give this saved message a name staff can recognize when reusing it."
             label="Name for this message"
             value={name}
             maxLength={MAX_NAME_LENGTH}
@@ -316,7 +316,7 @@ export default function AnnouncementSavedMessages({
                     ) : null}
                     {open?.kind === 'rename' ? (
                       <form ref={renameRef} className="mt-xs flex flex-col gap-xs" onSubmit={rename}>
-                        <TextField label="New name" value={newName} maxLength={MAX_NAME_LENGTH} onChange={setNewName} />
+                        <TextField data-help-skip="The label directly names the requested detail; no further explanation needed." label="New name" value={newName} maxLength={MAX_NAME_LENGTH} onChange={setNewName} />
                         <div className="flex flex-wrap gap-xs">
                           <button type="submit" className={secondaryButtonClass} aria-busy={busy === `rename:${message.id}` ? 'true' : undefined}>
                             {busy === `rename:${message.id}` ? 'Saving…' : 'Save name'}
