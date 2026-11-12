@@ -2889,6 +2889,16 @@
     font-weight: 700;
   }
 
+  .control-choice:disabled,
+  .admin-room .control-choice:disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+
+  .control-choice:disabled + svg {
+    color: GrayText;
+  }
+
   .schedule-grid [data-track-forward]::before {
     background-color: transparent;
     border-inline: 2px solid Highlight;
