@@ -62,3 +62,13 @@ test('isBareEmailAddress takes one plain address and nothing that could name ano
     assert.equal(isBareEmailAddress(value), false, String(value));
   }
 });
+
+test('mailing addresses require visible text and refuse the setup placeholder', () => {
+  const { hasMailingAddress } = require('./email.cjs');
+  for (const address of [null, undefined, '', ' \n ', '<p><br></p>', '<p>&nbsp;&#160;&#xA0;</p>', '[Replace with mailing address]', '<p>[replace address]</p>']) {
+    assert.equal(hasMailingAddress(address), false, String(address));
+  }
+  for (const address of ['Example Org\n1 Main Street', '<p>Example Org<br>1 Main Street</p>']) {
+    assert.equal(hasMailingAddress(address), true);
+  }
+});

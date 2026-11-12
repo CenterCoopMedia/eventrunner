@@ -42,8 +42,16 @@ function isBareEmailAddress(value) {
   return isEmailAddress(value) && !NOT_BARE_RE.test(value);
 }
 
+/** The mailing-address requirement for announcement and reminder email. */
+function hasMailingAddress(value) {
+  return typeof value === 'string'
+    && !/\[Replace/i.test(value)
+    && value.split(/<[^>]*>/).some((text) => text.replace(/&nbsp;|&#160;|&#xA0;/gi, ' ').trim());
+}
+
 module.exports = {
   EMAIL_ADDRESS_RE,
   isEmailAddress,
   isBareEmailAddress,
+  hasMailingAddress,
 };

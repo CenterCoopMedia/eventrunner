@@ -8,6 +8,7 @@
 // `init-event.cjs --check` (shared/readiness). The page never decides that a
 // row is met. It only says what each row means and where to go
 // (../setupSteps.js). `init-event.cjs --check` stays the launch gate.
+// The mailing-address status is advisory and does not enter that gate.
 //
 // THE ONE WRITE on this page is the legal sign-off: an operator confirms
 // that counsel approved the privacy policy and terms, and the page saves
@@ -136,6 +137,7 @@ export default function AdminSetup() {
   const { stepSlug } = useParams();
   const wide = useMediaQuery(ADMIN_DESKTOP_VIEWPORT);
   const [checks, setChecks] = useState(null);
+  const [mailingAddressReady, setMailingAddressReady] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -148,6 +150,7 @@ export default function AdminSetup() {
     try {
       const result = await call('webMcpCheckEventReadiness', {});
       setChecks(Array.isArray(result?.checks?.items) ? result.checks.items : []);
+      setMailingAddressReady(typeof result?.mailingAddressReady === 'boolean' ? result.mailingAddressReady : null);
       setError(null);
     } catch {
       setError(new Error('The setup could not be checked. Try again.'));
@@ -164,6 +167,15 @@ export default function AdminSetup() {
   const rows = checks ? joinSetupSteps(checks) : [];
   const steps = rows.filter((row) => row.owner === 'you' || row.owner === 'both');
   const hosting = rows.filter((row) => row.owner === 'host');
+  if (checks) hosting.push({
+    id: 'mailing-address',
+    title: 'Email mailing address',
+    ready: mailingAddressReady === true,
+    done: 'A mailing address is set for announcement and reminder emails.',
+    todo: mailingAddressReady === null
+      ? 'The mailing address could not be checked. Select Check again.'
+      : 'Announcements and reminders need your mailing address in the email footer. Contact the Event Runner team to set it.',
+  });
   const doneCount = steps.filter((step) => step.ready).length;
   const clientDone = steps.length > 0 && doneCount === steps.length;
   const allDone = rows.length > 0 && rows.every((row) => row.ready) && !error && !busy;
@@ -199,7 +211,7 @@ export default function AdminSetup() {
         />
       ) : null}
       {allDone ? (
-        <Notice tone="ok" message="Every setup task and hosting check is ready. Your site is ready to share." />
+        <Notice tone="ok" message="Your setup tasks and launch checks are ready. Your site is ready to share." />
       ) : null}
       {clientDone && !allDone && !error && !busy ? (
         <Notice tone="caution" message="Your setup tasks are done. Awaiting Event Runner setup before you share your site." />
@@ -220,7 +232,7 @@ export default function AdminSetup() {
       {hosting.length > 0 ? (
         <section className="admin-panel flex min-w-0 flex-col gap-sm rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md" aria-labelledby="setup-hosting-heading">
           <h2 id="setup-hosting-heading" className="font-admin-ui text-admin-lg font-bold text-admin-ink">Hosting status</h2>
-          <p className="text-admin-base text-admin-ink-secondary">The Event Runner team manages these checks. No action is needed from you.</p>
+          <p className="text-admin-base text-admin-ink-secondary">The Event Runner team manages these checks.</p>
           <ul className="flex flex-col gap-md" aria-label="Hosting checks">
             {hosting.map((check) => (
               <li key={check.id} className="flex flex-col gap-xs">

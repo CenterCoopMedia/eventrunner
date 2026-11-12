@@ -144,6 +144,19 @@ test('readiness reads the config fresh, not from the container cache', async () 
   assert.deepEqual(calls, [{ forceRefresh: true }]);
 });
 
+test('mailing-address status is advisory and exposes no address', async () => {
+  for (const [address, expected] of [['[Replace address]', false], ['', false], ['<p>&nbsp;</p>', false], ['Example Org<br>1 Main Street', true]]) {
+    const current = config();
+    current.event.legal.postalAddressHtml = address;
+    const result = await internals.readEventReadiness({ db: makeFakeDb(seed()), getConfig: async () => current });
+    const publicResult = internals.redactDiagnosticValue(result);
+    assert.equal(publicResult.mailingAddressReady, expected);
+    assert.equal(publicResult.ready, true);
+    assert.equal(publicResult.checks.total, 7);
+    assert.doesNotMatch(JSON.stringify(publicResult), /Replace address|Example Org|Main Street/);
+  }
+});
+
 test('the current-page diagnostic uses the route-owned id and bounds validator issues', async () => {
   const db = makeFakeDb(seed());
   const result = await internals.readCurrentPageDraft({ db }, { pageId: 'home' });

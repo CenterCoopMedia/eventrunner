@@ -1013,7 +1013,7 @@ The event's own identity fields: Name, dates, time zone, venue, social accounts,
 
 **From address.** The address is shown as read-only text for all admins, including operators. To send from a different address, contact us. Operators can still edit the sender name and reply-to address. Staff can read those values.
 
-**Mailing address.** Our team sets the mailing address in the email footer during setup. Admins cannot change it here. Announcements cannot be sent until it is set: "Add your mailing address before sending announcements. Contact us to set it." Receipts and sign-in codes are not blocked by this check.
+**Mailing address.** Our team sets the mailing address in the email footer during setup. Admins cannot change it here. On **Set up your event**, **Hosting status → Email mailing address** says whether it is set. Contact the Event Runner team if it is missing. This advisory does not stop you from sharing the site, but announcements and reminders cannot be sent until the address is set. Receipts and sign-in codes are not blocked by this check.
 
 **The time zone is chosen from a list.** Type part of a city, a region, the zone's usual name, or an offset into **Time zone**, such as `Chicago`, `Eastern Time`, or `UTC+05:30`. Each match shows the city, the zone's name, and its offset today. Use the arrow keys and Enter, or select one. Escape, or leaving the field without a choice, keeps the saved zone. The saved zone is marked **Current**. The site still stores the IANA name, such as `America/Chicago`, and the field states it under the search. A line under the field gives the UTC offset on your event days. If the clocks change during the event, it names both offsets and the day the second one starts.
 

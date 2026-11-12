@@ -1,6 +1,7 @@
 'use strict';
 
 const { evaluateReadiness, allReady } = require('shared/readiness');
+const { hasMailingAddress } = require('shared/email');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { validatePageDoc, internals: pageInternals } = require('../cms/pages.cjs');
@@ -147,6 +148,8 @@ async function readEventReadiness({ db, getConfig }) {
   });
   return {
     ready: allReady(rows),
+    // Advisory for email delivery; it does not change the launch gate.
+    mailingAddressReady: hasMailingAddress(config.event?.legal?.postalAddressHtml),
     checks: bounded(
       rows.map((row) => ({
         name: row.id,
