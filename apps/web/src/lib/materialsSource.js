@@ -149,7 +149,7 @@ export async function fetchSessionMaterialUrl({ user, materialId }) {
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
       message:
-        typeof error.message === 'string' ? error.message : 'This material is not available.',
+        typeof error.message === 'string' ? error.message : 'The material link could not be opened. Try again.',
     });
   }
   return payload;
@@ -202,7 +202,7 @@ export async function downloadSessionMaterialFile({ user, materialId, filename }
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
       message:
-        typeof error.message === 'string' ? error.message : 'This material is not available.',
+        typeof error.message === 'string' ? error.message : 'The material could not be downloaded. Try again.',
     });
   }
   let blob;
