@@ -16,6 +16,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
   const section = page?.current?.sections?.find((item) => item.id === 'hero');
   const blocks = byStoredOrder(rows.filter((row) => row.current?.section === 'hero'));
   const image = blocks.find((row) => row.current?.blockType === 'image' && isDrawable(row.current));
+  const imageId = image?.id ?? null;
   const [edit, setEdit] = useState(null);
   const [baseline, setBaseline] = useState(null);
   const [savedField, setSavedField] = useState(null);
@@ -23,6 +24,7 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
   const [error, setError] = useState(null);
   const [status, setStatus] = useState('');
   const pending = useRef(false);
+  const observedImage = useRef(null);
   const errorRef = useRef(null);
   const values = edit ?? toEditableContent(image?.current, 'image').values;
   const dirty = edit !== null && (edit.url !== baseline?.url || edit.alt !== baseline?.alt);
@@ -40,6 +42,20 @@ export default function HomeHeroImageEditor({ page, rows, ready, disabled = fals
   }, [dirty, busy, onEditStateChange]);
 
   useEffect(() => () => onEditStateChange({ dirty: false, busy: false }), [onEditStateChange]);
+
+  useEffect(() => {
+    if (!ready || busy) return;
+    if (observedImage.current && !imageId) {
+      setSavedField(null);
+      if (!dirty) {
+        setEdit(null);
+        setBaseline(null);
+      }
+      setError(null);
+      setStatus('');
+    }
+    observedImage.current = imageId;
+  }, [ready, busy, imageId, dirty]);
 
   function change(name, value) {
     if (edit === null) setBaseline(values);

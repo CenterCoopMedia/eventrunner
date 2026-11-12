@@ -204,7 +204,7 @@ describe('the Home hero image slot', () => {
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
-  it('shows a labelled image slot and creates a draft without a block type choice', async () => {
+  it('creates a draft without a block type choice and can replace it after deletion', async () => {
     fetch.mockResolvedValue(okResponse({ docId: 'hero__image', status: 'dirty' }));
     await renderAt('/admin/content/home/hero');
     expect(await screen.findByRole('heading', { name: 'Hero image' })).toBeInTheDocument();
@@ -227,6 +227,22 @@ describe('the Home hero image slot', () => {
     expect(screen.getByLabelText('Hero image')).toHaveValue('cms-images/hero.jpg');
     expect(screen.getByText('Draft saved. Publish to show it on your site.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'People at the event' })).toHaveAttribute('href', '/admin/content/home/hero/image');
+    const imageRow = screen.getByRole('link', { name: 'People at the event' }).closest('li');
+    fireEvent.click(within(imageRow).getByRole('button', { name: 'Delete', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this block' }));
+    await screen.findByText(/deleted. The live block and its draft were removed/);
+    act(() => adminSubscriptions.get('cmsContent_drafts')([]));
+    expect(screen.getByLabelText('Hero image')).toHaveValue('');
+    expect(screen.getByLabelText('Alt text')).toHaveValue('');
+    expect(heroUnloadBlocked()).toBe(false);
+    fireEvent.change(screen.getByLabelText('Hero image'), { target: { value: 'cms-images/replacement.jpg' } });
+    fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'A replacement picture' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. Publish to show it on your site.');
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(urlOf(1)).toMatch(/\/cmsDeleteContent$/);
+    expect(urlOf(2)).toMatch(/\/cmsCreateContent$/);
+    expect(bodyOf(2).fields).toMatchObject({ url: 'cms-images/replacement.jpg', alt: 'A replacement picture' });
   });
 
   it.each(['success', 'failure'])('keeps a delayed publish %s after the draft listener adds the image', async (outcome) => {
