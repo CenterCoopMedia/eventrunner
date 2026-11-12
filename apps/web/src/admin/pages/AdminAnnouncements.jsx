@@ -225,14 +225,14 @@ export default function AdminAnnouncements() {
               onChange={(level) => setForm((current) => ({ ...current, level }))}
             />
             <div className="grid gap-sm md:grid-cols-2">
-              <TextField help="Choose when this banner starts appearing on the event’s local clock."
+              <TextField help="Choose when this banner starts appearing, using the time zone on your device."
                 label="Starts"
                 type="datetime-local"
                 value={form.startsAt}
                 required
                 onChange={(startsAt) => setForm((current) => ({ ...current, startsAt }))}
               />
-              <TextField help="Choose when this banner stops appearing on the event’s local clock."
+              <TextField help="Choose when this banner stops appearing, using the time zone on your device."
                 label="Ends"
                 type="datetime-local"
                 value={form.endsAt}

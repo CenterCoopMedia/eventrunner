@@ -111,7 +111,7 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
           <p className="text-admin-sm text-admin-ink-secondary">Email: {lead?.email || 'Not recorded'}. </p>
           <div className="planner-fields grid gap-sm md:grid-cols-3">
             <TextField data-help-skip="The label directly names the requested detail; no further explanation needed." label="Lead presenter name" required maxLength={120} value={form.leadName} onChange={edit('leadName')} />
-            <TextField help="Describe the presenter’s part in this session." label="Lead presenter role" maxLength={120} value={form.leadRole} onChange={edit('leadRole')} />
+            <TextField help="Enter the presenter’s job title, such as reporter or executive director." label="Lead presenter role" maxLength={120} value={form.leadRole} onChange={edit('leadRole')} />
             <TextField data-help-skip="The label directly names the requested detail; no further explanation needed." label="Organization" maxLength={200} value={form.organization} onChange={edit('organization')} />
           </div>
         </fieldset>
@@ -122,7 +122,7 @@ export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy,
               <TextField data-help-skip="The label names this co-presenter’s name, email or organization." label={`Co-presenter ${index + 1} name`} required maxLength={120} value={row.name} onChange={(name) => editRow(row.key, { name })} />
               <TextField data-help-skip="The label names this co-presenter’s name, email or organization." label={`Co-presenter ${index + 1} email`} required type="email" maxLength={254} value={row.email} onChange={(email) => editRow(row.key, { email })} />
               <TextField data-help-skip="The label names this co-presenter’s name, email or organization." label={`Co-presenter ${index + 1} organization`} maxLength={200} value={row.organization} onChange={(organization) => editRow(row.key, { organization })} />
-              <TextField help="Describe this co-presenter’s part in the proposed session." label={`Co-presenter ${index + 1} role`} maxLength={120} value={row.role} onChange={(role) => editRow(row.key, { role })} />
+              <TextField help="Enter this co-presenter’s job title, such as reporter or executive director." label={`Co-presenter ${index + 1} role`} maxLength={120} value={row.role} onChange={(role) => editRow(row.key, { role })} />
               <AdminIconControl icon="remove" className={secondaryButtonClass} label={`Remove co-presenter ${index + 1}`} onClick={() => setForm((current) => ({ ...current, presenters: current.presenters.filter((other) => other.key !== row.key) }))} />
             </div>
           ))}
