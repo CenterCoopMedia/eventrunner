@@ -29,6 +29,8 @@ const ROOT = path.resolve(__dirname, '..');
 // These method guards return 405 before authentication or writes:
 // functions/src/email/send.cjs and functions/src/ticketing/webhook.cjs.
 const POST_ONLY_WEBHOOKS = new Set(['emailDeliveryWebhook', 'ticketingWebhook']);
+const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+const REQUEST_TIMEOUT_MS = 10_000;
 
 function usage() {
   return [
@@ -39,19 +41,33 @@ function usage() {
 
 /**
  * @param {string} url
- * @param {{ method?: string, expectedStatus?: number }} [opts]
+ * @param {{ method?: string, expectedStatus?: number, timeoutMs?: number }} [opts]
  * @returns {Promise<{ url: string, ok: boolean, status: number|null, error: string|null }>}
  */
-async function probe(url, { method = 'GET', expectedStatus } = {}) {
-  try {
-    const res = await fetch(url, { method, redirect: 'manual' });
-    // Only known POST-only webhooks have an expected 405 on OPTIONS.
-    // Other probes retain their existing 2xx/3xx success behavior.
-    const ok = res.status < 400 || res.status === expectedStatus;
-    return { url, ok, status: res.status, error: null };
-  } catch (err) {
-    return { url, ok: false, status: null, error: err.message };
+async function probe(url, { method = 'GET', expectedStatus, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+  let result;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { method, redirect: 'manual', signal: controller.signal });
+      // Only known POST-only webhooks have an expected 405 on OPTIONS.
+      const ok = res.status < 400 || res.status === expectedStatus;
+      result = { url, ok, status: res.status, error: null };
+    } catch (err) {
+      result = { url, ok: false, status: null,
+        error: controller.signal.aborted ? `request timed out after ${timeoutMs} ms` : err.message };
+    } finally {
+      clearTimeout(timer);
+      // This status-only check does not consume the response body.
+      controller.abort();
+    }
+    const transient = result.status === null || TRANSIENT_STATUSES.has(result.status);
+    if (result.ok || !['GET', 'OPTIONS'].includes(method) || !transient || attempt === 1) break;
+    // One bounded retry lets a cold deployment or transient transport recover.
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
+  return result;
 }
 
 async function main(argv) {
