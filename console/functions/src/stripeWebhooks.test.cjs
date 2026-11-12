@@ -70,15 +70,36 @@ test('invalid signatures and expired replay timestamps fail before routing or re
     request('acct_one', { timestamp: NOW / 1000 - 301 }),
     request('acct_one', { raw: false }),
   ]) assert.equal((await deliver(req, { ...deps, db })).statusCode, 400);
+  const unsigned = request();
+  unsigned.headers = {};
+  assert.equal((await deliver(unsigned, { ...deps, db })).statusCode, 400);
   assert.equal(reads, 0);
   assert.equal(calls.length, 0);
 });
 
-test('an unknown or missing account and test-mode payload never reach a site', async () => {
+test('a signed live account without a route is acknowledged and logged without forwarding or its payload', async () => {
+  const { deliver, calls, logs } = setup();
+  const req = request('acct_unknown', { body: { data: { object: { email: 'private@example.test' } } } });
+  const res = await deliver(req);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body, 'Ignored');
+  assert.equal(calls.length, 0);
+  assert.deepEqual(logs, [['stripe Connect webhook ignored', {
+    category: 'unrouted-account', status: 200, accountId: 'acct_unknown', eventId: 'evt_fixture',
+  }]]);
+  assert.ok(!JSON.stringify(logs).includes('private@example.test'));
+});
+
+test('a missing account and test-mode payload never reach a site', async () => {
   const { deliver, calls } = setup();
-  assert.equal((await deliver(request('acct_unknown'))).statusCode, 404);
   assert.equal((await deliver(request(null))).statusCode, 400);
   assert.equal((await deliver(request('acct_one', { body: { livemode: false } }))).statusCode, 400);
+  assert.equal(calls.length, 0);
+});
+
+test('an unknown HTTP path returns 404 without forwarding', async () => {
+  const { deliver, calls } = setup();
+  assert.equal((await deliver({ ...request(), path: '/missing' })).statusCode, 404);
   assert.equal(calls.length, 0);
 });
 

@@ -189,6 +189,7 @@ function buildHandlers({ startBuild } = {}) {
         fetch: globalThis.fetch,
       }),
       fetch: globalThis.fetch,
+      log: require('firebase-functions/logger'),
     })(req, res);
   });
   for (const [name, spec] of Object.entries(ENDPOINTS)) {

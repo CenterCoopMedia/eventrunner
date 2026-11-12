@@ -66,6 +66,7 @@ async function deleteStripeRoutes({ db, secrets, appId, projectId }) {
 /** The platform's signed bytes are the only source of the routing account. */
 function stripeConnectWebhook({ db, secrets, endpointSecret, fetch, now = Date.now, log = console }) {
   return async (req, res) => {
+    if (req.path && req.path !== '/') return res.status(404).send('Not found');
     if (req.method !== 'POST') return res.status(405).send('POST required');
     let event;
     const fail = (category, status, message, detail = {}) => {
@@ -88,7 +89,14 @@ function stripeConnectWebhook({ db, secrets, endpointSecret, fetch, now = Date.n
     let stage = 'route-read';
     try {
       const route = (await db.collection(STRIPE_ROUTE_COLLECTION).doc(event.account).get()).data();
-      if (!route) return fail('unknown-account', 404, 'Unknown connected account');
+      if (!route) {
+        // Retries for an unbuilt or retired site can disable the shared endpoint.
+        log.warn('stripe Connect webhook ignored', {
+          category: 'unrouted-account', status: 200, accountId: event.account,
+          ...(typeof event.id === 'string' && /^evt_[A-Za-z0-9]+$/.test(event.id) ? { eventId: event.id } : {}),
+        });
+        return res.status(200).send('Ignored');
+      }
       stage = 'route-identity';
       const url = ticketWebhookUrl(route);
       stage = 'site-secret';

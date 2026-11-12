@@ -182,8 +182,10 @@ actionable event type. The hosted two-account contract must already pass for
 this commit.
 
 Run this block before deletion and again after deletion. It requires 400 for
-a bad signature, 404 for a correctly signed unknown account, and 200 for NC
-Local. The receiver returns 200 only after its destination returns 2xx. The
+a bad or missing signature, 404 for an unknown HTTP path, and 200 for a correctly
+signed account without a route and for NC Local. An unrouted event is acknowledged
+without forwarding and produces a structured warning counted by
+`stripe_connect_unrouted`. A routed event returns 200 only after its destination returns 2xx. The
 direct-site check also requires the exact no-op acknowledgement. Signatures,
 secret values and payloads are never printed.
 
@@ -206,10 +208,12 @@ const { createSecretStore } = require("./console/functions/src/secretStore.cjs")
   const send = async (label, target, account, secret, expected, valid = true) => {
     const body = envelope(account), timestamp = Math.floor(Date.now() / 1000);
     const hash = createHmac("sha256", secret).update(`${timestamp}.`).update(body).digest("hex");
-    const signature = `t=${timestamp},v1=${valid ? hash : "0".repeat(64)}`;
-    const response = await fetch(target, { method: "POST", redirect: "error", signal: AbortSignal.timeout(60_000), headers: { "Content-Type": "application/json", "Stripe-Signature": signature }, body });
+    const signature = `t=${timestamp},v1=${valid === false ? "0".repeat(64) : hash}`;
+    const headers = { "Content-Type": "application/json", ...(valid === null ? {} : { "Stripe-Signature": signature }) };
+    const response = await fetch(target, { method: "POST", redirect: "error", signal: AbortSignal.timeout(60_000), headers, body });
     const text = await response.text();
     if (response.status !== expected) throw new Error();
+    if (label === "unrouted account" && text !== "Ignored") throw new Error();
     if (label === "site no-op") {
       const result = JSON.parse(text);
       if (result.ok !== true || result.ignored !== "not_actionable") throw new Error();
@@ -217,7 +221,9 @@ const { createSecretStore } = require("./console/functions/src/secretStore.cjs")
     console.log(`${new Date().toISOString()} ${label}: HTTP ${response.status}; event ${id}`);
   };
   await send("bad signature", url, e.STRIPE_ACCOUNT_ID, shared, 400, false);
-  await send("unknown account", url, "acct_lojReceiverUnknown20261112", shared, 404);
+  await send("missing signature", url, e.STRIPE_ACCOUNT_ID, shared, 400, null);
+  await send("unknown HTTP path", `${url}/missing`, e.STRIPE_ACCOUNT_ID, shared, 404);
+  await send("unrouted account", url, "acct_lojReceiverUnknown20261112", shared, 200);
   await send("site no-op", `https://${e.CLIENT_REGION}-${e.CLIENT_PROJECT_ID}.cloudfunctions.net/ticketingWebhook`, e.STRIPE_ACCOUNT_ID, site, 200);
   await send("shared NC Local", url, e.STRIPE_ACCOUNT_ID, shared, 200);
 })().catch(() => { console.error("Delivery proof failed; keep the old endpoint and stop"); process.exitCode = 1; });
@@ -380,3 +386,29 @@ shared endpoint, the expected route and secret versions, and unchanged client
 This verifies the coordinator-approved synthetic signature and routing path.
 The first real Stripe-originated delivery remains pending. Step 6, the merge
 and normal Console deployment, belongs to the coordinator.
+
+## Unrouted event counter
+
+After the initial migration, the November 12 review identified that repeated
+404 deliveries for an unbuilt or retired account can disable the shared Stripe
+endpoint for every client. The coordinator approved acknowledging a signed live
+account without a route, with no forwarding or processing. Bad or missing
+signatures remain 400; unknown HTTP paths remain 404. The earlier migration
+receipt records the original deployed revision. Redeploy only the receiver with
+this correction, then run the current proof block above.
+
+Use one Cloud Logging counter for the structured `unrouted-account` warnings.
+The warnings retain only account/event IDs and status, with no provider payload.
+The counter adds no account or event labels. Existing warning logs retain the
+individual events; the counter gives their total. Remove the counter when the
+shared receiver is retired. This implements the count requested for the review
+finding; it adds no alert or delivery gate.
+
+```sh
+gcloud logging metrics create stripe_connect_unrouted --project="$CONSOLE_PROJECT_ID" --description="Count signed Stripe Connect events acknowledged without a site route" --log-filter='resource.type="cloud_run_revision" AND resource.labels.service_name="stripeconnectwebhook" AND severity=WARNING AND jsonPayload.category="unrouted-account"'
+```
+
+Read back its filter and DELTA/INT64 descriptor. After the signed unrouted probe,
+confirm a structured warning with that account/event ID and no payload. The
+metric counts matching entries as Cloud Logging ingests them. Do not create a
+Firestore counter or make acknowledgement wait for Monitoring ingestion.

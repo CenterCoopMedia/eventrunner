@@ -342,8 +342,11 @@ and in live mode for the launch. `EVENT_STRIPE_MODE` follows the mode of the tok
 The Console's `stripeConnectWebhook` receives live Connect snapshot events through one
 platform endpoint. It verifies the exact raw body with the pinned Stripe SDK and
 `CONSOLE_STRIPE_WEBHOOK_SECRET`, including the SDK's 300-second signature timestamp tolerance,
-before looking up the signed `event.account`. Missing, unknown and test-mode accounts are
-refused. Payment data stays in the trusted Console service until this check completes.
+before looking up the signed `event.account`. Missing and test-mode accounts are refused.
+A signed live account without a route is acknowledged without forwarding. The receiver logs
+its account and event IDs in a structured warning, counted by `stripe_connect_unrouted`.
+This prevents repeated failures for an unbuilt or retired site from disabling delivery for
+every client. Payment data stays in the trusted Console service until this check completes.
 
 `console_stripe_routes/{accountId}` holds the application, project and region of the one site
 that owns that account's route. Browser clients, including operators, cannot read or write
@@ -360,8 +363,8 @@ Neither the platform API key nor the platform signing secret goes to a client pr
 
 The receiver constructs the destination from the trusted project and region, then forwards
 the unchanged raw body with a fresh Stripe-format `t=...,v1=...` HMAC using that site's secret.
-Redirects are refused. Missing secrets and delivery failures return retryable errors; only a
-successful site response acknowledges the event. The site's Stripe provider, authoritative
+Redirects are refused. Missing secrets and delivery failures return retryable errors; a routed
+event is acknowledged only after a successful site response. The site's Stripe provider, authoritative
 account/mode checks, event-ID deduplication and reconciliation queue stay unchanged. Stripe
 retries receive fresh signatures and reuse that existing deduplication; there is no new queue.
 
