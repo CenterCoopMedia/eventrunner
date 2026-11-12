@@ -145,12 +145,12 @@ test('a production caught error reaches the emulator and the real System errors 
 test('production missing chunk reloads once and stays out of telemetry', async ({ page }) => {
   const reports = await intercept(page);
   let documents = 0;
-  page.on('request', (request) => {
-    if (request.isNavigationRequest() && request.url() === `${origin}/chunk-error`) documents += 1;
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame() && frame.url() === `${origin}/chunk-error`) documents += 1;
   });
   await page.goto(`${origin}/chunk-error`, { waitUntil: 'commit' });
-  await expect(page.getByRole('heading', { name: 'This page could not be shown' })).toBeVisible();
   await expect.poll(() => documents).toBe(2);
+  await expect(page.getByRole('heading', { name: 'This page could not be shown' })).toBeVisible();
   expect(await page.evaluate(() => globalThis.sessionStorage.getItem('eventrunner:chunk-reload'))).toBe('1');
   expect(reports).toHaveLength(0);
 });
