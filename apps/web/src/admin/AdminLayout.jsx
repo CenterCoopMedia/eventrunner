@@ -635,7 +635,7 @@ function AdminDesk() {
   };
 
   return (
-    <div className="admin-room flex min-h-screen flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
+    <div className="admin-room flex min-h-screen min-h-svh flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
       <a href="#admin-content" className="skip-link skip-link--admin">
         Skip to main content
       </a>

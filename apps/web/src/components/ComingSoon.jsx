@@ -34,7 +34,7 @@ export default function ComingSoon() {
   const logo = primary.split('/').length > 2 ? brandingSrc(primary) : null;
 
   return (
-    <div className="coming-soon flex min-h-screen flex-col bg-surface text-text-primary">
+    <div className="coming-soon flex min-h-screen min-h-svh flex-col bg-surface text-text-primary">
       <main id="main-content" className="flex flex-1 items-center px-md py-2xl">
         <div className="mx-auto w-full max-w-stage">
           {logo ? <img src={logo} alt={organizer || name} className="mb-xl h-12 w-auto max-w-[12rem] object-contain" /> : null}
