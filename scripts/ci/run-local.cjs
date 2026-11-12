@@ -24,6 +24,7 @@ const CHECKS = {
     ['npm', 'run', 'build'],
     ['node', 'scripts/ci/bundle-budget.cjs', '--dist', 'apps/web/dist'],
     ['npm', 'run', 'build:console'],
+    ['node', 'scripts/ci/bundle-budget.cjs', '--dist', 'console/web/dist', '--budget', 'scripts/ci/console-bundle-budget.json'],
   ],
   hygiene: [['node', 'scripts/generate-content.cjs', '--demo', '--check']],
   rules: [['npm', 'run', 'test:rules']],

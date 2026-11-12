@@ -872,6 +872,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Console pages load separately, keeping setup, team and hosting-team tools out of the initial
+  download. A delayed page keeps navigation focus and a missing page offers a reload (#632).
 - Homepage hero-image edits keep save and publish feedback visible when the draft listener updates.
   Branding edits the visible image used by Home, and local URL/alt changes warn before navigation
   or reload. A failed save keeps edits dirty until the draft is confirmed (#726).

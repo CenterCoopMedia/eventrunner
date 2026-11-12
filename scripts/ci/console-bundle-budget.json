@@ -1,0 +1,14 @@
+{
+  "initial": {
+    "raw": 325000,
+    "gzip": 103000
+  },
+  "initialCss": {
+    "raw": 26000,
+    "gzip": 6000
+  },
+  "lazyChunk": {
+    "raw": 20000,
+    "gzip": 6500
+  }
+}

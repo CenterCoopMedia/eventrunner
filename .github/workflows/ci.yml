@@ -285,6 +285,8 @@ jobs:
         run: |
           npm run build:console
           test -f console/web/dist/index.html
+      - name: Enforce console bundle budget
+        run: node scripts/ci/bundle-budget.cjs --dist console/web/dist --budget scripts/ci/console-bundle-budget.json
 
   hygiene:
     name: Generated-content hygiene

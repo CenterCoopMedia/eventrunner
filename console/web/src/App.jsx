@@ -2,23 +2,25 @@ import PageHeading from './PageHeading.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, forgetReturn, rememberReturn, signInErrorMessage, useAuth } from './auth.jsx';
-import AcceptInvite from './pages/AcceptInvite.jsx';
-import AcceptedAgreement from './pages/AcceptedAgreement.jsx';
-import ApplicationStatus from './pages/ApplicationStatus.jsx';
-import ConnectReturn from './pages/ConnectReturn.jsx';
-import OrganizationHome from './pages/OrganizationHome.jsx';
-import Setup from './pages/setup/Setup.jsx';
-import StartEvent from './pages/StartEvent.jsx';
-import Organizations from './pages/Organizations.jsx';
 import SignIn from './pages/SignIn.jsx';
 import SignInFinish from './pages/SignInFinish.jsx';
-import Team from './pages/Team.jsx';
-import ConsoleSettings from './pages/review/ConsoleSettings.jsx';
-import ReviewApplication from './pages/review/ReviewApplication.jsx';
-import ReviewQueue from './pages/review/ReviewQueue.jsx';
-import SignupLinks from './pages/review/SignupLinks.jsx';
 import LoadingState from './LoadingState.jsx';
 import ReportProblem from './ReportProblem.jsx';
+import RouteBoundary, { lazyPage } from './RouteBoundary.jsx';
+
+const AcceptInvite = lazyPage(() => import('./pages/AcceptInvite.jsx'));
+const AcceptedAgreement = lazyPage(() => import('./pages/AcceptedAgreement.jsx'));
+const ApplicationStatus = lazyPage(() => import('./pages/ApplicationStatus.jsx'));
+const ConnectReturn = lazyPage(() => import('./pages/ConnectReturn.jsx'));
+const OrganizationHome = lazyPage(() => import('./pages/OrganizationHome.jsx'));
+const Setup = lazyPage(() => import('./pages/setup/Setup.jsx'));
+const StartEvent = lazyPage(() => import('./pages/StartEvent.jsx'));
+const Organizations = lazyPage(() => import('./pages/Organizations.jsx'));
+const Team = lazyPage(() => import('./pages/Team.jsx'));
+const ConsoleSettings = lazyPage(() => import('./pages/review/ConsoleSettings.jsx'));
+const ReviewApplication = lazyPage(() => import('./pages/review/ReviewApplication.jsx'));
+const ReviewQueue = lazyPage(() => import('./pages/review/ReviewQueue.jsx'));
+const SignupLinks = lazyPage(() => import('./pages/review/SignupLinks.jsx'));
 
 const MARK = (
   <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false" className="mark">
@@ -47,7 +49,22 @@ function useFocusHeadingOnNavigate() {
       first.current = false;
       return;
     }
-    (document.querySelector('main h1') || document.querySelector('main'))?.focus();
+    const main = document.querySelector('main');
+    const heading = main?.querySelector('h1');
+    if (heading) {
+      heading.focus();
+      return;
+    }
+    main?.focus();
+    const observer = new MutationObserver(() => {
+      const destination = main?.querySelector('h1');
+      if (destination) {
+        destination.focus();
+        observer.disconnect();
+      }
+    });
+    if (main) observer.observe(main, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [pathname]);
 }
 
@@ -79,7 +96,9 @@ function Layout() {
         </div>
       </header>
       <main id="main" tabIndex={-1} className="page">
-        <Outlet />
+        <RouteBoundary resetKey={pathname}>
+          <Outlet />
+        </RouteBoundary>
         {helpEmail ? <p className="muted section">{helpName ? `Need a hand? Email ${helpName} at ` : 'Need the hosting team? Email '}<a href={`mailto:${helpEmail}`}>{helpEmail}</a>.</p> : null}
       </main>
     </>
