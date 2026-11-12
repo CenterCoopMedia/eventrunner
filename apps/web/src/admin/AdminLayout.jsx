@@ -71,6 +71,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
 import { useMediaQuery } from '../lib/viewport.js';
+import { reloadOnce } from '../lib/chunkReload.js';
 import { AdminEmptyState } from './components/adminChrome.jsx';
 import AdminIcon from './components/AdminIcon.jsx';
 import AdminIconControl from './components/AdminIconControl.jsx';
@@ -500,7 +501,10 @@ function TourLoadFailed({ onEnd }) {
   );
 }
 
-const AdminTour = lazy(() => import('./components/AdminTour.jsx').catch(() => ({ default: TourLoadFailed })));
+const AdminTour = lazy(() => import('./components/AdminTour.jsx').catch(() => {
+  reloadOnce();
+  return { default: TourLoadFailed };
+}));
 
 /**
  * The shell opens one unpublished-count document for the banner. The
