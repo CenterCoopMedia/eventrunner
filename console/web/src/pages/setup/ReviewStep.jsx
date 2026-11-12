@@ -1,14 +1,15 @@
 import { Link } from 'react-router';
-import { STEPS, SIGNUPS_CLOSED, SITE_DOMAIN, TICKET_CHOICES, setupPath, stepById, stepOfField } from '../../setup/steps.js';
+import { SIGNUPS_CLOSED, SITE_DOMAIN, TICKET_CHOICES, setupPath, stepById, stepOfField } from '../../setup/steps.js';
 import { senderPreview } from './EmailStep.jsx';
 import { eventDayText } from '../../reviewText.js';
 import IconControl from '../../IconControl.jsx';
 
-function Row({ label, children }) {
+function Row({ label, children, optional = false }) {
+  const hasValue = typeof children === 'string' ? children.trim() : children;
   return (
     <div className="summary-row">
       <dt>{label}</dt>
-      <dd>{children || <span className="muted">Not added</span>}</dd>
+      <dd>{hasValue ? children : <span className="muted">{optional ? 'Not provided' : 'Not answered'}</span>}</dd>
     </div>
   );
 }
@@ -18,7 +19,7 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
   const choice = TICKET_CHOICES.find((c) => c.value === tickets.choice);
   const account = choice?.connect ? connections[choice.value] : null;
   const edit = (id, title) => (
-    <IconControl icon="edit" label={`Edit ${title.toLowerCase()}`} to={setupPath(orgId, appId, STEPS.find((s) => s.id === id))} />
+    <IconControl icon="edit" label={`Edit ${title.toLowerCase()}`} to={`${setupPath(orgId, appId, stepById(id))}?from=review`} />
   );
   return (
     <>
@@ -26,8 +27,8 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
         <div className="summary-heading"><h2 id="sum-org">Your organization</h2>{edit('organization', 'Your organization')}</div>
         <dl>
           <Row label="Name">{organization.name}</Row>
-          <Row label="Website">{organization.website}</Row>
-          <Row label="Mailing address"><span className="pre">{organization.address}</span></Row>
+          <Row label="Website" optional>{organization.website}</Row>
+          <Row label="Mailing address">{organization.address.trim() ? <span className="pre">{organization.address}</span> : null}</Row>
         </dl>
       </section>
       <section aria-labelledby="sum-event" className="summary">
@@ -35,12 +36,12 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
         <dl>
           <Row label="Event name">{event.name}</Row>
           <Row label="Short name">{event.shortName}</Row>
-          <Row label="Description">{event.tagline}</Row>
+          <Row label="Description" optional>{event.tagline}</Row>
           <Row label="Time zone">{event.timezone.replaceAll('_', ' ').split('/').reverse().join(', ')}</Row>
           <Row label="Dates">
             {event.days.length > 0 ? <ul className="plain">{event.days.map((d, i) => <li key={i}>{eventDayText(d)}</li>)}</ul> : null}
           </Row>
-          <Row label="Venue">{[event.venue.name, event.venue.address].filter(Boolean).join(', ')}</Row>
+          <Row label="Venue" optional>{[event.venue.name, event.venue.address].filter((part) => part.trim()).join(', ')}</Row>
         </dl>
       </section>
       <section aria-labelledby="sum-web" className="summary">
@@ -71,7 +72,7 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
 }
 
 /** Each open problem, with a link to its step. */
-export function Problems({ fields, orgId, appId }) {
+export function Problems({ fields, orgId, appId, fromReview = false }) {
   const items = Object.entries(fields)
     .filter(([path]) => path !== 'team')
     .map(([path, message]) => ({ path, message, step: stepOfField(path) }))
@@ -83,7 +84,7 @@ export function Problems({ fields, orgId, appId }) {
       <ul>
         {items.map((item) => (
           <li key={item.path}>
-            <Link to={`${setupPath(orgId, appId, item.step)}?check=1`}>{item.step.title}</Link>: {item.message}
+            <Link to={`${setupPath(orgId, appId, item.step)}?check=1${fromReview ? '&from=review' : ''}`}>{item.step.title}</Link>: {item.message}
           </li>
         ))}
       </ul>
@@ -98,7 +99,7 @@ function NotSaved({ steps, orgId, appId }) {
     <div className="message error">
       {steps.map((step) => (
         <p key={step.id}>
-          <Link to={`${setupPath(orgId, appId, step)}?check=1`}>{step.title}</Link> is not saved. Fix it before you continue.
+          <Link to={`${setupPath(orgId, appId, step)}?check=1&from=review`}>{step.title}</Link> is not saved. Fix it before you continue.
         </p>
       ))}
     </div>
@@ -113,7 +114,7 @@ export default function ReviewStep({ app, answers, errors, ownersNeeded, refused
     <div className="stack">
       <p className="lead">Check your event details, then continue to the hosting agreement.</p>
       <NotSaved steps={notSaved} orgId={orgId} appId={appId} />
-      <Problems fields={errors} orgId={orgId} appId={appId} />
+      <Problems fields={errors} orgId={orgId} appId={appId} fromReview />
       <Summary answers={answers} connections={app.connections} ownersNeeded={ownersNeeded} orgId={orgId} appId={appId} />
       {!app.signups?.open ? <p className="message error">{SIGNUPS_CLOSED}</p> : null}
       {app.signups?.open && !ready && notSaved.length === 0 ? <p className="muted">Finish the answers above first. Then you can continue.</p> : null}

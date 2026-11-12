@@ -83,6 +83,7 @@ export default function Setup() {
   // The same list, readable right after a save inside go().
   const refusedNow = useRef([]);
   const showAll = search.get('check') === '1';
+  const fromReview = search.get('from') === 'review' && (ANSWER_STEPS.includes(step?.id) || step?.id === 'team');
 
   const { queue, flush, status: saveStatus, error: saveError } = useAutosave({
     save: (value) => callApi('saveApplicationStep', { orgId, appId, step: value.step, answers: value.answers }),
@@ -120,9 +121,9 @@ export default function Setup() {
     first?.focus?.();
   }, [showAll, app, location.key]);
 
-  // Next checks the latest server errors after saving. Other navigation
-  // saves without checking; Review still holds a refused answer.
-  const go = useCallback(async (target, { leaving = false } = {}) => {
+  // Next checks the latest server errors after saving. Returning to Review
+  // skips validation but keeps an answer here until the server saves it.
+  const go = useCallback(async (target, action = 'next') => {
     if (navigationPending.current) return;
     navigationPending.current = true;
     setNavigating(true);
@@ -134,11 +135,11 @@ export default function Setup() {
       actionArea.current?.focus();
       return;
     }
-    if (!leaving && Object.keys(errorsOfStep(applicationNow.current?.errors, step?.id)).length > 0) {
+    if (action === 'next' && Object.keys(errorsOfStep(applicationNow.current?.errors, step?.id)).length > 0) {
       navigate(`${setupPath(orgId, appId, step)}?check=1`);
       return;
     }
-    if (!leaving && refusedNow.current.includes(step?.id)) {
+    if (action !== 'leave' && refusedNow.current.includes(step?.id)) {
       actionArea.current?.focus();
       return;
     }
@@ -169,17 +170,17 @@ export default function Setup() {
         orgId={orgId}
         appId={appId}
         disabled={navigating}
-        onGo={(e, target) => { e.preventDefault(); go(setupPath(orgId, appId, target), { leaving: true }); }}
+        onGo={(e, target) => { e.preventDefault(); go(setupPath(orgId, appId, target), 'leave'); }}
       />
       <section className="step-body" aria-labelledby="step-title">
         <p className="muted">Step {index + 1} of {STEPS.length}</p>
         <div className="step-heading">
           <PageHeading id="step-title" tabIndex={-1}>{step.title}</PageHeading>
           <IconControl icon="close" label="Close setup" to={statusPath(orgId, appId)} aria-disabled={navigating || undefined}
-            onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId), { leaving: true }); }} />
+            onClick={(event) => { event.preventDefault(); go(statusPath(orgId, appId), 'leave'); }} />
         </div>
         {error ? <ActionFeedback kind="error"><p>{error}</p><IconControl icon="refresh" label="Reload setup" onClick={() => reload().catch(() => {})} /></ActionFeedback> : null}
-        {View && showAll ? <Problems fields={shownErrors} orgId={orgId} appId={appId} /> : null}
+        {View && showAll ? <Problems fields={shownErrors} orgId={orgId} appId={appId} fromReview={fromReview} /> : null}
         <fieldset disabled={navigating} className="console-feedback-fields">
         {View ? (
           <View
@@ -221,8 +222,9 @@ export default function Setup() {
             <ActionFeedback kind="error">{saveStatusText(saveStatus, saveError)}</ActionFeedback>
           ) : <p className="save-status" role="status" aria-live="polite">{saveStatusText(saveStatus, saveError)}</p>}
           <div className="step-actions">
-            {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous), { leaving: true })}>Back</button> : null}
-            {next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next</button> : null}
+            {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous), 'leave')}>Back</button> : null}
+            {fromReview ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, stepById('review')), 'review')}>Back to Review</button>
+              : next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next</button> : null}
             {saveStatus === 'error' ? <button type="button" className="button" disabled={navigating} onClick={async () => { await flush(); actionArea.current?.focus(); }}>Save</button> : null}
           </div>
         </div>

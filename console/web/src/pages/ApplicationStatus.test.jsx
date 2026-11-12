@@ -34,6 +34,18 @@ describe('ApplicationStatus', () => {
     serveStatus({ status: 'approved', canEdit: false, canWithdraw: false });
   });
 
+  it.each([
+    ['a new request', { organization: false, event: false, webAddress: false, tickets: false, email: false }, 'organization'],
+    ['the first two answers complete', { organization: true, event: true, webAddress: false, tickets: false, email: false }, 'web-address'],
+    ['an unfinished later answer', { organization: true, event: true, webAddress: true, team: false, tickets: true, email: false }, 'email'],
+    ['all answers complete', { organization: true, event: true, webAddress: true, team: false, tickets: true, email: true }, 'review'],
+  ])('continues %s at the first unfinished answer or Review', async (_name, progress, step) => {
+    serveStatus({ status: 'draft', canEdit: true, progress });
+    page();
+    expect(await screen.findByRole('link', { name: 'Continue the setup' }))
+      .toHaveAttribute('href', `/organizations/o1/applications/a1/${step}`);
+  });
+
   it('shows plain steps with the live state', async () => {
     serveStatus({
       status: 'approved',
@@ -260,7 +272,7 @@ describe('ApplicationStatus', () => {
   });
 
   it('offers to continue a draft', async () => {
-    serveStatus({ status: 'draft' });
+    serveStatus({ status: 'draft', progress: { organization: false } });
     page();
     expect(await screen.findByRole('link', { name: 'Continue the setup' })).toHaveAttribute('href', '/organizations/o1/applications/a1/organization');
   });

@@ -8,7 +8,7 @@ import WaitingBuddy from '../WaitingBuddy.jsx';
 import IconControl from '../IconControl.jsx';
 import ConnectionPanel, { ConnectionNotice } from '../setup/ConnectionPanel.jsx';
 import { PROVIDER_COPY } from '../setup/connections.js';
-import { BUILD_FAILED_LABEL, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
+import { ANSWER_STEPS, BUILD_FAILED_LABEL, STATUS_LABELS, TICKET_CHOICES, setupPath, statusPath, stepById } from '../setup/steps.js';
 import { formatDate, hostName } from '../text.js';
 
 const REFRESH_MS = 30000;
@@ -339,7 +339,7 @@ export default function ApplicationStatus() {
               <p><a className="button primary" href={`https://${app.address}/admin`}>Open your admin panel</a></p>
             ) : null}
             {app.canEdit ? (
-              <p><Link className="button primary" to={setupPath(orgId, appId, STEPS[0])}>Continue the setup</Link></p>
+              <p><Link className="button primary" to={setupPath(orgId, appId, stepById(ANSWER_STEPS.find((id) => !app.progress[id]) || 'review'))}>Continue the setup</Link></p>
             ) : null}
             <p><Link className="button" to={`/organizations/${orgId}`}>Back to your event sites</Link></p>
           </div>
