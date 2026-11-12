@@ -137,7 +137,7 @@ describe('route content-read contract', () => {
           <EventConfigProvider>
             <ContentProvider>
               <AuthContext.Provider value={{ user, loading: false, isAdmin: path === '/admin/*', adminStatus: path === '/admin/*' ? 'admin' : 'denied', adminTier: 'operator' }}>
-                <ProfileContext.Provider value={{ profile, status: 'ready', attendeeAccess: true, needsProfileSetup: false, profileConfirmed: true }}>
+                <ProfileContext.Provider value={{ profile, status: 'ready', attendeeAccess: true, needsProfileSetup: false, profileConfirmed: true, profileReady: true }}>
                   <RecordingContexts reads={reads} missing={missing}>
                     <ToastProvider><AppRoutes /></ToastProvider>
                   </RecordingContexts>

@@ -274,7 +274,7 @@ describe('BookmarkAction', () => {
     rerenderActions(attendee);
     rerenderActions({ ...attendee, profile: { attendeeAccess: true, profileReady: true, profileConfirmed: false, status: 'ready' } });
     const button = screen.getByRole('button', { name: /bookmark/i });
-    expect(button).toBeFocused();
+    expect(button).toHaveFocus();
     expect(button).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(button);
     expect(screen.getByRole('button', { name: /bookmarked/i })).toHaveAttribute(
@@ -309,12 +309,12 @@ describe('BookmarkAction', () => {
     const busy = screen.getByRole('button', { name: label });
     expect(busy).toHaveAttribute('aria-busy', 'true');
     expect(busy).toHaveAttribute('aria-pressed', String(!fromDevice));
-    expect(busy).toBeFocused();
+    expect(busy).toHaveFocus();
     await act(async () => {
       settle();
     });
     expect(screen.getByRole('button', { name: label })).not.toHaveAttribute('aria-busy');
-    expect(screen.getByRole('button', { name: label })).toBeFocused();
+    expect(screen.getByRole('button', { name: label })).toHaveFocus();
     expect(getDeviceBookmarks().ids).toEqual([]);
   });
 
