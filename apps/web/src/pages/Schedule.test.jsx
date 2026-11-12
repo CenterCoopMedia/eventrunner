@@ -556,7 +556,8 @@ describe('compact program controls', () => {
   function viewport(initialWidth) {
     let width = initialWidth;
     const queries = new Map();
-    const matches = (query) => query === '(max-width: 639px)' ? width <= 639 : width >= 1024;
+    const matches = (query) => query === '(max-width: 639px)' ? width <= 639
+      : query === '(min-width: 64rem)' && width >= 1024;
     vi.stubGlobal('matchMedia', (query) => {
       if (!queries.has(query)) {
         const listeners = new Set();
