@@ -62,7 +62,7 @@ async function recordTimeline(page) {
       timeline.paints.push(...list.getEntries().map(({ name, startTime }) => ({ name, startTime })));
     }).observe({ type: 'paint', buffered: true });
     let previous;
-    new MutationObserver(() => {
+    new globalThis.MutationObserver(() => {
       const boot = globalThis.document.getElementById('app-boot');
       const state = {
         boot: Boolean(boot),
@@ -102,6 +102,18 @@ async function evidence(page, name, extra = {}) {
   const timeline = await page.evaluate(() => globalThis.bootTimeline);
   await fs.writeFile(path.join(EVIDENCE, `app-boot-${name}.json`), JSON.stringify({ shellSize, ...extra, ...timeline }, null, 2));
   return timeline;
+}
+
+async function captureUnfinishedPage(page, name) {
+  // Playwright's screenshot waits for document.fonts.ready, which cannot
+  // settle while this test deliberately holds the document's entry script.
+  const session = await page.context().newCDPSession(page);
+  try {
+    const { data } = await session.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    await fs.writeFile(path.join(EVIDENCE, `app-boot-${name}.png`), Buffer.from(data, 'base64'));
+  } finally {
+    await session.detach();
+  }
 }
 
 test('a fast production load paints content without fallback text', async ({ page }) => {
@@ -146,11 +158,11 @@ for (const colorScheme of ['light', 'dark']) {
       expect((levels[1] + 0.05) / (levels[0] + 0.05)).toBeGreaterThanOrEqual(4.5);
       expect(colors.animation).toBe('none');
       expect(colors.font).toContain('system-ui');
-      await page.screenshot({ path: path.join(EVIDENCE, `app-boot-${colorScheme}-opening.png`) });
+      await captureUnfinishedPage(page, `${colorScheme}-opening`);
       await expect(page.getByRole('button', { name: 'Reload this page' })).toBeVisible();
       await expect(status).toContainText('taking longer than usual');
       expect(await status.evaluate((element) => element.getBoundingClientRect().top)).toBe(initialTop);
-      await page.screenshot({ path: path.join(EVIDENCE, `app-boot-${colorScheme}-slow.png`) });
+      await captureUnfinishedPage(page, `${colorScheme}-slow`);
       const delayed = await evidence(page, `${colorScheme}-delayed`, { colors });
       const line = delayed.changes.find(({ text }) => text);
       const reload = delayed.changes.find((state) => state.reload);
@@ -195,7 +207,7 @@ test('a blocking production stylesheet delays the fallback paint too', async ({ 
   const release = await holdAssets(page, { css: true });
   try {
     await page.goto(`${origin}${BASE}`, { waitUntil: 'commit' });
-    await page.waitForFunction(() => performance.now() >= 1500);
+    await page.waitForFunction(() => performance.now() >= 1500, undefined, { polling: 100 });
     const blocked = await page.evaluate(() => ({
       paints: performance.getEntriesByType('paint').map(({ name, startTime }) => ({ name, startTime })),
       elapsed: performance.now(),
