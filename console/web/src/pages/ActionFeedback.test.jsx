@@ -248,6 +248,7 @@ describe('Console action feedback and recovery', () => {
       listApplications: { applications: [] }, getTeam: () => destination.promise });
     renderPage(<AppRoutes />);
     fireEvent.click(await screen.findByRole('link', { name: 'Newsroom' }));
+    await screen.findByText('Loading the organization.');
     expect(screen.getByRole('main')).toHaveFocus();
     await act(async () => destination.resolve(team()));
     expect(await screen.findByRole('heading', { name: 'NC Local' })).toBeInTheDocument();

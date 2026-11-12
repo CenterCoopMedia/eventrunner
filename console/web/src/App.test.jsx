@@ -1,6 +1,6 @@
 import { hostName } from './text.js';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { Link, MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { callApi } from './api.js';
 import { AuthContext, RETURN_KEY } from './auth.jsx';
@@ -9,6 +9,14 @@ import { AppRoutes } from './App.jsx';
 import { application, serveApi, team } from './test/application.js';
 
 vi.mock('./api.js', () => ({ callApi: vi.fn(async () => ({ operator: false, organizations: [{ id: 'o1', name: 'Org', role: 'owner' }] })) }));
+
+const teamImport = vi.hoisted(() => {
+  let finish;
+  const pending = new Promise((resolve) => { finish = resolve; });
+  return { pending, finish };
+});
+vi.mock('./pages/Team.jsx', () => teamImport.pending);
+vi.mock('./pages/AcceptedAgreement.jsx', () => { throw new Error('synthetic route unavailable'); });
 
 function renderApp(path, auth = fakeAuth()) {
   render(
@@ -40,6 +48,71 @@ describe('AppRoutes', () => {
     expect(skip).toHaveAttribute('href', '#main');
     expect(screen.getByRole('main')).toHaveAttribute('id', 'main');
     expect(await screen.findByRole('link', { name: 'Org' })).toBeInTheDocument();
+  });
+
+  it('waits quietly for a route chunk, then focuses its heading after it arrives', async () => {
+    render(
+      <AuthContext.Provider value={fakeAuth()}>
+        <MemoryRouter initialEntries={['/']}>
+          <AppRoutes />
+          <Link to="/organizations/o1/team">Open team</Link>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+    await screen.findByRole('link', { name: 'Org' });
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole('link', { name: 'Open team' }));
+      await act(async () => {});
+      expect(screen.getByRole('main')).toHaveFocus();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      expect(screen.getByRole('status')).toHaveTextContent('Loading.');
+      await act(async () => teamImport.finish({ default: () => <h1 tabIndex={-1}>Deferred team</h1> }));
+      expect(screen.getByRole('heading', { name: 'Deferred team' })).toHaveFocus();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  it('focuses the destination after leaving a missing route through the shell', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const expectedError = (event) => {
+      if (event.error?.cause?.message === 'synthetic route unavailable') event.preventDefault();
+    };
+    window.addEventListener('error', expectedError);
+    try {
+      renderApp('/organizations/o1/applications/a1/accepted-agreement');
+      await screen.findByRole('heading', { name: 'This page did not load' });
+      fireEvent.click(screen.getByRole('link', { name: 'Event Runner' }));
+      const heading = await screen.findByRole('heading', { level: 1, name: 'Your organizations' });
+      expect(heading).toBeInTheDocument();
+      expect(screen.getByRole('main')).toHaveFocus();
+    } finally {
+      cleanup();
+      window.removeEventListener('error', expectedError);
+      error.mockRestore();
+    }
+  });
+
+  it('keeps focus on a control the reader chose while the destination data loads', async () => {
+    let finishTeam;
+    serveApi({
+      listOrganizations: { operator: false, organizations: [{ id: 'o1', name: 'Org', role: 'owner' }] },
+      listApplications: { applications: [] },
+      getTeam: () => new Promise((resolve) => { finishTeam = resolve; }),
+    });
+    renderApp('/');
+    fireEvent.click(await screen.findByRole('link', { name: 'Org' }));
+    await screen.findByText('Loading the organization.');
+    expect(screen.getByRole('main')).toHaveFocus();
+    const signOut = screen.getByRole('button', { name: 'Sign out' });
+    signOut.focus();
+    await act(async () => finishTeam({ organization: { id: 'o1', name: 'Org' } }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Org' })).toBeInTheDocument();
+    expect(signOut).toHaveFocus();
   });
 
   it('sends a signed-out reader to sign in and remembers the page, invite token included', () => {

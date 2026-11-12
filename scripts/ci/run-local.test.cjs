@@ -45,4 +45,5 @@ test('the local checks cover what the hosted jobs they replace run, the console 
   const commands = (job) => CHECKS[job].map((command) => command.join(' '));
   assert.ok(commands('unitWeb').includes('npm run test:console'));
   assert.ok(commands('build').includes('npm run build:console'));
+  assert.ok(commands('build').includes('node scripts/ci/bundle-budget.cjs --dist console/web/dist --budget scripts/ci/console-bundle-budget.json'));
 });
