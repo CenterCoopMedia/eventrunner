@@ -9,6 +9,7 @@ The workflow runs weekly on Monday at 09:17 UTC, on manual dispatch, and on pull
 Use Bash, Node 22.23.5 or a supported newer version, and system Chrome or Chromium. Keep its sandbox enabled. The block below was run on Debian with `/usr/bin/chromium`; on another system, use its installed browser path in the export below. No bundled browser is installed.
 
 ```bash
+npm run prepare:functions
 npm ci --ignore-scripts --prefer-offline
 export CHROME_PATH=/usr/bin/chromium
 export PUPPETEER_SKIP_DOWNLOAD=true
