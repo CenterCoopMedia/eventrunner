@@ -239,6 +239,7 @@ export default function AdminTimelineEditor({ mode }) {
     >
       <AdminPageHeader
         title={creating ? 'New entry' : form.title.trim() || 'Untitled entry'}
+        recentTitle={row?.current?.title}
         state={!creating && row ? <RecordState state={row.state} /> : null}
         feedback={status || error ? <EditorActionFeedback unsaved={feedbackSnapshot !== null && JSON.stringify(form) !== feedbackSnapshot} status={status} error={error} errorTitle={errorTitle} /> : null}
         actions={

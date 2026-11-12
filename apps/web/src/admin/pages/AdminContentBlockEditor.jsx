@@ -654,6 +654,7 @@ export default function AdminContentBlockEditor({ mode }) {
         title={mode === 'create'
           ? 'New content block'
           : contentBlockTitle({ ...content.values, blockType: content.blockType })}
+        recentTitle={existingRow ? contentBlockTitle(existingRow.current) : null}
         state={(
           <>
             {existingRow ? <RecordState state={existingRow.state} /> : null}

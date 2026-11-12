@@ -295,6 +295,7 @@ export default function AdminOrganizationEditor({ mode }) {
       >
         <AdminPageHeader
           title={creating ? 'New organization' : form.name || 'Unnamed organization'}
+          recentTitle={row?.current?.name}
           state={!creating && row ? <RecordState state={row.state} /> : null}
           identifiers={null}
           description="Edit the details attendees see on the sponsors page."

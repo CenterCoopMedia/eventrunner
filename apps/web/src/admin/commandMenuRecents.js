@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 
 // Only the six publishable collections' existing editors belong in recents.
 // Account records, list pages and unsaved new records never do.
@@ -38,13 +38,12 @@ export function rememberCommandRecord(uid, record) {
   }
 }
 
-/** Remember the title adopted on this editor visit, never an unsaved edit. */
+/** Remember the title from the editor's confirmed record, never its form. */
 export function useCommandRecent(label) {
   const account = useContext(CommandMenuAccount);
   const uid = account?.uid;
   const to = account?.pathname;
-  const adoptedLabel = useRef(label);
   useEffect(() => {
-    rememberCommandRecord(uid, { to, label: adoptedLabel.current });
-  }, [uid, to]);
+    rememberCommandRecord(uid, { to, label });
+  }, [uid, to, label]);
 }
