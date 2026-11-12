@@ -166,7 +166,7 @@ Each one is keyboard-first, reads the tier-2 tokens, and lives in `apps/web/src/
 | Control | One job | The rule |
 |---|---|---|
 | `Switch` | A setting that is on or off | `role="switch"`, `aria-checked`, the state as a word beside the label. The label names the ENABLED state. No sliding knob. |
-| `SegmentedControl` | One choice from a short set | A `role="radiogroup"` set as one ruled row. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill. |
+| `SegmentedControl` | One choice from a short set | A `role="radiogroup"` set as one ruled row, with at least `--space-xs` (8px) between adjacent touch targets inside the group. The chosen word takes the filled ground and the bold weight. One tab stop; arrow keys, Home and End move inside it. Never a pill. |
 | `Tabs` | One panel from a short set | The ARIA tab pattern with a roving tab index. Selection follows focus. The selected tab carries the strong rule. Never a pill, never a filled tab. |
 | `Checkbox`, `Radio` | Pick any; pick one | A real input with `appearance: none`, redrawn from the tokens: the boundary in `--color-border-control`, the checked fill in the accent, the mark an inline SVG reading `currentColor`. The keyboard, the label and the group stay the platform's. |
 | `SearchField` | Narrow a list by words | A labelled `type="search"` input, a stated clear control, and the result count in a `role="status"` line the caller feeds. |
