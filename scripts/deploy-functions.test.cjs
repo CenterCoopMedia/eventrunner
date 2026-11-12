@@ -504,7 +504,9 @@ test('the complete initial plan rejects unknown regions and selector expansion b
 test('a paced initial deploy recovers a missing create through a later unforced deploy', async () => {
   const config = [{ codebase: 'default', source: 'functions' }];
   const localFunctions = Array.from({ length: 51 }, (_, index) => local(`handler${String(index).padStart(3, '0')}`, false));
-  const desired = localFunctions.map((fn) => deployed(fn.id));
+  const desired = localFunctions.map((fn) => ({
+    ...deployed(fn.id), httpsTrigger: {}, state: 'ACTIVE', hash: 'unchanged-source',
+  }));
   const backendOf = (endpoints) => {
     const endpointsByRegion = {};
     for (const fn of endpoints) (endpointsByRegion[fn.region] ??= {})[fn.id] = fn;
