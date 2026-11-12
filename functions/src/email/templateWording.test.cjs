@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 
 const { readWording, readDraft, renderWording, WordingError } = require('./templateWording.cjs');
 const { resetTemplateCacheForTest, loadTemplate } = require('./templates.cjs');
-const { defaultSpeakerWordingFields } = require('./templates/speakerWordingFields.cjs');
+const { defaultSpeakerWordingFields } = require('./speakerWordingFields.cjs');
 const { makeSpeakersDb } = require('../speakers/speakersFake.cjs');
 
 const CONFIG = {

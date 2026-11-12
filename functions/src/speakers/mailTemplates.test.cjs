@@ -20,7 +20,7 @@ const {
 } = require('./invites.cjs');
 const { makeSpeakersDb: makeBareSpeakersDb } = require('./speakersFake.cjs');
 const { getDefaultTemplate, resetTemplateCacheForTest, loadTemplate } = require('../email/templates.cjs');
-const { defaultSpeakerWordingFields } = require('../email/templates/speakerWordingFields.cjs');
+const { defaultSpeakerWordingFields } = require('../email/speakerWordingFields.cjs');
 
 const STAFF = { uid: 'staff-1', email: 'staff@example.org' };
 const T0 = Date.parse('2026-10-20T12:00:00Z');

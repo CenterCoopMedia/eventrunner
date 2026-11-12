@@ -7,8 +7,8 @@
  * wording service checks those values and the built source.
  */
 
-const { internals: { escapeHtml } } = require('../render.cjs');
-const { wrap, TEXT_FOOTER } = require('./layout.cjs');
+const { internals: { escapeHtml } } = require('./render.cjs');
+const { wrap, TEXT_FOOTER } = require('./templates/layout.cjs');
 
 const CONDITIONAL_MARKER_RE = /\{\{\s*(?:#if\b|\/if\b)/i;
 const HTML_ENTITIES = Object.freeze({ '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" });

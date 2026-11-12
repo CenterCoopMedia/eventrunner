@@ -22,7 +22,7 @@ const {
   buildSpeakerWording,
   parseSpeakerWording,
   readSpeakerWordingFields,
-} = require('./templates/speakerWordingFields.cjs');
+} = require('./speakerWordingFields.cjs');
 
 const TEMPLATES = 'email_templates';
 const WORDING_FIELDS = Object.freeze(['subject', 'html', 'text']);

@@ -23,7 +23,7 @@ const { createEmailCore } = require('../functions/src/email/send.cjs');
 const { createConsoleProvider } = require('../functions/src/email/providers/console.cjs');
 const { createEmailUnsubscribeHandler, suppressionIdFor } = require('../functions/src/announcements/suppression.cjs');
 const { resetTemplateCacheForTest } = require('../functions/src/email/templates.cjs');
-const { defaultSpeakerWordingFields } = require('../functions/src/email/templates/speakerWordingFields.cjs');
+const { defaultSpeakerWordingFields } = require('../functions/src/email/speakerWordingFields.cjs');
 
 const PROJECT_ID = 'demo-run-of-show';
 const STAFF_EMAIL = 'schedule-staff@example.test';
