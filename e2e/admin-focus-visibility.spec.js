@@ -10,7 +10,7 @@ const VIEWPORTS = [
 ];
 const CONTROLS = 'input:enabled:visible:not([type="hidden"]), textarea:enabled:visible, select:enabled:visible, button:enabled:visible, a[href]:visible:not([tabindex="-1"])';
 
-async function focusIsClear(page) {
+async function focusGeometry(page) {
   return page.evaluate(() => {
     const active = document.activeElement;
     const rect = active.getBoundingClientRect();
@@ -24,7 +24,14 @@ async function focusIsClear(page) {
     if (head && !head.contains(active)) {
       boundary = Math.max(boundary, ...Array.from(head.querySelectorAll('th'), (cell) => cell.getBoundingClientRect().bottom));
     }
-    return rect.top >= boundary - 1 && rect.bottom <= innerHeight + 1;
+    // Native textarea focus can retain a caret while part of the control is
+    // outside the viewport. The visible portion must clear every sticky head.
+    const visibleTop = Math.max(0, rect.top);
+    const visibleBottom = Math.min(innerHeight, rect.bottom);
+    return {
+      clear: visibleBottom > visibleTop && visibleTop >= boundary - 1,
+      top: rect.top, bottom: rect.bottom, boundary, viewport: innerHeight,
+    };
   });
 }
 
@@ -37,7 +44,7 @@ async function reverseThrough(page, region) {
   // Native time fields have several keyboard stops inside one input.
   while (await region.evaluate((element) => element !== document.activeElement && element.contains(document.activeElement))) {
     if (await controls.first().evaluate((element) => element === document.activeElement)) reachedFirst = true;
-    await expect.poll(() => focusIsClear(page), { message: 'The focused control stays clear of sticky heads' }).toBe(true);
+    await expect.poll(() => focusGeometry(page), { message: 'The focused control stays clear of sticky heads' }).toMatchObject({ clear: true });
     await page.keyboard.press('Shift+Tab');
   }
   expect(reachedFirst).toBe(true);
@@ -85,7 +92,7 @@ for (const kind of ['page', 'invoice', 'session']) {
         await page.getByLabel('Public description').fill('');
         await page.getByRole('button', { name: 'Save', exact: true }).click();
         await expect(page.getByLabel('Public description')).toBeFocused();
-        await expect.poll(() => focusIsClear(page)).toBe(true);
+        await expect.poll(() => focusGeometry(page)).toMatchObject({ clear: true });
       }
       const directory = path.resolve('test-results/admin-focus-evidence');
       await fs.mkdir(directory, { recursive: true });

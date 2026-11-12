@@ -76,7 +76,11 @@ async function renderAt(path) {
   }, { timeout: 10_000 });
 }
 
-function pushSessions(live, drafts) {
+async function pushSessions(live, drafts) {
+  await waitFor(() => {
+    expect(adminSubscriptions.get('cmsSchedule')).toBeTypeOf('function');
+    expect(adminSubscriptions.get('cmsSchedule_drafts')).toBeTypeOf('function');
+  });
   act(() => {
     adminSubscriptions.get('cmsSchedule')(live);
     adminSubscriptions.get('cmsSchedule_drafts')(drafts);
@@ -133,7 +137,7 @@ describe('admin Sessions workspace', () => {
       recordingUrl: 'https://example.org/recording',
       materialsNotNeeded: true,
     };
-    pushSessions([], [
+    await pushSessions([], [
       { id: 'opening', dayId: 'day-1', title: 'Opening', status: 'dirty' },
       { id: 'panel', ...saved, visible: false, status: 'dirty' },
     ]);
@@ -195,7 +199,7 @@ describe('admin Sessions workspace', () => {
     reportAdminCollectionsAtOnce = false;
     await renderAt('/admin/sessions/keynote');
     await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
-    pushSessions([{
+    await pushSessions([{
       id: 'keynote', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
       title: 'Keynote', description: 'Opening remarks.', visible: true,
     }], []);
@@ -212,7 +216,7 @@ describe('admin Sessions workspace', () => {
   it('groups by day and keeps a child directly below its parent', async () => {
     await renderAt('/admin/sessions');
     await screen.findByRole('heading', { name: 'Sessions' });
-    pushSessions(
+    await pushSessions(
       [{ id: 'later', dayId: 'day-1', startTime: '10:00', title: 'Later', visible: true }],
       [
         { id: 'parent', dayId: 'day-1', startTime: '09:00', title: 'Parent', status: 'dirty' },
@@ -284,7 +288,7 @@ describe('admin Sessions workspace', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The draft is saved, and it is not published');
     expect(alert).toHaveTextContent('Publishing is unavailable.');
-    pushSessions([], [{ id: 'opening-session', dayId: 'day-1', title: 'Opening session', status: 'dirty' }]);
+    await pushSessions([], [{ id: 'opening-session', dayId: 'day-1', title: 'Opening session', status: 'dirty' }]);
     expect(within(screen.getByLabelText('Parent session')).queryByRole('option', { name: 'Opening session' })).not.toBeInTheDocument();
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Welcome remarks' } });
@@ -372,7 +376,7 @@ describe('admin Sessions workspace', () => {
   it('keeps creation separate from a session named new and encodes edit links', async () => {
     await renderAt('/admin/sessions');
     await screen.findByRole('heading', { name: 'Sessions' });
-    pushSessions([], [
+    await pushSessions([], [
       { id: 'new', dayId: 'day-1', title: 'Named new', status: 'dirty' },
       { id: 'panel?day2#room', dayId: 'day-1', title: 'Panel', status: 'dirty' },
     ]);
@@ -388,7 +392,7 @@ describe('admin Sessions workspace', () => {
   it('resumes a part-way bulk publish with the queue id', async () => {
     await renderAt('/admin/sessions');
     await screen.findByRole('heading', { name: 'Sessions' });
-    pushSessions([], [
+    await pushSessions([], [
       { id: 'opening', dayId: 'day-1', title: 'Opening', status: 'dirty' },
     ]);
     fetch
@@ -406,7 +410,7 @@ describe('admin Sessions workspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
     const resume = await screen.findByRole('button', { name: 'Resume publish' });
-    pushSessions([{ id: 'opening', dayId: 'day-1', title: 'Opening' }], [
+    await pushSessions([{ id: 'opening', dayId: 'day-1', title: 'Opening' }], [
       { id: 'later', dayId: 'day-1', title: 'Later draft', status: 'dirty' },
     ]);
     fireEvent.click(resume);
@@ -421,7 +425,7 @@ describe('admin Sessions workspace', () => {
   it('returns to the sessions list on Cancel', async () => {
     await renderAt('/admin/sessions/child');
     await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
-    pushSessions([], [
+    await pushSessions([], [
       {
         id: 'child', dayId: 'day-1', startTime: '09:30', endTime: '10:00',
         title: 'Child', description: 'Child session.', status: 'dirty',
@@ -435,7 +439,7 @@ describe('admin Sessions workspace', () => {
   it('publishes a draft-only parent with its child', async () => {
     await renderAt('/admin/sessions/child');
     await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
-    pushSessions([], [
+    await pushSessions([], [
       {
         id: 'parent', dayId: 'day-1', startTime: '09:00', endTime: '11:00',
         title: 'Parent', description: 'Parent session.', status: 'dirty',
@@ -461,7 +465,7 @@ describe('admin Sessions workspace', () => {
   it('publishes the parent chosen in the form, not the parent stored before the edit', async () => {
     await renderAt('/admin/sessions/child');
     await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
-    pushSessions([], [
+    await pushSessions([], [
       {
         id: 'old-parent', dayId: 'day-1', startTime: '09:00', endTime: '11:00',
         title: 'Old parent', description: 'The stored parent.', status: 'dirty',
@@ -497,7 +501,7 @@ describe('admin Sessions workspace', () => {
     // real day's name.
     await renderAt('/admin/sessions/orphan');
     await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
-    pushSessions([], [
+    await pushSessions([], [
       { id: 'orphan', dayId: 'day-9', title: 'Orphan', description: 'On a removed day.', status: 'dirty' },
     ]);
     const select = await screen.findByLabelText('Event day');
@@ -511,7 +515,7 @@ describe('admin Sessions workspace', () => {
     // at all unless the sentence is part of the link's own name.
     await renderAt('/admin/sessions/child');
     await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
-    pushSessions([], [
+    await pushSessions([], [
       {
         id: 'child', dayId: 'day-1', startTime: '09:30', endTime: '10:00',
         title: 'Child', description: 'Child session.', status: 'dirty',
@@ -551,7 +555,7 @@ describe('admin Sessions workspace', () => {
         await waitFor(() => expect(configSubscriptions.has('features')).toBe(true));
         act(() => configSubscriptions.get('features')(features));
       }
-      pushSessions(LIVE, DRAFTS);
+      await pushSessions(LIVE, DRAFTS);
       return (await screen.findByRole('heading', { name: 'Most saved' })).closest('section');
     }
 
@@ -637,7 +641,7 @@ describe('admin Sessions workspace', () => {
     it('draws no panel while there are no sessions', async () => {
       await renderAt('/admin/sessions');
       await screen.findByRole('heading', { name: 'Sessions' });
-      pushSessions([], []);
+      await pushSessions([], []);
       expect(await screen.findByRole('heading', { name: 'No sessions yet' })).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Most saved' })).toBeNull();
     });
