@@ -40,7 +40,7 @@ describe('command menu recents', () => {
   });
 
   it('accepts the six publishable editors and excludes attendees, actions, lists, new records and external paths', () => {
-    const allowed = ['/admin/pages/home', '/admin/sessions/opening', '/admin/organizations/newsroom', '/admin/updates/news', '/admin/timeline/founding', '/admin/content/home/intro/body'];
+    const allowed = ['/admin/pages/home', '/admin/sessions/opening', '/admin/organizations/newsroom', '/admin/updates/news', '/admin/timeline/founding', '/admin/content/home/intro/body', '/admin/sessions/new', '/admin/organizations/new', '/admin/updates/new', '/admin/timeline/new'];
     const excluded = ['/admin/attendees/private', '/admin/access', '/admin/speakers/person', '/admin/pages', '/admin/pages/new', '/admin/sessions/new/session', '/admin/content/home/intro/_new', '//example.test/admin/pages/home', 'javascript:alert(1)'];
     for (const to of [...allowed, ...excluded]) rememberCommandRecord('one', { to, label: 'Record' });
     expect(readCommandRecents('one').map((item) => item.to)).toEqual(allowed.toReversed());

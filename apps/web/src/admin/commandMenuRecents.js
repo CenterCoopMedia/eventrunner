@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect } from 'react';
+import { createContext, useContext, useEffect, useRef } from 'react';
 
 // Only the six publishable collections' existing editors belong in recents.
 // Account records, list pages and unsaved new records never do.
-const EDITOR = /^\/admin\/(?:(pages|sessions|organizations|updates|timeline)\/(?!new(?:\/|$))[^/?#]+|content\/[^/?#]+\/[^/?#]+\/(?!_new(?:\/|$))[^/?#]+)$/i;
+const EDITOR = /^\/admin\/(?:pages\/(?!new(?:\/|$))[^/?#]+|(?:sessions|organizations|updates|timeline)\/[^/?#]+|content\/[^/?#]+\/[^/?#]+\/(?!_new(?:\/|$))[^/?#]+)$/i;
 const LIMIT = 10;
 const memory = new Map();
 export const CommandMenuAccount = createContext(null);
@@ -38,12 +38,13 @@ export function rememberCommandRecord(uid, record) {
   }
 }
 
-/** The loaded editor's own title, without another content subscription. */
+/** Remember the title adopted on this editor visit, never an unsaved edit. */
 export function useCommandRecent(label) {
   const account = useContext(CommandMenuAccount);
   const uid = account?.uid;
   const to = account?.pathname;
+  const adoptedLabel = useRef(label);
   useEffect(() => {
-    rememberCommandRecord(uid, { to, label });
-  }, [uid, to, label]);
+    rememberCommandRecord(uid, { to, label: adoptedLabel.current });
+  }, [uid, to]);
 }

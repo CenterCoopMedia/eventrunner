@@ -19,6 +19,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router';
 
 const configSubscriptions = new Map();
+const commandEditorRecords = new Map();
 vi.mock('../lib/configSource.js', () => ({
   subscribeConfigDoc: (docId, onNext) => {
     configSubscriptions.set(docId, onNext);
@@ -31,8 +32,8 @@ vi.mock('../lib/contentSource.js', () => ({
 }));
 vi.mock('../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 vi.mock('./adminSource.js', () => ({
-  subscribeAdminCollection: (_name, onNext) => {
-    onNext([]);
+  subscribeAdminCollection: (name, onNext) => {
+    onNext(commandEditorRecords.get(name) ?? []);
     return () => {};
   },
 }));
@@ -79,6 +80,7 @@ import {
 // Mocked for every file in src/test/setup.js; steered here for the banner.
 import { subscribePendingCounts } from './pendingCountsSource.js';
 import { markTourDone, readTourDone } from './tourState.js';
+import { rememberCommandRecord } from './commandMenuRecents.js';
 
 async function renderAdmin(path = '/admin/pages') {
   const result = render(
@@ -125,7 +127,9 @@ function openEveryGroup() {
 }
 
 beforeEach(() => {
+  signedInUid = 'admin-1';
   configSubscriptions.clear();
+  commandEditorRecords.clear();
   window.localStorage.removeItem(RAIL_COLLAPSED_KEY);
   window.localStorage.removeItem(DOCKET_GROUPS_KEY);
   forgetLayoutMemory();
@@ -134,6 +138,26 @@ beforeEach(() => {
 });
 
 describe('the admin shell', () => {
+  it.each([
+    ['sessions', 'cmsSchedule', 'Public title', { dayId: 'day-1', startTime: '09:00', endTime: '10:00', description: '' }, 'title'],
+    ['organizations', 'cmsOrganizations', 'Name', { tier: 'partner', order: 0, visible: true }, 'name'],
+    ['timeline', 'cmsTimeline', 'Title', { year: 2026, description: '', visible: true }, 'title'],
+  ])('loads the destination record when Find work switches between two %s editors', async (section, collection, field, values, labelField) => {
+    signedInUid = `command-editor-${section}`;
+    commandEditorRecords.set(collection, [
+      { id: 'command-first', ...values, [labelField]: 'First command record' },
+      { id: 'command-second', ...values, [labelField]: 'Second command record' },
+    ]);
+    rememberCommandRecord(signedInUid, { to: `/admin/${section}/command-second`, label: 'Second command record' });
+    await renderAdmin(`/admin/${section}/command-first`);
+    expect(await screen.findByLabelText(field, { exact: true })).toHaveValue('First command record');
+    fireEvent.click(screen.getByRole('button', { name: 'Find work' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Second command record Recent record' }));
+    await waitFor(() => expect(screen.getByLabelText(field, { exact: true })).toHaveValue('Second command record'));
+    expect(screen.getByRole('heading', { level: 1, name: 'Second command record' })).toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('opens Find work from the rail and a text-field shortcut, and leaves an existing dialog alone', async () => {
     await renderAdmin('/admin/pages');
     const trigger = screen.getByRole('button', { name: 'Find work' });
