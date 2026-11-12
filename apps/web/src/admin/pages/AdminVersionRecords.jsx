@@ -13,7 +13,7 @@
 //
 // THE FIGURE SENTENCE, NOT A TILE. One stated line says how many records
 // are shown and in what order.
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import AdminPageHeader, {
@@ -31,7 +31,7 @@ import {
 } from '../components/formControls.jsx';
 import RuledTable from '../components/RuledTable.jsx';
 import { useAdminRecords } from '../useAdminRecords.js';
-import { readAdminVersions } from '../adminSource.js';
+import { useAdminVersions } from '../useAdminVersions.js';
 import {
   COLLECTION_CHOICES,
   DEFAULT_COLLECTION,
@@ -84,26 +84,15 @@ export default function AdminVersionRecords() {
 
   const records = useAdminRecords(collection);
   const removedHeadingId = useId();
-  const [history, setHistory] = useState(null);
-  const [historyAttempt, setHistoryAttempt] = useState(0);
-  useEffect(() => {
-    if (!records.ready) return undefined;
-    let active = true;
-    setHistory({ collection, entries: null, error: null });
-    readAdminVersions(collection).then(
-      (entries) => { if (active) setHistory({ collection, entries, error: null }); },
-      (error) => { if (active) setHistory({ collection, entries: null, error }); },
-    );
-    return () => { active = false; };
-  }, [collection, records.ready, historyAttempt]);
-  const ownHistory = history?.collection === collection ? history : null;
-  const removed = useMemo(() => removedVersionRecords(collection, ownHistory?.entries ?? [], records.rows)
+  const removedHeadingRef = useRef(null);
+  const history = useAdminVersions(collection, records.ready);
+  const removed = useMemo(() => removedVersionRecords(collection, history.entries ?? [], records.rows)
     .map((entry) => ({ ...entry, name: versionRecordName(collection, entry.fields), publishedMs: toMillis(entry.publishedAt) }))
     .filter((entry) => !needle || entry.name.toLowerCase().includes(needle))
-    .sort(sort === 'name' ? byName : byPublished), [collection, ownHistory?.entries, records.rows, needle, sort]);
+    .sort(sort === 'name' ? byName : byPublished), [collection, history.entries, records.rows, needle, sort]);
   const removedCount = `${count(removed.length)} removed ${removed.length === 1 ? 'record' : 'records'}`;
   const matchWord = removed.length === 1 ? 'matches' : 'match';
-  const removedSummary = needle ? `${removedCount} ${matchWord} this search.` : `${removedCount} with published versions.`;
+  const removedSummary = needle ? `${removedCount} ${matchWord} this search.` : `${removedCount} with published versions${history.nextCursor ? ' found so far' : ''}.`;
 
   const all = useMemo(
     () =>
@@ -280,13 +269,10 @@ export default function AdminVersionRecords() {
 
       {records.ready ? (
         <section aria-labelledby={removedHeadingId} className="flex flex-col gap-sm">
-          <h2 id={removedHeadingId} className="font-admin-ui text-admin-lg font-bold text-admin-ink">Removed records</h2>
-          {ownHistory?.error ? (
-            <div className="flex flex-col items-start gap-xs">
-              <Notice tone="error" message="Removed records did not load. Current records remain available." />
-              <button type="button" className={secondaryButtonClass} onClick={() => setHistoryAttempt((attempt) => attempt + 1)}>Try again</button>
-            </div>
-          ) : !ownHistory?.entries ? <AdminLoadingState label="Loading removed records…" /> : (
+          <h2 id={removedHeadingId} ref={removedHeadingRef} tabIndex={-1} className="font-admin-ui text-admin-lg font-bold text-admin-ink">Removed records</h2>
+          {history.error ? <Notice tone="error" message="Removed records did not load. Current records remain available." /> : null}
+          {!history.entries && history.loading ? <AdminLoadingState label="Loading removed records…" /> : null}
+          {history.entries ? (
             <>
               <p role="status" className="text-admin-sm text-admin-ink-secondary">
                 {`${removedSummary} Open a record to restore a version as a draft.`}
@@ -299,8 +285,16 @@ export default function AdminVersionRecords() {
                   </li>
                 ))}
               </ul>
+              {history.nextCursor ? <p className="text-admin-sm text-admin-ink-secondary">More published versions remain to check. Search includes the removed records loaded so far.</p> : null}
             </>
-          )}
+          ) : null}
+          {history.nextCursor || history.error ? (
+            <button type="button" className={`${secondaryButtonClass} self-start`} disabled={history.loading} aria-busy={history.loading || undefined} onClick={async () => {
+              if (await history.loadMore()) removedHeadingRef.current?.focus();
+            }}>
+              {history.loading ? 'Checking…' : history.error ? 'Try again' : 'Check more history'}
+            </button>
+          ) : null}
         </section>
       ) : null}
     </div>
