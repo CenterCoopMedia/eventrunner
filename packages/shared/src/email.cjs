@@ -42,8 +42,26 @@ function isBareEmailAddress(value) {
   return isEmailAddress(value) && !NOT_BARE_RE.test(value);
 }
 
+/** The mailing-address requirement for announcement and reminder email. */
+function hasMailingAddress(value) {
+  if (typeof value !== 'string' || /\[Replace/i.test(value)) return false;
+  const hasText = (text) => text.replace(/&nbsp;|&#160;|&#xA0;/gi, ' ').trim().length > 0;
+  let cursor = 0;
+  while (cursor < value.length) {
+    const opening = value.indexOf('<', cursor);
+    if (opening === -1) return hasText(value.slice(cursor));
+    const closing = value.indexOf('>', opening + 1);
+    // An unmatched opening bracket is text, as in the existing footer check.
+    if (closing === -1) return hasText(value.slice(cursor));
+    if (hasText(value.slice(cursor, opening))) return true;
+    cursor = closing + 1;
+  }
+  return false;
+}
+
 module.exports = {
   EMAIL_ADDRESS_RE,
   isEmailAddress,
   isBareEmailAddress,
+  hasMailingAddress,
 };

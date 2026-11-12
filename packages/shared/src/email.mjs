@@ -1,1 +1,1 @@
-export { EMAIL_ADDRESS_RE, isEmailAddress, isBareEmailAddress } from './email.cjs';
+export { EMAIL_ADDRESS_RE, isEmailAddress, isBareEmailAddress, hasMailingAddress } from './email.cjs';

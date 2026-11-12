@@ -35,6 +35,7 @@ const crypto = require('node:crypto');
 const { render, internals: renderInternals } = require('../email/render.cjs');
 const announcementTemplate = require('../email/templates/announcement.email.cjs');
 const { safeUrlHref } = require('shared/urlSafety');
+const { hasMailingAddress } = require('shared/email');
 const { testUnsubscribeUrl, internals: suppressionInternals } = require('./suppression.cjs');
 
 const { escapeHtml } = renderInternals;
@@ -186,10 +187,7 @@ function refused(code) {
  */
 async function resolveChannel({ provider, config }) {
   const postalAddress = config?.event?.legal?.postalAddressHtml;
-  if (typeof postalAddress !== 'string'
-    // Visible text between the tags; a check, not a sanitizer.
-    || !postalAddress.split(/<[^>]*>/).some((text) => text.replace(/&nbsp;|&#160;|&#xA0;/gi, ' ').trim())
-    || /\[Replace/i.test(postalAddress)) {
+  if (!hasMailingAddress(postalAddress)) {
     return refused('mailing-address-missing');
   }
   const configured = config?.providers?.email?.announcementStream;

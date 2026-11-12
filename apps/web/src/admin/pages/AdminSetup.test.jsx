@@ -54,7 +54,7 @@ function readiness(readyIds) {
     label: name,
     state: readyIds.includes(name) ? 'ready' : 'action-required',
   }));
-  return { ready: items.every((item) => item.state === 'ready'), checks: { items, total: items.length, truncated: 0 } };
+  return { ready: items.every((item) => item.state === 'ready'), mailingAddressReady: true, checks: { items, total: items.length, truncated: 0 } };
 }
 
 function okResponse(body) {
@@ -85,6 +85,10 @@ async function openStep(title) {
 
 function stepList() {
   return screen.getByRole('list', { name: 'Setup steps' });
+}
+
+function hostingCheck(name) {
+  return within(screen.getByRole('region', { name: 'Hosting status' })).getByRole('heading', { name }).closest('li');
 }
 
 beforeEach(() => {
@@ -188,6 +192,21 @@ describe('the setup stepper', () => {
     expect(step.textContent).not.toMatch(/SPF|DKIM|DMARC|DNS/);
   });
 
+  it.each(['operator', 'staff'])('shows %s a missing mailing-address advisory without blocking launch readiness', async (role) => {
+    tier.value = role;
+    fetch.mockResolvedValueOnce(okResponse({ ...readiness(ROW_IDS), mailingAddressReady: false }));
+    await renderSetup();
+    expect(await screen.findByText('Your setup tasks and launch checks are ready. Your site is ready to share.')).toBeInTheDocument();
+    const hosting = screen.getByRole('region', { name: 'Hosting status' });
+    const address = within(hosting).getByRole('heading', { name: 'Email mailing address' }).closest('li');
+    expect(address).toHaveTextContent('Contact the Event Runner team to set it.');
+    expect(address).toHaveTextContent('Announcements and reminders need your mailing address');
+    expect(within(address).queryByRole('textbox')).toBeNull();
+    expect(within(address).queryByRole('button')).toBeNull();
+    expect(endpoints()).toEqual(['webMcpCheckEventReadiness']);
+    expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
+  });
+
   it('lets an operator mark the legal review complete, and checks again', async () => {
     fetch
       .mockResolvedValueOnce(okResponse(readiness([])))
@@ -249,8 +268,8 @@ describe('the setup stepper', () => {
   it('says so when every step is done', async () => {
     fetch.mockResolvedValueOnce(okResponse(readiness(ROW_IDS)));
     await renderSetup();
-    expect(await screen.findByText('Every setup task and hosting check is ready. Your site is ready to share.')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Hosting status' })).getByText('Ready', { exact: true })).toBeInTheDocument();
+    expect(await screen.findByText('Your setup tasks and launch checks are ready. Your site is ready to share.')).toBeInTheDocument();
+    expect(within(hostingCheck('Google sign-in')).getByText('Ready', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
     await openStep('Add a second operator');
   });
@@ -269,7 +288,7 @@ describe('the setup stepper', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
     expect(await screen.findByText(/Your site is ready to share/)).toBeInTheDocument();
     expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Hosting status' })).getByText('Ready', { exact: true })).toBeInTheDocument();
+    expect(within(hostingCheck('Google sign-in')).getByText('Ready', { exact: true })).toBeInTheDocument();
   });
 
   it('keeps a future host check read-only and outside completed client tasks', async () => {
@@ -309,7 +328,7 @@ describe('the setup stepper', () => {
     await waitFor(() => expect(screen.getByText(/The setup could not be checked/)).toBeInTheDocument());
     expect(stepList()).toBeInTheDocument();
     expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Hosting status' })).getByText('Ready', { exact: true })).toBeInTheDocument();
+    expect(within(hostingCheck('Google sign-in')).getByText('Ready', { exact: true })).toBeInTheDocument();
     expect(screen.queryByText(/Your site is ready to share/)).toBeNull();
   });
 });
