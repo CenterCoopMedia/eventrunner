@@ -215,10 +215,14 @@ Without it, the functions deploy fails to create these two triggers. The bucket 
 ## 3. GitHub Environment
 
 Create the environment (repo Settings → Environments → New environment → name it exactly
-`<CLIENT_ENV>`), then set its variables and secrets. **Every value below is a GitHub Environment
-variable (`vars.*`), not a secret** — none of it is a credential; the credential-shaped value
-(the WIF provider resource name, the service account email) is a Google-side ACL check, not a
-bearer token, and none of the Tier A values are confidential either.
+`<CLIENT_ENV>`), then set its variables and secrets. The first table lists GitHub Environment
+variables (`vars.*`). The Stripe account identifier uses an Environment secret so Actions
+masks it before printing step metadata. It is an identifier, not a credential.
+Before deploying this release to an existing Stripe environment, the coordinator must set
+`EVENT_STRIPE_ACCOUNT_ID` as an Environment secret with the current organizer account ID.
+Supply the value through stdin to `gh secret set`, then verify that the secret name exists.
+Complete this setup for every Stripe environment before the release reaches `main`, because
+the normal main push can start client deployments. Do not print the value or put it in an argument.
 
 | Variable | Value |
 |---|---|
@@ -234,7 +238,6 @@ bearer token, and none of the Tier A values are confidential either.
 | `EVENT_EMAIL_PROVIDER` | `postmark` \| `webhook`. `console` is valid only when the GitHub Environment name is exactly `demo` |
 | `EVENT_TICKETING_PROVIDER` | `eventbrite` \| `stripe` \| `manual` \| `none` |
 | `EVENT_TICKETING_EVENT_ID` | Eventbrite event ID or stable internal event ID for Stripe; required for either provider |
-| `EVENT_STRIPE_ACCOUNT_ID` | organizer-owned `acct_…` account; required when the ticketing provider is `stripe` |
 | `EVENT_STRIPE_MODE` | explicit `test` or `live` when using Stripe; begin onboarding in `test` |
 | `EVENT_OPERATOR_NOTIFIER` | `webhook` \| `email` \| `none` |
 | `EVENT_APP_CHECK_ENFORCED` | `false` by default; set the App Check site key before changing this to `true` |
@@ -254,12 +257,12 @@ the first deploy because Functions deploys before the new web bundle.
 
 Full list, with descriptions: `.env.example`.
 
-The **only** secrets `deploy-client.yml` reads are the provider-specific ones from spec §2.1/§8.2 —
-set them here too, as environment **secrets** (Settings → Environments → `<CLIENT_ENV>` → Secrets),
-only the rows that apply to the providers selected above:
+Set the applicable rows as Environment **secrets**
+(Settings → Environments → `<CLIENT_ENV>` → Secrets):
 
 | Secret | Required when |
 |---|---|
+| `EVENT_STRIPE_ACCOUNT_ID` | `EVENT_TICKETING_PROVIDER = stripe`; the organizer-owned account identifier. Actions masks it in logs before the first step starts. Provisioning writes this secret automatically. |
 | `EMAIL_PROVIDER_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` (server token) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | `EVENT_EMAIL_PROVIDER = postmark` and delivery-event ingest is enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | `EVENT_EMAIL_PROVIDER = webhook` |
@@ -1356,7 +1359,7 @@ Use placeholders from your own records. Nothing below belongs in the repository.
    | Console | **Actions: write** | Secret Manager in the console project, `CONSOLE_GITHUB_APP_PRIVATE_KEY` |
    | Provisioner | **Administration: write**, **Environments: write**, **Actions: read** | The `provisioning` Environment, `PROVISIONER_APP_PRIVATE_KEY` |
 
-   GitHub's permission list puts creating an Environment and its branch rule under Administration, variables under Environments, and reading the Environment under Actions. The provisioner writes no GitHub secrets, because `deploy-client.yml` reads none: a client's secrets live in its own Secret Manager. Administration is broad. The key exists only in the `provisioning` Environment, and each token the script asks for is cut down to these three on this one repository.
+   GitHub's permission list puts creating an Environment and its branch rule under Administration, variables and Environment secrets under Environments, and reading the Environment under Actions. The provisioner writes the Stripe account identifier as an Environment secret so Actions masks it before step metadata is printed. It encrypts the identifier with GitHub's public key. Client payment credentials stay in the client's Secret Manager. Administration is broad. The key exists only in the `provisioning` Environment, and each token the script asks for is cut down to these three on this one repository.
 
 5. **The console's settings.** Set these as variables in the `console` Environment, which `deploy-console.yml` writes to `console/functions/.env`, and store the key. The secret must exist before any deploy. Until the App exists, store a placeholder: the console then refuses to start a build, and says so to operators.
 

@@ -84,7 +84,8 @@ test('Stripe account and mode reach validation, both runtime env writers, and th
   assert.equal(writers.length, 2, 'normal and post-deploy recovery must preserve the same scope');
   for (const name of names) {
     for (const block of [validation, publisher, ...writers]) {
-      assert.ok(block.includes(name + ': ${{ vars.' + name + ' }}'), `${name} must come from this client Environment`);
+      const context = name === 'EVENT_STRIPE_ACCOUNT_ID' ? 'secrets' : 'vars';
+      assert.ok(block.includes(name + ': ${{ ' + context + '.' + name + ' }}'), `${name} must come from this client Environment`);
     }
     for (const writer of writers) {
       assert.ok(writer.includes(`echo "${name}=$${name}"`), `${name} must survive functions dotenv generation`);
@@ -92,6 +93,7 @@ test('Stripe account and mode reach validation, both runtime env writers, and th
     assert.ok(publisher.includes(`--arg ${name} "$${name}"`));
     assert.ok(publisher.includes(`${name}: $${name},`), `${name} must survive publisher JSON generation`);
   }
+  assert.doesNotMatch(workflow, /vars\.EVENT_STRIPE_ACCOUNT_ID/, 'the first step metadata copy must already be masked');
   for (const secret of ['TICKETING_API_TOKEN', 'TICKETING_WEBHOOK_SECRET']) {
     assert.ok(writers.every((writer) => !writer.includes(`echo "${secret}=`)), 'payment secrets stay in Secret Manager');
     assert.ok(!publisher.includes(`--arg ${secret} `));

@@ -87,10 +87,12 @@ function fakeCloud(options = {}) {
     stripeToken: options.stripeToken ?? STRIPE_TOKEN,
     platformKey: 'sk_live_ccm_platform',
     liveConnect: options.liveConnect ?? !/^(?:sk|rk)_test_/.test(options.stripeToken ?? STRIPE_TOKEN),
+    stripeAccountId: 'acct_1',
     eventbriteToken: options.eventbriteToken ?? EVENTBRITE_TOKEN,
     environment: null,
     branchRules: [],
     variables: {},
+    environmentSecrets: {},
     runs: [],
     sourceRevision: ENV.GITHUB_SHA,
     compareStatus: 'behind',
@@ -313,7 +315,7 @@ function fakeCloud(options = {}) {
     }
     const key = p.startsWith('/v1/webhook_endpoints') && state.liveConnect ? state.platformKey : state.stripeToken;
     if (headers.Authorization !== `Bearer ${key}`) return answer({ error: { message: `bad token ${headers.Authorization}` } }, 401);
-    if (p === '/v1/account') return answer({ id: 'acct_1' });
+    if (p === '/v1/account') return answer({ id: state.stripeAccountId });
     if (method === 'GET') return answer({ data: state.endpoints });
     if (method === 'DELETE') {
       state.endpoints = state.endpoints.filter((e) => !p.endsWith(`/${e.id}`));
@@ -355,6 +357,17 @@ function fakeCloud(options = {}) {
       return answer({ status: state.compareStatus });
     }
     if (!fromApp) return answer({ message: 'needs the App' }, 403);
+    if (p.endsWith('/secrets/public-key')) {
+      return answer({ key_id: 'key-1', key: options.environmentPublicKey || Buffer.alloc(32, 7).toString('base64') });
+    }
+    if (p.endsWith('/secrets/EVENT_STRIPE_ACCOUNT_ID')) {
+      if (method === 'PUT') {
+        if (options.environmentSecretRefused) return answer({ message: 'refused acct_1' }, 403);
+        state.environmentSecrets.EVENT_STRIPE_ACCOUNT_ID = body;
+        return new Response(null, { status: 204 });
+      }
+      return state.environmentSecrets.EVENT_STRIPE_ACCOUNT_ID ? answer({ name: 'EVENT_STRIPE_ACCOUNT_ID' }) : answer({}, 404);
+    }
     if (p.endsWith('/deployment-branch-policies')) {
       if (method === 'POST') state.branchRules.push(body);
       return answer({ branch_policies: state.branchRules });
@@ -816,8 +829,11 @@ test('with no ticket account nothing moves, and any leftover is deleted', async 
   assert.ok(!fake.commands.some((c) => c.args[0].includes('register-ticketing')));
 });
 
-test('the Environment allows main only, needs the App, and holds variables the deploy accepts', async () => {
-  const fake = setup();
+test('the Environment masks the Stripe identifier and preserves the deploy settings', async () => {
+  const sodium = require('libsodium-wrappers');
+  await sodium.ready;
+  const pair = sodium.crypto_box_keypair();
+  const fake = setup({ cloud: { environmentPublicKey: Buffer.from(pair.publicKey).toString('base64') } });
   await provision({ appId: 'a1', deps: fake.deps });
   assert.equal(fake.state.environment.name, 'nclocal');
   assert.deepEqual(fake.state.environment.deployment_branch_policy, { protected_branches: false, custom_branch_policies: true });
@@ -826,14 +842,42 @@ test('the Environment allows main only, needs the App, and holds variables the d
   assert.deepEqual(asked, { repositories: ['repo'], permissions: { administration: 'write', environments: 'write', actions: 'read' } });
 
   const { variables } = fake.state;
-  const checked = validateDeployEnv(variables);
+  const secret = fake.state.environmentSecrets.EVENT_STRIPE_ACCOUNT_ID;
+  assert.equal(secret.key_id, 'key-1');
+  const account = Buffer.from(sodium.crypto_box_seal_open(Buffer.from(secret.encrypted_value, 'base64'), pair.publicKey, pair.privateKey)).toString();
+  assert.equal(account, 'acct_1');
+  assert.doesNotMatch(JSON.stringify(secret), /acct_1/);
+  const checked = validateDeployEnv({ ...variables, EVENT_STRIPE_ACCOUNT_ID: account });
   assert.deepEqual([checked.ok, checked.missing, checked.errors], [true, [], []]);
   assert.equal(variables.WIF_SERVICE_ACCOUNT, DEPLOY);
   assert.equal(variables.WIF_PROVIDER, `projects/${NUMBER}/locations/global/workloadIdentityPools/github-actions/providers/github`);
   assert.equal(variables.EVENT_PUBLIC_URL, `https://${DOMAIN}`);
-  assert.equal(variables.EVENT_STRIPE_ACCOUNT_ID, 'acct_1');
+  assert.equal(variables.EVENT_STRIPE_ACCOUNT_ID, undefined);
+  assert.ok(!fake.calls.some((c) => c.url.includes('/variables') && c.body?.name === 'EVENT_STRIPE_ACCOUNT_ID'));
   assert.equal(variables.EVENT_STRIPE_MODE, 'live');
   assert.equal(variables.EVENT_OPERATOR_NOTIFIER, 'email');
+
+  // Deletion must repair the secret, and a new merchant must not reuse an old binding.
+  for (const accountId of ['acct_1', 'acct_2']) {
+    if (accountId === 'acct_1') delete fake.state.environmentSecrets.EVENT_STRIPE_ACCOUNT_ID;
+    fake.state.stripeAccountId = accountId;
+    await fake.db.collection('console_connections').doc('a1').set({ stripe: { accountId, connectedBy: 'ana' } });
+    await fake.db.collection('applications').doc('a1').update({ status: 'building' });
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    const current = fake.state.environmentSecrets.EVENT_STRIPE_ACCOUNT_ID;
+    const decrypted = sodium.crypto_box_seal_open(Buffer.from(current.encrypted_value, 'base64'), pair.publicKey, pair.privateKey);
+    assert.equal(Buffer.from(decrypted).toString(), accountId);
+    assert.equal(fake.db.read('console_builds/a1').stripeEnvironmentBinding, `nclocal:${accountId}`);
+  }
+});
+
+test('a refused masked identifier write stops before deployment without logging the provider body', async () => {
+  const fake = setup({ cloud: { environmentSecretRefused: true } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.equal(fake.state.runs.length, 0);
+  const record = fake.db.read('console_builds/a1');
+  assert.match(record.error, /write the Stripe account identifier: HTTP 403/);
+  assert.doesNotMatch(record.error, /acct_1/);
 });
 
 test('it deploys in the bootstrap order, and seeds between the two deploys', async () => {

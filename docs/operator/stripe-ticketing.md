@@ -24,7 +24,7 @@ All ticket types grant the existing full-event entitlement. Describe early-bird 
 
 Use a separate Firebase event/project and the organizer's Stripe sandbox for the authorized rehearsal. Keep its identities and data synthetic. Provision the final live event separately; copying test orders, inventory, attempts, or tickets into a live project is unsupported. After accepting orders, changing the merchant, event identity, currency, or provider requires a separately reviewed migration; a fresh event/project is the supported starting point.
 
-Set the following non-secret values in the correct client GitHub Environment and operator process configuration. The deployment workflow passes the server values to functions. The catalog and private commerce records are never generated into the public site snapshot.
+Set the following values in the correct client GitHub Environment and operator process configuration. Store `EVENT_STRIPE_ACCOUNT_ID` as an Environment secret so Actions masks the identifier before step metadata is printed. The other rows use Environment variables. The deployment workflow passes the server values to functions. The catalog and private commerce records are never generated into the public site snapshot.
 
 | Variable | Required value |
 | --- | --- |
@@ -57,7 +57,7 @@ The runtime has no reason to receive permissions for money refunds, payouts, acc
 
 Store the API key as **`TICKETING_API_TOKEN`** in managed Secret Manager. Besides the ticketing functions, `invoiceAdmin` binds it when the provider is Stripe, for invoice pay links. Grant the runtime access before you deploy. Create the webhook endpoint described below and store its Stripe-generated signing secret as **`TICKETING_WEBHOOK_SECRET`**. A signing secret is distinct from an API key and belongs to that endpoint and mode; do not generate an arbitrary replacement string. No publishable Stripe key is needed in this hosted flow. See Stripe's [key types](https://docs.stripe.com/keys) and [key-handling guidance](https://docs.stripe.com/keys-best-practices).
 
-Use the approved secret-management interface or an approved secure input file to create/add a version. Do not put a secret value in a shell command, committed environment file, screenshot, issue, browser setting, or support message. The deploy workflow does not serialize Stripe secrets into public build variables or its functions environment file. Secret names and non-secret account identifiers may appear in the deployment record; values may not.
+Use the approved secret-management interface or an approved secure input file to create/add a version. Do not put a secret value in a shell command, committed environment file, screenshot, issue, browser setting, or support message. The deploy workflow does not serialize Stripe credentials into public build variables or its functions environment file. Secret names may appear in the deployment record; credentials and account identifiers must remain masked.
 
 The secret writer needs permission to create/add the intended secret versions. Grant `roles/secretmanager.secretAccessor` on each payment secret to the **function runtime service account**, and retain the deploy identity's separate reference/access permissions from the deploy runbook. The repository uses the default compute runtime identity unless explicitly overridden. A successful deployment does not prove that runtime secret access works. Verify cold-start execution after the grant. Event Runner operator access alone does not grant Stripe or Google Cloud credential administration.
 
