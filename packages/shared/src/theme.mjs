@@ -73,5 +73,6 @@ export {
   liftToContrast,
   deriveDarkColors,
   deriveRuleColors,
+  deriveMoreContrastColors,
   resolveMode,
 } from './theme.cjs';

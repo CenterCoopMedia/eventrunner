@@ -190,10 +190,11 @@ test('the admin set gets the first-paint block too, on the same policy', () => {
     assert.equal(blocks.length, 2, `${mode} emits one first-paint block per token set`);
   }
 
-  // Under 'system' both blocks sit inside the media query, so a reader whose
-  // setting is light never sees either of them.
+  // Under 'system' both ordinary blocks sit inside the media query. The
+  // public contrast preference has its own nested dark-scheme query below.
   const system = buildTokenCss({ ...THEME, mode: 'system' });
-  const queries = [...system.matchAll(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n\}/g)];
+  const ordinary = system.replace(/@media screen and \(prefers-contrast: more\) \{[\s\S]*?\n\}/, '');
+  const queries = [...ordinary.matchAll(/@media \(prefers-color-scheme: dark\) \{([\s\S]*?)\n\}/g)];
   assert.equal(queries.length, 2);
   assert.ok(queries.some((q) => q[1].includes(`${marker}:`)), 'the admin block is inside the query');
 });
@@ -303,6 +304,21 @@ test("the active preset's block carries this deployment's overrides", () => {
     other[1],
     new RegExp(`--brand-surface-rgb: ${getPreset('atlas').palette.light.surface.join(' ')};`),
   );
+});
+
+test('more contrast follows the existing first-paint mode policy without changing ordinary values', () => {
+  const preferenceBlock = (policy) => {
+    const css = buildTokenCss({ ...THEME, mode: policy });
+    const start = css.indexOf('@media screen and (prefers-contrast: more)');
+    assert.ok(start >= 0);
+    return css.slice(start, css.indexOf('/* Print palette', start));
+  };
+  const selector = ':root:not([data-mode]):not(:has(.admin-room))';
+  assert.ok(!preferenceBlock('light').includes(selector));
+  assert.ok(preferenceBlock('dark').includes(`${selector} {`));
+  assert.ok(!preferenceBlock('dark').includes('prefers-color-scheme'));
+  assert.match(preferenceBlock('system'), /@media \(prefers-color-scheme: dark\) \{/);
+  assert.ok(preferenceBlock('system').includes(`${selector} {`));
 });
 
 test('the stage and the measure are declared once and read by name', () => {

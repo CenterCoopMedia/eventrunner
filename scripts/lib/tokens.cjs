@@ -51,6 +51,7 @@ const {
   THEME_DENSITY_STEPS,
   DEFAULT_MODE_POLICY,
   deriveRuleColors,
+  deriveMoreContrastColors,
   getPreset,
   themePresetId,
   resolveAdminAccent,
@@ -602,21 +603,41 @@ function colorBlock(selector, names, values, comment) {
  * @param {string} comment
  * @returns {string[]} CSS lines, empty under the `light` policy
  */
-function firstPaintDarkBlock(policy, names, dark, comment) {
+function firstPaintDarkBlock(policy, names, dark, comment, selector = ':root:not([data-mode])') {
   if (policy === 'dark') {
-    return ['', ...colorBlock(':root:not([data-mode])', names, dark, comment)];
+    return ['', ...colorBlock(selector, names, dark, comment)];
   }
   if (policy === 'system') {
     return [
       '',
       `/* ${comment} */`,
       '@media (prefers-color-scheme: dark) {',
-      ...colorBlock(':root:not([data-mode])', names, dark, 'Dark until data-mode lands.')
+      ...colorBlock(selector, names, dark, 'Dark until data-mode lands.')
         .map((line) => `  ${line}`),
       '}',
     ];
   }
   return [];
+}
+
+const MORE_CONTRAST_PROPS = {
+  secondary: '--color-text-secondary-rgb',
+  hairline: '--rule-hairline-rgb',
+  strong: '--rule-strong-rgb',
+  nameplate: '--rule-nameplate-rgb',
+  control: '--color-border-control-rgb',
+};
+
+function moreContrastValues(palette) {
+  return Object.fromEntries(Object.entries(deriveMoreContrastColors(palette))
+    .map(([name, rgb]) => [MORE_CONTRAST_PROPS[name], triple(rgb)]));
+}
+
+/** The preference belongs to public pages and their framed previews. */
+function moreContrastBlock(selector, palette) {
+  const values = moreContrastValues(palette);
+  const publicSelector = selector.split(',\n').map((part) => `${part}:not(:has(.admin-room))`).join(',\n');
+  return colorBlock(publicSelector, Object.keys(values), values, 'More contrast for public reading.');
 }
 
 /**
@@ -786,6 +807,22 @@ function buildTokenCss(theme, { tokensDir } = {}) {
       }
     }
 
+    const palettes = resolveThemePalettes(theme);
+    const contrastValues = moreContrastValues(palettes.dark);
+    const contrastLines = [
+      ...moreContrastBlock(':root', palettes.light),
+      ...moreContrastBlock(scopedSelector("[data-mode='light']"), palettes.light),
+      ...moreContrastBlock(scopedSelector("[data-mode='dark']"), palettes.dark),
+      ...firstPaintDarkBlock(policy, Object.keys(contrastValues), contrastValues,
+        'More contrast before data-mode lands.', ':root:not([data-mode]):not(:has(.admin-room))'),
+    ];
+    for (const id of THEME_PRESET_IDS) {
+      const presetPalettes = id === activePreset ? palettes : getPreset(id).palette;
+      for (const mode of THEME_MODES) {
+        contrastLines.push(...moreContrastBlock(scopedSelector(`[data-theme='${id}'][data-mode='${mode}']`), presetPalettes[mode]));
+      }
+    }
+    lines.push('', '@media screen and (prefers-contrast: more) {', ...contrastLines.flatMap((line) => line.split('\n').map((part) => `  ${part}`)), '}');
     lines.push(...printPaletteBlock(policy, names, values.light));
   }
 

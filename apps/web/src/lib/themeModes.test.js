@@ -22,7 +22,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { contrastRatio, THEME_PRESET_IDS, getPreset } from 'shared/theme';
+import { contrastRatio, THEME_PRESET_IDS, getPreset, resolveThemePalettes, rgbToHex } from 'shared/theme';
+import { buildRuntimeThemeCss } from './themeRuntime.js';
+import { scopeThemeCss } from '../admin/themePreview.js';
+import * as generatorTokens from '../../../../scripts/lib/tokens.cjs';
+
+const { buildTokenCss } = generatorTokens.default ?? generatorTokens;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const GENERATED_THEME = path.resolve(here, '..', 'generated', 'theme.css');
@@ -89,9 +94,9 @@ const RULES = topLevelRules(css);
  * @param {string} selector
  * @returns {Record<string, string>}
  */
-function declarations(selector) {
+function declarations(selector, rules = RULES) {
   const found = {};
-  for (const rule of RULES) {
+  for (const rule of rules) {
     if (!rule.selectors.includes(selector)) continue;
     for (const match of rule.body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
       found[match[1]] = match[2].trim();
@@ -128,6 +133,76 @@ function channels(triple) {
 }
 
 const baseline = declarations(':root');
+
+const MORE_CONTRAST_QUERY = '@media screen and (prefers-contrast: more)';
+const PUBLIC_CONTRAST_SCOPE = ':not(:has(.admin-room))';
+const MORE_CONTRAST_NAMES = [
+  '--color-text-secondary-rgb', '--rule-hairline-rgb', '--rule-strong-rgb',
+  '--rule-nameplate-rgb', '--color-border-control-rgb',
+].sort();
+
+function moreContrastRules(source) {
+  const query = topLevelRules(source).find((rule) => rule.selectors.includes(MORE_CONTRAST_QUERY));
+  expect(query, 'public contrast preference block').toBeDefined();
+  return topLevelRules(query.body).flatMap((rule) => rule.selectors[0].startsWith('@media') ? topLevelRules(rule.body) : [rule]);
+}
+
+describe('the public more-contrast preference', () => {
+  const rules = moreContrastRules(css);
+  const scopes = [':root', ...['light', 'dark'].map((mode) => `:root[data-mode='${mode}']`),
+    ...THEME_PRESET_IDS.flatMap((id) => ['light', 'dark'].map((mode) => `:root[data-theme='${id}'][data-mode='${mode}']`))];
+
+  it.each(scopes)('defines every affected token in %s and excludes the admin', (scope) => {
+    const colors = declarations(`${scope}${PUBLIC_CONTRAST_SCOPE}`, rules);
+    expect(Object.keys(colors).sort()).toEqual(MORE_CONTRAST_NAMES);
+  });
+
+  it('excludes the admin from every selector in the remap', () => {
+    for (const rule of rules) {
+      for (const selector of rule.selectors) expect(selector.endsWith(PUBLIC_CONTRAST_SCOPE), selector).toBe(true);
+      expect(Object.keys(declarations(rule.selectors[0], rules)).sort()).toEqual(MORE_CONTRAST_NAMES);
+    }
+  });
+
+  it.each(THEME_PRESET_IDS)('%s keeps the reading targets on both grounds in both modes', (id) => {
+    for (const mode of ['light', 'dark']) {
+      const selector = `:root[data-theme='${id}'][data-mode='${mode}']`;
+      const scope = { ...baseline, ...declarations(selector), ...declarations(`${selector}${PUBLIC_CONTRAST_SCOPE}`, rules) };
+      for (const ground of ['--color-surface-rgb', '--color-surface-alt-rgb']) {
+        for (const [text, minimum] of [['--color-text-primary-rgb', 7], ['--color-text-secondary-rgb', 7], ['--color-border-control-rgb', 4.5]]) {
+          expect(contrastRatio(channels(resolve(scope, text)), channels(resolve(scope, ground))), `${mode}: ${text} on ${ground}`).toBeGreaterThanOrEqual(minimum);
+        }
+      }
+    }
+  });
+
+  it('runtime overrides match the generated preference values after brand and Advanced choices', () => {
+    for (const preset of THEME_PRESET_IDS) {
+      const theme = { preset, brandColor: rgbToHex([245, 220, 130]), tokens: { light: { inkMuted: rgbToHex([105, 105, 105]) } } };
+      const generated = moreContrastRules(buildTokenCss(theme));
+      const runtime = moreContrastRules(buildRuntimeThemeCss(theme));
+      for (const mode of ['light', 'dark']) {
+        const actual = declarations(`:root[data-theme][data-mode='${mode}']${PUBLIC_CONTRAST_SCOPE}`, runtime);
+        const expected = declarations(`:root[data-theme='${preset}'][data-mode='${mode}']${PUBLIC_CONTRAST_SCOPE}`, generated);
+        expect(Object.keys(actual).sort()).toEqual(MORE_CONTRAST_NAMES);
+        expect(actual).toEqual(expected);
+        const palette = resolveThemePalettes(theme)[mode];
+        for (const ground of [palette.surface, palette.surfaceAlt]) {
+          expect(contrastRatio(channels(actual['--color-text-secondary-rgb']), ground)).toBeGreaterThanOrEqual(7);
+          expect(contrastRatio(channels(actual['--color-border-control-rgb']), ground)).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    }
+  });
+
+  it('preserves framed preview scoping and the final print block', () => {
+    const runtime = buildRuntimeThemeCss({ preset: 'nclocal' });
+    const scoped = scopeThemeCss(runtime, 'contrast-proof');
+    const rules = moreContrastRules(scoped);
+    expect(Object.keys(declarations(`#contrast-proof[data-theme][data-mode='dark']${PUBLIC_CONTRAST_SCOPE}`, rules)).sort()).toEqual(MORE_CONTRAST_NAMES);
+    expect(runtime.trimEnd()).toMatch(/@media print \{[\s\S]*\}\s*\}$/);
+  });
+});
 
 // The base theme is the attribute-free pair; every preset is its own
 // (data-theme, data-mode) pair. The body of the describe block is identical

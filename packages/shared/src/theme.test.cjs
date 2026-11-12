@@ -48,6 +48,7 @@ const {
   liftToContrast,
   deriveDarkColors,
   deriveRuleColors,
+  deriveMoreContrastColors,
   resolveMode,
   THEME_HEADERS,
   DEFAULT_HEADER,
@@ -212,6 +213,59 @@ test('rule colors invert with the mode, so a rule reads on either ground', () =>
 });
 
 // ------------------------------------- the publish-time contract (brief §5.2)
+
+test('more contrast meets the public reading targets in every style and mode', () => {
+  for (const preset of THEME_PRESET_IDS) {
+    for (const brandColor of [undefined, rgbToHex([245, 220, 130])]) {
+      const palettes = resolveThemePalettes({ preset, brandColor });
+      const before = JSON.stringify(palettes);
+      for (const mode of THEME_MODES) {
+        const palette = palettes[mode];
+        const colors = deriveMoreContrastColors(palette);
+        assert.deepEqual(Object.keys(colors).sort(), [
+          'secondary', 'hairline', 'strong', 'nameplate', 'control',
+        ].sort());
+        for (const ground of [palette.surface, palette.surfaceAlt]) {
+          assert.ok(contrastRatio(palette.ink, ground) >= 7, `${preset} ${mode}: body`);
+          assert.ok(contrastRatio(colors.secondary, ground) >= 7, `${preset} ${mode}: secondary`);
+          assert.ok(contrastRatio(colors.control, ground) >= 4.5, `${preset} ${mode}: control`);
+          const weights = ['hairline', 'strong', 'nameplate'].map((weight) => contrastRatio(colors[weight], ground));
+          assert.ok(weights[0] >= 3 && weights[0] <= weights[1] && weights[1] <= weights[2], `${preset} ${mode}: rule order`);
+        }
+      }
+      assert.equal(JSON.stringify(palettes), before, 'the preference never changes stored palette values');
+    }
+  }
+});
+
+test('more contrast uses Advanced grounds and preserves an already readable override', () => {
+  const palette = resolveThemePalettes({ preset: 'civic', tokens: { light: {
+    surface: rgbToHex([180, 180, 180]), surfaceAlt: rgbToHex([175, 175, 175]),
+    ink: rgbToHex([0, 0, 0]), inkMuted: rgbToHex([60, 60, 60]),
+  } } }).light;
+  const colors = deriveMoreContrastColors(palette);
+  for (const ground of [palette.surface, palette.surfaceAlt]) {
+    assert.ok(contrastRatio(colors.secondary, ground) >= 7);
+    assert.ok(contrastRatio(colors.control, ground) >= 4.5);
+  }
+  const readable = { ...palette, inkMuted: [0, 0, 0] };
+  assert.deepEqual(deriveMoreContrastColors(readable).secondary, readable.inkMuted);
+});
+
+test('more contrast keeps the better ink when opposed Advanced grounds cannot meet its target', () => {
+  const palette = { ink: [117, 117, 117], inkMuted: [117, 117, 117], surface: [0, 0, 0], surfaceAlt: [255, 255, 255] };
+  const colors = deriveMoreContrastColors(palette);
+  assert.deepEqual(colors.secondary, palette.inkMuted);
+  assert.deepEqual(deriveMoreContrastColors({}), {});
+});
+
+test('more contrast reaches a rule target between opposed grounds before the endpoint', () => {
+  const palette = { ink: [30, 30, 30], inkMuted: [30, 30, 30], surface: [30, 30, 30], surfaceAlt: [220, 220, 220] };
+  const colors = deriveMoreContrastColors(palette);
+  for (const ground of [palette.surface, palette.surfaceAlt]) {
+    assert.ok(contrastRatio(colors.hairline, ground) >= 3);
+  }
+});
 
 test('the contrast contract measures primaryDark on surface, in both directions', () => {
   // CtaBlock paints primaryDark as the hover BACKGROUND under a surface

@@ -643,6 +643,28 @@ function deriveRuleColors({ ink, surface }) {
   return colors;
 }
 
+/** Public reading preference: raise five existing roles on both grounds. */
+function deriveMoreContrastColors(palette) {
+  const grounds = [palette.surface, palette.surfaceAlt].filter(isRgb);
+  if (grounds.length === 0) return {};
+  const colors = isRgb(palette.ink) && isRgb(palette.surface) ? deriveRuleColors(palette) : {};
+  if (isRgb(palette.inkMuted)) colors.secondary = [...palette.inkMuted];
+  const score = (rgb) => Math.min(...grounds.map((ground) => contrastRatio(rgb, ground)));
+  // Choose the direction from both actual grounds, including Advanced overrides.
+  const black = [0, 0, 0];
+  const white = [255, 255, 255];
+  const target = score(black) >= score(white) ? black : white;
+  for (const name in colors) {
+    const rgb = colors[name];
+    const minimum = { hairline: 3, strong: 4.5, control: 4.5 }[name] || 7;
+    if (score(target) <= score(rgb)) continue;
+    for (let step = 1; step <= 200 && score(colors[name]) < minimum; step += 1) {
+      colors[name] = mixRgb(rgb, target, step / 200);
+    }
+  }
+  return colors;
+}
+
 /**
  * Resolve a mode policy to the mode that should render.
  *
@@ -1471,5 +1493,6 @@ module.exports = {
   liftToContrast,
   deriveDarkColors,
   deriveRuleColors,
+  deriveMoreContrastColors,
   resolveMode,
 };
