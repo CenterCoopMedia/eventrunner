@@ -87,7 +87,7 @@ test.describe.serial('Scheduled reminders', () => {
     await page.getByRole('link', { name: 'Speaker reminders' }).click();
     await expect(page).toHaveURL(/\/admin\/speakers\/reminders\/send$/);
     await expect(page.getByText('Saving or resetting the wording pauses scheduled reminders until you approve them again.')).toBeVisible();
-    await page.getByLabel('Subject').fill(`Still needed for {{event_name}} ${stamp}`);
+    await page.getByLabel('Subject', { exact: true }).fill(`Still needed for {{event_name}} ${stamp}`);
     await page.getByRole('button', { name: 'Save wording' }).click();
     await expect(page.getByText('Wording saved. The next preview and send use it.')).toBeVisible();
 
@@ -128,7 +128,7 @@ test.describe.serial('Scheduled reminders', () => {
     await expect(page.getByTestId('attendee-last-run')).toHaveText('The schedule has not run yet.');
 
     // New wording while on pauses the schedule.
-    await panel.getByLabel('Attendee reminder subject').fill('See you in {{days_until}}');
+    await panel.getByLabel('Attendee reminder subject', { exact: true }).fill('See you in {{days_until}}');
     await panel.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(panel.getByText('Attendee settings saved. The schedule is paused until you preview and approve it again.')).toBeVisible();
     await expect(page.getByTestId('attendee-schedule-state')).toContainText('Scheduled attendee reminders are paused.');

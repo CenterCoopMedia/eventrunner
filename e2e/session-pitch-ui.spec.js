@@ -50,10 +50,10 @@ test('pitch entries survive the steps, sign-in, keyboard validation, a lost resp
   await page.getByLabel('Session description', { exact: true }).fill(fixture.description);
   await nextStep(page, 'Format');
   await expect(page).toHaveURL(/\/pitch\/format$/);
-  await page.getByLabel('Format (optional)').fill(fixture.format);
+  await page.getByLabel('Format (optional)', { exact: true }).fill(fixture.format);
   await nextStep(page, 'Presenters');
-  await page.getByLabel('Your name').fill('Synthetic presenter');
-  await page.getByLabel('Your organization (optional)').fill(fixture.organization);
+  await page.getByLabel('Your name', { exact: true }).fill('Synthetic presenter');
+  await page.getByLabel('Your organization (optional)', { exact: true }).fill(fixture.organization);
   await nextStep(page, 'Access and notes');
   await nextStep(page, 'Review and submit');
 
@@ -67,7 +67,7 @@ test('pitch entries survive the steps, sign-in, keyboard validation, a lost resp
   const since = mailFileSize();
   await page.getByLabel('Email address', { exact: true }).fill(email);
   await page.getByRole('button', { name: 'Email me a code', exact: true }).click();
-  await page.getByLabel('Six-digit code').fill(await waitForOtpCode(since, email));
+  await page.getByLabel('Six-digit code', { exact: true }).fill(await waitForOtpCode(since, email));
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Submit pitch' })).toBeEnabled();
   await expect(page.getByText(`Submitting as ${email}`)).toBeVisible();
@@ -142,7 +142,7 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await longRef.delete();
     await page.goto(`/admin/pitches/${id}`);
-    await page.getByLabel('Add a note').fill('PRIVATE-STAFF-NOTE');
+    await page.getByLabel('Add a note', { exact: true }).fill('PRIVATE-STAFF-NOTE');
     await ref.update({ reviewRevision: 1, privateNotes: 'Other reviewer note' });
     await expect(page.getByText(/Someone else changed this pitch while you had it open/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Accept', exact: true })).toBeDisabled();
@@ -153,7 +153,7 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await page.getByRole('button', { name: 'Load the current version' }).click();
     // A staff correction keeps the submitted copy and sends nothing.
     await page.getByRole('button', { name: 'Edit pitch' }).click();
-    await page.getByLabel('Lead presenter name').fill('Example Presenter');
+    await page.getByLabel('Lead presenter name', { exact: true }).fill('Example Presenter');
     await page.getByLabel('Title', { exact: true }).fill(`${fixture.title} (edited)`);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Changes saved. The submitted copy is kept. No email was sent.')).toBeVisible();
@@ -167,7 +167,7 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await expect(page.getByText('No email was sent for this pitch.')).toBeVisible();
     expect(taggedMailSince(decisionSince, email, 'pitch.accepted')).toHaveLength(0);
     await page.getByText('Prepare the acceptance email', { exact: true }).click();
-    await page.getByLabel('Note to the submitter (optional)').fill('Plan for 45 minutes.');
+    await page.getByLabel('Note to the submitter (optional)', { exact: true }).fill('Plan for 45 minutes.');
     await page.getByRole('button', { name: 'Preview the acceptance email' }).click();
     const preview = page.getByRole('region', { name: 'Preview of the acceptance email' });
     await expect(preview).toBeFocused();
@@ -196,13 +196,13 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     expect(text).not.toMatch(/PRIVATE-STAFF-NOTE|privateNotes|uid|reviewedBy/);
     await page.getByRole('link', { name: `Review ${fixture.title} (edited)` }).click();
     await expect(page.getByRole('heading', { name: 'Create session and speaker drafts' })).toBeVisible();
-    await expect(page.getByLabel('Lead presenter first name')).not.toHaveValue('');
-    await page.getByLabel('Lead presenter first name').fill('Example');
-    await page.getByLabel('Lead presenter last name').fill('Presenter');
+    await expect(page.getByLabel('Lead presenter first name', { exact: true })).not.toHaveValue('');
+    await page.getByLabel('Lead presenter first name', { exact: true }).fill('Example');
+    await page.getByLabel('Lead presenter last name', { exact: true }).fill('Presenter');
     await expect(page.getByRole('checkbox', { name: 'Invite the presenters now' })).toBeChecked();
     const inviteSince = mailFileSize();
     const dayId = (await db.collection('config').doc('event').get()).data().days[0].id;
-    await page.getByLabel('Event day').selectOption(dayId);
+    await page.getByLabel('Event day', { exact: true }).selectOption(dayId);
     await page.getByLabel('Start time', { exact: true }).fill('10:00');
     await page.getByLabel('End time', { exact: true }).fill('11:00');
     await page.getByRole('checkbox', { name: /I reviewed the proposal/ }).check();
@@ -217,7 +217,7 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     expect((await db.collection('cmsSchedule_drafts').doc(converted.sessionId).get()).data()).toMatchObject({ visible: false, status: 'dirty', speakerIds: [converted.speakerId] });
     expect((await db.collection('speakers').doc(converted.speakerId).get()).data()).toMatchObject({ firstName: 'Example', lastName: 'Presenter', status: 'invited', uid: null });
     expect((await db.collection('speakers_public').doc(converted.speakerId).get()).exists).toBe(false);
-    await page.getByLabel('Add a note').fill('Post-conversion review');
+    await page.getByLabel('Add a note', { exact: true }).fill('Post-conversion review');
     await page.getByRole('button', { name: 'Add note' }).click();
     await expect(page.getByText('Note added.')).toBeVisible();
     const afterNotes = (await ref.get()).data();
@@ -245,11 +245,11 @@ test('CSV preview imports consented source rows once and refuses changed or unre
   await signIn(page, 'e2e-admin@example.test');
   await page.goto('/admin/pitches/import');
   await expect(page.getByRole('heading', { name: 'Import proposals from CSV' })).toBeVisible();
-  await page.getByLabel('Source name').fill('outside-form');
-  await page.getByLabel('Proposal CSV').setInputFiles({ name: 'proposals.csv', mimeType: 'text/csv', buffer: Buffer.from('externalId,email,title,description,organization,format,consent\noutside-1,external-pitch@example.test,Reporting together,A practical workshop on shared local reporting. Learn to plan a project; share evidence; and reach new readers.,Example newsroom,Workshop,true') });
+  await page.getByLabel('Source name', { exact: true }).fill('outside-form');
+  await page.getByLabel('Proposal CSV', { exact: true }).setInputFiles({ name: 'proposals.csv', mimeType: 'text/csv', buffer: Buffer.from('externalId,email,title,description,organization,format,consent\noutside-1,external-pitch@example.test,Reporting together,A practical workshop on shared local reporting. Learn to plan a project; share evidence; and reach new readers.,Example newsroom,Workshop,true') });
   await expect(page.getByRole('region', { name: 'Match proposal columns' })).toBeVisible();
-  await expect(page.getByLabel('Source ID (required)')).toHaveValue('externalId');
-  await expect(page.getByLabel('Consent (required)')).toHaveValue('consent');
+  await expect(page.getByLabel('Source ID (required)', { exact: true })).toHaveValue('externalId');
+  await expect(page.getByLabel('Consent (required)', { exact: true })).toHaveValue('consent');
   await page.getByRole('button', { name: 'Review proposals', exact: true }).click();
   await expect(page.getByText('1 proposal ready for review.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Import reviewed proposals' })).toBeDisabled();

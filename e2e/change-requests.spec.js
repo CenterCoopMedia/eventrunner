@@ -281,9 +281,9 @@ test.describe.serial('change requests', () => {
 
     // Staff write a reply and a result link they checked on this site.
     await row.getByRole('button', { name: 'Reply and result link' }).click();
-    await row.getByLabel('Reply to the requester (optional)').fill('We fixed the parking map.');
-    await row.getByLabel('Result link (optional)').fill(resultUrl);
-    await row.getByLabel('I opened this link and it shows the change.').check();
+    await row.getByLabel('Reply to the requester (optional)', { exact: true }).fill('We fixed the parking map.');
+    await row.getByLabel('Result link (optional)', { exact: true }).fill(resultUrl);
+    await row.getByLabel('I opened this link and it shows the change.', { exact: true }).check();
     await row.getByRole('button', { name: 'Save the reply and link' }).click();
     await expect(row.getByText('Reply and link saved.')).toBeVisible();
 

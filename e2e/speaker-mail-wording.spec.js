@@ -57,9 +57,9 @@ test.describe.serial('Speaker email wording', () => {
     expect((await adminDb().collection('email_templates').doc('speaker.invite').get()).exists).toBe(false);
 
     await invitation.fill(shippedInvitation);
-    await form.getByLabel('Subject').fill(subject);
+    await form.getByLabel('Subject', { exact: true }).fill(subject);
     // The keyboard path: Enter in the subject field submits the form.
-    await form.getByLabel('Subject').press('Enter');
+    await form.getByLabel('Subject', { exact: true }).press('Enter');
     await expect(form.getByRole('status')).toHaveText('Invitation wording saved. The next email uses it.');
     await expect(form.getByText(/Saved wording is in use, last changed .* by e2e-mail-wording-staff@example\.test\./)).toBeVisible();
 

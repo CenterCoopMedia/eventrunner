@@ -70,17 +70,17 @@ test.describe.serial('live update audiences and key dates', () => {
     await page.goto('/admin/live-updates');
     await expect(page.getByRole('heading', { level: 1, name: 'Live updates' })).toBeVisible();
 
-    await page.getByLabel('Message').fill(publicMessage);
-    await page.getByLabel('Category').fill('Venue');
-    await expect(page.getByLabel('Who can read it')).toHaveValue('everyone');
+    await page.getByLabel('Message', { exact: true }).fill(publicMessage);
+    await page.getByLabel('Category', { exact: true }).fill('Venue');
+    await expect(page.getByLabel('Who can read it', { exact: true })).toHaveValue('everyone');
     await page.getByRole('button', { name: 'Post update' }).click();
     await expect(page.getByText(publicMessage)).toBeVisible();
     // The list can report the new row before the save answers; the form
     // clears on the answer, so wait for that before the second post.
-    await expect(page.getByLabel('Message')).toHaveValue('');
+    await expect(page.getByLabel('Message', { exact: true })).toHaveValue('');
 
-    await page.getByLabel('Message').fill(speakerMessage);
-    await page.getByLabel('Who can read it').selectOption('speakers');
+    await page.getByLabel('Message', { exact: true }).fill(speakerMessage);
+    await page.getByLabel('Who can read it', { exact: true }).selectOption('speakers');
     await page.getByRole('button', { name: 'Post update' }).click();
     await expect(page.getByText(speakerMessage)).toBeVisible();
 
