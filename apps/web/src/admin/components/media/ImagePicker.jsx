@@ -157,7 +157,7 @@ export default function ImagePicker({
         <div className="min-w-0 flex-1">
           <input
             id={id}
-            className="admin-target min-h-admin-control min-w-0 w-full rounded-admin border-admin-hairline border-admin-rule-control bg-admin-ground-input px-sm py-xs font-admin-data text-admin-sm text-admin-ink-data aria-[invalid=true]:border-admin-rule-alarm"
+            className="min-h-admin-control min-w-0 w-full rounded-admin border-admin-hairline border-admin-rule-control bg-admin-ground-input px-sm py-xs font-admin-data text-admin-sm text-admin-ink-data aria-[invalid=true]:border-admin-rule-alarm"
             value={value ?? ''}
             onChange={(event) => onChange(event.target.value)}
             aria-invalid={error ? 'true' : undefined}

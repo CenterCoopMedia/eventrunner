@@ -8,7 +8,7 @@ import {
 
 const selectClass =
   'touch-target w-full min-w-0 rounded-brand border-hairline border-control bg-surface ' +
-  'px-sm font-data text-caption text-text-primary';
+  'px-sm font-data text-body text-text-primary';
 
 const bandActionClass = `${quietActionClass} justify-center`;
 
