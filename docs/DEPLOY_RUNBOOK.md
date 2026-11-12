@@ -381,11 +381,22 @@ Before each Functions deploy, the script reads the complete Functions inventory 
 `firebase-tools` backend used by `functions:list`. It rejects missing regional availability or any
 unreachable region. A failed or partial inventory stops the deploy.
 
-**Case 1: verified-empty bootstrap.** On a bootstrap run, the script passes `--force` to the full
-`--only functions` deploy only when the inventory reports no Functions. For that initial deploy,
-`--force` also accepts Firebase CLI's default Artifact Registry cleanup policy: container images
-older than one day are deleted. This is build-artifact retention only; it does not change deployed
-Functions or event data.
+**Case 1: First deployment.** When a bootstrap inventory reports no Functions, the script discovers
+all local Functions before any deployment. It creates explicit groups of at most 50 regional
+Functions, with a 105-second wait after each completed group before the next starts. A Function in
+two regions counts as two creates. This stays below Google's write quotas: 60 per 60 seconds per
+region for second-generation Functions, and 80 per 100 seconds per project for first-generation
+Functions. See [Google's Functions quotas](https://docs.cloud.google.com/functions/quotas).
+
+Each group uses `--force` with explicit selectors to accept initial retry and cleanup policies.
+The script rejects selectors that reach other local Functions. Before a later group, it reads the
+complete inventory again and stops if any target already exists. It does not repeat a full deploy
+after the groups; it verifies the complete inventory instead. A failed group or inventory check
+stops the run, and the provisioner's existing deploy retry remains available.
+
+Initial `--force` also accepts Firebase CLI's default Artifact Registry cleanup policy: Container
+images older than one day are deleted. This is build-artifact retention only; it does not change
+deployed Functions or event data.
 
 **Case 2: New retry policies.** On every other run, the script also discovers the local
 Functions with the pinned `firebase-tools` runtime, the same discovery that `firebase deploy` runs.

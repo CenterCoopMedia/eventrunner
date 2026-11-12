@@ -6,9 +6,9 @@
  *
  * firebase-tools requires --force to accept a new retry policy in
  * non-interactive mode. The same flag also accepts deletions and unsafe
- * migrations, so a full `--only functions` deploy must never receive it,
- * except on a bootstrap run whose complete inventory (read through the same
- * pinned firebase-tools backend as functions:list) is empty.
+ * migrations, so a full `--only functions` deploy must never receive it.
+ * A verified-empty bootstrap creates functions in paced, explicit groups.
+ * Every forced group must select only functions that do not exist yet.
  *
  * On any other run, functions that newly enable retry are deployed first
  * with --force and explicit selectors. Existing functions qualify only
@@ -46,6 +46,9 @@ const PROJECT_DIR = path.resolve(__dirname, '..');
 // The v1 write quota uses a 100-second window; v2 uses a 60-second window.
 const QUOTA_RECOVERY_WAIT_MS = 105_000;
 const MAX_DEPLOY_ATTEMPTS = 3;
+// V2 permits 60 writes/60 seconds per region; v1 permits 80/100 seconds per project.
+const INITIAL_BATCH_WRITES = 50;
+const INITIAL_BATCH_WAIT_MS = 105_000;
 
 function firebaseArgs(command, projectId) {
   return ['firebase', command, '--project', projectId, '--non-interactive'];
@@ -77,6 +80,7 @@ const DIAGNOSTIC_ERROR_CODES = new Set([
   'INVENTORY_NO_AVAILABILITY', 'INVENTORY_UNREACHABLE_REGIONS', 'INVENTORY_BAD_ENDPOINTS',
   'FUNCTIONS_ANALYSIS_FAILED', 'FUNCTIONS_NO_RUNTIME', 'FUNCTIONS_BAD_ENDPOINTS',
   'FUNCTIONS_RETRY_VALUE', 'FUNCTIONS_RETRY_REGIONS',
+  'FUNCTIONS_INITIAL_REGIONS', 'FUNCTIONS_INITIAL_SELECTORS', 'FUNCTIONS_INITIAL_BUDGET', 'FUNCTIONS_INITIAL_EXISTS',
   'FUNCTIONS_CONFIG_CODEBASE', 'FUNCTIONS_CONFIG_SOURCE',
   'MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND', 'ERR_PACKAGE_PATH_NOT_EXPORTED',
   'ERR_REQUIRE_ESM', 'ERR_REQUIRE_ASYNC_MODULE', 'ENOENT', 'EACCES',
@@ -101,7 +105,8 @@ function diagnosticDetail(error, projectDir = PROJECT_DIR) {
   if (Number.isInteger(error.status) && error.status >= 100 && error.status <= 599) detail.sdkStatus = error.status;
   if (Number.isInteger(error.httpStatus) && error.httpStatus >= 100 && error.httpStatus <= 599) detail.httpStatus = error.httpStatus;
   if (DIAGNOSTIC_ERROR_CODES.has(error.code)) detail.code = error.code;
-  if (['FUNCTIONS_RETRY_VALUE', 'FUNCTIONS_RETRY_REGIONS'].includes(error.code)
+  if (['FUNCTIONS_RETRY_VALUE', 'FUNCTIONS_RETRY_REGIONS', 'FUNCTIONS_INITIAL_REGIONS',
+    'FUNCTIONS_INITIAL_SELECTORS', 'FUNCTIONS_INITIAL_BUDGET', 'FUNCTIONS_INITIAL_EXISTS'].includes(error.code)
       && typeof error.functionId === 'string' && /^[A-Za-z][A-Za-z0-9_-]{0,62}$/.test(error.functionId)) {
     detail.function = error.functionId;
   }
@@ -458,12 +463,18 @@ async function deployAttempt({
   verifyCompleteInventory,
   discoverFunctions,
   readConfig,
+  wait,
   log,
 }) {
   const forceInitialDeploy = bootstrap === 'true' && inventory.length === 0;
   let localFunctions;
   if (forceInitialDeploy) {
-    log.log('deploy-functions: bootstrap inventory is empty; accepting initial retry and cleanup policies');
+    log.log('deploy-functions: bootstrap inventory is empty; creating paced groups with initial retry and cleanup policies');
+    const initial = await deployInitialFunctions({
+      projectId, discoverFunctions, readConfig, verifyCompleteInventory, run, wait, log,
+    });
+    if (initial.code !== undefined) return initial;
+    localFunctions = initial.localFunctions;
   } else {
     if (bootstrap === 'true') {
       log.log(`deploy-functions: bootstrap inventory has ${inventory.length} function(s); deploying without --force`);
@@ -485,27 +496,97 @@ async function deployAttempt({
       projectId, plan, localFunctions, run, verifyCompleteInventory, log,
     });
     if (retryResult) return retryResult;
-  }
 
-  const args = [...firebaseArgs('deploy', projectId), '--only', 'functions'];
-  if (forceInitialDeploy) args.push('--force');
-  const deployment = run(args, { stdio: 'inherit' });
-  if (failed(deployment)) {
-    log.error(reportFailure('deploy-functions: Firebase deploy failed', deployment));
-    return { code: deployFailure(deployment) };
+    const args = [...firebaseArgs('deploy', projectId), '--only', 'functions'];
+    const deployment = run(args, { stdio: 'inherit' });
+    if (failed(deployment)) {
+      log.error(reportFailure('deploy-functions: Firebase deploy failed', deployment));
+      return { code: deployFailure(deployment) };
+    }
   }
 
   let deployed;
-  let verificationPhase = 'post-deploy-discovery';
   try {
-    localFunctions ??= await discoverFunctions(projectId);
-    verificationPhase = 'post-deploy-inventory';
     deployed = await verifyCompleteInventory(projectId);
   } catch (error) {
-    log.error(diagnosticFailure('deploy-functions: could not verify the deployed functions', verificationPhase, error));
+    log.error(diagnosticFailure('deploy-functions: could not verify the deployed functions', 'post-deploy-inventory', error));
     return { code: 1 };
   }
   return incompleteDeployment(deployed, localFunctions);
+}
+
+/** Count regional creates, and reject selectors that would expand the write budget. */
+function planInitialFunctionBatches(localFunctions, config) {
+  const batches = [];
+  let batch = { selectors: [], filters: [], writes: 0 };
+  for (const fn of [...localFunctions].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (!/^[A-Za-z][A-Za-z0-9_-]{0,62}$/.test(fn.id) || !fn.regions?.length) {
+      throw Object.assign(new Error('every initial function must have a valid id and literal regions'), {
+        code: 'FUNCTIONS_INITIAL_REGIONS', functionId: fn.id,
+      });
+    }
+    if (fn.regions.length > INITIAL_BATCH_WRITES) {
+      throw Object.assign(new Error('one function exceeds the initial regional write budget'), {
+        code: 'FUNCTIONS_INITIAL_BUDGET', functionId: fn.id,
+      });
+    }
+    const filters = parseFunctionSelector(fn.id, config);
+    if (localFunctions.some((other) => other.id !== fn.id && filters.some((filter) => endpointMatchesFilter(other, filter)))) {
+      throw Object.assign(new Error('an initial selector also selects another function'), {
+        code: 'FUNCTIONS_INITIAL_SELECTORS', functionId: fn.id,
+      });
+    }
+    if (batch.writes + fn.regions.length > INITIAL_BATCH_WRITES) {
+      batches.push(batch);
+      batch = { selectors: [], filters: [], writes: 0 };
+    }
+    batch.selectors.push(`functions:${fn.id}`);
+    batch.filters.push(...filters);
+    batch.writes += fn.regions.length;
+  }
+  if (batch.selectors.length) batches.push(batch);
+  return batches;
+}
+
+/** A completed group precedes the quota wait, so slow creates cannot overlap the next window. */
+async function deployInitialFunctions({ projectId, discoverFunctions, readConfig, verifyCompleteInventory, run, wait, log }) {
+  let localFunctions;
+  let batches;
+  try {
+    localFunctions = await discoverFunctions(projectId);
+    batches = planInitialFunctionBatches(localFunctions, readConfig());
+  } catch (error) {
+    log.error(diagnosticFailure('deploy-functions: could not plan the initial functions', 'pre-deploy-discovery', error));
+    return { code: 1 };
+  }
+  for (let index = 0; index < batches.length; index += 1) {
+    const batch = batches[index];
+    if (index > 0) {
+      try {
+        await wait(INITIAL_BATCH_WAIT_MS);
+        const inventory = await verifyCompleteInventory(projectId);
+        const existing = inventory.find((fn) => batch.filters.some((filter) => endpointMatchesFilter(fn, filter)));
+        if (existing) {
+          throw Object.assign(new Error('an initial forced group would change a function that already exists'), {
+            code: 'FUNCTIONS_INITIAL_EXISTS', functionId: existing.id,
+          });
+        }
+      } catch (error) {
+        log.error(diagnosticFailure('deploy-functions: could not verify a safe initial group', 'initial-group-inventory', error));
+        return { code: 1 };
+      }
+    }
+    log.log(`deploy-functions: initial group ${index + 1}/${batches.length}, at most ${batch.writes} function writes`);
+    const deployment = run([
+      'firebase', 'deploy', '--only', batch.selectors.join(','),
+      '--project', projectId, '--non-interactive', '--force',
+    ], { stdio: 'inherit' });
+    if (failed(deployment)) {
+      log.error(reportFailure('deploy-functions: initial function group failed', deployment));
+      return { code: deployFailure(deployment) };
+    }
+  }
+  return { localFunctions };
 }
 
 async function main({
@@ -543,7 +624,7 @@ async function main({
   // Firebase CLI that completes quota-delayed creates without a fresh process.
   for (let attempt = 1; attempt <= MAX_DEPLOY_ATTEMPTS; attempt += 1) {
     const result = await deployAttempt({
-      projectId, bootstrap, inventory, run, verifyCompleteInventory, discoverFunctions, readConfig, log,
+      projectId, bootstrap, inventory, run, verifyCompleteInventory, discoverFunctions, readConfig, wait, log,
     });
     if (result.code !== undefined) return result.code;
 
