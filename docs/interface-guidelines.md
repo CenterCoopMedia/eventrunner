@@ -302,7 +302,7 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 - `pointer-events: none` on decorative elements (glows, texture overlays).
 - Wrap hover styles in `@media (hover: hover)`; wrap motion in `@media (prefers-reduced-motion: no-preference)`.
 - `role="status"` for routine updates, `role="alert"` for urgent errors only.
-- Never color alone for a status — pair it with an icon, label, or underline. Essential boundaries, selected states, errors, and focus must remain distinguishable in forced colors.
+- Never use color alone for a status: Pair it with an icon, label or underline. In forced colors, preserve current navigation, selected and checked states, errors, focus rings and status badge boundaries. Use system colors for repairs; meaningful icons must remain visible or have text equivalents.
 - Skip-to-content link is the first focusable element; anchored headings get `scroll-margin-top`.
 
 ## Layout

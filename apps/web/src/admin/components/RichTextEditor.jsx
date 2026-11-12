@@ -93,7 +93,7 @@ const BLOCK_FORMATS = Object.freeze([
 ]);
 
 const toolbarButtonClass =
-  'inline-flex min-h-admin-control items-center justify-center rounded-admin border-admin-hairline ' +
+  'admin-format-button inline-flex min-h-admin-control items-center justify-center rounded-admin border-admin-hairline ' +
   'border-admin-rule-strong bg-admin-ground-raised px-sm py-xs font-admin-ui text-admin-sm ' +
   'font-medium text-admin-ink hover:border-admin-action-soft-hover hover:bg-admin-action-soft ' +
   'hover:text-admin-ink-link aria-pressed:border-admin-action aria-pressed:bg-admin-action-soft ' +
