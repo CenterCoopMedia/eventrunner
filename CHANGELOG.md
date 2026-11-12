@@ -866,6 +866,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Email event dates use readable calendar dates, such as March 12, 2027,
+  and keep the configured day regardless of the server's timezone (#818).
 - Deployment smoke requests have a 10-second deadline and retry a transient
   GET/OPTIONS failure once. Persistent and deterministic failures still stop
   the workflow (#817).
