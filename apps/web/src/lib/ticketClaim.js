@@ -65,7 +65,7 @@ export async function verifyTicketOrder({ orderNumber, idToken }) {
       message:
         typeof error.message === 'string' && error.message
           ? error.message
-          : 'Something went wrong. Try again.',
+          : 'The ticket claim could not be confirmed. Try again.',
     });
   }
   return payload ?? { ok: true, claimed: 0, registrationStatus: null };

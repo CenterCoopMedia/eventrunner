@@ -88,7 +88,7 @@ async function post(name, body, { idToken = null } = {}) {
       message:
         typeof error.message === 'string' && error.message
           ? error.message
-          : 'Something went wrong. Try again.',
+          : 'The invitation request could not be confirmed. Try again.',
       invitedEmailMasked:
         typeof error.invitedEmailMasked === 'string' ? error.invitedEmailMasked : null,
     });

@@ -155,7 +155,7 @@ export default function AdminSpeakersList() {
       // Verbatim: the server's message is the actionable part — which
       // transition it refused, or that the invitation was recorded but not
       // delivered.
-      setResult(speaker.id, { tone: 'error', message: plannerMessage(err?.message ?? 'Something went wrong.') });
+      setResult(speaker.id, { tone: 'error', message: plannerMessage(err?.message ?? 'The speaker action could not be confirmed. Check the speaker status before trying again.') });
       await refreshInvites();
     } finally {
       requestPending.current = false;

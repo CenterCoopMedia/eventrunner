@@ -64,7 +64,7 @@ export async function downloadMaterialsArchive({ getIdToken, materialIds }) {
     throw new AdminApiError({
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
-      message: typeof error.message === 'string' && error.message ? error.message : 'Something went wrong. Try again.',
+      message: typeof error.message === 'string' && error.message ? error.message : 'The materials archive could not be downloaded. Try again.',
     });
   }
 

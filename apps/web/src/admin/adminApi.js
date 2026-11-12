@@ -6,9 +6,10 @@
 // requireAdmin (core/auth.cjs) is the enforcement boundary — the client-side
 // gate (AdminGate in AdminApp.jsx) is convenience only.
 //
-// Failures normalize to AdminApiError carrying the server's `error.message`
-// verbatim. `fieldErrors` splits that message into the per-field segments the
-// server joined with '; ': each keeps its field key in `field`, so a form can
+// Failures normalize to AdminApiError retaining the server's `error.message`.
+// Server failures also name the event-team contact action. `fieldErrors`
+// splits that message into the per-field segments the server joined with '; ':
+// each keeps its field key in `field`, so a form can
 // mark the input, and its readable sentence, without the key, in `message`.
 // Screens show the segments, never the raw `field: reason` text.
 import { useCallback } from 'react';
@@ -124,13 +125,16 @@ export async function callAdminEndpoint(name, body, getIdToken) {
   }
   if (!response.ok) {
     const error = payload?.error ?? {};
+    let message = typeof error.message === 'string' && error.message
+      ? error.message
+      : 'The request could not be completed. Try again.';
+    if (response.status >= 500) {
+      message += ' Keep this page open and contact the event team for help.';
+    }
     throw new AdminApiError({
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
-      message:
-        typeof error.message === 'string' && error.message
-          ? error.message
-          : 'Something went wrong. Try again.',
+      message,
       queueId: typeof payload?.queueId === 'string' ? payload.queueId : null,
       usage: Array.isArray(payload?.usage) ? payload.usage : null,
     });

@@ -46,7 +46,7 @@ describe('submitChangeRequest', () => {
     const fetchImpl = vi.fn(async () => ({ ok: false, status: 502, json: async () => { throw new Error('html'); } }));
     expect(await submitChangeRequest(PAYLOAD, { user, env: ENV, fetchImpl })).toEqual({
       ok: false,
-      error: 'Something went wrong. Try again.',
+      error: 'Your change request could not be confirmed. Try again.',
     });
   });
 

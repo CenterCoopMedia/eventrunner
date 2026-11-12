@@ -17,6 +17,8 @@ Prefer:
 
 Do not introduce an instruction with sales language, a rhetorical question, or a general claim.
 
+Error messages follow [the interface writing rule](interface-guidelines.md#error-messages): State the failure and the next action, preserve typed input, and avoid blame, apology filler and "Oops".
+
 ## Use one term for one concept
 
 Use the same term in the interface, documentation, email, and support text.

@@ -217,7 +217,7 @@ function createSendOtpHandler({
     }
     if (!renderedMailCarriesCode(rendered, code)) {
       log.error('auth.otp render lacks the code in html and/or text; refusing to send');
-      res.status(500).json({ error: { code: 'internal', message: 'Sign-in mail could not be prepared.' } });
+      res.status(500).json({ error: { code: 'internal', message: 'Sign-in mail could not be prepared. Request a new code.' } });
       return;
     }
 

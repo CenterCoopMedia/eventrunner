@@ -56,6 +56,31 @@ describe('callAdminEndpoint', () => {
       status: 0,
     });
   });
+
+  it('keeps a server failure fact and gives the reader a next step', async () => {
+    fetch.mockResolvedValueOnce(response(500, {
+      error: { code: 'internal', message: 'The speaker could not be deleted.' },
+    }));
+    await expect(callAdminEndpoint('deleteSpeaker', { speakerId: 'speaker-a' }, getIdToken)).rejects.toMatchObject({
+      code: 'internal',
+      status: 500,
+      message: 'The speaker could not be deleted. Keep this page open and contact the event team for help.',
+    });
+  });
+
+  it('preserves a validation response and its field keys', async () => {
+    const message = "Invalid page: path: must start with '/'; label: must be a non-empty string";
+    fetch.mockResolvedValueOnce(response(400, { error: { code: 'bad-request', message } }));
+    await expect(callAdminEndpoint('cmsSavePage', { page: {} }, getIdToken)).rejects.toMatchObject({
+      code: 'bad-request',
+      status: 400,
+      message,
+      fieldErrors: [
+        { field: 'path', message: "Path: must start with '/'" },
+        { field: 'label', message: 'Label: must be a non-empty string' },
+      ],
+    });
+  });
 });
 
 describe('fieldErrorsOf', () => {
