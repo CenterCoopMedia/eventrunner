@@ -54,7 +54,7 @@ import {
   DEFAULT_PRESET_ID,
   ADMIN_TOKEN_SET,
   deriveRuleColors,
-  deriveMoreContrastTokens,
+  deriveMoreContrastColors,
   resolveAdminAccent,
   resolveAdminScheme,
   ADMIN_SCHEME_IDS as THEME_ADMIN_SCHEME_IDS,
@@ -407,7 +407,8 @@ export function buildRuntimeThemeCss(themeDoc) {
       ? [':root', ":root[data-mode='light']", ":root[data-theme][data-mode='light']"]
       : [":root[data-mode='dark']", ":root[data-theme][data-mode='dark']"];
     blocks.push(`${selectors.join(',\n')} {\n${modeLines[mode].join('\n')}\n}`);
-    const declarations = Object.entries(deriveMoreContrastTokens(palettes[mode])).map(([name, rgb]) => `  ${name}: ${rgb.join(' ')};`);
+    const declarations = Object.entries(deriveMoreContrastColors(palettes[mode])).map(([name, rgb]) =>
+      `  ${name === 'secondary' ? '--color-text-secondary-rgb' : RULE_PROPS[name]}: ${rgb.join(' ')};`);
     if (declarations.length === 0) continue;
     const selector = selectors.map((one) => `${one}:not(:has(.admin-room))`).join(',\n');
     contrastBlocks.push(`${selector} {\n${declarations.join('\n')}\n}`);

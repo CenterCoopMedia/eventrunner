@@ -1587,155 +1587,155 @@
 @media screen and (prefers-contrast: more) {
   /* More contrast for public reading. */
   :root:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 80 80 80;
     --rule-hairline-rgb: 139 139 139;
+    --color-border-control-rgb: 109 109 109;
     --rule-strong-rgb: 109 109 109;
     --rule-nameplate-rgb: 17 17 17;
-    --color-border-control-rgb: 109 109 109;
+    --color-text-secondary-rgb: 80 80 80;
   }
   /* More contrast for public reading. */
   :root[data-mode='light']:not(:has(.admin-room)),
   [data-mode='light']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 80 80 80;
     --rule-hairline-rgb: 139 139 139;
+    --color-border-control-rgb: 109 109 109;
     --rule-strong-rgb: 109 109 109;
     --rule-nameplate-rgb: 17 17 17;
-    --color-border-control-rgb: 109 109 109;
+    --color-text-secondary-rgb: 80 80 80;
   }
   /* More contrast for public reading. */
   :root[data-mode='dark']:not(:has(.admin-room)),
   [data-mode='dark']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 194 206 209;
     --rule-hairline-rgb: 97 114 121;
+    --color-border-control-rgb: 130 143 148;
     --rule-strong-rgb: 137 148 153;
     --rule-nameplate-rgb: 249 247 245;
-    --color-border-control-rgb: 130 143 148;
+    --color-text-secondary-rgb: 194 206 209;
   }
   /* More contrast for public reading. */
   :root[data-theme='civic'][data-mode='light']:not(:has(.admin-room)),
   [data-theme='civic'][data-mode='light']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 77 80 86;
     --rule-hairline-rgb: 138 138 138;
+    --color-border-control-rgb: 109 109 110;
     --rule-strong-rgb: 108 109 109;
     --rule-nameplate-rgb: 23 24 26;
-    --color-border-control-rgb: 109 109 110;
+    --color-text-secondary-rgb: 77 80 86;
   }
   /* More contrast for public reading. */
   :root[data-theme='civic'][data-mode='dark']:not(:has(.admin-room)),
   [data-theme='civic'][data-mode='dark']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 174 178 184;
     --rule-hairline-rgb: 111 112 112;
+    --color-border-control-rgb: 141 141 141;
     --rule-strong-rgb: 142 143 142;
     --rule-nameplate-rgb: 238 238 236;
-    --color-border-control-rgb: 141 141 141;
+    --color-text-secondary-rgb: 174 178 184;
   }
   /* More contrast for public reading. */
   :root[data-theme='newsroom'][data-mode='light']:not(:has(.admin-room)),
   [data-theme='newsroom'][data-mode='light']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 80 80 80;
     --rule-hairline-rgb: 139 139 139;
+    --color-border-control-rgb: 109 109 109;
     --rule-strong-rgb: 109 109 109;
     --rule-nameplate-rgb: 17 17 17;
-    --color-border-control-rgb: 109 109 109;
+    --color-text-secondary-rgb: 80 80 80;
   }
   /* More contrast for public reading. */
   :root[data-theme='newsroom'][data-mode='dark']:not(:has(.admin-room)),
   [data-theme='newsroom'][data-mode='dark']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 194 206 209;
     --rule-hairline-rgb: 97 114 121;
+    --color-border-control-rgb: 130 143 148;
     --rule-strong-rgb: 137 148 153;
     --rule-nameplate-rgb: 249 247 245;
-    --color-border-control-rgb: 130 143 148;
+    --color-text-secondary-rgb: 194 206 209;
   }
   /* More contrast for public reading. */
   :root[data-theme='broadsheet'][data-mode='light']:not(:has(.admin-room)),
   [data-theme='broadsheet'][data-mode='light']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 74 78 86;
     --rule-hairline-rgb: 137 135 133;
+    --color-border-control-rgb: 106 106 106;
     --rule-strong-rgb: 106 106 107;
     --rule-nameplate-rgb: 24 26 32;
-    --color-border-control-rgb: 106 106 106;
+    --color-text-secondary-rgb: 74 78 86;
   }
   /* More contrast for public reading. */
   :root[data-theme='broadsheet'][data-mode='dark']:not(:has(.admin-room)),
   [data-theme='broadsheet'][data-mode='dark']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 181 177 168;
     --rule-hairline-rgb: 112 112 110;
+    --color-border-control-rgb: 143 141 135;
     --rule-strong-rgb: 144 141 135;
     --rule-nameplate-rgb: 237 232 222;
-    --color-border-control-rgb: 143 141 135;
+    --color-text-secondary-rgb: 181 177 168;
   }
   /* More contrast for public reading. */
   :root[data-theme='atlas'][data-mode='light']:not(:has(.admin-room)),
   [data-theme='atlas'][data-mode='light']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 72 80 86;
     --rule-hairline-rgb: 135 136 137;
+    --color-border-control-rgb: 105 108 110;
     --rule-strong-rgb: 105 108 111;
     --rule-nameplate-rgb: 20 26 30;
-    --color-border-control-rgb: 105 108 110;
+    --color-text-secondary-rgb: 72 80 86;
   }
   /* More contrast for public reading. */
   :root[data-theme='atlas'][data-mode='dark']:not(:has(.admin-room)),
   [data-theme='atlas'][data-mode='dark']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 168 180 188;
     --rule-hairline-rgb: 109 113 116;
+    --color-border-control-rgb: 137 142 146;
     --rule-strong-rgb: 137 143 148;
     --rule-nameplate-rgb: 231 238 242;
-    --color-border-control-rgb: 137 142 146;
+    --color-text-secondary-rgb: 168 180 188;
   }
   /* More contrast for public reading. */
   :root[data-theme='field-guide'][data-mode='light']:not(:has(.admin-room)),
   [data-theme='field-guide'][data-mode='light']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 84 80 74;
     --rule-hairline-rgb: 139 138 136;
+    --color-border-control-rgb: 111 109 106;
     --rule-strong-rgb: 112 109 107;
     --rule-nameplate-rgb: 38 35 31;
-    --color-border-control-rgb: 111 109 106;
+    --color-text-secondary-rgb: 84 80 74;
   }
   /* More contrast for public reading. */
   :root[data-theme='field-guide'][data-mode='dark']:not(:has(.admin-room)),
   [data-theme='field-guide'][data-mode='dark']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 180 179 173;
     --rule-hairline-rgb: 113 113 112;
+    --color-border-control-rgb: 143 142 139;
     --rule-strong-rgb: 143 142 139;
     --rule-nameplate-rgb: 235 233 228;
-    --color-border-control-rgb: 143 142 139;
+    --color-text-secondary-rgb: 180 179 173;
   }
   /* More contrast for public reading. */
   :root[data-theme='zine'][data-mode='light']:not(:has(.admin-room)),
   [data-theme='zine'][data-mode='light']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 81 79 76;
     --rule-hairline-rgb: 137 137 134;
+    --color-border-control-rgb: 109 108 106;
     --rule-strong-rgb: 109 108 106;
     --rule-nameplate-rgb: 20 19 18;
-    --color-border-control-rgb: 109 108 106;
+    --color-text-secondary-rgb: 81 79 76;
   }
   /* More contrast for public reading. */
   :root[data-theme='zine'][data-mode='dark']:not(:has(.admin-room)),
   [data-theme='zine'][data-mode='dark']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 174 170 166;
     --rule-hairline-rgb: 107 106 107;
+    --color-border-control-rgb: 137 135 134;
     --rule-strong-rgb: 143 141 140;
     --rule-nameplate-rgb: 242 240 236;
-    --color-border-control-rgb: 137 135 134;
+    --color-text-secondary-rgb: 174 170 166;
   }
   /* More contrast for public reading. */
   :root[data-theme='nclocal'][data-mode='light']:not(:has(.admin-room)),
   [data-theme='nclocal'][data-mode='light']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 80 80 80;
     --rule-hairline-rgb: 139 138 137;
+    --color-border-control-rgb: 109 109 108;
     --rule-strong-rgb: 109 109 109;
     --rule-nameplate-rgb: 17 17 17;
-    --color-border-control-rgb: 109 109 108;
+    --color-text-secondary-rgb: 80 80 80;
   }
   /* More contrast for public reading. */
   :root[data-theme='nclocal'][data-mode='dark']:not(:has(.admin-room)),
   [data-theme='nclocal'][data-mode='dark']:not(:has(.admin-room)) {
-    --color-text-secondary-rgb: 194 206 209;
     --rule-hairline-rgb: 97 114 121;
+    --color-border-control-rgb: 130 143 148;
     --rule-strong-rgb: 137 148 153;
     --rule-nameplate-rgb: 249 247 245;
-    --color-border-control-rgb: 130 143 148;
+    --color-text-secondary-rgb: 194 206 209;
   }
 }
 

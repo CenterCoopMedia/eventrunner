@@ -51,7 +51,7 @@ const {
   THEME_DENSITY_STEPS,
   DEFAULT_MODE_POLICY,
   deriveRuleColors,
-  deriveMoreContrastTokens,
+  deriveMoreContrastColors,
   getPreset,
   themePresetId,
   resolveAdminAccent,
@@ -620,10 +620,22 @@ function firstPaintDarkBlock(policy, names, dark, comment, selector = ':root:not
   return [];
 }
 
+const MORE_CONTRAST_PROPS = {
+  secondary: '--color-text-secondary-rgb',
+  hairline: '--rule-hairline-rgb',
+  strong: '--rule-strong-rgb',
+  nameplate: '--rule-nameplate-rgb',
+  control: '--color-border-control-rgb',
+};
+
+function moreContrastValues(palette) {
+  return Object.fromEntries(Object.entries(deriveMoreContrastColors(palette))
+    .map(([name, rgb]) => [MORE_CONTRAST_PROPS[name], triple(rgb)]));
+}
+
 /** The preference belongs to public pages and their framed previews. */
 function moreContrastBlock(selector, palette) {
-  const colors = deriveMoreContrastTokens(palette);
-  const values = Object.fromEntries(Object.entries(colors).map(([name, rgb]) => [name, triple(rgb)]));
+  const values = moreContrastValues(palette);
   const publicSelector = selector.split(',\n').map((part) => `${part}:not(:has(.admin-room))`).join(',\n');
   return colorBlock(publicSelector, Object.keys(values), values, 'More contrast for public reading.');
 }
@@ -796,8 +808,7 @@ function buildTokenCss(theme, { tokensDir } = {}) {
     }
 
     const palettes = resolveThemePalettes(theme);
-    const contrastDark = deriveMoreContrastTokens(palettes.dark);
-    const contrastValues = Object.fromEntries(Object.entries(contrastDark).map(([name, rgb]) => [name, triple(rgb)]));
+    const contrastValues = moreContrastValues(palettes.dark);
     const contrastLines = [
       ...moreContrastBlock(':root', palettes.light),
       ...moreContrastBlock(scopedSelector("[data-mode='light']"), palettes.light),
