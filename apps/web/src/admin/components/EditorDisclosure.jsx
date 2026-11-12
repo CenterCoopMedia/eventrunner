@@ -16,7 +16,7 @@ export default function EditorDisclosure({ title, description, help, children, d
   }
   return (
     <div className={`admin-editor-disclosure ${className}`} data-open={open}>
-      <div className="flex items-center gap-2xs"><Heading className="min-w-0">
+      <div className="flex items-center gap-2xs"><Heading className="min-w-0 flex-1">
         <button type="button" className="admin-editor-disclosure__toggle" aria-expanded={open} aria-controls={contentId} onClick={() => setOpen((value) => !value)}>
           <span className="admin-editor-disclosure__label"><span>{title}</span>{description ? <span className="admin-editor-disclosure__description">{description}</span> : null}</span>
           <span className="admin-editor-disclosure__indicator" aria-hidden="true">{open ? '−' : '+'}</span>

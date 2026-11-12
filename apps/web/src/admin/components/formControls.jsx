@@ -148,7 +148,7 @@ export function TextField({
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
-      <div className="flex items-center gap-2xs"><label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
+      <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       {hint ? (
@@ -210,7 +210,7 @@ export function TextAreaField({
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
-      <div className="flex items-center gap-2xs"><label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
+      <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       {hint ? (
@@ -253,7 +253,7 @@ export function SelectField({
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
-      <div className="flex items-center gap-2xs"><label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
+      <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       {hint ? (
