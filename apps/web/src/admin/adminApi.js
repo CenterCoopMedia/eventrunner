@@ -6,10 +6,9 @@
 // requireAdmin (core/auth.cjs) is the enforcement boundary — the client-side
 // gate (AdminGate in AdminApp.jsx) is convenience only.
 //
-// Failures normalize to AdminApiError retaining the server's `error.message`.
-// Server failures without recovery text also name the support action. `fieldErrors`
-// splits that message into the per-field segments the server joined with '; ':
-// each keeps its field key in `field`, so a form can
+// Failures normalize to AdminApiError carrying the server's `error.message`
+// verbatim. `fieldErrors` splits that message into the per-field segments the
+// server joined with '; ': each keeps its field key in `field`, so a form can
 // mark the input, and its readable sentence, without the key, in `message`.
 // Screens show the segments, never the raw `field: reason` text.
 import { useCallback } from 'react';
@@ -18,7 +17,6 @@ import { functionsOrigin, useAuth } from '../contexts/AuthContext.jsx';
 /** Leading context the server prepends before the joined field errors. */
 const MESSAGE_PREFIX_RE = /^[^:]*Invalid [a-z]+:\s*/i;
 const FIELD_SEGMENT_RE = /^([A-Za-z0-9_$[\].]+):\s*(.+)$/;
-const RECOVERY_STEP_RE = /(?:^|[.!?;]\s+)(?:try(?:ing)? again|retry|re-run|resume|contact|keep|check|reload|refresh|request|select|open|use|sign in|wait|ask|review)\b/i;
 
 export class AdminApiError extends Error {
   constructor({ code, message, status, queueId = null, usage = null }) {
@@ -126,16 +124,13 @@ export async function callAdminEndpoint(name, body, getIdToken) {
   }
   if (!response.ok) {
     const error = payload?.error ?? {};
-    let message = typeof error.message === 'string' && error.message
-      ? error.message
-      : 'The request could not be completed. Try again.';
-    if (response.status >= 500 && !RECOVERY_STEP_RE.test(message)) {
-      message += ' Keep this page open and contact support for help.';
-    }
     throw new AdminApiError({
       code: typeof error.code === 'string' ? error.code : 'unknown',
       status: response.status,
-      message,
+      message:
+        typeof error.message === 'string' && error.message
+          ? error.message
+          : 'The request could not be completed. Try again.',
       queueId: typeof payload?.queueId === 'string' ? payload.queueId : null,
       usage: Array.isArray(payload?.usage) ? payload.usage : null,
     });

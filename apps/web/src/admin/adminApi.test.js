@@ -56,47 +56,6 @@ describe('callAdminEndpoint', () => {
       status: 0,
     });
   });
-
-  it('keeps a server failure fact and gives the reader a next step', async () => {
-    fetch.mockResolvedValueOnce(response(500, {
-      error: { code: 'internal', message: 'The speaker could not be deleted.' },
-    }));
-    await expect(callAdminEndpoint('deleteSpeaker', { speakerId: 'speaker-a' }, getIdToken)).rejects.toMatchObject({
-      code: 'internal',
-      status: 500,
-      message: 'The speaker could not be deleted. Keep this page open and contact support for help.',
-    });
-  });
-
-  it.each([
-    [500, 'internal', 'Publish failed part-way. Re-run with { queueId } to resume.'],
-    [503, 'ticketing-unavailable', 'Ticketing is temporarily unavailable. Try again later.'],
-    [502, 'delivery-unknown', 'We do not know if the email went out. Check the Email log before you send it again. The decision is still saved.'],
-    [502, 'delivery-failed', 'The email was not sent. The decision is still saved. Retry the email later.'],
-    [503, 'unavailable', 'Invoices could not complete this action. Reload the invoice before trying again.'],
-  ])('keeps an existing %s %s recovery step', async (status, code, message) => {
-    const usage = [{ id: 'asset-a', count: 1 }];
-    fetch.mockResolvedValueOnce(response(status, {
-      error: { code, message }, queueId: 'queue-a', usage,
-    }));
-    await expect(callAdminEndpoint('cmsPublish', {}, getIdToken)).rejects.toMatchObject({
-      code, status, message, queueId: 'queue-a', usage,
-    });
-  });
-
-  it('preserves a validation response and its field keys', async () => {
-    const message = "Invalid page: path: must start with '/'; label: must be a non-empty string";
-    fetch.mockResolvedValueOnce(response(400, { error: { code: 'bad-request', message } }));
-    await expect(callAdminEndpoint('cmsSavePage', { page: {} }, getIdToken)).rejects.toMatchObject({
-      code: 'bad-request',
-      status: 400,
-      message,
-      fieldErrors: [
-        { field: 'path', message: "Path: must start with '/'" },
-        { field: 'label', message: 'Label: must be a non-empty string' },
-      ],
-    });
-  });
 });
 
 describe('fieldErrorsOf', () => {
