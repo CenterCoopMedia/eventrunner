@@ -120,6 +120,7 @@ test('reverse-tab focus clears a scrolling table head and admin padding ends at 
   await page.getByRole('link', { name: 'Skip to main content', exact: true }).focus();
   await page.keyboard.press('Enter');
   expect(await page.locator('#admin-content').evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThanOrEqual(-1);
+  expect(await page.evaluate(() => document.scrollingElement.scrollTop)).toBe(0);
   await page.setViewportSize(VIEWPORTS[2]);
   await page.getByRole('link', { name: 'View site', exact: true }).click();
   await expect(page.locator('.admin-room')).toHaveCount(0);
