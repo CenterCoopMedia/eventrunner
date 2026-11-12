@@ -67,7 +67,7 @@ export default function StripeTicketList({ call, kind, catalog, timezone, refres
       {isOrders ? <>
         <SelectField help="Show orders with the selected payment result." label="Payment state" value={filters.paymentStatus} onChange={(value) => setFilter('paymentStatus', value)} options={options(PAYMENT_STATUSES, paymentStatusLabel)} />
         <SelectField help="Show orders with the selected refund status." label="Refund state" value={filters.refundStatus} onChange={(value) => setFilter('refundStatus', value)} options={options(REFUND_STATUSES, refundStateLabel)} />
-        <SelectField help="Show orders that are open, completed or cancelled." label="Order state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(ORDER_STATUSES, orderStatusLabel)} />
+        <SelectField help="Show orders by payment outcome, such as paid, refunded or expired." label="Order state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(ORDER_STATUSES, orderStatusLabel)} />
       </> : <>
         <SelectField help="Show tickets for one admission type, or leave this on all types." label="Ticket type filter" value={filters.ticketTypeId} onChange={(value) => setFilter('ticketTypeId', value)} options={[{ value: '', label: 'Any ticket type' }, ...(catalog?.ticketTypes || []).map((type) => ({ value: type.id, label: type.name }))]} />
         <SelectField help="Show tickets by whether they currently allow entry." label="Admission state" value={filters.status} onChange={(value) => setFilter('status', value)} options={options(TICKET_STATUSES, ticketStatusLabel)} />
