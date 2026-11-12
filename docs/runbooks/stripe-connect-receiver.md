@@ -1,6 +1,7 @@
 # Migrate NC Local to the shared Stripe Connect receiver
 
-This is an operator migration for issue #835. It has not been run. Execute it only
+This is the operator migration record for issue #835. Steps 1–5 completed on
+November 12, 2026, under the named coordinator task. Execute it only
 under a named coordinator deployment task, after NC Local's site has been built
 and confirmed. Keep new live account connections and builds closed until step 6.
 Do not run the normal Console deploy first: it removes the one-site guard.
@@ -67,16 +68,30 @@ This block validates the supplied identifiers against the private Console record
 reads the site's deployed signing secret directly into memory and calls the same
 route-registration method as provisioning. Repeating it keeps the same route.
 
+For the November 12 execution, the gcloud user cannot read the client signing
+secret. Joe approved token-creation access to the Console provisioner, which
+owns the client project. Use its impersonated token for this registration and
+the client-secret read during verification. Retain that approved access.
+
+Project-level `testIamPermissions` cannot prove a resource-name condition will
+authorize creating a named secret. On November 12 the coordinator directed one
+create of the exact destination secret, followed by metadata readback. Stop on
+a failed create before registration; do not broaden permissions or retry it.
+
+```sh
+gcloud secrets create "stripe-webhook-$APPLICATION_ID" --project="$CONSOLE_PROJECT_ID" --replication-policy=automatic --impersonate-service-account="$PROVISIONER"
+```
+
 ```sh
 node -e '
 const { execFileSync } = require("node:child_process");
 const { Firestore } = require("@google-cloud/firestore");
-const { OAuth2Client } = require("google-gax/node_modules/google-auth-library");
+const { OAuth2Client } = require(require("node:path").join(process.cwd(), "node_modules/google-gax/node_modules/google-auth-library"));
 const { createSecretStore } = require("./console/functions/src/secretStore.cjs");
 const { registerStripeRoute } = require("./console/functions/src/stripeWebhooks.cjs");
 (async () => {
   const e = process.env;
-  const token = execFileSync("gcloud", ["auth", "print-access-token"], { encoding: "utf8" }).trim();
+  const token = execFileSync("gcloud", ["auth", "print-access-token", `--impersonate-service-account=${e.PROVISIONER}`], { encoding: "utf8" }).trim();
   const authClient = new OAuth2Client();
   authClient.setCredentials({ access_token: token });
   const credential = { getAccessToken: async () => ({ access_token: token }) };
@@ -140,7 +155,7 @@ node -e '
 const { execFileSync, spawnSync } = require("node:child_process");
 const token = execFileSync("gcloud", ["auth", "print-access-token"], { encoding: "utf8" }).trim();
 const result = spawnSync("npx", ["firebase", "deploy", "--config", "console/firebase.json", "--project", process.env.CONSOLE_PROJECT_ID, "--only", "functions:console:stripeConnectWebhook", "--non-interactive"], {
-  env: { ...process.env, FIREBASE_TOKEN: token }, stdio: "inherit",
+  env: { ...process.env, FIREBASE_TOKEN: token, GOOGLE_CLOUD_QUOTA_PROJECT: process.env.CONSOLE_PROJECT_ID }, stdio: "inherit",
 });
 process.exit(result.status ?? 1);
 '
@@ -182,7 +197,8 @@ const { createSecretStore } = require("./console/functions/src/secretStore.cjs")
   const token = execFileSync("gcloud", ["auth", "print-access-token"], { encoding: "utf8" }).trim();
   const store = projectId => createSecretStore({ projectId, getAccessToken: async () => ({ access_token: token }), fetch });
   const shared = await store(e.CONSOLE_PROJECT_ID).readSecret("CONSOLE_STRIPE_WEBHOOK_SECRET");
-  const site = await store(e.CLIENT_PROJECT_ID).readSecret("TICKETING_WEBHOOK_SECRET");
+  const clientToken = execFileSync("gcloud", ["auth", "print-access-token", `--impersonate-service-account=${e.PROVISIONER}`], { encoding: "utf8" }).trim();
+  const site = await createSecretStore({ projectId: e.CLIENT_PROJECT_ID, getAccessToken: async () => ({ access_token: clientToken }), fetch }).readSecret("TICKETING_WEBHOOK_SECRET");
   if (!shared || !site) throw new Error();
   const id = "evt_lojReceiver20261112";
   const envelope = account => Buffer.from(JSON.stringify({ id, object: "event", type: "account.updated", livemode: true, account, data: { object: { id: account, object: "account" } } }));
@@ -210,6 +226,32 @@ const { createSecretStore } = require("./console/functions/src/secretStore.cjs")
 
 Confirm that the shared endpoint is the only new endpoint, and that every active
 connected account has its own reviewed route before allowing additional accounts.
+
+If containment disabled the shared endpoint, the coordinator's November 12
+direction is to re-enable it only after receiver deployment and the signed proof
+above pass. Set `SHARED_ENDPOINT_ID` to the recorded new endpoint ID. This block
+checks its identity before the update and reads back the enabled state:
+
+```sh
+node -e '
+const { execFileSync } = require("node:child_process");
+const { createSecretStore } = require("./console/functions/src/secretStore.cjs");
+const Stripe = require("stripe");
+(async () => {
+  const e = process.env;
+  const token = execFileSync("gcloud", ["auth", "print-access-token"], { encoding: "utf8" }).trim();
+  const secrets = createSecretStore({ projectId: e.CONSOLE_PROJECT_ID, getAccessToken: async () => ({ access_token: token }), fetch });
+  const stripe = new Stripe(await secrets.readSecret("CONSOLE_STRIPE_SECRET_KEY"));
+  const url = `https://us-central1-${e.CONSOLE_PROJECT_ID}.cloudfunctions.net/stripeConnectWebhook`;
+  const before = await stripe.webhookEndpoints.retrieve(e.SHARED_ENDPOINT_ID);
+  if (before.url !== url || before.livemode !== true || before.status !== "disabled") throw new Error();
+  await stripe.webhookEndpoints.update(before.id, { disabled: false });
+  const after = await stripe.webhookEndpoints.retrieve(before.id);
+  if (after.url !== url || after.status !== "enabled") throw new Error();
+  console.log(`${new Date().toISOString()} shared endpoint ${after.id}: enabled`);
+})().catch(() => { console.error("Endpoint enable failed; keep the old endpoint and stop"); process.exitCode = 1; });
+'
+```
 
 Only after that proof, delete the recorded old NC Local endpoint with platform
 credentials. The synthetic probe cannot check Stripe-side configuration, so this
@@ -279,5 +321,62 @@ and the deployed one-site guard, repair the receiver and retry. After deletion,
 repair shared delivery and use Stripe's event redelivery; do not restore a per-site
 platform endpoint or admit another account through it.
 
+### Partial setup containment
+
+During the November 12 execution, route registration failed before any route or
+secret-copy write. The operator started endpoint creation before checking that
+failure. The coordinator directed disabling the new shared endpoint while its
+receiver was undeployed, retaining its secret and NC Local's old endpoint.
+Run one step at a time, inspect its exit code and readback, and stop on nonzero.
+Record the shared endpoint ID, then run this containment block before diagnosis:
+
+```sh
+node -e '
+const { execFileSync } = require("node:child_process");
+const { createSecretStore } = require("./console/functions/src/secretStore.cjs");
+const Stripe = require("stripe");
+(async () => {
+  const projectId = process.env.CONSOLE_PROJECT_ID;
+  const token = execFileSync("gcloud", ["auth", "print-access-token"], { encoding: "utf8" }).trim();
+  const secrets = createSecretStore({ projectId, getAccessToken: async () => ({ access_token: token }), fetch });
+  const stripe = new Stripe(await secrets.readSecret("CONSOLE_STRIPE_SECRET_KEY"));
+  const id = process.env.SHARED_ENDPOINT_ID;
+  const before = await stripe.webhookEndpoints.retrieve(id);
+  if (before.url !== `https://us-central1-${projectId}.cloudfunctions.net/stripeConnectWebhook` || before.livemode !== true) throw new Error();
+  await stripe.webhookEndpoints.update(id, { disabled: true });
+  const after = await stripe.webhookEndpoints.retrieve(id);
+  if (after.status !== "disabled") throw new Error();
+  console.log(`${new Date().toISOString()} shared endpoint ${id}: disabled`);
+})().catch(() => { console.error("Containment failed; stop and report"); process.exitCode = 1; });
+'
+```
+
+Do not delete the shared endpoint or secret. Re-enable that same endpoint only
+after the receiver is deployed and the signed probes pass, under coordinator
+direction. Keep the old endpoint until the enabled-state readback and the
+delivery proofs pass. This containment ends at successful migration.
+
 References: [ADR 0004](../adr/0004-stripe-ticket-commerce.md),
 [signature timestamps and retries](https://docs.stripe.com/webhooks).
+
+## November 12 migration receipt
+
+The receiver source is `1d190778cbb47a166be7eee9c8bf4a60b05f852f`.
+Cloud Build `ffd6b75e-a6c8-480c-ab2c-84be9ae9def8` deployed only
+`stripeConnectWebhook`, revision `stripeconnectwebhook-00001-naf`, ACTIVE at
+22:43:16 UTC (17:43:16 EST). It binds shared signing-secret version 1.
+NC Local's copied signing-secret version 1 matches its unchanged site version 1.
+
+Synthetic event `evt_lojReceiver20261112` returned bad-signature 400,
+unknown-account 404, site no-op 200 and shared-receiver 200 before deletion.
+The shared endpoint `we_1Ub6XZIWKb9HQueEySY1tXX9` was enabled at 22:44:07 UTC.
+At 22:44:20 UTC the Stripe-side live, enabled, Connect-application, URL and
+event-type checks passed. The old endpoint `we_1UakOgIWKb9HQueEit53ggyI` was
+then deleted and its readback returned 404. The same four probes passed again
+at 22:44:28–29 UTC. Final metadata read at 22:44:59 UTC found exactly the enabled
+shared endpoint, the expected route and secret versions, and unchanged client
+`ticketingWebhook` and existing Console `completeConnection` update times.
+
+This verifies the coordinator-approved synthetic signature and routing path.
+The first real Stripe-originated delivery remains pending. Step 6, the merge
+and normal Console deployment, belongs to the coordinator.
