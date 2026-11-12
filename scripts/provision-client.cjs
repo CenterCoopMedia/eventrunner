@@ -35,6 +35,7 @@ const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } 
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
 const { stripeErrorDetails } = require('../functions/src/ticketing/stripeErrors.cjs');
+const { resolveAdminTier } = require('../functions/src/core/auth.cjs');
 const { historyEntry } = require('../console/functions/src/applications.cjs');
 const { readTeam } = require('../console/functions/src/organizations.cjs');
 const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
@@ -1202,14 +1203,17 @@ async function consoleTeam(db, orgId, at) {
  * granted. Support accounts are never added or removed. A change that would
  * leave no operator outside the support accounts is not written. A site's
  * first sync only records the console team: an earlier Access page removal
- * cannot be told apart from a late console change, so it is not undone.
- * @returns {Promise<'changed'|'unchanged'|'no-site'|'last-operator'>}
+ * cannot be told apart from a late console change, so it is not undone, and
+ * each address whose console role and site tier differ is listed for an
+ * operator to review (#848). New staff that a `staffExpiry` which is not a
+ * plain map refuses are listed too (#849).
+ * @returns {Promise<{ result: 'changed'|'unchanged'|'no-site'|'last-operator', review: ((name: (email: string) => string) => string)[] }>}
  */
 async function syncTeamAccess({ db, team, support, now }) {
   const ref = db.collection('config').doc('bootstrap');
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    if (!snap.exists) return 'no-site';
+    if (!snap.exists) return { result: 'no-site', review: [] };
     const stored = snap.data();
     const supportSet = new Set([...support, ...normalizeEmails(stored.supportAdminEmails)]);
     const client = (list) => list.filter((email) => !supportSet.has(email));
@@ -1218,17 +1222,32 @@ async function syncTeamAccess({ db, team, support, now }) {
     const prev = { admin: client(normalizeEmails(stored.consoleAdminEmails)), staff: client(normalizeEmails(stored.consoleStaffEmails)) };
     const held = (list) => list.filter((email) => team.expired.includes(email));
     const next = { admin: client([...team.owners, ...held(prev.admin)]), staff: client([...team.editors, ...held(prev.staff)]) };
-    if (first) Object.assign(prev, next);
+    const admins = normalizeEmails(stored.adminEmails);
+    const staff = normalizeEmails(stored.staffEmails);
+    const tierIn = (operators, staffList, email) => (operators.includes(email) ? 'operator' : staffList.includes(email) ? 'staff' : null);
+    const review = [];
+    if (first) {
+      // An expired invite grants nothing and takes nothing away, so it is not listed.
+      const consoleRole = (email) => (next.admin.includes(email) ? 'owner' : next.staff.includes(email) ? 'editor' : 'none');
+      const expected = { owner: 'operator', editor: 'staff', none: null };
+      for (const email of client([...new Set([...next.admin, ...next.staff, ...admins, ...staff])])) {
+        const role = consoleRole(email);
+        // The access core/auth.cjs grants, so a staff grant it refuses reads as none.
+        const tier = resolveAdminTier(stored, email, now());
+        if (team.expired.includes(email) || expected[role] === tier) continue;
+        review.push((name) => `${name(email)} console ${role}, site ${tier || 'none'}`);
+      }
+      Object.assign(prev, next);
+    }
     const gone = without([...prev.admin, ...prev.staff], [...next.admin, ...next.staff]);
     const addAdmin = without(next.admin, prev.admin);
     const addStaff = without(next.staff, prev.staff);
     const dropAdmin = [...without(prev.admin, next.admin), ...gone];
     const dropStaff = [...without(prev.staff, next.staff), ...gone];
 
-    const admins = normalizeEmails(stored.adminEmails);
     const adminEmails = [...new Set([...without(admins, dropAdmin), ...addAdmin])];
     const staffEmails = without([...new Set([...without(normalizeEmails(stored.staffEmails), dropStaff), ...addStaff])], adminEmails);
-    if (client(adminEmails).length === 0 && client(admins).length > 0) return 'last-operator';
+    if (client(adminEmails).length === 0 && client(admins).length > 0) return { result: 'last-operator', review };
 
     // A console Editor's access has no end time. Anything but a plain map
     // (core/auth.cjs refuses all staff for it) is left as it is.
@@ -1236,15 +1255,15 @@ async function syncTeamAccess({ db, team, support, now }) {
     const proto = expiry && typeof expiry === 'object' && !Array.isArray(expiry) ? Object.getPrototypeOf(expiry) : undefined;
     const isMap = proto === Object.prototype || proto === null;
     const staffExpiry = isMap ? Object.fromEntries(Object.entries(expiry).filter(([email]) => !addStaff.includes(email))) : expiry;
+    const refused = expiry === undefined || isMap ? [] : addStaff.filter((email) => staffEmails.includes(email));
+    if (refused.length > 0) review.push((name) => `staffExpiry is not a map; new staff ${refused.map(name).join(', ')} are refused`);
     const fields = { adminEmails, staffEmails, consoleAdminEmails: next.admin, consoleStaffEmails: next.staff, staffExpiry };
-    if (Object.entries(fields).every(([field, value]) => JSON.stringify(stored[field]) === JSON.stringify(value))) return 'unchanged';
+    if (Object.entries(fields).every(([field, value]) => JSON.stringify(stored[field]) === JSON.stringify(value))) return { result: 'unchanged', review };
     const written = { ...stored, ...fields, updatedAt: new Date(now()), updatedBy: SEED_ACTOR.email };
     if (staffExpiry === undefined || (isMap && Object.keys(staffExpiry).length === 0)) delete written.staffExpiry;
     tx.set(ref, written);
     // One admin_logs row per changed address, as the expiry sweep in
     // functions/src/admin/access.cjs writes, so the admin log shows it.
-    const staff = normalizeEmails(stored.staffEmails);
-    const tierIn = (operators, staffList, email) => (operators.includes(email) ? 'operator' : staffList.includes(email) ? 'staff' : null);
     for (const email of new Set([...admins, ...staff, ...adminEmails, ...staffEmails])) {
       const previousTier = tierIn(admins, staff, email);
       const tier = tierIn(adminEmails, staffEmails, email);
@@ -1260,8 +1279,18 @@ async function syncTeamAccess({ db, team, support, now }) {
         details: { email, tier, previousTier, ...(cleared ? { previousExpiresAt: Number.isFinite(ms) ? new Date(ms).toISOString() : null } : {}) },
       });
     }
-    return 'changed';
+    return { result: 'changed', review };
   });
+}
+
+/**
+ * Warn about each sync difference an operator must review. Actions logs are
+ * public, so the addresses are left out there. They are not masked: a mask
+ * command carries the address, and the runner reads commands inside it.
+ */
+function logTeamReview(deps, appId, review) {
+  const name = deps.env.GITHUB_ACTIONS === 'true' ? () => '***' : (email) => email;
+  for (const line of review) deps.log.warn(`team sync: ${appId} review: ${line(name)}`);
 }
 
 /**
@@ -1306,7 +1335,8 @@ async function stepSeed(ctx) {
   }
 
   if (await seedSupportAdmins(ctx, db)) notes.push('added CCM support operators');
-  const synced = await syncTeamAccess({ db, team, support: supportAdminEmails(ctx), now: ctx.deps.now });
+  const { result: synced, review } = await syncTeamAccess({ db, team, support: supportAdminEmails(ctx), now: ctx.deps.now });
+  logTeamReview(ctx.deps, ctx.appId, review);
   if (synced === 'changed') notes.push('updated the site team');
   if (synced === 'last-operator') notes.push('kept the site operators, because the console team has no Owner');
 
@@ -1627,7 +1657,8 @@ async function syncTeams({ deps }) {
         continue;
       }
       const team = await consoleTeam(db, app.data().orgId, now());
-      const result = await syncTeamAccess({ db: clientDb(projectId), team, support, now });
+      const { result, review } = await syncTeamAccess({ db: clientDb(projectId), team, support, now });
+      logTeamReview(deps, app.id, review);
       if (result === 'no-site') {
         log.warn(`team sync: ${app.id} skipped: the site has no config/bootstrap`);
         continue;
