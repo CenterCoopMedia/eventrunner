@@ -250,14 +250,16 @@
   /* THE SEGMENTED CONTROL (expansion record §3.3): one choice from a short
      set, set as ONE RULED ROW of words. The chosen word sits on the filled
      ground and takes the bold weight, so the state is never colour alone.
-     The row is a rectangle on the theme radius. A segmented control is
-     never a pill.
+     The row is a rectangle on the theme radius. Options keep an xs gap
+     between their touch targets; the outer rule groups wrapped rows too.
+     A segmented control is never a pill.
 
      The inner radius is the outer radius less the boundary it sits inside,
      which is the concentric rule (interface guidelines, User interface). */
   .segmented {
     display: inline-flex;
     flex-wrap: wrap;
+    gap: var(--space-xs);
     border: var(--rule-hairline-width) solid rgb(var(--color-border-control-rgb));
     border-radius: var(--radius-base);
   }
