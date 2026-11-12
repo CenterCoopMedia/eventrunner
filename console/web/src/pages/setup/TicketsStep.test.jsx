@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api.js';
 import { leavePage } from '../../setup/leavePage.js';
+import { takeConnectReturn } from '../../setup/connections.js';
 import { application, callsTo, connections, emptyAnswers, fullAnswers, serveApi } from '../../test/application.js';
 import { renderSetup } from '../../test/setupPage.jsx';
 
@@ -25,6 +26,15 @@ beforeEach(() => {
 });
 
 describe('Tickets step', () => {
+  it.each(['stripe', 'eventbrite'])('keeps Review context when connecting %s', async (provider) => {
+    const url = provider === 'stripe' ? STRIPE_PAGE : 'https://www.eventbrite.com/oauth/authorize?state=s1';
+    serve({ answers: answersWith(provider), connections: connections({ [provider]: { ...notConnected, event: null } }) }, { startConnection: { url } });
+    renderSetup('tickets', { query: '?check=1&from=review' });
+    fireEvent.click(await screen.findByRole('button', { name: `Connect with ${provider === 'stripe' ? 'Stripe' : 'Eventbrite'}` }));
+    await waitFor(() => expect(leavePage).toHaveBeenCalledWith(url));
+    expect(takeConnectReturn()).toBe('/organizations/o1/applications/a1/tickets?check=1&from=review');
+  });
+
   it('offers the four choices in plain words', async () => {
     renderSetup('tickets');
     const group = await screen.findByRole('group', { name: 'Ticket sales' });

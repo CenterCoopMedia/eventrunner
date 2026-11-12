@@ -42,6 +42,13 @@ beforeEach(() => {
 });
 
 describe('Coming back from a provider', () => {
+  it.each(['?from=review', '?check=1&from=review', '?from=review&check=1'])('keeps Review context on return with %s', async (query) => {
+    callApi.mockResolvedValue(DONE);
+    rememberConnectReturn(`${TICKETS}${query}`);
+    renderReturn('?code=c1&state=s1');
+    expect(await screen.findByText(`Landed ${TICKETS}${query}: success: Your Stripe account is connected.`)).toBeInTheDocument();
+  });
+
   it('hands the code and state to the server once, takes them out of the address, and returns to the step', async () => {
     callApi.mockResolvedValue(DONE);
     rememberConnectReturn(TICKETS);
@@ -90,6 +97,14 @@ describe('Where the browser may go', () => {
     rememberConnectReturn('/organizations/o1/applications/a1');
     expect(takeConnectReturn()).toBe('/organizations/o1/applications/a1');
     for (const path of ['https://evil.example', '//evil.example', '/signin', '/organizations/o1/applications/a1/../../x', TICKETS.replace('tickets', 'email')]) {
+      rememberConnectReturn(path);
+      expect(takeConnectReturn(), path).toBe(null);
+    }
+    for (const path of [
+      `${TICKETS}?from=elsewhere`, `${TICKETS}?check=2`, `${TICKETS}?check=1&check=1`,
+      `${TICKETS}?from=review&from=review`, `${TICKETS}?from=review&next=https://evil.example`,
+      `${TICKETS}#outside`, '/organizations/o1/applications/a1?from=review',
+    ]) {
       rememberConnectReturn(path);
       expect(takeConnectReturn(), path).toBe(null);
     }

@@ -12,7 +12,7 @@ const PROVIDERS = TICKET_CHOICES.filter((choice) => choice.connect).map((choice)
  * listed, so the client can disconnect it.
  */
 export default function TicketsStep({ value, errors, onChange, app, orgId, appId, flush, onConnections }) {
-  const { state } = useLocation();
+  const { state, search } = useLocation();
   const error = errors['tickets.choice'];
   const { connections } = app;
   const [retained, setRetained] = useState([]);
@@ -57,7 +57,7 @@ export default function TicketsStep({ value, errors, onChange, app, orgId, appId
           errors={provider === value.choice ? errors : {}}
           myRole={app.myRole}
           beforeLeave={flush}
-          returnPath={setupPath(orgId, appId, stepById('tickets'))}
+          returnPath={`${setupPath(orgId, appId, stepById('tickets'))}${search}`}
           onConnections={onConnections}
           preserveResult
           onResult={() => setRetained((previous) => previous.includes(provider) ? previous : [...previous, provider])}

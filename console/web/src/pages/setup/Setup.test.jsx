@@ -134,16 +134,23 @@ describe('Setup', () => {
 
   it.each(['transport failure', 'refused answer'])('stays on a Review edit after a %s, then returns after a successful save', async (outcome) => {
     let fail = true;
+    const SHORT = 'Use 3 to 27 lowercase letters, numbers and hyphens.';
     serveApi({ saveApplicationStep: (body) => {
       if (fail && outcome === 'transport failure') throw new Error('We could not reach the server. Try again.');
-      return { step: body.step, saved: !fail, errors: fail ? { 'webAddress.name': 'Choose another name.' } : {} };
+      return { step: body.step, saved: !fail, errors: fail ? { 'webAddress.name': SHORT } : {} };
     } });
     renderSetup('web-address', { query: '?from=review' });
-    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'nclocal2' } });
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: outcome === 'refused answer' ? 'ab' : 'nclocal2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
     expect(await screen.findByText(/Not saved\./)).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    if (outcome === 'refused answer') {
+      await waitFor(() => expect(screen.getByLabelText('Name')).toHaveAccessibleDescription(new RegExp(SHORT.replaceAll('.', '\\.'))));
+      expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByRole('region', { name: 'Answers that need attention' })).toHaveTextContent(SHORT);
+      expect(screen.getByRole('button', { name: 'Back to Review' })).toBeInTheDocument();
+    }
     fail = false;
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'nclocal3' } });
     fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
@@ -358,7 +365,7 @@ describe('Setup', () => {
     fireEvent.click(within(held).getByRole('link', { name: 'Your web address' }));
     await screen.findByLabelText('Name');
     fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
-    await waitFor(() => expect(screen.getByLabelText('Save and continue')).toHaveFocus());
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveFocus());
     expect(screen.getByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'nclocal2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));

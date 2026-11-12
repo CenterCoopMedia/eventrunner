@@ -141,6 +141,7 @@ export default function Setup() {
     }
     if (action !== 'leave' && refusedNow.current.includes(step?.id)) {
       actionArea.current?.focus();
+      if (action === 'review') navigate(`${setupPath(orgId, appId, step)}?check=1&from=review`);
       return;
     }
     navigate(target);
