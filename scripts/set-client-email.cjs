@@ -16,7 +16,7 @@ const USAGE = `Usage: EVENT_FIREBASE_PROJECT_ID=<project> node scripts/set-clien
 Set either or both email settings with project-scoped Firebase IAM credentials.
 The address file is plain text, up to 8 KiB. Each line becomes an escaped HTML line.
 Verify a new sender domain with the email provider before changing the From address.
-After an address change, run scripts/verify-sender-domain.cjs to record verification.
+After a sender email change, run scripts/verify-sender-domain.cjs to record verification.
 The client-admin API continues to refuse these settings.`;
 
 function readArgs(argv) {
