@@ -88,6 +88,9 @@ test('ordinary model configuration, policy examples, human credits and neutral r
     'Review: CSS cursor and cursor pagination', 'Reviewed by a maintainer for CSS cursor behavior.']) {
     assert.equal(hasReviewCredit(line), false, line);
   }
+  for (const line of ['Attribution: strip leftover (Claude) trailers',
+    'Code review: confirmed the (Claude configuration) loads', 'Review: fix (cursor) pagination',
+    'Review: fix (cursor)']) assert.equal(hasReviewCredit(line), false, line);
 });
 
 function harness(eventName, current, authorType = 'User') {
