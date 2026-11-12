@@ -1590,7 +1590,8 @@ async function markStopped({ appId, runId, deps }) {
 
 /**
  * The scheduled team sync (#839): each built site gets its console team's
- * changes since the build, without a rebuild. One site's failure does not
+ * changes since the build, without a rebuild. A site with no project or no
+ * config/bootstrap is skipped with a warning. Any other failure does not
  * stop the others, and fails the run so an operator sees it.
  * @returns {Promise<number>} the exit code
  */
@@ -1602,10 +1603,17 @@ async function syncTeams({ deps }) {
   for (const app of built.flatMap((snap) => snap.docs)) {
     try {
       const projectId = (await db.collection(BUILD_COLLECTION).doc(app.id).get()).data()?.resources?.projectId;
-      if (!projectId) throw new Error('the build record has no project');
+      if (!projectId) {
+        log.warn(`team sync: ${app.id} skipped: the build record has no project`);
+        continue;
+      }
       const team = await consoleTeam(db, app.data().orgId, now());
       const result = await syncTeamAccess({ db: clientDb(projectId), team, support, now });
-      if (result === 'no-site' || result === 'last-operator') throw new Error(`not synced (${result})`);
+      if (result === 'no-site') {
+        log.warn(`team sync: ${app.id} skipped: the site has no config/bootstrap`);
+        continue;
+      }
+      if (result === 'last-operator') throw new Error('not synced: it would remove the last operator');
       log.log(`team sync: ${app.id} ${result}`);
     } catch (err) {
       failed += 1;

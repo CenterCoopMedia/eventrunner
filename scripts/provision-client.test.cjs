@@ -817,6 +817,19 @@ test('a team sync keeps a staffExpiry that is not a plain map', async () => {
   assert.equal(tierOn(fake, 'old@example.org'), null);
 });
 
+test('a team sync skips a site with no project and still succeeds', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  // A ready application whose build record names no project, as the rehearsal organization.
+  await fake.db.doc('applications/a2').set({ ...fake.db.read('applications/a1'), status: 'ready' });
+  const warnings = [];
+  fake.deps.log = { ...fake.deps.log, warn: (line) => warnings.push(line) };
+  await invite(fake, 'cara@example.org', 'owner');
+  assert.equal(await syncTeams({ deps: fake.deps }), 0);
+  assert.equal(tierOn(fake, 'cara@example.org'), 'operator');
+  assert.deepEqual(warnings, ['team sync: a2 skipped: the build record has no project']);
+});
+
 test('a team sync never removes the last client operator or a support account', async () => {
   const fake = setup();
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
