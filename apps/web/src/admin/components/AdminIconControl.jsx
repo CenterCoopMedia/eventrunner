@@ -56,8 +56,10 @@ const AdminIconControl = forwardRef(function AdminIconControl({
     const hide = () => setVisible(false);
     const dismiss = (event) => {
       if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
+        if (tooltip) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
         clearTimeout(closeTimer.current);
         setVisible(false);
       }
@@ -71,7 +73,7 @@ const AdminIconControl = forwardRef(function AdminIconControl({
       document.removeEventListener('keydown', dismiss, true);
       document.removeEventListener('pointerdown', outside);
     };
-  }, [visible]);
+  }, [visible, tooltip]);
 
   return (
     <>
