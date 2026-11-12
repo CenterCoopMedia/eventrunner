@@ -49,11 +49,10 @@ const LIGHT_BLOCK = ":root,\n:root[data-mode='light'],\n:root[data-theme][data-m
 const DARK_BLOCK = ":root[data-mode='dark'],\n:root[data-theme][data-mode='dark'] {";
 
 /**
- * The two screen mode blocks, with the print block that follows them cut
- * away — it carries the light palette a second time, so leaving it attached
- * would put light values inside what a test reads as "the dark block".
+ * The normal mode blocks exclude the preference remaps and print section.
+ * Those carry both palettes again and are checked separately.
  */
-const screenModeBlocks = (css) => css.split('@media print')[0].split(DARK_BLOCK);
+const screenModeBlocks = (css) => css.split('@media screen and (prefers-contrast: more)')[0].split('@media print')[0].split(DARK_BLOCK);
 
 describe('buildRuntimeThemeCss', () => {
   it('emits brand and semantic RGB-triple overrides from config/theme colors', () => {

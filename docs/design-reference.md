@@ -226,6 +226,12 @@ Any single colour can be set by hand, per mode, under **Advanced colour settings
 
 There is no second brand colour anywhere in the system. The admin's own mark takes the brand colour where it can be seen against the admin's white title band and falls back to the admin's ink where it cannot, so there is nothing to set and nothing to get wrong. The admin's rail, buttons and links follow the same colour by default, worked to the admin's own contrast bars in both modes; **Admin colours** on the Branding tab can replace that with a house scheme, and the public site never sees the choice.
 
+### The reader's contrast preference
+
+When the browser reports `prefers-contrast: more`, public secondary text, the three rule weights and form-control boundaries gain contrast in all seven site styles and both modes. This remaps five existing roles. It adds no colour mode or site setting. Secondary text targets 7:1 and control boundaries target 4.5:1 against both public grounds. Primary body ink already exceeds 7:1 in the designed palettes and keeps its value. The admin, semantic state colours and print keep their palettes.
+
+The preference uses the resolved colours, including **Advanced colour settings**. It can raise secondary ink and boundaries beyond a stored override while the preference is active. Stored values stay intact and return when the preference ends. An Advanced palette with opposed grounds can make a target impossible; the derivation then keeps the better ink. Advanced primary ink still uses the normal publish bar below, so an arbitrary override has no new 7:1 body guarantee.
+
 ### The contrast gate
 
 Publishing is refused when any defined foreground/background pair fails its bar, in either mode. Text holds 4.5:1. A form control's boundary is non-text user interface and holds 3:1, measured against every ground an input actually renders on. Contrast is measured against the real rendered background, not the page background.

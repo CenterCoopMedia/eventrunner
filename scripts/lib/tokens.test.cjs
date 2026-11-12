@@ -305,6 +305,21 @@ test("the active preset's block carries this deployment's overrides", () => {
   );
 });
 
+test('more contrast follows the existing first-paint mode policy without changing ordinary values', () => {
+  const preferenceBlock = (policy) => {
+    const css = buildTokenCss({ ...THEME, mode: policy });
+    const start = css.indexOf('@media screen and (prefers-contrast: more)');
+    assert.ok(start >= 0);
+    return css.slice(start, css.indexOf('/* Print palette', start));
+  };
+  const selector = ':root:not([data-mode]):not(:has(.admin-room))';
+  assert.ok(!preferenceBlock('light').includes(selector));
+  assert.ok(preferenceBlock('dark').includes(`${selector} {`));
+  assert.ok(!preferenceBlock('dark').includes('prefers-color-scheme'));
+  assert.match(preferenceBlock('system'), /@media \(prefers-color-scheme: dark\) \{/);
+  assert.ok(preferenceBlock('system').includes(`${selector} {`));
+});
+
 test('the stage and the measure are declared once and read by name', () => {
   // The two widths every page is built on (2026-09-10 vocabulary
   // expansion). Tier 1 holds the values, tier 2 names the family, and the

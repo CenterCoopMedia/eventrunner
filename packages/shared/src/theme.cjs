@@ -643,6 +643,38 @@ function deriveRuleColors({ ink, surface }) {
   return colors;
 }
 
+/** Public reading preference: raise five existing roles on both grounds. */
+function deriveMoreContrastTokens(palette) {
+  const grounds = [palette.surface, palette.surfaceAlt].filter(isRgb);
+  if (grounds.length === 0) return {};
+  const rules = isRgb(palette.ink) && isRgb(palette.surface) ? deriveRuleColors(palette) : {};
+  const score = (rgb) => Math.min(...grounds.map((ground) => contrastRatio(rgb, ground)));
+  // Choose the direction from both actual grounds, including Advanced overrides.
+  const black = [0, 0, 0];
+  const white = [255, 255, 255];
+  const target = score(black) >= score(white) ? black : white;
+  const result = {};
+  for (const [name, rgb, minimum] of [
+    ['--color-text-secondary-rgb', palette.inkMuted, 7],
+    ['--rule-hairline-rgb', rules.hairline, 3],
+    ['--rule-strong-rgb', rules.strong, 4.5],
+    ['--rule-nameplate-rgb', rules.nameplate, 7],
+    ['--color-border-control-rgb', rules.control, 4.5],
+  ]) {
+    if (!isRgb(rgb)) continue;
+    let value = [...rgb];
+    // Opposed Advanced grounds can make a target impossible. Keep the better ink.
+    if (score(value) < minimum && score(target) > score(value)) {
+      for (let step = 1; step <= 200; step += 1) {
+        value = mixRgb(rgb, target, step / 200);
+        if (score(value) >= minimum) break;
+      }
+    }
+    result[name] = value;
+  }
+  return result;
+}
+
 /**
  * Resolve a mode policy to the mode that should render.
  *
@@ -1471,5 +1503,6 @@ module.exports = {
   liftToContrast,
   deriveDarkColors,
   deriveRuleColors,
+  deriveMoreContrastTokens,
   resolveMode,
 };
