@@ -297,7 +297,7 @@ export function PaymentReviews({ invoice, canResolve, busy, onResolve }) {
           className="flex flex-col gap-xs rounded-admin-panel border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm"
         >
           <div className="flex items-center gap-2xs"><h3 id={headingId} className="text-admin-base font-bold text-admin-state-error">
-            {waiting.length === 1 ? 'A card payment needs review' : `${waiting.length} card payments need review`}</h3><HelpTooltip label="this section">Review these card payments before deciding how they affect the invoice balance.</HelpTooltip></div>
+            {waiting.length === 1 ? 'A card payment needs review' : `${waiting.length} card payments need review`}</h3><HelpTooltip label="Card payments needing review">Review these card payments before deciding how they affect the invoice balance.</HelpTooltip></div>
           {waiting.map((entry) => (
             <div key={entry.reviewId} className="flex flex-col gap-3xs text-admin-sm text-admin-ink">
               <p className="font-bold">{`Stripe took ${money(entry)} for this invoice ${reviewPhrase(entry)}.`}</p>

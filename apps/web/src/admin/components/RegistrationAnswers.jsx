@@ -17,7 +17,7 @@ export function RegistrationSummary({ form, records }) {
   const summary = summarizeAnswers(records, form);
   const hasCounts = summary.dietary || summary.accessNeeds || summary.photoConsent;
   return (
-    <Panel help="Read the attendee’s registration responses. Diet and access details are private to staff."
+    <Panel help="Review totals for attendees’ diet, access and photo consent answers. Diet and access details are private to staff."
       title="Registration answers"
       description={`${plural(summary.total, 'attendee')} answered the registration questions. Diet and access answers are private to staff.`}
     >

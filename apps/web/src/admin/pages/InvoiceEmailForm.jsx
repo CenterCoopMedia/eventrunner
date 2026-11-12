@@ -198,6 +198,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
       </p>
       <ServerErrorSummary error={serverError} title="The invoice was not emailed" />
       <TextField help="Optional. One more address that gets the same email, such as your finance team."
+        hint="Optional. One more address that gets the same email, such as your finance team."
         label="Copy to"
         type="email"
         autoComplete="off"

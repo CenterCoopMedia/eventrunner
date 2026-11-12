@@ -690,6 +690,7 @@ export default function AdminInvoiceEditor({ mode }) {
               maxLength={INVOICE_LIMITS.contactName}
             />
             <TextField help="Optional. The invoice is sent to this address."
+              hint="Optional. The invoice is sent to this address."
               label="Billing email"
               
               type="email"
@@ -897,6 +898,7 @@ export default function AdminInvoiceEditor({ mode }) {
               className="sm:max-w-[16rem]"
             />
             <TextAreaField help="Optional. Printed under the lines, such as a thank-you or what the package includes."
+              hint="Optional. Printed under the lines, such as a thank-you or what the package includes."
               label="Notes"
               
               rows={4}

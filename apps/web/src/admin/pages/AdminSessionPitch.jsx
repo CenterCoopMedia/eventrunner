@@ -102,7 +102,7 @@ function ConvertToDrafts({ pitch, call, disabled, onConverted }) {
         </ul>
         <SelectField help="Place this session on one of the days set up in Event settings." label="Event day" value={dayId} onChange={setDayId} required options={[{ value: '', label: 'Choose a day' }, ...(event.days || []).map((day, i) => ({ value: day.id, label: day.label || day.date || `Day ${i + 1}` }))]} />
         <div className="planner-fields grid gap-sm sm:grid-cols-2"><TextField help="Enter when the session begins on the event’s local clock." label="Start time" type="time" value={startTime} onChange={setStartTime} required /><TextField help="Enter when the session ends on the event’s local clock." label="End time" type="time" value={endTime} onChange={setEndTime} required /></div>
-        <CheckboxField help="Each new speaker gets the speaker invite email, to make an account and fill in a profile. Linked speakers get nothing." label="Invite the presenters now"  checked={invite} onChange={setInvite} />
+        <CheckboxField help="Each new speaker gets the speaker invite email, to make an account and fill in a profile. Linked speakers get nothing." label="Invite the presenters now" hint="Each new speaker gets the speaker invite email, to make an account and fill in a profile. Linked speakers get nothing." checked={invite} onChange={setInvite} />
         <CheckboxField help="Confirm these details are ready before creating session and speaker drafts." label="I reviewed the proposal, the presenters, consent, and the time." checked={confirmed} onChange={setConfirmed} />
       </fieldset>
       <button className={secondaryButtonClass} disabled={busy || disabled || !confirmed || speakersLoading}>{busy ? 'Creating…' : 'Create drafts'}</button>

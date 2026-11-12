@@ -86,7 +86,7 @@ export default function ImportPitches({ call }) {
       <p className="text-admin-sm text-admin-ink-secondary">Choose a file, match its columns, then review the proposals before importing. Use 1-50 proposals per file. Unmatched columns are ignored.</p>
       <ServerErrorSummary error={error} errorRef={errorRef} />
       <fieldset disabled={busy} className="space-y-md">
-        <TextField help="A stable name for the original form. Reuse it for retries; changing it creates a separate source." label="Source name" value={source} onChange={(v) => { setSource(v); clearReview(); }} required maxLength={80} pattern="[A-Za-z0-9_-]+"  />
+        <TextField help="A stable name for the original form. Reuse it for retries; changing it creates a separate source." label="Source name" value={source} onChange={(v) => { setSource(v); clearReview(); }} required maxLength={80} pattern="[A-Za-z0-9_-]+" hint="A stable name for the original form. Reuse it for retries; changing it creates a separate source." />
         <label className="flex flex-col gap-xs font-semibold">Proposal CSV<input data-help-skip="File chooser; the surrounding import instructions describe the required CSV." type="file" accept=".csv,text/csv" onChange={readFile} className="min-h-admin-control min-w-0 max-w-full text-admin-sm" /></label>
         {reading ? <p role="status">Reading the CSV…</p> : null}
         {file ? <section aria-label="Match proposal columns" className="space-y-sm">

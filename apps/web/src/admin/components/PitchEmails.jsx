@@ -209,11 +209,11 @@ export function PitchEmailDelivery({ pitch, notices, disabled, call }) {
     {canSendDecision ? <div className="flex min-w-0 items-start gap-2xs"><details className="min-w-0 flex-1">
       <summary className="min-h-admin-control cursor-pointer font-semibold">Prepare the {slotNames[decisionSlot].toLowerCase()} </summary>
       <SendEmail key={`${decisionSlot}-${pitch.reviewRevision ?? 0}`} pitch={pitch} kind="decision" slot={decisionSlot} disabled={disabled} call={call} onSent={setResult} />
-    </details><HelpTooltip label="this section">Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></div> : null}
+    </details><HelpTooltip label={`Prepare the ${slotNames[decisionSlot].toLowerCase()}`}>Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></div> : null}
     {canSendReceipt ? <div className="flex min-w-0 items-start gap-2xs"><details className="min-w-0 flex-1">
       <summary className="min-h-admin-control cursor-pointer font-semibold">{notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'} </summary>
       <SendEmail key={`receipt-${pitch.reviewRevision ?? 0}`} pitch={pitch} kind="receipt" slot="receipt" disabled={disabled} call={call} onSent={setResult} />
-    </details><HelpTooltip label="this section">Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></div> : null}
+    </details><HelpTooltip label={notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'}>Prepare and preview this proposal email before sending it to the submitter.</HelpTooltip></div> : null}
     {result ? <SaveStatus message={result} /> : null}
   </section>;
 }

@@ -141,6 +141,7 @@ export function ChangeRequestEmailSettings({ settings, call }) {
           <ServerErrorSummary error={error} errorRef={errorRef} title="The email settings were not saved" />
           <SelectField help="Choose whether to email people when their change request is received." label="Acknowledgement email" value={acknowledgement} onChange={(value) => { setAcknowledgement(value); setResult(''); }} options={ACKNOWLEDGEMENT_OPTIONS} />
           <SelectField help="One email for each outcome. Marking a request done again sends nothing more."
+            hint="One email for each outcome. Marking a request done again sends nothing more."
             label="Outcome email"
             value={outcome}
             onChange={(value) => { setOutcome(value); setResult(''); }}
@@ -329,6 +330,7 @@ export function OutcomeDetails({ row, call }) {
         <form onSubmit={save} className="mt-xs flex flex-col gap-sm" noValidate>
           <ServerErrorSummary error={error} errorRef={errorRef} title="This was not saved" />
           <TextAreaField help="The requester reads this on their change requests page. It is not emailed."
+            hint="The requester reads this on their change requests page. It is not emailed."
             label="Reply to the requester (optional)"
             value={reply}
             onChange={(value) => { setReply(value); setResult(''); }}
