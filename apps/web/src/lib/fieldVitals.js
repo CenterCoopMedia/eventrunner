@@ -44,8 +44,12 @@ export function createFieldVitalsCollector({
     if (!sampled || stopped || enabled === false || pending.length + sent >= MAX_SAMPLES) return;
     const sample = { route: routePattern(win.location.href),
       device: win.innerWidth < 768 ? 'mobile' : 'desktop', name: 'held_up', value: 1 };
-    if (reporter) send(sample);
+    if (reporter && enabled === true) send(sample);
     else pending.push(sample);
+  }
+
+  function flushPending() {
+    while (pending.length) send(pending.shift());
   }
 
   function afterPaint() {
@@ -59,7 +63,7 @@ export function createFieldVitalsCollector({
           if (stopped) return;
           reporter = module;
           module.startVitalsReporter({ send, routePattern, initialURL, window: win });
-          while (pending.length) send(pending.shift());
+          if (enabled === true) flushPending();
         } catch {
           pending.length = 0;
           // A failed chunk is dropped for this document. There is no retry.
@@ -74,11 +78,15 @@ export function createFieldVitalsCollector({
   }
   return {
     setEnabled(value) {
-      enabled = value === true;
-      if (!enabled) {
-        pending.length = 0;
+      // Unconfirmed config suspends sends; only a confirmed opt-out drops
+      // observations already waiting for the server's feature decision.
+      enabled = value === true ? true : value === false ? false : null;
+      if (enabled !== true) {
+        if (enabled === false) pending.length = 0;
         if (frame !== undefined) win.cancelAnimationFrame(frame);
         frame = undefined;
+      } else if (reporter) {
+        flushPending();
       } else if (sampled && !attempted && frame === undefined && !stopped) {
         afterPaint();
       }

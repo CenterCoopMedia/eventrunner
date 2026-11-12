@@ -11,7 +11,7 @@ describe('anonymous field route categories', () => {
     for (const pattern of ROUTE_PATTERNS) {
       if (pattern === '/*') continue;
       const example = pattern.replace(/:[^/]+\?/g, 'private-step').replace(/:[^/]+/g, 'private-id')
-        .replace('*', 'orders/private-id');
+        .replaceAll('*', 'orders/private-id');
       expect(fieldVitalsRoute(`${example}?email=private@example.test#secret`)).toBe(pattern);
     }
   });

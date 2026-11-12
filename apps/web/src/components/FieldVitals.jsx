@@ -5,8 +5,8 @@ import { setFieldVitalsEnabled } from '../lib/fieldVitals.js';
 export default function FieldVitals() {
   const { features, available, featuresStatus } = useEventConfig();
   useEffect(() => {
-    if (featuresStatus === null) return;
-    setFieldVitalsEnabled(available.features && features.coreWebVitals === true);
+    const unconfirmed = featuresStatus === null || featuresStatus === 'cached';
+    setFieldVitalsEnabled(unconfirmed ? null : available.features && features.coreWebVitals === true);
   }, [available.features, features.coreWebVitals, featuresStatus]);
   return null;
 }
