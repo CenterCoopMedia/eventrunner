@@ -176,7 +176,7 @@ function connectionsReply({ connectionsAvailable: available, consoleTestMode: te
  *
  * @returns {Promise<{ revoked: boolean, shared: boolean }>}
  */
-async function revokeIfUnused({ db, connectors, log = console }, provider, accountId) {
+async function revokeIfUnused({ db, connectors, log = console }, provider, accountId, { requireSuccess = false } = {}) {
   let users;
   try {
     users = await db.collection(ACCOUNT_COLLECTION).where(`${provider}.accountId`, '==', accountId).limit(1).get();
@@ -193,7 +193,10 @@ async function revokeIfUnused({ db, connectors, log = console }, provider, accou
     return { revoked: await connectors[provider].revoke(accountId), shared: false };
   } catch (err) {
     log.error('console could not revoke a connection', provider, err.message);
-    throw failure(502, 'disconnect-failed', `We could not end your ${PROVIDER_NAMES[provider]} connection at the provider. Email info@eventrunner.org for help.`, err);
+    if (requireSuccess) {
+      throw failure(502, 'disconnect-failed', `We could not end your ${PROVIDER_NAMES[provider]} connection at the provider. Email info@eventrunner.org for help.`, err);
+    }
+    return { revoked: false, shared: false };
   }
 }
 
@@ -297,7 +300,7 @@ async function exchange(deps, { connector, provider, code }) {
     return await connector.exchangeCode({ code, redirectUri: redirectUri(deps.publicUrl, provider) });
   } catch (err) {
     // The provider made a connection we cannot use, so end it.
-    if (err.accountId) await revokeIfUnused(deps, provider, err.accountId);
+    if (err.accountId) await revokeIfUnused(deps, provider, err.accountId, { requireSuccess: true });
     throw failure(502, 'connection-failed', failedToConnect(provider), err);
   }
 }
@@ -344,7 +347,7 @@ async function completeConnection(deps, { body, user }) {
       tx.set(accountsRef(db, appId), { ...accounts, [provider]: { accountId: answer.accountId, connectedBy: user.uid, ...mode, ...keepOrganization } });
     });
   } catch (err) {
-    await revokeIfUnused(deps, provider, answer.accountId);
+    await revokeIfUnused(deps, provider, answer.accountId, { requireSuccess: true });
     throw err;
   }
 
@@ -352,7 +355,7 @@ async function completeConnection(deps, { body, user }) {
     await secrets.writeSecret(connectionSecretId(appId, provider), answer.token);
   } catch (err) {
     await endAfterFailure(deps, { orgId, appId, provider, previous, changeId });
-    await revokeIfUnused(deps, provider, answer.accountId);
+    await revokeIfUnused(deps, provider, answer.accountId, { requireSuccess: true });
     throw failure(502, 'connection-failed', `We could not connect your ${PROVIDER_NAMES[provider]} account. Try again in a few minutes.`, err);
   }
 
@@ -565,7 +568,7 @@ function recordTokenDeletion(tx, db, appId, connected, at) {
 /**
  * After that transaction: delete the tokens, end each connection nothing else
  * uses, then the row. A token that cannot be deleted throws and leaves the row
- * for the retention job. A failed revoke also leaves the row for retry. Safe to repeat.
+ * for the retention job. A failed revoke is logged. Safe to repeat.
  */
 async function deleteRecordedTokens(deps, appId, connected) {
   for (const provider of PROVIDERS) await deps.secrets.deleteSecret(connectionSecretId(appId, provider));

@@ -356,15 +356,28 @@ test('Eventbrite has no way to end a connection, so disconnect says so in its re
   assert.equal(body.revoked, false);
 });
 
-test('a failed revoke reports that the provider connection could not be ended, without the token', async () => {
+test('a failed revoke does not stop a disconnect, and is logged without the token', async () => {
   const { db, secrets, stripe, log, deps } = setup({ application: { connections: { stripe: stripeConnection() } } });
   secrets.store.set('connection-stripe-a1', TOKEN);
   stripe.revokeError = new Error('stripe revoke: HTTP 500');
-  await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 502, code: 'disconnect-failed' });
+  const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.equal(body.revoked, false);
   assert.equal(secrets.store.size, 0);
   assert.equal(stored(db).stripe, undefined);
   assert.equal(log.errors.length, 1);
   assert.ok(!JSON.stringify(log.errors).includes(TOKEN));
+});
+
+test('a reconnect stays successful when revoking the older account fails', async () => {
+  const { deps, db, stripe, log, secrets } = setup({ application: { connections: { stripe: stripeConnection() } } });
+  stripe.revokeError = new Error('stripe revoke: HTTP 500');
+  const { body } = await complete(deps, { state: await start(deps) });
+  assert.equal(body.connected, true);
+  assert.equal(stored(db).stripe.connected, true);
+  assert.equal(privateRow(db).stripe.accountId, 'acct_new');
+  assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+  assert.match(JSON.stringify(log.errors), /stripe revoke: HTTP 500/);
 });
 
 test('a failed token delete ends the connection and says so, and trying again ends the account', async () => {
