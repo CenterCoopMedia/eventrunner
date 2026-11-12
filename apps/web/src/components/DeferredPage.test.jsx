@@ -1,7 +1,9 @@
 import { lazy } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router';
 import DeferredPage from './DeferredPage.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
 
 describe('DeferredPage', () => {
   it('announces loading and then renders the route', async () => {
@@ -20,9 +22,9 @@ describe('DeferredPage', () => {
   it('routes a rejected import through the existing recovery boundary', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const Route = lazy(() => Promise.reject(new Error('route failed')));
-    render(<DeferredPage component={Route} label="schedule" />);
+    render(<MemoryRouter><ErrorBoundary><DeferredPage component={Route} label="schedule" /></ErrorBoundary></MemoryRouter>);
     expect(
-      await screen.findByRole('heading', { name: 'This part of the site did not load' }),
+      await screen.findByRole('heading', { name: 'This page could not be shown' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reload the page' })).toBeInTheDocument();
   });

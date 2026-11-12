@@ -2,8 +2,32 @@
 // snapshot — providers nest, routes resolve, and the snapshot content
 // reaches the DOM with no Firebase connection (spec §2.4 first-paint path).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
+
+let renderFailure = null;
+vi.mock('./pages/Home.jsx', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, default: (props) => {
+    if (renderFailure === 'home') throw new Error('Synthetic home render failure');
+    return <actual.default {...props} />;
+  } };
+});
+vi.mock('./pages/Schedule.jsx', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, default: (props) => {
+    if (renderFailure === 'schedule') throw new Error('Synthetic schedule render failure');
+    return <actual.default {...props} />;
+  } };
+});
+vi.mock('./components/Layout.jsx', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, default: (props) => {
+    if (renderFailure === 'layout') throw new Error('Synthetic layout render failure');
+    return <actual.default {...props} />;
+  } };
+});
 
 // The smoke test needs no Firebase env or network (spec §8.1 credential-free
 // CI): stub the two provider seams that would otherwise initialize the SDK.
@@ -97,17 +121,49 @@ function renderAt(path) {
     <MemoryRouter
       initialEntries={[path]}
     >
-      <App />
+      <ErrorBoundary title="The site could not be shown"><App /></ErrorBoundary>
     </MemoryRouter>,
   );
 }
 
 beforeEach(() => {
+  renderFailure = null;
   contentSubscriptions.clear();
   adminProbeShouldSucceed = true;
 });
 
 describe('app shell', () => {
+  for (const [failure, path] of [['home', '/'], ['schedule', '/schedule']]) {
+    it(`keeps the header and recovers through navigation after a ${failure} render failure`, async () => {
+      const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        renderFailure = failure;
+        renderAt(path);
+        const panel = await screen.findByRole('alert');
+        expect(panel).toHaveTextContent('This page could not be shown');
+        expect(panel).not.toHaveTextContent(/admin/i);
+        expect(screen.getByRole('banner')).toBeInTheDocument();
+        fireEvent.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Partners', exact: true }));
+        expect(await screen.findByRole('heading', { name: 'Partners', exact: true })).toBeInTheDocument();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      } finally {
+        quiet.mockRestore();
+      }
+    });
+  }
+
+  it('shows a provider-independent root panel when the layout cannot render', () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      renderFailure = 'layout';
+      renderAt('/');
+      expect(screen.getByRole('heading', { name: 'The site could not be shown' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reload the page' })).toBeInTheDocument();
+    } finally {
+      quiet.mockRestore();
+    }
+  });
+
   it('renders the home page from the snapshot', () => {
     renderAt('/');
     // Hero title comes from the generated snapshot, not hardcoded copy. The

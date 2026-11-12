@@ -14,10 +14,11 @@
 // AdminLayout's concern: each docket item declares the tier it needs, and
 // the layout hides the rest and refuses their routes (issue #186).
 import { Suspense, lazy } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router';
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
 import AdminLayout from './AdminLayout.jsx';
+import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminPageEditor from './pages/AdminPageEditor.jsx';
 import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
@@ -167,6 +168,7 @@ export default function AdminApp() {
       <AdminWebMcpRegistration />
       <Routes>
         <Route element={<AdminLayout />}>
+          <Route element={<ErrorBoundary appearance="admin" title="This admin page could not be shown"><Outlet /></ErrorBoundary>}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route
             path="overview"
@@ -373,6 +375,7 @@ export default function AdminApp() {
               />
             }
           />
+          </Route>
         </Route>
       </Routes>
     </AdminGate>

@@ -7,6 +7,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
+let pageRenderFails = false;
+vi.mock('./pages/AdminPagesList.jsx', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, default: (props) => {
+    if (pageRenderFails) throw new Error('Synthetic admin page render failure');
+    return <actual.default {...props} />;
+  } };
+});
+
 vi.mock('../lib/configSource.js', () => ({
   subscribeConfigDoc: () => () => {},
 }));
@@ -143,6 +152,7 @@ async function renderAt(path) {
 }
 
 beforeEach(() => {
+  pageRenderFails = false;
   adminProbeShouldSucceed = true;
   operatorProbeShouldSucceed = true;
   operatorProbeError = null;
@@ -157,6 +167,22 @@ beforeEach(() => {
 });
 
 describe('admin route gating', () => {
+  it('keeps the real rail and recovers when an admin page throws', async () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      pageRenderFails = true;
+      await renderAt('/admin/pages');
+      expect(await screen.findByRole('heading', { name: 'This admin page could not be shown' })).toBeInTheDocument();
+      expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+      openEveryGroup();
+      fireEvent.click(screen.getByRole('link', { name: 'Overview', exact: true }));
+      expect(await screen.findByRole('heading', { name: 'Overview', exact: true })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'This admin page could not be shown' })).not.toBeInTheDocument();
+    } finally {
+      quiet.mockRestore();
+    }
+  });
+
   it('routes an unauthenticated visitor to sign-in instead of the admin area', async () => {
     currentUser = null;
     await renderAt('/admin/pages');

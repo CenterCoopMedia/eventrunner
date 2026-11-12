@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, HashRouter } from 'react-router';
 import App from './App.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { IS_DEMO } from './lib/demoMode.js';
 // Theme tokens first (the @generated alias honors GENERATED_DIR, spec §2.4),
 // then the Tailwind layers that consume them.
@@ -43,7 +44,12 @@ const Router = IS_DEMO ? HashRouter : BrowserRouter;
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Router>
-      <App />
+      <ErrorBoundary
+        title="The site could not be shown"
+        description="The site ran into a problem. Reload to try again."
+      >
+        <App />
+      </ErrorBoundary>
     </Router>
   </React.StrictMode>,
 );

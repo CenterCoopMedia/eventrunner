@@ -10,7 +10,7 @@
 // it, which fixes every ordinary case. It has to be exactly one: if the reload
 // does not help (offline, a genuinely broken deploy), reloading again would
 // loop forever, so the attempt is recorded in sessionStorage and the second
-// failure is left for ChunkErrorBoundary to show as a retry panel instead.
+// failure is left for ErrorBoundary to show as a retry panel instead.
 
 export const RELOAD_FLAG = 'eventrunner:chunk-reload';
 
@@ -96,7 +96,7 @@ export function clearReloadFlag(storage = safeStorage()) {
  * Listen for Vite's `vite:preloadError`, which fires when a modulepreload for
  * a lazy chunk fails. Calling `preventDefault()` stops Vite rethrowing, so it
  * is only correct when a reload is actually starting; otherwise the error is
- * left to propagate to ChunkErrorBoundary.
+ * left to propagate to ErrorBoundary.
  *
  * @param {EventTarget} [target]
  * @param {{ reload?: () => void }} [options]
