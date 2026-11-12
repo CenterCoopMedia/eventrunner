@@ -88,7 +88,8 @@ describe('AppRoutes', () => {
       await screen.findByRole('heading', { name: 'This page did not load' });
       fireEvent.click(screen.getByRole('link', { name: 'Event Runner' }));
       const heading = await screen.findByRole('heading', { level: 1, name: 'Your organizations' });
-      expect(heading).toHaveFocus();
+      expect(heading).toBeInTheDocument();
+      expect(screen.getByRole('main')).toHaveFocus();
     } finally {
       cleanup();
       window.removeEventListener('error', expectedError);

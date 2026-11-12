@@ -17,11 +17,11 @@ uses the checker consistently.
 
 | Graph | Before raw bytes | Before gzip bytes | After raw bytes | After gzip bytes |
 | --- | ---: | ---: | ---: | ---: |
-| Initial JavaScript | 414,059 | 122,698 | 312,880 | 98,093 |
+| Initial JavaScript | 414,059 | 122,698 | 312,734 | 98,023 |
 | Initial CSS | 25,217 | 5,492 | 23,721 | 5,300 |
-| Largest deferred JavaScript | — | — | 17,758 | 5,592 |
+| Largest deferred JavaScript | — | — | 17,758 | 5,594 |
 
-The initial graph shrank 24.4% raw and 20.1% gzip. It contains the entry plus a
+The initial graph shrank 24.5% raw and 20.1% gzip. It contains the entry plus a
 599-byte shared runtime. The largest deferred file is setup; staff review has
 separate dynamic entries. The initial gzip graph is below the 114,040-byte goal.
 
@@ -61,9 +61,10 @@ Each stable page wrapper has its own Suspense boundary. A new page can show a
 delayed loading state during a router transition, while setup retains its page
 instance across step URLs. This follows [React's Suspense transition behavior](https://react.dev/reference/react/Suspense#preventing-already-revealed-content-from-hiding).
 Imports that finish within 300 ms show no route fallback. Longer imports reuse
-the existing loading state. Navigation focuses main while waiting, then the
-destination heading if focus has not moved during the wait. A focus change
-cancels the pending heading focus, including when the reader returns to main.
+the existing loading state. Navigation focuses an available heading or main.
+When lazy route code first commits, it focuses an available heading if focus is
+still on main. If that page is waiting for data, focus stays on main; later data
+does not move it. A reader who moves to another control keeps that focus.
 
 A route error preserves the shell and offers an explicit page reload. The
 reload requests the current deployment's entry and chunks; it does not retry

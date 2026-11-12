@@ -49,29 +49,7 @@ function useFocusHeadingOnNavigate() {
       first.current = false;
       return;
     }
-    const main = document.querySelector('main');
-    const heading = main?.querySelector('h1');
-    if (heading) {
-      heading.focus();
-      return;
-    }
-    main?.focus();
-    const observer = new MutationObserver(() => {
-      const destination = main?.querySelector('h1');
-      if (destination) {
-        if (document.activeElement === main) destination.focus();
-        stop();
-      }
-    });
-    function stop() {
-      observer.disconnect();
-      document.removeEventListener('focusin', stop);
-    }
-    if (main) {
-      observer.observe(main, { childList: true, subtree: true });
-      document.addEventListener('focusin', stop, { once: true });
-    }
-    return stop;
+    (document.querySelector('main h1') || document.querySelector('main'))?.focus();
   }, [pathname]);
 }
 

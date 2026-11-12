@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useState } from 'react';
+import { Component, lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import LoadingState from './LoadingState.jsx';
 import PageHeading from './PageHeading.jsx';
 
@@ -15,8 +15,15 @@ function RouteLoading() {
 /** Each page has a new boundary; setup step URLs keep the same page instance. */
 export function lazyPage(load) {
   const Page = lazy(load);
+  function ReadyPage() {
+    useLayoutEffect(() => {
+      const main = document.querySelector('main');
+      if (main && document.activeElement === main) main.querySelector('h1')?.focus();
+    }, []);
+    return <Page />;
+  }
   return function LazyPage() {
-    return <Suspense fallback={<RouteLoading />}><Page /></Suspense>;
+    return <Suspense fallback={<RouteLoading />}><ReadyPage /></Suspense>;
   };
 }
 

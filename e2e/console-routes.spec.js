@@ -113,7 +113,8 @@ test('an applicant reaches setup without review chunks, with focus after a delay
     await expect(page.getByRole('status')).toHaveText('Loading.');
     await expect(page.getByRole('main')).toBeFocused();
     release();
-    await expect(page.getByRole('heading', { name: 'Your organization', exact: true })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Your organization', exact: true })).toBeVisible();
+    await expect(page.getByRole('main')).toBeFocused();
     expect(scripts.some((entry) => entry.path === setup)).toBe(true);
     expect(scripts.filter((entry) => review.includes(entry.path))).toEqual([]);
   } finally {
@@ -139,7 +140,8 @@ test('an unavailable route keeps the shell and reloads successfully when the chu
     await expect(page.getByRole('heading', { name: 'This page did not load' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
     await page.getByRole('link', { name: 'Event Runner', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Your organizations', exact: true })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Your organizations', exact: true })).toBeVisible();
+    await expect(page.getByRole('main')).toBeFocused();
     await page.getByRole('link', { name: ORG.name, exact: true }).click();
     await page.getByRole('link', { name: 'Team', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'This page did not load' })).toBeVisible();
