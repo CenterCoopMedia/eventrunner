@@ -2,7 +2,7 @@
 
 The Lighthouse workflow measures the static demo with mobile settings. It runs three times each on Home, Schedule and Speakers. Each metric uses its own median. Hash routes stay separate in the reports.
 
-The workflow runs weekly on Monday at 09:17 UTC, on manual dispatch, and on pull requests and main pushes that change the listed public app or demo inputs. A change confined to `docs/` or `apps/web/src/admin/` does not start it. Superseded runs are cancelled. The workflow has read-only repository access and does not deploy.
+The workflow runs weekly on Monday at 09:17 UTC, on manual dispatch, and on pull requests and main pushes that change the web app, shared package, tokens or demo build inputs. Web admin source, web/shared tests and web/shared Markdown are excluded. A change confined to `docs/` or `apps/web/src/admin/` does not start it. Superseded runs are cancelled. The workflow has read-only repository access and does not deploy.
 
 ## Run locally
 
@@ -30,9 +30,9 @@ The [recorded baseline](lighthouse-baseline.json) contains all three values for 
 
 | Route | Runs | Median LCP | Median TBT | Median CLS |
 | --- | ---: | ---: | ---: | ---: |
-| Home | 3 | 4441 ms | 927 ms | 0 |
-| Schedule | 3 | 5362 ms | 1787 ms | 0.0768 |
-| Speakers | 3 | 4511 ms | 567 ms | 0.0010 |
+| Home | 3 | 4441 ms | 927.0 ms | 0 |
+| Schedule | 3 | 5362 ms | 1787.5 ms | 0.0768 |
+| Speakers | 3 | 4511 ms | 567.0 ms | 0.0010 |
 
 The focused collection took about 126 seconds, including the demo build. The build took 5.9 seconds; individual Lighthouse recorded totals were 7.7–8.8 seconds. Hosted runtime can differ. The workflow uses a 15-minute job limit and one browser stream.
 

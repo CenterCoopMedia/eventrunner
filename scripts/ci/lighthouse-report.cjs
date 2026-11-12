@@ -35,7 +35,7 @@ function markdown(rows) {
     '## Lighthouse mobile demo', '',
     '| Route | Runs | Median LCP (ms) | Median TBT (ms) | Median CLS |',
     '| --- | ---: | ---: | ---: | ---: |',
-    ...rows.map((row) => `| ${row.route} | ${row.runs} | ${Math.round(row.lcp)} | ${Math.round(row.tbt)} | ${row.cls.toFixed(4)} |`),
+    ...rows.map((row) => `| ${row.route} | ${row.runs} | ${Math.round(row.lcp)} | ${row.tbt.toFixed(1)} | ${row.cls.toFixed(4)} |`),
     '', 'Lab results cover the static demo. TBT is a lab proxy; these results do not measure field INP or live Firestore/image-manifest latency.', '',
   ].join('\n');
 }

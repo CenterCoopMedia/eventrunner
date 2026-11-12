@@ -68,7 +68,7 @@ test('writes the JSON and Markdown artifacts and appends the job summary', () =>
     });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(fs.readFileSync(path.join(output, 'summary.json'), 'utf8')).length, 3);
-    assert.match(fs.readFileSync(path.join(output, 'summary.md'), 'utf8'), /\/#\/schedule \| 3 \| 200 \| 20 \| 0\.0200/);
+    assert.match(fs.readFileSync(path.join(output, 'summary.md'), 'utf8'), /\/#\/schedule \| 3 \| 200 \| 20\.0 \| 0\.0200/);
     assert.match(fs.readFileSync(jobSummary, 'utf8'), /^Existing job summary\n## Lighthouse mobile demo/);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
