@@ -28,7 +28,7 @@
  * Every member of an organization can read `applications/{appId}` directly,
  * so that document holds only what they may see (connectionState.cjs). The
  * rest is in `console_connections/{appId}`, which no browser can read:
- *   { stripe?: { accountId, connectedBy },
+ *   { stripe?: { accountId, connectedBy, livemode },
  *     eventbrite?: { accountId, connectedBy, eventOrganizationId } }
  *
  * One account can serve several requests, and ending a connection at the
@@ -140,8 +140,16 @@ async function requireOnlyLiveStripe(tx, db, appId) {
   // after its account was disconnected, reserves the one slot.
   const held = await tx.get(db.collection(ACCOUNT_COLLECTION));
   const builds = await tx.get(db.collection(BUILD_COLLECTION));
-  const other = held.docs.some((doc) => doc.id !== appId && doc.data()?.stripe?.accountId)
-    || builds.docs.some((doc) => doc.id !== appId && doc.data()?.stripeEndpointOwner === 'platform');
+  let other = builds.docs.some((doc) => doc.id !== appId && doc.data()?.stripeEndpointOwner === 'platform');
+  for (const doc of held.docs) {
+    if (other) break;
+    const stripe = doc.data()?.stripe;
+    if (doc.id === appId || !stripe?.accountId) continue;
+    // Existing private rows predate mode storage. Unknown mode keeps the slot.
+    const livemode = typeof stripe.livemode === 'boolean' ? stripe.livemode
+      : (await tx.get(db.collection('applications').doc(doc.id))).data()?.connections?.stripe?.livemode;
+    other = livemode !== false;
+  }
   if (other) {
     throw new ConsoleError(409, 'locked', 'Event Runner can connect one live Stripe account for now. Email info@eventrunner.org and we will set up yours.');
   }
@@ -185,7 +193,7 @@ async function revokeIfUnused({ db, connectors, log = console }, provider, accou
     return { revoked: await connectors[provider].revoke(accountId), shared: false };
   } catch (err) {
     log.error('console could not revoke a connection', provider, err.message);
-    return { revoked: false, shared: false };
+    throw failure(502, 'disconnect-failed', `We could not end your ${PROVIDER_NAMES[provider]} connection at the provider. Email info@eventrunner.org for help.`, err);
   }
 }
 
@@ -307,6 +315,9 @@ async function completeConnection(deps, { body, user }) {
   const connector = requireConnector(deps, provider);
   const first = await readApplication((r) => r.get(), db, orgId, appId);
   await requireConnectable(deps, (r) => r.get(), { appId, data: first.data, provider });
+  if (provider === 'stripe' && connector.livemode === true) {
+    await db.runTransaction((tx) => requireOnlyLiveStripe(tx, db, appId));
+  }
 
   const answer = await exchange(deps, { connector, provider, code: body.code });
 
@@ -327,9 +338,10 @@ async function completeConnection(deps, { body, user }) {
       const same = previous.account?.accountId === answer.accountId;
       const keepEvent = provider === 'eventbrite' ? { event: same ? previous.connection?.event ?? null : null } : {};
       const keepOrganization = same && previous.account.eventOrganizationId ? { eventOrganizationId: previous.account.eventOrganizationId } : {};
+      const mode = provider === 'stripe' ? { livemode: answer.details.livemode } : {};
       connection = { connected: true, displayName: answer.displayName, ...answer.details, ...keepEvent, connectedAt: at };
       tx.update(ref, { connections: { ...data.connections, [provider]: changing }, updatedAt: at, updatedBy: user.uid });
-      tx.set(accountsRef(db, appId), { ...accounts, [provider]: { accountId: answer.accountId, connectedBy: user.uid, ...keepOrganization } });
+      tx.set(accountsRef(db, appId), { ...accounts, [provider]: { accountId: answer.accountId, connectedBy: user.uid, ...mode, ...keepOrganization } });
     });
   } catch (err) {
     await revokeIfUnused(deps, provider, answer.accountId);
@@ -553,7 +565,7 @@ function recordTokenDeletion(tx, db, appId, connected, at) {
 /**
  * After that transaction: delete the tokens, end each connection nothing else
  * uses, then the row. A token that cannot be deleted throws and leaves the row
- * for the retention job. A failed revoke is logged. Safe to repeat.
+ * for the retention job. A failed revoke also leaves the row for retry. Safe to repeat.
  */
 async function deleteRecordedTokens(deps, appId, connected) {
   for (const provider of PROVIDERS) await deps.secrets.deleteSecret(connectionSecretId(appId, provider));
