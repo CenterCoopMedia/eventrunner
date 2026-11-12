@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RULESET_PATTERN, stripAttribution, cleanText, run } = require('./no-ai-attribution.cjs');
+const { RULESET_PATTERN, hasReviewCredit, stripAttribution, cleanText, run } = require('./no-ai-attribution.cjs');
 const history = require('./fixtures/attribution-history.json');
 
 const credit = 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>';
@@ -61,8 +61,35 @@ test('preserves retained line endings, blank lines and missing final newline', (
   assert.equal(stripAttribution(''), '');
 });
 
+test('recognizes the missed review credit and named review or credit forms', () => {
+  for (const model of ['Claude Opus 5.5', 'Opus', 'Sonnet', 'Haiku', 'Codex', 'GPT-6.1',
+    'Gemini', 'Copilot', 'ChatGPT', 'Cursor', 'Grok', 'Kimi', 'Qwen', 'DeepSeek']) {
+    for (const line of [`Independent full-diff review: ${model} (high)`,
+      `- **Reviewer:** [${model}](https://example.test)`, `Reviewed by ${model}`, `Credit: ${model}`,
+      `Generated with ${model}`, `Co-authored-by: ${model}`]) {
+      assert.equal(hasReviewCredit(line), true, line);
+    }
+  }
+  for (const line of ['Codex reviewed this change.', 'Claude Opus 5.5 (high) reviewed this change.',
+    '### Independent full-diff review completed with Claude', 'first\r\nreview: opus\r\nlast']) {
+    assert.equal(hasReviewCredit(line), true, line);
+  }
+});
+
+test('ordinary model configuration, policy examples, human credits and neutral review records stay valid', () => {
+  for (const line of ['Claude and Codex are supported clients.',
+    'Review the Claude configuration and Codex instructions.', 'Claude configuration was reviewed by a maintainer.',
+    'The missed line was "Independent full-diff review: Claude Opus 5.5 (high)".',
+    'Credit: Human Maintainer', 'Independent full-diff review passed at high effort.',
+    'Reviewed by the maintainers.', 'Set the CSS cursor property.', 'Use cursor pagination.',
+    'Review: CSS cursor and cursor pagination', 'Reviewed by a maintainer for CSS cursor behavior.']) {
+    assert.equal(hasReviewCredit(line), false, line);
+  }
+});
+
 function harness(eventName, current, authorType = 'User') {
-  const state = { current: { ...current }, writes: [], failures: [], notices: [] };
+  const state = { current: { state: 'open', base: { sha: 'a'.repeat(40) }, head: { sha: 'b'.repeat(40) }, ...current },
+    writes: [], failures: [], notices: [], comparisons: [], commitPages: [[]] };
   const repo = { owner: 'CenterCoopMedia', repo: 'eventrunner' };
   const get = async (params) => {
     assert.equal(params.owner, repo.owner);
@@ -75,9 +102,17 @@ function harness(eventName, current, authorType = 'User') {
       if (Object.hasOwn(params, key)) state.current[key] = params[key];
     }
   };
+  const compareCommitsWithBasehead = () => {};
   const github = { rest: {
+    repos: { compareCommitsWithBasehead },
     issues: { get, update, getComment: get, updateComment: update },
     pulls: { get, update, getReview: get, updateReview: update, getReviewComment: get, updateReviewComment: update },
+  }, paginate: async (route, params, map) => {
+    assert.equal(route, compareCommitsWithBasehead);
+    assert.deepEqual(params, { ...repo,
+      basehead: `${state.current.base.sha}...${state.current.head.sha}`, per_page: 100 });
+    state.comparisons.push(params);
+    return state.commitPages.flatMap((commits) => map({ data: { url: 'https://api.github.com/compare', commits } }));
   } };
   const context = { repo, eventName, payload: {
     pull_request: { number: 123, title: 'stale', body: 'stale' },
@@ -122,6 +157,64 @@ test('title consisting of attribution fails while body cleanup still runs', asyn
   assert.equal(h.state.current.body, 'Useful.');
   assert.ok(h.state.failures.length);
   assert.ok(!Object.hasOwn(h.state.writes[0], 'title'));
+});
+
+test('named review credits in current titles and bodies fail without silently editing them', async () => {
+  for (const field of ['title', 'body']) {
+    const h = harness('pull_request_target', { title: 'Useful title', body: 'Useful body',
+      [field]: 'Independent full-diff review: Claude Opus 5.5 (high)' });
+    await run(h);
+    assert.deepEqual(h.state.failures, ['A named model/tool review credit remains; remove the credit line from the affected GitHub text.']);
+    assert.equal(h.state.writes.length, 0);
+    assert.equal(h.state.comparisons.length, 1);
+  }
+});
+
+test('checks every page of only the current PR commit range and does not print commit text', async () => {
+  const h = harness('pull_request_target', { title: 'Useful title', body: 'Useful body' });
+  h.context.payload.pull_request.base = { sha: 'c'.repeat(40) };
+  h.context.payload.pull_request.head = { sha: 'd'.repeat(40) };
+  const clean = { commit: { message: 'A normal signed change\n\nSigned-off-by: Human <human@example.test>' } };
+  const bad = 'Independent full-diff review: Claude Opus 5.5 (high)';
+  h.state.commitPages = [Array(100).fill(clean), Array(100).fill(clean), Array(100).fill(clean),
+    [{ commit: { message: `A normal subject\n\n${bad}\nuntrusted private text` } }]];
+  await run(h);
+  assert.deepEqual(h.state.failures, ['A PR commit message contains model/tool attribution; use git rebase -i to reword the unmerged commit.']);
+  assert.equal(h.state.writes.length, 0);
+  assert.equal(h.state.comparisons.length, 1);
+  assert.ok(!h.state.failures.join('').includes('untrusted private text'));
+  assert.ok(!h.state.failures.join('').includes(bad));
+});
+
+test('commit checks keep trailer/footer detection and surface an unreadable comparison', async () => {
+  for (const message of [credit, 'Generated with Codex']) {
+    const h = harness('pull_request_target', { title: 'Useful title', body: 'Useful body' });
+    h.state.commitPages = [[{ commit: { message } }]];
+    await run(h);
+    assert.ok(h.state.failures.some((failure) => failure.includes('PR commit message')));
+  }
+  const h = harness('pull_request_target', { title: 'Useful title', body: 'Useful body' });
+  h.github.paginate = async () => { throw Object.assign(new Error('untrusted response text'), { status: 403 }); };
+  await run(h);
+  assert.deepEqual(h.state.failures, ['Attribution cleanup could not complete (HTTP 403).']);
+});
+
+test('comment and review events do not read repository commit history', async () => {
+  for (const event of ['issues', 'issue_comment', 'pull_request_review_comment', 'pull_request_review']) {
+    const h = harness(event, { title: 'Useful title', body: 'Useful body' });
+    await run(h);
+    assert.deepEqual(h.state.comparisons, []);
+  }
+});
+
+test('editing a closed or merged PR does not recheck its historical commits', async () => {
+  for (const merged of [false, true]) {
+    const h = harness('pull_request_target', { state: 'closed', merged, title: 'Useful title', body: 'Useful body' });
+    h.state.commitPages = [[{ commit: { message: 'Independent full-diff review: Claude Opus 5.5 (high)' } }]];
+    await run(h);
+    assert.deepEqual(h.state.comparisons, []);
+    assert.deepEqual(h.state.failures, []);
+  }
 });
 
 test('empty PR/issue body is allowed; attribution-only comments/reviews receive an invisible marker', async () => {
