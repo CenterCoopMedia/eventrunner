@@ -35,9 +35,10 @@ const AdminIconControl = forwardRef(function AdminIconControl({
     const place = () => {
       const anchor = controlRef.current.getBoundingClientRect();
       const hint = tooltipRef.current.getBoundingClientRect();
-      const beside = anchor.right + 8 + hint.width <= window.innerWidth - 8;
+      const width = document.documentElement.clientWidth;
+      const beside = anchor.right + 8 + hint.width <= width - 8;
       setPosition({
-        left: Math.max(8, Math.min(beside ? anchor.right + 8 : anchor.left, window.innerWidth - hint.width - 8)),
+        left: Math.max(8, Math.min(beside ? anchor.right + 8 : anchor.left, width - hint.width - 8)),
         top: Math.max(8, Math.min(beside ? anchor.top + (anchor.height - hint.height) / 2 : anchor.bottom + 8, window.innerHeight - hint.height - 8)),
       });
     };
