@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { CONSOLE_BUILD_PHASES } from 'shared/consoleRequest';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext } from '../auth.jsx';
 import { application, callsTo, connections, fullAnswers, serveApi } from '../test/application.js';
@@ -15,6 +16,17 @@ const page = () => renderPage(<ApplicationStatus />, {
 
 function serveStatus(overrides) {
   serveApi({ getApplication: { application: application(overrides) } });
+}
+
+const BUILD_IDS = CONSOLE_BUILD_PHASES.flatMap((phase) => phase.steps);
+function progressAt(index, startedAt = '2026-11-04T15:00:00.000Z') {
+  const current = BUILD_IDS[index];
+  return { failed: false, needsReconnect: false, current, done: index, total: 13, step: index + 1,
+    phrase: CONSOLE_BUILD_PHASES.find((phase) => phase.steps.includes(current)).label, startedAt, delayed: false };
+}
+
+async function advanceClock(ms) {
+  await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 }
 
 describe('ApplicationStatus', () => {
@@ -45,12 +57,15 @@ describe('ApplicationStatus', () => {
   });
 
   it('tells a client they can leave during a build, and what is next', async () => {
-    serveStatus({ status: 'building', myRole: 'owner', canEdit: false, canWithdraw: false, build: { failed: false, needsReconnect: false, current: 'web-address' } });
+    serveStatus({ status: 'building', myRole: 'owner', canEdit: false, canWithdraw: false, build: {
+      failed: false, needsReconnect: false, current: 'web-address', done: 3, total: 13, step: 4,
+      phrase: 'Setting up your web address', startedAt: '2026-11-04T15:00:00.000Z', delayed: false,
+    } });
     page();
     expect(await screen.findByText('You can close this page')).toBeInTheDocument();
     expect(screen.getByText(/You will receive an email when your site is ready, with a link to finish setting it up/)).toBeInTheDocument();
     expect(screen.getByText('Most sites take about an hour and a half to build. Setting up your web address takes the longest.')).toBeInTheDocument();
-    expect(screen.getByText('Now: Setting up your web address. Next: Setting up email and tickets.')).toBeInTheDocument();
+    expect(screen.getByText('Step 4 of 13. Now: Setting up your web address. Next: Setting up email and tickets.')).toBeInTheDocument();
     // Every build step shows in plain words, with the one underway marked and explained.
     const steps = within(screen.getByRole('list', { name: 'Build steps' })).getAllByRole('listitem');
     expect(steps).toHaveLength(7);
@@ -58,17 +73,22 @@ describe('ApplicationStatus', () => {
     expect(steps[1]).toHaveAttribute('aria-current', 'step');
     expect(steps[1]).toHaveTextContent('This step can take up to an hour.');
     expect(steps[2]).not.toHaveAttribute('aria-current');
+    const progress = screen.getByRole('progressbar', { name: 'Build progress' });
+    expect(progress).toHaveAttribute('value', '3');
+    expect(progress).toHaveAttribute('max', '13');
+    expect(screen.getByRole('status')).toHaveTextContent('Step 4 of 13');
   });
 
   it('says the build is starting before its first step, and names no next step after the last', async () => {
     serveStatus({ status: 'approved', myRole: 'editor', canEdit: false, canWithdraw: false });
     const { unmount } = page();
-    expect(await screen.findByText('Now: Starting the build. Next: Setting up your hosting.')).toBeInTheDocument();
+    expect(await screen.findByText('0 of 13 steps done. Now: Starting the build. Next: Setting up your hosting.')).toBeInTheDocument();
     expect(screen.getByText(/Your team owners will receive an email when your site is ready/)).toBeInTheDocument();
     unmount();
-    serveStatus({ status: 'building', canEdit: false, canWithdraw: false, build: { failed: false, needsReconnect: false, current: 'ready' } });
+    serveStatus({ status: 'building', canEdit: false, canWithdraw: false, build: { failed: false, needsReconnect: false,
+      current: 'ready', done: 12, total: 13, step: 13, phrase: 'Emailing the link to your site' } });
     page();
-    expect(await screen.findByText('Now: Emailing the link to your site.')).toBeInTheDocument();
+    expect(await screen.findByText('Step 13 of 13. Now: Emailing the link to your site.')).toBeInTheDocument();
   });
 
   it('shows the building and ready states', async () => {
@@ -102,10 +122,115 @@ describe('ApplicationStatus', () => {
   });
 
   it('announces actual build activity with the next step', async () => {
-    serveStatus({ status: 'building', canEdit: false, build: { failed: false, current: 'web-address' } });
+    serveStatus({ status: 'building', canEdit: false, build: { failed: false,
+      current: 'web-address', done: 3, total: 13, step: 4, phrase: 'Setting up your web address' } });
     page();
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByRole('status')).toHaveTextContent('Now: Setting up your web address. Next: Setting up email and tickets.');
+    expect(screen.getByRole('status')).toHaveTextContent('Step 4 of 13. Now: Setting up your web address. Next: Setting up email and tickets.');
+  });
+
+  it('moves through every step at five-second reads, explains a restart, and stops when ready', async () => {
+    vi.useFakeTimers();
+    let build = progressAt(0);
+    let status = 'building';
+    serveApi({ getApplication: () => ({ application: application({ status, canEdit: false, canWithdraw: false, build }) }) });
+    const mounted = page();
+    try {
+      await act(async () => {});
+      for (let index = 0; index < BUILD_IDS.length; index += 1) {
+        build = progressAt(index);
+        if (index > 0) await advanceClock(5000);
+        expect(screen.getByRole('progressbar', { name: 'Build progress' })).toHaveAttribute('value', String(index));
+        expect(screen.getAllByRole('status')).toHaveLength(1);
+        expect(screen.getByRole('status')).toHaveTextContent(`Step ${index + 1} of 13.`);
+      }
+      build = { failed: false, current: null, done: 0, total: 13, step: 0, phrase: 'Starting the build',
+        startedAt: '2026-11-04T16:00:00.000Z', delayed: false };
+      await advanceClock(5000);
+      expect(screen.getByText(/The build started again/)).toBeInTheDocument();
+      expect(screen.getByRole('progressbar')).toHaveAttribute('value', '0');
+      build = progressAt(0, '2026-11-04T16:01:00.000Z');
+      await advanceClock(5000);
+      expect(screen.getByText(/The build started again/)).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Step 1 of 13.');
+      status = 'ready';
+      await advanceClock(5000);
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      const reads = callsTo('getApplication').length;
+      await advanceClock(60_000);
+      expect(callsTo('getApplication')).toHaveLength(reads);
+    } finally {
+      mounted.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not overlap scheduled reads, says a slow step is delayed and stops after failure', async () => {
+    vi.useFakeTimers();
+    let finishRead;
+    let reads = 0;
+    const running = application({ status: 'building', canEdit: false, canWithdraw: false, build: progressAt(3) });
+    serveApi({ getApplication: () => {
+      reads += 1;
+      return reads === 1 ? { application: running } : new Promise((resolve) => { finishRead = resolve; });
+    } });
+    const mounted = page();
+    try {
+      await act(async () => {});
+      await advanceClock(5000);
+      expect(reads).toBe(2);
+      await advanceClock(30_000);
+      expect(reads).toBe(2);
+      await act(async () => finishRead({ application: { ...running, build: { ...running.build, delayed: true } } }));
+      expect(screen.getByText(/This step is taking longer than usual/)).toBeInTheDocument();
+      expect(screen.getAllByRole('status').filter((node) => node.textContent.includes('Step 4 of 13'))).toHaveLength(1);
+      await advanceClock(5000);
+      await act(async () => finishRead({ application: { ...running, build: { failed: true, needsReconnect: false } } }));
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByText(/is told about every build/)).not.toBeInTheDocument();
+      const failedReads = reads;
+      await advanceClock(60_000);
+      expect(reads).toBe(failedReads);
+    } finally {
+      mounted.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores an old in-flight poll after the reader opens another request', async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    let finishOld;
+    const old = application({ status: 'building', canEdit: false, canWithdraw: false, build: progressAt(3) });
+    const next = application({ id: 'a2', status: 'ready', canEdit: false, canWithdraw: false,
+      answers: { ...fullAnswers(), event: { ...fullAnswers().event, name: 'Another synthetic event' } } });
+    serveApi({ getApplication: ({ appId }) => {
+      if (appId === 'a2') return { application: next };
+      reads += 1;
+      return reads === 1 ? { application: old } : new Promise((resolve) => { finishOld = resolve; });
+    } });
+    function SwitchRequest() {
+      const navigate = useNavigate();
+      return <button type="button" onClick={() => navigate('/organizations/o1/applications/a2')}>Open another request</button>;
+    }
+    const mounted = renderPage(<><SwitchRequest /><ApplicationStatus /></>, {
+      path: '/organizations/o1/applications/a1', route: '/organizations/:orgId/applications/:appId',
+    });
+    try {
+      await act(async () => {});
+      await advanceClock(5000);
+      expect(reads).toBe(2);
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open another request' })));
+      expect(screen.getByRole('heading', { level: 1, name: 'Another synthetic event' })).toBeInTheDocument();
+      await act(async () => finishOld({ application: old }));
+      expect(screen.getByRole('heading', { level: 1, name: 'Another synthetic event' })).toBeInTheDocument();
+      await advanceClock(60_000);
+      expect(reads).toBe(2);
+    } finally {
+      mounted.unmount();
+      vi.useRealTimers();
+    }
   });
 
   it.each(['ready', 'launched', 'withdrawn', 'declined'])('shows no build activity for a %s request', async (status) => {

@@ -8,6 +8,7 @@ const {
   CONSOLE_REQUEST_TRANSITIONS: TRANSITIONS,
   CONSOLE_REQUEST_OPERATOR_LABELS,
   CONSOLE_REQUEST_CLIENT_LABELS,
+  CONSOLE_BUILD_PHASES,
   canMoveConsoleRequest,
   inConsoleRequestGroup,
 } = require('./consoleRequest.cjs');
@@ -53,4 +54,9 @@ test('the lists and tables cannot be changed by a caller', () => {
   assert.ok(Object.isFrozen(STATUSES));
   assert.ok(Object.isFrozen(GROUPS) && Object.values(GROUPS).every(Object.isFrozen));
   assert.ok(Object.isFrozen(TRANSITIONS) && Object.values(TRANSITIONS).every(Object.isFrozen));
+  assert.ok(Object.isFrozen(CONSOLE_BUILD_PHASES));
+  for (const phase of CONSOLE_BUILD_PHASES) {
+    assert.ok(Object.isFrozen(phase) && Object.isFrozen(phase.steps));
+    assert.ok(phase.slowAfterMinutes > 0);
+  }
 });

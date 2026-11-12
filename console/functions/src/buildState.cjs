@@ -16,7 +16,9 @@ const { connectionProblem } = require('./connectionState.cjs');
 const { reviewedAnswers } = require('./reviewAccess.cjs');
 
 const BUILD_COLLECTION = 'console_builds';
-const RETRY_STATUSES = require('shared/consoleRequest').CONSOLE_REQUEST_GROUPS.building;
+const { CONSOLE_REQUEST_GROUPS, CONSOLE_BUILD_PHASES } = require('shared/consoleRequest');
+const RETRY_STATUSES = CONSOLE_REQUEST_GROUPS.building;
+const BUILD_IDS = CONSOLE_BUILD_PHASES.flatMap((phase) => phase.steps);
 const SILENT_START_MS = 60 * 60 * 1000;
 // More than provision-client.yml's timeout-minutes, so a run this old is not alive.
 const RUN_LIMIT_MS = 6 * 60 * 60 * 1000;
@@ -66,15 +68,37 @@ function canRetryBuild(app, build, at) {
     && (app.buildStart?.state === 'failed' || build?.state === 'failed' || buildWentSilent(app, build, at));
 }
 
-/** What a client may know: never the error text, the run address or the step detail. `current` is a running step's id. */
+/** Safe, factual progress. Queued retries cannot reuse the previous run's completed rows. */
+function clientProgress(app, build, at) {
+  const rows = build?.state === 'running' && Array.isArray(build.steps) ? build.steps : [];
+  const last = rows.at(-1);
+  const index = BUILD_IDS.indexOf(last?.id);
+  const current = index >= 0 ? last.id : null;
+  const phase = CONSOLE_BUILD_PHASES.find((item) => item.steps.includes(current));
+  const done = new Set(rows.filter((row) => row.state === 'done' && BUILD_IDS.includes(row.id)).map((row) => row.id)).size;
+  const started = new Date(toMillis(build?.state === 'running' ? build.startedAt : app.buildStart?.at));
+  return {
+    current,
+    done,
+    total: BUILD_IDS.length,
+    step: index + 1,
+    phrase: phase?.label || 'Starting the build',
+    startedAt: Number.isNaN(started.getTime()) ? null : started.toISOString(),
+    delayed: Boolean(phase && last.state === 'running' && at - toMillis(last.at) > phase.slowAfterMinutes * 60_000),
+  };
+}
+
+/** What a client may know: never the error text, the run address or the step detail. */
 function buildForClient(app, build, at, { testMode = false } = {}) {
   const failed = canRetryBuild(app, build, at);
   // A retry whose dispatch failed leaves the record `queued`, with the failed step still on it.
   const ticketsFailed = build?.failedStep === TICKETS_STEP;
   // The same check a retry makes, so the page offers a way out of every connection refusal.
   const refused = Boolean(connectionProblem(reviewedAnswers(app)?.tickets?.choice, app.connections, { testMode }));
-  const current = !failed && build?.state === 'running' ? build.steps?.at(-1)?.id : null;
-  return { failed, needsReconnect: failed && (ticketsFailed || refused), ...(current ? { current } : {}) };
+  return {
+    failed, needsReconnect: failed && (ticketsFailed || refused),
+    ...(!failed && RETRY_STATUSES.includes(app.status) ? clientProgress(app, build, at) : {}),
+  };
 }
 
 module.exports = { BUILD_COLLECTION, RETRY_STATUSES, buildForClient, buildWentSilent, canRetryBuild, readBuild };

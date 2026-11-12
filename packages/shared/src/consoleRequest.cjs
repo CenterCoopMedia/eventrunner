@@ -88,12 +88,24 @@ const CONSOLE_REQUEST_CLIENT_LABELS = Object.freeze({
   archived: 'Your site is switched off',
 });
 
+/** Client phrases and conservative slow-display windows, independent of private build labels. */
+const CONSOLE_BUILD_PHASES = Object.freeze([
+  { steps: ['project', 'firebase', 'deploy-identity'], label: 'Setting up your hosting', slowAfterMinutes: 90 },
+  { steps: ['web-address', 'sign-in'], label: 'Setting up your web address', detail: 'This step can take up to an hour.', slowAfterMinutes: 60 },
+  { steps: ['email', 'tickets'], label: 'Setting up email and tickets', slowAfterMinutes: 90 },
+  { steps: ['environment', 'first-deploy', 'mail-webhooks'], label: 'Installing your site', slowAfterMinutes: 90 },
+  { steps: ['seed'], label: 'Adding your event details and team', slowAfterMinutes: 90 },
+  { steps: ['full-deploy'], label: 'Publishing your site', slowAfterMinutes: 90 },
+  { steps: ['ready'], label: 'Emailing the link to your site', slowAfterMinutes: 90 },
+].map((phase) => Object.freeze({ ...phase, steps: Object.freeze(phase.steps) })));
+
 module.exports = {
   CONSOLE_REQUEST_STATUSES,
   CONSOLE_REQUEST_GROUPS,
   CONSOLE_REQUEST_TRANSITIONS,
   CONSOLE_REQUEST_OPERATOR_LABELS,
   CONSOLE_REQUEST_CLIENT_LABELS,
+  CONSOLE_BUILD_PHASES,
   canMoveConsoleRequest,
   inConsoleRequestGroup,
 };
