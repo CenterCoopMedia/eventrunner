@@ -136,6 +136,11 @@ test('an unavailable route keeps the shell and reloads successfully when the chu
     await page.getByRole('link', { name: 'Team', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'This page did not load' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await page.getByRole('link', { name: 'Event Runner', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Your organizations', exact: true })).toBeFocused();
+    await page.getByRole('link', { name: ORG.name, exact: true }).click();
+    await page.getByRole('link', { name: 'Team', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'This page did not load' })).toBeVisible();
     available = true;
     await page.getByRole('button', { name: 'Reload page' }).click();
     await expect(page.getByRole('heading', { name: 'Team', exact: true })).toBeVisible();

@@ -22,14 +22,14 @@ export function lazyPage(load) {
 
 /** A missing deployment chunk keeps the shell and offers a fresh page load. */
 export default class RouteBoundary extends Component {
-  state = { failed: false };
+  state = { failed: false, resetKey: this.props.resetKey };
 
   static getDerivedStateFromError() {
     return { failed: true };
   }
 
-  componentDidUpdate(previous) {
-    if (this.state.failed && previous.resetKey !== this.props.resetKey) this.setState({ failed: false });
+  static getDerivedStateFromProps({ resetKey }, state) {
+    return state.resetKey === resetKey ? null : { failed: false, resetKey };
   }
 
   render() {

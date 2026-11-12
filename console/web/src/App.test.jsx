@@ -16,6 +16,7 @@ const teamImport = vi.hoisted(() => {
   return { pending, finish };
 });
 vi.mock('./pages/Team.jsx', () => teamImport.pending);
+vi.mock('./pages/AcceptedAgreement.jsx', () => { throw new Error('synthetic route unavailable'); });
 
 function renderApp(path, auth = fakeAuth()) {
   render(
@@ -73,6 +74,25 @@ describe('AppRoutes', () => {
     } finally {
       cleanup();
       vi.useRealTimers();
+    }
+  });
+
+  it('focuses the destination after leaving a missing route through the shell', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const expectedError = (event) => {
+      if (event.error?.cause?.message === 'synthetic route unavailable') event.preventDefault();
+    };
+    window.addEventListener('error', expectedError);
+    try {
+      renderApp('/organizations/o1/applications/a1/accepted-agreement');
+      await screen.findByRole('heading', { name: 'This page did not load' });
+      fireEvent.click(screen.getByRole('link', { name: 'Event Runner' }));
+      const heading = await screen.findByRole('heading', { level: 1, name: 'Your organizations' });
+      expect(heading).toHaveFocus();
+    } finally {
+      cleanup();
+      window.removeEventListener('error', expectedError);
+      error.mockRestore();
     }
   });
 
