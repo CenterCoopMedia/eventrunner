@@ -17,11 +17,11 @@ uses the checker consistently.
 
 | Graph | Before raw bytes | Before gzip bytes | After raw bytes | After gzip bytes |
 | --- | ---: | ---: | ---: | ---: |
-| Initial JavaScript | 414,059 | 122,698 | 312,787 | 98,066 |
+| Initial JavaScript | 414,059 | 122,698 | 312,880 | 98,093 |
 | Initial CSS | 25,217 | 5,492 | 23,721 | 5,300 |
 | Largest deferred JavaScript | — | — | 17,758 | 5,592 |
 
-The initial graph shrank 24.5% raw and 20.1% gzip. It contains the entry plus a
+The initial graph shrank 24.4% raw and 20.1% gzip. It contains the entry plus a
 599-byte shared runtime. The largest deferred file is setup; staff review has
 separate dynamic entries. The initial gzip graph is below the 114,040-byte goal.
 
@@ -50,9 +50,10 @@ deferred chunk has about 13–16%. These limits prevent the review/setup code fr
 silently returning to first load or a deferred page growing without review.
 Do not raise a limit without recording new measurements and their cause.
 
-The unchanged checker was also run against a throwaway copy of the budget with
+At the initial ready head `37df1ec8`, the unchanged checker was also run against a throwaway copy of the budget with
 initial gzip set to 98,065. It exited 1 with `98066 > 98065`; the committed budget
-passes the same build. No temporary limit is committed.
+passes the current build too. The guard and limits are unchanged. No temporary
+limit is committed.
 
 ## Loading and recovery
 
@@ -61,8 +62,8 @@ delayed loading state during a router transition, while setup retains its page
 instance across step URLs. This follows [React's Suspense transition behavior](https://react.dev/reference/react/Suspense#preventing-already-revealed-content-from-hiding).
 Imports that finish within 300 ms show no route fallback. Longer imports reuse
 the existing loading state. Navigation focuses main while waiting, then the
-destination heading if focus is still in main. A reader who moves to another
-control keeps that focus.
+destination heading if focus has not moved during the wait. A focus change
+cancels the pending heading focus, including when the reader returns to main.
 
 A route error preserves the shell and offers an explicit page reload. The
 reload requests the current deployment's entry and chunks; it does not retry

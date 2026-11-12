@@ -60,11 +60,18 @@ function useFocusHeadingOnNavigate() {
       const destination = main?.querySelector('h1');
       if (destination) {
         if (document.activeElement === main) destination.focus();
-        observer.disconnect();
+        stop();
       }
     });
-    if (main) observer.observe(main, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    function stop() {
+      observer.disconnect();
+      document.removeEventListener('focusin', stop);
+    }
+    if (main) {
+      observer.observe(main, { childList: true, subtree: true });
+      document.addEventListener('focusin', stop, { once: true });
+    }
+    return stop;
   }, [pathname]);
 }
 

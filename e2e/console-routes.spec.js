@@ -41,7 +41,7 @@ function chunk(suffix) {
 
 test.beforeAll(async () => {
   const { build, preview } = await import('vite');
-  const { default: config } = await import('../console/web/vite.config.js');
+  const { default: consoleConfig } = await import('../console/web/vite.config.js');
   directory = await fs.mkdtemp(path.join(os.tmpdir(), 'console-routes-'));
   await build({
     configFile: false, root: FIXTURE, logLevel: 'warn',
@@ -53,13 +53,15 @@ test.beforeAll(async () => {
         }
         return null;
       },
-    }, ...config.plugins],
+    }, ...consoleConfig.plugins],
+    optimizeDeps: consoleConfig.optimizeDeps,
     define: { 'import.meta.env.VITE_CONSOLE_API_BASE': JSON.stringify('') },
     build: { outDir: directory, emptyOutDir: true, manifest: true },
   });
   manifest = JSON.parse(await fs.readFile(path.join(directory, '.vite/manifest.json'), 'utf8'));
   server = await preview({
     configFile: false, root: FIXTURE, logLevel: 'warn',
+    optimizeDeps: consoleConfig.optimizeDeps,
     build: { outDir: directory }, preview: { host: '127.0.0.1', port: 0 },
   });
   origin = `http://127.0.0.1:${server.httpServer.address().port}`;
