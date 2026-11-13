@@ -225,6 +225,35 @@ describe('the updates list', () => {
 });
 
 describe('the update editor', () => {
+  it.each(['live', 'drafts'])('ignores cached revisions until both server answers arrive (%s first)', async (first) => {
+    reportAtOnce = false;
+    await renderAt('/admin/updates/edited');
+    const nextLive = adminSubscriptions.get('cmsUpdates');
+    const nextDrafts = adminSubscriptions.get('cmsUpdates_drafts');
+    act(() => {
+      nextLive([EDITED_LIVE], { fromCache: true });
+      nextDrafts([], { fromCache: true });
+    });
+    expect(screen.queryByLabelText('Title')).toBeNull();
+    act(() => {
+      if (first === 'live') nextLive([EDITED_LIVE], { fromCache: false });
+      else nextDrafts([EDITED_DRAFT], { fromCache: false });
+    });
+    expect(screen.queryByLabelText('Title')).toBeNull();
+    act(() => {
+      if (first === 'live') nextDrafts([EDITED_DRAFT], { fromCache: false });
+      else nextLive([EDITED_LIVE], { fromCache: false });
+    });
+    expect(await screen.findByLabelText('Title')).toHaveValue(EDITED_DRAFT.title);
+    act(() => nextDrafts([], { fromCache: true }));
+    expect(screen.getByLabelText('Title')).toHaveValue(EDITED_DRAFT.title);
+
+    fetch.mockResolvedValueOnce(response({ id: 'edited', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
+    expect(bodyOf(callsTo('cmsSaveUpdate')[0]).update.title).toBe(EDITED_DRAFT.title);
+  });
+
   it('saves a new update as a draft only, and a retry after a failure reuses its id', async () => {
     await renderAt('/admin/updates/new/update');
     await screen.findByRole('heading', { level: 1, name: 'New update' });

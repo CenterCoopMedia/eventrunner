@@ -11,11 +11,13 @@ export function useAdminOrganizations() {
 
   useEffect(() => {
     const unsubscribers = [
-      subscribeAdminCollection('cmsOrganizations', (docs) => {
+      subscribeAdminCollection('cmsOrganizations', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setLive(docs);
         setLiveError(null);
       }, setLiveError),
-      subscribeAdminCollection('cmsOrganizations_drafts', (docs) => {
+      subscribeAdminCollection('cmsOrganizations_drafts', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setDrafts(docs);
         setDraftsError(null);
       }, setDraftsError),
@@ -31,7 +33,7 @@ export function useAdminOrganizations() {
 
   return {
     rows,
-    // Both listeners have reported. They report in no fixed order, and a row
+    // Both server snapshots have arrived. They arrive in no fixed order, and a row
     // built before the drafts arrive is the live doc alone.
     ready,
     loading: !ready && !error,

@@ -103,6 +103,41 @@ beforeEach(() => {
 });
 
 describe('admin Sessions workspace', () => {
+  it.each(['live', 'drafts'])('ignores cached revisions until both server answers arrive (%s first)', async (first) => {
+    reportAdminCollectionsAtOnce = false;
+    await renderAt('/admin/sessions/keynote');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    const live = {
+      id: 'keynote', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
+      title: 'Published title', description: 'Published description.', visible: true,
+    };
+    const draft = { ...live, title: 'Saved draft title', description: 'Saved draft description.', status: 'dirty' };
+    const nextLive = adminSubscriptions.get('cmsSchedule');
+    const nextDrafts = adminSubscriptions.get('cmsSchedule_drafts');
+    act(() => {
+      nextLive([live], { fromCache: true });
+      nextDrafts([], { fromCache: true });
+    });
+    expect(screen.queryByLabelText('Public title')).toBeNull();
+    act(() => {
+      if (first === 'live') nextLive([live], { fromCache: false });
+      else nextDrafts([draft], { fromCache: false });
+    });
+    expect(screen.queryByLabelText('Public title')).toBeNull();
+    act(() => {
+      if (first === 'live') nextDrafts([draft], { fromCache: false });
+      else nextLive([live], { fromCache: false });
+    });
+    expect(await screen.findByLabelText('Public title')).toHaveValue(draft.title);
+    act(() => nextDrafts([], { fromCache: true }));
+    expect(screen.getByLabelText('Public title')).toHaveValue(draft.title);
+
+    fetch.mockResolvedValueOnce(response({ docId: 'keynote', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields).toMatchObject({ title: draft.title, description: draft.description });
+  });
+
   it('groups the session into content, time, location, and publishing cards without changing field order', async () => {
     await renderAt('/admin/sessions/new/session');
     await screen.findByRole('heading', { name: 'New session' });

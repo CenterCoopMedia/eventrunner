@@ -17,11 +17,13 @@ export function useAdminPages() {
 
   useEffect(() => {
     const unsubscribers = [
-      subscribeAdminCollection('cmsPages', (docs) => {
+      subscribeAdminCollection('cmsPages', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setLive(docs);
         setLiveError(null);
       }, setLiveError),
-      subscribeAdminCollection('cmsPages_drafts', (docs) => {
+      subscribeAdminCollection('cmsPages_drafts', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setDrafts(docs);
         setDraftsError(null);
       }, setDraftsError),
@@ -39,8 +41,10 @@ export function useAdminPages() {
 
   return {
     rows,
-    // BOTH listeners must report before the list is trustworthy — an empty
-    // array is a legitimate answer ("no pages"), but a missing one is not:
+    // Both server snapshots must arrive before an editor adopts a revision.
+    // Cached drafts can be empty even when a server draft exists.
+    // An empty server array is a legitimate answer ("no pages"), but a
+    // missing one is not:
     // with only the live result in, a draft-only page reads as "no such
     // page", and with only the drafts result in, a clean draft reads as
     // never published and Publish all would republish it. An errored
