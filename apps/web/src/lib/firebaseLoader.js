@@ -1,3 +1,4 @@
+import { startTransition } from 'react';
 import { appCheckEnabled } from './firebaseSettings.js';
 
 const SIGNED_IN_HINT = 'eventrunner:signed-in';
@@ -49,7 +50,12 @@ export function subscribeToFirebase(attach, onError = (error) => console.warn('L
   let detach;
   firebaseReady().then((sdk) => {
     if (!stopped) detach = attach(sdk);
-  }).catch((error) => { if (!stopped) onError(error); });
+  }).catch((error) => {
+    // An unavailable background runtime must not replace a still-hydrating
+    // snapshot. The callback still runs now; React can finish hydration
+    // before committing its error/status state.
+    if (!stopped) startTransition(() => onError(error));
+  });
   return () => { stopped = true; detach?.(); };
 }
 

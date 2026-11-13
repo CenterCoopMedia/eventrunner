@@ -2,7 +2,7 @@ import { IS_DEMO } from './demoMode.js';
 
 const HERO_ART = {
   civic: ['civic.webp', 'A sunlit civic hall beside the harbor.'],
-  newsroom: ['nclocal-summit.jpg', 'The historical NC News & Information Summit keynote panel. Photo: Elon University.'],
+  newsroom: [import.meta.env.PROD ? 'nclocal-summit.webp' : 'nclocal-summit.jpg', 'The historical NC News & Information Summit keynote panel. Photo: Elon University.'],
   broadsheet: ['broadsheet.webp', 'An engraved lighthouse overlooking a working harbor.'],
   atlas: ['atlas.webp', 'A waterfront transit platform looking toward the city.'],
   'field-guide': ['field-guide.webp', 'A coastal heron among reeds beside the harbor.'],

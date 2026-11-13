@@ -14,6 +14,6 @@ export function criticalFontTags(css) {
     const file = /url\(['"]?(\/fonts\/[a-z0-9-]+\.woff2)['"]?\)/.exec(block)?.[1];
     if (file) files.add(file);
   }
-  return [...files].map((href) => ({ tag: 'link', injectTo: 'head-prepend',
+  return [...files].map((href) => ({ tag: 'link', injectTo: 'head',
     attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href } }));
 }
