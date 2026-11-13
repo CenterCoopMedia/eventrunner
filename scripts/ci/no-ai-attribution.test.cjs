@@ -74,7 +74,14 @@ test('recognizes the missed review credit and named review or credit forms', () 
     '### Independent full-diff review completed with Claude', 'first\r\nreview: opus\r\nlast',
     'Claude Code review: clean', 'Copilot code review: no comments',
     'Claude Opus 5.5 cross-model review: clean', 'Cross-model review (Claude Opus 5.5): clean',
-    'Independent full-diff review (GPT-6.1): clean', 'Review: clean (Opus 5.5)']) {
+    'Independent full-diff review (GPT-6.1): clean', 'Review: clean (Opus 5.5)',
+    'Cross-model review (Claude Opus 5.5, high): clean',
+    'Cross-model review (Claude Opus 5.5 (high)): clean',
+    'Review: clean (Claude Opus 5.5, high effort)',
+    'Independent full-diff review (GPT-6.1 high): clean',
+    'Code review (Copilot, low): passed', 'Review: approved (Gemini (medium effort))',
+    'Cross-model review ( Codex , ( xhigh effort ) ): clean',
+    'Cross-model review (Claude Opus 5.5 high effort): clean']) {
     assert.equal(hasReviewCredit(line), true, line);
   }
 });
@@ -90,7 +97,10 @@ test('ordinary model configuration, policy examples, human credits and neutral r
   }
   for (const line of ['Attribution: strip leftover (Claude) trailers',
     'Code review: confirmed the (Claude configuration) loads', 'Review: fix (cursor) pagination',
-    'Review: fix (cursor)']) assert.equal(hasReviewCredit(line), false, line);
+    'Review: fix (cursor)', 'Review: clean (cursor, pagination)',
+    'Code review (Claude configuration, high): clean',
+    'Review: clean (cursor (pagination))', 'Review: clean (Claude Opus 5.5, high confidence)',
+    'Review: clean (Claude Opus 5.5 (high) configuration)']) assert.equal(hasReviewCredit(line), false, line);
 });
 
 function harness(eventName, current, authorType = 'User') {
@@ -181,7 +191,7 @@ test('checks every page of only the current PR commit range and does not print c
   h.context.payload.pull_request.base = { sha: 'c'.repeat(40) };
   h.context.payload.pull_request.head = { sha: 'd'.repeat(40) };
   const clean = { commit: { message: 'A normal signed change\n\nSigned-off-by: Human <human@example.test>' } };
-  const bad = 'Independent full-diff review: Claude Opus 5.5 (high)';
+  const bad = 'Cross-model review (Claude Opus 5.5 (high)): clean';
   h.state.commitPages = [Array(100).fill(clean), Array(100).fill(clean), Array(100).fill(clean),
     [{ commit: { message: `A normal subject\n\n${bad}\nuntrusted private text` } }]];
   await run(h);
