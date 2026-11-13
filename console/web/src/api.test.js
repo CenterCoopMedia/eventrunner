@@ -3,6 +3,7 @@ import { auth } from './firebase.js';
 import { ApiError, callApi } from './api.js';
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   delete auth.currentUser;
 });
@@ -29,7 +30,95 @@ describe('callApi', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer id-token' },
       body: JSON.stringify({ a: 1 }),
+      signal: expect.any(AbortSignal),
     });
+  });
+
+  it.each([['getTeam', 20000], ['listOrganizations', 0], ['checkWebAddress', 0]])('ends an unanswered %s read at 30 seconds including %sms of token lookup', async (name, tokenDelay) => {
+    vi.useFakeTimers();
+    auth.currentUser = { getIdToken: () => new Promise((resolve) => setTimeout(() => resolve('t'), tokenDelay)) };
+    const fetch = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal('fetch', fetch);
+    let outcome;
+    callApi(name).then((value) => { outcome = { value }; }, (error) => { outcome = { error }; });
+    await vi.advanceTimersByTimeAsync(29999);
+    expect(outcome).toBeUndefined();
+    expect(fetch.mock.calls[0][1].signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(outcome).toMatchObject({ error: { status: 0, code: 'timeout', message: 'We could not finish loading. Try again.' } });
+    expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('bounds token lookup and never sends a read after its token arrives too late', async () => {
+    vi.useFakeTimers();
+    let token;
+    auth.currentUser = { getIdToken: () => new Promise((resolve) => { token = resolve; }) };
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    let outcome;
+    callApi('getTeam').catch((error) => { outcome = error; });
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(outcome).toMatchObject({ status: 0, code: 'timeout' });
+    expect(fetch).not.toHaveBeenCalled();
+    token('late-token');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('bounds body reading, permits a fresh read and ignores the abandoned response', async () => {
+    vi.useFakeTimers();
+    auth.currentUser = { getIdToken: async () => 't' };
+    let oldBody;
+    const fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => new Promise((resolve) => { oldBody = resolve; }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ team: 'fresh' }) });
+    vi.stubGlobal('fetch', fetch);
+    let first;
+    callApi('getTeam').then((value) => { first = { value }; }, (error) => { first = { error }; });
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(first).toMatchObject({ error: { status: 0, code: 'timeout' } });
+    await expect(callApi('getTeam')).resolves.toEqual({ team: 'fresh' });
+    oldBody({ team: 'obsolete' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(first).toMatchObject({ error: { code: 'timeout' } });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(['saveApplicationStep', 'acceptAgreement', 'completeConnection', 'getUnknownAction'])('leaves %s untimed and sends no repeat while its result is unknown', async (name) => {
+    vi.useFakeTimers();
+    auth.currentUser = { getIdToken: async () => 't' };
+    let finish;
+    const fetch = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    vi.stubGlobal('fetch', fetch);
+    let outcome;
+    const request = callApi(name).then((value) => { outcome = value; });
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(outcome).toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][1]).not.toHaveProperty('signal');
+    expect(vi.getTimerCount()).toBe(0);
+    finish({ ok: true, json: async () => ({ saved: true }) });
+    await request;
+    expect(outcome).toEqual({ saved: true });
+  });
+
+  it.each(['success', 'failure'])('clears a read deadline after an early %s', async (outcome) => {
+    vi.useFakeTimers();
+    auth.currentUser = { getIdToken: async () => 't' };
+    const fetch = vi.fn(async () => {
+      if (outcome === 'failure') throw new TypeError('Network offline');
+      return { ok: true, json: async () => ({ team: 'ready' }) };
+    });
+    vi.stubGlobal('fetch', fetch);
+    if (outcome === 'success') await expect(callApi('getTeam')).resolves.toEqual({ team: 'ready' });
+    else await expect(callApi('getTeam')).rejects.toMatchObject({ status: 0, code: 'network' });
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(fetch.mock.calls[0][1].signal.aborted).toBe(false);
   });
 
   it('throws an ApiError with the server message and code', async () => {
