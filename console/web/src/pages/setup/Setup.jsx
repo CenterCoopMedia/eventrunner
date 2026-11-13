@@ -111,10 +111,13 @@ export default function Setup() {
     recoveryPending.current = true;
     setRecovering(true);
     setRecoveryError('');
-    keepForSignIn();
-    const returnPath = `${location.pathname}${location.search}${location.hash}`;
-    rememberReturn(returnPath);
     try {
+      if (!keepForSignIn()) {
+        setRecoveryError('Your browser could not keep this answer. Copy it somewhere safe before leaving setup to sign in again.');
+        return;
+      }
+      const returnPath = `${location.pathname}${location.search}${location.hash}`;
+      rememberReturn(returnPath);
       await signOut();
       navigate(`/signin?next=${encodeURIComponent(returnPath)}&recovery=1`, { replace: true });
     } catch {
@@ -268,7 +271,7 @@ export default function Setup() {
               : next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next: {next.title}</button> : null}
             {saveStatus === 'error' && failure?.status === 401 ? (
               <button type="button" className="button" disabled={recovering || navigating} onClick={signInAgain}>Sign in again</button>
-            ) : saveStatus === 'error' && (failure?.status === 0 || failure?.status >= 500) ? (
+            ) : saveStatus === 'error' && ([0, 408, 429].includes(failure?.status) || failure?.status >= 500) ? (
               <button type="button" className="button" disabled={navigating} onClick={async () => { saveMessage.current?.focus(); await flush(); saveMessage.current?.focus(); }}>Save again</button>
             ) : null}
           </div>

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { clearKeptAnswer, keepAnswer, removeKeptAnswer } from './keptAnswers.js';
+import { clearKeptAnswer, keepAnswer, readKeptAnswer, removeKeptAnswer } from './keptAnswers.js';
 
 // The masthead waits for the mounted setup's save before signing out.
 export const SetupSaveContext = createContext(null);
@@ -96,11 +96,16 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
   const keepForSignIn = useCallback(() => {
     clearTimeout(timer.current);
     timer.current = null;
-    if (latest.current) keepUnsaved(latest.current, latest.current);
+    if (latest.current) {
+      const { scope: savedScope, value } = latest.current;
+      keepAnswer(savedScope, value);
+      if (JSON.stringify(readKeptAnswer(savedScope, value.step)) !== JSON.stringify(value)) return false;
+    }
     // Authentication is about to end. Recovery reopens the copy explicitly,
     // without an unmount retry against the signed-out session.
     pending.current = undefined;
     latest.current = undefined;
+    return true;
   }, []);
 
   useEffect(() => {

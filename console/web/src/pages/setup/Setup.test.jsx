@@ -431,7 +431,7 @@ describe('Setup', () => {
     expect(await screen.findByText(/Not saved. Your site is being built/)).toBeInTheDocument();
   });
 
-  it.each([0, 503])('offers Save again for status %s and keeps focus on the result through the retry', async (status) => {
+  it.each([0, 408, 429, 503])('offers Save again for status %s and keeps focus on the result through the retry', async (status) => {
     let finish;
     let calls = 0;
     serveApi({ saveApplicationStep: (body) => {
@@ -462,6 +462,22 @@ describe('Setup', () => {
     expect(await screen.findByText('Not saved. This request is locked.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save again' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sign in again' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the typed answer and session when storage cannot retain a recovery copy', async () => {
+    const blocked = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage blocked'); });
+    try {
+      serveApi({ saveApplicationStep: () => { throw Object.assign(new Error('Sign in to continue.'), { status: 401, code: 'unauthorized' }); } });
+      const { auth } = renderSetup('organization');
+      fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'Keep in the form' } });
+      fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Sign in again' }));
+      await screen.findByText('Your browser could not keep this answer. Copy it somewhere safe before leaving setup to sign in again.');
+      expect(auth.signOut).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('Organization name')).toHaveValue('Keep in the form');
+    } finally {
+      blocked.mockRestore();
+    }
   });
 
   it('holds the request while the server kept an older web address, until a name saves', async () => {
