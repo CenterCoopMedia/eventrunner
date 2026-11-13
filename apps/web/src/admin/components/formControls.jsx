@@ -18,6 +18,7 @@
 // reader; nothing is signalled by colour alone.
 import { useEffect, useId, useRef, useState } from 'react';
 import AdminIconControl from './AdminIconControl.jsx';
+import HelpTooltip from './HelpTooltip.jsx';
 import './adminControls.css';
 
 // The field boundary is --admin-rule-control, not the hairline: a form
@@ -132,6 +133,7 @@ export function TextField({
   onChange,
   error,
   hint,
+  help,
   warning,
   type = 'text',
   className = '',
@@ -141,14 +143,14 @@ export function TextField({
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const warningId = `${id}-warning`;
-  const describedBy = [hint ? hintId : null, warning ? warningId : null, error ? errorId : null]
+  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, warning ? warningId : null, error ? errorId : null]
     .filter(Boolean)
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
-      <label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
+      <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
-      </label>
+      </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       {hint ? (
         <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
@@ -195,6 +197,7 @@ export function TextAreaField({
   onChange,
   error,
   hint,
+  help,
   rows = 3,
   className = '',
   ...rest
@@ -202,14 +205,14 @@ export function TextAreaField({
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const describedBy = [hint ? hintId : null, error ? errorId : null]
+  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, error ? errorId : null]
     .filter(Boolean)
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
-      <label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
+      <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
-      </label>
+      </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       {hint ? (
         <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
@@ -238,20 +241,21 @@ export function SelectField({
   options,
   error,
   hint,
+  help,
   className = '',
   ...rest
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const describedBy = [hint ? hintId : null, error ? errorId : null]
+  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, error ? errorId : null]
     .filter(Boolean)
     .join(' ');
   return (
     <div className="admin-field flex min-w-0 flex-col gap-3xs">
-      <label htmlFor={id} className={`${fieldLabelClass} admin-field__label`}>
+      <div className="admin-field__label flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
-      </label>
+      </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       {hint ? (
         <p id={hintId} className={`${fieldHintClass} admin-field__hint`}>
           {hint}
@@ -287,14 +291,14 @@ export function SelectField({
  *           itemName: string, hint?: string, error?: string }} props
  *   Other props go to the input, for example `inputMode`.
  */
-export function AddOneListField({ label, items, onChange, itemName, hint, error, ...rest }) {
+export function AddOneListField({ label, items, onChange, itemName, hint, help, error, ...rest }) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const [draft, setDraft] = useState('');
   const [heldRows, setHeldRows] = useState(null);
   const mouseIsDown = useRef(false);
-  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
+  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ');
 
   // A click on Save blurs this input first. A new row drawn at that moment
   // would move Save away from the pointer and lose the click, so the row
@@ -327,7 +331,7 @@ export function AddOneListField({ label, items, onChange, itemName, hint, error,
 
   return (
     <div className="flex min-w-0 flex-col gap-3xs">
-      <label htmlFor={id} className={fieldLabelClass}>{label}</label>
+      <div className="flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>{label}</label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       {hint ? <p id={hintId} className={fieldHintClass}>{hint}</p> : null}
       <div className="flex items-center gap-2xs">
         <input
@@ -375,7 +379,7 @@ export function AddOneListField({ label, items, onChange, itemName, hint, error,
 }
 
 /** A labelled checkbox. */
-export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
+export function CheckboxField({ label, checked, onChange, hint, help, ...rest }) {
   const id = useId();
   const hintId = `${id}-hint`;
   return (
@@ -387,13 +391,13 @@ export function CheckboxField({ label, checked, onChange, hint, ...rest }) {
           className="mt-3xs h-5 w-5 shrink-0 rounded-admin-small border-admin-rule-control bg-admin-ground-input accent-admin-action"
           checked={Boolean(checked)}
           onChange={(event) => onChange(event.target.checked)}
-          aria-describedby={hint ? hintId : undefined}
-          {...rest}
+          aria-describedby={[help ? `${id}-help` : null, hint ? hintId : null, rest['aria-describedby']].filter(Boolean).join(' ') || undefined}
+          {...Object.fromEntries(Object.entries(rest).filter(([key]) => key !== 'aria-describedby'))}
         />
         <div className="flex flex-col">
-          <label htmlFor={id} className={fieldLabelClass}>
+          <div className="flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
             {label}
-          </label>
+          </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
           {hint ? (
             <p id={hintId} className={fieldHintClass}>
               {hint}
@@ -630,6 +634,7 @@ export function DestructiveConfirm({
 export function Panel({
   title,
   description,
+  help,
   children,
   actions,
   className = '',
@@ -648,7 +653,7 @@ export function Panel({
           }admin-panel__heading mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-sm`}
         >
           <div className="min-w-0 flex-auto">
-            <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2>
+            <div className="flex items-center gap-2xs"><h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2><HelpTooltip label={title}>{help}</HelpTooltip></div>
             {description ? (
               <p className="mt-3xs text-admin-sm text-admin-ink-secondary">
                 {description}

@@ -18,6 +18,7 @@
 // with the word, and never colour alone (§8.1).
 import { RECORD_STATE_IDS, RECORD_STATE_WORDS } from '../recordState.js';
 import LoadingStatus from '../../components/LoadingStatus.jsx';
+import HelpTooltip from './HelpTooltip.jsx';
 import useLoadingStage from '../../lib/useLoadingStage.js';
 import useAdminHeaderPadding from './useAdminHeaderPadding.js';
 import { useCommandRecent } from '../commandMenuRecents.js';
@@ -156,6 +157,7 @@ export default function AdminPageHeader({
   description,
   actions,
   feedback,
+  help,
   as: Heading = 'h1',
 }) {
   const headerRef = useAdminHeaderPadding();
@@ -165,15 +167,18 @@ export default function AdminPageHeader({
       <header ref={headerRef} className="admin-job-line flex flex-col gap-2xs border-admin-rule-header border-b-admin-header bg-admin-ground-raised">
         <div className={`admin-job-line__heading ${feedback !== undefined ? 'admin-job-line__heading--editor' : ''}`}>
           <div className="flex min-w-0 flex-wrap items-center gap-x-sm gap-y-2xs">
-            {/* The ink dot a compositor puts on the chase: a small solid mark
-                beside the name. The one place the client accent appears. */}
-            <span
-              aria-hidden="true"
-              className="h-2.5 w-2.5 shrink-0 rounded-admin-small bg-admin-page-header-mark"
-            />
-            <Heading className="min-w-0 break-words font-admin-ui text-admin-title font-bold text-admin-ink">
-              {title}
-            </Heading>
+            <div className="flex min-w-0 items-center gap-2xs">
+              {/* The ink dot a compositor puts on the chase: a small solid mark
+                  beside the name. The one place the client accent appears. */}
+              <span
+                aria-hidden="true"
+                className="mr-xs h-2.5 w-2.5 shrink-0 rounded-admin-small bg-admin-page-header-mark"
+              />
+              <Heading className="min-w-0 break-words font-admin-ui text-admin-title font-bold text-admin-ink">
+                {title}
+              </Heading>
+              <HelpTooltip label={title}>{help}</HelpTooltip>
+            </div>
             {state}
           </div>
           {actions ? (

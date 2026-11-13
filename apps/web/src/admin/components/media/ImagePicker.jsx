@@ -17,6 +17,7 @@
 // to click, and a picker that could not express them would be a downgrade
 // from the plain field it replaces.
 import { useId, useRef, useState } from 'react';
+import HelpTooltip from '../HelpTooltip.jsx';
 import {
   FieldError,
   fieldHintClass,
@@ -53,6 +54,7 @@ export default function ImagePicker({
   onChange,
   folder = 'cms-images',
   hint = null,
+  help,
   error = null,
 }) {
   const id = useId();
@@ -121,9 +123,9 @@ export default function ImagePicker({
 
   return (
     <div className="flex min-w-0 flex-col gap-2xs">
-      <label htmlFor={id} className={fieldLabelClass}>
+      <div className="flex items-center gap-2xs"><label htmlFor={id} className={fieldLabelClass}>
         {label}
-      </label>
+      </label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       {hint ? (
         <p id={`${id}-hint`} className={fieldHintClass}>
           {hint}
@@ -162,7 +164,7 @@ export default function ImagePicker({
             onChange={(event) => onChange(event.target.value)}
             aria-invalid={error ? 'true' : undefined}
             aria-describedby={
-              [hint ? `${id}-hint` : null, shownPhase === 'loading' || !ASSET_SLOT_STATUS[shownPhase] ? null : statusId, error ? `${id}-error` : null]
+              [help ? `${id}-help` : null, hint ? `${id}-hint` : null, shownPhase === 'loading' || !ASSET_SLOT_STATUS[shownPhase] ? null : statusId, error ? `${id}-error` : null]
                 .filter(Boolean)
                 .join(' ') || undefined
             }

@@ -1,4 +1,5 @@
 import AdminIconControl from './AdminIconControl.jsx';
+import HelpTooltip from './HelpTooltip.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Radio } from '../../components/forms/Choice.jsx';
 import {
@@ -76,7 +77,7 @@ function shortZone(instant, timeZone) {
  */
 export default function EventDateTimeField({
   label, value, timeZone: zoneProp, onChange, onProblemChange, required = false, showError = false,
-  hint, summaryPrefix = '', emptySummary = 'No date set.', clearable = false, disabled = false,
+  hint, help, summaryPrefix = '', emptySummary = 'No date set.', clearable = false, disabled = false,
 }) {
   const id = useId();
   const timeZone = isKnownTimeZone(zoneProp) ? zoneProp : 'UTC';
@@ -119,15 +120,15 @@ export default function EventDateTimeField({
   const summaryId = `${id}-summary`;
   const errorId = `${id}-error`;
   const legendId = `${id}-legend`;
-  const describedBy = [hint ? hintId : null, zoneId, summaryId, shown ? errorId : null].filter(Boolean).join(' ');
+  const describedBy = [help ? `${id}-help` : null, hint ? hintId : null, zoneId, summaryId, shown ? errorId : null].filter(Boolean).join(' ');
   const zoneInstant = read.instant || (fields.date ? resolveEventDateTime(fields.date, '12:00', timeZone).instant : null) || new Date();
   const summary = read.instant
     ? `${summaryPrefix ? `${summaryPrefix} ` : ''}${describeEventDateTime(read.instant, timeZone)}.`
     : !fields.date && !fields.time ? emptySummary : 'Not set until the date and time are complete.';
 
   return (
-    <fieldset className="flex min-w-0 flex-col gap-3xs" disabled={disabled}>
-      <legend id={legendId} className={`${fieldLabelClass} mb-3xs`}>{label}</legend>
+    <fieldset className="flex min-w-0 flex-col gap-3xs" disabled={disabled} aria-labelledby={legendId}>
+      <legend className={`${fieldLabelClass} mb-3xs`}><span id={legendId}>{label}</span> <HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></legend>
       {hint ? <p id={hintId} className={`${fieldHintClass} text-pretty`}>{hint}</p> : null}
       <div className="flex flex-wrap items-end gap-sm">
         <div className="flex min-w-0 flex-[1_1_9rem] flex-col gap-3xs">

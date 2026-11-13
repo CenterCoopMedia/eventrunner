@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
+import HelpTooltip from './HelpTooltip.jsx';
 import { isKnownTimeZone } from '../../lib/eventDateTime.js';
 import {
   describeEventDayOffsets,
@@ -38,7 +39,7 @@ const optionClass =
  * @param {{ date?: string, startTime?: string }[]} [props.days] the event days, for the offset line
  * @param {Date} [props.now] the moment whose offsets the list shows; now by default
  */
-export default function TimeZoneField({ value, onChange, label = 'Time zone', error, days = [], now }) {
+export default function TimeZoneField({ value, onChange, label = 'Time zone', help, error, days = [], now }) {
   const id = useId();
   const inputId = `${id}-input`;
   const labelId = `${id}-label`;
@@ -69,7 +70,7 @@ export default function TimeZoneField({ value, onChange, label = 'Time zone', er
 
   const offsets = describeEventDayOffsets(value, days);
   const shown = query ?? (selected ? selected.display : value ?? '');
-  const describedBy = [hintId, offsets ? offsetsId : null, error ? errorId : null].filter(Boolean).join(' ');
+  const describedBy = [help ? `${id}-help` : null, hintId, offsets ? offsetsId : null, error ? errorId : null].filter(Boolean).join(' ');
 
   function openAt(index) {
     setLoaded(true);
@@ -142,7 +143,7 @@ export default function TimeZoneField({ value, onChange, label = 'Time zone', er
 
   return (
     <div className="flex min-w-0 flex-col gap-3xs">
-      <label id={labelId} htmlFor={inputId} className={fieldLabelClass}>{label}</label>
+      <div className="flex items-center gap-2xs"><label id={labelId} htmlFor={inputId} className={fieldLabelClass}>{label}</label><HelpTooltip label={label} id={`${id}-help`}>{help}</HelpTooltip></div>
       <p id={hintId} className={`${fieldHintClass} text-pretty`}>
         {known
           ? `Search by city, region, or UTC offset. Saved as ${value}.`
