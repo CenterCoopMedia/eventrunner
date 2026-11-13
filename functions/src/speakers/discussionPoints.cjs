@@ -11,6 +11,7 @@ const { render } = require('../email/render.cjs');
 const { transactionalStream } = require('../email/stream.cjs');
 
 const TEMPLATE_ID = 'speaker.discussion_points';
+const NOTIFICATION_WINDOW_MS = 15 * 60 * 1000;
 const forbidden = () => ({ ok: false, status: 403, code: 'forbidden', message: 'You may only access your own speaker discussion points.' });
 const conflict = () => ({ ok: false, status: 409, code: 'revision-conflict', message: 'Your saved discussion points changed. Load the current submission before saving again.' });
 
@@ -66,6 +67,7 @@ function createGetSpeakerDiscussionPointsHandler({ db, auth, log = console }) {
 /** Only the first commit of a request may attempt mail. A crash leaves unknown. */
 async function saveSubmission({ db, speakerId, uid, fields, now }) {
   const ref = db.collection('speakers').doc(speakerId);
+  const nowMs = now();
   return db.runTransaction(async (tx) => {
     const policy = await checkDemoWrites({ db, transaction: tx });
     if (!policy.ok) return policy;
@@ -79,15 +81,20 @@ async function saveSubmission({ db, speakerId, uid, fields, now }) {
     }
     const revision = previous?.revision || 0;
     if (revision !== fields.expectedRevision || revision >= Number.MAX_SAFE_INTEGER) return conflict();
+    // Reserve one mail attempt per speaker window in the save transaction.
+    // Later saves keep the reservation, including failed or ambiguous sends.
+    const windowStartedAt = previous?.notificationWindowStartedAt;
+    const notify = !(typeof windowStartedAt === 'number' && nowMs - windowStartedAt < NOTIFICATION_WINDOW_MS);
     const submission = {
       text: fields.text,
       revision: revision + 1,
       requestId: fields.requestId,
-      submittedAt: new Date(now()),
-      notification: { state: 'unknown' },
+      submittedAt: new Date(nowMs),
+      notificationWindowStartedAt: notify ? nowMs : windowStartedAt,
+      notification: { state: notify ? 'unknown' : 'omitted' },
     };
     tx.update(ref, { discussionPoints: submission });
-    return { ok: true, submission, speaker, replay: false };
+    return { ok: true, submission, speaker, replay: false, notify };
   });
 }
 
@@ -168,6 +175,7 @@ function createSaveSpeakerDiscussionPointsHandler({ db, auth, getConfig, sendEma
     }
     if (!result.ok) return sendError(res, result.status, result.code, result.message);
     if (result.replay) return res.status(200).json({ submission: submissionView(result.submission), replay: true });
+    if (!result.notify) return res.status(200).json({ submission: submissionView(result.submission) });
     let notification;
     try {
       notification = await notifyOrganizers({ db, getConfig, sendEmail, speakerId, ...result });
