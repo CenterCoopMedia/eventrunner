@@ -16,9 +16,11 @@ export const RELOAD_FLAG = 'eventrunner:chunk-reload';
 
 const CHUNK_ERROR_RE =
   /(dynamically imported module|importing a module script failed|loading chunk|failed to fetch dynamically)/i;
+const MISSING_LAZY_MODULE_RE =
+  /^(?:undefined is not an object \(evaluating ['"][\w$]+\._result\.default['"]\)|Cannot read properties of undefined \(reading ['"]default['"]\))$/i;
 
 /**
- * Is this the browser's "I could not fetch that module" failure?
+ * Is this a missing module or React.lazy reading an absent module's default?
  *
  * The message differs per engine (Chrome, Firefox, and Safari each word it
  * their own way), so this matches on the shared fragments rather than one
@@ -30,7 +32,9 @@ const CHUNK_ERROR_RE =
 export function isChunkLoadError(error) {
   if (!error) return false;
   if (error.name === 'ChunkLoadError') return true;
-  return CHUNK_ERROR_RE.test(String(error.message || error));
+  const message = String(error.message || error);
+  return CHUNK_ERROR_RE.test(message) ||
+    (error.name === 'TypeError' && MISSING_LAZY_MODULE_RE.test(message));
 }
 
 /**

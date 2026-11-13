@@ -18,6 +18,11 @@ function Boom({ error }) {
   throw error;
 }
 
+const missingLazyModuleMessages = [
+  "undefined is not an object (evaluating 'e._result.default')",
+  "Cannot read properties of undefined (reading 'default')",
+];
+
 function renderBoundary(children, props = {}) {
   return render(<MemoryRouter><ErrorBoundary {...props}>{children}</ErrorBoundary></MemoryRouter>);
 }
@@ -46,7 +51,14 @@ describe('isChunkLoadError', () => {
 
   it('does not claim an ordinary application error', () => {
     expect(isChunkLoadError(new Error('permission-denied'))).toBe(false);
+    expect(isChunkLoadError(new TypeError("Cannot read properties of undefined (reading 'title')"))).toBe(false);
+    expect(isChunkLoadError(new TypeError("undefined is not an object (evaluating 'event.default')"))).toBe(false);
+    expect(isChunkLoadError(new Error(missingLazyModuleMessages[1]))).toBe(false);
     expect(isChunkLoadError(null)).toBe(false);
+  });
+
+  it.each(missingLazyModuleMessages)('recognizes a missing lazy module: %s', (message) => {
+    expect(isChunkLoadError(new TypeError(message))).toBe(true);
   });
 });
 
@@ -103,6 +115,19 @@ describe('ErrorBoundary', () => {
     renderBoundary(<Boom error={new Error('Failed to fetch dynamically imported module: /assets/admin-a1b2.js')} />, { reload });
 
     expect(reload).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Reload the page' })).toBeTruthy();
+  });
+
+  it.each(missingLazyModuleMessages)('recovers once from a missing lazy module: %s', (message) => {
+    const reload = vi.fn();
+    const { unmount } = renderBoundary(<Boom error={new TypeError(message)} />, { reload });
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+    unmount();
+
+    renderBoundary(<Boom error={new TypeError(message)} />, { reload });
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('A page file did not load.');
     expect(screen.getByRole('button', { name: 'Reload the page' })).toBeTruthy();
   });
 
