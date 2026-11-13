@@ -13,10 +13,9 @@ import {
   editorPathFor,
   groupPending,
   mergeRuns,
-  runSummary,
   summarizeAll,
-  toMillis,
 } from './pendingChanges.js';
+import { runSummary, toMillis } from './publishRunWords.js';
 import { sectionTier } from './AdminLayout.jsx';
 
 const ACTOR = { uid: 'admin-1', email: 'admin@example.org' };

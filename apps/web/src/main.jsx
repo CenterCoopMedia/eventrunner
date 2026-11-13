@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, HashRouter } from 'react-router';
+import { BrowserRouter, HashRouter, useLocation } from 'react-router';
 import AppRoot from './AppRoot.jsx';
 import { IS_DEMO } from './lib/demoMode.js';
 // Theme tokens first (the @generated alias honors GENERATED_DIR, spec §2.4),
@@ -20,6 +20,7 @@ import { isFirebaseLoading } from './lib/firebaseLoader.js';
 import { snapshotViewport } from './lib/snapshotViewport.js';
 import { publicRoutes } from './routes.jsx';
 import { preloadPublicTools } from './components/Layout.jsx';
+import { ADMIN_SPECIMEN_PATH, loadAdminSpecimenPage } from './pages/specimen/specimenRoute.js';
 
 // Recent warnings and errors ride along with a "Report a problem" report.
 startRecentMessages();
@@ -47,11 +48,27 @@ installChunkReload(globalThis, { isPrefetching: () => isRoutePrefetchPending() |
 // which here is the project's docs/ site, so the shim would hijack 404
 // handling for every unrelated docs page too.
 const Router = IS_DEMO ? HashRouter : BrowserRouter;
+const AdminSpecimen = loadAdminSpecimenPage ? React.lazy(loadAdminSpecimenPage) : null;
+
+// This review document has no application providers or authenticated pages.
+// Its import is folded out beside the existing specimen gate in client builds.
+function RouteRoot() {
+  const { pathname } = useLocation();
+  return (
+    <AppRoot>
+      {AdminSpecimen && pathname === `/${ADMIN_SPECIMEN_PATH}` ? (
+        <React.Suspense fallback={<p role="status">Loading the Admin specimen…</p>}>
+          <AdminSpecimen />
+        </React.Suspense>
+      ) : undefined}
+    </AppRoot>
+  );
+}
 
 const app = (
   <React.StrictMode>
     <Router>
-      <AppRoot />
+      <RouteRoot />
     </Router>
   </React.StrictMode>
 );

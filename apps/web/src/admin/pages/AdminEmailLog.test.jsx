@@ -20,7 +20,8 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig: { timezone: 'UTC' } }),
 }));
 
-import AdminEmailLog, { figureSentence, SOURCE_LABELS } from './AdminEmailLog.jsx';
+import AdminEmailLog from './AdminEmailLog.jsx';
+import { figureSentence, SOURCE_LABELS } from '../components/EmailLogTable.jsx';
 import { PREVIEW_POLICY } from '../emailPreview.js';
 
 const SENT_AT = Date.UTC(2023, 10, 14, 22, 13);

@@ -28,7 +28,8 @@ vi.mock('../../contexts/AuthContext.jsx', () => ({
   }),
 }));
 
-import AdminAccess, { describeChange, describeResult, formatEndTime, nextEndReloadDelay } from './AdminAccess.jsx';
+import AdminAccess, { describeChange, describeResult, nextEndReloadDelay } from './AdminAccess.jsx';
+import { formatEndTime } from '../components/AdminAccessList.jsx';
 import { TIER_SCOPE } from '../AdminLayout.jsx';
 
 const LIST = {
