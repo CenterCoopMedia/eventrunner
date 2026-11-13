@@ -546,7 +546,7 @@ describe('AdminEmailLog', () => {
     fireEvent.click(button);
     const openRow = document.getElementById(button.getAttribute('aria-controls'));
     expect(within(openRow).getByText(
-      'This message is private because it contains a sign-in code or invitation link.',
+      'This message is private. Its body is not stored in the email log.',
     )).toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();
     expect(getCalls()).toEqual([]);

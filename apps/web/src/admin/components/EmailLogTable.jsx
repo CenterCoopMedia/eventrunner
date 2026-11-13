@@ -208,7 +208,7 @@ function PreviewBody({ row, detail, onRetry }) {
   if (!row.bodyStored) {
     return (
       <p className="text-admin-sm text-admin-ink">
-        This message is private because it contains a sign-in code or invitation link.
+        This message is private. Its body is not stored in the email log.
       </p>
     );
   }
