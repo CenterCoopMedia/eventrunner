@@ -98,6 +98,13 @@ export function useSpeakerDiscussion({ user, speakerId }) {
       setState((value) => ({ ...value, phase: 'ready', submission, revision: submission.revision, pending: null }));
     } catch (error) {
       if (!active.current || ticket !== operation.current) return;
+      if (error?.code === 'read-only-demo') {
+        setState((value) => ({
+          ...value, phase: 'read-only', pending: null,
+          error: 'This historical demo is read-only. Your local text is kept, but discussion points cannot be saved.',
+        }));
+        return;
+      }
       const denied = accessFailure(error);
       const conflict = error?.status === 409;
       const invalid = error?.status === 400;

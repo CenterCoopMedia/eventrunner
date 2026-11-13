@@ -142,6 +142,20 @@ describe('speaker-wide private discussion draft', () => {
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
+  it('explains a read-only demo refusal without hiding the owner draft or offering an access loop', async () => {
+    fetch.mockResolvedValueOnce(response({ submission: STORED })).mockResolvedValueOnce(response({
+      error: { code: 'read-only-demo', message: 'This historical demo is read-only.' },
+    }, 403));
+    render(hub()); openDiscussion(); await screen.findByDisplayValue(STORED.text);
+    edit('Keep my local text.'); submit();
+    await screen.findByText(/historical demo is read-only/);
+    expect(screen.getByRole('textbox')).toHaveValue('Keep my local text.');
+    expect(screen.getByRole('button', { name: 'Replace saved discussion points' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Check access' })).toBeNull();
+    submit();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it.each(['account', 'speaker'])('discards private state and ignores a late read after a %s switch', async (scope) => {
     const oldRead = deferred();
     fetch.mockReturnValueOnce(oldRead.promise).mockResolvedValueOnce(response({ submission: null }));
