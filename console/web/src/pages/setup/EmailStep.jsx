@@ -9,20 +9,20 @@ export function senderPreview(senderName, siteName) {
 }
 
 /** Step 6: the sender name and the address that gets replies. */
-export default function EmailStep({ value, errors, onChange, answers, scope, replyTo = '' }) {
+export default function EmailStep({ value, errors, onChange, onPreset, answers, scope, replyTo = '' }) {
   const set = (key) => (next) => onChange({ ...value, [key]: next });
   const preset = useRef(false);
   useEffect(() => {
     if (preset.current) return;
     preset.current = true;
-    // A default save must not clear an answer awaiting explicit recovery.
+    // Leave a kept answer for explicit recovery before offering defaults.
     if (readKeptAnswer(scope, 'email')) return;
     const senderName = value.senderName || answers.event.shortName || answers.event.name;
     const reply = value.replyTo || replyTo;
     if (senderName !== value.senderName || reply !== value.replyTo) {
-      onChange({ ...value, senderName, replyTo: reply });
+      onPreset({ ...value, senderName, replyTo: reply });
     }
-  }, [value, answers, scope, replyTo, onChange]);
+  }, [value, answers, scope, replyTo, onPreset]);
   return (
     <div className="stack">
       <p className="lead">Choose the sender name and where replies go.</p>

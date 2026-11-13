@@ -76,6 +76,7 @@ export default function Setup() {
   const { app, setApp, error, reload } = useApplication(orgId, appId);
   const applicationNow = useRef(app);
   applicationNow.current = app;
+  const [preset, setPreset] = useState(null);
   const [navigating, setNavigating] = useState(false);
   const navigationPending = useRef(false);
   const actionArea = useRef(null);
@@ -130,9 +131,14 @@ export default function Setup() {
 
   const onChange = useCallback((value) => {
     if (!step || !ANSWER_STEPS.includes(step.id)) return;
+    setPreset(null);
     setApp((prev) => ({ ...prev, answers: { ...prev.answers, [step.id]: value } }));
     queue({ step: step.id, answers: value });
   }, [step, setApp, queue]);
+
+  const onPreset = useCallback((value) => {
+    setPreset({ visit: location.key, step: step.id, answers: value });
+  }, [step, location.key]);
 
   const onConnections = useCallback(({ connections, errors }) => {
     setApp((prev) => ({ ...withStepErrors(prev, 'tickets', errors), connections }));
@@ -158,6 +164,13 @@ export default function Setup() {
     if (navigationPending.current) return;
     navigationPending.current = true;
     setNavigating(true);
+    if (preset?.visit === location.key && preset.step === step?.id && (action === 'next' || action === 'review')) {
+      applicationNow.current = { ...applicationNow.current,
+        answers: { ...applicationNow.current.answers, [step.id]: preset.answers } };
+      setApp(applicationNow.current);
+      queue({ step: step.id, answers: preset.answers });
+    }
+    setPreset(null);
     const saved = await flush();
     navigationPending.current = false;
     setNavigating(false);
@@ -180,7 +193,7 @@ export default function Setup() {
       return;
     }
     navigate(target);
-  }, [flush, navigate, orgId, appId, step]);
+  }, [flush, queue, navigate, orgId, appId, step, preset, location.key, setApp]);
 
   const stepErrors = useMemo(() => (app && step ? errorsOfStep(app.errors, step.id) : {}), [app, step]);
 
@@ -225,12 +238,13 @@ export default function Setup() {
           onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} /> : null}
         {View ? (
           <View
-            value={app.answers[step.id]}
+            value={preset?.visit === location.key && preset.step === step.id ? preset.answers : app.answers[step.id]}
             answers={app.answers}
             scope={scope}
             replyTo={user?.emailVerified ? user.email : ''}
             errors={shownErrors}
             onChange={onChange}
+            onPreset={onPreset}
             app={app}
             orgId={orgId}
             appId={appId}

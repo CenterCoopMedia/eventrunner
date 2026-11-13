@@ -53,7 +53,7 @@ function DayRow({ day, index, errors, onDay, onRemove, canRemove }) {
 }
 
 /** Step 2: the event, its days, its time zone and its venue. */
-export default function EventStep({ value, errors, onChange, scope }) {
+export default function EventStep({ value, errors, onChange, onPreset, scope }) {
   const zones = useMemo(() => timeZones(value.timezone), [value.timezone]);
   const addButton = useRef(null);
   const set = (key) => (next) => onChange({ ...value, [key]: next });
@@ -68,8 +68,8 @@ export default function EventStep({ value, errors, onChange, scope }) {
     if (readKeptAnswer(scope, 'event')) return;
     const timezone = value.timezone || browserTimeZone();
     const days = value.days.length ? value.days : [{ ...NEW_DAY }];
-    if (timezone !== value.timezone || days !== value.days) onChange({ ...value, timezone, days });
-  }, [value, scope, onChange]);
+    if (timezone !== value.timezone || days !== value.days) onPreset({ ...value, timezone, days });
+  }, [value, scope, onPreset]);
 
   function onDay(index, day) {
     onChange({ ...value, days: value.days.map((d, i) => (i === index ? day : d)) });

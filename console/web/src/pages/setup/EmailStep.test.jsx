@@ -113,4 +113,23 @@ describe('Email step', () => {
       vi.useRealTimers();
     }
   });
+
+  it('shows defaults without autosaving and discards them when leaving without confirmation', async () => {
+    vi.useFakeTimers();
+    try {
+      await act(async () => { renderSetup('email'); });
+      expect(screen.getByLabelText('Sender name')).toHaveValue('NC Local News Summit');
+      expect(screen.getByLabelText('Reply address')).toHaveValue('ana@example.org');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(callsTo('saveApplicationStep')).toHaveLength(0);
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Back' })); });
+      await act(async () => { fireEvent.click(screen.getByRole('link', { name: /Review/ })); });
+      expect(screen.getByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Email' })).not.toHaveTextContent('ana@example.org');
+      expect(screen.getByRole('region', { name: 'Email' })).not.toHaveTextContent('NC Local News Summit');
+      expect(callsTo('saveApplicationStep')).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

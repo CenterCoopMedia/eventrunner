@@ -106,6 +106,21 @@ describe('Your event step', () => {
     }
   });
 
+  it('does not autosave a displayed first day or save it when closing setup', async () => {
+    vi.useFakeTimers();
+    try {
+      await act(async () => { renderSetup('event'); });
+      expect(screen.getByLabelText('Date')).toHaveValue('');
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(callsTo('saveApplicationStep')).toHaveLength(0);
+      await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'Close setup' })); });
+      expect(screen.getByText('Status page')).toBeInTheDocument();
+      expect(callsTo('saveApplicationStep')).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('stops Add a day at 14 days and says why', async () => {
     const days = Array.from({ length: 14 }, (_, i) => ({ date: `2027-05-${String(i + 1).padStart(2, '0')}`, startTime: '09:00', endTime: '17:00' }));
     serveApi(withEvent({ days }));

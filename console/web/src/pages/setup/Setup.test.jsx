@@ -360,11 +360,15 @@ describe('Setup', () => {
   });
 
   it('Next focuses a group error when no individual field has an error', async () => {
-    serveApi({ getApplication: { application: application({ answers: emptyAnswers(), errors: { 'event.days': 'Add at least one day.' } }) } });
+    const answers = emptyAnswers();
+    answers.event.days = Array.from({ length: 15 }, (_, i) => ({
+      date: `2027-05-${String(i + 1).padStart(2, '0')}`, startTime: '09:00', endTime: '17:00',
+    }));
+    serveApi({ getApplication: { application: application({ answers, errors: { 'event.days': 'Add 14 days or fewer.' } }) } });
     renderSetup('event');
     await screen.findByRole('heading', { level: 1, name: 'Your event' });
     fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
-    await waitFor(() => expect(screen.getByText('Add at least one day.')).toHaveFocus());
+    await waitFor(() => expect(screen.getByText('Add 14 days or fewer.')).toHaveFocus());
     expect(callsTo('saveApplicationStep')).toHaveLength(0);
   });
 
