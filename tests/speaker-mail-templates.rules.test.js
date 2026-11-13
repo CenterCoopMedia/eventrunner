@@ -16,6 +16,7 @@ const { createSpeakerMailTemplatesHandler } = require('../functions/src/speakers
 const { createSendSpeakerInviteHandler } = require('../functions/src/speakers/invites.cjs');
 const { createEmailCore } = require('../functions/src/email/send.cjs');
 const { resetTemplateCacheForTest } = require('../functions/src/email/templates.cjs');
+const { defaultSpeakerWordingFields } = require('../functions/src/email/templates/speakerWordingFields.cjs');
 
 const PROJECT_ID = 'demo-run-of-show';
 const OPERATOR_EMAIL = 'mail-operator@example.test';
@@ -165,8 +166,12 @@ describe('wording', () => {
     const saved = await call({
       action: 'saveTemplate',
       templateId: 'speaker.invite',
-      subject: 'Join us at {{event_name}}',
-      text: 'Dear {{speaker_name}}, accept here: {{invite_url}}',
+      fields: {
+        ...defaultSpeakerWordingFields('speaker.invite'),
+        subject: 'Join us at {{event_name}}',
+        greeting: 'Dear {{speaker_name}},',
+        buttonLabel: 'accept',
+      },
     });
     expect(saved.statusCode).toBe(200);
     expect(saved.body.template.saved).toMatchObject({ subject: 'Join us at {{event_name}}', updatedBy: STAFF_EMAIL });
@@ -178,7 +183,8 @@ describe('wording', () => {
 
     expect((await invite('ben')).statusCode).toBe(200);
     expect(outbox[1].subject).toBe('Join us at Example Event');
-    expect(outbox[1].text.startsWith('Dear Ben Lee, accept here: https://site.example.test/speaker/accept?token=')).toBe(true);
+    expect(outbox[1].text.startsWith('Dear Ben Lee,')).toBe(true);
+    expect(outbox[1].text).toContain('\naccept:\nhttps://site.example.test/speaker/accept?token=');
     // The invite body carries a bearer link, so sent_emails never stores it.
     const rows = await db.collection('sent_emails').get();
     expect(rows.size).toBe(2);

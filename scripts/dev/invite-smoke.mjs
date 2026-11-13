@@ -197,7 +197,7 @@ async function signInWithEmailedCode(email, deadline) {
   // HTML alternative — `color:#333333` is the one that bites — and reports
   // it as a wrong-code failure that has nothing to do with the code.
   const code = await waitForMailMatch(
-    /"text":\s*"Here is your sign-in code[^"]{0,120}?\\n\\n(\d{6})\\n/g,
+    /"text":\s*"[^"]*?\\n\\n(\d{6})\\n/g,
     logSize,
     deadline,
   );

@@ -37,9 +37,7 @@ const LAYOUT_TOKENS = [
  */
 const TEXT_FOOTER = [
   '--',
-  '{{event_name}}',
-  '{{#if event_details}}{{event_details}}\n{{/if}}',
-  '{{#if operator_name}}Hosted by {{operator_name}}\n{{/if}}',
+  '{{event_name}}{{#if event_details}}\n{{event_details}}{{/if}}{{#if operator_name}}\nHosted by {{operator_name}}{{/if}}',
   '{{postal_address_html}}{{#if social_links_text}}',
   '',
   '{{social_links_text}}{{/if}}',

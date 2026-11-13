@@ -20,7 +20,7 @@ Landed so far (M2 backend foundation):
 
 ## Transactional email
 
-Every template uses the shared event masthead and host footer in
+Shipped templates use the shared event masthead and host footer in
 `src/email/templates/layout.cjs`. Brand colors and the uploaded raster logo come
 from the client configuration. The sign-in email has an outlined code panel and
 an expiry-only inbox preview. Its code stays ungrouped and is not stored in the
@@ -34,8 +34,10 @@ Other templates can store subject, HTML and text overrides. Token declarations,
 required links and the rendered-body storage policy remain defined in code.
 
 Before this rollout, check each client's `email_templates` collection for saved
-speaker wording. A client with saved wording needs a reviewed migration that
-preserves its copy before or with deployment.
+speaker wording and the `ticket.get_ticket` and `ticket.claim_prompt` copies
+written by setup. Saved raw source retains its own frame. A client with saved
+copies needs a reviewed migration that preserves its wording before or with
+deployment.
 
 ## Admin tiers
 
