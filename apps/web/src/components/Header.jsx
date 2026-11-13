@@ -95,7 +95,7 @@ export default function Header({
                 <span className="sr-only">{name}</span>
               </>
             ) : (
-              title
+              wordmark
             ),
           )}
         </p>

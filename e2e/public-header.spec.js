@@ -50,7 +50,7 @@ test.afterAll(async () => { await server?.close(); });
 
 for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
   for (const logo of ['wide', 'square', 'none']) {
-    test(`${variant} header keeps words intact with ${logo} logo`, async ({ page }, testInfo) => {
+    test(`${variant} header fits with ${logo} logo`, async ({ page }, testInfo) => {
       await page.route('**/*', (route) => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
       const metrics = [];
       for (const source of base ? ['before', 'after'] : ['after']) {
@@ -93,6 +93,7 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
               width: globalThis.innerWidth,
               scrollWidth: globalThis.document.documentElement.scrollWidth,
               linkRight: link.getBoundingClientRect().right,
+              linkFragments: [...link.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0).length,
               titleHeight: box?.height ?? 0,
               lineHeight: style ? parseFloat(style.lineHeight) : 0,
               titleScrollHeight: title.scrollHeight,
@@ -108,6 +109,7 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
           if (source === 'before') continue;
           expect(measured.scrollWidth).toBeLessThanOrEqual(width);
           expect(measured.linkRight).toBeLessThanOrEqual(width);
+          expect(measured.linkFragments).toBeGreaterThan(0);
           if (logo !== 'none') expect(measured.logoRatio).toBeCloseTo(measured.naturalLogoRatio, 2);
           if (variant !== 'minimal' || logo === 'none') {
             expect(measured.screenReaderOnly).toBe(width === 390 && logo !== 'none');
@@ -115,7 +117,7 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
               expect(measured.titleHeight).toBeGreaterThan(0);
               expect(measured.titleHeight).toBeLessThanOrEqual(measured.lineHeight * 2 + 1);
               expect(measured.words.every((word) => word.lines === 1), JSON.stringify(measured.words)).toBe(true);
-              expect(measured.titleClientWidth).toBeGreaterThanOrEqual(measured.words[0].width);
+              expect(measured.titleClientWidth).toBeGreaterThanOrEqual(Math.max(...measured.words.map((word) => word.width)));
             }
           }
         }
