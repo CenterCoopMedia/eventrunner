@@ -62,9 +62,9 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/content/home/hero/_new');
     await endTour(page);
-    await page.getByLabel('Block type').selectOption('cta');
-    await page.getByLabel('Button text').fill(LABEL);
-    const destination = page.getByLabel('Destination');
+    await page.getByLabel('Block type', { exact: true }).selectOption('cta');
+    await page.getByLabel('Button text', { exact: true }).fill(LABEL);
+    const destination = page.getByLabel('Destination', { exact: true });
     await destination.fill('/schedule');
     const warning = page.getByText(WARNING);
     await expect(warning).toBeVisible();
@@ -104,9 +104,9 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/content/home/hero/_new');
     await endTour(page);
-    await page.getByLabel('Block type').selectOption('cta');
-    await page.getByLabel('Button text').fill(NO_PAGE_LABEL);
-    await page.getByLabel('Destination').fill('/speaker-notes');
+    await page.getByLabel('Block type', { exact: true }).selectOption('cta');
+    await page.getByLabel('Button text', { exact: true }).fill(NO_PAGE_LABEL);
+    await page.getByLabel('Destination', { exact: true }).fill('/speaker-notes');
     await expect(page.getByText(NO_PAGE_WARNING)).toBeVisible();
     await page.getByRole('button', { name: 'Publish', exact: true }).click();
     await expect.poll(async () => (await findCta(NO_PAGE_LABEL))?.revision ?? 0, { timeout: 20_000 }).toBeGreaterThan(0);

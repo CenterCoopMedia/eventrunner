@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { useId } from 'react';
 import { Link } from 'react-router';
 import { Figure, plural } from './figures.jsx';
@@ -6,7 +7,7 @@ function FigureItem({ title, action, to, children }) {
   const titleId = useId();
   return (
     <article className="admin-register-item" aria-labelledby={titleId}>
-      <h3 id={titleId}>{title}</h3>
+      <div className="flex items-center gap-2xs"><h3 id={titleId}>{title}</h3><HelpTooltip label={title}>Review the latest total and status breakdown, then open the related records.</HelpTooltip></div>
       <div className="admin-register-item__body">{children}</div>
       <Link className="admin-register-action" to={to}>{action}<span aria-hidden="true">→</span></Link>
     </article>
@@ -29,7 +30,7 @@ export function SystemHealth({ errors, isOperator }) {
   const unresolved = errors?.unresolved ?? 0;
   return (
     <article className="admin-overview-health" aria-labelledby={titleId}>
-      <h2 id={titleId}>System health</h2>
+      <div className="flex items-center gap-2xs"><h2 id={titleId}>System health</h2><HelpTooltip label="System health">Check the latest count of site problems. An operator can review the details.</HelpTooltip></div>
       <p className="admin-figure-total"><Figure value={unresolved} /> <span>unresolved {plural(unresolved, 'error', 'errors')}</span></p>
       <p className="admin-figure-note">{unresolved > 0 ? 'Unresolved errors need an operator’s review.' : 'No unresolved errors at the last check.'}</p>
       {isOperator ? (
@@ -49,7 +50,7 @@ export default function EventFigures({ stats }) {
   return (
     <section className="admin-overview-register" aria-labelledby="event-figures-title">
       <div className="admin-section-intro">
-        <h2 id="event-figures-title">Event figures</h2>
+        <div className="flex items-center gap-2xs"><h2 id="event-figures-title">Event figures</h2><HelpTooltip label="Event figures">Review attendance, ticket and program totals from the latest refresh.</HelpTooltip></div>
         <p>Attendance, ticketing and program progress from your latest refresh.</p>
       </div>
       <div className="admin-register-grid">

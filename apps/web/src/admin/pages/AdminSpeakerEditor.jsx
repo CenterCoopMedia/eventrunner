@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerError } from '../plannerErrors.js';
 import '../plannerFields.css';
 // Speaker create/edit form (issue #20), wired to createSpeaker /
@@ -275,7 +276,7 @@ export default function AdminSpeakerEditor({ mode }) {
 
   return (
     <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}>
-      <AdminPageHeader
+      <AdminPageHeader help="Manage this speaker’s profile and contact details."
         title={
           mode === 'create' ? 'New speaker' : form.firstName || form.lastName
             ? `${form.firstName} ${form.lastName}`.trim()
@@ -310,20 +311,20 @@ export default function AdminSpeakerEditor({ mode }) {
       ) : null}
 
       <div className="admin-editor-layout admin-editor-layout--speaker">
-        <Panel
+        <Panel help="Identify this speaker and their directory address."
           title="Name"
           description="Identify this speaker and their directory address."
           className="admin-editor-card--identity"
         >
           <div className="flex flex-col gap-sm">
-            <TextField
+            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
               label="First name"
               value={form.firstName}
               onChange={(value) => set({ firstName: value })}
               error={errorFor('firstName')}
               required
             />
-            <TextField
+            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
               label="Last name"
               value={form.lastName}
               onChange={(value) => set({ lastName: value })}
@@ -332,7 +333,7 @@ export default function AdminSpeakerEditor({ mode }) {
             />
           </div>
           {mode === 'create' ? <div className="mt-sm">
-            <TextField
+            <TextField help="Set this speaker’s public page address when creating the profile. The address stays fixed after it is saved."
               label="Page link"
               hint={
                 mode === 'edit'
@@ -346,15 +347,15 @@ export default function AdminSpeakerEditor({ mode }) {
           </div> : null}
         </Panel>
 
-        <Panel
+        <Panel help="Everything here appears on the public speaker directory."
           title="Profile"
           description="Everything here appears on the public speaker directory."
           className="admin-editor-card--primary"
         >
           <div className="mb-sm">
-            <TextField
+            <TextField help="Optional. Shown with the name, for example she/her."
               label="Pronouns"
-              hint="Optional. Shown with the name, for example she/her."
+              
               value={form.pronouns}
               onChange={(value) => set({ pronouns: value })}
               maxLength={80}
@@ -362,13 +363,13 @@ export default function AdminSpeakerEditor({ mode }) {
             />
           </div>
           <div className="planner-fields grid gap-sm sm:grid-cols-2">
-            <TextField
+            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
               label="Job title"
               value={form.jobTitle}
               onChange={(value) => set({ jobTitle: value })}
               error={errorFor('jobTitle')}
             />
-            <TextField
+            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
               label="Organization"
               value={form.organization}
               onChange={(value) => set({ organization: value })}
@@ -376,7 +377,7 @@ export default function AdminSpeakerEditor({ mode }) {
             />
           </div>
           <div className="mt-sm flex flex-col gap-sm">
-            <TextAreaField
+            <TextAreaField help="Write the introduction attendees see in the speaker directory."
               label="Bio"
               rows={5}
               value={form.bio}
@@ -385,7 +386,7 @@ export default function AdminSpeakerEditor({ mode }) {
             />
             {mode === 'edit' ? (
               <div className="flex flex-col gap-3xs">
-                <SpeakerPhotoField
+                <SpeakerPhotoField data-help-skip="Headshot names the expected picture; existing format, size and save guidance remains."
                   user={user}
                   speakerId={speakerId}
                   value={form.headshotPath}
@@ -401,13 +402,13 @@ export default function AdminSpeakerEditor({ mode }) {
           </div>
         </Panel>
 
-        <Panel
+        <Panel help="The email address is used for invitations and is never published."
           title="Contact and status"
           description="The email address is used for invitations and is never published."
           className="admin-editor-card--contact"
         >
           <div className="flex flex-col gap-sm">
-            <TextField
+            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
               label="Email"
               type="email"
               value={form.email}
@@ -415,7 +416,7 @@ export default function AdminSpeakerEditor({ mode }) {
               error={errorFor('email')}
             />
             {ADMIN_SETTABLE_STATUSES.includes(form.status) ? (
-              <SelectField
+              <SelectField help="Set the speaker’s invitation and approval stage. Publishing is a separate step."
                 label="Status"
                 value={form.status}
                 onChange={(value) => {
@@ -448,7 +449,7 @@ export default function AdminSpeakerEditor({ mode }) {
                 </svg>
               </span>
               <div className="admin-object-row__body">
-                <h3 className="admin-object-row__title">Linked attendee account</h3>
+                <div className="flex items-center gap-2xs"><h3 className="admin-object-row__title">Linked attendee account</h3><HelpTooltip label="Linked attendee account">Check which signed-in attendee account is connected to this speaker.</HelpTooltip></div>
                 <p className="admin-object-row__description">
                   This speaker has an attendee account.
                 </p>
@@ -486,7 +487,7 @@ export default function AdminSpeakerEditor({ mode }) {
       </div>
 
       {deleteBlocked ? (
-        <Panel title="This speaker could not be deleted">
+        <Panel help="Review why the deletion failed before trying again." title="This speaker could not be deleted">
           <p className="text-admin-base text-admin-ink">
             Nothing was changed. Marking the speaker removed hides them from the
             public directory and every public surface, and leaves the sessions

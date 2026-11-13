@@ -42,13 +42,13 @@ test('long CMS pages keep save and row outcomes with the action at desktop and p
     await Promise.all(blocks.map(({ id: blockId, ...data }) => db.collection('cmsContent_drafts').doc(blockId).set(data)));
     await signIn(page, ADMIN_EMAIL);
     await page.goto(`/admin/pages/${id}`);
-    await expect(page.getByLabel('Navigation label')).toHaveValue('Feedback evidence');
+    await expect(page.getByLabel('Navigation label', { exact: true })).toHaveValue('Feedback evidence');
     const endTour = page.getByRole('button', { name: 'End tour', exact: true });
     if (await endTour.isVisible()) await endTour.click();
 
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: 900 });
-      await page.getByLabel('Navigation label').fill(`Feedback evidence ${width}`);
+      await page.getByLabel('Navigation label', { exact: true }).fill(`Feedback evidence ${width}`);
       await page.locator('[data-editor-section]').last().scrollIntoViewIfNeeded();
       if (width >= 640) {
         expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(200);

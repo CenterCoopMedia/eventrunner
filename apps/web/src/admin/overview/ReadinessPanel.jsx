@@ -45,7 +45,7 @@ export default function ReadinessPanel({ content }) {
   }));
   const nothingLive = COLLECTIONS.every(([id]) => (content?.[id]?.published ?? 0) === 0);
   return (
-    <Panel title="Content readiness" className="admin-readiness-panel" actions={<Link to="/admin/unpublished" className={secondaryButtonClass}>Review changes</Link>}>
+    <Panel help="Review content that still needs preparation before your event." title="Content readiness" className="admin-readiness-panel" actions={<Link to="/admin/unpublished" className={secondaryButtonClass}>Review changes</Link>}>
       <div className="flex flex-col gap-sm">
         {nothingLive ? (
           <p className="text-admin-base text-admin-ink">Nothing is on the site yet.</p>

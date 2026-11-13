@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Data export (issue #329): the event's records as spreadsheets, and, for
 // an operator, the event data package for the handoff after an event.
 //
@@ -103,7 +104,7 @@ function SpreadsheetRow({ sheet, busy, result, onExport }) {
     <li className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0">
       <div className={rowClass}>
         <div className="min-w-0 flex-1">
-          <h3 className="text-admin-base font-bold text-admin-ink">{sheet.label}</h3>
+          <div className="flex items-center gap-2xs"><h3 className="text-admin-base font-bold text-admin-ink">{sheet.label}</h3><HelpTooltip label={sheet.label}>Download this set of event records as a spreadsheet. Keep files with private attendee or staff information secure.</HelpTooltip></div>
           <p id={descriptionId} className="text-admin-sm text-admin-ink-secondary">
             {sheet.description}
           </p>
@@ -210,12 +211,12 @@ export default function AdminDataExport() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Download spreadsheets or a package of your event’s records."
         title="Data export"
         description="Download spreadsheets or a package of your event’s records."
       />
 
-      <Panel
+      <Panel help="Each spreadsheet includes current records and drafts, with their status."
         flush
         title="Spreadsheets"
         description="Each spreadsheet includes current records and drafts, with their status."
@@ -244,17 +245,17 @@ export default function AdminDataExport() {
       </Panel>
 
       {isOperator ? (
-        <Panel
+        <Panel help="Download published records, including hidden records, in one file. Drafts and uploaded files are not included."
           title="Event data package"
           description="Download published records, including hidden records, in one file. Drafts and uploaded files are not included."
         >
           <div className="flex flex-col gap-md">
-            <fieldset className="flex flex-col gap-sm">
+            <fieldset aria-label={[" Parts to include (", (chosen.size), " of ", (PACKAGE_SECTIONS.length), " chosen) "].join('').trim()} className="flex flex-col gap-sm">
               <legend className={`${fieldLabelClass} mb-xs`}>
                 Parts to include ({chosen.size} of {PACKAGE_SECTIONS.length} chosen)
-              </legend>
+               <HelpTooltip label="Parts to include">Choose which parts of the event to include in the download.</HelpTooltip></legend>
               {PACKAGE_SECTIONS.map((section) => (
-                <CheckboxField
+                <CheckboxField help="Include this part of the event in the download."
                   key={section.id}
                   label={section.label}
                   hint={section.id === 'organizations' ? 'Names, sponsorship levels, websites, and logos.' : section.id === 'materials' ? 'Links to slides and handouts, with their review status.' : section.id === 'content' ? 'Event details, pages, updates, announcements, and images.' : section.hint}
@@ -263,9 +264,9 @@ export default function AdminDataExport() {
                 />
               ))}
             </fieldset>
-            <CheckboxField
+            <CheckboxField hint="Reviewers’ private notes. Leave this off unless the client asked for them." help="Reviewers’ private notes. Leave this off unless the client asked for them."
               label="Include staff notes on session pitches"
-              hint="Reviewers’ private notes. Leave this off unless the client asked for them."
+              
               checked={includeStaffNotes}
               onChange={setIncludeStaffNotes}
             />

@@ -98,7 +98,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice
   const tooMany = rows.length > MAX_COLLECTION_IDS;
   const whyId = useId();
   return (
-    <Panel
+    <Panel help="Review saved drafts in this group and publish the ones ready for the site."
       flush
       title={choice.label}
       actions={rows.length > 0 ? (
@@ -377,7 +377,7 @@ export default function AdminUnpublishedChanges() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Pages, content blocks, sessions, organizations, updates, and timeline entries that are saved but not yet on the site. Publish here or in each editor."
         title="Unpublished changes"
         description="Pages, content blocks, sessions, organizations, updates, and timeline entries that are saved but not yet on the site. Publish here or in each editor."
         actions={
@@ -438,7 +438,7 @@ export default function AdminUnpublishedChanges() {
         </>
       )}
 
-      <Panel
+      <Panel help="Review recent publishes and resume any that stopped before they finished."
         title="Recent publishes"
         description="Review recent publishes and resume any that stopped before they finished."
       >

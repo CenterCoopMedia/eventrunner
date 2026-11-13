@@ -25,7 +25,7 @@ const CSV = [
 ].join('\n');
 
 async function uploadCsv(page) {
-  await page.getByLabel('CSV file').setInputFiles({
+  await page.getByLabel('CSV file', { exact: true }).setInputFiles({
     name: 'organizations.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(CSV, 'utf8'),
@@ -48,10 +48,10 @@ test.describe.serial('import records: upload -> preview -> import, organizations
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/import');
     await expect(page.getByRole('heading', { level: 1, name: 'Import records' })).toBeVisible();
-    await page.getByLabel('Record type').selectOption('organizations');
+    await page.getByLabel('Record type', { exact: true }).selectOption('organizations');
     await uploadCsv(page);
-    await expect(page.getByLabel('Reference (required)')).toHaveValue('external_id');
-    await expect(page.getByLabel('Website')).toHaveValue('website');
+    await expect(page.getByLabel('Reference (required)', { exact: true })).toHaveValue('external_id');
+    await expect(page.getByLabel('Website', { exact: true })).toHaveValue('website');
 
     await page.getByRole('button', { name: 'Preview import' }).click();
     const preview = page.getByRole('region', { name: /Preview: organizations/ });
@@ -88,7 +88,7 @@ test.describe.serial('import records: upload -> preview -> import, organizations
   test('the same file again previews as no change and offers nothing to import', async ({ page }) => {
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/import');
-    await page.getByLabel('Record type').selectOption('organizations');
+    await page.getByLabel('Record type', { exact: true }).selectOption('organizations');
     await uploadCsv(page);
     await page.getByRole('button', { name: 'Preview import' }).click();
     const preview = page.getByRole('region', { name: /Preview: organizations/ });

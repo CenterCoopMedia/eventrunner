@@ -137,7 +137,7 @@ export default function MilestonesEditor({ milestones, onChange, errorFor }) {
   };
 
   return (
-    <Panel
+    <Panel help="Add the public milestone dates the overview counts down to. Keep private planning notes out of these names."
       title="Milestones"
       description="Dates the overview counts down to, such as the day proposals close. Anyone can read these dates and names. Keep private notes out of them."
       actions={
@@ -175,15 +175,15 @@ export default function MilestonesEditor({ milestones, onChange, errorFor }) {
                 className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm first:mt-0 first:border-t-0 first:pt-0"
               >
                 <div className="grid gap-sm sm:grid-cols-2">
-                  <TextField
+                  <TextField help="Such as Proposals close."
                     label={`Milestone ${index + 1} name`}
                     value={row.label}
                     onChange={(value) => changeRow(index, { label: value })}
                     error={errorFor(`milestones[${index}].label`) ?? errorFor(`milestones[${index}]`)}
                     maxLength={MAX_MILESTONE_LABEL_LENGTH}
-                    hint="Such as Proposals close."
+                    
                   />
-                  <TextField
+                  <TextField help="Choose the date of this event milestone for the overview countdown."
                     label={`Milestone ${index + 1} date`}
                     type="date"
                     value={row.date}

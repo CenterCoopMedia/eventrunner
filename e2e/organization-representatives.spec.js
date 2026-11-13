@@ -83,7 +83,7 @@ test.describe.serial('organization representatives', () => {
     await staff.goto(`/admin/organizations/${orgA}`);
     const reps = staff.getByRole('region', { name: 'Representatives' });
     await expect(reps.getByText('No representatives yet.')).toBeVisible();
-    await reps.getByLabel('Account address').fill(REP_EMAIL);
+    await reps.getByLabel('Account address', { exact: true }).fill(REP_EMAIL);
     await reps.getByRole('button', { name: 'Add representative' }).click();
     await expect(reps.getByText('Representative added. They can edit this organization from their profile.')).toBeVisible();
     await expect(reps.getByText(REP_EMAIL, { exact: true })).toBeVisible();
@@ -99,7 +99,7 @@ test.describe.serial('organization representatives', () => {
   test('the representative edits by keyboard and sends for review; the public page does not change', async ({ browser }, testInfo) => {
     await rep.goto('/profile/organization');
     await expect(rep.getByRole('heading', { level: 1, name: `Rep Org A ${stamp}` })).toBeVisible();
-    const description = rep.getByLabel('Short description');
+    const description = rep.getByLabel('Short description', { exact: true });
     await expect(description).toHaveValue(liveText);
     await expect(rep.getByLabel(/tier/i)).toHaveCount(0);
 
@@ -170,7 +170,7 @@ test.describe.serial('organization representatives', () => {
     await review.screenshot({ path: testInfo.outputPath('staff-review-panel.png') });
     await review.getByRole('button', { name: 'Apply to draft' }).click();
     await expect(staff.getByRole('status').filter({ hasText: 'Edit applied to the draft. Publish to show it on the site.' })).toBeVisible();
-    await expect(staff.getByLabel('Description')).toHaveValue(newText);
+    await expect(staff.getByLabel('Description', { exact: true })).toHaveValue(newText);
 
     const draft = (await adminDb().collection('cmsOrganizations_drafts').doc(orgA).get()).data();
     expect(draft.description).toBe(newText);

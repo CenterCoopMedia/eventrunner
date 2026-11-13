@@ -45,7 +45,13 @@ test.describe.serial('the setup checklist', () => {
     const authReady = items.find((item) => item.name === 'auth').state === 'ready';
     await expect(hosting.getByText(authReady ? 'Ready' : 'Awaiting Event Runner setup', { exact: true })).toBeVisible();
     await expect(hosting.getByRole('link')).toHaveCount(0);
-    await expect(hosting.getByRole('button')).toHaveCount(0);
+    const hostingHeadings = await hosting.getByRole('heading').allTextContents();
+    await expect(hosting.getByRole('button')).toHaveCount(hostingHeadings.length);
+    for (const title of hostingHeadings) {
+      const help = hosting.getByRole('button', { name: `Help with ${title}`, exact: true });
+      await expect(help).toHaveClass(/admin-help-trigger/);
+      await expect(help).toHaveAttribute('type', 'button');
+    }
     await expect(page.getByRole('list', { name: 'Setup steps' }).getByRole('link')).toHaveCount(6);
 
     const legal = page.locator('section', { has: page.getByRole('heading', { level: 2, name: 'Approve the privacy policy and terms' }) });

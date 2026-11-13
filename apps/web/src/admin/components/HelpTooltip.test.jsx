@@ -3,9 +3,18 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import HelpTooltip from './HelpTooltip.jsx';
 import AdminIconControl from './AdminIconControl.jsx';
 import EventDateTimeField from './EventDateTimeField.jsx';
-import { TextField } from './formControls.jsx';
+import { Panel, TextField } from './formControls.jsx';
 
 describe('staff help tooltips', () => {
+  it('reuses an existing description without adding a duplicate text node', () => {
+    render(<Panel title="Overview" description="Review event totals." help="Review event totals."><TextField label="Address" value="" onChange={() => {}} hint="Use the public page address." help="Use the public page address." /></Panel>);
+    expect(screen.getByText('Review event totals.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Help with Overview' })).toHaveAccessibleDescription('Review event totals.');
+    expect(screen.getByText('Use the public page address.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Address' })).toHaveAccessibleDescription('Use the public page address.');
+    expect(screen.getByRole('button', { name: 'Help with Address' })).toHaveAccessibleDescription('Use the public page address.');
+  });
+
   it('keeps date and time names separate from their help', () => {
     render(<EventDateTimeField label="Deadline" value="" timeZone="UTC" onChange={() => {}} help="Choose when proposals close." />);
     expect(screen.getByRole('group', { name: 'Deadline' })).toBeInTheDocument();
@@ -26,7 +35,7 @@ describe('staff help tooltips', () => {
 
   it('describes the field and help button while closed, then opens on focus and dismisses with Escape', () => {
     render(<TextField label="Track" value="" onChange={() => {}} help="Choose a program topic." hint="Saving…" error="Choose one." />);
-    expect(screen.getByRole('textbox', { name: 'Track' })).toHaveAccessibleDescription('Choose a program topic. Saving… Choose one.');
+    expect(screen.getByRole('textbox', { name: 'Track' })).toHaveAccessibleDescription('Saving… Choose one. Choose a program topic.');
     const help = screen.getByRole('button', { name: 'Help with Track' });
     expect(help).toHaveAccessibleDescription('Choose a program topic.');
     expect(screen.queryByRole('tooltip', { hidden: true })).not.toBeInTheDocument();

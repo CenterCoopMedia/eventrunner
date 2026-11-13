@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Version history, the record list (issue #195): pick a collection, then a
 // record, to read what changed in each publish.
 //
@@ -213,7 +214,7 @@ export default function AdminVersionRecords() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Choose an item to see its published versions and restore past content."
         title="Version history"
         description="Choose an item to see its published versions and restore past content."
       />
@@ -226,7 +227,7 @@ export default function AdminVersionRecords() {
         className="flex flex-wrap items-end gap-sm"
       >
         <div className="min-w-0 grow basis-48">
-          <SelectField
+          <SelectField help="Choose which kind of published records to browse."
             label="Content type"
             value={collection}
             onChange={(id) => writeParam('collection', id === DEFAULT_COLLECTION ? '' : id)}
@@ -234,7 +235,7 @@ export default function AdminVersionRecords() {
           />
         </div>
         <div className="min-w-0 grow basis-64">
-          <TextField
+          <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
             label="Search by name"
             type="search"
             value={query}
@@ -246,7 +247,7 @@ export default function AdminVersionRecords() {
         </div>
         <AdminIconControl icon="close" label="Clear search" className={secondaryButtonClass} onClick={clearSearch} />
         <div className="min-w-0 grow basis-48">
-          <SelectField
+          <SelectField help="Sort the records by name or by when they last changed."
             label="Order records by"
             value={sort}
             onChange={(value) => writeParam('sort', value === 'name' ? 'name' : '')}
@@ -269,7 +270,7 @@ export default function AdminVersionRecords() {
 
       {records.ready ? (
         <section aria-labelledby={removedHeadingId} className="flex flex-col gap-sm">
-          <h2 id={removedHeadingId} ref={removedHeadingRef} tabIndex={-1} className="font-admin-ui text-admin-lg font-bold text-admin-ink">Removed records</h2>
+          <div className="flex items-center gap-2xs"><h2 id={removedHeadingId} ref={removedHeadingRef} tabIndex={-1} className="font-admin-ui text-admin-lg font-bold text-admin-ink">Removed records</h2><HelpTooltip label="Removed records">Review deleted records that still have published versions available to restore.</HelpTooltip></div>
           {history.error ? <Notice tone="error" message="Removed records did not load. Current records remain available." /> : null}
           {!history.entries && history.loading ? <AdminLoadingState label="Loading removed records…" /> : null}
           {history.entries ? (

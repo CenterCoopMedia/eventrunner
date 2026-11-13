@@ -70,7 +70,7 @@ export default function AdminContentPages() {
 
   return (
     <div className="admin-content-browser flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Choose a page to edit the text, images and other content in its sections."
         title="Content"
         actions={<Link to="/admin/pages" className={linkButtonClass}>Manage page structure</Link>}
       />
@@ -101,7 +101,7 @@ export default function AdminContentPages() {
                     <circle cx="10.5" cy="10.5" r="6.5" />
                     <path d="m15.5 15.5 5 5" />
                   </svg>
-                  <input
+                  <input data-help-skip="Search field; its label identifies finding page content."
                     ref={searchRef}
                     id={searchId}
                     type="search"

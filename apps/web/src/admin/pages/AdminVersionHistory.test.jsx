@@ -228,7 +228,7 @@ describe('one record’s versions', () => {
     expect(versionItem(2)).toHaveTextContent(
       'This is the published version, and it is hidden. The site shows nothing for this record until a shown version is published.',
     );
-    expect(versionItem(1)).not.toHaveTextContent('published version');
+    expect(within(versionItem(1)).queryByText(/^This is the published version/)).toBeNull();
   });
 
   it('marks a record whose live and draft documents are gone as removed, and keeps its versions', async () => {

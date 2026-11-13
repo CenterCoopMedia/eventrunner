@@ -84,7 +84,7 @@ export default function MediaLibrary({
           <label htmlFor={searchId} className={fieldLabelClass}>
             Search the library
           </label>
-          <input
+          <input data-help-skip="Search field; its label identifies searching the media library."
             ref={searchRef}
             id={searchId}
             type="search"

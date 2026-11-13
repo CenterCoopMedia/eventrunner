@@ -66,7 +66,7 @@ export default function MilestonesPanel({ milestones, goal, approved, timezone, 
   if (sorted.length === 0 && !hasGoal) return null;
 
   return (
-    <Panel title="Milestones">
+    <Panel help="See upcoming event dates entered in Event settings." title="Milestones">
       <div className="flex flex-col gap-md">
         {hasGoal ? <GoalLine goal={goal} approved={approved} /> : null}
         {sorted.length > 0 ? (

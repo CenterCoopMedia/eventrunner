@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Version history, one record (issue #195): every version the record has
 // had, newest first, each with when it was published, by which account, and
 // what changed from the version before it.
@@ -71,9 +72,9 @@ function ValueCell({ value, time, timeZone, path }) {
     <>
       <span className="whitespace-pre-wrap">{`${text.slice(0, SHOWN_CHARACTERS)}…`}</span>
       <details className="mt-3xs">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink-link">
+        <summary data-help-skip="The disclosure label directly states that it shows the complete saved value." className="admin-target cursor-pointer font-semibold text-admin-ink-link">
           {`Show all ${text.length.toLocaleString('en-US')} characters`}
-        </summary>
+         </summary>
         <span className="mt-2xs block whitespace-pre-wrap">{text}</span>
       </details>
     </>
@@ -152,9 +153,8 @@ function RestoreConfirm({ entry, removed, collection, busy, disabled, error, onC
       aria-labelledby={headingId}
       className="flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-soft px-md py-sm"
     >
-      <h3 id={headingId} ref={headingRef} tabIndex={-1} className="font-admin-ui text-admin-base font-bold text-admin-ink">
-        {`Restore version ${entry.revision}?`}
-      </h3>
+      <div className="flex items-center gap-2xs"><h3 id={headingId} ref={headingRef} tabIndex={-1} className="font-admin-ui text-admin-base font-bold text-admin-ink">
+        {`Restore version ${entry.revision}?`}</h3><HelpTooltip label={`Restore version ${entry.revision}`}>Restore this published version as a draft. Review and publish the draft to change the site.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">
         {`Version ${entry.revision} becomes the draft of this record.`}
         {removed ? ' The record is saved again as a draft.' : ''}
@@ -542,7 +542,7 @@ export default function AdminVersionHistory() {
                 className="flex flex-col gap-sm border-b-admin-hairline border-admin-rule-hairline px-md py-md last:border-b-0"
               >
                 <div className="flex flex-col gap-3xs">
-                  <h2
+                  <div className="flex items-center gap-2xs"><h2
                     ref={(node) => {
                       if (node) headingRefs.current.set(entry.revision, node);
                       else headingRefs.current.delete(entry.revision);
@@ -550,8 +550,7 @@ export default function AdminVersionHistory() {
                     tabIndex={-1}
                     className="font-admin-ui text-admin-lg font-bold text-admin-ink"
                   >
-                    Version <span className="font-admin-data">{entry.revision}</span>
-                  </h2>
+                    Version <span className="font-admin-data">{entry.revision}</span></h2><HelpTooltip label={`Version ${entry.revision}`}>Review the content saved at this published version.</HelpTooltip></div>
                   <p className="text-admin-sm text-admin-ink-secondary wrap-anywhere">
                     {'Published '}
                     {published ? (
@@ -644,7 +643,7 @@ export default function AdminVersionHistory() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Newest first. A version is added each time this record is published."
         title={versionRecordName(choice.id, row?.current ?? entries[0]?.fields, { full: true })}
         state={recordState}
         description="Newest first. A version is added each time this record is published."

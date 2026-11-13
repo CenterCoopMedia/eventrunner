@@ -91,6 +91,15 @@ function hostingCheck(name) {
   return within(screen.getByRole('region', { name: 'Hosting status' })).getByRole('heading', { name }).closest('li');
 }
 
+function expectOnlyHelpButtons(region) {
+  expect(within(region).getAllByRole('button').map((button) => button.getAttribute('aria-label')))
+    .toEqual(within(region).getAllByRole('heading').map((heading) => `Help with ${heading.textContent}`));
+  for (const button of within(region).getAllByRole('button')) {
+    expect(button).toHaveClass('admin-help-trigger');
+    expect(button).toHaveAttribute('type', 'button');
+  }
+}
+
 beforeEach(() => {
   markTourDone('admin-1');
   tier.value = 'operator';
@@ -180,7 +189,7 @@ describe('the setup stepper', () => {
     expect(within(hosting).getByRole('heading', { level: 3, name: 'Google sign-in' })).toBeInTheDocument();
     expect(within(hosting).getByText('Awaiting Event Runner setup')).toBeInTheDocument();
     expect(within(hosting).queryByRole('link')).toBeNull();
-    expect(within(hosting).queryByRole('button')).toBeNull();
+    expectOnlyHelpButtons(hosting);
     expect(within(stepList()).queryByRole('link', { name: /Google sign-in/ })).toBeNull();
   });
 
@@ -202,7 +211,7 @@ describe('the setup stepper', () => {
     expect(address).toHaveTextContent('Contact the Event Runner team to set it.');
     expect(address).toHaveTextContent('Announcements and reminders need your mailing address');
     expect(within(address).queryByRole('textbox')).toBeNull();
-    expect(within(address).queryByRole('button')).toBeNull();
+    expectOnlyHelpButtons(address);
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness']);
     expect(screen.getByText('6 of 6 steps done')).toBeInTheDocument();
   });
@@ -261,7 +270,7 @@ describe('the setup stepper', () => {
     const hosting = screen.getByRole('region', { name: 'Hosting status' });
     expect(within(hosting).getByText('Awaiting Event Runner setup')).toBeInTheDocument();
     expect(within(hosting).queryByRole('link')).toBeNull();
-    expect(within(hosting).queryByRole('button')).toBeNull();
+    expectOnlyHelpButtons(hosting);
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness']);
   });
 
@@ -305,7 +314,7 @@ describe('the setup stepper', () => {
     expect(within(hosting).getByRole('heading', { name: 'Future hosting check' })).toBeInTheDocument();
     expect(within(hosting).getByText('Awaiting Event Runner setup')).toBeInTheDocument();
     expect(within(hosting).queryByRole('link')).toBeNull();
-    expect(within(hosting).queryByRole('button')).toBeNull();
+    expectOnlyHelpButtons(hosting);
     expect(screen.queryByText(/Your site is ready to share/)).toBeNull();
   });
 

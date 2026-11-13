@@ -1,3 +1,4 @@
+import HelpTooltip from '../HelpTooltip.jsx';
 // Asset detail modal: the file's facts, its editable description, where it
 // is used, and delete. Admin-only (design brief §5.2, admin story part 2
 // "the cut file") — a print shop's cabinet of engravings, not a photo
@@ -196,8 +197,8 @@ export default function AssetModal({
 
       {locked ? <p className="mt-md text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p> : (
         <form className="mt-md flex flex-col gap-sm" onSubmit={save}>
-          <TextAreaField label="Image description" hint="Describe what the image shows for people who cannot see it." value={alt} onChange={(value) => { setAlt(value); setStatus(''); }} rows={2} disabled={busy} />
-          <TextField label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} disabled={busy} />
+          <TextAreaField help="Describe what the image shows for people who cannot see it." label="Image description"  value={alt} onChange={(value) => { setAlt(value); setStatus(''); }} rows={2} disabled={busy} />
+          <TextField help="Give this file a name staff can recognize in the media library." label="Title" value={title} onChange={(value) => { setTitle(value); setStatus(''); }} disabled={busy} />
           {status ? <SaveStatus message={status} /> : null}
           {saveError ? <Notice tone="error" message={saveError} /> : null}
           <div className="flex flex-wrap gap-xs">
@@ -210,7 +211,7 @@ export default function AssetModal({
       )}
 
       <section className="mt-md border-admin-rule-hairline border-t-admin-hairline pt-sm">
-        <h3 className="text-admin-lg font-bold text-admin-ink">Where this is used</h3>
+        <div className="flex items-center gap-2xs"><h3 className="text-admin-lg font-bold text-admin-ink">Where this is used</h3><HelpTooltip label="Where this is used">Check which content currently uses this image before changing it.</HelpTooltip></div>
         <div className="mt-2xs">
           <UsageList references={references} error={usageError} onRetry={() => setScanAttempt((attempt) => attempt + 1)} />
         </div>

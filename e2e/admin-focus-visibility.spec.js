@@ -59,12 +59,12 @@ for (const kind of ['page', 'invoice', 'session']) {
       await signIn(page, ADMIN_EMAIL);
       if (kind === 'page') {
         await page.goto('/admin/pages/home');
-        await page.getByLabel('Navigation label').fill('A guide to attending the local news and information summit with your community');
+        await page.getByLabel('Navigation label', { exact: true }).fill('A guide to attending the local news and information summit with your community');
       } else if (kind === 'invoice') {
         await page.goto('/admin/invoices/new/invoice');
-        await page.getByLabel('Name to bill').fill('Example local news and information summit partner organization '.repeat(4).slice(0, 200));
-        await page.getByLabel('Line 1 description').fill('Synthetic focus check');
-        await page.getByLabel('Line 1 unit price').fill('10.00');
+        await page.getByLabel('Name to bill', { exact: true }).fill('Example local news and information summit partner organization '.repeat(4).slice(0, 200));
+        await page.getByLabel('Line 1 description', { exact: true }).fill('Synthetic focus check');
+        await page.getByLabel('Line 1 unit price', { exact: true }).fill('10.00');
         await page.getByRole('button', { name: 'Save', exact: true }).click();
         await expect(page.getByRole('button', { name: 'Issue invoice', exact: true })).toBeVisible();
         invoiceId = new URL(page.url()).pathname.split('/').at(-1);
@@ -73,7 +73,7 @@ for (const kind of ['page', 'invoice', 'session']) {
         const sessions = await db.collection('cmsSchedule').limit(1).get();
         expect(sessions.empty).toBe(false);
         await page.goto(`/admin/sessions/${encodeURIComponent(sessions.docs[0].id)}`);
-        await page.getByLabel('Public title').fill('Local reporting partnerships that reach every community: Lessons from shared investigations and sustained public service across North Carolina'.padEnd(160, '.'));
+        await page.getByLabel('Public title', { exact: true }).fill('Local reporting partnerships that reach every community: Lessons from shared investigations and sustained public service across North Carolina'.padEnd(160, '.'));
       }
       const endTour = page.getByRole('button', { name: 'End tour', exact: true });
       if (await endTour.isVisible()) await endTour.click();
@@ -89,9 +89,9 @@ for (const kind of ['page', 'invoice', 'session']) {
         })));
       }
       if (kind === 'session') {
-        await page.getByLabel('Public description').fill('');
+        await page.getByLabel('Public description', { exact: true }).fill('');
         await page.getByRole('button', { name: 'Save', exact: true }).click();
-        await expect(page.getByLabel('Public description')).toBeFocused();
+        await expect(page.getByLabel('Public description', { exact: true })).toBeFocused();
         await expect.poll(() => focusGeometry(page)).toMatchObject({ clear: true });
       }
       const directory = path.resolve('test-results/admin-focus-evidence');

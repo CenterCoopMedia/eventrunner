@@ -217,7 +217,7 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/content/faq/faq_items/_new');
     await expect(page.getByRole('heading', { level: 1, name: 'New content block' })).toBeVisible();
-    await page.getByLabel('Question').fill(question);
+    await page.getByLabel('Question', { exact: true }).fill(question);
 
     const editor = page.getByRole('textbox', { name: 'Answer' });
     await editor.fill(answer);

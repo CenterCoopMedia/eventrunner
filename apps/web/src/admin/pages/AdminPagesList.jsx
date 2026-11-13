@@ -276,7 +276,7 @@ export default function AdminPagesList() {
 
   return (
     <div ref={frameRef} className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Manage page names, web addresses and structure. Edit their text and images under Content."
         title="Pages"
         identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
         actions={

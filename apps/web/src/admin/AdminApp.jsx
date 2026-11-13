@@ -20,14 +20,12 @@ import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx
 import AdminLayout from './AdminLayout.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
-import AdminPageEditor from './pages/AdminPageEditor.jsx';
 import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
 import AdminSpeakerEditor from './pages/AdminSpeakerEditor.jsx';
 import AdminContentPages from './pages/AdminContentPages.jsx';
 import AdminContentSections from './pages/AdminContentSections.jsx';
 import AdminContentSection from './pages/AdminContentSection.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
-import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
@@ -39,10 +37,12 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // sessions list, so its figures and panels stay out of the admin entry chunk
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'));
+const AdminPageEditor = lazy(() => import('./pages/AdminPageEditor.jsx'));
 const AdminWebAddress = lazy(() => import('./pages/AdminWebAddress.jsx'));
 const AdminSessionPitch = lazy(() => import('./pages/AdminSessionPitch.jsx'));
 const AdminPitchSettings = lazy(() => import('./pages/AdminPitchSettings.jsx'));
 const AdminRegistrationForm = lazy(() => import('./pages/AdminRegistrationForm.jsx'));
+const AdminBadgeSettings = lazy(() => import('./pages/AdminBadgeSettings.jsx'));
 const AdminPitchImport = lazy(() => import('./pages/AdminPitchImport.jsx'));
 const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.jsx'));
 // Scheduled reminders (issue #518): one screen behind one link.
@@ -187,8 +187,8 @@ export default function AdminApp() {
           <Route path="pitches/import" element={<DeferredAdminPage label="pitch import"><AdminPitchImport /></DeferredAdminPage>} />
           <Route path="pitches/:pitchId" element={<DeferredAdminPage label="session pitch"><AdminSessionPitch /></DeferredAdminPage>} />
           <Route path="pages" element={<AdminPagesList />} />
-          <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
-          <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />
+          <Route path="pages/new" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="create" /></DeferredAdminPage>} />
+          <Route path="pages/:pageId" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="edit" /></DeferredAdminPage>} />
           <Route
             path="sessions"
             element={<DeferredAdminPage label="sessions"><AdminSessionsList /></DeferredAdminPage>}
@@ -291,7 +291,7 @@ export default function AdminApp() {
             }
           />
           <Route path="features" element={<AdminFeatureSettings />} />
-          <Route path="badges" element={<AdminBadgeSettings />} />
+          <Route path="badges" element={<DeferredAdminPage label="badges"><AdminBadgeSettings /></DeferredAdminPage>} />
           <Route path="registration-form" element={<DeferredAdminPage label="registration form"><AdminRegistrationForm /></DeferredAdminPage>} />
           <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
           <Route path="media" element={<AdminMedia />} />

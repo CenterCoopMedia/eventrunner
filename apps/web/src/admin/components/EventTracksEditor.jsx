@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 import { useRef, useState } from 'react';
 import { Panel, TextField } from './formControls.jsx';
 import {
@@ -131,7 +132,7 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
   };
 
   return (
-    <Panel
+    <Panel help="Name each parallel schedule line with a letter and a name. Leave this empty if sessions all use one room."
       className="admin-settings-card"
       title="Tracks"
       description="Sessions that run at the same time, on separate lines. Each line has a letter and a name, and the schedule shows both. Leave this empty if everything happens in one room."
@@ -158,10 +159,9 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
             return (
               <li key={track.key} className="admin-settings-row-card" aria-labelledby={headingId}>
                 <div className="admin-settings-row-heading">
-                  <h3 id={headingId} className="min-w-0 break-words text-admin-base font-bold text-admin-ink">
+                  <div className="flex items-center gap-2xs"><h3 id={headingId} className="min-w-0 break-words text-admin-base font-bold text-admin-ink">
                     Track {n}
-                    {trackName(track) ? <span className="font-normal text-admin-ink-secondary">: {trackName(track)}</span> : null}
-                  </h3>
+                    {trackName(track) ? <span className="font-normal text-admin-ink-secondary">: {trackName(track)}</span> : null}</h3><HelpTooltip label={`Track ${n}`}>Name one program track so attendees can distinguish sessions running at the same time.</HelpTooltip></div>
                   <RemoveItemButton
                     ref={(node) => {
                       if (node) removeRefs.current.set(track.key, node);
@@ -173,13 +173,13 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
                   />
                 </div>
                 <div className="admin-settings-fields">
-                  <TextField
+                  <TextField help="One letter, A to Z. It is how a reader tells the lines apart."
                     label={`Track ${n} letter`}
                     value={track.letter}
                     onChange={(value) => setTrack(index, { letter: value })}
                     error={errorFor(`tracks[${index}].letter`)}
                     maxLength={1}
-                    hint="One letter, A to Z. It is how a reader tells the lines apart."
+                    
                     warning={[
                       relettered
                         ? `${uses.length} session${uses.length === 1 ? ' uses' : 's use'} letter ${track.savedLetter}. Change their track too, or they lose it when you save.`
@@ -189,12 +189,12 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
                         : '',
                     ].filter(Boolean).join(' ')}
                   />
-                  <TextField
+                  <TextField help="Shown beside the letter, e.g. Practice."
                     label={`Track ${n} name`}
                     value={track.name}
                     onChange={(value) => setTrack(index, { name: value })}
                     error={errorFor(`tracks[${index}].name`)}
-                    hint="Shown beside the letter, e.g. Practice."
+                    
                     data-row-key={track.key}
                   />
                 </div>

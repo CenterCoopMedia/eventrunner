@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 import { plannerError, plannerMessage } from '../plannerErrors.js';
 import '../plannerFields.css';
 import PlannerFeatureControls from '../components/PlannerFeatureControls.jsx';
@@ -171,12 +172,12 @@ function AddLinkForm({ sessionId, onAdded }) {
   return (
     <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit}>
       <ServerErrorSummary error={error} />
-      <TextField label="Link" value={url} onChange={setUrl} type="url" required />
-      <TextField
+      <TextField help="Add the full address of the material attendees should open." label="Link" value={url} onChange={setUrl} type="url" required />
+      <TextField help="Optional. Leave empty to show “External link”."
         label="Link text"
         value={label}
         onChange={setLabel}
-        hint="Optional. Leave empty to show “External link”."
+        
       />
       <div>
         <button
@@ -293,7 +294,7 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
       <td className="p-0 align-top">
         {isFile ? (
           <label className={CHECK_LABEL_CLASS}>
-            <input
+            <input data-help-skip="Row selection checkbox; its accessible name identifies the material."
               type="checkbox"
               className={CHECKBOX_CLASS}
               checked={selected}
@@ -419,9 +420,8 @@ function CoveragePanel({ materials, truncated, readAt, sessions, sessionsState, 
           </p>
         ) : (
           <section aria-labelledby={`${headingId}-sessions`} className="flex flex-col gap-2xs">
-            <h3 id={`${headingId}-sessions`} className="text-admin-base font-bold text-admin-ink">
-              Sessions with no materials
-            </h3>
+            <div className="flex items-center gap-2xs"><h3 id={`${headingId}-sessions`} className="text-admin-base font-bold text-admin-ink">
+              Sessions with no materials</h3><HelpTooltip label="Sessions with no materials">Review sessions that still need slides, handouts or other materials.</HelpTooltip></div>
             <ul className="flex flex-col">
               {coverage.uncoveredSessions.map((session) => (
                 <li key={session.id} className={RULED_ITEM_CLASS}>
@@ -438,9 +438,8 @@ function CoveragePanel({ materials, truncated, readAt, sessions, sessionsState, 
         )}
         {coverage.uncoveredSpeakers.length > 0 ? (
           <section aria-labelledby={`${headingId}-speakers`} className="flex flex-col gap-2xs">
-            <h3 id={`${headingId}-speakers`} className="text-admin-base font-bold text-admin-ink">
-              Speakers with no materials
-            </h3>
+            <div className="flex items-center gap-2xs"><h3 id={`${headingId}-speakers`} className="text-admin-base font-bold text-admin-ink">
+              Speakers with no materials</h3><HelpTooltip label="Speakers with no materials">Review speakers who have not yet supplied materials for their sessions.</HelpTooltip></div>
             <ul className="flex flex-col">
               {coverage.uncoveredSpeakers.map((speaker) => (
                 <li key={speaker.id} className={RULED_ITEM_CLASS}>
@@ -464,7 +463,7 @@ function CoveragePanel({ materials, truncated, readAt, sessions, sessionsState, 
   }
 
   return (
-    <Panel
+    <Panel help="Find sessions or speakers that still need materials. Pending or approved files count as supplied; rejected files do not."
       title="Coverage"
       description="A pending or approved material counts. A rejected one does not. Sessions with no speaker are left out."
     >
@@ -774,7 +773,7 @@ export default function AdminMaterialsTab() {
               <tr>
                 <th scope="col" className={`${HEAD_BASE_CLASS} w-11`}>
                   <label className={CHECK_LABEL_CLASS}>
-                    <input
+                    <input data-help-skip="Select-all checkbox; its accessible name describes the selection."
                       ref={headCheckboxRef}
                       type="checkbox"
                       className={CHECKBOX_CLASS}
@@ -816,33 +815,33 @@ export default function AdminMaterialsTab() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Every session’s files and links. Download files one at a time or together as one archive, and see which sessions have nothing yet."
         title="Materials"
         description="Every session’s files and links. Download files one at a time or together as one archive, and see which sessions have nothing yet."
       />
       <PlannerFeatureControls choices={[{ key: 'sessionMaterials', label: 'Session materials' }]} />
 
-      <Panel title="Show">
+      <Panel help="Narrow the materials list by session and review status." title="Show">
         <div className="planner-fields grid gap-sm sm:grid-cols-2">
           <div ref={sessionFieldRef}>
-            <SelectField
+            <SelectField help="Show materials attached to the selected session."
               label="Session"
               value={sessionFilter}
               onChange={changeSessionFilter}
               options={sessionOptions}
             />
           </div>
-          <SelectField label="Review" value={reviewFilter} onChange={changeReviewFilter} options={REVIEW_FILTERS} />
+          <SelectField help="Show materials by whether staff have approved them for attendees." label="Review" value={reviewFilter} onChange={changeReviewFilter} options={REVIEW_FILTERS} />
         </div>
       </Panel>
 
       {sessionFilter ? (
-        <Panel title="Add a link">
+        <Panel help="Share an external resource with attendees of the selected session." title="Add a link">
           <AddLinkForm sessionId={sessionFilter} onAdded={load} />
         </Panel>
       ) : null}
 
-      <Panel
+      <Panel help="Review uploaded files and links before making them available to attendees."
         title="Materials"
         flush
         actions={

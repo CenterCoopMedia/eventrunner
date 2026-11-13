@@ -94,8 +94,8 @@ test('a long import form moves keyboard focus to its real preview outcome on a p
   await page.getByRole('button', { name: 'Take the tour', exact: true }).click();
   await endTour.click();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByLabel('Record type').selectOption('organizations');
-  await page.getByLabel('CSV file').setInputFiles({
+  await page.getByLabel('Record type', { exact: true }).selectOption('organizations');
+  await page.getByLabel('CSV file', { exact: true }).setInputFiles({
     name: 'event-partners.csv', mimeType: 'text/csv',
     buffer: Buffer.from(`external_id,name,slug,tier,website,description,order\nRECOVERY-${RUN},Community Newsroom,recovery-${RUN},Partner,https://example.org,A local journalism partner.,1\n`),
   });

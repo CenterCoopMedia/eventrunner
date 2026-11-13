@@ -90,7 +90,7 @@ export default function SessionPopularityPanel({ groups }) {
   }
 
   return (
-    <Panel
+    <Panel help="How many attendees saved each session to their schedule."
       title="Most saved"
       description="How many attendees saved each session to their schedule."
     >

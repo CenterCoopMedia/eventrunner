@@ -189,7 +189,8 @@ describe('the admin overview', () => {
     expect(screen.getByText('Read at 9:14 AM EDT')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Figures read at 9:14 AM EDT.');
     // No decorative rings: every figure remains labeled in words.
-    expect(screen.getByRole('main').querySelector('svg circle')).toBeNull();
+    expect([...screen.getByRole('main').querySelectorAll('svg circle')]
+      .filter((circle) => !circle.closest('.admin-help-trigger'))).toEqual([]);
   });
 
   it('takes the singular at one and prints zero as 0', async () => {
@@ -465,12 +466,19 @@ describe('the admin overview', () => {
       const stops = [...main.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
         .filter((el) => el.getAttribute('tabindex') !== '-1');
       expect(stops.map((el) => el.getAttribute('aria-label') ?? el.textContent.replace('→', '').trim())).toEqual([
+        'Help with Overview',
         'Refresh figures',
         'Review changes',
+        'Help with Event figures',
+        'Help with Attendees',
         'Manage attendees',
+        'Help with Tickets',
         'Open ticketing',
+        'Help with Speakers',
         'Manage speakers',
+        'Help with Program',
         'Manage sessions',
+        'Help with Content readiness',
         'Review changes',
         'Records on the site and records with unpublished changes, by content type.',
         'Pages',
@@ -479,6 +487,8 @@ describe('the admin overview', () => {
         'Organizations',
         'Timeline',
         'Updates',
+        'Help with Registration funnel',
+        'Help with System health',
         'Review system errors',
       ]);
       const region = screen.getByRole('region', { name: 'Records on the site and records with unpublished changes, by content type.' });

@@ -42,7 +42,7 @@ export default function AdminMedia() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Upload images and see where they are used."
         title="Media"
         description="Upload images and see where they are used."
       />

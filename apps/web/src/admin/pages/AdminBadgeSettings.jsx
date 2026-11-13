@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Badge configuration (issue #14), wired to updateBadges.
 //
 // config/badges is `{ categories: [{ id, label, maxPicks, badges: [{ id,
@@ -112,7 +113,7 @@ export default function AdminBadgeSettings() {
 
   return (
     <form className="flex flex-col gap-md" onSubmit={submit}>
-      <AdminPageHeader
+      <AdminPageHeader help="Manage the badge categories and choices attendees can select for their profiles."
         title="Badges"
         description="The badge set attendees pick from, grouped into categories with a cap on how many each attendee may choose."
         identifiers={`${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}
@@ -128,7 +129,7 @@ export default function AdminBadgeSettings() {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel
+      <Panel help="Group attendee badges and set how many people may choose in each group."
         title="Categories"
         actions={
           <button
@@ -157,19 +158,19 @@ export default function AdminBadgeSettings() {
                   className="border-admin-rule-hairline border-t-admin-hairline pt-sm mt-sm first:border-t-0 first:pt-0 first:mt-0"
                 >
                   <div className="grid gap-sm sm:grid-cols-3">
-                    <TextField
+                    <TextField help="Use a short stable name for this category, made of lowercase letters, numbers and hyphens."
                       label={`Category ${index + 1} id`}
                       value={category.id}
                       onChange={(value) => setCategory(index, { id: value })}
                       error={errorFor(`${at}.id`)}
                     />
-                    <TextField
+                    <TextField help="Use the category name attendees should see above these badges."
                       label={`Category ${index + 1} label`}
                       value={category.label}
                       onChange={(value) => setCategory(index, { label: value })}
                       error={errorFor(`${at}.label`)}
                     />
-                    <TextField
+                    <TextField help="Set how many badges an attendee may choose from this category."
                       label={`Category ${index + 1} max picks`}
                       type="number"
                       min="1"
@@ -182,9 +183,8 @@ export default function AdminBadgeSettings() {
                   </div>
 
                   <div className="mt-sm flex flex-wrap items-center justify-between gap-xs">
-                    <h3 className="font-admin-ui text-admin-base font-bold text-admin-ink">
-                      Badges
-                    </h3>
+                    <div className="flex items-center gap-2xs"><h3 className="font-admin-ui text-admin-base font-bold text-admin-ink">
+                      Badges</h3><HelpTooltip label="Badges">Name the badges attendees can select in this category.</HelpTooltip></div>
                     <button
                       type="button"
                       className={secondaryButtonClass}
@@ -203,7 +203,7 @@ export default function AdminBadgeSettings() {
                     <ol className="mt-xs flex flex-col gap-sm">
                       {category.badges.map((badge, badgeIndex) => (
                         <li key={badgeIndex} className="grid gap-sm sm:grid-cols-[1fr,1fr,auto]">
-                          <TextField
+                          <TextField help="Use a short stable name for this badge so saved selections keep referring to it."
                             label={`Badge ${badgeIndex + 1} id — category ${index + 1}`}
                             value={badge.id}
                             onChange={(value) =>
@@ -215,7 +215,7 @@ export default function AdminBadgeSettings() {
                             }
                             error={errorFor(`${at}.badges[${badgeIndex}].id`)}
                           />
-                          <TextField
+                          <TextField help="Use the badge name attendees should see when choosing badges."
                             label={`Badge ${badgeIndex + 1} label — category ${index + 1}`}
                             value={badge.label}
                             onChange={(value) =>

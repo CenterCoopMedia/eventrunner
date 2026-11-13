@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Sections use the current page revision, so an unpublished rename remains
 // visible here. Block counts wait for both content revisions before stating
 // a total; one published block plus its draft is still one block.
@@ -45,7 +46,7 @@ export default function AdminContentSections() {
 
   return (
     <div className="admin-content-browser flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Choose a section to edit."
         title={pageName}
         identifiers={identifiers}
         description="Choose a section to edit."
@@ -82,9 +83,8 @@ export default function AdminContentSections() {
               return (
                 <li key={section.id} className="admin-content-section">
                   <div className="admin-content-section__description">
-                    <h2 className="font-admin-ui">
-                      <Link to={to} className={`${rowTitleLinkClass} admin-content-page-name`}>{sectionName}</Link>
-                    </h2>
+                    <div className="flex items-center gap-2xs"><h2 className="font-admin-ui">
+                      <Link to={to} className={`${rowTitleLinkClass} admin-content-page-name`}>{sectionName}</Link></h2><HelpTooltip label={sectionName}>Open this section to edit its content blocks.</HelpTooltip></div>
                     {section.description ? <p>{section.description}</p> : null}
                     <p className="admin-content-section__types">
                       <span>Content: </span>{types.length ? types.join(', ') : 'Any content'}

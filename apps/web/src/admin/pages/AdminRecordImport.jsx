@@ -94,7 +94,7 @@ function MappingFields({ type, headers, mapping, onChange }) {
   return (
     <div className="planner-fields grid grid-cols-1 gap-sm sm:grid-cols-2">
       {type.fields.map((field) => (
-        <SelectField
+        <SelectField help="Choose the CSV column that supplies this detail. Leave optional details unmatched if they are absent."
           key={`${type.id}-${field.id}`}
           label={field.required ? `${field.label} (required)` : field.label}
           value={mapping[field.id] ?? ''}
@@ -280,20 +280,20 @@ export default function AdminRecordImport() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Import speakers, sessions, organizations or registrations from a CSV file. Nothing is published or emailed; registration rows create tickets."
         title="Import records"
         description="Add or update speakers, sessions, organizations and registrations from a CSV file. Speakers, sessions and organizations are saved as drafts only; registrations make tickets. The import publishes nothing and sends no email."
       />
 
-      <fieldset disabled={busy === 'import'} className="flex min-w-0 flex-col gap-md">
-      <legend className="sr-only">Import inputs</legend>
-      <Panel
+      <fieldset  disabled={busy === 'import'} className="flex min-w-0 flex-col gap-md">
+      <legend className="sr-only">Import inputs </legend>
+      <Panel help="Choose the record type and a CSV file with column names in its first row."
         title="File"
         description="Choose the record type, then the CSV file. The first row of the file names the columns."
       >
         <div className="flex flex-col gap-md">
           <div className="flex flex-wrap items-end gap-sm">
-            <SelectField
+            <SelectField help="Choose what the CSV contains so the import offers the matching fields."
               label="Record type"
               value={typeId}
               onChange={chooseType}
@@ -308,7 +308,7 @@ export default function AdminRecordImport() {
             <p id="record-import-file-hint" className={fieldHintClass}>
               Up to {MAX_ROWS} rows. Use the same reference for each person or item when you import updates.
             </p>
-            <input
+            <input data-help-skip="File chooser; the File section explains the required CSV."
               id="record-import-file"
               type="file"
               accept=".csv,text/csv"
@@ -326,7 +326,7 @@ export default function AdminRecordImport() {
       </Panel>
 
       {parsed ? (
-        <Panel
+        <Panel help="Match each record detail to a column from the uploaded CSV file."
           title="Columns"
           description={`Choose the file column for each detail. Leave unused details as "Not in this file".`}
         >
@@ -351,7 +351,7 @@ export default function AdminRecordImport() {
       {notice ? <div ref={noticeRef} tabIndex={-1} className="admin-operation-result"><Notice tone={notice.tone} message={notice.message} /></div> : null}
 
       {result ? (
-        <Panel
+        <Panel help="Review what happened to each row, including rows skipped because of errors."
           title={result.dryRun ? 'Preview' : 'Result'}
           description={
             result.dryRun

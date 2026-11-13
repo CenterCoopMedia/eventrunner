@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // "Set up your event" (ADR 0007 §7): client tasks and read-only hosting status.
 // One step shows at a time, at its own address (/admin/setup/<slug>), with a
 // list of every step beside it and Back and Next under it. /admin/setup
@@ -69,7 +70,7 @@ function LegalSignOff({ onSaved }) {
 
   return (
     <div className="flex flex-col gap-xs">
-      <CheckboxField
+      <CheckboxField data-help-skip="The label states the complete legal-review confirmation."
         label="Our counsel reviewed and approved the privacy policy and the terms."
         checked={confirmed}
         onChange={(next) => {
@@ -186,7 +187,7 @@ export default function AdminSetup() {
 
   return (
     <div className="admin-setup flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Complete your setup tasks before you share your site. Hosting status shows the checks managed by the Event Runner team."
         title="Set up your event"
         identifiers={checks ? `${doneCount} of ${steps.length} steps done` : null}
         description="Complete your setup tasks before you share your site. Hosting status shows the checks managed by the Event Runner team."
@@ -231,13 +232,13 @@ export default function AdminSetup() {
       ) : null}
       {hosting.length > 0 ? (
         <section className="admin-panel flex min-w-0 flex-col gap-sm rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md" aria-labelledby="setup-hosting-heading">
-          <h2 id="setup-hosting-heading" className="font-admin-ui text-admin-lg font-bold text-admin-ink">Hosting status</h2>
+          <div className="flex items-center gap-2xs"><h2 id="setup-hosting-heading" className="font-admin-ui text-admin-lg font-bold text-admin-ink">Hosting status</h2><HelpTooltip label="Hosting status">Review the setup checks managed by the Event Runner team.</HelpTooltip></div>
           <p className="text-admin-base text-admin-ink-secondary">The Event Runner team manages these checks.</p>
           <ul className="flex flex-col gap-md" aria-label="Hosting checks">
             {hosting.map((check) => (
               <li key={check.id} className="flex flex-col gap-xs">
                 <div className="flex flex-wrap items-center gap-xs">
-                  <h3 className="text-admin-base font-semibold text-admin-ink">{check.title}</h3>
+                  <div className="flex items-center gap-2xs"><h3 className="text-admin-base font-semibold text-admin-ink">{check.title}</h3><HelpTooltip label={check.title}>Review this hosting check and any action described below it.</HelpTooltip></div>
                   <StatusBadge tone={check.ready ? 'ok' : 'caution'}>{check.ready ? 'Ready' : 'Awaiting Event Runner setup'}</StatusBadge>
                 </div>
                 <p className="text-admin-base text-admin-ink">{check.ready ? check.done : check.todo}</p>

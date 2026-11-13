@@ -131,6 +131,7 @@ async function renderAt(path) {
       expect(screen.queryByLabelText('Loading admin…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Checking your access…')).not.toBeInTheDocument();
       expect(screen.queryByLabelText('Loading event settings…')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading badges…')).not.toBeInTheDocument();
     },
     // The admin chunk now pulls the whole public app in with it (the theme
     // editor's frame renders real pages), so the first mount in a file can
@@ -1354,7 +1355,7 @@ describe('milestones and the registration goal', () => {
     const date = screen.getByLabelText('Milestone 1 date');
     await waitFor(() => expect(document.activeElement).toBe(date));
     expect(date).toHaveAttribute('aria-invalid', 'true');
-    expect(date).toHaveAccessibleDescription('Enter the date of this milestone.');
+    expect(date).toHaveAccessibleDescription('Enter the date of this milestone. Choose the date of this event milestone for the overview countdown.');
     expect(fetch).not.toHaveBeenCalled();
   });
 

@@ -136,7 +136,7 @@ test.describe.serial('Speaker reminders', () => {
 
     await page.goto(`/admin/sessions/${encodeURIComponent(sessionId)}`);
     const request = page.getByRole('switch', { name: 'Request speaker materials' });
-    await expect(page.getByLabel('Public title')).toHaveValue(sessionTitle);
+    await expect(page.getByLabel('Public title', { exact: true })).toHaveValue(sessionTitle);
     await expect(request).toBeChecked();
     await request.focus();
     await page.keyboard.press('Space');
@@ -146,7 +146,7 @@ test.describe.serial('Speaker reminders', () => {
       .toBe(true);
 
     await page.goto('/admin/speakers/reminders/send?show=materials');
-    await expect(page.getByLabel('Show')).toHaveValue('materials');
+    await expect(page.getByLabel('Show', { exact: true })).toHaveValue('materials');
     // The list has loaded (or is empty) before the speaker's absence counts.
     await expect(page.getByRole('list', { name: 'Accepted speakers' })
       .or(page.getByRole('heading', { name: 'No speaker matches' }))).toBeVisible();

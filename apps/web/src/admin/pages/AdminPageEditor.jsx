@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Page editor (issue #13 — "creating a Scholarships page via the admin CMS").
 //
 // Maps onto the cmsPages contract exactly (spec §5.2, functions/src/cms/
@@ -502,6 +503,9 @@ export default function AdminPageEditor({ mode }) {
   }
 
   const isSystemPage = page.systemPage === true;
+  const pathHelp = isSystemPage
+    ? 'This built-in page has a fixed web address.'
+    : 'The page’s web address, such as /scholarships.';
   // "Existing" = a document the server has already written: an edited page,
   // or one this form just created.
   const isExisting = mode === 'edit' || savedId !== null;
@@ -516,7 +520,7 @@ export default function AdminPageEditor({ mode }) {
         save({ publish: false });
       }}
     >
-      <AdminPageHeader
+      <AdminPageHeader help="Save a draft to keep your changes. Publish to show them on the site."
         title={mode === 'create' ? 'New page' : page.label || 'Page'}
         recentTitle={row?.current?.label}
         state={(
@@ -560,14 +564,14 @@ export default function AdminPageEditor({ mode }) {
       ) : null}
 
       <div className="admin-page-basics">
-      <Panel title="Page" description="How the page is identified and linked." className="admin-page-identity">
+      <Panel help="How the page is identified and linked." title="Page" description="How the page is identified and linked." className="admin-page-identity">
         <div className="admin-page-fields">
-          <TextField
+          <TextField help="Shown in the header navigation and the footer page list. Keep it short — every page shares one row."
             label="Navigation label"
             value={page.label}
             onChange={(value) => update({ label: value })}
             error={errorFor('label')}
-            hint="Shown in the header navigation and the footer page list. Keep it short — every page shares one row."
+            
           />
           {/* Optional, and empty is the normal answer: a page with no
               heading of its own is headed by its navigation label. The
@@ -591,12 +595,12 @@ export default function AdminPageEditor({ mode }) {
               <p className={`${fieldHintClass} admin-field__hint`}>This built-in page sets its own heading.</p>
             </div>
           ) : (
-            <TextField
+            <TextField help="Set the heading at the top of this page when it differs from the navigation label. Leave blank to use the navigation label."
               label="Page heading"
               value={page.title}
               onChange={(value) => update({ title: value })}
               error={errorFor('title')}
-              hint="Optional. The heading at the top of the page, when it differs from the navigation label. Leave blank to use the label."
+              
             />
           )}
           {/* A system page's path names a route that is declared in the
@@ -611,14 +615,11 @@ export default function AdminPageEditor({ mode }) {
             onChange={(value) => update({ path: value })}
             error={errorFor('path')}
             readOnly={isSystemPage}
-            hint={
-              isSystemPage
-                ? 'This built-in page has a fixed web address.'
-                : 'The page’s web address, such as /scholarships.'
-            }
+            help={pathHelp}
+            hint={pathHelp}
           />
           <div className="flex flex-col justify-center gap-xs">
-            <CheckboxField
+            <CheckboxField help="Include this content on the public site after publishing."
               label="Visible"
               checked={page.visible}
               onChange={(checked) => update({ visible: checked })}
@@ -633,7 +634,7 @@ export default function AdminPageEditor({ mode }) {
         </div>
       </Panel>
 
-      <Panel
+      <Panel help="Choose the page’s starting layout and adjust its presentation."
         title="Page template"
         className="admin-page-template"
         description={
@@ -642,7 +643,7 @@ export default function AdminPageEditor({ mode }) {
             : 'What kind of page this is.'
         }
       >
-        <SelectField
+        <SelectField help="Choose a prepared page layout. Review how it changes the page before saving."
           label="Template"
           value={page.template ?? CUSTOM_TEMPLATE}
           options={[
@@ -686,7 +687,7 @@ export default function AdminPageEditor({ mode }) {
             </p>
             <div className="grid gap-sm sm:grid-cols-2">
               {EDITABLE_LAYOUT_KEYS.map((key) => (
-                <SelectField
+                <SelectField help="Choose how this part of the page is arranged. Leave the default to follow the page template."
                   key={key}
                   label={LAYOUT_LABELS[key]}
                   value={page.layout?.[key] ?? PAGE_LAYOUT_DEFAULTS[key]}
@@ -703,7 +704,7 @@ export default function AdminPageEditor({ mode }) {
               ))}
             </div>
             <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
-              <SelectField
+              <SelectField help="The site sets this once for every page, on the Branding tab. Change it here only for a page that genuinely needs to differ — the template above is unaffected either way."
                 label="Navigation on this page"
                 value={page.layout?.navPlacement ?? SITE_NAV_PLACEMENT}
                 options={[
@@ -728,7 +729,7 @@ export default function AdminPageEditor({ mode }) {
                   });
                 }}
                 error={errorFor('layout.navPlacement')}
-                hint="The site sets this once for every page, on the Branding tab. Change it here only for a page that genuinely needs to differ — the template above is unaffected either way."
+                
               />
             </div>
           </div>
@@ -737,7 +738,7 @@ export default function AdminPageEditor({ mode }) {
 
       </div>
 
-      <Panel
+      <Panel help="Open a section to change its name and blocks."
         title="Sections"
         description="Open a section to change its name and blocks."
         actions={
@@ -767,7 +768,7 @@ export default function AdminPageEditor({ mode }) {
                   className="min-w-0"
                   {...bindReorderDrop('section:', sectionIndex, moveSections)}
                 >
-                  <EditorDisclosure
+                  <EditorDisclosure help="Open this section to change its label, content limits and block types."
                     title={section.label || `Section ${sectionIndex + 1}`}
                     description={`${section.defaultBlocks.length} ${section.defaultBlocks.length === 1 ? 'block' : 'blocks'}`}
                     defaultOpen={!section.id}
@@ -795,13 +796,13 @@ export default function AdminPageEditor({ mode }) {
                   </div>
 
                   <div className="admin-section-fields">
-                    <TextField
+                    <TextField help="Name this section so staff can find it when editing page content."
                       label={`Section ${sectionIndex + 1} label`}
                       value={section.label}
                       onChange={(value) => updateSection(sectionIndex, { label: value })}
                       error={errorFor(`${at}.label`)}
                     />
-                    <TextField
+                    <TextField help="Limit how many content blocks staff can add to this section."
                       label={`Section ${sectionIndex + 1} max blocks`}
                       type="number"
                       min="1"
@@ -814,7 +815,7 @@ export default function AdminPageEditor({ mode }) {
                       error={errorFor(`${at}.maxBlocks`)}
                     />
                     <div className="flex items-center">
-                      <CheckboxField
+                      <CheckboxField help="Allow staff to change the order of content blocks in this section."
                         label={`Section ${sectionIndex + 1} is reorderable`}
                         checked={section.reorderable}
                         onChange={(checked) =>
@@ -826,31 +827,31 @@ export default function AdminPageEditor({ mode }) {
                         there is nothing for a section to sit above or below
                         — the control only exists on a system page. */}
                     {isSystemPage ? (
-                      <SelectField
+                      <SelectField help="Show this section before or after the main content."
                         label={`Section ${sectionIndex + 1} position`}
                         value={slotValue(section.slot)}
                         options={SLOT_CHOICES}
                         onChange={(value) => updateSection(sectionIndex, { slot: value })}
                         error={errorFor(`${at}.slot`)}
-                        hint="Show this section before or after the main content."
+                        
                       />
                     ) : null}
                     <div className="sm:col-span-2">
-                      <TextAreaField
+                      <TextAreaField help="Guidance for whoever fills this section in."
                         label={`Section ${sectionIndex + 1} description`}
                         value={section.description}
                         onChange={(value) =>
                           updateSection(sectionIndex, { description: value })
                         }
                         error={errorFor(`${at}.description`)}
-                        hint="Guidance for whoever fills this section in."
+                        
                       />
                     </div>
                   </div>
 
                   <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2xs">
-                      <h4 className="text-admin-base font-bold text-admin-ink">Blocks</h4>
+                      <div className="flex items-center gap-2xs"><h4 className="text-admin-base font-bold text-admin-ink">Blocks</h4><HelpTooltip label="Blocks">Choose the kinds of content staff can add to this section.</HelpTooltip></div>
                       <button
                         type="button"
                         className={secondaryButtonClass}
@@ -887,7 +888,7 @@ export default function AdminPageEditor({ mode }) {
                                   never changes, so it is not shown. Type and description sit
                                   on one row with no hints, so their boxes line up. */}
                               <div className="grid items-start gap-xs sm:grid-cols-[minmax(10rem,14rem)_1fr]">
-                                <SelectField
+                                <SelectField help="Choose which kind of content this block should contain."
                                   label={`Block ${blockIndex + 1} type — section ${sectionIndex + 1}`}
                                   value={block.blockType}
                                   options={options}
@@ -896,7 +897,7 @@ export default function AdminPageEditor({ mode }) {
                                   }
                                   error={errorFor(`${bat}.blockType`) || errorFor(`${bat}.field`)}
                                 />
-                                <TextField
+                                <TextField help="Explain what staff should put in this content block."
                                   label={`Block ${blockIndex + 1} description — section ${sectionIndex + 1}`}
                                   value={block.description}
                                   onChange={(value) =>

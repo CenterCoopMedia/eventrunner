@@ -238,7 +238,7 @@ export default function AdminTimelineEditor({ mode }) {
       noValidate
       onSubmit={(event) => { event.preventDefault(); save(); }}
     >
-      <AdminPageHeader
+      <AdminPageHeader help="Describe a past event and publish it to the public timeline."
         title={creating ? 'New entry' : form.title.trim() || 'Untitled entry'}
         recentTitle={row?.current?.title}
         state={!creating && row ? <RecordState state={row.state} /> : null}
@@ -268,9 +268,9 @@ export default function AdminTimelineEditor({ mode }) {
 
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
-      <Panel title="Entry">
+      <Panel help="Describe one past event for the public timeline." title="Entry">
         <div className="flex flex-col gap-sm">
-          <TextField
+          <TextField help="Enter the year of this past event."
             label="Year"
             inputMode="numeric"
             autoComplete="off"
@@ -280,23 +280,23 @@ export default function AdminTimelineEditor({ mode }) {
             className="font-admin-data"
             required
           />
-          <TextField
+          <TextField help="What made this event memorable?"
             label="Title"
-            hint="What made this event memorable?"
+            
             value={form.title}
             onChange={(value) => set('title', value)}
             error={errorFor('title')}
             required
           />
-          <TextAreaField
+          <TextAreaField help="One or two sentences about this event."
             label="Description"
-            hint="One or two sentences about this event."
+            
             rows={3}
             value={form.description}
             onChange={(value) => set('description', value)}
             error={errorFor('description')}
           />
-          <CheckboxField
+          <CheckboxField help="Include this past event in the public timeline after publishing."
             label="Show this entry when it is published"
             checked={form.visible}
             onChange={(value) => set('visible', value)}

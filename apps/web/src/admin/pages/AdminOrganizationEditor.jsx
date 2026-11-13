@@ -294,7 +294,7 @@ export default function AdminOrganizationEditor({ mode }) {
         noValidate
         onSubmit={(event) => { event.preventDefault(); save(); }}
       >
-        <AdminPageHeader
+        <AdminPageHeader help="Edit the details attendees see on the sponsors page."
           title={creating ? 'New organization' : form.name || 'Unnamed organization'}
           recentTitle={row?.current?.name}
           state={!creating && row ? <RecordState state={row.state} /> : null}
@@ -338,13 +338,13 @@ export default function AdminOrganizationEditor({ mode }) {
         <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
         <div className="admin-editor-layout admin-editor-layout--organization">
-          <Panel
+          <Panel help="The name, introduction, and website shown to attendees."
             title="Public details"
             description="The name, introduction, and website shown to attendees."
             className="admin-editor-card--primary"
           >
             <div className="flex flex-col gap-sm">
-              <TextField
+              <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                 label="Name"
                 value={form.name}
                 onChange={(value) => {
@@ -357,9 +357,9 @@ export default function AdminOrganizationEditor({ mode }) {
                 required
               />
               {creating ? (
-                <TextField
+                <TextField hint="Choose the end of the page link. This is fixed after the first save." help="Choose the end of the page link. This is fixed after the first save."
                   label="Page address"
-                  hint="Choose the end of the page link. This is fixed after the first save."
+                  
                   value={form.slug}
                   onChange={(value) => {
                     setSlugTouched(true);
@@ -372,15 +372,15 @@ export default function AdminOrganizationEditor({ mode }) {
                   required
                 />
               ) : null}
-              <TextAreaField
+              <TextAreaField help="One or two sentences on what this organization supports."
                 label="Description"
-                hint="One or two sentences on what this organization supports."
+                
                 rows={3}
                 value={form.description}
                 onChange={(value) => set('description', value)}
                 error={errorFor('description')}
               />
-              <TextField
+              <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
                 label="Website"
                 type="url"
                 value={form.url}
@@ -391,12 +391,12 @@ export default function AdminOrganizationEditor({ mode }) {
           </Panel>
 
           <div className="admin-editor-stack">
-            <Panel title="Placement" description="Set the group and visibility here. The sponsors list sets the order.">
+            <Panel help="Choose the sponsor group and whether this organization appears after publishing." title="Placement" description="Set the group and visibility here. The sponsors list sets the order.">
               <div className="admin-editor-fields planner-fields grid gap-sm sm:grid-cols-2">
                 <div>
-                  <TextField
+                  <TextField help="Choose an existing tier to group sponsors together."
                     label="Tier"
-                    hint="Choose an existing tier to group sponsors together."
+                    
                     value={form.tier}
                     onChange={(value) => set('tier', value)}
                     error={errorFor('tier')}
@@ -409,7 +409,7 @@ export default function AdminOrganizationEditor({ mode }) {
                   ) : null}
                 </div>
                 <div className="sm:col-span-2">
-                  <PlannerSwitch
+                  <PlannerSwitch help="Include this organization on the public sponsors page after publishing."
                     label="Show on the sponsors page"
                     checked={form.visible}
                     onChange={(value) => set('visible', value)}
@@ -418,10 +418,10 @@ export default function AdminOrganizationEditor({ mode }) {
               </div>
             </Panel>
 
-            <Panel title="Logo" description="The organization’s mark on its page and the sponsor wall.">
-              <ImagePicker
+            <Panel help="The organization’s mark on its page and the sponsor wall." title="Logo" description="The organization’s mark on its page and the sponsor wall.">
+              <ImagePicker help="Choose or upload a logo."
                 label="Logo"
-                hint="Choose or upload a logo."
+                
                 folder="cms-images"
                 value={form.logoPath}
                 onChange={(value) => set('logoPath', value)}

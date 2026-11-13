@@ -284,7 +284,7 @@ export default function AdminUpdateEditor({ mode }) {
         save();
       }}
     >
-      <AdminPageHeader
+      <AdminPageHeader help="Write an update for attendees. Save a draft or publish it to the Updates page."
         title={mode === 'create' ? 'New update' : form.title.trim() || 'Untitled update'}
         recentTitle={row?.current?.title}
         state={mode === 'edit' ? <RecordState state={row?.state} /> : null}
@@ -327,16 +327,16 @@ export default function AdminUpdateEditor({ mode }) {
 
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
 
-      <Panel title="Public update">
+      <Panel help="Write the news and date attendees should see on the Updates page." title="Public update">
         <div className="flex flex-col gap-sm">
-          <TextField
+          <TextField help="Use the headline attendees should see above this update."
             label="Title"
             value={form.title}
             onChange={(value) => set({ title: value })}
             error={errorFor('title')}
             required
           />
-          <TextAreaField
+          <TextAreaField help="Write the news attendees should read on the Updates page."
             label="Text"
             rows={8}
             value={form.body}
@@ -344,10 +344,10 @@ export default function AdminUpdateEditor({ mode }) {
             error={errorFor('body')}
             required
           />
-          <TextField
+          <TextField help="The date shown to readers. A future date does not delay publishing."
             label="Date"
             type="date"
-            hint="The date shown to readers. A future date does not delay publishing."
+            
             name="date"
             value={form.date}
             onChange={(value) => set({ date: value })}
@@ -357,9 +357,9 @@ export default function AdminUpdateEditor({ mode }) {
             error={errorFor('date')}
             className="sm:max-w-[16rem]"
           />
-          <TextField
+          <TextField help="An optional topic, such as Travel or Program."
             label="Category"
-            hint="An optional topic, such as Travel or Program."
+            
             value={form.category}
             onChange={(value) => set({ category: value })}
             error={errorFor('category')}
@@ -377,20 +377,20 @@ export default function AdminUpdateEditor({ mode }) {
         </div>
       </Panel>
 
-      <Panel title="Placement">
+      <Panel help="Choose where this update appears after publishing." title="Placement">
         <div className="flex flex-col gap-sm">
-          <CheckboxField
+          <CheckboxField help="Keep this update ahead of newer unpinned updates."
             label="Pin this update to the top of the list"
             checked={form.pinned}
             onChange={(value) => set({ pinned: value })}
           />
-          <CheckboxField
+          <CheckboxField help="The first featured update appears above the list."
             label="Feature this update at the head of the list"
-            hint="The first featured update appears above the list."
+            
             checked={form.featured}
             onChange={(value) => set({ featured: value })}
           />
-          <CheckboxField
+          <CheckboxField help="Include this update on the public site after publishing."
             label="Show this update when it is published"
             checked={form.visible}
             onChange={(value) => set({ visible: value })}
