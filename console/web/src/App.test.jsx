@@ -1,15 +1,20 @@
 import { hostName } from './text.js';
+import { useState } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Link, MemoryRouter } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { callApi } from './api.js';
 import { AuthContext, RETURN_KEY } from './auth.jsx';
-import { fakeAuth } from './test/renderPage.jsx';
+import { fakeAuth, signedInUser } from './test/renderPage.jsx';
 import { AppRoutes } from './App.jsx';
 import { application, serveApi, team } from './test/application.js';
 import { keepAnswer, readKeptAnswer } from './setup/keptAnswers.js';
 
 vi.mock('./api.js', () => ({ callApi: vi.fn(async () => ({ operator: false, organizations: [{ id: 'o1', name: 'Org', role: 'owner' }] })) }));
+
+beforeEach(() => {
+  callApi.mockImplementation(async () => ({ operator: false, organizations: [{ id: 'o1', name: 'Org', role: 'owner' }] }));
+});
 
 const teamImport = vi.hoisted(() => {
   let finish;
@@ -31,6 +36,53 @@ function renderApp(path, auth = fakeAuth()) {
 }
 
 describe('AppRoutes', () => {
+  it.each(['popup', 'email in another tab'])('recovers a 401 and offers the original tab’s answer after %s sign-in', async (method) => {
+    let setSession;
+    let unauthorized = true;
+    const auth = fakeAuth({
+      signOut: vi.fn(async () => setSession(null)),
+      signInWithGoogle: vi.fn(async () => { unauthorized = false; setSession(signedInUser()); }),
+    });
+    function Session() {
+      const [user, update] = useState(signedInUser());
+      setSession = update;
+      return <AuthContext.Provider value={{ ...auth, user }}><MemoryRouter initialEntries={['/organizations/o1/applications/a1/organization?from=review']}><AppRoutes /></MemoryRouter></AuthContext.Provider>;
+    }
+    serveApi({ saveApplicationStep: (body) => {
+      if (unauthorized) throw Object.assign(new Error('Sign in to continue.'), { status: 401, code: 'unauthorized' });
+      return { step: body.step, saved: true, errors: {} };
+    } });
+    render(<Session />);
+    fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'Kept through sign-in' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
+    const recover = await screen.findByRole('button', { name: 'Sign in again' });
+    expect(screen.queryByRole('button', { name: 'Save again' })).not.toBeInTheDocument();
+    fireEvent.click(recover);
+    await screen.findByRole('heading', { name: 'Sign in to Event Runner' });
+    expect(await screen.findByText(/If the email link opens another tab, return to this tab/)).toBeInTheDocument();
+    expect(auth.signOut).toHaveBeenCalledTimes(1);
+    expect(callApi.mock.calls.filter(([name]) => name === 'saveApplicationStep')).toHaveLength(1);
+    if (method === 'popup') fireEvent.click(screen.getByRole('button', { name: 'Continue with Google' }));
+    else {
+      fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'ana@example.org' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Send link' }));
+      await waitFor(() => expect(auth.sendEmailLink).toHaveBeenCalledWith('ana@example.org'));
+      // Another tab completes the emailed link and clears the shared path.
+      // The AuthProvider's existing cross-tab token notification updates us.
+      window.localStorage.removeItem(RETURN_KEY);
+      unauthorized = false;
+      act(() => setSession(signedInUser()));
+    }
+    const use = await screen.findByRole('button', { name: 'Use kept answer' });
+    expect(screen.getByRole('button', { name: 'Back to Review' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Organization name')).toHaveValue('NC Local');
+    fireEvent.click(use);
+    expect(screen.getByLabelText('Organization name')).toHaveValue('Kept through sign-in');
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Review' }));
+    await screen.findByRole('heading', { level: 1, name: 'Review' });
+    expect(readKeptAnswer({ userId: 'ana', orgId: 'o1', appId: 'a1' }, 'organization')).toBeNull();
+  });
+
   it('keeps a decorative Badger inside the semantic page title and main region', () => {
     renderApp('/nowhere');
     const heading = screen.getByRole('heading', { level: 1, name: 'Page not found' });

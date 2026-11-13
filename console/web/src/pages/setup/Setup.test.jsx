@@ -431,6 +431,55 @@ describe('Setup', () => {
     expect(await screen.findByText(/Not saved. Your site is being built/)).toBeInTheDocument();
   });
 
+  it.each([0, 408, 429, 503])('offers Save again for status %s and keeps focus on the result through the retry', async (status) => {
+    let finish;
+    let calls = 0;
+    serveApi({ saveApplicationStep: (body) => {
+      if (++calls === 1) throw Object.assign(new Error('Try again.'), { status, code: status ? 'unavailable' : 'network' });
+      return new Promise((resolve) => { finish = () => resolve({ step: body.step, saved: true, errors: {} }); });
+    } });
+    renderSetup('organization');
+    fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'Retry this answer' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
+    const retry = await screen.findByRole('button', { name: 'Save again' });
+    retry.focus();
+    fireEvent.click(retry);
+    await waitFor(() => expect(finish).toBeTypeOf('function'));
+    expect(screen.getByRole('group', { name: 'Save status' })).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+    await act(async () => finish());
+    await screen.findByText('Saved.');
+    expect(screen.queryByRole('button', { name: 'Save again' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Save status' })).toHaveFocus();
+    expect(callsTo('saveApplicationStep').map((body) => body.answers.name)).toEqual(['Retry this answer', 'Retry this answer']);
+  });
+
+  it('keeps a 409 refusal visible without a retry or sign-in action', async () => {
+    serveApi({ saveApplicationStep: () => { throw Object.assign(new Error('This request is locked.'), { status: 409, code: 'locked' }); } });
+    renderSetup('organization');
+    fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'Refused edit' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
+    expect(await screen.findByText('Not saved. This request is locked.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save again' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign in again' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the typed answer and session when storage cannot retain a recovery copy', async () => {
+    const blocked = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage blocked'); });
+    try {
+      serveApi({ saveApplicationStep: () => { throw Object.assign(new Error('Sign in to continue.'), { status: 401, code: 'unauthorized' }); } });
+      const { auth } = renderSetup('organization');
+      fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'Keep in the form' } });
+      fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Sign in again' }));
+      await screen.findByText('Your browser could not keep this answer. Copy it somewhere safe before leaving setup to sign in again.');
+      expect(auth.signOut).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('Organization name')).toHaveValue('Keep in the form');
+    } finally {
+      blocked.mockRestore();
+    }
+  });
+
   it('holds the request while the server kept an older web address, until a name saves', async () => {
     const TAKEN = 'Another event already uses this name. Choose another name.';
     serveApi({
@@ -443,8 +492,13 @@ describe('Setup', () => {
     fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken' } });
     fireEvent.click(screen.getByRole('link', { name: /Review/ }));
     await screen.findByRole('heading', { level: 1, name: 'Review' });
-    expect(screen.queryByRole('button', { name: /^Next:/ })).not.toBeInTheDocument();
     const held = screen.getByText(/is not saved/);
+    const next = screen.getByRole('button', { name: 'Next: Agreement' });
+    expect(next).toBeEnabled();
+    fireEvent.click(next);
+    await waitFor(() => expect(document.getElementById('review-not-saved')).toHaveFocus());
+    expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument();
+    expect(callsTo('getAgreement')).toHaveLength(0);
     expect(held).toHaveTextContent('Your web address is not saved. Fix it before you continue.');
     expect(within(screen.getByRole('navigation', { name: 'Setup steps' })).getByText('Save the answers that have not been saved first.')).toBeInTheDocument();
     expect(within(held).getByRole('link', { name: 'Your web address' }))
