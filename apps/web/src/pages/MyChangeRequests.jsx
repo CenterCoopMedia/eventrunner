@@ -19,6 +19,7 @@ import { Link } from 'react-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
+import LoadingState from '../components/LoadingState.jsx';
 import { secondaryActionClass } from '../components/controlClasses.js';
 import { listMyChangeRequests } from '../lib/changeRequestApi.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
@@ -148,7 +149,7 @@ export default function MyChangeRequests() {
 
   const heading = <h1 className="font-heading text-h1 font-semibold">Your change requests</h1>;
   if (demo) return <article className="space-y-md">{heading}<p>Change requests are off in this read-only demo.</p></article>;
-  if (loading) return <p role="status">Checking your sign-in…</p>;
+  if (loading) return <LoadingState label="Checking your sign-in…" rows={0} />;
   if (!user) {
     return <article className="space-y-md">{heading}<p>Sign in to see the change requests you sent.</p><SignInPanel /></article>;
   }
@@ -178,7 +179,8 @@ export default function MyChangeRequests() {
         </button>
       </div>
       {mine && !mine.ok ? <p role="alert" className="text-danger">{mine.error}</p> : null}
-      {!mine ? <p role="status">Loading your change requests…</p> : null}
+      {!mine ? <LoadingState label="Loading your change requests…" rows={0} /> : null}
+      <section aria-label="Change requests" aria-busy={busy || !mine} className="space-y-md">
       {mine?.ok && mine.requests.length === 0 ? (
         <section className="space-y-sm">
           <p>You have not sent a change request.</p>
@@ -190,6 +192,7 @@ export default function MyChangeRequests() {
           {mine.requests.map((request) => <RequestItem key={request.id} request={request} />)}
         </ol>
       ) : null}
+      </section>
     </article>
   );
 }
