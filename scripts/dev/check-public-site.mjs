@@ -263,11 +263,11 @@ async function main() {
         const url = new URL(request.url());
         if (options.blockFirebase && /\/assets\/firebase-sdk-[^/]+\.js$/.test(url.pathname)) {
           const timing = await page.evaluate(() => ({
-            origin: globalThis.performance.timeOrigin,
             paint: globalThis.performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0,
+            sdk: globalThis.performance.getEntriesByName('eventrunner:firebase-start').at(-1)?.startTime || 0,
           }));
           record.firstPaintAtSdkRequest = timing.paint;
-          record.sdkRequestStart = request.timing().startTime - timing.origin;
+          record.sdkRequestStart = timing.sdk;
           record.blockedSdkRequests = (record.blockedSdkRequests || 0) + 1;
           return route.abort('blockedbyclient');
         }

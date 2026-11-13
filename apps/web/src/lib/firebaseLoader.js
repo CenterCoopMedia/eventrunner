@@ -24,6 +24,7 @@ export function isFirebaseLoading() { return loading; }
 export function loadFirebase() {
   if (!runtime) {
     loading = true;
+    globalThis.performance?.mark?.('eventrunner:firebase-start');
     runtime = import('../firebase.js')
       .catch((error) => { runtime = null; throw error; })
       .finally(() => { loading = false; });
