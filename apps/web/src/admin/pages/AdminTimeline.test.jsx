@@ -175,10 +175,19 @@ describe('the timeline list', () => {
   it('says it is loading until both revisions have arrived', async () => {
     holdAdminCollections = true;
     await renderAt('/admin/timeline');
+    // The lazy-route fallback has the same label as the data wait. The
+    // Timeline listeners identify the mounted page whose readiness we test.
+    await waitFor(() => {
+      expect(adminSubscriptions.has('cmsTimeline')).toBe(true);
+      expect(adminSubscriptions.has('cmsTimeline_drafts')).toBe(true);
+    });
     expect(await screen.findByRole('status', { name: 'Loading timeline…' })).toBeInTheDocument();
-    await waitFor(() => expect(adminSubscriptions.has('cmsTimeline_drafts')).toBe(true));
-    pushTimeline(LIVE, DRAFTS);
+    act(() => adminSubscriptions.get('cmsTimeline')(LIVE, { fromCache: false }));
+    expect(screen.getByRole('status', { name: 'Loading timeline…' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'The first meeting', exact: true })).toBeNull();
+    act(() => adminSubscriptions.get('cmsTimeline_drafts')(DRAFTS, { fromCache: false }));
     expect(screen.queryByRole('status', { name: 'Loading timeline…' })).toBeNull();
+    expect(screen.getByText('4 entries')).toBeInTheDocument();
   });
 
   it('offers the first entry when there is none', async () => {
