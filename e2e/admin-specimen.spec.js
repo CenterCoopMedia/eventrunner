@@ -84,6 +84,17 @@ for (const width of [1440, 390]) {
           const header = main.querySelector('.admin-job-line');
           const description = header.nextElementSibling;
           const style = (node) => globalThis.getComputedStyle(node);
+          const bounds = (node) => {
+            const rect = node.getBoundingClientRect();
+            return { width: rect.width, right: rect.right, scrollWidth: node.scrollWidth, clientWidth: node.clientWidth };
+          };
+          const escapesViewport = (node) => {
+            if (node.getBoundingClientRect().right <= globalThis.innerWidth) return false;
+            for (let ancestor = node.parentElement; ancestor && ancestor !== main; ancestor = ancestor.parentElement) {
+              if (['auto', 'scroll', 'hidden', 'clip'].includes(style(ancestor).overflowX)) return false;
+            }
+            return true;
+          };
           return {
             mode: globalThis.document.documentElement.dataset.mode,
             viewport: globalThis.innerWidth, scrollWidth: globalThis.document.documentElement.scrollWidth,
@@ -92,9 +103,17 @@ for (const width of [1440, 390]) {
             font: style(main).fontFamily, dataFont: style(main.querySelector('.font-admin-data')).fontFamily,
             descriptionHeight: description.getBoundingClientRect().height,
             descriptionWidth: description.getBoundingClientRect().width,
+            families: [...main.querySelectorAll('[data-admin-specimen]')].map((node) => ({ family: node.dataset.adminSpecimen, ...bounds(node) })),
+            overflow: [...globalThis.document.querySelectorAll('body *')].filter(escapesViewport).slice(0, 20).map((node) => ({
+              family: node.closest('[data-admin-specimen]')?.dataset.adminSpecimen ?? 'document',
+              element: node.tagName, className: node.getAttribute('class'), ...bounds(node),
+            })),
           };
         });
         metrics.push({ source, ...measurement });
+        await fs.writeFile(path.join(EVIDENCE, `admin-specimen--${mode}--${width}.json`), JSON.stringify({
+          base, comparison: 'Base shared chrome and PR shared chrome in the same new synthetic specimen', width, mode, metrics,
+        }, null, 2));
         await page.screenshot({ path: path.join(EVIDENCE, `admin-specimen--${source}--${mode}--${width}.png`), fullPage: true, animations: 'disabled' });
         if (source === 'before') {
           expect(measurement.liveWeight).toBe('600');
