@@ -390,10 +390,13 @@ test('an event with no usable social account adds nothing to either footer', () 
   const template = getDefaultTemplate('account.welcome');
   const tokenValues = { first_name: 'Ada', profile_url: 'https://summit.example.org/profile' };
   const none = render({ template, tokenValues, config: CONFIG });
-  // No row, no separator, and no blank line after the postal block.
-  assert.ok(none.text.endsWith('--\nExample Org\n1 Main St\nSpringfield'), none.text);
+  // Option B adds event details; an absent social list still adds no footer row.
+  assert.ok(none.text.endsWith('Hosted by Example Org\n1 Main St\nSpringfield'), none.text);
   assert.doesNotMatch(none.html, /<p[^>]*>\s*<\/p>/);
-  assert.ok(!none.html.includes('&middot;'));
+  const footerStart = none.html.indexOf(CONFIG.event.legal.postalAddressHtml);
+  assert.notEqual(footerStart, -1);
+  const footer = none.html.slice(footerStart);
+  assert.ok(!footer.includes('&middot;'));
   assert.deepEqual(none.warnings, []);
   // Absent, and holding only a link the shared check refuses, read the same.
   for (const social of [undefined, { handles: [{ platform: 'Script', url: 'javascript:alert(1)' }] }]) {
