@@ -102,6 +102,27 @@ test.describe.serial('speaker discussion points', () => {
     });
   }
 
+  test('an accepted speaker with no visible session can save at phone width', async ({ page }) => {
+    for (const id of sessions) await adminDb().collection('cmsSchedule').doc(id).update({ visible: false });
+    await adminDb().collection('speakers').doc(speakerId).update({ status: 'accepted' });
+    await page.setViewportSize({ width: 390, height: 900 });
+    await signIn(page, email);
+    await page.goto('/speaker/dashboard');
+    await expect(page.getByText('No sessions are assigned to you.')).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Discussion points' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('combobox', { name: 'Session', exact: true })).toHaveCount(0);
+    const field = page.getByRole('textbox', { name: 'Discussion points' });
+    await expect(field).toBeEnabled();
+    await field.fill('Discussion points before my session is public.');
+    await page.getByRole('button', { name: 'Replace saved discussion points' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Your discussion points are saved.' })).toBeVisible();
+    const read = await callFunction('getSpeakerDiscussionPoints', { speakerId }, await idTokenFor(uid));
+    expect(read.status).toBe(200);
+    expect(read.body.submission.text).toBe('Discussion points before my session is public.');
+    expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth)).toBe(true);
+    await page.screenshot({ path: 'test-results/admin-visual-evidence/speaker-discussion-unassigned-390.png', fullPage: true });
+  });
+
   test('another account cannot read or replace the submission', async () => {
     const token = await idTokenFor(otherUid);
     const before = (await adminDb().collection('speakers').doc(speakerId).get()).data().discussionPoints;

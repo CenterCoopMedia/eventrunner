@@ -120,45 +120,54 @@ function SpeakerSessionHubContent({
   return (
     <section aria-labelledby="speaker-sessions-heading" className="mt-xl">
       <SectionHead id="speaker-sessions-heading" title="Your sessions" />
-      {selectedSession ? (
-        <div className="mt-md">
+      <div className="mt-md">
+        {selectedSession ? (
           <SelectField
             label="Session"
             value={selectedSession.id}
             onChange={setSelectedId}
             options={sessions.map((session) => ({ value: session.id, label: session.title }))}
           />
-          <div className="mt-md">
-            <Tabs value={activeTab} onChange={setActiveTab} tabs={TAB_IDS}>
-              <TabList label="Session information and speaker discussion points">
-                <Tab id="details">Details</Tab>
-                <Tab id="co-speakers">Co-speakers</Tab>
-                <Tab id="materials">Materials</Tab>
-                <Tab id="discussion">Discussion points</Tab>
-              </TabList>
-              <TabPanel id="details">
-                <SessionDetails eventConfig={eventConfig} session={selectedSession} />
-              </TabPanel>
-              <TabPanel id="discussion">
-                <SpeakerDiscussionPoints discussion={discussion} />
-              </TabPanel>
-              <TabPanel id="co-speakers">
-                <CoSpeakers session={selectedSession} speakerId={speakerId} />
-              </TabPanel>
-              <TabPanel id="materials">
-                <SpeakerSessionMaterials
-                  key={`${speakerId}:${selectedSession.id}`}
-                  sessionId={selectedSession.id}
-                  speakerId={speakerId}
-                  onMaterialsChanged={onMaterialsChanged}
-                />
-              </TabPanel>
-            </Tabs>
-          </div>
+        ) : (
+          <p className="text-body text-text-secondary">No sessions are assigned to you.</p>
+        )}
+        <div className="mt-md">
+          <Tabs value={selectedSession ? activeTab : 'discussion'} onChange={setActiveTab}
+            tabs={selectedSession ? TAB_IDS : ['discussion']}>
+            <TabList label="Session information and speaker discussion points">
+              {selectedSession ? (
+                <>
+                  <Tab id="details">Details</Tab>
+                  <Tab id="co-speakers">Co-speakers</Tab>
+                  <Tab id="materials">Materials</Tab>
+                </>
+              ) : null}
+              <Tab id="discussion">Discussion points</Tab>
+            </TabList>
+            <TabPanel id="discussion">
+              <SpeakerDiscussionPoints discussion={discussion} />
+            </TabPanel>
+            {selectedSession ? (
+              <>
+                <TabPanel id="details">
+                  <SessionDetails eventConfig={eventConfig} session={selectedSession} />
+                </TabPanel>
+                <TabPanel id="co-speakers">
+                  <CoSpeakers session={selectedSession} speakerId={speakerId} />
+                </TabPanel>
+                <TabPanel id="materials">
+                  <SpeakerSessionMaterials
+                    key={`${speakerId}:${selectedSession.id}`}
+                    sessionId={selectedSession.id}
+                    speakerId={speakerId}
+                    onMaterialsChanged={onMaterialsChanged}
+                  />
+                </TabPanel>
+              </>
+            ) : null}
+          </Tabs>
         </div>
-      ) : (
-        <p className="mt-md text-body text-text-secondary">No sessions are assigned to you.</p>
-      )}
+      </div>
     </section>
   );
 }

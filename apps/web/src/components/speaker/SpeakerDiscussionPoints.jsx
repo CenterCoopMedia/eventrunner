@@ -10,10 +10,10 @@ const INITIAL = {
 };
 
 const NOTIFICATION_COPY = {
-  accepted: 'Your discussion points are saved. The email provider accepted the notification. Organizer receipt is unconfirmed.',
-  omitted: 'Your discussion points are saved. No organizer email was sent for this update.',
-  failed: 'Your discussion points are saved. The organizer email failed.',
-  unknown: 'Your discussion points are saved. The organizer email outcome is unconfirmed.',
+  accepted: 'The email provider accepted the notification. Organizer receipt is unconfirmed.',
+  omitted: 'No organizer email was sent for this update.',
+  failed: 'The organizer email failed.',
+  unknown: 'The organizer email outcome is unconfirmed.',
 };
 
 function accessFailure(error) {
@@ -77,7 +77,7 @@ export function useSpeakerDiscussion({ user, speakerId }) {
   async function save(event) {
     event.preventDefault();
     const previous = latest.current;
-    if (busy.current || !['ready', 'uncertain'].includes(previous.phase) || previous.accessBlocked) return;
+    if (busy.current || !['ready', 'saved', 'uncertain'].includes(previous.phase) || previous.accessBlocked) return;
     const validation = validateDiscussionPoints(previous.pending ?? {
       speakerId, text: previous.draft, expectedRevision: previous.revision, requestId: crypto.randomUUID(),
     });
@@ -95,7 +95,7 @@ export function useSpeakerDiscussion({ user, speakerId }) {
     try {
       const submission = await saveSpeakerDiscussionPoints({ user: currentUser.current, ...request });
       if (!active.current || ticket !== operation.current) return;
-      setState((value) => ({ ...value, phase: 'ready', submission, revision: submission.revision, pending: null }));
+      setState((value) => ({ ...value, phase: 'saved', submission, revision: submission.revision, pending: null }));
     } catch (error) {
       if (!active.current || ticket !== operation.current) return;
       if (error?.code === 'read-only-demo') {
@@ -127,7 +127,9 @@ export function useSpeakerDiscussion({ user, speakerId }) {
 
   return {
     ...state, load, save,
-    changeDraft: (draft) => setState((previous) => ({ ...previous, draft, fieldError: '' })),
+    changeDraft: (draft) => setState((previous) => ({
+      ...previous, draft, fieldError: '', phase: previous.phase === 'saved' ? 'ready' : previous.phase,
+    })),
   };
 }
 
@@ -145,7 +147,8 @@ export default function SpeakerDiscussionPoints({ discussion }) {
     );
   }
   const waiting = phase === 'loading' || phase === 'saving';
-  const canSave = phase === 'ready' || phase === 'uncertain';
+  const canSave = ['ready', 'saved', 'uncertain'].includes(phase);
+  const draftMatchesSaved = submission?.text === draft.replace(/\r\n?/g, '\n').trim();
   return (
     <form onSubmit={save} aria-label="Speaker discussion points" aria-busy={waiting} className="space-y-md">
       <p className="text-body text-text-secondary">
@@ -161,12 +164,17 @@ export default function SpeakerDiscussionPoints({ discussion }) {
       {error ? <p role="alert" className="text-body text-danger">{error}</p> : null}
       {submission ? (
         <div className="space-y-xs">
-          {phase === 'ready' ? <p role="status" className="text-body text-text-secondary">{NOTIFICATION_COPY[submission.notification.state]}</p> : null}
+          {['ready', 'saved'].includes(phase) ? (
+            <p role="status" className="text-body text-text-secondary">
+              {phase === 'saved' && draftMatchesSaved ? 'Your discussion points are saved. ' : 'Last confirmed submission: '}
+              {NOTIFICATION_COPY[submission.notification.state]}
+            </p>
+          ) : null}
           <details>
             <summary className="public-text-control touch-target font-data text-caption">Last confirmed submission</summary>
             <p className="mt-xs whitespace-pre-wrap break-words text-body text-text-primary">{submission.text}</p>
           </details>
-          {draft.replace(/\r\n?/g, '\n').trim() !== submission.text
+          {!draftMatchesSaved
             ? <p className="text-body text-text-secondary">Your current changes have not been saved.</p> : null}
         </div>
       ) : null}

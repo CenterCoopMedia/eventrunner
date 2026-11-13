@@ -158,7 +158,8 @@ describe('SpeakerSessionHub', () => {
 
     expect(screen.getByText('No sessions are assigned to you.')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Session' })).toBeNull();
-    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getByRole('tab', { name: 'Discussion points' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('opens a linked session materials tab without reopening it after a schedule update', () => {

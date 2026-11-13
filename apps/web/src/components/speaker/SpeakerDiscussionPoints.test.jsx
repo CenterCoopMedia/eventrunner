@@ -22,10 +22,10 @@ function deferred() {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
-function hub(user = OWNER, speakerId = 'speaker-own') {
+function hub(user = OWNER, speakerId = 'speaker-own', scheduleData = SESSIONS) {
   return (
     <ContentContext.Provider value={{ speakers: [] }}>
-      <SpeakerSessionHub user={user} speakerId={speakerId} eventConfig={EVENT} scheduleData={SESSIONS} />
+      <SpeakerSessionHub user={user} speakerId={speakerId} eventConfig={EVENT} scheduleData={scheduleData} />
     </ContentContext.Provider>
   );
 }
@@ -40,6 +40,39 @@ function savedFor(request, state = 'accepted') {
 beforeEach(() => { globalThis.fetch = vi.fn(); });
 
 describe('speaker-wide private discussion draft', () => {
+  it.each([
+    ['no assigned sessions', []], ['only hidden sessions', SESSIONS.map((session) => ({ ...session, visible: false }))],
+  ])('allows an owner with %s to submit discussion points', async (_name, scheduleData) => {
+    fetch.mockResolvedValueOnce(response({ submission: null }))
+      .mockImplementationOnce(async (_url, init) => response({ submission: savedFor(JSON.parse(init.body)) }));
+    render(hub(OWNER, 'speaker-own', scheduleData));
+    expect(screen.getByText('No sessions are assigned to you.')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Session' })).toBeNull();
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getByRole('tab', { name: 'Discussion points' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled());
+    edit('An opening question before scheduling.'); submit();
+    await screen.findByText(/^Your discussion points are saved\./);
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ text: 'An opening question before scheduling.', expectedRevision: 0 });
+  });
+
+  it('labels a loaded submission as prior confirmation, not a new save', async () => {
+    fetch.mockResolvedValueOnce(response({ submission: STORED }));
+    render(hub()); openDiscussion(); await screen.findByDisplayValue(STORED.text);
+    expect(screen.getByRole('status')).toHaveTextContent(/^Last confirmed submission:/);
+    expect(screen.getByRole('status')).not.toHaveTextContent('Your discussion points are saved.');
+  });
+
+  it('does not announce a successful save after a 400 refusal', async () => {
+    fetch.mockResolvedValueOnce(response({ submission: STORED })).mockResolvedValueOnce(failure(400));
+    render(hub()); openDiscussion(); await screen.findByDisplayValue(STORED.text);
+    edit('Keep this refused draft.'); submit();
+    await screen.findByText(/server refused this text/);
+    expect(screen.getByRole('textbox')).toHaveValue('Keep this refused draft.');
+    expect(screen.getByRole('status')).toHaveTextContent(/^Last confirmed submission:/);
+    expect(screen.getByRole('status')).not.toHaveTextContent('Your discussion points are saved.');
+  });
+
   it('restores the owner submission and keeps an unsaved draft across tabs and sessions', async () => {
     fetch.mockResolvedValue(response({ submission: STORED }));
     render(hub());
@@ -105,6 +138,7 @@ describe('speaker-wide private discussion draft', () => {
     await act(async () => { pending.resolve(response({ submission: savedFor(request) })); });
     expect(screen.getByRole('textbox')).toHaveValue('Still editing.');
     expect(screen.getByText('Your current changes have not been saved.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/^Last confirmed submission:/);
   });
 
   it('reconciles a conflict without replacing the local draft, then requires an explicit replacement', async () => {
@@ -119,6 +153,7 @@ describe('speaker-wide private discussion draft', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load current submission' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Replace saved discussion points' })).toBeEnabled());
     expect(screen.getByRole('textbox')).toHaveValue('Keep my text.');
+    expect(screen.getByRole('status')).toHaveTextContent(/^Last confirmed submission:/);
     expect(fetch).toHaveBeenCalledTimes(3);
     fetch.mockImplementationOnce(async (_url, init) => response({ submission: savedFor(JSON.parse(init.body), 'omitted') }));
     submit();
