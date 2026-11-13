@@ -219,6 +219,9 @@ function requestLabel(rawUrl) {
 }
 
 async function settlePage(page, shot) {
+  // The static snapshot can paint controls before React attaches handlers.
+  // AppRoot removes the boot control when its React tree commits.
+  await page.locator('#app-boot').waitFor({ state: 'detached' });
   await page.waitForFunction(({ preset, mode }) => (
     globalThis.document.documentElement.dataset.theme === preset &&
     globalThis.document.documentElement.dataset.mode === mode

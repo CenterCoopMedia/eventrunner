@@ -50,24 +50,17 @@ export default function Header({
   // overlay), so an unrecognized value renders the base header.
   const treatment = THEME_HEADERS.includes(variant) ? variant : DEFAULT_HEADER;
 
-  // THE ROW MAY BREAK A WORD. A flex row is sized from its content's own
-  // minimum, and the minimum of a line of text is its longest word — so a
-  // name with a long word in it held the whole word and ran past the stage
-  // at 320px instead of wrapping inside it. `wrap-anywhere` lowers that
-  // minimum as well as drawing the break, and it breaks only a word that
-  // cannot fit, so nothing changes at a width where the word fits. It is
-  // the same shape the nameplate carries; the measurement is written up
-  // there (interface guidelines, Responsive: no page scrolls sideways at
-  // 320px).
-  //
-  // `items-start`, not `items-center`: when the name wraps to a second
-  // line, centring put the mark beside the middle line of its own row;
-  // starting it puts the mark beside the first line at every width, and
-  // beside the only line when the name does not wrap (issue #252).
-  const wordmark = (
-    <span className="inline-flex items-start gap-xs wrap-anywhere">
-      {mark}
+  // The repeated title uses one line. Beside a mark on phones,
+  // it remains available to screen readers without taking layout space.
+  const title = (
+    <span className={`site-header-title block min-w-0 truncate${mark ? ' site-header-title--with-mark' : ''}`}>
       {name}
+    </span>
+  );
+  const wordmark = (
+    <span className="inline-flex max-w-full items-start gap-xs">
+      {mark}
+      {title}
     </span>
   );
   const identityLink = (body) => (
@@ -102,7 +95,7 @@ export default function Header({
                 <span className="sr-only">{name}</span>
               </>
             ) : (
-              name
+              wordmark
             ),
           )}
         </p>
@@ -120,7 +113,7 @@ export default function Header({
         <div className="site-header-identity-row">
           <Nameplate
             variant="compact"
-            name={name}
+            name={title}
             dates={dates}
             edition={place}
             to={to}

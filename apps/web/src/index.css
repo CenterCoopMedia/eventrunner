@@ -2403,6 +2403,14 @@
    backlight, and a handout is read across a room. */
 /* Event heroes: shared content and controls, authored preset compositions. */
 @layer components {
+  .site-header-treatment .nameplate__name > a > span {
+    max-inline-size: 100%;
+  }
+  .site-header-identity,
+  .site-header-treatment .nameplate__name {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
   .site-logo {
     block-size: 1.5rem;
     inline-size: auto;
@@ -2430,7 +2438,7 @@
   }
   .site-masthead__identity {
     flex: 0 0 auto;
-    max-inline-size: 15rem;
+    max-inline-size: 28rem;
     font-size: var(--text-h3);
     line-height: 1.06;
     font-weight: 700;
@@ -2646,6 +2654,9 @@
     .disclosure-chevron { transition: transform var(--motion-base) var(--motion-ease); }
   }
   @media (max-width: 639px) {
+    .site-header-title--with-mark {
+      @apply sr-only;
+    }
     .site-masthead__bar,
     .site-header-identity-row {
       display: flex;

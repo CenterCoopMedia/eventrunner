@@ -30,12 +30,12 @@ describe('dev server shared imports', () => {
     expect([...imported].filter((id) => !included.has(id)).sort()).toEqual([]);
   });
 
-  it('E2E servers built without the config reuse its prebundle list', () => {
+  it('E2E servers built without a config reuse their app prebundle list', () => {
     const e2e = path.join(root, '..', '..', 'e2e');
     const missing = readdirSync(e2e).filter((name) => name.endsWith('.spec.js')).filter((name) => {
       const text = readFileSync(path.join(e2e, name), 'utf8');
       return /\bcreateServer\s*\(/.test(text) && /configFile:\s*false/.test(text)
-        && !text.includes('optimizeDeps: consoleConfig.optimizeDeps');
+        && !/optimizeDeps:\s*(?:consoleConfig|webConfig)\.optimizeDeps/.test(text);
     });
     expect(missing).toEqual([]);
   });
