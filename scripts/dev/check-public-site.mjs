@@ -27,7 +27,7 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml',
   '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp', '.ico': 'image/x-icon', '.mp4': 'video/mp4',
+  '.webp': 'image/webp', '.avif': 'image/avif', '.ico': 'image/x-icon', '.mp4': 'video/mp4',
 };
 const VIEWS = [
   { width: 1440, height: 1000, label: 'desktop' },

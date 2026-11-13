@@ -24,9 +24,9 @@ export function snapshotHtml() {
       const { default: sharp } = await import('sharp');
       const hero = await sharp(path.join(config.root, 'public/hero/nclocal-summit.jpg'))
         .rotate()
-        .webp({ quality: 80 })
-        .toFile(path.resolve(config.root, config.build.outDir, 'hero/nclocal-summit.webp'));
-      console.log(`Demo hero WebP: ${hero.size} bytes (${hero.width} x ${hero.height}).`);
+        .avif({ quality: 60, effort: 6 })
+        .toFile(path.resolve(config.root, config.build.outDir, 'hero/nclocal-summit.avif'));
+      console.log(`Demo hero AVIF: ${hero.size} bytes (${hero.width} x ${hero.height}).`);
       const temporary = await mkdtemp(path.join(config.root, '.snapshot-'));
       try {
         const { build } = await import('vite');
