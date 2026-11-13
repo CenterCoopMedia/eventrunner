@@ -1505,7 +1505,7 @@ The `seed` step merges the configured support addresses into `config/bootstrap.a
 
 Newly seeded sites route runtime platform alerts to the monitored agent inbox, `amditisjunk@gmail.com`, through `config/providers.notifier.operatorEmail`. Already seeded sites keep their saved notifier address. Build-failure emails (§12.2) go to the console operator list in `console_config/operators` (§11.1).
 
-The `deploy-identity` step also grants `roles/editor` to each `user:<support address>` on the client project, using that same setting. These permanent, unconditional IAM bindings are additive and restored on retry. They permit changes to project resources and access to project data. Site Access controls do not change project IAM; a support account removed from the site keeps its project grant. Decommissioning is unchanged. Disclose project access separately from the site role.
+The `deploy-identity` step also grants `roles/editor` to each `user:<support address>` on the client project, using the `EVENT_SUPPORT_ADMIN_EMAILS` list. These permanent, unconditional IAM bindings are additive and restored on retry. They permit changes to project resources and access to project data. Site Access controls do not change project IAM; a support account removed from the site keeps its project grant. Decommissioning is unchanged. Disclose project access separately from the site role.
 
 10. **Check the organization's policies on the client folder.** `iam.allowedPolicyMemberDomains` can refuse the `allUsers` binding public functions need. Allow public invocation on the client folder where required, or the deploy fails. Provisioning grants the compute account its required roles explicitly; it does not depend on automatic Editor grants.
 
