@@ -18,14 +18,16 @@ async function expectCloseFits(page, width) {
   const dialog = page.getByRole('dialog', { name: /Choose an image/ });
   const close = dialog.getByRole('button', { name: 'Close', exact: true });
   await expect(close).toBeVisible();
+  // Resizing dismisses the focused close button's tooltip in a resize handler.
+  // Wait for that layout to settle before reading the close button's bounds.
+  await expect.poll(() => dialog.evaluate((node) => node.scrollWidth - node.clientWidth))
+    .toBeLessThanOrEqual(1);
   const box = await close.boundingBox();
   expect(box).not.toBeNull();
   expect(box.width).toBeGreaterThanOrEqual(44);
   expect(box.height).toBeGreaterThanOrEqual(44);
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
-  const overflow = await dialog.evaluate((node) => node.scrollWidth - node.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
   await expect(close).toHaveAttribute('title', 'Close dialog');
 }
 
