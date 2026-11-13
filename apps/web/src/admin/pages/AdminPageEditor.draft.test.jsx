@@ -14,8 +14,8 @@ vi.mock('../adminApi.js', () => ({ useAdminApi: () => state.call }));
 vi.mock('../deletionUndo.jsx', () => ({ useDeletedRecord: () => vi.fn() }));
 vi.mock('../useAdminPages.js', () => ({
   useAdminPages: () => {
-    const row = { id: 'faq', draft: state.source, current: state.source, state: 'draft' };
-    return { rows: [row], ready: true, findRow: (id) => id === 'faq' ? row : null };
+    const row = { id: state.source.id, draft: state.source, current: state.source, state: 'draft' };
+    return { rows: [row], ready: true, findRow: (id) => id === row.id ? row : null };
   },
 }));
 vi.mock('../useAdminContent.js', () => ({ useAdminContent: () => ({ rows: [], ready: true }) }));
@@ -54,6 +54,33 @@ describe('page editor recovery', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true })));
     view.unmount();
     expect(openLocalDraft('alice', 'cmsPages/new', 'new').read()).toBeNull();
+  });
+
+  it('moves typing during a create save to the real page without leaving a new-page copy', async () => {
+    let finish;
+    state.call.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const view = renderEditor('/admin/pages/new');
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'New page' } });
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/new-page' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true }));
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Text typed during save' } });
+    act(() => vi.advanceTimersByTime(500));
+    expect(openLocalDraft('alice', 'cmsPages/new', 'new').read()).not.toBeNull();
+    await act(async () => finish({ id: 'new-page' }));
+    view.unmount(); // Both the old and new session cleanups must be safe.
+    expect(openLocalDraft('alice', 'cmsPages/new', 'new').read()).toBeNull();
+    const copy = openLocalDraft('alice', 'cmsPages/new-page', 'new').read();
+    expect(JSON.parse(copy.value).label).toBe('Text typed during save');
+
+    state.source = { ...state.call.mock.calls[0][1].page, updatedAt: 'after-save' };
+    const actual = renderEditor('/admin/pages/new-page');
+    fireEvent.click(screen.getByRole('button', { name: 'Restore', exact: true }));
+    expect(screen.getByLabelText('Navigation label')).toHaveValue('Text typed during save');
+    actual.unmount();
+    renderEditor('/admin/pages/new');
+    expect(screen.queryByRole('button', { name: 'Restore', exact: true })).toBeNull();
+    expect(screen.getByLabelText('Navigation label')).toHaveValue('');
+    expect(state.call).toHaveBeenCalledTimes(1);
   });
 
   it('offers the exact long text after unmount and clears it after a successful save', async () => {

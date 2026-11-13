@@ -447,7 +447,10 @@ function PageEditor({ mode }) {
     let stage = 'save';
     try {
       await call('cmsSavePage', creating ? { page: payload, create: true } : { page: payload });
-      localDraft.saved(pageSnapshot(assigned), beforeAssignment);
+      // The next session keeps newer typing under the assigned document id.
+      // Stop the old new-page session before its cleanup can write it back.
+      if (creating) localDraft.discard();
+      else localDraft.saved(pageSnapshot(assigned), beforeAssignment);
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt: a failed publish must not leave the id editable,
       // because retrying under a different id would create a second document
