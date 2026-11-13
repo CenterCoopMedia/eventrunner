@@ -66,7 +66,7 @@ function response() {
   };
 }
 
-function makeHarness({ records = seed(), config = CONFIG, sendEmail } = {}) {
+function makeHarness({ records = seed(), config = CONFIG, sendEmail, now = NOW } = {}) {
   const db = makeSpeakersDb(records);
   const authChecks = [];
   const auth = {
@@ -81,7 +81,7 @@ function makeHarness({ records = seed(), config = CONFIG, sendEmail } = {}) {
     sent.push(message);
     return { status: 'sent', providerMessageId: `message-${sent.length}` };
   });
-  const deps = { db, auth, getConfig: async () => config, sendEmail: deliver, now: NOW, log: QUIET };
+  const deps = { db, auth, getConfig: async () => config, sendEmail: deliver, now, log: QUIET };
   const get = createGetSpeakerDiscussionPointsHandler(deps);
   const save = createSaveSpeakerDiscussionPointsHandler(deps);
   const call = async (handler, token, body, method = 'POST') => {
@@ -230,6 +230,66 @@ test('an exact request replay returns the current result and does not send again
   assert.deepEqual(replay.body, { ...first.body, replay: true });
   assert.equal(h.sent.length, 1);
   assert.equal(h.db.read('speakers', 's1').discussionPoints.revision, 1);
+});
+
+test('rapid saves store every revision but send one organizer email per speaker per 15-minute window', async () => {
+  let nowMs = T0;
+  const h = makeHarness({ now: () => nowMs });
+  const first = await h.save('owner', body('First question.'));
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.body.submission.notification.state, 'accepted');
+
+  for (const [revision, offset] of [[2, 1000], [3, 15 * 60 * 1000 - 1]]) {
+    nowMs = T0 + offset;
+    const res = await h.save('owner', body(`Question ${revision}.`, `request_window_${revision}`, revision - 1));
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.submission.revision, revision);
+    assert.equal(res.body.submission.notification.state, 'omitted');
+    const saved = h.db.read('speakers', 's1').discussionPoints;
+    assert.equal(saved.text, `Question ${revision}.`);
+    assert.equal(saved.notificationWindowStartedAt, T0, 'suppressed saves do not extend the window');
+  }
+  assert.equal(h.sent.length, 1);
+
+  // A replay stays idempotent even when a new email window is available.
+  nowMs = T0 + 15 * 60 * 1000;
+  const replay = await h.save('owner', body('Question 3.', 'request_window_3', 2));
+  assert.equal(replay.statusCode, 200);
+  assert.equal(replay.body.replay, true);
+  assert.equal(replay.body.submission.notification.state, 'omitted');
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.db.read('speakers', 's1').discussionPoints.notificationWindowStartedAt, T0);
+
+  const next = await h.save('owner', body('Question 4.', 'request_window_4', 3));
+  assert.equal(next.statusCode, 200);
+  assert.equal(next.body.submission.notification.state, 'accepted');
+  assert.equal(h.sent.length, 2, 'a new save at the window boundary can send again');
+  assert.equal(h.db.read('speakers', 's1').discussionPoints.notificationWindowStartedAt, nowMs);
+  const nextReplay = await h.save('owner', body('Question 4.', 'request_window_4', 3));
+  assert.deepEqual(nextReplay.body, { ...next.body, replay: true });
+  assert.equal(h.sent.length, 2);
+});
+
+test('one speaker cannot consume another speaker notification window', async () => {
+  const h = makeHarness();
+  await h.save('owner', body());
+  const other = await h.save('other', { ...body(), speakerId: 's2' });
+  assert.equal(other.statusCode, 200);
+  assert.equal(other.body.submission.notification.state, 'accepted');
+  assert.equal(h.sent.length, 2);
+});
+
+test('failed and ambiguous notification attempts keep their window while later saves still store', async () => {
+  for (const result of [{ status: 'failed' }, { status: 'failed', ambiguous: true }]) {
+    let sends = 0;
+    const h = makeHarness({ sendEmail: async () => { sends += 1; return result; } });
+    await h.save('owner', body('First question.'));
+    const later = await h.save('owner', body('Second question.', REQUEST_2, 1));
+    assert.equal(later.statusCode, 200);
+    assert.equal(later.body.submission.notification.state, 'omitted');
+    assert.equal(h.db.read('speakers', 's1').discussionPoints.text, 'Second question.');
+    assert.equal(sends, 1);
+  }
 });
 
 test('a replay after a failed notification returns the saved failure without another send', async () => {
@@ -394,6 +454,7 @@ test('a historical demo refuses the save inside the transaction', async () => {
 });
 
 test('a late result from an older request cannot overwrite the current notification state', async () => {
+  let nowMs = T0;
   let startFirst;
   let finishFirst;
   let startSecond;
@@ -404,6 +465,7 @@ test('a late result from an older request cannot overwrite the current notificat
   const secondStarted = new Promise((resolve) => { startSecond = resolve; });
   const secondResult = new Promise((resolve) => { finishSecond = resolve; });
   const h = makeHarness({
+    now: () => nowMs,
     sendEmail: async () => {
       calls += 1;
       if (calls === 1) {
@@ -417,6 +479,7 @@ test('a late result from an older request cannot overwrite the current notificat
 
   const older = h.save('owner', body('Older question.'));
   await firstStarted;
+  nowMs += 15 * 60 * 1000;
   const newer = h.save('owner', body('Newer question.', REQUEST_2, 1));
   await secondStarted;
   finishFirst({ status: 'failed', error: 'late refusal' });
