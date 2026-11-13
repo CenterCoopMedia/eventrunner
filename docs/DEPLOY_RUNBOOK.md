@@ -1503,7 +1503,7 @@ Use placeholders from your own records. Nothing below belongs in the repository.
 
 The `seed` step merges the configured support addresses into `config/bootstrap.adminEmails` alongside client Owners, and records `supportAdminEmails` for the Access page's CCM support label. A retry restores the configured support operators and keeps other operators. Clients can change or remove these accounts under the normal last-operator rule. Provisioning sends no access-instructions email to support accounts. Disclose their access during onboarding; see [Client onboarding](CLIENT_ONBOARDING.md#7-first-operator-then-a-second).
 
-Newly seeded sites route runtime platform alerts to the monitored agent inbox, `amditisjunk@gmail.com`, through `config/providers.notifier.operatorEmail`. Already seeded sites keep their saved notifier address. Build-failure emails use the console operator list described in §12.2.
+Newly seeded sites route runtime platform alerts to the monitored agent inbox, `amditisjunk@gmail.com`, through `config/providers.notifier.operatorEmail`. Already seeded sites keep their saved notifier address. Build-failure emails (§12.2) go to the console operator list in `console_config/operators` (§11.1).
 
 The `deploy-identity` step also grants `roles/editor` to each `user:<support address>` on the client project, using that same setting. These permanent, unconditional IAM bindings are additive and restored on retry. They permit changes to project resources and access to project data. Site Access controls do not change project IAM; a support account removed from the site keeps its project grant. Decommissioning is unchanged. Disclose project access separately from the site role.
 
