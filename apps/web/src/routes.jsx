@@ -8,9 +8,10 @@ function pageRoute(path, importer, label, shape) {
 
 // The admin brings its own shell and access gate. Theme remaps are code,
 // loaded alongside the editor rather than with the public first paint.
-export const adminRoute = pageRoute('admin/*', () =>
-  Promise.all([import('./admin/AdminApp.jsx'), loadPresetRemaps()]).then(([module]) => module),
-);
+export const adminRoute = Object.assign(routePage(
+  () => Promise.all([import('./admin/AdminApp.jsx'), loadPresetRemaps()]).then(([module]) => module),
+  { clearReloadOnLoad: false },
+), { path: 'admin/*' });
 
 // Route rendering and intent matching use these same paths and importers.
 // Reserved paths (speaker, ticket, profile, schedule) also receive links

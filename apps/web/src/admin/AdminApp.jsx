@@ -13,7 +13,8 @@
 // from answering before the probe has. Which TIER the admin holds is
 // AdminLayout's concern: each docket item declares the tier it needs, and
 // the layout hides the rest and refuses their routes (issue #186).
-import { Suspense, lazy } from 'react';
+import { Suspense } from 'react';
+import { lazyPage as lazy } from '../lib/routePage.jsx';
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';

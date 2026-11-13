@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Suspense } from 'react';
 import { MemoryRouter } from 'react-router';
 import { installRoutePrefetch, HOVER_DWELL_MS } from './routePrefetch.js';
-import { isRoutePrefetchPending, routePage } from './routePage.jsx';
+import { isRoutePrefetchPending, lazyPage, routePage } from './routePage.jsx';
 import { installChunkReload, RELOAD_FLAG } from './chunkReload.js';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import { installDeferredRoutePrefetch } from './deferredRoutePrefetch.js';
@@ -153,6 +153,41 @@ describe('route intent', () => {
 });
 
 describe('route import lifecycle', () => {
+  it.each([
+    ['public', undefined], ['public', {}], ['admin', undefined], ['admin', {}],
+  ])('recovers once across fresh %s loads of a missing module %j', async (kind, module) => {
+    sessionStorage.removeItem(RELOAD_FLAG);
+    const reload = vi.fn();
+    const quietExpectedError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let view;
+    async function openPage() {
+      const Page = kind === 'admin'
+        ? lazyPage(() => Promise.resolve(module))
+        : routePage(() => Promise.resolve(module)).Component;
+      const Root = kind === 'admin'
+        ? routePage(() => Promise.resolve({
+          default: () => <Suspense fallback={<p>Loading admin page</p>}><Page /></Suspense>,
+        }), { clearReloadOnLoad: false }).Component
+        : Page;
+      await act(async () => {
+        view = render(<MemoryRouter><ErrorBoundary reload={reload}><Suspense fallback={<p>Loading route</p>}><Root /></Suspense></ErrorBoundary></MemoryRouter>);
+      });
+    }
+    try {
+      await openPage();
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+      view.unmount();
+      await openPage();
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+      expect(screen.getByRole('alert')).toHaveTextContent('A page file did not load.');
+    } finally {
+      view?.unmount();
+      quietExpectedError.mockRestore();
+    }
+  });
+
   it('keeps the reload budget when Vite returns no module after starting recovery', async () => {
     sessionStorage.removeItem(RELOAD_FLAG);
     const reload = vi.fn();

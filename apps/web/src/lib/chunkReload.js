@@ -17,7 +17,7 @@ export const RELOAD_FLAG = 'eventrunner:chunk-reload';
 const CHUNK_ERROR_RE =
   /(dynamically imported module|importing a module script failed|loading chunk|failed to fetch dynamically)/i;
 const MISSING_LAZY_MODULE_RE =
-  /^(?:undefined is not an object \(evaluating ['"][\w$]+\._result\.default['"]\)|Cannot read properties of undefined \(reading ['"]default['"]\))$/i;
+  /^undefined is not an object \(evaluating ['"][\w$]+\._result\.default['"]\)$/i;
 
 /**
  * Is this a missing module or React.lazy reading an absent module's default?

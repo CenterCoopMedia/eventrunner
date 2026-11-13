@@ -18,10 +18,8 @@ function Boom({ error }) {
   throw error;
 }
 
-const missingLazyModuleMessages = [
-  "undefined is not an object (evaluating 'e._result.default')",
-  "Cannot read properties of undefined (reading 'default')",
-];
+const safariMissingLazyModuleMessage = "undefined is not an object (evaluating 'e._result.default')";
+const chromeDefaultPropertyMessage = "Cannot read properties of undefined (reading 'default')";
 
 function renderBoundary(children, props = {}) {
   return render(<MemoryRouter><ErrorBoundary {...props}>{children}</ErrorBoundary></MemoryRouter>);
@@ -53,12 +51,13 @@ describe('isChunkLoadError', () => {
     expect(isChunkLoadError(new Error('permission-denied'))).toBe(false);
     expect(isChunkLoadError(new TypeError("Cannot read properties of undefined (reading 'title')"))).toBe(false);
     expect(isChunkLoadError(new TypeError("undefined is not an object (evaluating 'event.default')"))).toBe(false);
-    expect(isChunkLoadError(new Error(missingLazyModuleMessages[1]))).toBe(false);
+    expect(isChunkLoadError(new TypeError(chromeDefaultPropertyMessage))).toBe(false);
+    expect(isChunkLoadError(new Error(safariMissingLazyModuleMessage))).toBe(false);
     expect(isChunkLoadError(null)).toBe(false);
   });
 
-  it.each(missingLazyModuleMessages)('recognizes a missing lazy module: %s', (message) => {
-    expect(isChunkLoadError(new TypeError(message))).toBe(true);
+  it('recognizes the React-specific Safari missing-module signal', () => {
+    expect(isChunkLoadError(new TypeError(safariMissingLazyModuleMessage))).toBe(true);
   });
 });
 
@@ -118,17 +117,24 @@ describe('ErrorBoundary', () => {
     expect(screen.getByRole('button', { name: 'Reload the page' })).toBeTruthy();
   });
 
-  it.each(missingLazyModuleMessages)('recovers once from a missing lazy module: %s', (message) => {
+  it('recovers once from the Safari missing-module signal', () => {
     const reload = vi.fn();
-    const { unmount } = renderBoundary(<Boom error={new TypeError(message)} />, { reload });
+    const { unmount } = renderBoundary(<Boom error={new TypeError(safariMissingLazyModuleMessage)} />, { reload });
     expect(reload).toHaveBeenCalledTimes(1);
     expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
     unmount();
 
-    renderBoundary(<Boom error={new TypeError(message)} />, { reload });
+    renderBoundary(<Boom error={new TypeError(safariMissingLazyModuleMessage)} />, { reload });
     expect(reload).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('alert')).toHaveTextContent('A page file did not load.');
     expect(screen.getByRole('button', { name: 'Reload the page' })).toBeTruthy();
+  });
+
+  it('does not reload for an ordinary Chrome default-property render error', () => {
+    const reload = vi.fn();
+    renderBoundary(<Boom error={new TypeError(chromeDefaultPropertyMessage)} />, { reload });
+    expect(reload).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Reload the page to try again.');
   });
 
   it('offers a retry rather than reloading again when the reload did not help', () => {
