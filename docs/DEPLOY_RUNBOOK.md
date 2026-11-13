@@ -377,6 +377,19 @@ explicit acceptance for a new retry policy, even in non-interactive mode. `--for
 acceptance, but it also accepts function deletion and unsafe trigger migration. So
 `scripts/deploy-functions.cjs` passes `--force` in two narrow cases only.
 
+Every client Functions deploy paces its actual Functions and Cloud Run API writes, including
+invoker policies and the CLI's HTTP retries. Write requests start at least 1.5 seconds apart:
+at most 40 in a rolling 60 seconds and 67 in 100 seconds, below both Functions generations'
+write limits. Reads continue normally. Ordinary deploys keep Firebase's hash comparison for
+unchanged functions; explicit per-function selectors would force those unchanged updates.
+
+An HTTP 429 pauses queued writes for 105 seconds and retries that request up to three total
+attempts. If the last attempt still fails, the original response reaches Firebase's error
+handling. Other HTTP failures retain Firebase's error handling. Logs contain only fixed
+retry counts and wait times. A completed CLI child also leaves a 105-second window before
+another child starts, so retry-policy and normal deploy phases cannot reset the write budget.
+Existing initial-group and inventory-recovery waits count toward that window.
+
 Before each Functions deploy, the script reads the complete Functions inventory through the pinned
 `firebase-tools` backend used by `functions:list`. It rejects missing regional availability or any
 unreachable region. A failed or partial inventory stops the deploy.
