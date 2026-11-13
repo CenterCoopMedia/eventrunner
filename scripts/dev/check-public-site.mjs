@@ -348,7 +348,7 @@ async function main() {
       for (const route of ['', '#/schedule']) {
         await run(`demo-sdk-failure-${route ? 'schedule' : 'home'}-${view.label}`, view, 'light', async (page, record) => {
           await page.addInitScript(() => {
-            const observer = new MutationObserver(() => {
+            const observer = new globalThis.MutationObserver(() => {
               const root = globalThis.document.getElementById('root');
               if (!root?.dataset.snapshotRoute) return;
               globalThis.__snapshotMain = root.querySelector('main');

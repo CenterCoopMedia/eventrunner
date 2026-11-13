@@ -7,7 +7,7 @@
 // A short read-only notice and preview action remain visible. The style
 // controls are an optional disclosure on the shared stage, so readers can
 // reach the event content without first scrolling through a control panel.
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { recommendedConfiguration } from '../lib/themeRuntime.js';
@@ -135,7 +135,7 @@ export function DemoBannerContent({
     const recommended = recommendedConfiguration(styleId);
     if (!recommended) return;
 
-    setDemoTheme({ ...recommended, mode });
+    startTransition(() => setDemoTheme({ ...recommended, mode }));
 
     const search = writeDemoDisplaySearch(location.search, styleId, mode);
     const url = `${location.pathname}${search}${location.hash}`;
