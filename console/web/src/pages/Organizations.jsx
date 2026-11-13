@@ -1,6 +1,6 @@
 import PageHeading from '../PageHeading.jsx';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { callApi } from '../api.js';
 import LoadingState from '../LoadingState.jsx';
 import IconControl from '../IconControl.jsx';
@@ -33,6 +33,7 @@ function OrganizationDirectory({ organizations, all = false, labelledBy }) {
 
 /** The home page: my organizations, and every organization for the hosting team. */
 export default function Organizations() {
+  const { state } = useLocation();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -60,6 +61,7 @@ export default function Organizations() {
         {refresh}
       </header>
       {error ? <p className="message error" role="alert">{error}</p> : null}
+      {state?.deletedOrganization ? <p className="message success" role="status">{state.deletedOrganization} was deleted.</p> : null}
       {data.organizations.length > 0 ? (
         <OrganizationDirectory organizations={data.organizations} labelledBy="orgs-title" />
       ) : (

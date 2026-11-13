@@ -14,6 +14,7 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       { "source": "/api/listOrganizations", "function": { "functionId": "listOrganizations", "region": "us-central1" } },
+      { "source": "/api/deleteOrganization", "function": { "functionId": "deleteOrganization", "region": "us-central1" } },
       { "source": "/api/getTeam", "function": { "functionId": "getTeam", "region": "us-central1" } },
       { "source": "/api/inviteMember", "function": { "functionId": "inviteMember", "region": "us-central1" } },
       { "source": "/api/acceptInvite", "function": { "functionId": "acceptInvite", "region": "us-central1" } },

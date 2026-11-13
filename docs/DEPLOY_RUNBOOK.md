@@ -1365,6 +1365,30 @@ A link works once and expires after 30 days. It is not tied to an email address,
 
 If creating a link says sign-ups are closed, the message names what is missing: the agreement, the client folder, the billing account or the region. Set them at `/review/settings` (§12.1 step 9). While one is missing, an open link also refuses, and so does accepting the agreement.
 
+### 11.4 Deleting an unused organization
+
+Sign in as an operator, open the organization from **All organizations**, and
+select **Delete organization** below its event sites. Read the confirmation,
+which names the organization and says deletion cannot be undone. **Cancel**
+keeps it. **Delete this organization** removes it and returns to the directory.
+Owners and Editors do not get this action.
+
+The server permits deletion only when every request is draft, withdrawn or
+declined and none was ever approved, built or launched. A build record, client
+project settings or retained agreement acceptance also prevents deletion, even
+after a request was closed. Withdraw an unused draft request when you only need
+to stop that request. Archive an existing site through **Decommission client**
+(§12.6). A connection change in progress must finish before deletion.
+
+One server call removes the organization, all members and invites, its unused
+requests, explicitly linked signup links, reserved names, private connection
+rows and pending connection states. Links with only a matching organization
+name stay: names do not prove that a link belongs to this organization. Stored
+account tokens use the existing cleanup process; unfinished cleanup stays
+recorded for the retention job to retry. The `console_audit` entry contains only
+`action: delete-organization`, `orgId`, `by` and `at`. The action cannot remove a
+client project or a live site.
+
 ## 12. Site builder
 
 The site builder builds one client's site after an Owner accepts the agreement, with nobody's help ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md) §6). The console's `startBuild` dispatches `.github/workflows/provision-client.yml`, which runs `scripts/provision-client.cjs` as the provisioner service account. Sections 1 to 5 are the same work by hand, for a site made outside the console.

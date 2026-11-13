@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { callApi } from '../api.js';
 import { serveApi, team } from '../test/application.js';
@@ -43,5 +43,50 @@ describe('OrganizationHome', () => {
     page();
     expect(await screen.findByText(/Open your signup link to start an event site/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh event sites' })).toBeInTheDocument();
+  });
+
+  it('does not offer deletion to an Owner', async () => {
+    page();
+    await screen.findByRole('heading', { level: 1, name: 'NC Local' });
+    expect(screen.queryByRole('button', { name: 'Delete organization' })).not.toBeInTheDocument();
+  });
+
+  it('names the organization and the irreversible delete, and Cancel keeps it', async () => {
+    serveApi({ listApplications: list({ operator: true, myRole: null }), getTeam: team() });
+    page();
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete organization' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete NC Local?' });
+    expect(dialog).toHaveAccessibleDescription(/NC Local.*Deletion cannot be undone/);
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(callApi.mock.calls.filter(([name]) => name === 'deleteOrganization')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Delete organization' })).toHaveFocus();
+  });
+
+  it('sends one confirmed delete and returns to the directory after success', async () => {
+    let complete;
+    serveApi({ listApplications: list({ operator: true }), getTeam: team(), deleteOrganization: () => new Promise((resolve) => { complete = resolve; }) });
+    renderPage(<OrganizationHome />, { path: '/organizations/o1', route: '/organizations/:orgId', routes: { '/': 'Organization directory' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete organization' }));
+    const confirm = screen.getByRole('button', { name: 'Delete this organization' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(screen.getByRole('button', { name: 'Deleting…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(callApi.mock.calls.filter(([name]) => name === 'deleteOrganization')).toEqual([['deleteOrganization', { orgId: 'o1', confirm: true }]]);
+    await act(async () => complete({ deleted: true, orgId: 'o1' }));
+    expect(await screen.findByText('Organization directory')).toBeInTheDocument();
+  });
+
+  it('keeps a server refusal in the confirmation and permits a retry', async () => {
+    const remove = vi.fn().mockRejectedValueOnce(new Error('This organization was approved. Archive the site instead.')).mockResolvedValue({ deleted: true });
+    serveApi({ listApplications: list({ operator: true }), getTeam: team(), deleteOrganization: remove });
+    page();
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete organization' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this organization' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Archive the site instead.');
+    expect(screen.getByRole('dialog', { name: 'Delete NC Local?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete this organization' })).toBeEnabled();
   });
 });
