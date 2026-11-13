@@ -153,6 +153,30 @@ describe('route intent', () => {
 });
 
 describe('route import lifecycle', () => {
+  it('keeps the reload budget when Vite returns no module after starting recovery', async () => {
+    sessionStorage.removeItem(RELOAD_FLAG);
+    const reload = vi.fn();
+    restoreReload = installChunkReload(window, { reload, isPrefetching: isRoutePrefetchPending });
+    const navigation = routePage(() => Promise.resolve().then(() => {
+      const error = new Error('Failed to fetch dynamically imported module: /assets/replaced-page.js');
+      const event = new Event('vite:preloadError', { cancelable: true });
+      event.payload = error;
+      window.dispatchEvent(event);
+      if (!event.defaultPrevented) throw error;
+    }));
+    const quietExpectedError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await act(async () => {
+        render(<MemoryRouter><ErrorBoundary reload={reload}><Suspense fallback={<p>Loading route</p>}><navigation.Component /></Suspense></ErrorBoundary></MemoryRouter>);
+      });
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+      expect(screen.getByRole('alert')).toHaveTextContent('A page file did not load.');
+    } finally {
+      quietExpectedError.mockRestore();
+    }
+  });
+
   it('preserves a spent reload budget when the final page fails', async () => {
     let fail;
     const reload = vi.fn();

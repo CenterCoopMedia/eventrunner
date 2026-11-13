@@ -18,7 +18,7 @@ export function routePage(importer) {
   }
   const Component = lazy(() => loaded ? {
     then(resolve) { clearReloadFlag(); resolve(loaded); },
-  } : load().then((module) => { clearReloadFlag(); return module; }));
+  } : load().then((module) => { if (module) clearReloadFlag(); return module; }));
   function prefetch() {
     if (loaded || speculation) return speculation;
     speculativeLoads += 1;
