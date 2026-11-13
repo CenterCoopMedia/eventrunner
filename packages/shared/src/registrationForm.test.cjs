@@ -50,6 +50,58 @@ test('a stored form reads safely, and a damaged entry reads as off or is dropped
   assert.deepEqual(read.standard.dietary, { enabled: false, required: false });
   assert.deepEqual(read.custom.map((q) => q.id), ['q_shirt']);
   assert.equal(read.revision, 4);
+  assert.deepEqual(read.standard.phone, { enabled: false, required: false });
+});
+
+test('phone is a private built-in question, independent of the custom-question limit', () => {
+  const result = validateRegistrationForm({
+    standard: { phone: { enabled: true, required: true } },
+    custom: Array.from({ length: MAX_CUSTOM_QUESTIONS }, (_, i) => ({ id: `q_item${i}`, kind: 'yes_no', label: `Q${i}` })),
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.form.custom.length, MAX_CUSTOM_QUESTIONS);
+  assert.deepEqual(activeQuestions(result.form)[0], {
+    id: 'phone', name: 'Phone number', kind: 'phone', label: 'Phone number',
+    help: 'Private to event staff. Include the country code for an international number.',
+    required: true, sensitive: true, choices: [], standard: true,
+  });
+});
+
+test('phone answers preserve entered text, normalize common formats and round-trip through CSV', () => {
+  const { answerText, answerFromText } = require('./registrationForm.cjs');
+  const form = { standard: { phone: { enabled: true } } };
+  const question = activeQuestions(form)[0];
+  assert.equal(answerFromText(question, "'+44 20 7946 0958"), '+44 20 7946 0958');
+  for (const [entered, normalized] of [
+    [' (201) 555-0123 ', '2015550123'],
+    ['+1 201.555.0123', '+12015550123'],
+    ['+44 (20) 7946 0958', '+442079460958'],
+    ['020 7946 0958', '02079460958'],
+    ['+49 30 123456 x42', '+4930123456;ext=42'],
+    ['201-555-0123 ext. 123', '2015550123;ext=123'],
+  ]) {
+    const checked = checkAnswers({ phone: entered }, form);
+    assert.deepEqual(checked, { ok: true, answers: { phone: { entered, normalized } } });
+    assert.deepEqual(checkAnswers({ phone: { entered, normalized: 'untrusted' } }, form), checked);
+    assert.equal(answerText(question, checked.answers.phone), entered);
+    const imported = checkAnswers({ phone: answerFromText(question, answerText(question, checked.answers.phone)) }, form);
+    assert.equal(imported.answers.phone.normalized, normalized);
+  }
+});
+
+test('phone answers enforce optional and required states and refuse unusable input', () => {
+  const optional = { standard: { phone: { enabled: true } } };
+  const required = { standard: { phone: { enabled: true, required: true } } };
+  for (const phone of [undefined, null, '', '   ', { entered: '' }]) {
+    assert.deepEqual(checkAnswers({ phone }, optional), { ok: true, answers: {} });
+    assert.deepEqual(checkAnswers({ phone }, required), { ok: false, errors: { phone: 'Answer this question.' } });
+  }
+  for (const phone of ['call me', '123', '+1+2015550123', '1234567890123456', '2015550123x', '2015550123\n5555555', '1'.repeat(81), 2015550123, {}, { entered: 'bad', normalized: '+12015550123' }]) {
+    const checked = checkAnswers({ phone }, optional);
+    assert.equal(checked.ok, false, JSON.stringify(phone));
+    assert.match(checked.errors.phone, /Enter a phone number/);
+  }
+  assert.equal(checkAnswers({ phone: '2015550123' }, emptyForm()).ok, false);
 });
 
 test('the attendee sees the standard questions that are on, in order, then the custom ones', () => {

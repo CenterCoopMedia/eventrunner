@@ -66,6 +66,21 @@ test('the claim moves held answers to the account and removes the hold', withPro
   assert.equal(db.read('ticket_answer_holds', 'REG-1'), undefined);
 }));
 
+test('an international phone from the protected staff export imports privately, re-imports and survives claim', withProvider('manual', async () => {
+  const db = dbWithForm({ 'config/registration_form': { ...FORM, standard: { ...FORM.standard, phone: { enabled: true } } } });
+  const input = body([{ ...ROW, Phone: "'+44 20 7946 0958" }], { ...MAPPING, 'answer:phone': 'Phone' });
+  const { commit } = await previewAndCommit(db, input);
+  assert.equal(commit.statusCode, 200, JSON.stringify(commit.body));
+  const phone = { entered: '+44 20 7946 0958', normalized: '+442079460958' };
+  assert.deepEqual(db.read('ticket_answer_holds', 'REG-1').answers.phone, phone);
+  const again = await previewAndCommit(db, input);
+  assert.equal(again.commit.body.summary.unchanged, 1);
+  await claimTicket({ db, externalId: 'REG-1', uid: 'uid-ada', email: 'ada@example.org' });
+  assert.deepEqual(db.read('ticket_answers', 'REG-1').answers.phone, phone);
+  assert.equal(db.read('ticket_answer_holds', 'REG-1'), undefined);
+  assert.equal(db.read('users', 'uid-ada').phone, undefined);
+}));
+
 test('an answer the attendee saved before the claim wins over the held one', withProvider('manual', async () => {
   const db = dbWithForm();
   await previewAndCommit(db, body());

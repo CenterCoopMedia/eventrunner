@@ -55,7 +55,7 @@ test('server-owned fields are never self-editable', () => {
 });
 
 test('the projection never carries account-private fields', () => {
-  for (const field of ['email', 'registrationStatus', 'approvalSource', 'role']) {
+  for (const field of ['email', 'registrationStatus', 'approvalSource', 'role', 'phone', 'answers']) {
     assert.equal(PUBLIC_PROFILE_FIELDS.includes(field), false, `${field} must not be public`);
   }
 });
@@ -70,9 +70,11 @@ test('projection copies only public-safe fields', () => {
 });
 
 test('projection drops fields that are not on the public list', () => {
-  const pub = buildPublicProfile(user({ secretNote: 'internal', dietaryNeeds: 'none' }), BADGES_CONFIG);
+  const pub = buildPublicProfile(user({ secretNote: 'internal', dietaryNeeds: 'none', phone: '+12015550123', answers: { phone: { entered: '+1 (201) 555-0123', normalized: '+12015550123' } } }), BADGES_CONFIG);
   assert.equal(pub.secretNote, undefined);
   assert.equal(pub.dietaryNeeds, undefined);
+  assert.equal(pub.phone, undefined);
+  assert.equal(pub.answers, undefined);
 });
 
 test('badges are rewritten to the intersection with config/badges', () => {

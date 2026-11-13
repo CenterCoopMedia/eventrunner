@@ -6,7 +6,7 @@
 // between what is typed and what is saved: a directory id, true or false
 // for yes or no, { choices, other } for diet, a list for many choices.
 import { useId } from 'react';
-import { DIRECTORY_CHOICES, activeQuestions } from 'shared/registrationForm';
+import { DIRECTORY_CHOICES, LIMITS, activeQuestions, answerText } from 'shared/registrationForm';
 import { Checkbox, Radio } from '../forms/Choice.jsx';
 import { TextAreaField, TextField } from '../forms/publicForm.jsx';
 
@@ -49,6 +49,8 @@ const plain = (choices) => choices.map((choice) => ({ value: choice, label: choi
 function Question({ question, value, onChange, error }) {
   const hint = question.help || undefined;
   switch (question.kind) {
+    case 'phone':
+      return <TextField label={labelOf(question)} hint={hint} type="tel" autoComplete="tel" maxLength={LIMITS.phone} value={typeof value === 'string' ? value : answerText(question, value)} onChange={onChange} error={error} />;
     case 'short_text':
       return <TextField label={labelOf(question)} hint={hint} value={value ?? ''} onChange={onChange} error={error} />;
     case 'long_text':

@@ -60,6 +60,25 @@ test('a public directory answer needs the public profiles feature, as the profil
   assert.equal(db.read('users', 'ada').profileVisibility, 'public');
 });
 
+test('phone is normalized in private answers and never copied into account or public profile records', async () => {
+  const originalUser = { uid: 'ada', profileVisibility: 'public', displayName: 'Ada' };
+  const publicUser = { displayName: 'Ada', profileVisibility: 'public' };
+  const db = world({
+    'config/registration_form': { ...FORM, standard: { phone: { enabled: true, required: true } } },
+    'users/ada': originalUser,
+    'users_public/ada': publicUser,
+  });
+  const res = await save(db, 'ada', { ticketId: 't-1', formRevision: 4, answers: { phone: { entered: '(201) 555-0123', normalized: 'forged' } } });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(db.read('ticket_answers', 't-1').answers.phone, { entered: '(201) 555-0123', normalized: '2015550123' });
+  assert.deepEqual(db.read('users', 'ada'), originalUser);
+  assert.deepEqual(db.read('users_public', 'ada'), publicUser);
+  assert.equal((await save(db, 'bo', { ticketId: 't-1', formRevision: 4, answers: { phone: '2015550123' } })).statusCode, 403);
+  const bad = await save(db, 'ada', { ticketId: 't-1', formRevision: 4, answers: { phone: 'call me' } });
+  assert.equal(bad.statusCode, 400);
+  assert.match(bad.body.error.message, /answers\.phone: Enter a phone number/);
+});
+
 test('nobody else may answer for a ticket, and staff may', async () => {
   const db = world();
   assert.equal((await save(db, 'bo', { ticketId: 't-1', formRevision: 4, answers: ANSWERS })).statusCode, 403);

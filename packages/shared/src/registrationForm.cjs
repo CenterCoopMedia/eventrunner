@@ -18,7 +18,7 @@
 
 const MAX_CUSTOM_QUESTIONS = 10;
 const MAX_CHOICES = 20;
-const LIMITS = Object.freeze({ label: 200, help: 300, choice: 100, shortText: 200, longText: 1000, other: 200 });
+const LIMITS = Object.freeze({ label: 200, help: 300, choice: 100, shortText: 200, longText: 1000, other: 200, phone: 80 });
 
 const DIETARY_CHOICES = Object.freeze([
   'Vegetarian', 'Vegan', 'Halal', 'Kosher', 'Gluten-free', 'Dairy-free', 'Nut allergy', 'Other',
@@ -34,12 +34,13 @@ const DIRECTORY_CHOICES = Object.freeze([
 /**
  * The standard set, in the order an attendee sees it. `name` is the short
  * name staff see in the editor and the export; `label` is the attendee's
- * wording. `sensitive` answers (dietary, access) are shown to staff for
+ * wording. `sensitive` answers (phone, dietary, access) are shown to staff for
  * planning and never published.
  */
 const STANDARD_QUESTIONS = Object.freeze([
   { id: 'organization', name: 'Organization', kind: 'short_text', label: 'Organization' },
   { id: 'jobTitle', name: 'Job title', kind: 'short_text', label: 'Job title' },
+  { id: 'phone', name: 'Phone number', kind: 'phone', label: 'Phone number', help: 'Private to event staff. Include the country code for an international number.', sensitive: true },
   { id: 'dietary', name: 'Dietary needs', kind: 'dietary', label: 'Dietary needs', help: 'Choose any that apply. Choose Other to describe something else.', sensitive: true },
   { id: 'accessNeeds', name: 'Access needs', kind: 'long_text', label: 'Access needs', help: 'Anything the organizers should arrange so you can take part.', sensitive: true },
   { id: 'photoConsent', name: 'Photo consent', kind: 'yes_no', label: 'May the organizers photograph you and use the photos?' },
@@ -219,12 +220,30 @@ function isBlank(value) {
   return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
 }
 
+/** Keep entered text and remove formatting, without guessing a country code. */
+function checkPhone(value, required) {
+  const entered = typeof value === 'string' ? value : (isPlainObject(value) ? value.entered : null);
+  const error = 'Enter a phone number with 7 to 15 digits. You can use +, spaces, parentheses, dots and hyphens, and an extension such as x123.';
+  if (typeof entered !== 'string' || entered.length > LIMITS.phone) return { error };
+  if (!entered.trim()) return required ? { error: 'Answer this question.' } : { value: null };
+  const text = entered.trim();
+  const extension = /(?:ext\.?|x|#) *([0-9]{1,6})$/i.exec(text);
+  const number = (extension ? text.slice(0, extension.index) : text).trim();
+  if (!/^\+?[0-9(). \u00a0-]+$/.test(number)) return { error };
+  const digits = number.replace(/[^0-9]/g, '');
+  if (digits.length < 7 || digits.length > 15) return { error };
+  const normalized = `${number.startsWith('+') ? '+' : ''}${digits}${extension ? `;ext=${extension[1]}` : ''}`;
+  // Recompute normalized even for a saved answer; never trust a supplied copy.
+  return { value: { entered, normalized } };
+}
+
 /** One answer against its question. @returns {{ value?: unknown, error?: string }} */
 function checkAnswer(question, value) {
   if (isBlank(value) || (question.kind === 'dietary' && isPlainObject(value) && isBlank(value.choices) && isBlank(value.other))) {
     return question.required ? { error: 'Answer this question.' } : { value: null };
   }
   switch (question.kind) {
+    case 'phone': return checkPhone(value, question.required);
     case 'short_text':
     case 'long_text': {
       const max = question.kind === 'short_text' ? LIMITS.shortText : LIMITS.longText;
@@ -293,6 +312,7 @@ function checkAnswers(source, form) {
 function answerText(question, value, answered = null) {
   if (value === undefined || value === null) return '';
   switch ((answered ?? question)?.kind) {
+    case 'phone': return isPlainObject(value) && typeof value.entered === 'string' ? value.entered : '';
     case 'yes_no': return value === true ? 'Yes' : value === false ? 'No' : '';
     case 'directory': return DIRECTORY_CHOICES.find((choice) => choice.id === value)?.label ?? '';
     case 'dietary': {
@@ -316,6 +336,8 @@ function answerFromText(question, text) {
   const key = (value) => value.trim().toLowerCase();
   const pick = (choices, value) => choices.find((choice) => key(choice) === key(value)) ?? value.trim();
   switch (question?.kind) {
+    // The staff export prefixes + numbers with a spreadsheet text marker.
+    case 'phone': return raw.startsWith("'") && raw.slice(1).trimStart().startsWith('+') ? raw.slice(1).trimStart() : raw;
     case 'yes_no':
       if (['yes', 'y', 'true'].includes(key(raw))) return true;
       if (['no', 'n', 'false'].includes(key(raw))) return false;

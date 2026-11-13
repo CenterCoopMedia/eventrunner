@@ -9,6 +9,7 @@ import RegistrationQuestionFields from './RegistrationQuestionFields.jsx';
 const FORM = {
   standard: {
     organization: { enabled: true, required: true },
+    phone: { enabled: true, required: false },
     dietary: { enabled: true, required: false },
     photoConsent: { enabled: true, required: true },
     directoryListing: { enabled: true, required: false },
@@ -82,5 +83,17 @@ describe('RegistrationQuestionFields', () => {
     expect(screen.getByText('Answer this question.')).toBeInTheDocument();
     const group = screen.getByRole('group', { name: /photograph/ });
     expect(group).toHaveAccessibleDescription('Choose yes or no.');
+  });
+
+  it('edits a saved phone answer using a telephone input and names an invalid number', () => {
+    render(<Harness initial={{ phone: { entered: '+44 20 7946 0958', normalized: '+442079460958' } }} errors={{ phone: 'Enter a phone number with 7 to 15 digits.' }} />);
+    const phone = screen.getByLabelText('Phone number');
+    expect(phone).toHaveAttribute('type', 'tel');
+    expect(phone).toHaveAttribute('autocomplete', 'tel');
+    expect(phone).toHaveValue('+44 20 7946 0958');
+    expect(phone).toHaveAttribute('aria-invalid', 'true');
+    expect(phone).toHaveAccessibleDescription(/Private to event staff\..*Enter a phone number/);
+    fireEvent.change(phone, { target: { value: '(201) 555-0123' } });
+    expect(values().phone).toBe('(201) 555-0123');
   });
 });

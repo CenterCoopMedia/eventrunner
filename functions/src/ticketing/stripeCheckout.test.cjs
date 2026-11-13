@@ -832,11 +832,11 @@ test('the catalog can lower the cumulative free budget and duplicates cannot hid
 
 // ADR 0008 §5: answers given at checkout wait on the order's seats until claim.
 const FORM = {
-  standard: { organization: { enabled: true, required: false }, dietary: { enabled: true, required: false } },
+  standard: { organization: { enabled: true, required: false }, phone: { enabled: true }, dietary: { enabled: true, required: false } },
   custom: [], revision: 2,
 };
-const ANSWERS = { organization: ' Gazette ', dietary: { choices: ['Vegan'] } };
-const CHECKED = { organization: 'Gazette', dietary: { choices: ['Vegan'], other: null } };
+const ANSWERS = { organization: ' Gazette ', phone: '+1 (201) 555-0123', dietary: { choices: ['Vegan'] } };
+const CHECKED = { organization: 'Gazette', phone: { entered: '+1 (201) 555-0123', normalized: '+12015550123' }, dietary: { choices: ['Vegan'], other: null } };
 const answered = (patch = {}, answers = ANSWERS) => request({
   formRevision: 2,
   lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [{ ...PERSON, answers }, { ...PERSON, email: BOB.email }] }],
@@ -851,10 +851,12 @@ test('checkout answers are checked against the live form and held only on the or
   assert.deepEqual(order.seats[0].answers, CHECKED);
   assert.equal(Object.hasOwn(order.seats[1], 'answers'), false);
   assert.equal(order.registrationFormRevision, 2);
-  assert.deepEqual(order.registrationQuestions.map((question) => question.id), ['organization', 'dietary']);
+  assert.deepEqual(order.registrationQuestions.map((question) => question.id), ['organization', 'phone', 'dietary']);
   // Never sent to Stripe or stored on the payment attempt.
   assert.equal(JSON.stringify(calls[0].params).includes('Gazette'), false);
   assert.equal(JSON.stringify(db.read('ticket_payment_attempts', order.attemptId)).includes('Gazette'), false);
+  assert.equal(JSON.stringify(calls[0].params).includes('555'), false);
+  assert.equal(JSON.stringify(db.read('ticket_payment_attempts', order.attemptId)).includes('555'), false);
 });
 
 test('checkout without answers needs no registration form and adds no answer fields', async () => {

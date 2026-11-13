@@ -61,6 +61,30 @@ describe('AdminRegistrationForm', () => {
     expect(preview().getByLabelText('Badge name')).toBeInTheDocument();
   });
 
+  it('keeps phone off for an older form, then previews and saves Ask and Required', async () => {
+    callMock.mockResolvedValue({ revision: 3 });
+    await renderPage({ ...SAVED, standard: {}, custom: [] });
+    expect(screen.getByRole('checkbox', { name: 'Ask: Phone number' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Required: Phone number' })).toBeDisabled();
+    expect(screen.queryByLabelText('Phone number')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ask: Phone number' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Required: Phone number' }));
+    const phone = preview().getByLabelText('Phone number (required)');
+    expect(phone).toHaveAttribute('type', 'tel');
+    expect(phone).toHaveAttribute('autocomplete', 'tel');
+    fireEvent.click(preview().getByRole('button', { name: 'Check answers' }));
+    expect(preview().getByText('Answer this question.')).toBeInTheDocument();
+    fireEvent.change(phone, { target: { value: 'call me' } });
+    fireEvent.click(preview().getByRole('button', { name: 'Check answers' }));
+    expect(phone).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.change(phone, { target: { value: '+44 20 7946 0958' } });
+    fireEvent.click(preview().getByRole('button', { name: 'Check answers' }));
+    expect(preview().getByText('These answers pass. An attendee could continue.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(callMock).toHaveBeenCalledTimes(1));
+    expect(callMock.mock.calls[0][1].form).toMatchObject({ standard: { phone: { enabled: true, required: true } }, custom: [] });
+  });
+
   it('names a mistake on its field without calling the server', async () => {
     await renderPage({ ...SAVED, custom: [] });
     fireEvent.click(screen.getByRole('button', { name: 'Add a question' }));
