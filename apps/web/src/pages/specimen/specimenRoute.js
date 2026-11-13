@@ -13,6 +13,7 @@ import { IS_DEMO } from '../../lib/demoMode.js';
 
 /** The route path, relative to the site root. */
 export const SPECIMEN_PATH = 'specimen';
+export const ADMIN_SPECIMEN_PATH = `${SPECIMEN_PATH}/admin`;
 
 /** The heading the page and the tab both carry. */
 export const SPECIMEN_TITLE = 'Specimen book';
@@ -37,6 +38,7 @@ export const SPECIMEN_ENABLED =
 
 /** Loads the page, or is null in a build where the route does not exist. */
 export const loadSpecimenPage = SPECIMEN_ENABLED ? () => import('./Specimen.jsx') : null;
+export const loadAdminSpecimenPage = SPECIMEN_ENABLED ? () => import('./AdminSpecimen.jsx') : null;
 
 /**
  * The same rule as a pure function, so a test can state its whole truth

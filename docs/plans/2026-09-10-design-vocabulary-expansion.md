@@ -116,7 +116,7 @@ Each device below lands as one tier 3 contract in `design/tokens/components.json
 
 ### 3.4 Admin devices
 
-The admin keeps its refusals. Its new devices are the ruled table with sort, filter, and a bulk-action row; the queue row with a state word and one action; the figure sentence ("412 registered, 38 in the last day, read at 09:14") in place of a tile; the log row with a preview frame; the version list with a what-changed entry; the pending-changes banner; the access matrix; the invoice form and list; and the rich text toolbar limited to the allowed tags. Every one is words, rules, and the desk's tints.
+The admin keeps its refusals. Its devices are the ruled table with sort, filter, and a bulk-action row; the queue row with a state word and one action; the figure sentence ("412 registered, 38 in the last day, read at 09:14") in place of a tile; the log row with a preview frame; the version list with a what-changed entry; the pending-changes banner; the account, tier and actions access list accepted in #187; the invoice form and list; and the rich text toolbar limited to the allowed tags. Every one is words, rules, and the desk's tints.
 
 ## 4. Option groups
 
@@ -158,6 +158,10 @@ Font candidates come from the research brief on editorial devices and fonts. A f
 A route that renders every device in every state, switched by the demo's style and mode controls, so a reviewer sees the whole vocabulary on one page. It ships in the demo build and in development, never in a client production build. It is `noindex`. It is a lazy chunk inside the lazy-chunk budget, split into sections if it must be.
 
 Every device lands with its specimen entry. A committed capture script renders each style and mode at 1440px and 390px into `docs/plans/evidence/specimen/`, so evidence stops being one-off work.
+
+The Admin section embeds `/specimen/admin` as an interactive document. It uses the fixed Source Sans 3 and IBM Plex Mono pairing, the navy house scheme and its own light/dark controls. Public style changes do not restyle the Admin examples. The document loads no application providers or authenticated pages. Its records are synthetic and its actions are local. The Email log's inner preview keeps its empty sandbox and no-referrer policy.
+
+The nine families reuse the presentation modules that their real pages call. `e2e/admin-specimen.spec.js` checks their rendered states, keyboard controls and document boundaries. Hosted captures at 1440px and 390px in light and dark use the existing Admin visual evidence artifact; PNGs and geometry records stay outside Git. The before comparison renders the base commit's shared chrome in the same new specimen. Human visual acceptance is recorded separately from passing checks. This review surface does not certify a live Admin or accept the social features in #205, #206 or #207.
 
 ## 8. What the milestones consume
 
@@ -201,12 +205,12 @@ The brief's §2.4 list stands. This record adds the mechanical checks that a wav
 - Every colour token in both mode blocks (the dark-mode test, extended to every new token).
 - Every font in the bundle allowlist with a recorded licence (the token test).
 
-## 11. Defects noticed on the way
+## 11. Shared Admin presentation
 
-Recorded so the wave that owns the surface fixes them:
+These shared rules apply to Admin record lists and title bands:
 
-- Admin sessions list: a day with no label renders its id ("day-2"). Wave 6, with a seed fix.
-- Admin lists: the "Live" badge repeats on every row. Wave 6 sets the default state at lower weight and keeps the word.
-- Admin title band: the description paragraph wraps to an orphaned word. Wave 6 sets `text-wrap: pretty`.
+- Admin session day labels use `resolveDayLabel` in `apps/web/src/admin/sessionDoc.js`; an empty label receives the formatted date.
+- Admin record states keep their words. `Live` uses normal weight; draft, unpublished, caution and error states keep their emphasis. Generic success and access-tier badges are unchanged.
+- Admin title descriptions use `text-wrap: pretty`, for short and long copy at phone and desktop widths.
 - Media widgets read `brand-*` names instead of tier 2 roles. Filed as an issue.
 - The motif asset test measures only the fauna set. Wave 3 extends it.

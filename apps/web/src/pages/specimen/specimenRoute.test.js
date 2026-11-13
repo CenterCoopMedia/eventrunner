@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { loadSpecimenPage, SPECIMEN_ENABLED, SPECIMEN_PATH, specimenRouteEnabled } from './specimenRoute.js';
+import { loadAdminSpecimenPage, loadSpecimenPage, SPECIMEN_ENABLED, SPECIMEN_PATH, specimenRouteEnabled } from './specimenRoute.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const registrySource = fs.readFileSync(path.resolve(here, '..', '..', 'routes.jsx'), 'utf8');
@@ -63,6 +63,7 @@ describe('the route registration in specimenRoute.js and routes.jsx', () => {
   it('agrees with the pure predicate in this environment', () => {
     expect(SPECIMEN_ENABLED).toBe(specimenRouteEnabled());
     expect(typeof loadSpecimenPage).toBe(SPECIMEN_ENABLED ? 'function' : 'object');
+    expect(typeof loadAdminSpecimenPage).toBe(SPECIMEN_ENABLED ? 'function' : 'object');
   });
 
   it('renders the route only when the gate is open', () => {

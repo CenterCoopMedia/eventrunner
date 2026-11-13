@@ -177,7 +177,9 @@ pull request stacked on the wave below.
 - [ ] Wave 4: schedule devices on the schedule (#162 to #167) and the dashboard
       shells (#168, #210)
 - [ ] Wave 5: three site styles: Gallery, Playbill, Listings
-- [ ] Wave 6: admin devices on the M9 to M11 pages
+- [ ] Wave 6: admin device specimen and visual acceptance (#551). The review document is `/specimen/admin`; hosted evidence and a human visual verdict complete acceptance.
+
+The M9 operations pages, M10 editors/publishing, and the M11 announcement and invoice tools listed below already have their real implementations. Wave 6 reuses their presentation. Social acceptance and unfinished work stay with #205, #206 and #207 and their existing implementation children. The specimen does not reopen or certify those features.
 
 ### M8: Attendee and schedule experience — complete except #177
 

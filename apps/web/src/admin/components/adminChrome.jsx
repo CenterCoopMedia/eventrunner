@@ -60,7 +60,7 @@ const STATE_TONE = Object.freeze({
 export function StatusBadge({ tone = 'neutral', className = '', children, ...rest }) {
   return (
     <span
-      className={`admin-status-badge inline-flex items-center rounded-admin-small px-xs py-3xs text-admin-xs font-semibold leading-tight ${
+      className={`admin-status-badge inline-flex items-center rounded-admin-small px-xs py-3xs text-admin-xs font-semibold leading-tight data-[record-state=live]:font-normal ${
         BADGE_TONES[tone] ?? BADGE_TONES.neutral
       } ${className}`}
       {...rest}
@@ -199,7 +199,7 @@ export default function AdminPageHeader({
         ) : null}
       </header>
       {description ? (
-        <p id={descriptionId} className="w-full text-admin-sm text-admin-ink-secondary">{description}</p>
+        <p id={descriptionId} className="w-full text-pretty text-admin-sm text-admin-ink-secondary">{description}</p>
       ) : null}
     </>
   );

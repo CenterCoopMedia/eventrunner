@@ -530,6 +530,7 @@ jobs:
             test-results/admin-visual-evidence/*.png
             test-results/admin-visual-evidence/app-boot-*.json
             test-results/admin-visual-evidence/public-header-*.json
+            test-results/admin-visual-evidence/admin-specimen--*.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload Playwright report

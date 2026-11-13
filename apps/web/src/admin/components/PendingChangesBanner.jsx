@@ -14,10 +14,9 @@
 //
 // It sits ABOVE the stone, never inside it: the title band pulls itself up
 // by the stone's top padding, and inside the stone it would slide over this.
-import { Link, matchPath, useLocation } from 'react-router';
+import { matchPath, useLocation } from 'react-router';
+import PendingChangesNotice, { UNPUBLISHED_PATH } from './PendingChangesNotice.jsx';
 import { usePendingChanges } from '../PendingChangesContext.jsx';
-
-export const UNPUBLISHED_PATH = '/admin/unpublished';
 
 // matchPath does not decode percent-encoding. The router still renders this
 // page for an encoded spelling, so decode each segment first. A decoded
@@ -47,32 +46,5 @@ export default function PendingChangesBanner() {
   // arrived keeps showing through a later failure while the read retries.
   const failed = !ready && Boolean(error);
   if (onOwnPage || (!failed && (!ready || total === 0))) return null;
-  return (
-    <div className="mx-auto w-full max-w-admin-canvas">
-      <aside
-        aria-label="Unpublished changes"
-        data-pending-total={failed ? undefined : total}
-        className="border-admin-rule-hairline border-b-admin-hairline bg-admin-ground-proof px-md py-xs text-admin-sm text-admin-ink lg:px-lg"
-      >
-        {failed ? (
-          <p>We could not count the unpublished changes. We will try again.</p>
-        ) : (
-          <p>
-            {sentence}{' '}
-            {/* The ink, not the link ink: the ink on the proof ground is a
-                measured pair, and the underline and weight say "link". It
-                stays in the sentence and still takes the hit-area floor
-                (admin-target: 24px on a pointer, 44px on touch); the
-                room's ring draws its focus. */}
-            <Link
-              to={UNPUBLISHED_PATH}
-              className="admin-target inline-flex items-center rounded-admin-small font-semibold text-admin-ink underline underline-offset-2"
-            >
-              Review unpublished changes
-            </Link>
-          </p>
-        )}
-      </aside>
-    </div>
-  );
+  return <PendingChangesNotice failed={failed} total={total} sentence={sentence} />;
 }

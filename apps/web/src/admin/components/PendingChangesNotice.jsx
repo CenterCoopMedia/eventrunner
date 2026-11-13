@@ -1,0 +1,36 @@
+import { Link } from 'react-router';
+
+export const UNPUBLISHED_PATH = '/admin/unpublished';
+
+/** The shell's notice, without the live count or own-page suppression. */
+export default function PendingChangesNotice({ failed, total, sentence }) {
+  return (
+    <div className="mx-auto w-full max-w-admin-canvas">
+      <aside
+        aria-label="Unpublished changes"
+        data-pending-total={failed ? undefined : total}
+        className="border-admin-rule-hairline border-b-admin-hairline bg-admin-ground-proof px-md py-xs text-admin-sm text-admin-ink lg:px-lg"
+      >
+        {failed ? (
+          <p>We could not count the unpublished changes. We will try again.</p>
+        ) : (
+          <p>
+            {sentence}{' '}
+            {/* The ink, not the link ink: the ink on the proof ground is a
+                measured pair, and the underline and weight say "link". It
+                stays in the sentence and still takes the hit-area floor
+                (admin-target: 24px on a pointer, 44px on touch); the
+                room's ring draws its focus. */}
+            <Link
+              to={UNPUBLISHED_PATH}
+              className="admin-target inline-flex items-center rounded-admin-small font-semibold text-admin-ink underline underline-offset-2"
+            >
+              Review unpublished changes
+            </Link>
+          </p>
+        )}
+      </aside>
+    </div>
+  );
+}
+

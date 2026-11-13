@@ -73,16 +73,9 @@ import {
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
-  StatusBadge,
 } from '../components/adminChrome.jsx';
 import { EMAIL_ADDRESS_RE as EMAIL_RE } from 'shared/email';
-import AdminIconControl from '../components/AdminIconControl.jsx';
-
-/** The tier word and its badge tone. The word is always rendered; the tone agrees with it. */
-const TIER_WORDS = Object.freeze({
-  operator: { label: 'Operator', tone: 'info' },
-  staff: { label: 'Staff', tone: 'neutral' },
-});
+import AdminAccessList, { TIER_WORDS, formatEndTime, isTemporary } from '../components/AdminAccessList.jsx';
 
 const GRANT_TIERS = [
   { value: 'staff', label: 'Staff' },
@@ -92,29 +85,6 @@ const GRANT_TIERS = [
 /** The longest a staff grant may run. The server holds the same limit. */
 const MAX_STAFF_ACCESS_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const END_TIME_FORMAT = {
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  timeZoneName: 'short',
-};
-
-/**
- * An end time as people read it, in the browser's own time zone and with
- * the zone named, so an operator in one zone and a reader in another do
- * not read the same words as two times.
- *
- * @param {string|null|undefined} iso
- * @returns {string}
- */
-export function formatEndTime(iso) {
-  const ms = typeof iso === 'string' ? Date.parse(iso) : Number.NaN;
-  if (!Number.isFinite(ms)) return 'an unreadable time';
-  return new Intl.DateTimeFormat(undefined, END_TIME_FORMAT).format(new Date(ms));
-}
 
 /** The longest delay setTimeout honours; a longer one fires at once. */
 const MAX_TIMER_DELAY = 2_147_483_647;
@@ -144,11 +114,6 @@ export function nextEndReloadDelay(accounts, nowMs) {
   // behind this one): ask again, but not every second.
   if (nearest <= nowMs) return STALE_END_RETRY_MS;
   return Math.min(nearest - nowMs + END_RELOAD_GRACE_MS, MAX_TIMER_DELAY);
-}
-
-/** Whether an account row holds a staff grant with an end time (readable or not). */
-function isTemporary(account) {
-  return Boolean(account) && account.tier === 'staff' && typeof account.expiryState === 'string';
 }
 
 /**
@@ -276,20 +241,6 @@ function emailNotice(outcome, saved = false) {
 }
 
 /**
- * The words under the tier badge for a staff grant with an end time. The
- * server decided the state by its own clock.
- */
-function EndTimeLine({ account }) {
-  if (!isTemporary(account)) return null;
-  const text = account.expiryState === 'active'
-    ? `Access ends ${formatEndTime(account.expiresAt)}.`
-    : account.expiryState === 'expired'
-      ? `Access ended ${formatEndTime(account.expiresAt)}. No access now.`
-      : 'The end time cannot be read. No access now.';
-  return <p className="mt-3xs text-admin-xs text-admin-ink-secondary">{text}</p>;
-}
-
-/**
  * The still surface a pending change is confirmed on. The page owns the
  * focus moves; this only exposes the two elements they land on.
  */
@@ -331,19 +282,6 @@ function ChangeConfirm({ change, busy, error, onConfirm, onCancel, surfaceRef, e
         </button>
       </div>
     </section>
-  );
-}
-
-function GalleyHead({ children, align = 'start' }) {
-  return (
-    <th
-      scope="col"
-      className={`border-b-admin-strong border-admin-rule-strong bg-admin-ground-soft px-md py-xs text-admin-xs font-semibold text-admin-ink-secondary ${
-        align === 'end' ? 'text-end' : 'text-start'
-      }`}
-    >
-      {children}
-    </th>
   );
 }
 
@@ -714,91 +652,7 @@ export default function AdminAccess() {
               description="Nobody is listed. Grant access above."
             />
           ) : (
-            <Panel flush>
-              <table ref={listRef} tabIndex={-1} className="w-full border-collapse text-admin-sm">
-                <caption className="sr-only">Admin accounts and their roles</caption>
-                <thead>
-                  <tr>
-                    <GalleyHead>Account</GalleyHead>
-                    <GalleyHead>Role</GalleyHead>
-                    <GalleyHead align="end">Actions</GalleyHead>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accounts.map((account) => {
-                    const isSelf = account.email === callerEmail;
-                    const word = TIER_WORDS[account.tier] ?? { label: 'Team member', tone: 'neutral' };
-                    const otherTier = account.tier === 'operator' ? 'staff' : 'operator';
-                    return (
-                      <tr
-                        key={account.email}
-                        className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0"
-                      >
-                        <td className="px-md py-sm align-top">
-                          <span className="break-all font-admin-data text-admin-base text-admin-ink">
-                            {account.email}
-                          </span>
-                          {isSelf ? (
-                            <span className="ms-xs text-admin-xs text-admin-ink-secondary">(you)</span>
-                          ) : null}
-                          {account.support ? (
-                            <span className="ms-xs text-admin-xs text-admin-ink-secondary">CCM support</span>
-                          ) : null}
-                        </td>
-                        <td className="px-md py-sm align-top">
-                          <StatusBadge tone={word.tone}>{word.label}</StatusBadge>
-                          {isTemporary(account) && account.expiryState !== 'active' ? (
-                            <StatusBadge tone="caution" className="ms-xs">
-                              {account.expiryState === 'expired' ? 'Ended' : 'No access'}
-                            </StatusBadge>
-                          ) : null}
-                          <EndTimeLine account={account} />
-                        </td>
-                        <td className="px-md py-sm text-end align-top">
-                          <div className="flex flex-wrap items-center justify-end gap-xs">
-                            <AdminIconControl
-                              icon="edit"
-                              label={`Change ${account.email} to ${TIER_WORDS[otherTier].label.toLowerCase()}`}
-                              disabled={busy}
-                              onClick={(event) => open(
-                                {
-                                  email: account.email,
-                                  tier: otherTier,
-                                  previousTier: account.tier,
-                                  previousTemporary: isTemporary(account),
-                                },
-                                event.currentTarget,
-                              )}
-                            />
-                            <AdminIconControl
-                              icon="remove"
-                              label={`Remove access for ${account.email}`}
-                              className="text-admin-state-error"
-                              disabled={busy}
-                              onClick={(event) => open(
-                                { email: account.email, tier: 'none', previousTier: account.tier },
-                                event.currentTarget,
-                              )}
-                            />
-                            {!isTemporary(account) || account.expiryState === 'active' ? (
-                              <button
-                                type="button"
-                                className={secondaryButtonClass}
-                                aria-label={`Send sign-in instructions to ${account.email}`}
-                                disabled={busy}
-                                onClick={(event) => open({ email: account.email, action: 'resend' }, event.currentTarget)}
-                              >
-                                Send sign-in instructions
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </Panel>
+            <AdminAccessList accounts={accounts} callerEmail={callerEmail} busy={busy} onOpen={open} listRef={listRef} />
           )}
         </>
       )}

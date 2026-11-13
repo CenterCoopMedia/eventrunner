@@ -20,6 +20,7 @@ import ControlsSection from './ControlsSection.jsx';
 import InputsSection from './InputsSection.jsx';
 import FeedbackSection from './FeedbackSection.jsx';
 import PrintSection from './PrintSection.jsx';
+import AdminSection from './AdminSection.jsx';
 
 /** A section's folio, from its place in the contents. */
 export function sectionFolio(index) {
@@ -40,6 +41,7 @@ export const SPECIMEN_SECTIONS = Object.freeze([
   Object.freeze({ id: 'specimen-inputs', label: 'Inputs', Component: InputsSection }),
   Object.freeze({ id: 'specimen-feedback', label: 'Feedback', Component: FeedbackSection }),
   Object.freeze({ id: 'specimen-print', label: 'Print', Component: PrintSection }),
+  Object.freeze({ id: 'specimen-admin', label: 'Admin devices', Component: AdminSection }),
 ]);
 
 export default SPECIMEN_SECTIONS;

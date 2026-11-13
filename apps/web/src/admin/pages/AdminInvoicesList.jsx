@@ -10,28 +10,24 @@ import { plannerError } from '../plannerErrors.js';
 // "Show more" continues the same filter from where the last page stopped.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { formatMoney } from 'shared/invoice';
 import { useAdminApi } from '../adminApi.js';
 import {
   INVOICES_ROOT,
   INVOICE_SETTINGS_PATH,
-  INVOICE_STATUS_TONES,
   INVOICE_STATUS_WORDS,
 } from '../invoiceDoc.js';
-import RuledTable from '../components/RuledTable.jsx';
+import AdminInvoiceTable from '../components/AdminInvoiceTable.jsx';
 import {
   Notice,
   ServerErrorSummary,
   inputClass,
   fieldLabelClass,
   primaryButtonClass,
-  rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
-  StatusBadge,
 } from '../components/adminChrome.jsx';
 
 export const STATUS_FILTERS = Object.freeze([
@@ -151,28 +147,7 @@ export default function AdminInvoicesList() {
   );
 
   const filtered = Boolean(status || search);
-  const tableRows = (rows ?? []).map((invoice) => ({
-    id: invoice.id,
-    cells: {
-      invoice: (
-        <Link to={`${INVOICES_ROOT}/${encodeURIComponent(invoice.id)}`} className={rowTitleLinkClass}>
-          {invoice.number ?? `Draft for ${invoice.billTo?.name || 'no name yet'}`}
-        </Link>
-      ),
-      billTo: invoice.billTo?.name || '—',
-      status: (
-        <span className="inline-flex flex-wrap items-center gap-3xs">
-          <StatusBadge tone={INVOICE_STATUS_TONES[invoice.status] ?? 'neutral'} data-invoice-status={invoice.status}>
-            {INVOICE_STATUS_WORDS[invoice.status] ?? 'Unknown'}
-          </StatusBadge>
-          {/* A card payment waits for an operator's review (#519). */}
-          {invoice.needsReview ? <StatusBadge tone="error" data-invoice-review="">Needs review</StatusBadge> : null}
-        </span>
-      ),
-      due: invoice.dueDate ? <span className="font-admin-data tabular-nums">{invoice.dueDate}</span> : 'No due date',
-      total: formatMoney(invoice.totals?.total ?? 0, invoice.currency),
-    },
-  }));
+
 
   return (
     <div className="flex flex-col gap-md">
@@ -293,19 +268,7 @@ export default function AdminInvoicesList() {
           <p role="status" className="text-admin-sm text-admin-ink-secondary">
             {invoiceCountLine(rows.length, Boolean(nextCursor))}
           </p>
-          <RuledTable
-            caption="Invoices, newest first"
-            hideCaption
-            columns={[
-              { id: 'invoice', label: 'Invoice' },
-              { id: 'billTo', label: 'Bill to' },
-              { id: 'status', label: 'Status' },
-              { id: 'due', label: 'Due' },
-              { id: 'total', label: 'Total', numeric: true },
-            ]}
-            rows={tableRows}
-            tableClassName="min-w-[40rem]"
-          />
+          <AdminInvoiceTable rows={rows} />
           {nextCursor ? <div>{showMoreButton('Show more invoices')}</div> : null}
         </>
       )}
