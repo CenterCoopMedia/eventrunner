@@ -4,6 +4,13 @@ import { keepAnswer, removeKeptAnswer } from './keptAnswers.js';
 // The masthead waits for the mounted setup's save before signing out.
 export const SetupSaveContext = createContext(null);
 
+function keepUnsaved(entry, latest) {
+  keepAnswer(entry.scope, entry.value);
+  // A response can arrive after a newer answer was copied on page hide.
+  // Keep both steps, or let the newer value win when they share a key.
+  if (latest && latest !== entry) keepAnswer(latest.scope, latest.value);
+}
+
 /**
  * Save as the client types (ADR 0007 §3). `queue(value)` waits `delay` ms
  * for the typing to stop, then calls `save(value)`. Saves run one at a
@@ -50,7 +57,7 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
       try {
         const result = await saveRef.current(value, options);
         setError('');
-        if (result?.saved === false) keepAnswer(savedScope, value);
+        if (result?.saved === false) keepUnsaved(entry, latest.current);
         else {
           removeKeptAnswer(savedScope, value);
           if (latest.current === entry) latest.current = undefined;
@@ -58,12 +65,12 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
         // A newer value queued during this save is still waiting: say so,
         // not 'saved', until its own save lands.
         if (pending.current !== undefined) setStatus('waiting');
+        else if (latest.current && latest.current !== entry) setStatus('saving');
         else setStatus(result && result.saved === false ? 'unsaved' : 'saved');
         onResultRef.current?.(result, value);
         return true;
       } catch (err) {
-        const kept = latest.current || entry;
-        keepAnswer(kept.scope, kept.value);
+        keepUnsaved(entry, latest.current);
         if (latest.current === entry && pending.current === undefined) pending.current = entry;
         setError(err.message);
         setStatus('error');

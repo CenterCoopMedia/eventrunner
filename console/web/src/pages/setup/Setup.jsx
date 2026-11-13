@@ -191,7 +191,7 @@ export default function Setup() {
         {View && showAll ? <Problems fields={shownErrors} orgId={orgId} appId={appId} fromReview={fromReview} /> : null}
         <fieldset disabled={navigating || signingOut} className="console-feedback-fields">
         {View ? <KeptAnswer key={`${user?.uid}/${orgId}/${appId}/${step.id}`} scope={scope} step={step.id}
-          answer={app.answers[step.id]} onUse={onChange}
+          onUse={onChange}
           onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} /> : null}
         {View ? (
           <View

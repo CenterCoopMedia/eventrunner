@@ -57,6 +57,27 @@ describe('Setup', () => {
     expect(screen.getByLabelText('Organization name')).toHaveValue('NC Local');
   });
 
+  it('keeps a refused answer after another step saves and the optimistic answer is shown again', async () => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    serveApi({ saveApplicationStep: (body) => ({ step: body.step, saved: body.step !== 'webAddress',
+      answers: body.answers, errors: body.step === 'webAddress' ? { 'webAddress.name': 'That name is taken.' } : {} }) });
+    const first = renderSetup('web-address');
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken-name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.change(await screen.findByLabelText('Event name'), { target: { value: 'Saved event edit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your web address' }));
+    expect(await screen.findByLabelText('Name')).toHaveValue('taken-name');
+    expect(screen.getByRole('button', { name: 'Use kept answer' })).toBeInTheDocument();
+    expect(readKeptAnswer(scope, 'webAddress').answers.name).toBe('taken-name');
+    await act(async () => first.unmount());
+    serveApi();
+    renderSetup('web-address');
+    expect(await screen.findByRole('button', { name: 'Use kept answer' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('nclocal');
+    fireEvent.click(screen.getByRole('button', { name: 'Use kept answer' }));
+    expect(screen.getByLabelText('Name')).toHaveValue('taken-name');
+  });
+
   it('shows one step per page with a step list, its progress and the current step', async () => {
     serveApi({
       getApplication: { application: application({ progress: { organization: true, event: true, team: true } }) },

@@ -80,7 +80,7 @@ describe('useAutosave', () => {
     expect(readKeptAnswer(scope, 'event')).toBeNull();
   });
 
-  it('keeps the newest value while an earlier save is in flight and does not clear it for that older response', async () => {
+  it.each([true, false])('keeps the newest value and unload warning when an earlier save completes with saved=%s', async (saved) => {
     let finish;
     const save = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
       .mockImplementationOnce(() => new Promise(() => {}));
@@ -92,9 +92,13 @@ describe('useAutosave', () => {
     act(() => result.current.queue(newest));
     act(() => window.dispatchEvent(new Event('pagehide')));
     expect(readKeptAnswer(scope, 'event')).toEqual(newest);
-    await act(async () => { finish({ saved: true }); await first; });
+    await act(async () => { finish({ saved }); await first; });
     expect(readKeptAnswer(scope, 'event')).toEqual(newest);
     expect(save.mock.calls[1]).toEqual([newest, { keepalive: true }]);
+    expect(result.current.status).toBe('saving');
+    const warning = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(warning);
+    expect(warning.defaultPrevented).toBe(true);
   });
 
   it('keeps an in-flight value even when nothing is pending in the debounce ref', async () => {
