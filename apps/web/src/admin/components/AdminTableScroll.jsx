@@ -15,5 +15,5 @@ export default function AdminTableScroll({ children, className = '', ...props })
     observer?.observe(head);
     return () => observer?.disconnect();
   }, [children]);
-  return <div {...props} ref={ref} className={`admin-table-scroll ${className}`}>{children}</div>;
+  return <div {...props} ref={ref} className={`admin-table-scroll relative ${className}`}>{children}</div>;
 }

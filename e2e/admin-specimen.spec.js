@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { test, expect } from '@playwright/test';
 
 const ROOT = process.cwd();
-const CHROME = path.join(ROOT, 'apps/web/src/admin/components/adminChrome.jsx');
+const COMPONENTS = path.join(ROOT, 'apps/web/src/admin/components');
 const EVIDENCE = path.join(ROOT, 'test-results/admin-visual-evidence');
 const FAMILIES = ['materials', 'queue', 'figures', 'email', 'versions', 'pending', 'access', 'invoices', 'rich-text'];
 let server;
@@ -20,7 +20,8 @@ test.beforeAll(async () => {
   const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(await fs.readFile(process.env.GITHUB_EVENT_PATH, 'utf8')) : null;
   base = event?.pull_request?.base?.sha;
   if (base) {
-    const chrome = execFileSync('git', ['show', `${base}:apps/web/src/admin/components/adminChrome.jsx`], { encoding: 'utf8' });
+    const baseline = new Map(['adminChrome.jsx', 'AdminTableScroll.jsx'].map((file) => [path.join(COMPONENTS, file),
+      execFileSync('git', ['show', `${base}:apps/web/src/admin/components/${file}`], { encoding: 'utf8' })]));
     const { createServer } = await import('vite');
     const { default: tailwindcss } = await import('tailwindcss');
     const { default: autoprefixer } = await import('autoprefixer');
@@ -28,7 +29,7 @@ test.beforeAll(async () => {
     const { default: configureWeb } = await import('../apps/web/vite.config.js');
     const webConfig = configureWeb({ command: 'serve', mode: 'development', isSsrBuild: false });
     server = await createServer({ ...webConfig, configFile: false, root: path.join(ROOT, 'apps/web'), base: '/',
-      plugins: [{ name: 'admin-specimen-base-chrome', enforce: 'pre', load(id) { return id.split('?')[0] === CHROME ? chrome : null; } }, ...webConfig.plugins],
+      plugins: [{ name: 'admin-specimen-base-presentation', enforce: 'pre', load(id) { return baseline.get(id.split('?')[0]) ?? null; } }, ...webConfig.plugins],
       css: { postcss: { plugins: [tailwindcss({ ...tailwind,
         content: [path.join(ROOT, 'apps/web/index.html'), path.join(ROOT, 'apps/web/src/**/*.{js,jsx}'), `!${path.join(ROOT, 'apps/web/src/**/*.test.{js,jsx}')}`],
       }), autoprefixer()] } },
@@ -91,7 +92,8 @@ for (const width of [1440, 390]) {
           const escapesViewport = (node) => {
             if (node.getBoundingClientRect().right <= globalThis.innerWidth) return false;
             for (let ancestor = node.parentElement; ancestor && ancestor !== main; ancestor = ancestor.parentElement) {
-              if (['auto', 'scroll', 'hidden', 'clip'].includes(style(ancestor).overflowX)) return false;
+              if (['auto', 'scroll', 'hidden', 'clip'].includes(style(ancestor).overflowX)
+                && (style(node).position !== 'absolute' || ancestor.contains(node.offsetParent))) return false;
             }
             return true;
           };
@@ -112,7 +114,7 @@ for (const width of [1440, 390]) {
         });
         metrics.push({ source, ...measurement });
         await fs.writeFile(path.join(EVIDENCE, `admin-specimen--${mode}--${width}.json`), JSON.stringify({
-          base, comparison: 'Base shared chrome and PR shared chrome in the same new synthetic specimen', width, mode, metrics,
+          base, comparison: 'Base shared presentation and PR shared presentation in the same new synthetic specimen', width, mode, metrics,
         }, null, 2));
         await page.screenshot({ path: path.join(EVIDENCE, `admin-specimen--${source}--${mode}--${width}.png`), fullPage: true, animations: 'disabled' });
         if (source === 'before') {
@@ -133,8 +135,15 @@ for (const width of [1440, 390]) {
         }
         await page.getByRole('button', { name: 'Show short description' }).click();
         await expect(page.getByText('Real Admin devices with synthetic data and local example actions.')).toBeVisible();
+        if (width === 390) {
+          const invoices = page.getByRole('region', { name: 'Invoices, newest first', exact: true });
+          await invoices.focus();
+          await page.keyboard.press('ArrowRight');
+          await expect.poll(() => invoices.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+          expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        }
       }
-      const evidence = JSON.stringify({ base, comparison: 'Base shared chrome and PR shared chrome in the same new synthetic specimen', width, mode, metrics }, null, 2);
+      const evidence = JSON.stringify({ base, comparison: 'Base shared presentation and PR shared presentation in the same new synthetic specimen', width, mode, metrics }, null, 2);
       await fs.writeFile(path.join(EVIDENCE, `admin-specimen--${mode}--${width}.json`), evidence);
       await testInfo.attach('admin-specimen-geometry', { body: evidence, contentType: 'application/json' });
     });

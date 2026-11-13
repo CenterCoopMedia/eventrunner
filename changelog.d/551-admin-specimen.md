@@ -1,1 +1,1 @@
-Live record labels use lighter text, and Admin page descriptions wrap more evenly. The development and demo specimen book now includes all nine Admin device families with synthetic records, interactive controls and separate light/dark previews. (#551)
+Live record labels use lighter text, and Admin page descriptions wrap more evenly. Table scroll areas contain their hidden captions at narrow widths. The development and demo specimen book now includes all nine Admin device families with synthetic records, interactive controls and separate light/dark previews. (#551)
