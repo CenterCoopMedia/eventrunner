@@ -312,7 +312,7 @@ function checkAnswers(source, form) {
 function answerText(question, value, answered = null) {
   if (value === undefined || value === null) return '';
   switch ((answered ?? question)?.kind) {
-    case 'phone': return isPlainObject(value) && typeof value.entered === 'string' ? value.entered : '';
+    case 'phone': return typeof value === 'string' ? value : (isPlainObject(value) && typeof value.entered === 'string' ? value.entered : '');
     case 'yes_no': return value === true ? 'Yes' : value === false ? 'No' : '';
     case 'directory': return DIRECTORY_CHOICES.find((choice) => choice.id === value)?.label ?? '';
     case 'dietary': {
