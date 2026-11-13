@@ -21,7 +21,7 @@ test.beforeAll(async () => {
   const { default: autoprefixer } = await import('autoprefixer');
   output = await fs.mkdtemp(path.join(os.tmpdir(), 'eventrunner-error-recovery-'));
   const config = {
-    ...appConfig,
+    ...appConfig({ command: 'build', mode: 'production', isSsrBuild: false }),
     configFile: false,
     mode: 'production',
     root: FIXTURE,

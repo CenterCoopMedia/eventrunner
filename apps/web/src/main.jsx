@@ -1,8 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, HashRouter } from 'react-router';
-import App from './App.jsx';
-import ErrorBoundary from './components/ErrorBoundary.jsx';
+import AppRoot from './AppRoot.jsx';
 import { IS_DEMO } from './lib/demoMode.js';
 // Theme tokens first (the @generated alias honors GENERATED_DIR, spec §2.4),
 // then the Tailwind layers that consume them.
@@ -18,6 +17,9 @@ import { startRecentMessages } from './lib/recentMessages.js';
 import { initFieldVitals } from './lib/fieldVitals.js';
 import { fieldVitalsRoute } from './lib/fieldVitalsRoute.js';
 import { isFirebaseLoading } from './lib/firebaseLoader.js';
+import { snapshotViewport } from './lib/snapshotViewport.js';
+import { publicRoutes } from './routes.jsx';
+import { preloadPublicTools } from './components/Layout.jsx';
 
 // Recent warnings and errors ride along with a "Report a problem" report.
 startRecentMessages();
@@ -46,12 +48,29 @@ installChunkReload(globalThis, { isPrefetching: () => isRoutePrefetchPending() |
 // handling for every unrelated docs page too.
 const Router = IS_DEMO ? HashRouter : BrowserRouter;
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+const app = (
   <React.StrictMode>
     <Router>
-      <ErrorBoundary title="The site could not be shown">
-        <App />
-      </ErrorBoundary>
+      <AppRoot />
     </Router>
-  </React.StrictMode>,
+  </React.StrictMode>
 );
+const root = document.getElementById('root');
+// A reader can follow a static link while the entry is still downloading.
+// Hydrate only when the selected snapshot still names this exact route.
+const matchesSnapshot = () => IS_DEMO && root.dataset.snapshotRoute === (location.hash.slice(1) || '/')
+  && root.dataset.snapshotSearch === location.search && root.dataset.snapshotViewport === snapshotViewport(window);
+function mount() {
+  if (matchesSnapshot()) ReactDOM.hydrateRoot(root, app);
+  else ReactDOM.createRoot(root).render(app);
+}
+if (matchesSnapshot()) {
+  // Resolve only the active lazy branches before hydrating. Provider effects
+  // must not update a still-dehydrated route and replace its painted nodes.
+  Promise.resolve().then(() => Promise.all([
+    publicRoutes.find(({ path }) => `/${path}` === root.dataset.snapshotRoute)?.prefetch(),
+    preloadPublicTools(),
+  ])).then(mount, mount);
+} else {
+  mount();
+}

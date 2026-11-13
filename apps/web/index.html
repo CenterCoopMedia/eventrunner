@@ -26,19 +26,22 @@
           #app-boot { position: fixed; inset: 0; box-sizing: border-box; padding: 24px; color-scheme: light dark; color: CanvasText; background: Canvas; font: 16px/1.5 system-ui, sans-serif; }
           #app-boot p { max-width: 36em; margin: 0 0 16px; }
           #app-boot button { color: inherit; background: transparent; border: 1px solid; padding: 6px 12px; font: inherit; cursor: pointer; }
+          #app-boot[data-snapshot] { inset: auto auto 16px 16px; z-index: 1000; width: calc(100% - 32px); max-width: 36em; padding: 16px; border: 1px solid CanvasText; }
+          #app-boot[data-snapshot]:has(button[hidden]) { display: none; }
         </style>
         <p role="status" aria-live="polite" aria-atomic="true"></p>
         <button type="button" hidden>Reload this page</button>
         <script>
           (() => {
-            const root = document.getElementById('root');
             const boot = document.getElementById('app-boot');
             const status = boot.querySelector('[role="status"]');
             const reload = boot.querySelector('button');
             const update = () => {
               const elapsed = performance.now();
               status.textContent = elapsed >= 10000
-                ? 'This site is taking longer than usual to open. You can keep waiting or reload this page.'
+                ? boot.dataset.snapshot
+                  ? 'The page controls have not loaded yet. Keep waiting or reload this page.'
+                  : 'This site is taking longer than usual to open. You can keep waiting or reload this page.'
                 : elapsed >= 1000 ? 'Opening this site…' : '';
               reload.hidden = elapsed < 10000;
               if (elapsed >= 10000) window.__eventHeldUpBoot = true;
@@ -53,7 +56,7 @@
                 observer.disconnect();
               }
             });
-            observer.observe(root, { childList: true });
+            observer.observe(document.body, { childList: true, subtree: true });
           })();
         </script>
       </div>

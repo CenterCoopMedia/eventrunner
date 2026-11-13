@@ -62,12 +62,12 @@ function attemptFullscreenCall(target, method) {
 }
 
 export function DemoBannerContent({
-  location = window.location,
-  history = window.history,
-  pageDocument = document,
+  location = globalThis.location,
+  history = globalThis.history,
+  pageDocument = globalThis.document,
 }) {
   const { theme, setDemoTheme } = useEventConfig();
-  const initialDisplay = readDemoDisplay(location.search, theme);
+  const initialDisplay = readDemoDisplay(location?.search, theme);
   const [styleId, setStyleId] = useState(initialDisplay.style);
   const [mode, setMode] = useState(initialDisplay.mode);
   const [previewing, setPreviewing] = useState(false);

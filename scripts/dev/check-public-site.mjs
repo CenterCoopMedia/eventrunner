@@ -261,6 +261,10 @@ async function main() {
       await context.route('**/*', async (route) => {
         const request = route.request();
         const url = new URL(request.url());
+        if (options.blockEntry && /\/assets\/index-[^/]+\.js$/.test(url.pathname)) {
+          record.blockedEntryRequests = (record.blockedEntryRequests || 0) + 1;
+          return route.abort('blockedbyclient');
+        }
         if (options.blockFirebase && /\/assets\/firebase-sdk-[^/]+\.js$/.test(url.pathname)) {
           const timing = await page.evaluate(() => ({
             paint: globalThis.performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0,
@@ -282,6 +286,11 @@ async function main() {
       page.setDefaultTimeout(8000);
       page.setDefaultNavigationTimeout(15000);
       page.on('pageerror', (error) => record.errors.push(error.message));
+      page.on('console', (message) => {
+        if (message.type() === 'error' && /hydration|hydrating|Minified React error/i.test(message.text())) {
+          record.errors.push('React reported a hydration or rendering error');
+        }
+      });
       page.on('response', (response) => {
         if (response.status() >= 400) record.errors.push(`HTTP ${response.status()}: ${new URL(response.url()).pathname}`);
       });
@@ -310,23 +319,64 @@ async function main() {
       await ready(page, options);
     };
 
-    for (const route of ['', '#/schedule']) {
-      await run(`demo-sdk-failure-${route ? 'schedule' : 'home'}`, VIEWS[1], 'light', async (page, record) => {
-        let documents = 0;
-        page.on('request', (request) => {
-          if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents += 1;
-        });
-        await page.goto(`${server.origin}${SITE.demoBase}${route}`, { waitUntil: 'load' });
-        await expect(page.locator('main h1')).toBeVisible();
-        await expect(page.locator('.event-hero__art')).toBeVisible();
-        await expect.poll(() => record.blockedSdkRequests || 0).toBeGreaterThan(0);
-        assert.ok(record.firstPaintAtSdkRequest > 0, 'SDK fetch must start after content first paints');
-        assert.ok(record.sdkRequestStart >= record.firstPaintAtSdkRequest, 'SDK request must follow first contentful paint');
-        await page.evaluate(() => new Promise((resolve) =>
-          globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(resolve))));
-        await expect(page.locator('main h1')).toBeVisible();
-        assert.equal(documents, 1, 'A failed background SDK must not reload the snapshot');
-      }, { blockFirebase: true });
+    for (const view of [...VIEWS.slice(0, 2), { width: 800, height: 1000, label: 'tablet' }]) {
+      for (const route of ['', '#/schedule', '#/speakers']) {
+        await run(`demo-html-${route.split('/')[1] || 'home'}-${view.label}`, view, 'light', async (page, record) => {
+          const checkRecovery = view.label === 'phone' && !route;
+          if (checkRecovery) await page.clock.install();
+          await page.goto(`${server.origin}${SITE.demoBase}${route}`, { waitUntil: 'load' });
+          await expect(page.locator('main h1')).toBeVisible();
+          if (route === '#/speakers') {
+            await expect(page.locator('.portrait-shelf p').first()).toBeVisible();
+          } else {
+            await expect(page.locator('.event-hero__art')).toBeVisible();
+          }
+          assert.ok(record.blockedEntryRequests > 0, 'The static route must render with its entry module blocked');
+          assert.equal(await page.locator('#root').getAttribute('data-snapshot-route'), route.slice(1) || '/');
+          if (view.width >= 640) await expect(page.getByRole('navigation', { name: 'Main', exact: true })).toBeVisible();
+          if (checkRecovery) {
+            await expect(page.locator('#app-boot')).toBeHidden();
+            await page.clock.fastForward(11000);
+            await expect(page.locator('#app-boot')).toContainText('The page controls have not loaded yet');
+            await expect(page.getByRole('button', { name: 'Reload this page', exact: true })).toBeVisible();
+          }
+        }, { blockEntry: true, screenshot: true });
+      }
+    }
+
+    for (const view of VIEWS.slice(0, 2)) {
+      for (const route of ['', '#/schedule']) {
+        await run(`demo-sdk-failure-${route ? 'schedule' : 'home'}-${view.label}`, view, 'light', async (page, record) => {
+          await page.addInitScript(() => {
+            const observer = new MutationObserver(() => {
+              const root = globalThis.document.getElementById('root');
+              if (!root?.dataset.snapshotRoute) return;
+              globalThis.__snapshotMain = root.querySelector('main');
+              globalThis.__snapshotHero = root.querySelector('.event-hero__art');
+              observer.disconnect();
+            });
+            observer.observe(globalThis.document, { subtree: true, attributes: true });
+          });
+          let documents = 0;
+          page.on('request', (request) => {
+            if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents += 1;
+          });
+          await page.goto(`${server.origin}${SITE.demoBase}${route}`, { waitUntil: 'load' });
+          await expect(page.locator('main h1')).toBeVisible();
+          await expect(page.locator('.event-hero__art')).toBeVisible();
+          await expect.poll(() => record.blockedSdkRequests || 0).toBeGreaterThan(0);
+          assert.ok(record.firstPaintAtSdkRequest > 0, 'SDK fetch must start after content first paints');
+          assert.ok(record.sdkRequestStart >= record.firstPaintAtSdkRequest, 'SDK request must follow first contentful paint');
+          await page.evaluate(() => new Promise((resolve) =>
+            globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(resolve))));
+          await expect(page.locator('main h1')).toBeVisible();
+          assert.equal(documents, 1, 'A failed background SDK must not reload the snapshot');
+          await expect(page.locator('#app-boot')).toHaveCount(0);
+          assert.equal(await page.evaluate(() => globalThis.__snapshotMain === globalThis.document.querySelector('#root main')
+            && globalThis.__snapshotHero === globalThis.document.querySelector('#root .event-hero__art')), true,
+          'Hydration must preserve the already-painted content and hero nodes');
+        }, { blockFirebase: true });
+      }
     }
 
     for (const view of VIEWS) {

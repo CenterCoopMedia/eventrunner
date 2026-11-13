@@ -2,6 +2,10 @@
 
 The budget measures the JavaScript graph required to render the first public snapshot. The Firebase runtime starts after that paint and has a separate ceiling. The report gives both costs and their combined first-visit download.
 
+The read-only static demo also renders Home, Program and Speakers to HTML at build time, using the same React components and snapshot data. Its document includes compact, standard and wide layouts; a short inline selector installs the requested route and viewport before entry modules execute. Matching routes hydrate those nodes. Different preview styles, filtered Program URLs and other routes use the live renderer. Client deployments retain their runtime render.
+
+The generated head preloads the hero source and any responsive candidates the rendered image offers. Heading, body and data fonts remain preloaded with `font-display: swap`; the Speakers paragraph can paint from the HTML without waiting for its route module. Hosted browser checks block the entry module at phone, tablet and desktop widths, then verify that normal hydration preserves the painted main and hero nodes.
+
 ## Measurement
 
 - Build the normal deployment and the static demo.

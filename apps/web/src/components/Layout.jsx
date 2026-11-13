@@ -95,18 +95,20 @@ function onDemand(importer) {
 }
 
 export function optionalOnDemand(importer, label) {
-  return lazy(() =>
-    importer()
-      .then((module) => {
-        clearReloadFlag();
-        return module;
-      })
-      .catch((error) => {
-        reloadOnce();
-        console.warn(`Optional ${label} could not load.`, error);
-        return { default: () => null };
-      }),
-  );
+  let loaded;
+  let pending;
+  const load = () => pending ||= importer()
+    .then((module) => {
+      clearReloadFlag();
+      return module;
+    })
+    .catch((error) => {
+      reloadOnce();
+      console.warn(`Optional ${label} could not load.`, error);
+      return { default: () => null };
+    }).then((module) => (loaded = module));
+  const Component = lazy(() => loaded ? { then(resolve) { resolve(loaded); } } : load());
+  return Object.assign(Component, { preload: load });
 }
 // Only multi-role accounts need this menu; keep it out of public first paint.
 const AccountMenu = optionalOnDemand(() => import('./AccountMenu.jsx'), 'account menu');
@@ -121,6 +123,7 @@ const PublicWebMcpRegistration = optionalOnDemand(
   () => import('../webmcp/PublicWebMcpRegistration.jsx'),
   'public model tools',
 );
+export const preloadPublicTools = PublicWebMcpRegistration.preload;
 
 /**
  * The page's own header, read into the theme's vocabulary.

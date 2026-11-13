@@ -15,6 +15,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolveGeneratedDir } from './generatedDir.js';
 import { criticalFontTags } from './criticalFonts.js';
+import { snapshotHtml } from './snapshotHtml.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const generatedDir = resolveGeneratedDir(process.env, path.resolve(here, 'src/generated'));
@@ -48,14 +49,14 @@ function staticImportGraph(context, entry = entryModule) {
   return seen;
 }
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react(), {
     name: 'snapshot-font-preloads',
     transformIndexHtml: {
       order: 'pre',
       handler: () => criticalFontTags(readFileSync(path.join(generatedDir, 'theme.css'), 'utf8')),
     },
-  }],
+  }, snapshotHtml()],
   // `shared` is a linked workspace package whose ESM entries re-export CJS
   // sources; linked deps skip prebundling by default, which would break the
   // dev server's CJS interop. Builds and vitest handle it either way.
@@ -97,7 +98,7 @@ export default defineConfig({
       'shared/webVitals',
     ],
   },
-  build: {
+  build: isSsrBuild ? {} : {
     rolldownOptions: {
       output: {
         codeSplitting: {
@@ -137,4 +138,4 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     css: false,
   },
-});
+}));
