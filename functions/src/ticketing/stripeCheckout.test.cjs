@@ -855,8 +855,10 @@ test('checkout answers are checked against the live form and held only on the or
   // Never sent to Stripe or stored on the payment attempt.
   assert.equal(JSON.stringify(calls[0].params).includes('Gazette'), false);
   assert.equal(JSON.stringify(db.read('ticket_payment_attempts', order.attemptId)).includes('Gazette'), false);
-  assert.equal(JSON.stringify(calls[0].params).includes('555'), false);
-  assert.equal(JSON.stringify(db.read('ticket_payment_attempts', order.attemptId)).includes('555'), false);
+  for (const phone of [ANSWERS.phone, CHECKED.phone.normalized]) {
+    assert.equal(JSON.stringify(calls[0].params).includes(phone), false);
+    assert.equal(JSON.stringify(db.read('ticket_payment_attempts', order.attemptId)).includes(phone), false);
+  }
 });
 
 test('checkout without answers needs no registration form and adds no answer fields', async () => {
