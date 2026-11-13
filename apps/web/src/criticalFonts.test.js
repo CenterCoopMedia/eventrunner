@@ -11,9 +11,9 @@ describe('snapshot font preload hints', () => {
       @font-face { font-family: 'Numbers'; src: url('/fonts/numbers.woff2'); }
       @font-face { font-family: 'Unused'; src: url('/fonts/unused.woff2'); }`;
     expect(criticalFontTags(css).map((tag) => tag.attrs)).toEqual([
-      { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', fetchpriority: 'low', href: '/fonts/reading-400.woff2' },
-      { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', fetchpriority: 'low', href: '/fonts/reading-700.woff2' },
-      { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', fetchpriority: 'low', href: '/fonts/labels.woff2' },
+      { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: '/fonts/reading-400.woff2' },
+      { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: '/fonts/reading-700.woff2' },
+      { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: '/fonts/labels.woff2' },
     ]);
   });
 

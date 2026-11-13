@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { injectSnapshotHtml } from '../snapshotHtml.js';
 
-function documentFor(route, search = '', width = 390) {
-  const html = injectSnapshotHtml('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/app.css"></head><body><div id="root">Opening</div></body></html>', {
+function documentFor(route, search = '', width = 390, frames = [], visibility = 'visible') {
+  const html = injectSnapshotHtml('<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/app.css"><link rel="modulepreload" href="/assets/shared.js" crossorigin></head><body><div id="root">Opening</div><script type="module" src="/assets/index-test.js" crossorigin></script></body></html>', {
     routes: ['/', '/schedule', '/speakers'].flatMap((path) => ['compact', 'standard', 'wide'].map((viewport) => ({
       route: path,
       viewport,
@@ -12,8 +12,12 @@ function documentFor(route, search = '', width = 390) {
     display: { style: 'newsroom', mode: 'light' },
   });
   const document = new DOMParser().parseFromString(html, 'text/html');
+  Object.defineProperty(document, 'visibilityState', { value: visibility, writable: true });
   const location = { hash: `#${route}`, search };
-  const view = { matchMedia: (query) => ({ matches: query.includes('max-width') ? width <= 639 : width >= 1024 }) };
+  const view = {
+    matchMedia: (query) => ({ matches: query.includes('max-width') ? width <= 639 : width >= 1024 }),
+    requestAnimationFrame: (callback) => frames.push(callback),
+  };
   for (const script of document.querySelectorAll('script')) {
     new Function('document', 'location', 'window', script.textContent)(document, location, view);
   }
@@ -40,7 +44,10 @@ describe('parser snapshot selection', () => {
   it('renders the requested public route without installing another route or an account page', () => {
     expect(documentFor('/speakers').querySelector('#root h1').textContent).toBe('/speakers');
     for (const route of ['/signin', '/profile', '/schedule?q=local']) {
-      expect(documentFor(route).querySelector('#root').textContent).toBe('Opening');
+      const document = documentFor(route);
+      expect(document.querySelector('#root').textContent).toBe('Opening');
+      expect(document.querySelector('script[src]').getAttribute('src')).toBe('/assets/index-test.js');
+      expect(document.head.querySelector('link[href="/assets/index-test.js"]').getAttribute('rel')).toBe('modulepreload');
     }
     expect(documentFor('/speakers', '?style=zine').querySelector('#root').textContent).toBe('Opening');
     expect(documentFor('/speakers', '?style=newsroom&mode=light').querySelector('#root h1').textContent).toBe('/speakers');
@@ -52,9 +59,26 @@ describe('parser snapshot selection', () => {
 
   it('selects the actual viewport layout before any entry module runs', () => {
     for (const [width, layout] of [[390, 'compact'], [800, 'standard'], [1440, 'wide']]) {
-      const document = documentFor('/schedule', '', width);
+      const frames = [];
+      const document = documentFor('/schedule', '', width, frames);
       expect(document.querySelector('#root main').dataset.layout).toBe(layout);
       expect(document.querySelector('#root').dataset.snapshotViewport).toBe(layout);
+      expect(document.querySelector('script[src]')).toBeNull();
+      expect(document.querySelector('link[rel="modulepreload"]')).toBeNull();
+      frames.shift()();
+      expect(document.querySelector('script[src]')).toBeNull();
+      frames.shift()();
+      expect(document.querySelector('script[src]').getAttribute('src')).toBe('/assets/index-test.js');
+      expect(document.querySelector('script[src]').hasAttribute('crossorigin')).toBe(true);
+      expect(document.querySelector('link[rel="modulepreload"]').getAttribute('href')).toBe('/assets/shared.js');
     }
+    expect(documentFor('/', '', 390, [], 'hidden').querySelector('script[src]')).not.toBeNull();
+    const frames = [];
+    const document = documentFor('/', '', 390, frames);
+    document.visibilityState = 'hidden';
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(document.querySelectorAll('script[src]')).toHaveLength(1);
+    while (frames.length) frames.shift()();
+    expect(document.querySelectorAll('script[src]')).toHaveLength(1);
   });
 });

@@ -331,7 +331,8 @@ async function main() {
           } else {
             await expect(page.locator('.event-hero__art')).toBeVisible();
           }
-          assert.ok(record.blockedEntryRequests > 0, 'The static route must render with its entry module blocked');
+          await expect.poll(() => record.blockedEntryRequests || 0,
+            { message: 'The static route must attempt its blocked entry module' }).toBeGreaterThan(0);
           assert.equal(await page.locator('#root').getAttribute('data-snapshot-route'), route.slice(1) || '/');
           if (view.width >= 640) await expect(page.getByRole('navigation', { name: 'Main', exact: true })).toBeVisible();
           if (checkRecovery) {

@@ -56,8 +56,17 @@ export function snapshotHtml() {
 }
 
 export function injectSnapshotHtml(html, { routes, attributes, display }) {
+  const modules = [];
+  const page = html.replace(/<script\b(?=[^>]*\btype=["']module["'])[^>]*>[\s\S]*?<\/script>|<link\b(?=[^>]*\brel=["']modulepreload["'])[^>]*>/gi, (tag) => {
+    modules.push(tag);
+    return '';
+  });
+  // Keep Vite's exact resource tags in the document (and bundle budget),
+  // but let the static content paint before starting their requests.
+  const entry = `<template id="app-modules">${modules.join('\n')}</template>`;
   const templates = routes.map(({ route, viewport, html: markup }) =>
     `<template data-snapshot-route="${route}" data-snapshot-viewport="${viewport}">${markup}</template>`).join('\n');
+  const snapshotRoutes = JSON.stringify([...new Set(routes.map(({ route }) => route))]);
   // Home and Program use the same source and responsive candidates. Start
   // their request while parsing the head, before stylesheets or app modules.
   const hero = /<img\b[^>]*class="event-hero__art"[^>]*>/.exec(routes[0].html)?.[0];
@@ -67,21 +76,54 @@ export function injectSnapshotHtml(html, { routes, attributes, display }) {
   const sizes = attribute('sizes');
   const preload = src ? `<link rel="preload" as="image" fetchpriority="high" href="${src}"${srcset ? ` imagesrcset="${srcset}" imagesizes="${sizes}"` : ''}>` : '';
   const displayMatches = `(${matchesDisplay.toString()})(location.search, ${JSON.stringify(display).replace(/</g, '\\u003c')})`;
-  const heroHint = preload ? `<script>
-    if (${displayMatches} && ['/', '/schedule'].includes((location.hash.slice(1) || '/').split('?')[0])) {
-      document.head.insertAdjacentHTML('beforeend', ${JSON.stringify(preload).replace(/</g, '\\u003c')});
-    }
-  </script>` : '';
+  const headBootstrap = `<script>
+    (() => {
+      const matchesSnapshot = ${displayMatches} && ${snapshotRoutes}.includes(location.hash.slice(1) || '/');
+      if (!matchesSnapshot) {
+        const entry = document.getElementById('app-modules');
+        for (const source of [...entry.content.children]) {
+          if (source.localName === 'link') document.head.appendChild(source);
+          else if (source.hasAttribute('src')) {
+            const hint = document.createElement('link');
+            hint.rel = 'modulepreload';
+            for (const { name, value } of source.attributes) {
+              if (name !== 'type') hint.setAttribute(name === 'src' ? 'href' : name, value);
+            }
+            document.head.appendChild(hint);
+          }
+        }
+      }
+      ${preload ? `if (${displayMatches} && ['/', '/schedule'].includes((location.hash.slice(1) || '/').split('?')[0])) {
+        document.head.insertAdjacentHTML('beforeend', ${JSON.stringify(preload).replace(/</g, '\\u003c')});
+      }` : ''}
+    })();
+  </script>`;
   const bootstrap = `<script>
     (() => {
+      const entry = document.getElementById('app-modules');
+      const onVisibility = () => {
+        if (document.visibilityState === 'hidden') startEntry();
+      };
+      const startEntry = () => {
+        if (!entry.isConnected) return;
+        document.removeEventListener('visibilitychange', onVisibility);
+        for (const source of entry.content.children) {
+          const tag = document.createElement(source.localName);
+          for (const { name, value } of source.attributes) tag.setAttribute(name, value);
+          tag.textContent = source.textContent;
+          document.head.appendChild(tag);
+        }
+        entry.remove();
+      };
       const route = location.hash.slice(1) || '/';
       const viewport = (${snapshotViewport.toString()})(window);
       // A filtered Program or a different preview style needs its own live
       // render. Never hydrate default content against a different URL state.
-      if (!${displayMatches} || !['/', '/schedule', '/speakers'].includes(route)) return;
-      const template = [...document.querySelectorAll('template[data-snapshot-route]')]
-        .find((item) => item.dataset.snapshotRoute === route && item.dataset.snapshotViewport === viewport);
-      if (!template) return;
+      const template = ${displayMatches} && ${snapshotRoutes}.includes(route)
+        ? [...document.querySelectorAll('template[data-snapshot-route]')]
+          .find((item) => item.dataset.snapshotRoute === route && item.dataset.snapshotViewport === viewport)
+        : null;
+      if (!template) { startEntry(); return; }
       const root = document.getElementById('root');
       const boot = document.getElementById('app-boot');
       if (boot) {
@@ -96,8 +138,13 @@ export function injectSnapshotHtml(html, { routes, attributes, display }) {
       for (const [name, value] of Object.entries(attributes)) {
         if (value) document.documentElement.setAttribute(name, value);
       }
+      if (document.visibilityState === 'hidden') startEntry();
+      else {
+        document.addEventListener('visibilitychange', onVisibility);
+        window.requestAnimationFrame(() => window.requestAnimationFrame(startEntry));
+      }
     })();
   </script>`;
-  return html.replace(/<meta\b[^>]*\bname=["']viewport["'][^>]*>/i, (meta) => `${meta}\n${heroHint}`)
+  return page.replace(/<meta\b[^>]*\bname=["']viewport["'][^>]*>/i, (meta) => `${meta}\n${entry}\n${headBootstrap}`)
     .replace('</body>', () => `${templates}\n${bootstrap}\n</body>`);
 }

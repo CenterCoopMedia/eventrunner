@@ -15,5 +15,5 @@ export function criticalFontTags(css) {
     if (file) files.add(file);
   }
   return [...files].map((href) => ({ tag: 'link', injectTo: 'head',
-    attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', fetchpriority: 'low', href } }));
+    attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href } }));
 }
