@@ -30,6 +30,7 @@ export default function ModalShell({ title, description = null, onClose, busy = 
   useModalDialog(panelRef, { returnFocusRef });
 
   return createPortal(
+    <div className="admin-room">
       <dialog
         ref={panelRef}
         aria-labelledby={headingId}
@@ -65,7 +66,8 @@ export default function ModalShell({ title, description = null, onClose, busy = 
           />
         </div>
         <div className="mt-sm">{children}</div>
-      </dialog>,
+      </dialog>
+    </div>,
     document.body,
   );
 }
