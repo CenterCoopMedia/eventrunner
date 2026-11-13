@@ -116,6 +116,16 @@ const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
 // Import account code only when this signed-in reader has browser saves.
 const DeviceScheduleMerge = onDemand(() => import('./schedule/DeviceScheduleMerge.jsx'));
+
+function AccountBrowserSaves() {
+  const device = useDeviceBookmarks();
+  if (!device.available || device.ids.length === 0) return null;
+  return (
+    <ErrorBoundary appearance="inline" title="Your browser saves could not be added to your account">
+      <Suspense fallback={null}><DeviceScheduleMerge /></Suspense>
+    </ErrorBoundary>
+  );
+}
 // The public model tools are optional and render no interface. Keep their
 // definitions and registration machinery out of the initial site bundle,
 // then load them only for the demo or a deployment that enables the flag.
@@ -269,7 +279,6 @@ export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage, getSectionBlocks } = useContent();
   const { user, loading: authLoading } = useAuth();
-  const deviceBookmarks = useDeviceBookmarks();
   const { pathname, key: locationKey } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef(null);
@@ -509,11 +518,7 @@ export default function Layout() {
       }
     >
       <ErrorBoundary>
-        {features.schedule && features.sessionBookmarks && user && deviceBookmarks.available && deviceBookmarks.ids.length > 0 ? (
-          <ErrorBoundary appearance="inline" title="Your browser saves could not be added to your account">
-            <Suspense fallback={null}><DeviceScheduleMerge /></Suspense>
-          </ErrorBoundary>
-        ) : null}
+        {features.schedule && features.sessionBookmarks && user ? <AccountBrowserSaves /> : null}
         <Outlet context={accountViews} />
       </ErrorBoundary>
     </main>
