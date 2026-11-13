@@ -16,6 +16,10 @@
  * selectors must reach only intended creates or retry upgrades, without
  * deletions or trigger recreation. The full deploy runs without --force.
  *
+ * Every CLI child paces actual Functions and Cloud Run writes, including
+ * invoker policies and HTTP retries. Ordinary deploys keep the CLI's hash
+ * comparison instead of forcing unchanged functions with explicit selectors.
+ *
  * After each deploy, the script reads the complete inventory again. A
  * successful CLI exit with missing function state waits out the provider's
  * write-quota window, then starts a fresh guarded deploy. Other failures stop.
@@ -54,8 +58,19 @@ function firebaseArgs(command, projectId) {
   return ['firebase', command, '--project', projectId, '--non-interactive'];
 }
 
-function defaultRun(args, options) {
-  return spawnSync('npx', args, options);
+function createDeployRunner({ spawn = spawnSync, now = () => performance.now(), wait = defaultWait } = {}) {
+  let finishedAt = null;
+  return async (args, options) => {
+    // A child owns its request clock. A completed child's quota window must
+    // expire before another child starts, including targeted retry-policy work.
+    if (finishedAt !== null) {
+      const remaining = QUOTA_RECOVERY_WAIT_MS - (now() - finishedAt);
+      if (remaining > 0) await wait(remaining);
+    }
+    const result = spawn(process.execPath, [path.join(__dirname, 'firebase-functions-cli.cjs'), ...args.slice(1)], options);
+    finishedAt = now();
+    return result;
+  };
 }
 
 function defaultWait(milliseconds) {
@@ -433,7 +448,7 @@ async function deployRetryPolicies({
 
   log.log('deploy-functions: accepting new retry policies with a targeted --force deploy: '
     + plan.functions.map(label).join(', '));
-  const targeted = run([
+  const targeted = await run([
     'firebase', 'deploy', '--only', plan.selectors.join(','),
     '--project', projectId, '--non-interactive', '--force',
   ], { stdio: 'inherit' });
@@ -498,7 +513,7 @@ async function deployAttempt({
     if (retryResult) return retryResult;
 
     const args = [...firebaseArgs('deploy', projectId), '--only', 'functions'];
-    const deployment = run(args, { stdio: 'inherit' });
+    const deployment = await run(args, { stdio: 'inherit' });
     if (failed(deployment)) {
       log.error(reportFailure('deploy-functions: Firebase deploy failed', deployment));
       return { code: deployFailure(deployment) };
@@ -577,7 +592,7 @@ async function deployInitialFunctions({ projectId, discoverFunctions, readConfig
       }
     }
     log.log(`deploy-functions: initial group ${index + 1}/${batches.length}, at most ${batch.writes} function writes`);
-    const deployment = run([
+    const deployment = await run([
       'firebase', 'deploy', '--only', batch.selectors.join(','),
       '--project', projectId, '--non-interactive', '--force',
     ], { stdio: 'inherit' });
@@ -591,7 +606,7 @@ async function deployInitialFunctions({ projectId, discoverFunctions, readConfig
 
 async function main({
   env = process.env,
-  run = defaultRun,
+  run = createDeployRunner(),
   verifyCompleteInventory = readCompleteInventory,
   discoverFunctions = discoverLocalFunctions,
   readConfig = () => readFunctionsConfig(PROJECT_DIR),
@@ -676,4 +691,5 @@ module.exports = {
   readCompleteInventory,
   discoverLocalFunctions,
   planNewRetryFunctions,
+  createDeployRunner,
 };

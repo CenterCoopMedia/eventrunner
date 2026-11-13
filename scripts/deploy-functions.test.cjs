@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 const { FirebaseError } = require('firebase-tools/lib/error.js');
 const firebaseLogger = require('firebase-tools/lib/logger.js').logger;
 
@@ -20,6 +21,7 @@ const {
   readCompleteInventory,
   discoverLocalFunctions,
   planNewRetryFunctions,
+  createDeployRunner,
 } = require('./deploy-functions.cjs');
 
 const PROJECT = 'demo-project';
@@ -33,6 +35,40 @@ const deployed = (id, region = REGION) => ({ id, region, platform: 'gcfv2', code
 const deployedRetry = (id, retry = true) => ({ ...deployed(id), eventTrigger: eventTrigger(retry) });
 const local = (id, retry, regions = [REGION]) => ({
   id, retry, regions, platform: 'gcfv2', eventTrigger: retry ? eventTrigger(true) : null,
+});
+
+test('the paced CLI entrypoint loads the locked Firebase CLI', () => {
+  const result = spawnSync(process.execPath, [path.join(__dirname, 'firebase-functions-cli.cjs'), '--version'], {
+    encoding: 'utf8', timeout: 10_000, env: { ...process.env, CI: 'true' },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), require('firebase-tools/package.json').version);
+});
+
+test('CLI children use the paced entrypoint and cannot reset the quota window between phases', async () => {
+  let clock = 0;
+  const starts = [];
+  const waits = [];
+  const result = { status: 0 };
+  const run = createDeployRunner({
+    now: () => clock,
+    wait: async (milliseconds) => { waits.push(milliseconds); clock += milliseconds; },
+    spawn: (executable, argv, options) => {
+      assert.equal(executable, process.execPath);
+      assert.equal(argv[0], path.join(__dirname, 'firebase-functions-cli.cjs'));
+      assert.deepEqual(argv.slice(1), FULL_DEPLOY.slice(1));
+      assert.equal(options.stdio, 'inherit');
+      starts.push(clock);
+      clock += 2000;
+      return result;
+    },
+  });
+  assert.equal(await run(FULL_DEPLOY, { stdio: 'inherit' }), result);
+  assert.equal(await run(FULL_DEPLOY, { stdio: 'inherit' }), result);
+  clock += 105_000; // an existing initial-group or recovery wait already covers the gap
+  await run(FULL_DEPLOY, { stdio: 'inherit' });
+  assert.deepEqual(waits, [105_000]);
+  assert.deepEqual(starts, [0, 107_000, 214_000]);
 });
 
 async function runDeploy({
