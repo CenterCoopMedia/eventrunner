@@ -17,11 +17,13 @@ export function useAdminUpdates() {
 
   useEffect(() => {
     const unsubscribers = [
-      subscribeAdminCollection('cmsUpdates', (docs) => {
+      subscribeAdminCollection('cmsUpdates', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setLive(docs);
         setLiveError(null);
       }, setLiveError),
-      subscribeAdminCollection('cmsUpdates_drafts', (docs) => {
+      subscribeAdminCollection('cmsUpdates_drafts', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setDrafts(docs);
         setDraftsError(null);
       }, setDraftsError),
@@ -37,12 +39,12 @@ export function useAdminUpdates() {
 
   return {
     rows,
-    // Both listeners must report before the list is trustworthy: with only
-    // the live result in, a draft-only update reads as "no such update",
+    // Both server snapshots must arrive before the list is trustworthy.
+    // With only the live result in, a draft-only update reads as "no such update",
     // and with only the drafts in, a live update reads as a draft. An
     // errored listener ends the wait.
     loading: !ready && !error,
-    // Both listeners have reported at least once. `loading` ends on an
+    // Both server snapshots have arrived. `loading` ends on an
     // error too, so the list can show the rows it has; the editor fills a
     // form only once this is true, so it never opens on one revision.
     ready,

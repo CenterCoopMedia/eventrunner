@@ -139,6 +139,38 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
+describe('timeline editor server adoption', () => {
+  it.each(['live', 'drafts'])('ignores cached revisions until both server answers arrive (%s first)', async (first) => {
+    holdAdminCollections = true;
+    await renderAt('/admin/timeline/edition-2025');
+    await waitFor(() => expect(adminSubscriptions.has('cmsTimeline_drafts')).toBe(true));
+    const nextLive = adminSubscriptions.get('cmsTimeline');
+    const nextDrafts = adminSubscriptions.get('cmsTimeline_drafts');
+    act(() => {
+      nextLive(LIVE, { fromCache: true });
+      nextDrafts([], { fromCache: true });
+    });
+    expect(screen.queryByLabelText('Title')).toBeNull();
+    act(() => {
+      if (first === 'live') nextLive(LIVE, { fromCache: false });
+      else nextDrafts(DRAFTS, { fromCache: false });
+    });
+    expect(screen.queryByLabelText('Title')).toBeNull();
+    act(() => {
+      if (first === 'live') nextDrafts(DRAFTS, { fromCache: false });
+      else nextLive(LIVE, { fromCache: false });
+    });
+    expect(await screen.findByLabelText('Title')).toHaveValue(DRAFTS[0].title);
+    act(() => nextDrafts([], { fromCache: true }));
+    expect(screen.getByLabelText('Title')).toHaveValue(DRAFTS[0].title);
+
+    fetch.mockResolvedValueOnce(response({ status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields.title).toBe(DRAFTS[0].title);
+  });
+});
+
 describe('the timeline list', () => {
   it('says it is loading until both revisions have arrived', async () => {
     holdAdminCollections = true;

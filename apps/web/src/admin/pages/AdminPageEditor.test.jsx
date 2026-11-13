@@ -152,6 +152,40 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
+describe('page editor server adoption', () => {
+  it.each(['live', 'drafts'])('ignores cached revisions until both server answers arrive (%s first)', async (first) => {
+    silentCollections = ['cmsPages', 'cmsPages_drafts'];
+    await renderAt('/admin/pages/scholarships', { waitForHeading: false });
+    await waitFor(() => expect(adminSubscriptions.has('cmsPages_drafts')).toBe(true));
+    const live = { ...SCHOLARSHIPS_DRAFT, label: 'Published label', status: undefined };
+    const draft = { ...SCHOLARSHIPS_DRAFT, label: 'Saved draft label' };
+    const nextLive = adminSubscriptions.get('cmsPages');
+    const nextDrafts = adminSubscriptions.get('cmsPages_drafts');
+    act(() => {
+      nextLive([live], { fromCache: true });
+      nextDrafts([], { fromCache: true });
+    });
+    expect(screen.queryByLabelText('Navigation label')).toBeNull();
+    act(() => {
+      if (first === 'live') nextLive([live], { fromCache: false });
+      else nextDrafts([draft], { fromCache: false });
+    });
+    expect(screen.queryByLabelText('Navigation label')).toBeNull();
+    act(() => {
+      if (first === 'live') nextDrafts([draft], { fromCache: false });
+      else nextLive([live], { fromCache: false });
+    });
+    expect(await screen.findByLabelText('Navigation label')).toHaveValue('Saved draft label');
+    act(() => nextDrafts([], { fromCache: true }));
+    expect(screen.getByLabelText('Navigation label')).toHaveValue('Saved draft label');
+
+    fetch.mockResolvedValueOnce(okResponse({ status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(fetch.mock.calls[0][1].body).page.label).toBe('Saved draft label');
+  });
+});
+
 describe('page list', () => {
   it('shows each page’s publish state across both revisions', async () => {
     liveDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'faq', label: 'FAQ', path: '/faq', status: undefined }];

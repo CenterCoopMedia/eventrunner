@@ -313,6 +313,36 @@ describe('the organizations list, resuming a publish', () => {
 });
 
 describe('the organization editor', () => {
+  it.each(['live', 'drafts'])('ignores cached revisions until both server answers arrive (%s first)', async (first) => {
+    holdAdminCollections = true;
+    await renderAt('/admin/organizations/tide-media');
+    await waitFor(() => expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true));
+    const nextLive = adminSubscriptions.get('cmsOrganizations');
+    const nextDrafts = adminSubscriptions.get('cmsOrganizations_drafts');
+    act(() => {
+      nextLive(LIVE, { fromCache: true });
+      nextDrafts([], { fromCache: true });
+    });
+    expect(screen.queryByLabelText('Name')).toBeNull();
+    act(() => {
+      if (first === 'live') nextLive(LIVE, { fromCache: false });
+      else nextDrafts(DRAFTS, { fromCache: false });
+    });
+    expect(screen.queryByLabelText('Name')).toBeNull();
+    act(() => {
+      if (first === 'live') nextDrafts(DRAFTS, { fromCache: false });
+      else nextLive(LIVE, { fromCache: false });
+    });
+    expect(await screen.findByLabelText('Name')).toHaveValue(DRAFTS[0].name);
+    act(() => nextDrafts([], { fromCache: true }));
+    expect(screen.getByLabelText('Name')).toHaveValue(DRAFTS[0].name);
+
+    fetch.mockResolvedValueOnce(response({ status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields.name).toBe(DRAFTS[0].name);
+  });
+
   it('keeps public details, placement, and logo in separate cards with every control reachable', async () => {
     await openNewOrganization();
     const form = screen.getByLabelText('Name').closest('form');

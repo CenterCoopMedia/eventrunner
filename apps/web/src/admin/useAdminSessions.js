@@ -12,11 +12,13 @@ export function useAdminSessions() {
 
   useEffect(() => {
     const unsubscribers = [
-      subscribeAdminCollection('cmsSchedule', (docs) => {
+      subscribeAdminCollection('cmsSchedule', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setLive(docs);
         setLiveError(null);
       }, setLiveError),
-      subscribeAdminCollection('cmsSchedule_drafts', (docs) => {
+      subscribeAdminCollection('cmsSchedule_drafts', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setDrafts(docs);
         setDraftsError(null);
       }, setDraftsError),
@@ -32,6 +34,7 @@ export function useAdminSessions() {
   );
   const rows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
   const error = liveError ?? draftsError ?? null;
+  // Initial form adoption needs both server snapshots, not an empty cache.
   const ready = live !== null && drafts !== null;
 
   return {

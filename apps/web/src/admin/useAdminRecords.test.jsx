@@ -22,6 +22,21 @@ beforeEach(() => {
 });
 
 describe('useAdminRecords', () => {
+  it('updates cached version-history rows when the server draft arrives', () => {
+    const { result } = renderHook(() => useAdminRecords('cmsPages'));
+    act(() => {
+      listeners.get('cmsPages').onNext(LIVE, { fromCache: true });
+      listeners.get('cmsPages_drafts').onNext([], { fromCache: true });
+    });
+    expect(result.current.ready).toBe(true);
+    expect(result.current.findRow('home').current.title).toBe('Home');
+
+    act(() => listeners.get('cmsPages_drafts').onNext([
+      { ...LIVE[0], title: 'Saved draft', status: 'dirty' },
+    ], { fromCache: false }));
+    expect(result.current.findRow('home').current.title).toBe('Saved draft');
+  });
+
   it('keeps a failed listener’s error while the other listener answers', () => {
     const { result } = renderHook(() => useAdminRecords('cmsPages'));
     const failure = new Error('permission-denied');

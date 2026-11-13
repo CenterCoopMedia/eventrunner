@@ -1,8 +1,9 @@
 // Live cmsContent + cmsContent_drafts for the admin content-block editor
-// (issue #61). Same shape and rationale as useAdminPages.js: both revisions
-// are subscribed so publish state shows without a reload, and a listener
-// failure fails soft (last-known rows keep rendering, `error` carries a
-// non-blocking notice) instead of blanking the screen.
+// (issue #61). Both server snapshots must arrive before initial editor
+// adoption: a cached empty drafts query does not prove no draft exists.
+// Later cache-only callbacks retain those confirmed rows. Both revisions
+// stay subscribed so publish state shows without a reload; listener errors
+// keep the last-known rows and carry a non-blocking notice.
 //
 // mergePageRevisions/publishStateOf (pageDoc.js) are written generically
 // over `{ id, order, status, visible }` — nothing in them is page-specific

@@ -13,11 +13,13 @@ export function useAdminTimeline() {
 
   useEffect(() => {
     const unsubscribers = [
-      subscribeAdminCollection('cmsTimeline', (docs) => {
+      subscribeAdminCollection('cmsTimeline', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setLive(docs);
         setLiveError(null);
       }, setLiveError),
-      subscribeAdminCollection('cmsTimeline_drafts', (docs) => {
+      subscribeAdminCollection('cmsTimeline_drafts', (docs, metadata) => {
+        if (metadata?.fromCache) return;
         setDrafts(docs);
         setDraftsError(null);
       }, setDraftsError),
@@ -30,7 +32,7 @@ export function useAdminTimeline() {
   const rows = useMemo(() => mergeTimelineRevisions(live, drafts), [live, drafts]);
 
   const error = liveError ?? draftsError ?? null;
-  // Both listeners have reported at least once. The editor fills its form
+  // Both server snapshots have arrived. The editor fills its form
   // only then, so it never opens on one revision and saves it over the other.
   const ready = live !== null && drafts !== null;
 
