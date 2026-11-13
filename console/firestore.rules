@@ -70,6 +70,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Platform payment routing stays in the trusted Console service.
+    match /console_stripe_routes/{accountId} {
+      allow read, write: if false;
+    }
+
     // The build record: full detail for operators, through
     // getApplicationForReview. A client sees only the status.
     match /console_builds/{appId} {

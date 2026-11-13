@@ -5,13 +5,14 @@ const { createHash } = require('node:crypto');
 const { test } = require('node:test');
 const {
   STATE_TTL_MS, chooseEventbriteEvent, completeConnection, connectionSecretId, deleteStoredConnection, disconnectAccount,
-  listEventbriteEvents, readStoredConnection, startConnection,
+  listEventbriteEvents, readStoredConnection, retryTokenDeletions, startConnection,
 } = require('./connections.cjs');
 const { getApplication } = require('./applications.cjs');
 const { acceptAgreement } = require('./agreementAcceptance.cjs');
 const { getApplicationForReview } = require('./reviewQueue.cjs');
 const { connectionsForClient, liveConnection } = require('./connectionState.cjs');
 const { connectionsAvailable, createStripeConnector } = require('./connectors.cjs');
+const { registerStripeRoute } = require('./stripeWebhooks.cjs');
 const { makeFakeAuth, makeFakeConnector, makeFakeSecrets, makeReq, makeRes } = require('./fakes.cjs');
 const { postEndpoint } = require('./http.cjs');
 const { NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers } = require('./testData.cjs');
@@ -306,15 +307,20 @@ test('a failed token write ends the connection, and connecting again ends the ol
 });
 
 test('connecting a different account ends the old one, and the same account does not', async () => {
-  const { stripe, deps } = setup({
+  const { db, stripe, deps } = setup({
     application: { connections: { stripe: stripeConnection() } },
     accounts: { stripe: { accountId: 'acct_old', connectedBy: 'ana' } },
+    extra: { 'console_stripe_routes/acct_old': { appId: 'a1', projectId: 'er-first', region: 'us-central1' } },
   });
   await complete(deps, { state: await start(deps) });
   assert.deepEqual(stripe.revoked, ['acct_old']);
+  assert.equal(db.read('console_stripe_routes/acct_old'), undefined);
+  const route = { appId: 'a1', projectId: 'er-first', region: 'us-central1' };
+  await db.doc('console_stripe_routes/acct_new').set(route);
   stripe.revoked.length = 0;
   await complete(deps, { state: await start(deps), code: 'code2' });
   assert.deepEqual(stripe.revoked, []);
+  assert.deepEqual(db.read('console_stripe_routes/acct_new'), route);
 });
 
 test('reconnecting Eventbrite keeps the chosen event for the same account and clears it for another', async () => {
@@ -430,13 +436,16 @@ function failedBuild({ frozen = validAnswers(), connections = { stripe: stripeCo
 }
 
 test('after a failed build an Owner can reconnect the chosen account, and the answers stay frozen', async () => {
-  const { db, secrets, deps } = failedBuild();
+  const { db, secrets, stripe, deps } = failedBuild();
+  await db.doc('console_stripe_routes/acct_client1').set({ appId: 'a1', projectId: 'er-first', region: 'us-central1' });
   const frozen = db.read('applications/a1').frozen;
   await complete(deps, { state: await start(deps, 'stripe') });
   assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
   assert.equal(stored(db).stripe.connected, true);
   assert.deepEqual(db.read('applications/a1').frozen, frozen);
   assert.equal(db.read('applications/a1').status, 'building');
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+  assert.equal(db.read('console_stripe_routes/acct_client1'), undefined);
 });
 
 test('after a failed build only an Owner can reconnect, only the chosen account, and not disconnect it', async () => {
@@ -618,6 +627,118 @@ test('an Owner can end a built site\'s Stripe connection at Stripe', async () =>
   assert.equal(privateRow(db).stripe, undefined);
 });
 
+test('a released Stripe account can connect and route to another request', async (t) => {
+  for (const status of ['withdrawn', 'ready']) await t.test(status, async () => {
+    const otherRoute = { appId: 'a3', projectId: 'er-other', region: 'us-central1' };
+    const { db, secrets, stripe, deps } = setup({
+      application: { status, connections: { stripe: stripeConnection() } },
+      extra: {
+        'console_stripe_routes/acct_client1': { appId: 'a1', projectId: 'er-first', region: 'us-central1' },
+        'console_stripe_routes/acct_other': otherRoute,
+        'applications/a2': applicationDoc({ connections: {} }),
+        'console_builds/a2': {},
+      },
+    });
+    await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+    assert.equal(db.read('console_stripe_routes/acct_client1'), undefined);
+    stripe.answer = stripeAnswer('acct_client1');
+    const started = await startConnection(deps, { body: { orgId: 'o1', appId: 'a2', provider: 'stripe' }, user: ana });
+    const state = new URL(started.body.url).searchParams.get('state');
+    await completeConnection(deps, { body: { provider: 'stripe', code: 'code2', state }, user: ana });
+    await registerStripeRoute({
+      db, secrets, appId: 'a2', accountId: 'acct_client1', projectId: 'er-second', region: 'us-central1',
+      secret: 'whsec_second_fixture', recordRef: db.doc('console_builds/a2'),
+    });
+    assert.deepEqual(db.read('console_stripe_routes/acct_client1'), { appId: 'a2', projectId: 'er-second', region: 'us-central1' });
+    assert.deepEqual(db.read('console_stripe_routes/acct_other'), otherRoute);
+  });
+});
+
+test('completed connection changes keep their reply when route cleanup fails', async (t) => {
+  for (const operation of ['connect', 'disconnect', 'built']) await t.test(operation, async () => {
+    const route = { appId: 'a1', projectId: 'er-first', region: 'us-central1' };
+    const { db, log, secrets, deps } = setup({
+      application: { status: operation === 'built' ? 'ready' : 'draft', connections: { stripe: stripeConnection() } },
+      extra: { 'console_stripe_routes/acct_client1': route },
+    });
+    secrets.store.set('connection-eventbrite-a1', EB_TOKEN);
+    const collection = db.collection;
+    db.collection = (path) => {
+      const ref = collection(path);
+      return path === 'console_stripe_routes'
+        ? { ...ref, where() { throw new Error('route lookup unavailable'); } }
+        : ref;
+    };
+    if (operation === 'connect') {
+      const { body } = await complete(deps, { state: await start(deps) });
+      assert.equal(body.connected, true);
+      assert.equal(privateRow(db).stripe.accountId, 'acct_new');
+    } else {
+      const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+      assert.equal(body.revoked, true);
+      assert.equal(privateRow(db).stripe, undefined);
+    }
+    assert.deepEqual(db.read('console_stripe_routes/acct_client1'), route);
+    assert.equal(log.errors.length, 1);
+    assert.match(JSON.stringify(log.errors), /console could not release Stripe routes.*route lookup unavailable/);
+    assert.ok(!JSON.stringify(log.errors).includes(TOKEN));
+    assert.equal(db.read('console_token_deletions/a1').routesOnly, true);
+    // Retention retries only the route release; the request's tokens stay.
+    db.collection = collection;
+    await retryTokenDeletions(deps, 10);
+    assert.equal(db.read('console_stripe_routes/acct_client1'), undefined);
+    assert.equal(db.read('console_token_deletions/a1'), undefined);
+    assert.equal(secrets.store.get('connection-eventbrite-a1'), EB_TOKEN);
+  });
+});
+
+test('route cleanup keeps a connection that an in-flight replacement can restore', { timeout: 1000 }, async (t) => {
+  const route = { appId: 'a1', projectId: 'er-first', region: 'us-central1' };
+  const { db, secrets, stripe, deps } = failedBuild();
+  await db.doc('console_stripe_routes/acct_client1').set(route);
+  stripe.answer = stripeAnswer('acct_client1');
+  let reachedWrite;
+  let failWrite;
+  const writing = new Promise((resolve) => { reachedWrite = resolve; });
+  const pendingWrite = new Promise((resolve) => { failWrite = resolve; });
+  const replacementToken = 'replacement_fixture_token';
+  const writeSecret = secrets.writeSecret.bind(secrets);
+  secrets.writeSecret = async (id, value) => {
+    if (value !== replacementToken) return writeSecret(id, value);
+    reachedWrite();
+    await pendingWrite;
+    throw new Error('secret write failed');
+  };
+  let replacement;
+  let beginReplacement = true;
+  const transaction = db.runTransaction.bind(db);
+  db.runTransaction = async (fn) => {
+    const changing = Boolean(stored(db).stripe?.change);
+    const result = await transaction(fn);
+    if (beginReplacement && changing && stored(db).stripe?.connected === true) {
+      beginReplacement = false;
+      stripe.answer = { ...stripeAnswer(), token: replacementToken };
+      replacement = complete(deps, { state: await start(deps) }).then((value) => ({ value }), (error) => ({ error }));
+      await Promise.race([
+        writing,
+        replacement.then(() => { throw new Error('replacement did not reach the token write'); }),
+      ]);
+    }
+    return result;
+  };
+  t.after(async () => { failWrite(); await replacement; });
+  assert.equal((await complete(deps, { state: await start(deps) })).body.connected, true);
+  assert.equal(privateRow(db).stripe.accountId, 'acct_new');
+  assert.deepEqual(db.read('console_stripe_routes/acct_client1'), route);
+  failWrite();
+  const { error } = await replacement;
+  assert.equal(error.status, 502);
+  assert.equal(error.code, 'connection-failed');
+  assert.equal(privateRow(db).stripe.accountId, 'acct_client1');
+  assert.deepEqual(db.read('console_stripe_routes/acct_client1'), route);
+  assert.deepEqual(stripe.revoked, ['acct_new']);
+});
+
 test('only an Owner can end a built site\'s Stripe connection', async () => {
   const { stripe, deps } = builtSite();
   for (const user of [ben, cy, ops]) {
@@ -645,6 +766,16 @@ test('a built site cannot end a Stripe connection another site uses', async () =
   assert.equal(db.read('console_connections/a2').stripe.accountId, 'acct_client1');
 });
 
+test('a built site cannot revoke an account routed to another application', async () => {
+  const route = { appId: 'a2', projectId: 'er-other', region: 'us-central1' };
+  const { db, stripe, deps } = builtSite({ 'console_stripe_routes/acct_client1': route });
+  await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'account-shared' });
+  assert.deepEqual(stripe.revoked, []);
+  assert.equal(stored(db).stripe.connected, true);
+  assert.equal(privateRow(db).stripe.accountId, 'acct_client1');
+  assert.deepEqual(db.read('console_stripe_routes/acct_client1'), route);
+});
+
 test('a built site\'s Eventbrite connection stays locked: an operator ends it', async () => {
   const { deps } = setup({ application: { status: 'ready', connections: { eventbrite: { connected: true, displayName: 'Ana', event: null } } } });
   await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'eventbrite' }, user: ana }), { status: 409, code: 'locked' });
@@ -665,11 +796,16 @@ test('disconnecting one of two requests on an account keeps the connection for t
 });
 
 test('the last request on an account ends the connection', async () => {
-  const { db, stripe, deps } = sharing();
-  await db.doc('console_connections/a2').set({});
-  const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
-  assert.deepEqual(stripe.revoked, ['acct_client1']);
-  assert.equal(body.shared, false);
+  for (const routeOwner of [null, 'a1', 'a2']) {
+    const { db, stripe, deps } = sharing();
+    await db.doc('console_connections/a2').set({});
+    if (routeOwner) await db.doc('console_stripe_routes/acct_client1').set({ appId: routeOwner, projectId: 'er-first', region: 'us-central1' });
+    const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+    const otherSite = routeOwner === 'a2';
+    assert.deepEqual(stripe.revoked, otherSite ? [] : ['acct_client1']);
+    assert.equal(body.shared, otherSite);
+    assert.equal(db.read('console_stripe_routes/acct_client1')?.appId, otherSite ? 'a2' : undefined);
+  }
 });
 
 test('a site whose application is gone still keeps the connection, through its private row', async () => {
@@ -689,56 +825,32 @@ test('moving a token to a client site leaves the row that keeps the connection',
 });
 
 test('connecting a different account keeps the old one when another request uses it', async () => {
-  // Two live Stripe accounts cannot both be connected (next test), so this runs in test mode.
   const { stripe, deps } = sharing();
-  stripe.answer = { ...stripeAnswer(), details: { livemode: false } };
   await complete(deps, { state: await start(deps) });
   assert.deepEqual(stripe.revoked, []);
 });
 
-test('the same live Stripe account is refused for a second request', async () => {
-  const { stripe, deps } = sharing();
+test('an account routed to another live site is refused before token storage and its authorization is kept', async () => {
+  const { stripe, secrets, deps } = setup({ extra: {
+    'console_stripe_routes/acct_client1': { appId: 'a2', projectId: 'er-second', region: 'us-central1' },
+  } });
   stripe.answer = stripeAnswer('acct_client1');
-  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
-});
-
-test('a disconnected site that still holds a platform endpoint keeps the one live Stripe slot', async () => {
-  const { db, deps } = setup();
-  await db.doc('console_builds/other').set({ state: 'done', stripeEndpointId: 'we_other', stripeEndpointOwner: 'platform' });
   await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
     assert.equal(err.status, 409);
-    assert.match(err.message, /one live Stripe account/);
+    assert.match(err.message, /another live site/);
     return true;
   });
+  assert.equal(secrets.store.has('connection-stripe-a1'), false);
+  assert.deepEqual(stripe.revoked, []);
 });
 
-test('test-mode private rows and existing test applications leave the live Stripe slot free', async () => {
-  for (const extra of [
-    { 'console_connections/test': { stripe: { accountId: 'acct_test', livemode: false } } },
-    {
-      'console_connections/test': { stripe: { accountId: 'acct_test' } },
-      'applications/test': applicationDoc({ connections: { stripe: stripeConnection({ livemode: false }) } }),
-    },
-  ]) {
-    const { db, deps } = setup({ extra });
-    const { connector } = stripeHttp();
-    deps.connectors.stripe = connector;
-    assert.equal((await complete(deps, { state: await start(deps) })).body.connected, true);
-    assert.equal(privateRow(db).stripe.livemode, true);
-  }
-});
-
-test('an account with unknown mode still reserves the live Stripe slot', async () => {
-  const { deps } = setup({ extra: { 'console_connections/orphan': { stripe: { accountId: 'acct_unknown' } } } });
-  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
-});
-
-test('a live OAuth code is refused before any Stripe request when another live slot is held', async () => {
-  const { deps } = sharing();
+test('a live OAuth exchange is allowed while another live account is connected', async () => {
+  const { deps, db } = sharing();
   const { connector, calls } = stripeHttp();
   deps.connectors.stripe = connector;
-  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409 });
-  assert.deepEqual(calls, []);
+  assert.equal((await complete(deps, { state: await start(deps) })).body.connected, true);
+  assert.ok(calls.some((url) => url === 'https://connect.stripe.com/oauth/token'));
+  assert.equal(privateRow(db).stripe.livemode, true);
 });
 
 test('a test OAuth exchange is allowed while another live slot is held', async () => {
@@ -750,10 +862,10 @@ test('a test OAuth exchange is allowed while another live slot is held', async (
   assert.equal(privateRow(db).stripe.livemode, false);
 });
 
-test('a competing live connection during exchange is refused and a failed deauthorization is reported', async () => {
+test('a connection refused during exchange reports failed deauthorization', async () => {
   const { db, deps, log, secrets } = setup();
   const { connector, calls } = stripeHttp({
-    onExchange: () => db.doc('console_connections/other').set({ stripe: { accountId: 'acct_other', livemode: true } }),
+    onExchange: () => db.doc('applications/a1').update({ status: 'approved' }),
     revokeStatus: 500,
   });
   deps.connectors.stripe = connector;
@@ -765,15 +877,12 @@ test('a competing live connection during exchange is refused and a failed deauth
   assert.ok(!JSON.stringify(log.errors).includes('private-provider-body'));
 });
 
-test('a second live Stripe account is refused before the exchange while another request holds one', async () => {
-  const { stripe, secrets, deps } = sharing();
-  await assert.rejects(complete(deps, { state: await start(deps) }), (err) => {
-    assert.equal(err.status, 409);
-    assert.match(err.message, /one live Stripe account/);
-    return true;
-  });
-  assert.equal(secrets.store.get('connection-stripe-a1'), undefined);
-  assert.equal(stripe.exchanged.length, 0);
+test('a second live Stripe account connects independently', async () => {
+  const { db, stripe, secrets, deps } = sharing();
+  await complete(deps, { state: await start(deps) });
+  assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
+  assert.equal(db.read('console_connections/a1').stripe.accountId, 'acct_new');
+  assert.equal(db.read('console_connections/a2').stripe.accountId, 'acct_client1');
   assert.deepEqual(stripe.revoked, []);
 });
 

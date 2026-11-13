@@ -15,6 +15,7 @@
  *   CONSOLE_STRIPE_CLIENT_ID           the Stripe Connect client id; unset means not available yet
  *   CONSOLE_EVENTBRITE_CLIENT_ID       the Eventbrite app key; unset means not available yet
  *   CONSOLE_STRIPE_SECRET_KEY          secret: CCM's Stripe key, for the Connect platform
+ *   CONSOLE_STRIPE_WEBHOOK_SECRET      secret: signing secret of the shared live Connect endpoint
  *   CONSOLE_EVENTBRITE_CLIENT_SECRET   secret: the Eventbrite app's client secret
  *   CONSOLE_GITHUB_APP_ID              the console's GitHub App, which starts the build
  *   CONSOLE_GITHUB_INSTALLATION_ID     that App's installation on the repository
@@ -51,6 +52,7 @@ const {
 } = require('./connections.cjs');
 const { connectionsAvailable, createConnectors } = require('./connectors.cjs');
 const { reportOriginAllowed, reportProblemHandler } = require('./problemReports.cjs');
+const { STRIPE_WEBHOOK_FUNCTION, STRIPE_WEBHOOK_SECRET, stripeConnectWebhook } = require('./stripeWebhooks.cjs');
 
 // Fixed, not a setting: console/firebase.json routes every /api/<name> to
 // this region, and the web app calls only those routes. Moving the console
@@ -133,6 +135,7 @@ function buildHandlers({ startBuild } = {}) {
   const region = REGION;
   const postmarkToken = defineSecret('CONSOLE_POSTMARK_TOKEN');
   const stripeKey = defineSecret('CONSOLE_STRIPE_SECRET_KEY');
+  const stripeWebhookSecret = defineSecret(STRIPE_WEBHOOK_SECRET);
   const eventbriteClientSecret = defineSecret('CONSOLE_EVENTBRITE_CLIENT_SECRET');
   const connectSecrets = [stripeKey, eventbriteClientSecret];
   const githubAppKey = defineSecret('CONSOLE_GITHUB_APP_PRIVATE_KEY');
@@ -174,6 +177,21 @@ function buildHandlers({ startBuild } = {}) {
   };
 
   const handlers = {};
+  handlers[STRIPE_WEBHOOK_FUNCTION] = onRequest({ region, secrets: [stripeWebhookSecret], invoker: 'public' }, async (req, res) => {
+    const { applicationDefault } = require('firebase-admin/app');
+    const { createSecretStore } = require('./secretStore.cjs');
+    await stripeConnectWebhook({
+      db: adminServices().db,
+      endpointSecret: stripeWebhookSecret.value(),
+      secrets: createSecretStore({
+        projectId: process.env.GCLOUD_PROJECT,
+        getAccessToken: () => applicationDefault().getAccessToken(),
+        fetch: globalThis.fetch,
+      }),
+      fetch: globalThis.fetch,
+      log: require('firebase-functions/logger'),
+    })(req, res);
+  });
   for (const [name, spec] of Object.entries(ENDPOINTS)) {
     const secrets = [...new Set([
       ...(spec.mail ? [postmarkToken] : []),

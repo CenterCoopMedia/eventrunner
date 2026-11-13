@@ -186,6 +186,32 @@ const TOKEN_ID = 'connection-stripe-a1';
 const closedOld = { status: 'declined', updatedAt: new Date(NOW - 100 * DAY) };
 const privateRow = { stripe: { accountId: 'acct_client1', connectedBy: 'ana' } };
 
+for (const action of ['spam', 'retention', 'retry']) test(`${action} releases its own Stripe route and keeps a foreign route`, async () => {
+  for (const routeOwner of ['a1', 'a2']) {
+    const route = { appId: routeOwner, projectId: 'er-first', region: 'us-central1' };
+    const db = seeded({
+      'applications/a1': application(action === 'retention' ? closedOld : { status: 'draft' }),
+      'console_connections/a1': privateRow,
+      'console_stripe_routes/acct_client1': route,
+    });
+    if (action === 'retry') {
+      await db.doc('applications/a1').delete();
+      await db.doc('console_connections/a1').delete();
+      await db.doc('console_token_deletions/a1').set({ connected: [{ provider: 'stripe', accountId: 'acct_client1' }], at: new Date(NOW) });
+    }
+    const stripe = makeFakeConnector();
+    const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
+    const d = deps(db, { secrets, connectors: { stripe }, now: () => NOW, log: QUIET });
+    if (action === 'spam') await deleteSpamApplication(d, { body: { appId: 'a1', confirm: true }, user: ops });
+    else await runRetention(d);
+    assert.deepEqual(stripe.revoked, routeOwner === 'a1' ? ['acct_client1'] : []);
+    assert.deepEqual(db.read('console_stripe_routes/acct_client1'), routeOwner === 'a1' ? undefined : route);
+    assert.equal(db.read('console_connections/a1'), undefined);
+    assert.equal(db.read('console_token_deletions/a1'), undefined);
+    assert.equal(secrets.store.size, 0);
+  }
+});
+
 test('the retention job deletes a closed request\'s stored tokens and ends its connection', async () => {
   const db = seeded({ 'applications/a1': application(closedOld), 'console_connections/a1': privateRow });
   const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored', 'connection-eventbrite-a1': 'eb-stored' });
@@ -246,19 +272,37 @@ test('the retention job leaves the tokens of a request it keeps', async () => {
   assert.equal(secrets.store.size, 1);
 });
 
-test('a token that cannot be deleted keeps its row, so the next run tries again', async () => {
-  const db = seeded({ 'applications/a1': application(closedOld) });
-  const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
-  secrets.failDelete = true;
-  const first = await runRetention({ db, secrets, now: () => NOW, log: QUIET });
-  assert.deepEqual(first, { deleted: ['a1'], failed: [] });
-  assert.equal(db.read('applications/a1'), undefined);
-  assert.equal(secrets.store.size, 1);
-  assert.ok(db.read('console_token_deletions/a1'));
-  secrets.failDelete = false;
-  await runRetention({ db, secrets, now: () => NOW, log: QUIET });
-  assert.equal(secrets.store.size, 0);
-  assert.equal(db.read('console_token_deletions/a1'), undefined);
+test('unfinished token or route cleanup keeps its row so retention retries it', async () => {
+  for (const failure of ['token', 'route']) {
+    const db = seeded({
+      'applications/a1': application(closedOld),
+      'console_connections/a1': privateRow,
+      'console_stripe_routes/acct_client1': { appId: 'a1', projectId: 'er-first', region: 'us-central1' },
+    });
+    const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
+    const stripe = makeFakeConnector();
+    const d = { db, secrets, connectors: { stripe }, now: () => NOW, log: QUIET };
+    const collection = db.collection;
+    if (failure === 'token') secrets.failDelete = true;
+    else db.collection = (path) => {
+      const ref = collection(path);
+      return path === 'console_stripe_routes'
+        ? { ...ref, where() { throw new Error('route lookup unavailable'); } }
+        : ref;
+    };
+    const first = await runRetention(d);
+    assert.deepEqual(first, { deleted: ['a1'], failed: [] });
+    assert.equal(db.read('applications/a1'), undefined);
+    assert.equal(secrets.store.size, failure === 'token' ? 1 : 0);
+    assert.ok(db.read('console_token_deletions/a1'));
+    secrets.failDelete = false;
+    db.collection = collection;
+    await runRetention(d);
+    assert.equal(secrets.store.size, 0);
+    assert.equal(db.read('console_token_deletions/a1'), undefined);
+    assert.equal(db.read('console_stripe_routes/acct_client1'), undefined);
+    assert.deepEqual(stripe.revoked, failure === 'token' ? ['acct_client1'] : ['acct_client1', 'acct_client1']);
+  }
 });
 
 test('a delete refused at the last moment has touched no token', async () => {

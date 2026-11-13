@@ -320,8 +320,8 @@ OAuth answer gives the connected account ID and an access token that acts on tha
 - `TICKETING_API_TOKEN` is that account's access token, moved by the provisioner into the event
   project's Secret Manager. The provider is unchanged: `GET /v1/account` with this token answers
   the connected account, so the existing account check holds.
-- The provisioner creates the webhook endpoint on the connected account with that token, for the
-  event types this provider handles, and stores its signing secret as `TICKETING_WEBHOOK_SECRET`.
+- Live Connect webhooks go to the trusted Console receiver described below. Test accounts use
+  a direct endpoint created with their test key.
 
 **Why a per-account token, not the platform key with a `Stripe-Account` header.** The platform
 key can act on every connected account. Each event runs in its own project, so a platform key in
@@ -336,6 +336,55 @@ not met until the client connects again.
 
 **Test mode.** The console connects in test mode first when the operator asks for a rehearsal,
 and in live mode for the launch. `EVENT_STRIPE_MODE` follows the mode of the token.
+
+## Amendment 2026-11-11: shared Connect webhook receiver
+
+The Console's `stripeConnectWebhook` receives Connect snapshot events through one
+platform endpoint. It verifies the exact raw body with the pinned Stripe SDK and
+`CONSOLE_STRIPE_WEBHOOK_SECRET`, including the SDK's 300-second signature timestamp tolerance,
+before handling the signed `event.account`. Missing or invalid account IDs and non-boolean
+`livemode` values are refused. A verified test-mode event with a valid account ID receives
+`200 ignored`, with no route lookup, site-secret read, forwarding or state change. One
+structured log line contains only validated account and event IDs. Stripe's
+[Connect webhook configuration](https://support.stripe.com/questions/connect-account-webhook-configurations)
+delivers test events to live endpoints too, so these acknowledgements avoid unnecessary retries.
+A signed live account without a route is acknowledged without forwarding. The receiver logs
+its account and event IDs in a structured warning, counted by `stripe_connect_unrouted`.
+This prevents repeated failures for an unbuilt or retired site from disabling delivery for
+every client. Payment data stays in the trusted Console service until this check completes.
+
+`console_stripe_routes/{accountId}` holds the application, project and region of the one site
+that owns that account's route. Browser clients, including operators, cannot read or write
+routes. The builder claims each account transactionally; it cannot replace another site's
+route. The Console refuses an already-routed account during connection, while distinct
+live accounts can connect independently. The build transaction also checks ownership
+to cover competing builds, before the build moves the token. A losing build keeps its
+Console token and fails with a refusal to connect a different live account. Registration removes the application's previous route in the same
+transaction. A change to another ticket provider removes its Stripe route. After a connection
+replacement, disconnect, operator close or recorded request deletion, the Console releases only
+its own routes whose accounts are no longer named by the private connection row. Deletion
+retries retain the releasing application's identity and work row until token and route cleanup finish.
+An active connection-change lease preserves routes
+while a replacement can still roll back. The provider-revocation decision runs first; cleanup
+failures are logged and leave a routes-only retry for retention, while completed connection
+changes keep their normal reply.
+
+The builder keeps the site's `TICKETING_WEBHOOK_SECRET` in the site's Secret Manager and
+copies it to the Console secret `stripe-webhook-{appId}`. Firestore stores no signing secret.
+Only the provisioner manages these copies; the receiver gets read access to that prefix.
+Neither the platform API key nor the platform signing secret goes to a client project.
+
+The receiver constructs the destination from the trusted project and region, then forwards
+the unchanged raw body with a fresh Stripe-format `t=...,v1=...` HMAC using that site's secret.
+Redirects are refused. Missing secrets and delivery failures return retryable errors; a routed
+event is acknowledged only after a successful site response. The site's Stripe provider, authoritative
+account/mode checks, event-ID deduplication and reconciliation queue stay unchanged. Stripe
+retries receive fresh signatures and reuse that existing deduplication; there is no new queue.
+
+Live provisioning records routes without creating Stripe endpoints. Direct test-mode endpoints
+still use their own test key. Purging a shared site removes its route before its Console signing
+secret copy, without modifying the shared endpoint or another site's route. Follow the
+[NC Local migration runbook](../runbooks/stripe-connect-receiver.md) before activating this method.
 
 ## Amendment 2026-11-04: promo codes
 
