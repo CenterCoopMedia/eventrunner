@@ -9,7 +9,7 @@ import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
 import ActionFeedback from '../../ActionFeedback.jsx';
 import AgreementStep from './AgreementStep.jsx';
 import EmailStep from './EmailStep.jsx';
-import EventStep from './EventStep.jsx';
+import EventStep, { browserTimeZone, NEW_DAY } from './EventStep.jsx';
 import OrganizationStep from './OrganizationStep.jsx';
 import ReviewStep, { Problems } from './ReviewStep.jsx';
 import TeamStep from './TeamStep.jsx';
@@ -20,6 +20,7 @@ import IconControl from '../../IconControl.jsx';
 import StepList from '../../setup/StepList.jsx';
 import { rememberReturn, useAuth } from '../../auth.jsx';
 import KeptAnswer from '../../setup/KeptAnswer.jsx';
+import { readKeptAnswer } from '../../setup/keptAnswers.js';
 
 const STEP_VIEWS = {
   organization: OrganizationStep,
@@ -77,6 +78,7 @@ export default function Setup() {
   const applicationNow = useRef(app);
   applicationNow.current = app;
   const [preset, setPreset] = useState(null);
+  const presetStep = useRef(null);
   const [navigating, setNavigating] = useState(false);
   const navigationPending = useRef(false);
   const actionArea = useRef(null);
@@ -132,13 +134,26 @@ export default function Setup() {
   const onChange = useCallback((value) => {
     if (!step || !ANSWER_STEPS.includes(step.id)) return;
     setPreset(null);
-    setApp((prev) => ({ ...prev, answers: { ...prev.answers, [step.id]: value } }));
+    applicationNow.current = { ...applicationNow.current,
+      answers: { ...applicationNow.current.answers, [step.id]: value } };
+    setApp(applicationNow.current);
     queue({ step: step.id, answers: value });
   }, [step, setApp, queue]);
 
-  const onPreset = useCallback((value) => {
-    setPreset({ visit: location.key, step: step.id, answers: value });
-  }, [step, location.key]);
+  useEffect(() => {
+    if (!app || !step || presetStep.current === step.id) return;
+    presetStep.current = step.id;
+    // Later edits and explicit recovery own the answer after this preset.
+    if (readKeptAnswer(scope, step.id)) return;
+    const value = app.answers[step.id];
+    let answers;
+    if (step.id === 'event') answers = { ...value,
+      timezone: value.timezone || browserTimeZone(), days: value.days.length ? value.days : [{ ...NEW_DAY }] };
+    if (step.id === 'email') answers = { ...value,
+      senderName: value.senderName || app.answers.event.shortName || app.answers.event.name,
+      replyTo: value.replyTo || (user?.emailVerified ? user.email : '') };
+    if (answers && JSON.stringify(answers) !== JSON.stringify(value)) setPreset({ visit: location.key, step: step.id, answers });
+  }, [app, step, location.key, scope, user]);
 
   const onConnections = useCallback(({ connections, errors }) => {
     setApp((prev) => ({ ...withStepErrors(prev, 'tickets', errors), connections }));
@@ -165,10 +180,7 @@ export default function Setup() {
     navigationPending.current = true;
     setNavigating(true);
     if (preset?.visit === location.key && preset.step === step?.id && (action === 'next' || action === 'review')) {
-      applicationNow.current = { ...applicationNow.current,
-        answers: { ...applicationNow.current.answers, [step.id]: preset.answers } };
-      setApp(applicationNow.current);
-      queue({ step: step.id, answers: preset.answers });
+      onChange(preset.answers);
     }
     setPreset(null);
     const saved = await flush();
@@ -193,7 +205,7 @@ export default function Setup() {
       return;
     }
     navigate(target);
-  }, [flush, queue, navigate, orgId, appId, step, preset, location.key, setApp]);
+  }, [flush, onChange, navigate, orgId, appId, step, preset, location.key]);
 
   const stepErrors = useMemo(() => (app && step ? errorsOfStep(app.errors, step.id) : {}), [app, step]);
 
@@ -240,11 +252,8 @@ export default function Setup() {
           <View
             value={preset?.visit === location.key && preset.step === step.id ? preset.answers : app.answers[step.id]}
             answers={app.answers}
-            scope={scope}
-            replyTo={user?.emailVerified ? user.email : ''}
             errors={shownErrors}
             onChange={onChange}
-            onPreset={onPreset}
             app={app}
             orgId={orgId}
             appId={appId}

@@ -87,7 +87,8 @@ describe('Email step', () => {
     fireEvent.change(screen.getByLabelText('Reply address'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
     await screen.findByRole('heading', { name: 'Answers that need attention' });
-    expect(screen.getByLabelText('Sender name')).toHaveAccessibleDescription('Enter a sender name.');
+    expect(screen.getByLabelText('Sender name')).toHaveAccessibleDescription('The name people see in their inbox. For example, your event name. Enter a sender name.');
+    expect(screen.getByLabelText('Sender name')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Sender name')).toHaveValue('');
     expect(screen.getByLabelText('Reply address')).toHaveValue('');
     expect(screen.getByLabelText('Email preview')).not.toHaveTextContent('NC Local News Summit');

@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { GroupError, SelectField, TextField, fieldId } from '../../setup/Field.jsx';
 import { MAX_DAYS } from '../../setup/steps.js';
 import IconControl from '../../IconControl.jsx';
-import { readKeptAnswer } from '../../setup/keptAnswers.js';
 
-const NEW_DAY = Object.freeze({ date: '', startTime: '09:00', endTime: '17:00' });
+export const NEW_DAY = Object.freeze({ date: '', startTime: '09:00', endTime: '17:00' });
 
 /** The browser's time zone, for the preset. */
 export function browserTimeZone() {
@@ -53,23 +52,12 @@ function DayRow({ day, index, errors, onDay, onRemove, canRemove }) {
 }
 
 /** Step 2: the event, its days, its time zone and its venue. */
-export default function EventStep({ value, errors, onChange, onPreset, scope }) {
+export default function EventStep({ value, errors, onChange }) {
   const zones = useMemo(() => timeZones(value.timezone), [value.timezone]);
   const addButton = useRef(null);
   const set = (key) => (next) => onChange({ ...value, [key]: next });
   const full = value.days.length >= MAX_DAYS;
   const setVenue = (key) => (next) => onChange({ ...value, venue: { ...value.venue, [key]: next } });
-
-  // Preset empty answers once; later edits, including clears, stay editable.
-  const preset = useRef(false);
-  useEffect(() => {
-    if (preset.current) return;
-    preset.current = true;
-    if (readKeptAnswer(scope, 'event')) return;
-    const timezone = value.timezone || browserTimeZone();
-    const days = value.days.length ? value.days : [{ ...NEW_DAY }];
-    if (timezone !== value.timezone || days !== value.days) onPreset({ ...value, timezone, days });
-  }, [value, scope, onPreset]);
 
   function onDay(index, day) {
     onChange({ ...value, days: value.days.map((d, i) => (i === index ? day : d)) });
