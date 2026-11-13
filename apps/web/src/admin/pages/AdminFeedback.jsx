@@ -157,7 +157,7 @@ export default function AdminFeedback() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Bug reports and feedback submitted through the public site."
         title="Feedback"
         description="Bug reports and feedback submitted through the public site."
         actions={
@@ -166,7 +166,7 @@ export default function AdminFeedback() {
           // two lines tall on one page alone.
           <label className="flex items-center gap-xs text-admin-sm font-semibold text-admin-ink">
             Show
-            <select
+            <select data-help-skip="Read-status filter; its label and options fully describe the filter."
               ref={filterRef}
               className={`${inputClass} w-auto min-w-[14rem]`}
               value={filter}

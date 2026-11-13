@@ -1,3 +1,5 @@
+import HelpDisclosure from './HelpDisclosure.jsx';
+import HelpTooltip from './HelpTooltip.jsx';
 // Session pitch emails (issue #324): the operator's receipt mode and
 // wording, and the delivery state and send controls on one pitch.
 //
@@ -171,7 +173,7 @@ function SendEmail({ pitch, kind, slot, disabled, call, onSent }) {
   return <form onSubmit={send} className="mt-sm space-y-sm">
     <ServerErrorSummary error={error} errorRef={errorRef} title="The email was not sent" />
     <fieldset disabled={busy || disabled} className="space-y-sm">
-      {kind === 'decision' ? <TextAreaField label="Note to the submitter (optional)" value={feedback} onChange={(value) => { setFeedback(value); setPreview(null); setConfirmed(false); }} rows={3} maxLength={MAX_SUBMITTER_FEEDBACK_LENGTH} hint="The submitter reads this note. Private review notes are never sent." /> : null}
+      {kind === 'decision' ? <TextAreaField hint="The submitter reads this note. Private review notes are never sent." help="The submitter reads this note. Private review notes are never sent." label="Note to the submitter (optional)" value={feedback} onChange={(value) => { setFeedback(value); setPreview(null); setConfirmed(false); }} rows={3} maxLength={MAX_SUBMITTER_FEEDBACK_LENGTH}  /> : null}
       <button type="button" className={secondaryButtonClass} onClick={showPreview}>Preview the {name}</button>
       {preview ? <section ref={previewRef} tabIndex={-1} aria-label={`Preview of the ${name}`} className="space-y-xs border-admin-hairline border-admin-rule-hairline p-sm">
         {preview.addressVerified ? null : <Notice tone="caution" message="This address came from an imported CSV. Nobody verified it. Check it before you send." />}
@@ -181,8 +183,8 @@ function SendEmail({ pitch, kind, slot, disabled, call, onSent }) {
         <p className="text-admin-sm font-semibold">Subject: {preview.subject}</p>
         <pre className="whitespace-pre-wrap break-words font-admin-ui text-admin-sm">{preview.text}</pre>
       </section> : null}
-      {preview?.mayHaveBeenSent ? <CheckboxField label="I checked the Email log. The earlier email was not delivered." checked={checkedLog} onChange={setCheckedLog} /> : null}
-      {preview ? <CheckboxField label={`I reviewed this email. Send it to ${preview.to}.`} checked={confirmed} onChange={setConfirmed} /> : null}
+      {preview?.mayHaveBeenSent ? <CheckboxField help="Confirm the earlier message failed before sending another copy." label="I checked the Email log. The earlier email was not delivered." checked={checkedLog} onChange={setCheckedLog} /> : null}
+      {preview ? <CheckboxField help="Confirm the recipient and wording before sending this proposal email." label={`I reviewed this email. Send it to ${preview.to}.`} checked={confirmed} onChange={setConfirmed} /> : null}
     </fieldset>
     {preview ? <button className={primaryButtonClass} disabled={busy || disabled || !confirmed || (preview.mayHaveBeenSent && !checkedLog)}>{busy ? 'Sending…' : `Send the ${name}`}</button> : null}
   </form>;
@@ -202,17 +204,15 @@ export function PitchEmailDelivery({ pitch, notices, disabled, call }) {
   const canSendReceipt = Boolean(pitch.uid) && canSend(notices?.receipt);
   const canSendDecision = decisionSlot && canSend(notices?.[decisionSlot]);
   return <section aria-label="Emails to the submitter" className="space-y-sm border-t-admin-hairline border-admin-rule-hairline pt-md">
-    <h3 className="font-semibold">Emails to the submitter</h3>
+    <div className="flex items-center gap-2xs"><h3 className="font-semibold">Emails to the submitter</h3><HelpTooltip label="Emails to the submitter">Review the messages sent to the person who submitted this proposal.</HelpTooltip></div>
     {records.length ? <ul className="space-y-xs">{records.map(([slot, record]) => <DeliveryState key={slot} slot={slot} record={record} />)}</ul>
       : <p className="text-admin-sm text-admin-ink-secondary">No email was sent for this pitch.</p>}
-    {canSendDecision ? <details>
-      <summary className="min-h-admin-control cursor-pointer font-semibold">Prepare the {slotNames[decisionSlot].toLowerCase()}</summary>
+    {canSendDecision ? <HelpDisclosure title={`Prepare the ${slotNames[decisionSlot].toLowerCase()}`} help={"Prepare and preview this proposal email before sending it to the submitter."} titleClassName="min-h-admin-control cursor-pointer font-semibold">
       <SendEmail key={`${decisionSlot}-${pitch.reviewRevision ?? 0}`} pitch={pitch} kind="decision" slot={decisionSlot} disabled={disabled} call={call} onSent={setResult} />
-    </details> : null}
-    {canSendReceipt ? <details>
-      <summary className="min-h-admin-control cursor-pointer font-semibold">{notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'}</summary>
+    </HelpDisclosure> : null}
+    {canSendReceipt ? <HelpDisclosure title={notices?.receipt ? 'Retry the receipt' : 'Prepare a receipt'} help={"Prepare and preview this proposal email before sending it to the submitter."} titleClassName="min-h-admin-control cursor-pointer font-semibold">
       <SendEmail key={`receipt-${pitch.reviewRevision ?? 0}`} pitch={pitch} kind="receipt" slot="receipt" disabled={disabled} call={call} onSent={setResult} />
-    </details> : null}
+    </HelpDisclosure> : null}
     {result ? <SaveStatus message={result} /> : null}
   </section>;
 }

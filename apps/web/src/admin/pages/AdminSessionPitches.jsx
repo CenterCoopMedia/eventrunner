@@ -60,7 +60,7 @@ export default function AdminSessionPitches() {
 
   return (
     <div className="flex flex-col gap-md [overflow-wrap:anywhere]">
-      <AdminPageHeader
+      <AdminPageHeader help="Review proposals and choose sessions for your program. Decisions do not send email."
         title="Session pitches"
         identifiers={rows ? `${total} pitch${total === 1 ? '' : 'es'}` : null}
         description="Review proposals and choose sessions for your program. Decisions do not send email."
@@ -77,8 +77,8 @@ export default function AdminSessionPitches() {
         <Link to="/pitch" className={rowTitleLinkClass}>Open the public pitch form</Link>. The export holds contact details: keep the file private. Private notes are left out.
       </p>
       <div className="planner-fields grid gap-sm sm:grid-cols-2 sm:items-end">
-        <SelectField label="Decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...PITCH_STATUS_OPTIONS]} />
-        <TextField label="Search" value={search} onChange={setSearch} type="search" placeholder="Title, email, organization or presenter" />
+        <SelectField help="Filter proposals by their current review decision." label="Decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...PITCH_STATUS_OPTIONS]} />
+        <TextField data-help-skip="The label directly names the requested detail; no further explanation needed." label="Search" value={search} onChange={setSearch} type="search" placeholder="Title, email, organization or presenter" />
       </div>
       {listError ? <Notice tone="caution" message="The list did not refresh. Trying again…" /> : null}
       {rows === null ? <AdminLoadingState label="Loading session pitches…" /> : (

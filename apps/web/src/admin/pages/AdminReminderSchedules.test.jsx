@@ -245,7 +245,7 @@ describe('AdminReminderSchedules', () => {
     }
     const resultHeading = screen.getByRole('heading', { name: 'Result' });
     await waitFor(() => expect(resultHeading).toHaveFocus());
-    expect(within(resultHeading.parentElement).getByRole('status')).toHaveTextContent('Preview ready: 3 reminders. 1 speaker owes a chosen item now.');
+    expect(within(resultHeading.closest('section')).getByRole('status')).toHaveTextContent('Preview ready: 3 reminders. 1 speaker owes a chosen item now.');
 
     fireEvent.click(screen.getByRole('button', { name: 'Approve and turn on' }));
     await waitFor(() => expect(screen.getByTestId('schedule-state')).toHaveTextContent('Scheduled speaker reminders are on.'));
@@ -389,7 +389,7 @@ describe('AdminReminderSchedules, attendees', () => {
     expect(panel.getByText(/It would reach 2 attendees now\. 1 address unsubscribed and is left out\./)).toBeInTheDocument();
     const resultHeading = panel.getByRole('heading', { name: 'Result' });
     await waitFor(() => expect(resultHeading).toHaveFocus());
-    expect(within(resultHeading.parentElement).getByRole('status')).toHaveTextContent('Preview ready: 2 reminders.');
+    expect(within(resultHeading.closest('section')).getByRole('status')).toHaveTextContent('Preview ready: 2 reminders.');
 
     fireEvent.click(panel.getByRole('button', { name: 'Approve and turn on attendee reminders' }));
     await waitFor(() => expect(screen.getByTestId('attendee-schedule-state')).toHaveTextContent('Scheduled attendee reminders are on.'));

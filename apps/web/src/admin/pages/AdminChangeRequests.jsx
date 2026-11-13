@@ -1,3 +1,4 @@
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Change requests (issue #188) — every request sent from the public footer
 // or from the form on this page, newest first, with a status filter, status
 // changes, and an outright removal. Reads `change_requests` directly
@@ -176,10 +177,10 @@ function RequestForm({ call }) {
   }
 
   return (
-    <Panel title="Request a change" description="Staff requests join the same list as requests from the public site.">
+    <Panel help="Staff requests join the same list as requests from the public site." title="Request a change" description="Staff requests join the same list as requests from the public site.">
       <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit} noValidate>
         <ServerErrorSummary error={error} errorRef={errorRef} title="The request was not sent" />
-        <TextAreaField
+        <TextAreaField help="Describe the page or content that needs updating and the result you want."
           label="What should change?"
           value={message}
           onChange={(next) => {
@@ -191,12 +192,12 @@ function RequestForm({ call }) {
           maxLength={MAX_MESSAGE_LENGTH}
           required
         />
-        <TextField
+        <TextField help="The page the change is about, such as /travel."
           label="Page (optional)"
           value={page}
           onChange={setPage}
           maxLength={MAX_PAGE_LENGTH}
-          hint="The page the change is about, such as /travel."
+          
         />
         <div className="flex flex-wrap items-center gap-sm">
           <button
@@ -327,13 +328,13 @@ export default function AdminChangeRequests() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Requests from staff and signed-in visitors for a change to the site."
         title="Change requests"
         description="Requests from staff and signed-in visitors for a change to the site."
         actions={
           <label className="flex items-center gap-xs text-admin-sm font-semibold text-admin-ink">
             Show
-            <select
+            <select data-help-skip="Status filter; the label and listed statuses fully identify the filter."
               className={`${inputClass} w-auto min-w-[14rem]`}
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
@@ -365,14 +366,13 @@ export default function AdminChangeRequests() {
       {enabled ? <RequestForm call={call} /> : null}
 
       <section aria-labelledby="change-requests-heading" className="flex flex-col gap-sm">
-        <h2
+        <div className="flex items-center gap-2xs"><h2
           id="change-requests-heading"
           ref={headingRef}
           tabIndex={-1}
           className="font-admin-ui text-admin-lg font-bold text-admin-ink"
         >
-          Requests
-        </h2>
+          Requests</h2><HelpTooltip label="Requests">Review requested changes and record the outcome for each requester.</HelpTooltip></div>
         {listed !== null ? <p role="status" className="text-admin-sm text-admin-ink-secondary">{countLine(shown.length, listed.length)}</p> : null}
         {result ? <SaveStatus message={result} /> : null}
 

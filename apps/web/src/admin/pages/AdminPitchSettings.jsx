@@ -28,7 +28,7 @@ export default function AdminPitchSettings() {
   }), []);
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="When the call is open, where people pitch, the choices on the pitch form, and the emails to people who pitch."
         title="Pitch call settings"
         description="When the call is open, where people pitch, the choices on the pitch form, and the emails to people who pitch."
         actions={<Link to="/admin/pitches" className={secondaryButtonClass}>Back to the queue</Link>}

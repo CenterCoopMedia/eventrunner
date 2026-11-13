@@ -501,9 +501,9 @@ describe('AdminEmailLog', () => {
     expect(framed.body.innerHTML).toBe('<p>Hello there.</p>');
     expect(within(openRow).getByText('Links are inactive and images are hidden.')).toBeInTheDocument();
     // The plain text sits closed under the frame, as React text.
-    const summary = within(openRow).getByText('Text preview');
-    expect(summary.closest('details').open).toBe(false);
-    expect(summary.closest('details').querySelector('pre').textContent).toBe('Hello there.');
+    const summary = within(openRow).getByRole('button', { name: 'Text preview' });
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById(summary.getAttribute('aria-controls')).textContent).toContain('Hello there.');
 
     // Close and reopen: no second call.
     fireEvent.click(button);
@@ -555,8 +555,8 @@ describe('AdminEmailLog', () => {
       details: { plain: { ...message({ id: 'plain' }), html: null, text: 'Only <text>.', bodyTruncated: true } },
     });
     fireEvent.click(within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' }));
-    const summary = await screen.findByText('Text preview');
-    expect(summary.closest('details').open).toBe(true);
+    const summary = await screen.findByRole('button', { name: 'Text preview' });
+    expect(summary).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Only <text>.')).toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();
     expect(screen.getByText('Only part of this message is available.')).toBeInTheDocument();
@@ -572,8 +572,8 @@ describe('AdminEmailLog', () => {
     fireEvent.click(within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' }));
     expect(await screen.findByText('The formatted preview is unavailable. The text preview is shown below.')).toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();
-    const summary = screen.getByText('Text preview');
-    expect(summary.closest('details').open).toBe(true);
+    const summary = screen.getByRole('button', { name: 'Text preview' });
+    expect(summary).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('The plain words.')).toBeInTheDocument();
     expect(screen.queryByText('Links are inactive and images are hidden.')).toBeNull();
 

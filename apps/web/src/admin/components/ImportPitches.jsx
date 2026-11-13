@@ -1,3 +1,5 @@
+import HelpDisclosure from './HelpDisclosure.jsx';
+import HelpTooltip from './HelpTooltip.jsx';
 // The reviewed CSV import of session pitches. Moved from the pitch page to
 // its own page (/admin/pitches/import) so the queue holds the queue alone.
 import { useEffect, useRef, useState } from 'react';
@@ -12,7 +14,7 @@ const MATCH_HINTS = {
 
 function ColumnMatches({ fields, headers, mapping, onChange }) {
   return <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
-    {fields.map((field) => <SelectField
+    {fields.map((field) => <SelectField help="Choose the source column for this proposal detail. Leave optional details unmatched if they are absent."
       key={field.id}
       label={`${field.label}${field.required ? ' (required)' : ''}`}
       value={mapping[field.id] ?? ''}
@@ -80,23 +82,22 @@ export default function ImportPitches({ call }) {
     } catch (err) { setError(err); }
     finally { setBusy(false); }
   }
-  return <Panel title="Import proposals from CSV" description="Bring proposals from another form into the private queue. Nothing is published or emailed.">
+  return <Panel help="Bring proposals from another form into the private queue. Nothing is published or emailed." title="Import proposals from CSV" description="Bring proposals from another form into the private queue. Nothing is published or emailed.">
     <form onSubmit={rows ? importRows : reviewRows} className="space-y-md">
       <p className="text-admin-sm text-admin-ink-secondary">Choose a file, match its columns, then review the proposals before importing. Use 1-50 proposals per file. Unmatched columns are ignored.</p>
       <ServerErrorSummary error={error} errorRef={errorRef} />
       <fieldset disabled={busy} className="space-y-md">
-        <TextField label="Source name" value={source} onChange={(v) => { setSource(v); clearReview(); }} required maxLength={80} pattern="[A-Za-z0-9_-]+" hint="A stable name for the original form. Reuse it for retries; changing it creates a separate source." />
-        <label className="flex flex-col gap-xs font-semibold">Proposal CSV<input type="file" accept=".csv,text/csv" onChange={readFile} className="min-h-admin-control min-w-0 max-w-full text-admin-sm" /></label>
+        <TextField help="A stable name for the original form. Reuse it for retries; changing it creates a separate source." label="Source name" value={source} onChange={(v) => { setSource(v); clearReview(); }} required maxLength={80} pattern="[A-Za-z0-9_-]+" hint="A stable name for the original form. Reuse it for retries; changing it creates a separate source." />
+        <label className="flex flex-col gap-xs font-semibold">Proposal CSV<input data-help-skip="File chooser; the surrounding import instructions describe the required CSV." type="file" accept=".csv,text/csv" onChange={readFile} className="min-h-admin-control min-w-0 max-w-full text-admin-sm" /></label>
         {reading ? <p role="status">Reading the CSV…</p> : null}
         {file ? <section aria-label="Match proposal columns" className="space-y-sm">
-          <h3 className="font-admin-ui text-admin-lg font-bold">Match columns</h3>
+          <div className="flex items-center gap-2xs"><h3 className="font-admin-ui text-admin-lg font-bold">Match columns</h3><HelpTooltip label="Match columns">Match each proposal detail to a column from the uploaded file.</HelpTooltip></div>
           <p className="break-words text-admin-sm">{file.name} · {file.count} {file.count === 1 ? 'proposal' : 'proposals'}</p>
           <p className="text-admin-sm text-admin-ink-secondary">Check each match. A file column can be used once. Organization and format can be left out.</p>
           <ColumnMatches fields={PITCH_IMPORT_FIELDS.filter(({ id }) => PITCH_COLUMNS.includes(id))} headers={file.headers} mapping={mapping} onChange={changeMapping} />
-          <details className="text-admin-sm">
-            <summary className="admin-target cursor-pointer font-semibold">Other proposal answers</summary>
+          <HelpDisclosure title="Other proposal answers" help={"Choose which extra source answers to keep with the imported proposal."} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold">
             <div className="pt-sm"><ColumnMatches fields={PITCH_IMPORT_FIELDS.filter(({ id }) => !PITCH_COLUMNS.includes(id))} headers={file.headers} mapping={mapping} onChange={changeMapping} /></div>
-          </details>
+          </HelpDisclosure>
         </section> : null}
         {rows ? <>
           <p>{rows.length} {rows.length === 1 ? 'proposal' : 'proposals'} ready for review.</p>
@@ -106,7 +107,7 @@ export default function ImportPitches({ call }) {
             <p className="whitespace-pre-wrap text-admin-sm">{row.description}</p>
             <p className="text-admin-sm">Consent: Recorded in source form</p>
           </li>)}</ul>
-          <CheckboxField label="I reviewed these proposals and verified consent in the source form" checked={reviewed} onChange={setReviewed} />
+          <CheckboxField help="Confirm the original form gives permission to use these proposals and presenter details." label="I reviewed these proposals and verified consent in the source form" checked={reviewed} onChange={setReviewed} />
         </> : null}
       </fieldset>
       {rows ? <button className={primaryButtonClass} disabled={busy || !reviewed}>{busy ? 'Importing…' : 'Import reviewed proposals'}</button> : null}

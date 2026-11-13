@@ -176,7 +176,7 @@ export default function AdminInvoicesList() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Create and send invoices to sponsors and partners, then track payments."
         title="Invoices"
         description="Create and send invoices to sponsors and partners, then track payments."
         actions={
@@ -204,7 +204,7 @@ export default function AdminInvoicesList() {
           <label htmlFor={statusId} className={fieldLabelClass}>
             Status
           </label>
-          <select
+          <select data-help-skip="Invoice status filter; its label and listed states describe the filter."
             id={statusId}
             className={inputClass}
             value={status}
@@ -221,7 +221,7 @@ export default function AdminInvoicesList() {
           <label htmlFor={searchId} className={fieldLabelClass}>
             Search
           </label>
-          <input
+          <input data-help-skip="Search field; its label identifies the invoice search."
             id={searchId}
             type="search"
             className={inputClass}

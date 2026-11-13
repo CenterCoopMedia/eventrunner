@@ -1,3 +1,4 @@
+import HelpDisclosure from './HelpDisclosure.jsx';
 import { plannerMessage } from '../plannerErrors.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
@@ -57,7 +58,7 @@ export default function StripeTicketingWorkspace({ call }) {
     <button type="button" className={secondaryButtonClass} onClick={() => { setError(''); bump(); }}>Retry Stripe ticketing</button>
   </div> : <AdminLoadingState label="Loading Stripe ticketing…" />;
   return <div className="min-w-0 space-y-md" key={user?.uid}>
-    <Panel title="Stripe sales" description="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused.">
+    <Panel help="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused." title="Stripe sales" description="Manage ticket sales and admission. Purchases already in progress can finish while sales are paused.">
       <div className="flex flex-wrap items-center gap-sm">
         <StatusBadge tone={data.mode === 'live' ? 'caution' : 'info'}>{data.mode === 'live' ? 'Live payments' : 'Test mode'}</StatusBadge>
         <StatusBadge tone={data.catalog?.salesPaused || !data.catalog?.published ? 'caution' : 'ok'}>{!data.catalog?.published ? 'Tickets not published' : data.catalog.salesPaused ? 'New sales paused' : 'New sales enabled'}</StatusBadge>
@@ -67,7 +68,7 @@ export default function StripeTicketingWorkspace({ call }) {
       {error && pause === null ? <div className="mt-sm"><Notice tone="error" message={error} /></div> : null}
     </Panel>
     {isOperator ? <details className="rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md"><summary className="min-h-admin-control cursor-pointer text-admin-lg font-bold text-admin-ink">Ticket settings</summary><div className="mt-md"><StripeCatalogPanel call={call} data={data} timezone={eventConfig.timezone} isOperator={isOperator} onSaved={(result) => { setData(result); bump(); }} /></div></details> : null}
-    <details className="rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md"><summary className="min-h-admin-control cursor-pointer text-admin-lg font-bold text-admin-ink">Promo codes</summary><div className="mt-md"><StripePromoCodesPanel call={call} catalog={data.catalog} timezone={eventConfig.timezone} /></div></details>
+    <HelpDisclosure title="Promo codes" help={"Create and manage discount codes for paid ticket types."} className="rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md" titleClassName="min-h-admin-control cursor-pointer text-admin-lg font-bold text-admin-ink"><div className="mt-md"><StripePromoCodesPanel call={call} catalog={data.catalog} timezone={eventConfig.timezone} /></div></HelpDisclosure>
     <StripeCheckInPanel call={call} timezone={eventConfig.timezone} isOperator={isOperator} onChanged={bump} />
     {orderId ? <div ref={detailRef} className="scroll-mt-lg"><StripeOrderDetail key={orderId} call={call} orderId={orderId} isOperator={isOperator} timezone={eventConfig.timezone} onChanged={bump} onClose={() => setOrderId(null)} /></div> : null}
     <StripeTicketList call={call} kind="orders" catalog={data.catalog} timezone={eventConfig.timezone} refreshToken={refresh} onOpenOrder={setOrderId} />
@@ -76,7 +77,7 @@ export default function StripeTicketingWorkspace({ call }) {
     {pause !== null ? <TicketingConfirmation title={pause ? 'Pause new ticket sales?' : 'Reopen new ticket sales?'} confirmLabel={pause ? 'Pause new sales' : 'Reopen new sales'} busy={busy} error={error} onClose={() => { setPause(null); setError(''); }} onConfirm={changeSales}>
       <p>{pause ? 'Attendees will not be able to start new purchases. Purchases already in progress can finish. Refunds and check-in remain available.' : 'Available ticket types will be offered for sale.'}</p>
       <p>{data.mode === 'live' ? 'These sales collect real payments.' : 'These sales use test payments.'}</p>
-      <TextAreaField label="Reason for changing sales" value={reason} onChange={setReason} required maxLength={500} />
+      <TextAreaField data-help-skip="Operator-only sales change; the label directly asks for its reason." label="Reason for changing sales" value={reason} onChange={setReason} required maxLength={500} />
     </TicketingConfirmation> : null}
   </div>;
 }

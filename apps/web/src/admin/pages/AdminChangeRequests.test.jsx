@@ -524,7 +524,7 @@ describe('AdminChangeRequests: the form and the flag', () => {
     renderPage();
     pushRows([]);
     fireEvent.change(screen.getByLabelText('What should change?'), { target: { value: '  Add the quiet room.  ' } });
-    fireEvent.change(screen.getByLabelText(/Page \(optional\)/), { target: { value: '/travel' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Page (optional)' }), { target: { value: '/travel' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
     await flush();
 
@@ -576,7 +576,7 @@ describe('AdminChangeRequests: the form and the flag', () => {
     await send();
     fireEvent.change(screen.getByLabelText('What should change?'), { target: { value: 'Hello there' } });
     await send();
-    fireEvent.change(screen.getByLabelText(/Page \(optional\)/), { target: { value: '/venue' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Page (optional)' }), { target: { value: '/venue' } });
     await send();
     await send();
 

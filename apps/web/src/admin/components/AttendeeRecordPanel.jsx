@@ -170,10 +170,10 @@ export default function AttendeeRecordPanel({
       <AttendeeAnswers form={registrationForm} records={answers} />
       <form className="flex flex-col gap-sm" onSubmit={save}>
         <ServerErrorSummary error={error} errorRef={errorRef} />
-        <AddOneListField
+        <AddOneListField help="Add past events this person attended, such as 2024."
           label="Past attendance"
           itemName="edition"
-          hint="Add past events this person attended, such as 2024."
+          
           items={toList(lines)}
           onChange={(items) => setLines(items.join('\n'))}
           error={fieldError}

@@ -116,16 +116,16 @@ test.describe.serial('invoice drafts', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible();
 
     await page.getByLabel('Organization', { exact: true }).selectOption(ORG_ID);
-    await expect(page.getByLabel('Name to bill')).toHaveValue('Example Invoice Sponsor');
-    await expect(page.getByLabel('Line 1 unit price')).toHaveValue('5000.00');
+    await expect(page.getByLabel('Name to bill', { exact: true })).toHaveValue('Example Invoice Sponsor');
+    await expect(page.getByLabel('Line 1 unit price', { exact: true })).toHaveValue('5000.00');
     const total = page.getByTestId('invoice-total');
     await expect(total).toHaveText(/Total: \$5,000\.00/);
 
-    await page.getByLabel('Line 1 quantity').fill('3');
+    await page.getByLabel('Line 1 quantity', { exact: true }).fill('3');
     await page.getByRole('button', { name: 'Add a discount' }).click();
-    await expect(page.getByLabel('Discount row 1 kind')).toBeFocused();
-    await page.getByLabel('Discount row 1 label').fill('Early commitment');
-    await page.getByLabel('Discount row 1 amount').fill('1,000.10');
+    await expect(page.getByLabel('Discount row 1 kind', { exact: true })).toBeFocused();
+    await page.getByLabel('Discount row 1 label', { exact: true }).fill('Early commitment');
+    await page.getByLabel('Discount row 1 amount', { exact: true }).fill('1,000.10');
     await expect(total).toHaveText(/Total: \$13,999\.90/);
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -135,8 +135,8 @@ test.describe.serial('invoice drafts', () => {
 
     await page.reload();
     await expect(page.getByRole('heading', { level: 1, name: 'Draft for Example Invoice Sponsor' })).toBeVisible();
-    await expect(page.getByLabel('Line 1 quantity')).toHaveValue('3');
-    await expect(page.getByLabel('Discount row 1 amount')).toHaveValue('1000.10');
+    await expect(page.getByLabel('Line 1 quantity', { exact: true })).toHaveValue('3');
+    await expect(page.getByLabel('Discount row 1 amount', { exact: true })).toHaveValue('1000.10');
     await expect(page.getByTestId('invoice-total')).toHaveText(/Total: \$13,999\.90/);
 
     const stored = (await adminDb().collection('invoices').doc(invoiceId).get()).data();
@@ -236,11 +236,11 @@ test.describe.serial('issued invoices', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Draft for Example Invoice Sponsor' })).toBeVisible();
     await page.getByRole('button', { name: 'Issue invoice' }).click();
     await expect(page.getByText(/The next number is INV-0001\./)).toBeVisible();
-    await page.getByRole('button', { name: 'Issue this invoice' }).click();
+    await page.getByRole('button', { name: 'Issue this invoice', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'INV-0001' })).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: 'Issued as INV-0001.' })).toBeVisible();
     // An issued invoice shows its billing details as a record, not a form.
-    await expect(page.getByLabel('Name to bill')).toHaveCount(0);
+    await expect(page.getByLabel('Name to bill', { exact: true })).toHaveCount(0);
 
     const issued = (await adminDb().collection('invoices').doc(FIRST).get()).data();
     expect(issued.status).toBe('issued');
@@ -265,8 +265,8 @@ test.describe.serial('issued invoices', () => {
     expect(drawn).not.toContain('Renamed Issuer');
 
     await page.getByRole('button', { name: 'Mark paid' }).click();
-    await page.getByLabel('Method').selectOption('check');
-    await page.getByLabel('Payment note').fill('Check 1042');
+    await page.getByLabel('Method', { exact: true }).selectOption('check');
+    await page.getByLabel('Payment note', { exact: true }).fill('Check 1042');
     await page.getByRole('button', { name: 'Record payment' }).click();
     await expect(page.locator('[data-invoice-status="paid"]')).toBeVisible();
     const paid = (await adminDb().collection('invoices').doc(FIRST).get()).data();
@@ -278,8 +278,8 @@ test.describe.serial('issued invoices', () => {
     const staffReopen = await callFunction('invoiceAdmin', { action: 'reopen', invoiceId: FIRST, expectedRevision: paid.revision, reason: 'x' }, staffToken);
     expect(staffReopen.status).toBe(403);
     await page.getByRole('button', { name: 'Reopen this invoice' }).click();
-    await page.getByLabel('Reason for reopening').fill('Check bounced');
-    await page.getByRole('button', { name: 'Reopen INV-0001' }).click();
+    await page.getByLabel('Reason for reopening', { exact: true }).fill('Check bounced');
+    await page.getByRole('button', { name: 'Reopen INV-0001', exact: true }).click();
     await expect(page.locator('[data-invoice-status="issued"]')).toBeVisible();
     await expect(page.getByRole('list', { name: 'Earlier payments' })).toContainText('Reopened: Check bounced');
     const reopened = (await adminDb().collection('invoices').doc(FIRST).get()).data();
@@ -289,7 +289,7 @@ test.describe.serial('issued invoices', () => {
     expect(reopened.paymentHistory[0]).toMatchObject({ method: 'check', note: 'Check 1042', reason: 'Check bounced' });
 
     await page.getByRole('button', { name: 'Mark paid' }).click();
-    await page.getByLabel('Method').selectOption('bank-transfer');
+    await page.getByLabel('Method', { exact: true }).selectOption('bank-transfer');
     await page.getByRole('button', { name: 'Record payment' }).click();
     await expect(page.locator('[data-invoice-status="paid"]')).toBeVisible();
     const repaid = (await adminDb().collection('invoices').doc(FIRST).get()).data();
@@ -299,8 +299,8 @@ test.describe.serial('issued invoices', () => {
     expect(refused.status).toBe(403);
 
     await page.getByRole('button', { name: 'Void this invoice' }).click();
-    await page.getByLabel('Reason').fill('Wrong amount');
-    await page.getByRole('button', { name: 'Void INV-0001' }).click();
+    await page.getByLabel('Reason', { exact: true }).fill('Wrong amount');
+    await page.getByRole('button', { name: 'Void INV-0001', exact: true }).click();
     await expect(page.locator('[data-invoice-status="void"]')).toBeVisible();
     await expect(page.getByText(/INV-0001 stays used/)).toBeVisible();
     const voided = (await adminDb().collection('invoices').doc(FIRST).get()).data();
@@ -349,8 +349,8 @@ test.describe.serial('issued invoices', () => {
     await expect(page.getByRole('heading', { level: 1, name: number })).toBeVisible();
     await page.getByRole('button', { name: 'Email invoice' }).click();
     const form = page.getByRole('region', { name: `Email ${number}` });
-    await form.getByLabel('Copy to').fill('finance@example.test');
-    await form.getByLabel('Note').fill('Thank you for sponsoring.');
+    await form.getByLabel('Copy to', { exact: true }).fill('finance@example.test');
+    await form.getByLabel('Note', { exact: true }).fill('Thank you for sponsoring.');
     await form.getByRole('button', { name: 'Preview', exact: true }).click();
     const preview = form.getByRole('region', { name: 'Email preview' });
     await expect(preview).toContainText(`Invoice ${number} from ${stored.issuer.name}`);
@@ -392,7 +392,7 @@ test.describe.serial('issued invoices', () => {
     await form.getByRole('button', { name: 'Preview', exact: true }).click();
     await expect(form).toContainText('less than 15 minutes ago');
     await form.getByRole('button', { name: 'Send', exact: true }).click();
-    await expect(form.getByLabel('Send it again anyway')).toBeFocused();
+    await expect(form.getByLabel('Send it again anyway', { exact: true })).toBeFocused();
     const again = await callFunction('invoiceAdmin', { action: 'previewSend', invoiceId: id }, staffToken);
     const refused = await callFunction('invoiceAdmin', {
       action: 'send', invoiceId: id, sendId: 'e2e-resend-0001', receipt: again.body.receipt,
@@ -463,8 +463,8 @@ test.describe.serial('issued invoices', () => {
 
     // A void closes the link. Stripe is not set up here, so the record says Stripe was not told.
     await page.getByRole('button', { name: 'Void this invoice' }).click();
-    await page.getByLabel('Reason').fill('Billed twice');
-    await page.getByRole('button', { name: `Void ${number}` }).click();
+    await page.getByLabel('Reason', { exact: true }).fill('Billed twice');
+    await page.getByRole('button', { name: `Void ${number}`, exact: true }).click();
     await expect(page.locator('[data-invoice-status="void"]')).toBeVisible();
     await expect(card).toContainText('Cancelled');
     await expect(card).toContainText('Stripe was not told');
@@ -493,7 +493,7 @@ test.describe.serial('issued invoices', () => {
     const staffResolve = await callFunction('invoiceAdmin', { action: 'resolvePaymentReview', invoiceId: FIRST, reviewId, note: 'x' }, staffToken);
     expect(staffResolve.status).toBe(403);
     await panel.getByRole('button', { name: 'Mark reviewed' }).click();
-    await panel.getByLabel('Review note').fill('Refunded in the Stripe Dashboard');
+    await panel.getByLabel('Review note', { exact: true }).fill('Refunded in the Stripe Dashboard');
     await panel.getByRole('button', { name: 'Save review' }).click();
     await expect(page.getByRole('region', { name: 'A card payment needs review' })).toHaveCount(0);
     await expect(page.getByText('Reviewed: Refunded in the Stripe Dashboard')).toBeVisible();

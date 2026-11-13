@@ -31,7 +31,7 @@ function NoteEntry({ note, mine, busy, onSave, feedback }) {
     return (
       <li className="flex flex-col gap-xs">
         {/* Opening Edit puts the cursor in the box, so typing goes into the note. */}
-        <TextAreaField label="Edit your note" value={draft} onChange={setDraft} maxLength={MAX_LENGTH} rows={3} disabled={busy} autoFocus />
+        <TextAreaField help="Update your private review note. Other staff can read it." label="Edit your note" value={draft} onChange={setDraft} maxLength={MAX_LENGTH} rows={3} disabled={busy} autoFocus />
         <div className="flex flex-wrap gap-xs">
           <button type="button" className={secondaryButtonClass} disabled={busy || !draft.trim() || draft.trim() === note.text}
             onClick={async () => { if (await onSave(note.id, draft, base)) setDraft(null); }}>
@@ -128,7 +128,7 @@ export default function PitchNotes({ pitch, call }) {
         <p className="text-admin-sm text-admin-ink-secondary">No notes yet.</p>
       )}
       <form onSubmit={add} className="flex flex-col gap-sm">
-        <TextAreaField label="Add a note" value={text} onChange={setText} maxLength={MAX_LENGTH} rows={3} disabled={busy} />
+        <TextAreaField help="Write a private review note for event staff. It is never sent to the person who pitched." label="Add a note" value={text} onChange={setText} maxLength={MAX_LENGTH} rows={3} disabled={busy} />
         <div><button type="submit" className={secondaryButtonClass} disabled={busy || !text.trim()}>{busy ? 'Saving…' : 'Add note'}</button></div>
         {where === 'add' ? feedback : null}
       </form>

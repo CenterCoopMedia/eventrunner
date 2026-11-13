@@ -228,8 +228,8 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await page.getByText('Promo codes', { exact: true }).first().click();
     await page.getByRole('button', { name: 'New promo code' }).click();
     await page.getByLabel('Code', { exact: true }).fill('early');
-    await page.getByLabel('Percent off').fill('20');
-    await page.getByLabel('Use limit (tickets)').fill('50');
+    await page.getByLabel('Percent off', { exact: true }).fill('20');
+    await page.getByLabel('Use limit (tickets)', { exact: true }).fill('50');
     await page.getByRole('button', { name: 'Save promo code', exact: true }).click();
     await expect(page.getByText('Promo code saved.')).toBeVisible();
     await expect(page.getByRole('listitem', { name: 'EARLY' })).toContainText('20% off each ticket');
@@ -330,7 +330,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(dialog).toBeHidden();
     await expect(opener).toBeFocused();
     await opener.click();
-    await dialog.getByLabel('Reason for this action').fill('The attendee cannot attend.');
+    await dialog.getByLabel('Reason for this action', { exact: true }).fill('The attendee cannot attend.');
     await dialog.getByRole('button', { name: 'Cancel 1 admission tickets' }).click();
     await expect(page.getByText('Selected tickets cancelled. No money was refunded and no seats were restocked.')).toBeVisible();
     expect(actions.filter((action) => action.action === 'cancelTickets')).toEqual([{ action: 'cancelTickets', orderId: ORDER.orderId, ticketIds: [TICKET.externalId], reason: 'The attendee cannot attend.', confirmed: true }]);

@@ -36,9 +36,9 @@ export default function StripeCheckInPanel({ call, isOperator, timezone, onChang
     } catch (err) { setError(plannerMessage(err.message)); }
     finally { busyRef.current = false; setBusy(false); }
   }
-  return <Panel title="Online check-in" description="Scan or enter a ticket code to check in an attendee.">
+  return <Panel help="Scan or enter a ticket code to check in an attendee." title="Online check-in" description="Scan or enter a ticket code to check in an attendee.">
     <form ref={formRef} className="space-y-sm" onSubmit={(event) => { event.preventDefault(); check(); }}>
-      <TextField label="Ticket code for check-in" value={ticketId} autoComplete="off" autoCapitalize="none" spellCheck={false} error={error && !correction && !ticketId.trim() ? error : undefined} onChange={(value) => { setTicketId(value); setResult(null); }} />
+      <TextField help="Scan or enter the code on the attendee’s ticket to record their arrival." label="Ticket code for check-in" value={ticketId} autoComplete="off" autoCapitalize="none" spellCheck={false} error={error && !correction && !ticketId.trim() ? error : undefined} onChange={(value) => { setTicketId(value); setResult(null); }} />
       <button type="submit" className={primaryButtonClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Checking ticket…' : 'Check in attendee'}</button>
     </form>
     {error && !correction ? <div className="mt-sm"><Notice tone="error" message={error} /></div> : null}
@@ -55,7 +55,7 @@ export default function StripeCheckInPanel({ call, isOperator, timezone, onChang
       <p>{correction.firstName} {correction.lastName} — {correction.ticketClass}.</p>
       <p className="wrap-anywhere font-admin-data text-admin-sm">Ticket: {correction.externalId || correction.id}</p>
       <p>This removes the check-in recorded at {formatTicketTime(correction.checkedInAt, timezone)}. A valid ticket can then be admitted again. It does not refund or change ticket ownership.</p>
-      <TextAreaField label="Reason for check-in correction" value={reason} onChange={setReason} required maxLength={500} />
+      <TextAreaField help="Explain why this arrival record needs changing. The reason stays in the ticket history." label="Reason for check-in correction" value={reason} onChange={setReason} required maxLength={500} />
     </TicketingConfirmation> : null}
   </Panel>;
 }

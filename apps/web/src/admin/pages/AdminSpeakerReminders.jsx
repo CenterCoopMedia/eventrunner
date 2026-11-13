@@ -1,3 +1,5 @@
+import HelpDisclosure from '../components/HelpDisclosure.jsx';
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Speaker reminders: email accepted speakers about the items they still owe
 // (functions/src/speakers/reminders.cjs, one staff endpoint with actions).
 //
@@ -58,17 +60,17 @@ import TicketingConfirmation from '../components/TicketingConfirmation.jsx';
 
 const STATUS_WORDS = { accepted: 'Accepted', approved: 'Approved' };
 const REMINDER_WORDING_FIELDS = [
-  { name: 'subject', label: 'Subject', singleLine: true },
-  { name: 'greeting', label: 'Greeting' },
-  { name: 'introduction', label: 'Introduction' },
-  { name: 'biographyItem', label: 'Biography item' },
-  { name: 'headshotItem', label: 'Headshot item' },
-  { name: 'sessionDescriptionItem', label: 'Session-description item' },
-  { name: 'materialsItem', label: 'Materials item' },
-  { name: 'dueDateLine', label: 'Due-date line' },
-  { name: 'buttonLabel', label: 'Button label', singleLine: true },
-  { name: 'backupLinkInstructions', label: 'Backup-link instructions' },
-  { name: 'contactInstructions', label: 'Contact instructions' },
+  { name: 'subject', label: 'Subject', help: "Write the subject line for the speaker reminder email.", singleLine: true },
+  { name: 'greeting', label: 'Greeting', help: "Write how the reminder greets the speaker. Keep the supported name placeholders." },
+  { name: 'introduction', label: 'Introduction', help: "Explain why the reminder was sent and what the speaker still needs to do." },
+  { name: 'biographyItem', label: 'Biography item', help: "Ask for the speaker’s missing biography." },
+  { name: 'headshotItem', label: 'Headshot item', help: "Ask for the speaker’s missing headshot." },
+  { name: 'sessionDescriptionItem', label: 'Session-description item', help: "Ask for missing descriptions of the speaker’s sessions." },
+  { name: 'materialsItem', label: 'Materials item', help: "Ask for missing slides or other session materials." },
+  { name: 'dueDateLine', label: 'Due-date line', help: "State when the missing items are due. Keep the deadline placeholder." },
+  { name: 'buttonLabel', label: 'Button label', help: "Write the short action label on the speaker dashboard button.", singleLine: true },
+  { name: 'backupLinkInstructions', label: 'Backup-link instructions', help: "Explain how to use the backup link if the button does not work." },
+  { name: 'contactInstructions', label: 'Contact instructions', help: "Tell the speaker how to ask the event team for help." },
 ];
 const REMINDER_WORDING_FIELD_NAMES = new Set(REMINDER_WORDING_FIELDS.map(({ name }) => name));
 
@@ -111,15 +113,14 @@ function RecipientMessage({ message }) {
       {srcDoc ? <PreviewFrame srcDoc={srcDoc} to={message.to} /> : (
         <p className="text-admin-sm text-admin-ink">This message’s HTML cannot be shown safely. The plain text version is below.</p>
       )}
-      <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version</summary>
+      <HelpDisclosure title="Plain text version" help={"Read the wording people receive when their email app displays plain text."} defaultOpen={!srcDoc} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
         <pre
           data-testid="reminder-preview-text"
           className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data"
         >
           {message.text}
         </pre>
-      </details>
+      </HelpDisclosure>
     </div>
   );
 }
@@ -129,7 +130,7 @@ function PreviewPanel({ preview, onSend }) {
   const shown = preview.recipients.find((row) => row.speakerId === shownId) ?? preview.recipients[0] ?? null;
   const count = preview.recipients.length;
   return (
-    <Panel
+    <Panel help="Review what the recipient or attendee will see before continuing."
       title="Preview"
       description="Each speaker gets the message shown for them. Choose a recipient to read their copy."
     >
@@ -145,7 +146,7 @@ function PreviewPanel({ preview, onSend }) {
         ) : null}
         {preview.skipped.length > 0 ? (
           <section aria-label="Speakers who get no reminder" className="flex flex-col gap-2xs">
-            <h3 className="text-admin-base font-bold text-admin-ink">No reminder</h3>
+            <div className="flex items-center gap-2xs"><h3 className="text-admin-base font-bold text-admin-ink">No reminder</h3><HelpTooltip label="No reminder">This speaker has no message to send for the selected missing items.</HelpTooltip></div>
             <ul className="flex flex-col gap-3xs text-admin-sm text-admin-ink">
               {preview.skipped.map((row) => (
                 <li key={row.speakerId}>
@@ -157,13 +158,13 @@ function PreviewPanel({ preview, onSend }) {
         ) : null}
         {shown ? (
           <>
-            <SelectField
+            <SelectField help="Choose a speaker to inspect their reminder before sending."
               label="Recipient"
               value={shown.speakerId}
               onChange={setShownId}
               options={preview.recipients.map((row) => ({ value: row.speakerId, label: `${row.name} (${row.to})` }))}
             />
-            <RecipientMessage message={shown} />
+            <RecipientMessage key={shown.speakerId} message={shown} />
             <div>
               <button type="button" className={primaryButtonClass} onClick={onSend}>
                 {sendLabel(count)}
@@ -184,7 +185,7 @@ function SpeakerRow({ row, checked, onToggle, timeZone }) {
   return (
     <li className="flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline px-md py-sm last:border-b-0">
       <div className="flex min-w-0 flex-col gap-3xs">
-        <CheckboxField label={row.name} checked={checked} onChange={() => onToggle(row.id)} />
+        <CheckboxField data-help-skip="The speaker name identifies the person being selected." label={row.name} checked={checked} onChange={() => onToggle(row.id)} />
         <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs ps-lg">
           <StatusBadge tone="ok">{STATUS_WORDS[row.status] ?? row.status}</StatusBadge>
           {!row.hasEmail ? <StatusBadge tone="caution">No email address</StatusBadge> : null}
@@ -282,8 +283,8 @@ function WordingEditor({ call, timeZone }) {
     const supported = data.editor?.kind === 'plain';
     body = (
       <form ref={formRef} className="flex flex-col gap-md" onSubmit={save} onChangeCapture={() => setResult(null)} noValidate>
-        <fieldset disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
-        <legend className="sr-only">Reminder wording</legend>
+        <fieldset  disabled={Boolean(busy)} className="flex min-w-0 flex-col gap-md">
+        <legend className="sr-only">Reminder wording </legend>
         <p className="text-admin-sm text-admin-ink">
           {data.saved
             ? `Saved wording, last changed ${formatWhen(data.saved.updatedAt, timeZone)} by ${data.saved.updatedBy ?? 'an admin'}.`
@@ -302,8 +303,8 @@ function WordingEditor({ call, timeZone }) {
             The item conditions, dashboard links, button, layout and branded footer stay fixed.
           </p>
         </div> : null}
-        {supported ? REMINDER_WORDING_FIELDS.map(({ name, label, singleLine }) => (singleLine ? (
-          <TextField
+        {supported ? REMINDER_WORDING_FIELDS.map(({ name, label, help, singleLine }) => (singleLine ? (
+          <TextField help={help}
             key={name}
             label={label}
             value={draft[name]}
@@ -314,7 +315,7 @@ function WordingEditor({ call, timeZone }) {
             }}
           />
         ) : (
-          <TextAreaField
+          <TextAreaField help={help}
             key={name}
             label={label}
             rows={3}
@@ -355,7 +356,7 @@ function WordingEditor({ call, timeZone }) {
   }
 
   return (
-    <Panel
+    <Panel help="Write the reminder text, then preview a copy for each speaker."
       title="Reminder wording"
       description="Staff can change every sentence. Save, then preview to read the message each speaker gets."
     >
@@ -509,7 +510,7 @@ export default function AdminSpeakerReminders() {
 
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Email accepted speakers about the items they still owe: biography, headshot, session description, and materials. A speaker gets at most one reminder in 24 hours."
         title="Speaker reminders"
         identifiers={`${speakerCount(list.rows.length)} accepted`}
         description="Email accepted speakers about the items they still owe: biography, headshot, session description, and materials. A speaker gets at most one reminder in 24 hours."
@@ -529,14 +530,14 @@ export default function AdminSpeakerReminders() {
         <Notice tone="caution" message={`The list did not refresh: ${list.error}`} />
       ) : null}
 
-      <Panel title="Choose speakers" description="The list shows speakers who accepted an invitation. Published sessions count. A pending or approved material counts, and a rejected one does not. A pending material also shows as waiting for review. A session marked as needing no materials never asks for them.">
+      <Panel help="Choose accepted speakers who still owe profile details, session descriptions or materials. Preview their individual reminders before sending." title="Choose speakers" description="The list shows speakers who accepted an invitation. Published sessions count. A pending or approved material counts, and a rejected one does not. A pending material also shows as waiting for review. A session marked as needing no materials never asks for them.">
         {list.status === 'loading' ? (
           <AdminLoadingState label="Loading speakers…" />
         ) : list.status === 'error' ? (
           <Notice tone="error" message={list.error} />
         ) : (
           <div className="flex flex-col gap-md">
-            <SelectField
+            <SelectField help="Filter speakers by which profile or session items they still need to provide."
               label="Show"
               value={group}
               onChange={changeGroup}
@@ -574,13 +575,13 @@ export default function AdminSpeakerReminders() {
                 ))}
               </ul>
             )}
-            <fieldset aria-describedby={`${topicsId}-hint`} className="flex flex-col gap-xs">
-              <legend className="text-admin-base font-semibold text-admin-ink">Items to include</legend>
+            <fieldset aria-label={["Items to include "].join('').trim()} aria-describedby={`${topicsId}-hint`} className="flex flex-col gap-xs">
+              <legend className="text-admin-base font-semibold text-admin-ink">Items to include <HelpTooltip label="Items to include">Choose which missing items the reminder asks speakers to provide.</HelpTooltip></legend>
               <p id={`${topicsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
                 Each speaker’s message names only the chosen items that speaker still owes.
               </p>
               {READINESS_ITEMS.map((item) => (
-                <CheckboxField
+                <CheckboxField help="Ask selected speakers to provide this missing item."
                   key={item}
                   label={READINESS_ITEM_LABELS[item]}
                   checked={topics.has(item)}

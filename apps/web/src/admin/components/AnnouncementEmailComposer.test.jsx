@@ -494,7 +494,7 @@ describe('AnnouncementEmailComposer', () => {
     });
     await renderLoaded();
     expect(screen.getByText(/Ask the event administrator to restore delivery with the email provider too/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Restore an unsubscribed address/), { target: { value: 'back@example.org' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Restore an unsubscribed address' }), { target: { value: 'back@example.org' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Restore address' })); });
     expect(showToast).toHaveBeenCalledWith('This address is restored here. Ask the event administrator to restore delivery with the email provider too.');
   });

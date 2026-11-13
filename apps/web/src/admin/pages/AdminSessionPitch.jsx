@@ -92,18 +92,18 @@ function ConvertToDrafts({ pitch, call, disabled, onConverted }) {
                   <p className="text-admin-sm text-admin-ink-secondary">Already a speaker: {speaker.displayName}.</p>
                 ) : (
                   <div className="planner-fields grid gap-sm sm:grid-cols-2">
-                    <TextField label={`${label} first name`} value={names[index][0]} onChange={(value) => setName(index, 0, value)} required maxLength={100} />
-                    <TextField label={`${label} last name`} value={names[index][1]} onChange={(value) => setName(index, 1, value)} required maxLength={100} />
+                    <TextField data-help-skip="The label directly names the presenter’s first or last name." label={`${label} first name`} value={names[index][0]} onChange={(value) => setName(index, 0, value)} required maxLength={100} />
+                    <TextField data-help-skip="The label directly names the presenter’s first or last name." label={`${label} last name`} value={names[index][1]} onChange={(value) => setName(index, 1, value)} required maxLength={100} />
                   </div>
                 )}
               </li>
             );
           })}
         </ul>
-        <SelectField label="Event day" value={dayId} onChange={setDayId} required options={[{ value: '', label: 'Choose a day' }, ...(event.days || []).map((day, i) => ({ value: day.id, label: day.label || day.date || `Day ${i + 1}` }))]} />
-        <div className="planner-fields grid gap-sm sm:grid-cols-2"><TextField label="Start time" type="time" value={startTime} onChange={setStartTime} required /><TextField label="End time" type="time" value={endTime} onChange={setEndTime} required /></div>
-        <CheckboxField label="Invite the presenters now" hint="Each new speaker gets the speaker invite email, to make an account and fill in a profile. Linked speakers get nothing." checked={invite} onChange={setInvite} />
-        <CheckboxField label="I reviewed the proposal, the presenters, consent, and the time." checked={confirmed} onChange={setConfirmed} />
+        <SelectField help="Place this session on one of the days set up in Event settings." label="Event day" value={dayId} onChange={setDayId} required options={[{ value: '', label: 'Choose a day' }, ...(event.days || []).map((day, i) => ({ value: day.id, label: day.label || day.date || `Day ${i + 1}` }))]} />
+        <div className="planner-fields grid gap-sm sm:grid-cols-2"><TextField help="Enter when the session begins on the event’s local clock." label="Start time" type="time" value={startTime} onChange={setStartTime} required /><TextField help="Enter when the session ends on the event’s local clock." label="End time" type="time" value={endTime} onChange={setEndTime} required /></div>
+        <CheckboxField help="Each new speaker gets the speaker invite email, to make an account and fill in a profile. Linked speakers get nothing." label="Invite the presenters now" hint="Each new speaker gets the speaker invite email, to make an account and fill in a profile. Linked speakers get nothing." checked={invite} onChange={setInvite} />
+        <CheckboxField help="Confirm these details are ready before creating session and speaker drafts." label="I reviewed the proposal, the presenters, consent, and the time." checked={confirmed} onChange={setConfirmed} />
       </fieldset>
       <button className={secondaryButtonClass} disabled={busy || disabled || !confirmed || speakersLoading}>{busy ? 'Creating…' : 'Create drafts'}</button>
     </form>
@@ -156,7 +156,7 @@ function PitchReview({ initial, current, call, settings }) {
   const created = shown.conversion;
   return (
     <div className="flex flex-col gap-md [overflow-wrap:anywhere]">
-      <AdminPageHeader
+      <AdminPageHeader help="A private proposal. Deciding or editing it sends no email and publishes nothing."
         title={shown.title}
         state={<StatusBadge tone={PITCH_STATUS_TONES[baseline.status]}>{PITCH_STATUS_LABELS[baseline.status]}</StatusBadge>}
         identifiers={shown.email}
@@ -172,7 +172,7 @@ function PitchReview({ initial, current, call, settings }) {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {result?.where === 'top' ? <SaveStatus message={result.message} /> : null}
 
-      <Panel
+      <Panel help="Set the proposal’s review outcome. Send an email separately if you want to notify the submitter."
         title="Decision"
         description={created
           ? 'This pitch is already a draft session, so the decision stays Accepted. To change it, delete that session first. Send an email separately below.'
@@ -196,7 +196,7 @@ function PitchReview({ initial, current, call, settings }) {
         {result?.where === 'decision' ? <div className="mt-sm"><SaveStatus message={result.message} /></div> : null}
       </Panel>
 
-      <Panel
+      <Panel help="Review the proposed session and presenter details. The original submission is kept."
         title="Proposal"
         description={shown.submitted ? 'Edited by staff. The original proposal is kept.' : 'As submitted.'}
         actions={editing ? null : <AdminIconControl label="Edit pitch" icon="edit" className={secondaryButtonClass} onClick={() => { setEditing(true); setEditError(null); }} disabled={busy || conflict} />}
@@ -213,7 +213,7 @@ function PitchReview({ initial, current, call, settings }) {
         )}
       </Panel>
 
-      <Panel title="Private notes" description="Staff only. Each note shows who wrote it. You can edit your own notes. Notes never go to the submitter or into public drafts.">
+      <Panel help="Write private notes that only event staff can read, and edit your own notes. Notes are never sent to the submitter or copied into public drafts." title="Private notes" description="Staff only. Each note shows who wrote it. You can edit your own notes. Notes never go to the submitter or into public drafts.">
         <PitchNotes pitch={current ?? baseline} call={call} />
       </Panel>
 
@@ -223,7 +223,7 @@ function PitchReview({ initial, current, call, settings }) {
       </Panel>
 
       {created ? (
-        <Panel title="Drafts from this pitch">
+        <Panel help="Open the session and speaker drafts already created from this proposal." title="Drafts from this pitch">
           <div className="flex flex-wrap gap-sm">
             <Link to={`/admin/sessions/${created.sessionId}`} className={secondaryButtonClass}>Review session draft</Link>
             {(Array.isArray(created.speakerIds) ? created.speakerIds : [created.speakerId]).map((speakerId, index, all) => (
@@ -234,7 +234,7 @@ function PitchReview({ initial, current, call, settings }) {
           </div>
         </Panel>
       ) : baseline.status === 'accepted' ? (
-        <Panel title="Create session and speaker drafts">
+        <Panel help="Turn an accepted proposal into drafts you can review and publish separately." title="Create session and speaker drafts">
           {/* The saved proposal, so a staff edit to the presenters shows here;
               a change to them starts the names and confirmation again. */}
           <ConvertToDrafts

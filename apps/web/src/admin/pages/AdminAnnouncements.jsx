@@ -172,7 +172,7 @@ export default function AdminAnnouncements() {
 
   return (
     <div className="admin-communications flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Choose a site banner or an email to your attendees."
         title="Announcements"
         description="Choose a site banner or an email to your attendees."
         actions={<Link to="/admin/email-log" className={linkButtonClass}>Open email log</Link>}
@@ -205,34 +205,34 @@ export default function AdminAnnouncements() {
         className="admin-communications__panel flex flex-col gap-md"
         hidden={channel !== 'banners'}
       >
-        <Panel
+        <Panel help="Banners appear on your site between the start and end times. A banner that starts now appears as soon as you save."
           title={editingId ? 'Edit announcement' : 'Create an announcement'}
           description="Banners appear on your site between the start and end times. A banner that starts now appears as soon as you save."
         >
           <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit}>
             <ServerErrorSummary error={error ? { message: communicationsError(error, "The announcement could not be saved. Check the message and dates, then try again.") } : null} />
-            <TextAreaField
+            <TextAreaField help="Write the short announcement attendees should see in the site banner."
               label="Message"
               value={form.message}
               maxLength={500}
               required
               onChange={(message) => setForm((current) => ({ ...current, message }))}
             />
-            <SelectField
+            <SelectField help="Choose how prominently this banner should appear on the site."
               label="Priority"
               value={form.level}
               options={[{ value: 'info', label: 'Notice' }, { value: 'urgent', label: 'Urgent' }]}
               onChange={(level) => setForm((current) => ({ ...current, level }))}
             />
             <div className="grid gap-sm md:grid-cols-2">
-              <TextField
+              <TextField help="Choose when this banner starts appearing, using the time zone on your device."
                 label="Starts"
                 type="datetime-local"
                 value={form.startsAt}
                 required
                 onChange={(startsAt) => setForm((current) => ({ ...current, startsAt }))}
               />
-              <TextField
+              <TextField help="Choose when this banner stops appearing, using the time zone on your device."
                 label="Ends"
                 type="datetime-local"
                 value={form.endsAt}
@@ -241,14 +241,14 @@ export default function AdminAnnouncements() {
               />
             </div>
             <div className="grid gap-sm md:grid-cols-2">
-              <TextField
+              <TextField help="Add the page attendees should visit from this banner. Leave empty for no link."
                 label="Link (optional)"
                 type="url"
                 value={form.linkUrl}
                 placeholder="https://example.org/details"
                 onChange={(linkUrl) => setForm((current) => ({ ...current, linkUrl }))}
               />
-              <TextField
+              <TextField help="Use a short phrase that tells attendees where the banner link goes."
                 label="Link text (optional)"
                 value={form.linkLabel}
                 maxLength={80}

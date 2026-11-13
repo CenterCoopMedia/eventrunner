@@ -197,7 +197,7 @@ describe('the invoice editor', () => {
     await renderAt('/admin/invoices/new/invoice');
     expect(await screen.findByRole('heading', { level: 1, name: 'New invoice' }, { timeout: 5000 })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Organization', { exact: false }), { target: { value: 'example-press' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Organization', exact: true }), { target: { value: 'example-press' } });
     expect(screen.getByLabelText('Name to bill')).toHaveValue('Example Press');
     expect(screen.getByLabelText('Line 1 description')).toHaveValue('Presenting');
     expect(screen.getByLabelText('Line 1 unit price')).toHaveValue('5000.00');
@@ -411,7 +411,7 @@ describe('issuing an invoice', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The invoice was not issued');
     expect(alert).toHaveTextContent('Ask an operator to fill in the invoice settings.');
-    expect(screen.getByLabelText('Due date', { exact: false })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Due date', { exact: true })).toHaveAttribute('aria-invalid', 'true');
   });
 });
 
@@ -442,12 +442,12 @@ describe('an issued invoice', () => {
     await renderAt(`/admin/invoices/${ISSUED.id}`);
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Mark paid' }));
-    const date = await screen.findByLabelText('Date paid', { exact: false });
+    const date = await screen.findByLabelText('Date paid', { exact: true });
     await waitFor(() => expect(date).toHaveFocus());
     expect(date.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     fireEvent.change(date, { target: { value: '2026-10-19' } });
     fireEvent.change(screen.getByLabelText('Method'), { target: { value: 'check' } });
-    fireEvent.change(screen.getByLabelText('Payment note', { exact: false }), { target: { value: 'Check 1042' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Payment note', exact: true }), { target: { value: 'Check 1042' } });
     fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
     await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({
       action: 'markPaid', invoiceId: ISSUED.id, expectedRevision: 4, payment: { paidOn: '2026-10-19', method: 'check', note: 'Check 1042' },
@@ -504,7 +504,7 @@ describe('an issued invoice', () => {
     await renderAt(`/admin/invoices/${ISSUED.id}`);
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Reopen this invoice' }));
-    const reason = await screen.findByLabelText('Reason for reopening', { exact: false });
+    const reason = await screen.findByRole('textbox', { name: 'Reason for reopening', exact: true });
     await waitFor(() => expect(reason).toHaveFocus());
     fireEvent.click(screen.getByRole('button', { name: 'Reopen INV-0004' }));
     expect(reason).toHaveAttribute('aria-invalid', 'true');
@@ -584,9 +584,9 @@ describe('emailing an invoice', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
     expect(within(form).getByText('billing@example.org')).toBeInTheDocument();
-    await waitFor(() => expect(within(form).getByLabelText('Copy to', { exact: false })).toHaveFocus());
-    fireEvent.change(within(form).getByLabelText('Copy to', { exact: false }), { target: { value: 'Finance@Example.org' } });
-    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Thanks again.' } });
+    await waitFor(() => expect(within(form).getByRole('textbox', { name: 'Copy to', exact: true })).toHaveFocus());
+    fireEvent.change(within(form).getByRole('textbox', { name: 'Copy to', exact: true }), { target: { value: 'Finance@Example.org' } });
+    fireEvent.change(within(form).getByRole('textbox', { name: 'Note', exact: true }), { target: { value: 'Thanks again.' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({
       action: 'previewSend', invoiceId: ISSUED.id, cc: 'finance@example.org', note: 'Thanks again.',
@@ -616,7 +616,7 @@ describe('emailing an invoice', () => {
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
     fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await within(form).findByRole('region', { name: 'Email preview' });
-    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Changed.' } });
+    fireEvent.change(within(form).getByRole('textbox', { name: 'Note', exact: true }), { target: { value: 'Changed.' } });
     expect(within(form).queryByRole('region', { name: 'Email preview' })).toBeNull();
     expect(within(form).queryByRole('button', { name: 'Send' })).toBeNull();
   });
@@ -630,10 +630,10 @@ describe('emailing an invoice', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
-    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'First.' } });
+    fireEvent.change(within(form).getByRole('textbox', { name: 'Note', exact: true }), { target: { value: 'First.' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await waitFor(() => expect(typeof release).toBe('function'));
-    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Second.' } });
+    fireEvent.change(within(form).getByRole('textbox', { name: 'Note', exact: true }), { target: { value: 'Second.' } });
     await act(async () => { release(); });
     expect(within(form).queryByRole('region', { name: 'Email preview' })).toBeNull();
     expect(within(form).queryByRole('button', { name: 'Send' })).toBeNull();
@@ -667,7 +667,7 @@ describe('emailing an invoice', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
     const form = await screen.findByRole('region', { name: 'Email INV-0004' });
-    const cc = within(form).getByLabelText('Copy to', { exact: false });
+    const cc = within(form).getByRole('textbox', { name: 'Copy to', exact: true });
     fireEvent.change(cc, { target: { value: 'not an address' } });
     fireEvent.click(within(form).getByRole('button', { name: 'Preview' }));
     await waitFor(() => expect(cc).toHaveFocus());
@@ -774,7 +774,7 @@ describe('paying an invoice by card (issue 519)', () => {
     expect(within(panel).getByText(/Stripe took \$4,500\.00 for this invoice after it was voided\./)).toBeInTheDocument();
     expect(within(panel).getByText(/Stripe payment reference: pi_test_0001\. Received /)).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole('button', { name: 'Mark reviewed' }));
-    const note = await within(panel).findByLabelText('Review note', { exact: false });
+    const note = await within(panel).findByRole('textbox', { name: 'Review note', exact: true });
     await waitFor(() => expect(note).toHaveFocus());
     fireEvent.click(within(panel).getByRole('button', { name: 'Save review' }));
     await waitFor(() => expect(note).toHaveAttribute('aria-invalid', 'true'));

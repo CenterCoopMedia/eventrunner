@@ -111,11 +111,11 @@ test('communications keeps drafts and review state across channels and fits desk
     await expect(email).toBeFocused();
     await expect(page.getByRole('heading', { name: 'Write your email' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Review your email' })).toBeVisible();
-    await page.getByLabel('Audience').selectOption({ label: 'Approved attendees' });
+    await page.getByLabel('Audience', { exact: true }).selectOption({ label: 'Approved attendees' });
     await page.getByLabel('Subject', { exact: true }).fill(SUBJECT);
-    await page.getByLabel('Email message').fill(MESSAGE);
-    await page.getByLabel('Button link (optional)').fill('https://example.org/schedule');
-    await page.getByLabel('Button label (optional)').fill('Read the schedule');
+    await page.getByLabel('Email message', { exact: true }).fill(MESSAGE);
+    await page.getByLabel('Button link (optional)', { exact: true }).fill('https://example.org/schedule');
+    await page.getByLabel('Button label (optional)', { exact: true }).fill('Read the schedule');
     await expect(page.getByRole('heading', { name: 'Saved messages' })).toBeVisible();
     await expect(page.getByText('Event guide', { exact: true })).toBeVisible();
 
@@ -123,7 +123,7 @@ test('communications keeps drafts and review state across channels and fits desk
     await expect(page.getByLabel('Message', { exact: true })).toHaveValue('Use the east entrance.');
     await email.click();
     await expect(page.getByLabel('Subject', { exact: true })).toHaveValue(SUBJECT);
-    await expect(page.getByLabel('Email message')).toHaveValue(MESSAGE);
+    await expect(page.getByLabel('Email message', { exact: true })).toHaveValue(MESSAGE);
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }, { width: 320, height: 720 }]) {
       await capture('communications-compose', viewport);
     }

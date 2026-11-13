@@ -65,11 +65,11 @@ test.describe.serial('announcement email', () => {
     await page.getByRole('tab', { name: 'Email', exact: true }).click();
     await expect(page.getByRole('heading', { level: 2, name: 'Write your email' })).toBeVisible();
 
-    await page.getByLabel('Audience').selectOption({ label: 'Approved attendees' });
-    await page.getByLabel('Subject').fill(SUBJECT);
-    await page.getByLabel('Email message').fill('Doors open at nine.\n\nBring your badge.');
-    await page.getByLabel('Button link (optional)').fill('https://example.org/schedule');
-    await page.getByLabel('Button label (optional)').fill('Read the schedule');
+    await page.getByLabel('Audience', { exact: true }).selectOption({ label: 'Approved attendees' });
+    await page.getByLabel('Subject', { exact: true }).fill(SUBJECT);
+    await page.getByLabel('Email message', { exact: true }).fill('Doors open at nine.\n\nBring your badge.');
+    await page.getByLabel('Button link (optional)', { exact: true }).fill('https://example.org/schedule');
+    await page.getByLabel('Button label (optional)', { exact: true }).fill('Read the schedule');
 
     const beforePreview = mailFileSize();
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
@@ -124,8 +124,8 @@ test.describe.serial('announcement email', () => {
     expect(await response.text()).toContain('You are unsubscribed');
 
     // The next preview leaves that address out.
-    await page.getByLabel('Subject').fill(`${SUBJECT} again`);
-    await page.getByLabel('Email message').fill('A second note.');
+    await page.getByLabel('Subject', { exact: true }).fill(`${SUBJECT} again`);
+    await page.getByLabel('Email message', { exact: true }).fill('A second note.');
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
     await expect(page.getByText(`${count - 1} recipient${count - 1 === 1 ? '' : 's'}: Approved attendees`)).toBeVisible();
     await expect(page.getByText('1 address is left out because they unsubscribed.')).toBeVisible();
@@ -149,9 +149,9 @@ test.describe.serial('announcement email', () => {
     const beforeSaved = mailFileSize();
 
     // Save a message under a name.
-    await page.getByLabel('Subject').fill(SAVED_SUBJECT);
-    await page.getByLabel('Email message').fill('Saved words.\n\nSecond paragraph.');
-    await page.getByLabel('Name for this message').fill(SAVED_NAME);
+    await page.getByLabel('Subject', { exact: true }).fill(SAVED_SUBJECT);
+    await page.getByLabel('Email message', { exact: true }).fill('Saved words.\n\nSecond paragraph.');
+    await page.getByLabel('Name for this message', { exact: true }).fill(SAVED_NAME);
     await page.getByRole('button', { name: 'Save new message' }).click();
     const row = saved.locator('li', { hasText: SAVED_NAME });
     await expect(row.getByText(SAVED_SUBJECT)).toBeVisible();
@@ -165,29 +165,29 @@ test.describe.serial('announcement email', () => {
     await page.reload();
     await page.getByRole('tab', { name: 'Email', exact: true }).click();
     await expect(row).toBeVisible();
-    await page.getByLabel('Subject').fill('Words I have not saved');
+    await page.getByLabel('Subject', { exact: true }).fill('Words I have not saved');
     await row.getByRole('button', { name: 'Load' }).click();
     await expect(page.getByRole('heading', { name: `Replace your draft with "${SAVED_NAME}"?` })).toBeFocused();
     await page.getByRole('button', { name: 'Keep my draft' }).click();
-    await expect(page.getByLabel('Subject')).toHaveValue('Words I have not saved');
+    await expect(page.getByLabel('Subject', { exact: true })).toHaveValue('Words I have not saved');
     await expect(row.getByRole('button', { name: 'Load' })).toBeFocused();
     await page.keyboard.press('Enter');
     await page.getByRole('button', { name: 'Replace draft' }).click();
-    await expect(page.getByLabel('Subject')).toHaveValue(SAVED_SUBJECT);
-    await expect(page.getByLabel('Email message')).toHaveValue('Saved words.\n\nSecond paragraph.');
-    await expect(page.getByLabel('Subject')).toBeFocused();
+    await expect(page.getByLabel('Subject', { exact: true })).toHaveValue(SAVED_SUBJECT);
+    await expect(page.getByLabel('Email message', { exact: true })).toHaveValue('Saved words.\n\nSecond paragraph.');
+    await expect(page.getByLabel('Subject', { exact: true })).toBeFocused();
 
     // An edit to the loaded draft leaves the saved message as it was.
-    await page.getByLabel('Subject').fill(`${SAVED_SUBJECT} edited`);
+    await page.getByLabel('Subject', { exact: true }).fill(`${SAVED_SUBJECT} edited`);
     await page.reload();
     await page.getByRole('tab', { name: 'Email', exact: true }).click();
     await row.getByRole('button', { name: 'Load' }).click();
-    await expect(page.getByLabel('Subject')).toHaveValue(SAVED_SUBJECT);
+    await expect(page.getByLabel('Subject', { exact: true })).toHaveValue(SAVED_SUBJECT);
     expect((await db.collection('announcement_messages').doc(savedId).get()).data().subject).toBe(SAVED_SUBJECT);
 
     // Rename with the keyboard; the id stays the same.
     await row.getByRole('button', { name: 'Rename' }).click();
-    const nameField = saved.getByLabel('New name');
+    const nameField = saved.getByLabel('New name', { exact: true });
     await expect(nameField).toBeFocused();
     await nameField.fill(RENAMED);
     await nameField.press('Enter');
@@ -197,10 +197,10 @@ test.describe.serial('announcement email', () => {
 
     // Remove it; the loaded copy stays in the form.
     await renamed.getByRole('button', { name: 'Remove' }).click();
-    await saved.getByRole('button', { name: `Remove "${RENAMED}"` }).click();
+    await saved.getByRole('button', { name: `Remove "${RENAMED}"`, exact: true }).click();
     await expect(saved.getByText(RENAMED)).toHaveCount(0);
     expect((await db.collection('announcement_messages').doc(savedId).get()).exists).toBe(false);
-    await expect(page.getByLabel('Subject')).toHaveValue(SAVED_SUBJECT);
+    await expect(page.getByLabel('Subject', { exact: true })).toHaveValue(SAVED_SUBJECT);
     // Saving, loading, renaming and removing sent nothing.
     expect(mailSince(beforeSaved)).toHaveLength(0);
     const changes = await db.collection('admin_logs').where('docPath', '==', `announcement_messages/${savedId}`).get();

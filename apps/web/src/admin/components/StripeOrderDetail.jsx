@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 import { plannerMessage } from '../plannerErrors.js';
 import AdminIconControl from './AdminIconControl.jsx';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -165,8 +166,8 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   }
 
   const selectedSummary = <ul className="space-y-xs">{selectedTickets.map((ticket) => <li key={ticket.externalId || ticket.id} className="wrap-anywhere"><span className="font-semibold">{ticket.firstName} {ticket.lastName}</span> — <span className="font-admin-data">{ticket.email || 'No email'}</span>{ticket.checkedInAt ? ' — already checked in' : ''}</li>)}</ul>;
-  return <Panel title="Order details" actions={<AdminIconControl label="Close order details" icon="close" className={secondaryButtonClass} onClick={onClose} />}>
-    <h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{order?.purchaserEmail || order?.purchaser?.email || 'Order'}</h3>
+  return <Panel help="Review the purchaser, payment and tickets in this order." title="Order details" actions={<AdminIconControl label="Close order details" icon="close" className={secondaryButtonClass} onClick={onClose} />}>
+    <div className="flex items-center gap-2xs"><h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{order?.purchaserEmail || order?.purchaser?.email || 'Order'}</h3><HelpTooltip label={order?.purchaserEmail || order?.purchaser?.email || "Order"}>Review the purchaser and payment details for this order.</HelpTooltip></div>
     {!order && !error ? <AdminLoadingState label="Loading order details…" /> : null}
     {error && !confirm ? <Notice tone="error" message={error} /> : null}
     {notice && confirm !== 'cancel' ? <Notice tone={notice.tone} message={notice.message} /> : null}
@@ -197,7 +198,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       </div>
       <p className="text-admin-sm text-admin-ink-secondary">Refund money through the authorized organizer’s Stripe Dashboard. Cancelling a ticket here removes admission without refunding the purchaser. Neither action returns sold seats to inventory. Payment amounts remain the original historical record.</p>
       <section className="space-y-sm" aria-label="Order admission tickets">
-        <h3 className="text-admin-lg font-bold">Individual tickets</h3>
+        <div className="flex items-center gap-2xs"><h3 className="text-admin-lg font-bold">Individual tickets</h3><HelpTooltip label="Individual tickets">Review each attendee’s admission and make ticket changes from here.</HelpTooltip></div>
         <div className="flex flex-wrap items-center gap-sm">
           <p role="status" className="text-admin-sm">{selected.length ? `${selected.length} tickets selected` : 'No tickets selected'}</p>
           <button type="button" className={secondaryButtonClass} disabled={busy} onClick={() => setSelected([])}>Clear selection</button>
@@ -209,7 +210,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
             const id = ticket.externalId || ticket.id;
             const requiresOperator = !isOperator && Boolean(ticket.checkedInAt);
             return <tr key={id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
-              <td className={cellClass}><Checkbox tone="admin" label={<span className="sr-only">Select {ticket.firstName} {ticket.lastName}</span>} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selected.includes(id)} onChange={(event) => {
+              <td className={cellClass}><Checkbox data-help-skip="The accessible label names the attendee ticket being selected." tone="admin" label={<span className="sr-only">Select {ticket.firstName} {ticket.lastName}</span>} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selected.includes(id)} onChange={(event) => {
                 if (busyRef.current || requiresOperator) return;
                 setSelected((previous) => event.target.checked ? [...previous, id] : previous.filter((selectedId) => selectedId !== id));
               }} /></td>
@@ -224,7 +225,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
           })}</tbody></TicketingTable> : <p className="text-admin-sm text-admin-ink-secondary">No admission tickets have been issued for this order.</p>}
       </section>
       {refunds.length ? <section className="space-y-sm">
-        <h3 className="text-admin-lg font-bold">Refund history</h3>
+        <div className="flex items-center gap-2xs"><h3 className="text-admin-lg font-bold">Refund history</h3><HelpTooltip label="Refund history">Review amounts returned to the purchaser and the tickets affected.</HelpTooltip></div>
         <ul className="space-y-xs">{refunds.map((refund) => <li key={refund.id} className="wrap-anywhere border-b-admin-hairline border-admin-rule-hairline pb-xs">{formatTicketMoney(refund.amount, refund.currency || order.currency)} — {refundLabel(refund.status)} — {formatTicketTime(refund.createdAt, timezone)}{refund.failureReason ? ` — ${refund.failureReason}` : ''}</li>)}</ul>
         {isOperator ? <>
           <p className="text-admin-sm text-admin-ink-secondary">An amount-only partial refund does not identify which attendee loses admission. Record the organizer’s decision using the ticket selection above, or explicitly retain every ticket.</p>
@@ -236,9 +237,9 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
           }}>Review refund allocation</button>
         </> : null}
       </section> : null}
-      {order.disputes?.length ? <section className="space-y-sm"><h3 className="text-admin-lg font-bold">Payment disputes</h3><p className="text-admin-sm text-admin-ink-secondary">Review and respond in Stripe Dashboard. A dispute does not automatically change admission; check each ticket before deciding whether to cancel it.</p><ul className="space-y-xs">{order.disputes.map((dispute) => <li key={dispute.id} className="wrap-anywhere">{formatTicketMoney(dispute.amount, dispute.currency || order.currency)} — {disputeStatusLabel(dispute.status)}</li>)}</ul></section> : null}
+      {order.disputes?.length ? <section className="space-y-sm"><div className="flex items-center gap-2xs"><h3 className="text-admin-lg font-bold">Payment disputes</h3><HelpTooltip label="Payment disputes">Check whether the purchaser has challenged a card payment.</HelpTooltip></div><p className="text-admin-sm text-admin-ink-secondary">Review and respond in Stripe Dashboard. A dispute does not automatically change admission; check each ticket before deciding whether to cancel it.</p><ul className="space-y-xs">{order.disputes.map((dispute) => <li key={dispute.id} className="wrap-anywhere">{formatTicketMoney(dispute.amount, dispute.currency || order.currency)} — {disputeStatusLabel(dispute.status)}</li>)}</ul></section> : null}
       <section className="space-y-sm">
-        <h3 className="text-admin-lg font-bold">Audit trail</h3>
+        <div className="flex items-center gap-2xs"><h3 className="text-admin-lg font-bold">Audit trail</h3><HelpTooltip label="Audit trail">Review who changed this order and the reasons they recorded.</HelpTooltip></div>
         {data.audit?.length ? <ol className="space-y-sm">{data.audit.map((entry) => <li key={entry.id} className="space-y-3xs border-b-admin-hairline border-admin-rule-hairline pb-sm"><p className="font-semibold">{AUDIT_LABELS[String(entry.action).replace(/^ticketing\./, '')] || 'Order updated'}</p><p className="wrap-anywhere font-admin-data text-admin-xs">{formatTicketTime(entry.at, timezone)} · {entry.actorEmail || 'Staff'}</p>{entry.reason ? <p className="wrap-anywhere text-admin-sm">{entry.reason}</p> : null}{entry.ticketIds?.length ? <p className="wrap-anywhere font-admin-data text-admin-xs">{entry.ticketIds.length} tickets affected</p> : null}</li>)}</ol> : <p className="text-admin-sm text-admin-ink-secondary">No staff actions have been recorded for this order.</p>}
       </section>
     </div> : null}
@@ -248,9 +249,9 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         <p>If a payment arrives later, the order is marked for review so you can refund it.</p>
       </> : confirm === 'edit' ? <>
 
-        <TextField label="Corrected first name" value={edit.firstName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, firstName: value }))} />
-        <TextField label="Corrected last name" hint="Optional for attendees who use one name." value={edit.lastName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, lastName: value }))} />
-        {edit.claimed || edit.checkedIn ? <p className="text-admin-sm">Email: {edit.email}</p> : <TextField label="Corrected attendee email" type="email" value={edit.email} maxLength={254} onChange={(value) => setEdit((previous) => ({ ...previous, email: value }))} />}
+        <TextField data-help-skip="The label directly names the requested detail; no further explanation needed." label="Corrected first name" value={edit.firstName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, firstName: value }))} />
+        <TextField data-help-skip="The label directly names the requested detail; no further explanation needed." label="Corrected last name" hint="Optional for attendees who use one name." value={edit.lastName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, lastName: value }))} />
+        {edit.claimed || edit.checkedIn ? <p className="text-admin-sm">Email: {edit.email}</p> : <TextField data-help-skip="The label directly names the requested detail; no further explanation needed." label="Corrected attendee email" type="email" value={edit.email} maxLength={254} onChange={(value) => setEdit((previous) => ({ ...previous, email: value }))} />}
       </> : <>
         {confirm === 'cancel' && notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
         <p className="wrap-anywhere">Original payment: {formatTicketMoney(order?.totalAmount, order?.currency)}.</p>
@@ -258,7 +259,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         {preserveAdmission && confirm === 'refund' ? <p>All ticket admission stays as it is. This records an amount-only payment adjustment.</p> : <>{selectedSummary}<p>These tickets will lose admission, including any that have already been checked in. Sold seats will not be returned to capacity.</p></>}
         <p>No refund payment is created by this action.</p>
       </>}
-      <TextAreaField label="Reason for this action" value={reason} onChange={setReason} required maxLength={500} />
+      <TextAreaField help="Explain this ticket change for staff reviewing the order history." label="Reason for this action" value={reason} onChange={setReason} required maxLength={500} />
     </TicketingConfirmation> : null}
   </Panel>;
 }

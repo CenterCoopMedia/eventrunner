@@ -26,7 +26,10 @@ module.exports = {
         if (ancestors.some(parent => parent.type === 'FunctionDeclaration' && operatorFunctions.has(parent.id?.name))) return;
         // Mixed staff/operator pages keep operator-only controls out of this audit.
         if (ancestors.some(parent => {
-          if (parent.type === 'ConditionalExpression' && source.getText(parent.test) === 'isOperator') {
+          if (parent.type === 'ConditionalExpression' && (
+            source.getText(parent.test) === 'isOperator' ||
+            (source.getText(parent.test) === 'canEditLifecycle' && context.filename.replaceAll('\\', '/').endsWith('/admin/pages/AdminEventSettings.jsx'))
+          )) {
             return node.range[0] >= parent.consequent.range[0] && node.range[1] <= parent.consequent.range[1];
           }
           return false;

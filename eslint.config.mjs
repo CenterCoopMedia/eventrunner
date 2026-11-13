@@ -9,6 +9,7 @@ import js from "@eslint/js";
 import globals from "globals";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
+import clientAdminHelp from "./scripts/eslint/client-admin-help.cjs";
 
 // Matches #rgb, #rgba, #rrggbb, #rrggbbaa in string literals, template
 // strings, and JSX attribute values (JSX attribute values are Literals).
@@ -112,6 +113,40 @@ export default [
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
     },
+  },
+
+  {
+    files: ["apps/web/src/admin/**/*.jsx"],
+    ignores: [
+      "**/*.test.jsx",
+      // Bare inputs in these shared primitives receive help at their call sites.
+      "apps/web/src/admin/components/formControls.jsx",
+      "apps/web/src/admin/components/EventDateTimeField.jsx",
+      "apps/web/src/admin/components/TimeZoneField.jsx",
+      "apps/web/src/admin/components/RichTextEditor.jsx",
+      "apps/web/src/admin/components/PlannerSwitch.jsx",
+      "apps/web/src/admin/components/ReminderScheduleSwitch.jsx",
+      "apps/web/src/admin/components/media/ImagePicker.jsx",
+      // These editors are reachable only by operators.
+      "apps/web/src/admin/pages/AdminAccess.jsx",
+      "apps/web/src/admin/pages/AdminBranding.jsx",
+      "apps/web/src/admin/pages/AdminFeatureSettings.jsx",
+      "apps/web/src/admin/pages/AdminSystemErrors.jsx",
+      "apps/web/src/admin/pages/AdminWebAddress.jsx",
+      "apps/web/src/admin/pages/AdminRegistrationForm.jsx",
+      "apps/web/src/admin/pages/AdminInvoiceSettings.jsx",
+      "apps/web/src/admin/components/ThemeProof.jsx",
+      "apps/web/src/admin/components/FeatureSwitch.jsx",
+      "apps/web/src/admin/components/PlannerFeatureControls.jsx",
+      "apps/web/src/admin/components/PitchCallSettings.jsx",
+      "apps/web/src/admin/components/PitchFormOptions.jsx",
+      "apps/web/src/admin/components/RegistrationQuestionEditor.jsx",
+      "apps/web/src/admin/components/RegistrationFormPreview.jsx",
+      "apps/web/src/admin/components/StripeCatalogPanel.jsx",
+      "apps/web/src/admin/components/StripeCompPanel.jsx",
+    ],
+    plugins: { "admin-help": { rules: { "client-field": clientAdminHelp } } },
+    rules: { "admin-help/client-field": "error" },
   },
 
   // The web workspace's build/test config files run under Node, and vitest

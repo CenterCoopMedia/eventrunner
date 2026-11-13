@@ -1,3 +1,4 @@
+import HelpTooltip from './HelpTooltip.jsx';
 // Registration answers on the Attendees page (ADR 0008 §4). The summary
 // counts what catering and access planning need; each attendee's record
 // lists that attendee's own answers. Both read ticket_answers, which only
@@ -16,7 +17,7 @@ export function RegistrationSummary({ form, records }) {
   const summary = summarizeAnswers(records, form);
   const hasCounts = summary.dietary || summary.accessNeeds || summary.photoConsent;
   return (
-    <Panel
+    <Panel help="Review totals for attendees’ diet, access and photo consent answers. Diet and access details are private to staff."
       title="Registration answers"
       description={`${plural(summary.total, 'attendee')} answered the registration questions. Diet and access answers are private to staff.`}
     >
@@ -61,7 +62,7 @@ export function AttendeeAnswers({ form, records }) {
   if (!questions.length) return null;
   return (
     <section aria-label="Registration answers" className="flex flex-col gap-xs">
-      <h3 className="font-admin-ui text-admin-base font-semibold text-admin-ink">Registration answers</h3>
+      <div className="flex items-center gap-2xs"><h3 className="font-admin-ui text-admin-base font-semibold text-admin-ink">Registration answers</h3><HelpTooltip label="Registration answers">Read the attendee’s registration responses. Diet and access details are private to staff.</HelpTooltip></div>
       {!records.length ? <p className={fieldHintClass}>No answers yet.</p> : records.map((record, index) => {
         const invalid = record.ticketStatus !== undefined && record.ticketStatus !== 'valid';
         return (

@@ -1,3 +1,5 @@
+import HelpDisclosure from '../components/HelpDisclosure.jsx';
+import HelpTooltip from '../components/HelpTooltip.jsx';
 // Scheduled reminders (issue #518, ADR 0006): reminders that go out on
 // their own, on a schedule staff set, with wording staff approved.
 // functions/src/reminders/schedules.cjs is the one staff endpoint.
@@ -69,9 +71,9 @@ function SampleMessage({ sample, timeZone }) {
   const srcDoc = useMemo(() => (sample.html ? buildPreviewDoc(sample.html) : null), [sample.html]);
   return (
     <section aria-label={`${sample.offsetDays}-day reminder`} className="flex flex-col gap-xs border-admin-rule-hairline border-t-admin-hairline pt-sm">
-      <h4 className="text-admin-base font-bold text-admin-ink">
+      <div className="flex items-center gap-2xs"><h4 className="text-admin-base font-bold text-admin-ink">
         {sample.offsetDays}-day reminder
-      </h4>
+      </h4><HelpTooltip label={`${sample.offsetDays}-day reminder`}>Review this reminder’s message for the selected day before enabling the schedule.</HelpTooltip></div>
       <p className="text-admin-sm text-admin-ink">
         Sends from {eventTime(sample.opensAt, timeZone)}.
         {sample.state === 'closed' ? ' This reminder date has passed, so it will not send.' : ''}
@@ -94,12 +96,11 @@ function SampleMessage({ sample, timeZone }) {
           className="block h-[20rem] w-full rounded-admin border-admin-hairline border-admin-rule-hairline [color-scheme:light]"
         />
       ) : null}
-      <details open={!srcDoc} className="text-admin-sm">
-        <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Text preview</summary>
+      <HelpDisclosure title="Text preview" help={"Read the email as plain text, without images or page styling."} defaultOpen={!srcDoc} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
         <pre data-testid={`schedule-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {sample.text}
         </pre>
-      </details>
+      </HelpDisclosure>
     </section>
   );
 }
@@ -109,7 +110,7 @@ function NextRunPanel({ data }) {
   const reach = nextRun?.reach;
   return (
     <section aria-labelledby="next-run-heading" className="flex flex-col gap-xs">
-      <h3 id="next-run-heading" className="text-admin-base font-bold text-admin-ink">Next run</h3>
+      <div className="flex items-center gap-2xs"><h3 id="next-run-heading" className="text-admin-base font-bold text-admin-ink">Next run</h3><HelpTooltip label="Next run">Check when the schedule will next look for people who need a reminder.</HelpTooltip></div>
       {state !== 'on' ? (
         <p className="text-admin-sm text-admin-ink">Nothing sends while the schedule is {state === 'paused' ? 'paused' : 'off'}. This is what it would do when on.</p>
       ) : null}
@@ -179,7 +180,7 @@ function SpeakerSchedule({ call }) {
     if (result) resultRef.current?.focus();
   }, [result]);
 
-  if (loadError && !data) return <Panel title="Speakers"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading} aria-busy={loading || undefined}>{loading ? 'Trying again…' : 'Try again'}</button></Panel>;
+  if (loadError && !data) return <Panel help="Choose when speakers receive reminders about missing items." title="Speakers"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading} aria-busy={loading || undefined}>{loading ? 'Trying again…' : 'Try again'}</button></Panel>;
   if (!data || !form) return <AdminLoadingState label="Loading the schedule…" />;
 
   const { timeZone } = data;
@@ -285,13 +286,13 @@ function SpeakerSchedule({ call }) {
   const zone = timeZone ? describeTimeZone(timeZone) : 'the event’s time zone';
 
   return (
-    <Panel
+    <Panel help="Choose when speakers receive reminders about missing items."
       title="Speakers"
       description="Remind speakers about missing items before the due date. Each speaker can receive one reminder every 24 hours."
       actions={<StatusBadge tone={STATE_TONES[data.state]}>{STATE_LABELS[data.state]}</StatusBadge>}
     >
       <div className="flex flex-col gap-md">
-        <ReminderScheduleSwitch label="Scheduled speaker reminders" checked={data.state !== 'off'} disabled={Boolean(busy)} onChange={(enabled) => { if (!enabled) turnOff(); else if (preview && !dirty) approve(); else runPreview(); }} />
+        <ReminderScheduleSwitch help="Send reminders automatically to speakers who still owe the selected items." label="Scheduled speaker reminders" checked={data.state !== 'off'} disabled={Boolean(busy)} onChange={(enabled) => { if (!enabled) turnOff(); else if (preview && !dirty) approve(); else runPreview(); }} />
         <p className="text-admin-base font-semibold text-admin-ink" data-testid="schedule-state">
           {stateWords(data.state)}
           {data.state !== 'off' && data.approval?.at ? ` Approved ${eventTime(data.approval.at, timeZone)}.` : ''}
@@ -306,16 +307,16 @@ function SpeakerSchedule({ call }) {
         {loadError ? <div className="flex flex-col gap-xs"><Notice tone="error" message={loadError} /><button type="button" className={secondaryButtonClass} onClick={load} disabled={loading}>{loading ? 'Trying again…' : 'Try again'}</button></div> : null}
 
         <form className="flex flex-col gap-md" onSubmit={save} noValidate>
-          <fieldset disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
-          <legend className="sr-only">Speaker reminder settings</legend>
-          <fieldset aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
-            <legend className="text-admin-base font-semibold text-admin-ink">Days before the due date</legend>
+          <fieldset  disabled={Boolean(busy && busy !== 'preview')} className="flex min-w-0 flex-col gap-md">
+          <legend className="sr-only">Speaker reminder settings </legend>
+          <fieldset aria-label={["Days before the due date "].join('').trim()} aria-describedby={`${offsetsId}-hint`} className="flex flex-col gap-xs">
+            <legend className="text-admin-base font-semibold text-admin-ink">Days before the due date <HelpTooltip label="Days before the due date">Choose how many days before the deadline each reminder is due.</HelpTooltip></legend>
             <p id={`${offsetsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
               Choose how many days before the due date to send each reminder.
             </p>
             {form.offsets.map((value, index) => (
               <div key={index} className="flex flex-wrap items-end gap-xs">
-                <TextField
+                <TextField help="Enter a whole number of days before the speaker deadline for this reminder."
                   label={`Reminder ${index + 1}, days before`}
                   type="number"
                   inputMode="numeric"
@@ -339,19 +340,19 @@ function SpeakerSchedule({ call }) {
             <FieldError message={offsetsProblem} />
           </fieldset>
 
-          <EventDateTimeField
+          <EventDateTimeField help="Set the deadline for missing items."
             label="Due date"
             value={form.dueAt}
             timeZone={timeZone}
             onChange={(value) => update({ dueAt: value })}
             onProblemChange={setDueProblem}
-            hint="Set the deadline for missing items."
+            
             summaryPrefix="Due"
             emptySummary="No due date is set."
             clearable
           />
 
-          <TextField
+          <TextField help="Choose a send time on the event’s local clock. Reminders due overnight wait until 8:00 AM."
             label="Send time"
             type="time"
             value={form.sendTime}
@@ -359,13 +360,13 @@ function SpeakerSchedule({ call }) {
             hint={`On the event clock, ${zone}. Nothing sends from 8:00 PM to 8:00 AM; a reminder due then waits for 8:00 AM.`}
           />
 
-          <fieldset aria-describedby={`${topicsId}-hint`} className="flex flex-col gap-xs">
-            <legend className="text-admin-base font-semibold text-admin-ink">Items to remind about</legend>
+          <fieldset aria-label={["Items to remind about "].join('').trim()} aria-describedby={`${topicsId}-hint`} className="flex flex-col gap-xs">
+            <legend className="text-admin-base font-semibold text-admin-ink">Items to remind about <HelpTooltip label="Items to remind about">Choose the missing profile or session items that should trigger a reminder.</HelpTooltip></legend>
             <p id={`${topicsId}-hint`} className="text-admin-sm text-admin-ink-secondary">
               Each speaker’s message names only the chosen items that speaker still owes.
             </p>
             {READINESS_ITEMS.map((item) => (
-              <CheckboxField
+              <CheckboxField help="Include speakers who still need to provide this item."
                 key={item}
                 label={READINESS_ITEM_LABELS[item]}
                 checked={form.topics.has(item)}
@@ -392,16 +393,15 @@ function SpeakerSchedule({ call }) {
 
         {result ? (
           <section aria-labelledby="schedule-result-heading" className="flex flex-col gap-2xs">
-            <h3 id="schedule-result-heading" ref={resultRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink">
-              Result
-            </h3>
+            <div className="flex items-center gap-2xs"><h3 id="schedule-result-heading" ref={resultRef} tabIndex={-1} className="text-admin-base font-bold text-admin-ink">
+              Result</h3><HelpTooltip label="Result">Review the outcome of the last action and any items that need attention.</HelpTooltip></div>
             <Notice tone={result.tone} message={result.message} />
           </section>
         ) : null}
 
         {preview ? (
           <section aria-labelledby="schedule-preview-heading" className="flex flex-col gap-sm">
-            <h3 id="schedule-preview-heading" className="text-admin-base font-bold text-admin-ink">Preview</h3>
+            <div className="flex items-center gap-2xs"><h3 id="schedule-preview-heading" className="text-admin-base font-bold text-admin-ink">Preview</h3><HelpTooltip label="Preview">Review what the recipient or attendee will see before continuing.</HelpTooltip></div>
             {preview.usedFallback ? (
               <Notice tone="caution" message="The saved message could not be used. Review the default message below before turning reminders on." />
             ) : null}
@@ -426,7 +426,7 @@ export default function AdminReminderSchedules() {
   const call = useAdminApi();
   return (
     <div className="flex flex-col gap-md">
-      <AdminPageHeader
+      <AdminPageHeader help="Send automatic reminders before a deadline or the event. Review each message before turning its schedule on."
         title="Scheduled reminders"
         description="Send automatic reminders before a deadline or the event. Review each message before turning its schedule on."
         actions={<Link to="/admin/speakers/reminders/send" className={linkButtonClass}>Speaker reminders</Link>}
