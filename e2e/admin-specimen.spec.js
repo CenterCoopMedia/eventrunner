@@ -1,5 +1,5 @@
-// Hosted acceptance for #551. The before view uses the PR base's actual
-// shared chrome inside the same new specimen. Presentation moves are shared
+// Hosted acceptance for the Admin specimen. The before view uses the PR base's
+// shared presentation inside the same synthetic specimen. The owners are shared
 // with the real pages; no authenticated page or provider is mounted here.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -10,7 +10,7 @@ const ROOT = process.cwd();
 const COMPONENTS = path.join(ROOT, 'apps/web/src/admin/components');
 const EVIDENCE = path.join(ROOT, 'test-results/admin-visual-evidence');
 const FAMILIES = ['materials', 'queue', 'figures', 'email', 'versions', 'pending', 'access', 'invoices', 'rich-text'];
-const BASE_OWNERS = ['adminChrome.jsx', 'AdminTableScroll.jsx'];
+const BASE_OWNERS = ['adminChrome.jsx', 'AdminTableScroll.jsx', 'AdminAccessList.jsx', 'EmailLogTable.jsx', 'VersionEntry.jsx'];
 const loadedBaseOwners = new Set();
 let server;
 let beforeOrigin;
@@ -121,7 +121,7 @@ for (const width of [1440, 390]) {
         });
         metrics.push({ source, ...measurement });
         await fs.writeFile(path.join(EVIDENCE, `admin-specimen--${mode}--${width}.json`), JSON.stringify({
-          base, comparison: 'Base shared presentation and PR shared presentation in the same new synthetic specimen', width, mode, metrics,
+          base, baseOwners: BASE_OWNERS, comparison: 'Base shared presentation and PR shared presentation in the same synthetic specimen', width, mode, metrics,
         }, null, 2));
         await page.screenshot({ path: path.join(EVIDENCE, `admin-specimen--${source}--${mode}--${width}.png`), fullPage: true, animations: 'disabled' });
         if (source === 'before') {
@@ -149,7 +149,7 @@ for (const width of [1440, 390]) {
           expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
         }
       }
-      const evidence = JSON.stringify({ base, comparison: 'Base shared presentation and PR shared presentation in the same new synthetic specimen', width, mode, metrics }, null, 2);
+      const evidence = JSON.stringify({ base, baseOwners: BASE_OWNERS, comparison: 'Base shared presentation and PR shared presentation in the same synthetic specimen', width, mode, metrics }, null, 2);
       await fs.writeFile(path.join(EVIDENCE, `admin-specimen--${mode}--${width}.json`), evidence);
       await testInfo.attach('admin-specimen-geometry', { body: evidence, contentType: 'application/json' });
     });
@@ -313,3 +313,127 @@ test('the public book contains an interactive separate document and keeps its ow
   await expect(frame.contentFrame().locator('html')).toHaveAttribute('data-mode', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-mode', parentMode);
 });
+
+async function textLines(locator) {
+  return locator.evaluate((element) => {
+    const lines = new Set();
+    const walker = globalThis.document.createTreeWalker(element, globalThis.NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent.trim()) continue;
+      const range = globalThis.document.createRange();
+      range.selectNodeContents(node);
+      for (const rect of range.getClientRects()) {
+        if (rect.width && rect.height) lines.add(Math.round(rect.top));
+      }
+    }
+    return lines.size;
+  });
+}
+
+async function scrollWithKeyboard(page, region) {
+  await region.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => region.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+}
+
+async function detailBounds(log, region) {
+  const detail = log.locator('tbody tr[id] > td > div');
+  await detail.scrollIntoViewIfNeeded();
+  const viewport = await region.boundingBox();
+  const box = await detail.boundingBox();
+  expect(box.width).toBeGreaterThan(280);
+  expect(box.x).toBeGreaterThanOrEqual(viewport.x);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.x + viewport.width);
+  const scrollLeft = await region.evaluate((node) => node.scrollLeft);
+  expect(scrollLeft).toBeGreaterThan(0);
+  return { viewport, detail: box, scrollLeft };
+}
+
+for (const mode of ['light', 'dark']) {
+  test(`phone Admin tables keep words, comparison values and scrolled previews readable in ${mode}`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openSpecimen(page, `/specimen/admin?mode=${mode}`);
+    const proof = { mode, width: 390, emailStates: [] };
+
+    const access = page.locator('[data-admin-specimen="access"]');
+    const account = access.getByText('operator@example.test', { exact: true });
+    const instructions = access.getByRole('button', { name: 'Send sign-in instructions to operator@example.test', exact: true });
+    proof.addressLines = await textLines(account);
+    proof.actionLines = await textLines(instructions);
+    expect(proof.addressLines).toBe(1);
+    expect(proof.actionLines).toBe(1);
+    const accounts = access.getByRole('region', { name: 'Admin accounts and their roles', exact: true });
+    await scrollWithKeyboard(page, accounts);
+    for (let index = 0; index < 3; index += 1) await page.keyboard.press('Tab');
+    await expect(instructions).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(access.getByText(/Example request for operator@example\.test:/)).toBeVisible();
+    await expect(instructions).toBeFocused();
+    await access.screenshot({ path: path.join(EVIDENCE, `admin-specimen--${mode}--390--access-actions.png`), animations: 'disabled' });
+
+    const versions = page.locator('[data-admin-specimen="versions"]');
+    const comparison = versions.getByRole('region', { name: 'What changed in version 3', exact: true });
+    proof.versionTitleLines = await textLines(comparison.getByRole('cell', { name: 'Reporting workshop', exact: true }));
+    expect(proof.versionTitleLines).toBe(1);
+    await scrollWithKeyboard(page, comparison);
+    await page.keyboard.press('Tab');
+    const disclosure = comparison.getByText(/^Show all \d+ characters$/);
+    await expect(disclosure).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(disclosure.locator('..')).toHaveAttribute('open', '');
+    await versions.screenshot({ path: path.join(EVIDENCE, `admin-specimen--${mode}--390--version-values.png`), animations: 'disabled' });
+
+    const log = page.locator('[data-admin-specimen="email"]');
+    const messages = log.getByRole('region', { name: 'Sent messages', exact: true });
+    proof.recipientLines = await textLines(log.getByRole('cell', { name: 'reader@example.test', exact: true }));
+    proof.subjectLines = await textLines(log.getByRole('cell', { name: 'Example event information', exact: true }));
+    expect(proof.recipientLines).toBe(1);
+    expect(proof.subjectLines).toBeLessThanOrEqual(2);
+    await scrollWithKeyboard(page, messages);
+    await page.keyboard.press('Tab');
+    const toggle = log.getByRole('button', { name: /^(Hide preview|Preview)$/ }).first();
+    await expect(toggle).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(log.locator('iframe')).toHaveCount(0);
+    await page.keyboard.press('Enter');
+    await expect(log.locator('iframe')).toBeVisible();
+    await expect(toggle).toBeFocused();
+    proof.emailStates.push({ state: 'ready', ...await detailBounds(log, messages) });
+    const frame = log.locator('iframe');
+    await expect(frame).toHaveAttribute('sandbox', '');
+    await expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer');
+    const mailWidth = await frame.contentFrame().locator('html').evaluate((html) => html.scrollWidth);
+    expect(mailWidth).toBeLessThanOrEqual(await frame.evaluate((element) => element.clientWidth));
+    proof.mailWidth = mailWidth;
+    await log.screenshot({ path: path.join(EVIDENCE, `admin-specimen--${mode}--390--email-preview-actions.png`), animations: 'disabled' });
+
+    for (const state of ['loading', 'error', 'retrying', 'private', 'text', 'truncated']) {
+      await log.getByLabel('Email preview example state').selectOption(state);
+      if (state === 'loading' || state === 'retrying') await expect(log.getByText('Loading the message…', { exact: true })).toBeVisible();
+      if (state === 'error') {
+        proof.emailStates.push({ state, ...await detailBounds(log, messages) });
+        await log.getByRole('button', { name: 'Retry preview', exact: true }).click();
+        await expect(log.locator('iframe')).toBeVisible();
+        proof.emailStates.push({ state: 'retry-result', ...await detailBounds(log, messages) });
+        continue;
+      }
+      if (state === 'private') {
+        await expect(log.getByText('This message is private because it contains a sign-in code or invitation link.')).toBeVisible();
+        await expect(log.locator('iframe')).toHaveCount(0);
+      }
+      if (state === 'text') {
+        const plainText = log.getByRole('button', { name: 'Text preview', exact: true });
+        if (await plainText.getAttribute('aria-expanded') === 'false') await plainText.click();
+        await expect(log.getByText('The example event opens at nine. Read the example information at https://example.test/info.', { exact: true })).toBeVisible();
+      }
+      if (state === 'truncated') await expect(log.getByText('Only part of this message is available.')).toBeVisible();
+      proof.emailStates.push({ state, ...await detailBounds(log, messages) });
+    }
+    proof.documentWidth = await page.evaluate(() => globalThis.document.documentElement.scrollWidth);
+    expect(proof.documentWidth).toBe(390);
+    const evidence = JSON.stringify(proof, null, 2);
+    await fs.writeFile(path.join(EVIDENCE, `admin-specimen--table-interactions--${mode}--390.json`), evidence);
+    await testInfo.attach('phone-table-interactions', { body: evidence, contentType: 'application/json' });
+  });
+}

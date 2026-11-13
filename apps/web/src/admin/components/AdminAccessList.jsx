@@ -1,6 +1,7 @@
 import { Panel, secondaryButtonClass } from './formControls.jsx';
 import { StatusBadge } from './adminChrome.jsx';
 import AdminIconControl from './AdminIconControl.jsx';
+import AdminTableScroll from './AdminTableScroll.jsx';
 
 /** The tier word and its badge tone. The word is always rendered; the tone agrees with it. */
 export const TIER_WORDS = Object.freeze({
@@ -67,7 +68,8 @@ function GalleyHead({ children, align = 'start' }) {
 export default function AdminAccessList({ accounts, callerEmail, busy, onOpen, listRef }) {
   return (
   <Panel flush>
-    <table ref={listRef} tabIndex={-1} className="w-full border-collapse text-admin-sm">
+    <AdminTableScroll role="region" aria-label="Admin accounts and their roles" tabIndex={0} className="overflow-auto rounded-admin-panel">
+    <table ref={listRef} tabIndex={-1} className="w-full min-w-[52rem] border-collapse text-admin-sm">
       <caption className="sr-only">Admin accounts and their roles</caption>
       <thead>
         <tr>
@@ -87,7 +89,7 @@ export default function AdminAccessList({ accounts, callerEmail, busy, onOpen, l
               className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0"
             >
               <td className="px-md py-sm align-top">
-                <span className="break-all font-admin-data text-admin-base text-admin-ink">
+                <span className="whitespace-nowrap font-admin-data text-admin-base text-admin-ink">
                   {account.email}
                 </span>
                 {isSelf ? (
@@ -135,7 +137,7 @@ export default function AdminAccessList({ accounts, callerEmail, busy, onOpen, l
                   {!isTemporary(account) || account.expiryState === 'active' ? (
                     <button
                       type="button"
-                      className={secondaryButtonClass}
+                      className={`${secondaryButtonClass} whitespace-nowrap`}
                       aria-label={`Send sign-in instructions to ${account.email}`}
                       disabled={busy}
                       onClick={(event) => onOpen({ email: account.email, action: 'resend' }, event.currentTarget)}
@@ -150,6 +152,7 @@ export default function AdminAccessList({ accounts, callerEmail, busy, onOpen, l
         })}
       </tbody>
     </table>
+    </AdminTableScroll>
   </Panel>
   );
 }

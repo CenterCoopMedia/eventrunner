@@ -28,7 +28,7 @@ export const EXAMPLE_MESSAGES = [
 ];
 export const EXAMPLE_MESSAGE_BODY = {
   to: 'reader@example.test',
-  html: '<p>The example event opens at nine.</p><p><a href="https://example.test/info">Read the example information</a></p><img src="https://example.test/image.png" alt="Example image">',
+  html: '<table role="presentation" width="600"><tbody><tr><td><p>The example event opens at nine.</p><p><a href="https://example.test/info">Read the example information</a></p><img src="https://example.test/image.png" alt="Example image"></td></tr></tbody></table>',
   text: 'The example event opens at nine. Read the example information at https://example.test/info.',
 };
 export const EXAMPLE_RUNS = ['failed', 'running', 'done'].map((status, index) => ({

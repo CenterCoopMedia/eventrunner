@@ -175,7 +175,7 @@ function PreviewFrame({ srcDoc, to }) {
  */
 function StoredBody({ message }) {
   const { html, text, bodyTruncated, to } = message;
-  const srcDoc = useMemo(() => (html ? buildPreviewDoc(html) : null), [html]);
+  const srcDoc = useMemo(() => (html ? buildPreviewDoc(html, { fitWidth: true }) : null), [html]);
   const refused = Boolean(html) && srcDoc === null;
   return (
     <div className="flex flex-col gap-xs">
@@ -239,6 +239,7 @@ export default function EmailLogTable({ rows, timeZone, openId, details, preview
       role="region"
       aria-label="Sent messages"
       tabIndex={0}
+      style={{ containerType: 'inline-size' }}
       className="max-h-[40rem] overflow-auto rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised"
     >
       <table className="w-full min-w-[52rem] border-collapse text-admin-sm">
@@ -264,10 +265,10 @@ export default function EmailLogTable({ rows, timeZone, openId, details, preview
                   <td className={`${cellClass} whitespace-nowrap font-admin-data text-admin-ink-data`}>
                     {sent ? <time dateTime={sent.iso}>{sent.text}</time> : <span className={quietWordClass}>Unknown</span>}
                   </td>
-                  <td className={`${cellClass} break-all font-admin-data text-admin-ink-data`}>
+                  <td className={`${cellClass} min-w-64 wrap-anywhere font-admin-data text-admin-ink-data`}>
                     {row.to ?? <span className={`font-admin-ui ${quietWordClass}`}>No recipient</span>}
                   </td>
-                  <td className={`${cellClass} break-words text-admin-ink`}>
+                  <td className={`${cellClass} min-w-64 wrap-anywhere text-admin-ink`}>
                     {row.subject ?? (
                       <span className={quietWordClass}>{row.bodyStored ? 'No subject' : 'Not stored'}</span>
                     )}
@@ -297,7 +298,11 @@ export default function EmailLogTable({ rows, timeZone, openId, details, preview
                 {open ? (
                   <tr id={previewId} className="border-b-admin-hairline border-admin-rule-hairline">
                     <td colSpan={6} className="bg-admin-ground-soft px-sm py-sm">
-                      <PreviewBody row={row} detail={details[row.id]} onRetry={() => onRetry(row.id)} />
+                      {/* Keep the detail in the visible log viewport when its
+                          row action is reached by horizontal scrolling. */}
+                      <div className="sticky" style={{ left: 'var(--space-sm)', width: 'calc(100cqi - 2 * var(--space-sm))', maxWidth: '100%' }}>
+                        <PreviewBody row={row} detail={details[row.id]} onRetry={() => onRetry(row.id)} />
+                      </div>
                     </td>
                   </tr>
                 ) : null}
