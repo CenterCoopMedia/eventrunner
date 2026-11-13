@@ -95,7 +95,7 @@ describe('page editor recovery', () => {
     expect(screen.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
     expect(state.call).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Restore', exact: true }));
-    expect(screen.getByDisplayValue('<p>Unsaved\n“text” 🦊</p>')).toBeEnabled();
+    expect(screen.getByDisplayValue('<p>Unsaved\n“text” 🦊</p>', { collapseWhitespace: false })).toBeEnabled();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true })));
     expect(state.call.mock.calls[0][1].page.sections[0].description).toBe('<p>Unsaved\n“text” 🦊</p>');
     expect(read()).toBeNull();

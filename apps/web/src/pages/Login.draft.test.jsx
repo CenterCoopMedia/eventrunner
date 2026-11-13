@@ -72,7 +72,7 @@ describe('page-edit recovery through the actual sign-in flow', () => {
     fireEvent.change(await screen.findByLabelText('Six-digit code'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in', exact: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Restore', exact: true }));
-    expect(screen.getByDisplayValue('<p>Unsaved\ntext 🦊</p>')).toBeEnabled();
+    expect(screen.getByDisplayValue('<p>Unsaved\ntext 🦊</p>', { collapseWhitespace: false })).toBeEnabled();
     expect(signInWithCustomToken).toHaveBeenCalledTimes(1);
     expect(signOut).not.toHaveBeenCalled();
     expect(JSON.parse(read().value).sections[0].description).toBe('<p>Unsaved\ntext 🦊</p>');
