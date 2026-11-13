@@ -435,6 +435,7 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
     }
     values[key.toLowerCase()] = value;
   }
+  values.host_label = values.logo_url ? 'Hosted by' : values.operator_name ? `Hosted by ${values.operator_name}` : '';
 
   return {
     subject: substitute(effective.subject, 'text', values, config, warnings),
@@ -460,10 +461,11 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
 /**
  * Every global token name (spec §6.2) — the vocabulary templates declare so
  * overrides may reference any of them without tripping the unknown-token
- * check. Derived from buildGlobalTokens plus the global `_html` resolvers.
+ * check. Includes config, presentation and global `_html` values.
  */
 const GLOBAL_TOKEN_NAMES = Object.freeze([
   ...Object.keys(buildGlobalTokens({})),
+  'host_label',
   'postal_address_html',
   'social_links_html',
 ]);

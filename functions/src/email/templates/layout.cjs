@@ -20,6 +20,7 @@ const LAYOUT_TOKENS = [
   'event_name',
   'event_details',
   'operator_name',
+  'host_label',
   'postal_address_html',
   'social_links_html',
   'social_links_text',
@@ -75,7 +76,7 @@ function wrap(innerHtml, { preheader = '' } = {}) {
     '</td></tr>',
     // Keep the host's uploaded raster logo on a white cell in mail clients.
     '<tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:20px 32px 28px 32px;border-top:1px solid #e6e6e6;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#676767;">',
-    '{{#if logo_url}}<p style="margin:0 0 6px 0;">Hosted by</p><img src="{{logo_url}}" alt="{{operator_name}}" width="120" style="display:block;width:120px;height:auto;border:0;margin:0 0 14px 0;">{{/if}}',
+    '{{#if host_label}}<p style="margin:0 0 6px 0;">{{host_label}}</p>{{/if}}{{#if logo_url}}<img src="{{logo_url}}" alt="{{operator_name}}" width="120" style="display:block;width:120px;height:auto;border:0;margin:0 0 14px 0;">{{/if}}',
     '<p style="margin:0 0 8px 0;">{{postal_address_html}}</p>',
     // The event's social accounts (#231). Guarded on the TEXT token because
     // `{{#if}}` reads plain values only; both are empty together, so an

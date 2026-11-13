@@ -392,6 +392,7 @@ test('an event with no usable social account adds nothing to either footer', () 
   const none = render({ template, tokenValues, config: CONFIG });
   // Option B adds event details; an absent social list still adds no footer row.
   assert.ok(none.text.includes('Hosted by Example Org\n'), none.text);
+  assert.ok(none.html.includes('Hosted by Example Org'), none.html);
   assert.ok(none.text.endsWith(CONFIG.event.legal.postalAddressHtml.replaceAll('<br>', '\n')), none.text);
   assert.doesNotMatch(none.html, /<p[^>]*>\s*<\/p>/);
   const footerStart = none.html.indexOf(CONFIG.event.legal.postalAddressHtml);
