@@ -69,6 +69,7 @@ export default defineConfig(({ isSsrBuild }) => ({
       'shared/delivery',
       'shared/pitchForm',
       'shared/speakerLogistics',
+      'shared/speakerDiscussion',
       'shared/registrationForm',
       'shared/promoCodes',
       'shared/registration',

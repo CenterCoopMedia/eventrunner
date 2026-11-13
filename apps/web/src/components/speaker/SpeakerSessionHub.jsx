@@ -11,8 +11,9 @@ import { useSessionSpeakerNames } from '../SessionCard.jsx';
 import { formatSessionTimeRange } from '../../lib/eventTime.js';
 import { selectOwnSpeakerSessions } from '../../lib/speakerSessions.js';
 import SpeakerSessionMaterials from './SpeakerSessionMaterials.jsx';
+import SpeakerDiscussionPoints, { useSpeakerDiscussion } from './SpeakerDiscussionPoints.jsx';
 
-const TAB_IDS = Object.freeze(['details', 'co-speakers', 'materials']);
+const TAB_IDS = Object.freeze(['details', 'co-speakers', 'materials', 'discussion']);
 
 function Detail({ term, children, className = '' }) {
   return (
@@ -78,9 +79,14 @@ function CoSpeakers({ session, speakerId }) {
   );
 }
 
-export default function SpeakerSessionHub({
-  eventConfig, scheduleData, speakerId, requestedSessionId, requestedTab, navigationKey, onMaterialsChanged,
+export default function SpeakerSessionHub(props) {
+  return <SpeakerSessionHubContent key={JSON.stringify([props.user?.uid ?? '', props.speakerId ?? ''])} {...props} />;
+}
+
+function SpeakerSessionHubContent({
+  eventConfig, scheduleData, speakerId, user, requestedSessionId, requestedTab, navigationKey, onMaterialsChanged,
 }) {
+  const discussion = useSpeakerDiscussion({ user, speakerId });
   const sessions = useMemo(
     () => selectOwnSpeakerSessions(scheduleData, speakerId, eventConfig),
     [eventConfig, scheduleData, speakerId],
@@ -124,13 +130,17 @@ export default function SpeakerSessionHub({
           />
           <div className="mt-md">
             <Tabs value={activeTab} onChange={setActiveTab} tabs={TAB_IDS}>
-              <TabList label={`${selectedSession.title} information`}>
+              <TabList label="Session information and speaker discussion points">
                 <Tab id="details">Details</Tab>
                 <Tab id="co-speakers">Co-speakers</Tab>
                 <Tab id="materials">Materials</Tab>
+                <Tab id="discussion">Discussion points</Tab>
               </TabList>
               <TabPanel id="details">
                 <SessionDetails eventConfig={eventConfig} session={selectedSession} />
+              </TabPanel>
+              <TabPanel id="discussion">
+                <SpeakerDiscussionPoints discussion={discussion} />
               </TabPanel>
               <TabPanel id="co-speakers">
                 <CoSpeakers session={selectedSession} speakerId={speakerId} />

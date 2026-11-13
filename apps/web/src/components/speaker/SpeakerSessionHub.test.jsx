@@ -128,6 +128,10 @@ describe('SpeakerSessionHub', () => {
     expect(details).toHaveFocus();
     expect(details).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(details, { key: 'End' });
+    const discussion = screen.getByRole('tab', { name: 'Discussion points' });
+    expect(discussion).toHaveFocus();
+    expect(discussion).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(discussion, { key: 'ArrowLeft' });
     expect(materials).toHaveFocus();
     expect(materials).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Materials for session-one')).toBeInTheDocument();
