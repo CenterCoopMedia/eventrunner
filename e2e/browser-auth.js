@@ -1,5 +1,6 @@
 import { signInWithCustomToken } from 'firebase/auth';
-import { auth, useEmulators } from '../apps/web/src/firebase.js';
+import { auth } from '../apps/web/src/firebase.js';
+import { useEmulators } from '../apps/web/src/lib/firebaseSettings.js';
 
 // Browser fixture for content tests. It retains the app's real auth observer
 // and grant checks while the auth journeys cover the email-code flow.

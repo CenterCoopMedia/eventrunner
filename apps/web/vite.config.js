@@ -11,13 +11,17 @@
 import { defineConfig, normalizePath } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolveGeneratedDir } from './generatedDir.js';
+import { criticalFontTags } from './criticalFonts.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const generatedDir = resolveGeneratedDir(process.env, path.resolve(here, 'src/generated'));
 const entryModule = normalizePath(path.resolve(here, 'src/main.jsx'));
 const firebaseModule = normalizePath(path.resolve(here, 'src/firebase.js'));
+const scheduleModule = normalizePath(path.resolve(here, 'src/pages/Schedule.jsx'));
+const speakersModule = normalizePath(path.resolve(here, 'src/pages/Speakers.jsx'));
 
 // Vite 8 bundles with Rolldown. Rollup put every module the entry imports
 // statically into the entry chunk. Rolldown splits the same modules into one
@@ -45,7 +49,13 @@ function staticImportGraph(context, entry = entryModule) {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), {
+    name: 'snapshot-font-preloads',
+    transformIndexHtml: {
+      order: 'pre',
+      handler: () => criticalFontTags(readFileSync(path.join(generatedDir, 'theme.css'), 'utf8')),
+    },
+  }],
   // `shared` is a linked workspace package whose ESM entries re-export CJS
   // sources; linked deps skip prebundling by default, which would break the
   // dev server's CJS interop. Builds and vitest handle it either way.
@@ -99,8 +109,17 @@ export default defineConfig({
             },
             {
               debugName: 'firebase-sdk',
-              name: (id, context) => id.includes('/node_modules/')
+              name: (id, context) => (id === firebaseModule || id.includes('/node_modules/'))
                 && staticImportGraph(context, firebaseModule).has(id) ? 'firebase-sdk' : null,
+            },
+            {
+              debugName: 'public-program',
+              name: (id, context) => {
+                if (/\.css(\?|$)/.test(id)) return null;
+                const schedule = staticImportGraph(context, scheduleModule).has(id);
+                const speakers = staticImportGraph(context, speakersModule).has(id);
+                return schedule && !speakers ? 'schedule' : speakers && !schedule ? 'speakers' : null;
+              },
             },
           ],
         },

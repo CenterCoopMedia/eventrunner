@@ -262,9 +262,13 @@ async function main() {
         const request = route.request();
         const url = new URL(request.url());
         if (options.blockFirebase && /\/assets\/firebase-sdk-[^/]+\.js$/.test(url.pathname)) {
+          const timing = await page.evaluate(() => ({
+            origin: globalThis.performance.timeOrigin,
+            paint: globalThis.performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0,
+          }));
+          record.firstPaintAtSdkRequest = timing.paint;
+          record.sdkRequestStart = request.timing().startTime - timing.origin;
           record.blockedSdkRequests = (record.blockedSdkRequests || 0) + 1;
-          record.firstPaintAtSdkRequest = await page.evaluate(() =>
-            globalThis.performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0);
           return route.abort('blockedbyclient');
         }
         if (url.origin === server.origin && ['GET', 'HEAD'].includes(request.method())) return route.continue();
@@ -308,17 +312,20 @@ async function main() {
 
     for (const route of ['', '#/schedule']) {
       await run(`demo-sdk-failure-${route ? 'schedule' : 'home'}`, VIEWS[1], 'light', async (page, record) => {
-        let navigations = 0;
-        page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations += 1; });
+        let documents = 0;
+        page.on('request', (request) => {
+          if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents += 1;
+        });
         await page.goto(`${server.origin}${SITE.demoBase}${route}`, { waitUntil: 'load' });
         await expect(page.locator('main h1')).toBeVisible();
         await expect(page.locator('.event-hero__art')).toBeVisible();
         await expect.poll(() => record.blockedSdkRequests || 0).toBeGreaterThan(0);
         assert.ok(record.firstPaintAtSdkRequest > 0, 'SDK fetch must start after content first paints');
+        assert.ok(record.sdkRequestStart >= record.firstPaintAtSdkRequest, 'SDK request must follow first contentful paint');
         await page.evaluate(() => new Promise((resolve) =>
           globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(resolve))));
         await expect(page.locator('main h1')).toBeVisible();
-        assert.equal(navigations, 1, 'A failed background SDK must not reload the snapshot');
+        assert.equal(documents, 1, 'A failed background SDK must not reload the snapshot');
       }, { blockFirebase: true });
     }
 

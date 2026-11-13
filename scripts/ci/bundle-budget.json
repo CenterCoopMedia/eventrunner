@@ -1,7 +1,7 @@
 {
   "initial": {
-    "raw": 450000,
-    "gzip": 140000
+    "raw": 430000,
+    "gzip": 135000
   },
   "initialCss": {
     "raw": 190000,
@@ -12,7 +12,7 @@
     "gzip": 50000
   },
   "firebaseSdkChunk": {
-    "raw": 650000,
-    "gzip": 200000
+    "raw": 560000,
+    "gzip": 165000
   }
 }
