@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { openLocalDraft } from '../lib/localDraft.js';
 
-export function useLocalDraft({ accountId, docPath, version, value, dirty, enabled }) {
+export function useLocalDraft({ accountId, docPath, version, baseline, value, dirty, enabled }) {
   const sessionRef = useRef(null);
   const [recovery, setRecovery] = useState(null);
   const [kept, setKept] = useState(false);
@@ -10,13 +10,13 @@ export function useLocalDraft({ accountId, docPath, version, value, dirty, enabl
     if (!enabled || !accountId) return undefined;
     const store = openLocalDraft(accountId, docPath, version);
     const copy = store.read();
-    const session = { store, value, dirty, copy: copy?.value === value ? null : copy, timer: null };
+    const session = { store, value, baseline, dirty, copy: copy?.value === value ? null : copy, timer: null };
     sessionRef.current = session;
     setRecovery(session.copy);
     setKept(false);
     const flush = () => {
       clearTimeout(session.timer);
-      if (session.dirty && !session.copy) setKept(store.write(session.value));
+      if (session.dirty && !session.copy) setKept(store.write(session.value, session.baseline));
     };
     session.flush = flush;
     const hidden = () => { if (document.visibilityState === 'hidden') flush(); };
@@ -73,6 +73,7 @@ export function useLocalDraft({ accountId, docPath, version, value, dirty, enabl
     if (!session?.copy || session.store.revoked()) return null;
     const copy = session.copy;
     session.store.restore(copy);
+    session.baseline = copy.baseline;
     session.copy = null;
     setRecovery(null);
     return copy.value;
@@ -81,6 +82,7 @@ export function useLocalDraft({ accountId, docPath, version, value, dirty, enabl
   function saved(submitted, beforeAssignment = submitted) {
     const session = sessionRef.current;
     if (!session) return;
+    session.baseline = submitted;
     if (session.value === submitted || session.value === beforeAssignment) discard();
     else session.flush(); // Keep text typed while the request was in flight.
   }

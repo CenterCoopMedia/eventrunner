@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import AdminPageEditor from './AdminPageEditor.jsx';
 import { openLocalDraft } from '../../lib/localDraft.js';
 import { pageSnapshot, toEditablePage } from '../pageDoc.js';
@@ -26,10 +26,14 @@ const PAGE = {
 };
 const version = JSON.stringify([PAGE.updatedAt, PAGE.basedOnRevision]);
 const read = () => openLocalDraft('alice', 'cmsPages/faq', version).read();
+function SignInDestination() {
+  const { state } = useLocation();
+  return <p>Sign-in destination: {state?.from}</p>;
+}
 function renderEditor(path = '/admin/pages/faq') {
   return render(<MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/admin/pages/:pageId" element={<AdminPageEditor mode={path.endsWith('/new') ? 'create' : 'edit'} />} />
-    <Route path="/signin" element={<p>Sign-in destination</p>} />
+    <Route path="/signin" element={<SignInDestination />} />
   </Routes></MemoryRouter>);
 }
 beforeEach(() => {
@@ -75,7 +79,7 @@ describe('page editor recovery', () => {
   it('states a stale version before restore, while Discard keeps the saved page', () => {
     const older = toEditablePage(PAGE);
     older.sections[0].description = 'Older local text';
-    openLocalDraft('alice', 'cmsPages/faq', 'older-version').write(pageSnapshot(older));
+    openLocalDraft('alice', 'cmsPages/faq', 'older-version').write(pageSnapshot(older), 'older baseline');
     renderEditor();
     expect(screen.getByText(/This page changed since this copy was kept/)).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Older local text')).toBeNull();
@@ -83,6 +87,33 @@ describe('page editor recovery', () => {
     expect(screen.getByDisplayValue('Saved description')).toBeEnabled();
     expect(read()).toBeNull();
     expect(state.call).not.toHaveBeenCalled();
+  });
+
+  it('does not call newer typing stale after the operator’s own save', async () => {
+    const view = renderEditor();
+    fireEvent.change(screen.getByDisplayValue('Saved description'), { target: { value: 'First saved edit' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true })));
+    fireEvent.change(screen.getByDisplayValue('First saved edit'), { target: { value: 'Later unsaved text' } });
+    view.unmount();
+    state.source = { ...PAGE, updatedAt: '2026-11-13', sections: [{ ...PAGE.sections[0], description: 'First saved edit' }] };
+    renderEditor();
+    expect(screen.getByRole('button', { name: 'Restore', exact: true })).toBeInTheDocument();
+    expect(screen.queryByText(/This page changed since this copy was kept/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Restore', exact: true }));
+    expect(screen.getByDisplayValue('Later unsaved text')).toBeEnabled();
+  });
+
+  it('returns a saved new page to its actual record after reauthentication', async () => {
+    renderEditor('/admin/pages/new');
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'New page' } });
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/new-page' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true })));
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'More unsaved text' } });
+    state.call.mockRejectedValueOnce({ code: 'unauthenticated', message: 'Sign in again.' });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true })));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in again' }));
+    expect(screen.getByText('Sign-in destination: /admin/pages/new-page')).toBeInTheDocument();
+    expect(openLocalDraft('alice', 'cmsPages/new-page', 'new').read()).not.toBeNull();
   });
 
   it('never offers the first account’s copy to a different account', () => {
@@ -103,7 +134,7 @@ describe('page editor recovery', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true })));
     expect(screen.getByText(/Your text is kept on this browser/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Sign in again' }));
-    expect(screen.getByText('Sign-in destination')).toBeInTheDocument();
+    expect(screen.getByText('Sign-in destination: /admin/pages/faq')).toBeInTheDocument();
     expect(read()).not.toBeNull();
     expect(JSON.parse(read().value).sections[0].description).toBe('Text before expiry');
   });
