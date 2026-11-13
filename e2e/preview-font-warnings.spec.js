@@ -6,7 +6,7 @@ import { ADMIN_EMAIL, signIn } from './helpers.mjs';
 async function openPageStyle(page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, ADMIN_EMAIL);
-  await page.goto('/admin/branding');
+  await page.goto('/admin/branding', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Page style', exact: true }).click();
   await expect(page.frameLocator('iframe[data-theme-proof]').first().locator('.event-hero__title')).toBeVisible();
 }

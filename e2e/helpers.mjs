@@ -252,13 +252,13 @@ export async function signIn(page, email) {
   // person signing in once would; no spec tests the limit itself.
   await clearSignInRateLimits();
   const since = mailFileSize();
-  await page.goto('/signin');
+  await page.goto('/signin', { waitUntil: 'domcontentloaded' });
   await page.locator('#signin-email').fill(email);
   await page.getByRole('button', { name: /email me a code/i }).click();
   await expect(page.locator('#signin-code')).toBeVisible();
   await page.locator('#signin-code').fill(await waitForOtpCode(since, email, 30_000));
   await page.getByRole('button', { name: /^sign in$/i }).click();
-  await page.waitForURL((url) => url.pathname !== '/signin');
+  await page.waitForURL((url) => url.pathname !== '/signin', { waitUntil: 'domcontentloaded' });
 }
 
 // The admin rail folds its groups (issue #477): only the group that holds
