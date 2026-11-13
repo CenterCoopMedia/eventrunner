@@ -14,7 +14,7 @@ test('a ticket holder saves registration answers, and staff see them on the Atte
   const formRef = db.collection('config').doc('registration_form');
   await formRef.set({
     revision: 1,
-    standard: { organization: { enabled: true, required: true }, dietary: { enabled: true, required: false }, accessNeeds: { enabled: true, required: false } },
+    standard: { organization: { enabled: true, required: true }, phone: { enabled: true }, dietary: { enabled: true, required: false }, accessNeeds: { enabled: true, required: false } },
     custom: [],
   });
   await db.collection('tickets').doc(ticketId).set({
@@ -24,7 +24,7 @@ test('a ticket holder saves registration answers, and staff see them on the Atte
   await expect.poll(async () => (await db.collection('users').doc(uid).get()).exists, { timeout: 20_000 }).toBe(true);
   await db.collection('users').doc(uid).set({ displayName: `Ada Answers ${stamp}` }, { merge: true });
   try {
-    const answers = { organization: 'Example News', dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, accessNeeds: 'A step-free route to the stage.' };
+    const answers = { organization: 'Example News', phone: '(201) 555-0123', dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, accessNeeds: 'A step-free route to the stage.' };
     const refused = await callFunction('saveTicketAnswers', { ticketId, formRevision: 1, answers }, await idTokenFor(otherUid));
     expect(refused.status).toBe(403);
     const saved = await callFunction('saveTicketAnswers', { ticketId, formRevision: 1, answers }, await idTokenFor(uid));
@@ -46,6 +46,8 @@ test('a ticket holder saves registration answers, and staff see them on the Atte
     const record = page.getByRole('region', { name: 'Registration answers' });
     await expect(record.getByText('A step-free route to the stage.')).toBeVisible();
     await expect(record.getByText('Vegan; Other: Low sodium')).toBeVisible();
+    await expect(record.getByText('Phone number (private)', { exact: true })).toBeVisible();
+    await expect(record.getByText('(201) 555-0123', { exact: true })).toBeVisible();
   } finally {
     await Promise.all([
       formRef.delete(),

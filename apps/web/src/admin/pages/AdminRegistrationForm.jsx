@@ -130,7 +130,7 @@ export default function AdminRegistrationForm() {
     <div className="flex flex-col gap-md [overflow-wrap:anywhere]">
       <AdminPageHeader
         title="Registration form"
-        description="The questions each attendee answers when they register. Answers about diet and access are private to staff."
+        description="The questions each attendee answers when they register. Phone numbers, diet and access answers are private to staff."
         // The editor form is named here: the preview sits outside it, so Enter
         // in a preview answer can never save the form.
         actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}>{busy ? 'Saving…' : 'Save'}</button>}

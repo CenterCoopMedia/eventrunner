@@ -13,7 +13,7 @@ test('a ticket holder answers the registration questions from the dashboard remi
   const formRef = db.collection('config').doc('registration_form');
   await formRef.set({
     revision: 1,
-    standard: { organization: { enabled: true, required: true }, photoConsent: { enabled: true, required: false } },
+    standard: { organization: { enabled: true, required: true }, phone: { enabled: true, required: true }, photoConsent: { enabled: true, required: false } },
     custom: [{ id: 'q_track', kind: 'one_choice', label: 'Which track interests you most?', help: '', choices: ['Revenue', 'Audience'], required: true }],
   });
   await db.collection('tickets').doc(ticketId).set({
@@ -31,6 +31,10 @@ test('a ticket holder answers the registration questions from the dashboard remi
     await page.getByRole('button', { name: 'Next: Review' }).click();
     await expect(page.getByText('Answer this question.').first()).toBeVisible();
     await page.getByLabel('Organization (required)').fill('Example News');
+    const phone = page.getByLabel('Phone number (required)');
+    await expect(phone).toHaveAttribute('type', 'tel');
+    await expect(phone).toHaveAttribute('autocomplete', 'tel');
+    await phone.fill('+44 20 7946 0958');
     await page.getByRole('radio', { name: 'Audience' }).check();
     await page.getByRole('radio', { name: 'Yes' }).check();
     await page.getByRole('button', { name: 'Next: Review' }).click();
@@ -38,8 +42,9 @@ test('a ticket holder answers the registration questions from the dashboard remi
     await expect(page.getByRole('heading', { level: 2, name: 'Review' })).toBeVisible();
     await expect(page.getByText('Your answers are saved. You can change them until registration closes.')).toBeVisible();
     await expect(page.getByText('Example News')).toBeVisible();
+    await expect(page.getByText('+44 20 7946 0958', { exact: true })).toBeVisible();
     const stored = (await db.collection('ticket_answers').doc(ticketId).get()).data();
-    expect(stored).toMatchObject({ uid, formRevision: 1, answers: { organization: 'Example News', q_track: 'Audience', photoConsent: true } });
+    expect(stored).toMatchObject({ uid, formRevision: 1, answers: { organization: 'Example News', phone: { entered: '+44 20 7946 0958', normalized: '+442079460958' }, q_track: 'Audience', photoConsent: true } });
 
     await page.getByRole('link', { name: 'Back to your dashboard' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

@@ -522,6 +522,7 @@ describe('registration questions in the ticket stepper', () => {
   });
 
   it('checks each attendee’s answers on Next and sends them per attendee with the form revision', async () => {
+    state.form = { ...FORM, standard: { ...FORM.standard, phone: { enabled: true } } };
     mount();
     await toQuestions(2);
     expect(screen.getByRole('group', { name: 'Ticket 1: General admission for Synthetic Attendee 1' })).toBeInTheDocument();
@@ -534,17 +535,21 @@ describe('registration questions in the ticket stepper', () => {
     expect(screen.getAllByText('Answer this question.')).toHaveLength(2);
     answerOrganization(0, '  Synthetic Org  ');
     answerOrganization(1, 'Second Org');
+    fireEvent.change(screen.getAllByLabelText('Phone number')[0], { target: { value: '+1 (201) 555-0123' } });
+    fireEvent.change(screen.getAllByLabelText('Phone number')[1], { target: { value: '+44 20 7946 0958' } });
     fireEvent.click(screen.getAllByRole('radio', { name: 'Yes' })[1]);
     next('Review');
     expect(screen.getByText('Synthetic Org')).toBeInTheDocument();
+    expect(screen.getByText('+1 (201) 555-0123', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('+44 20 7946 0958', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('Yes')).toBeInTheDocument();
     expect(screen.getByText('Not answered')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and accept the refund policy' }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $50.00' }));
     await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
     expect(checkoutCalls()[0][1].body).toEqual({ requestId: expect.any(String), catalogRevision: 1, formRevision: 4, lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
-      { firstName: 'Synthetic', lastName: 'Attendee 1', email: 'attendee-1@example.test', answers: { organization: 'Synthetic Org' } },
-      { firstName: 'Synthetic', lastName: 'Attendee 2', email: 'attendee-2@example.test', answers: { organization: 'Second Org', photoConsent: true } },
+      { firstName: 'Synthetic', lastName: 'Attendee 1', email: 'attendee-1@example.test', answers: { organization: 'Synthetic Org', phone: { entered: '+1 (201) 555-0123', normalized: '+12015550123' } } },
+      { firstName: 'Synthetic', lastName: 'Attendee 2', email: 'attendee-2@example.test', answers: { organization: 'Second Org', phone: { entered: '+44 20 7946 0958', normalized: '+442079460958' }, photoConsent: true } },
     ] }] });
   });
 

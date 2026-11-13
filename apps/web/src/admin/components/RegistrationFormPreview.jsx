@@ -7,7 +7,7 @@
 // The controls work, so an operator can try an answer, and "Check answers"
 // runs the same shared check the server will. Nothing here is saved.
 import { useState } from 'react';
-import { DIRECTORY_CHOICES, activeQuestions, checkAnswers } from 'shared/registrationForm';
+import { DIRECTORY_CHOICES, LIMITS, activeQuestions, checkAnswers } from 'shared/registrationForm';
 import { FieldError, Notice, TextAreaField, TextField, fieldHintClass, fieldLabelClass, secondaryButtonClass } from './formControls.jsx';
 
 function ChoiceGroup({ question, value, onChange, multiple, error }) {
@@ -49,6 +49,8 @@ function answerOf(question, value) {
 function Question({ question, value, onChange, error }) {
   const label = `${question.label}${question.required ? ' (required)' : ''}`;
   switch (question.kind) {
+    case 'phone':
+      return <TextField label={label} hint={question.help} type="tel" autoComplete="tel" maxLength={LIMITS.phone} value={value ?? ''} onChange={onChange} error={error} />;
     case 'short_text':
       return <TextField label={label} hint={question.help || undefined} value={value ?? ''} onChange={onChange} error={error} />;
     case 'long_text':
@@ -94,7 +96,7 @@ export default function RegistrationFormPreview({ form }) {
     // Enter in an answer never submits the editor.
     <section className="flex flex-col gap-md" aria-label="Preview of the attendee's questions">
       <p className={fieldHintClass}>
-        Each attendee on a ticket answers these. Answers about diet and access are private to staff. Nothing you enter here is saved.
+        Each attendee on a ticket answers these. Phone numbers, diet and access answers are private to staff. Nothing you enter here is saved.
       </p>
       {questions.map((question) => (
         <Question

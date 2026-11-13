@@ -464,10 +464,10 @@ test('the export adds one column per registration question, filled from each acc
     'users/uid-bo': fullAccount({ uid: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' }),
     'config/registration_form': {
       revision: 2,
-      standard: { dietary: { enabled: true, required: false }, accessNeeds: { enabled: true, required: false } },
+      standard: { phone: { enabled: true }, dietary: { enabled: true, required: false }, accessNeeds: { enabled: true, required: false } },
       custom: [{ id: 'q_shirt', kind: 'one_choice', label: 'T-shirt size', choices: ['S', 'M'], required: false }],
     },
-    'ticket_answers/t-ada': { ticketId: 't-ada', uid: 'uid-ada', answers: { dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, q_shirt: 'M' } },
+    'ticket_answers/t-ada': { ticketId: 't-ada', uid: 'uid-ada', answers: { phone: { entered: '+44 20 7946 0958', normalized: '+442079460958' }, dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, q_shirt: 'M' } },
     'ticket_answers/t-gone': { ticketId: 't-gone', uid: 'uid-gone', answers: { q_shirt: 'S' } },
     // Bo's refunded ticket comes second to his valid one; its answer was a
     // yes/no before the question became one choice, and still reads as one.
@@ -478,7 +478,7 @@ test('the export adds one column per registration question, filled from each acc
   const res = await run(db, req('admin', { uids: ['uid-ada', 'uid-bo'], filter: FILTER }));
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   const [header, ada, bo] = parseCsv(res.body.csv);
-  assert.deepEqual(header.slice(-3), ['Answer: Dietary needs', 'Answer: Access needs', 'Answer: T-shirt size']);
-  assert.deepEqual(ada.slice(-3), ['Vegan; Other: Low sodium', '', 'M']);
-  assert.deepEqual(bo.slice(-3), ['', '', 'Yes']);
+  assert.deepEqual(header.slice(-4), ['Answer: Phone number', 'Answer: Dietary needs', 'Answer: Access needs', 'Answer: T-shirt size']);
+  assert.deepEqual(ada.slice(-4), ["'+44 20 7946 0958", 'Vegan; Other: Low sodium', '', 'M']);
+  assert.deepEqual(bo.slice(-4), ['', '', '', 'Yes']);
 });

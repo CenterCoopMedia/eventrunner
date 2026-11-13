@@ -1,0 +1,1 @@
+Organizers can ask for a phone number as a built-in registration question and make it required. Phone numbers are off by default and stay private to event staff. Staff can read them in attendee records and registration exports. (#951)

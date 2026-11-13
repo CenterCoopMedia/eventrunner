@@ -62,7 +62,7 @@ export function AttendeeAnswers({ form, records }) {
   if (!questions.length) return null;
   return (
     <section aria-label="Registration answers" className="flex flex-col gap-xs">
-      <div className="flex items-center gap-2xs"><h3 className="font-admin-ui text-admin-base font-semibold text-admin-ink">Registration answers</h3><HelpTooltip label="Registration answers">Read the attendee’s registration responses. Diet and access details are private to staff.</HelpTooltip></div>
+      <div className="flex items-center gap-2xs"><h3 className="font-admin-ui text-admin-base font-semibold text-admin-ink">Registration answers</h3><HelpTooltip label="Registration answers">Read the attendee’s registration responses. Phone numbers, diet and access details are private to staff.</HelpTooltip></div>
       {!records.length ? <p className={fieldHintClass}>No answers yet.</p> : records.map((record, index) => {
         const invalid = record.ticketStatus !== undefined && record.ticketStatus !== 'valid';
         return (
