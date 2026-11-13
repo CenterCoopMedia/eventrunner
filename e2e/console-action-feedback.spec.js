@@ -216,7 +216,7 @@ test('console waiting stages remain readable and current-step focus stays distin
   let reads = 0;
   const errors = await intercept(page, async (name) => {
     if (name === 'getApplication') return { application: application() };
-    if (name === 'getTeam') { reads += 1; await pending.promise; return team(); }
+    if (name === 'getTeam') { reads += 1; if (reads === 1) await pending.promise; return team(); }
   });
 
   try {
@@ -259,18 +259,33 @@ test('console waiting stages remain readable and current-step focus stays distin
     await expect(spinner).toHaveCSS('transform', 'none');
     await capture(page, 'waiting-slow-reduced-motion', 390);
 
-    await page.clock.fastForward(50000);
-    await expect(loading).toHaveAttribute('data-loading-stage', 'extended');
-    await expect(loading).toContainText('No result yet. You can keep waiting or check your connection.');
+    // The read deadline arrives before LoadingState's 60 s extended stage.
+    // Keep the long-wait message through the last millisecond, then recover.
+    await page.clock.fastForward(19999);
+    await expect(loading).toHaveAttribute('data-loading-stage', 'slow');
+    await expect(loading).toContainText('This is taking longer than expected.');
     await expect(loading.getByRole('button')).toHaveCount(0);
     await expect(page.getByRole('progressbar')).toHaveCount(0);
-    await capture(page, 'waiting-extended-reduced-motion', 390);
+    expect(reads).toBe(1);
 
-    pending.resolve();
-    await expect(page.getByText('Invite the people who run the event with you.', { exact: true })).toBeVisible();
+    await page.clock.fastForward(1);
+    const timeout = page.getByRole('alert');
+    await expect(timeout).toContainText('We could not finish loading. Try again.');
+    const reload = timeout.getByRole('button', { name: 'Reload team' });
+    await expect(reload).toBeVisible();
     await expect(loading).toHaveCount(0);
     await expect(page.locator('.console-spinner')).toHaveCount(0);
     expect(reads).toBe(1);
+    await capture(page, 'waiting-timeout-reduced-motion', 390);
+
+    pending.resolve();
+    await reload.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Invite the people who run the event with you.', { exact: true })).toBeVisible();
+    await expect(timeout).toHaveCount(0);
+    await expect(loading).toHaveCount(0);
+    await expect(page.locator('.console-spinner')).toHaveCount(0);
+    expect(reads).toBe(2);
 
     await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
     await page.getByRole('heading', { name: 'Your team', exact: true }).focus();
