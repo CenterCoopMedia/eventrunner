@@ -1,5 +1,5 @@
 import PageHeading from '../../PageHeading.jsx';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
 import {
@@ -7,14 +7,13 @@ import {
 } from '../../setup/steps.js';
 import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
 import ActionFeedback from '../../ActionFeedback.jsx';
-import { lazyPage } from '../../RouteBoundary.jsx';
+import AgreementStep from './AgreementStep.jsx';
 import EmailStep from './EmailStep.jsx';
 import EventStep, { browserTimeZone, NEW_DAY } from './EventStep.jsx';
 import OrganizationStep from './OrganizationStep.jsx';
 import ReviewStep, { Problems } from './ReviewStep.jsx';
 import TeamStep from './TeamStep.jsx';
 import TicketsStep from './TicketsStep.jsx';
-import WebAddressStep from './WebAddressStep.jsx';
 import LoadingState from '../../LoadingState.jsx';
 import IconControl from '../../IconControl.jsx';
 import StepList from '../../setup/StepList.jsx';
@@ -22,7 +21,7 @@ import { rememberReturn, useAuth } from '../../auth.jsx';
 import KeptAnswer from '../../setup/KeptAnswer.jsx';
 import { readKeptAnswer } from '../../setup/keptAnswers.js';
 
-const AgreementStep = lazyPage(() => import('./AgreementStep.jsx'));
+const WebAddressStep = lazy(() => import('./WebAddressStep.jsx'));
 
 const STEP_VIEWS = {
   organization: OrganizationStep,
@@ -251,6 +250,7 @@ export default function Setup() {
           onUse={onChange}
           onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} /> : null}
         {View ? (
+          <Suspense fallback={<LoadingState>Loading your setup.</LoadingState>}>
           <View
             value={preset?.visit === location.key && preset.step === step.id ? preset.answers : app.answers[step.id]}
             answers={app.answers}
@@ -262,6 +262,7 @@ export default function Setup() {
             flush={flush}
             onConnections={onConnections}
           />
+          </Suspense>
         ) : null}
         {step.id === 'team' ? <TeamStep orgId={orgId} onOwnersNeeded={onOwnersNeeded} /> : null}
         {step.id === 'review' ? (
