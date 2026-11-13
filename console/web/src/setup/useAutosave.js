@@ -107,7 +107,15 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
   const beforeSignOut = signOut?.flush;
   useEffect(() => {
     if (!beforeSignOut) return;
-    beforeSignOut.current = async () => (await flush()) && latest.current === undefined;
+    beforeSignOut.current = async () => {
+      const finished = await flush();
+      if (!finished || pending.current !== undefined) return false;
+      // A completed refusal (such as a taken name) must not trap the reader
+      // in setup. Explicit sign-out discards their copies after auth exits;
+      // stop unmount cleanup from writing the refused answer back then.
+      latest.current = undefined;
+      return true;
+    };
     return () => { beforeSignOut.current = null; };
   }, [beforeSignOut, flush]);
 

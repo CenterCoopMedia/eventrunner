@@ -176,6 +176,20 @@ describe('AppRoutes', () => {
     expect(readKeptAnswer({ userId: 'ana', orgId: 'o1', appId: 'a1' }, 'organization').answers.name).toBe('Unsaved name');
   });
 
+  it('allows explicit sign-out after a refused answer, including after moving to another step', async () => {
+    serveApi({ saveApplicationStep: (body) => ({ step: body.step, saved: false, errors: { 'webAddress.name': 'That name is taken.' } }) });
+    const auth = renderApp('/organizations/o1/applications/a1/web-address');
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken-name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByRole('heading', { name: 'Your event' });
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    expect(readKeptAnswer(scope, 'webAddress')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledTimes(1));
+    cleanup();
+    expect(readKeptAnswer(scope, 'webAddress')).toBeNull();
+  });
+
   it('forgets the saved page once a signed-in reader is past sign-in', async () => {
     window.localStorage.setItem(RETURN_KEY, '/organizations/o1');
     renderApp('/');
