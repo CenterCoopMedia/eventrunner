@@ -238,6 +238,7 @@ function PageEditor({ mode }) {
     accountId: user?.uid,
     docPath: `cmsPages/${savedId ?? pageId ?? 'new'}`,
     version: loadedVersion,
+    baseline: savedSnapshot,
     value: pageSnapshot(page),
     dirty: unsaved,
     enabled: !isReadOnlyDemo(eventConfig) && (mode === 'create' || loadedIdRef.current === pageId),
@@ -587,13 +588,13 @@ function PageEditor({ mode }) {
           : 'A local copy could not be confirmed. Copy your text before signing in again.'}>
           <button type="button" className={linkButtonClass} onClick={() => {
             localDraft.flush();
-            navigate('/signin', { state: { from: `/admin/pages/${pageId ?? 'new'}` } });
+            navigate('/signin', { state: { from: `/admin/pages/${savedId ?? pageId ?? 'new'}` } });
           }}>Sign in again</button>
         </Notice>
       ) : null}
       {localDraft.recovery ? (
         <Panel title="Unsaved text found on this browser">
-          <p>{localDraft.recovery.version !== loadedVersion
+          <p>{localDraft.recovery.baseline !== savedSnapshot
             ? 'This page changed since this copy was kept. Restoring replaces the editor with the older copy; review it before saving.'
             : 'Restore your unsaved text, or discard this local copy and use the saved page.'}</p>
           <div className="flex flex-wrap gap-sm">

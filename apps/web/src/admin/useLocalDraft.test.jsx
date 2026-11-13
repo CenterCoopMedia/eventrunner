@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearLocalDrafts, openLocalDraft } from '../lib/localDraft.js';
 import { useLocalDraft } from './useLocalDraft.js';
 
-const initial = { accountId: 'alice', docPath: 'cmsPages/faq', version: 'v1', value: 'saved', dirty: false, enabled: true };
+const initial = { accountId: 'alice', docPath: 'cmsPages/faq', version: 'v1', baseline: 'saved', value: 'saved', dirty: false, enabled: true };
 const read = () => openLocalDraft('alice', 'cmsPages/faq', 'v1').read();
 const mount = (props = initial) => renderHook((next) => useLocalDraft(next), { initialProps: props });
 beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); });
@@ -65,14 +65,14 @@ describe('local draft lifecycle', () => {
   });
 
   it('keeps the original version warning after restoring an older copy', () => {
-    openLocalDraft('alice', 'cmsPages/faq', 'old').write('older text');
+    openLocalDraft('alice', 'cmsPages/faq', 'old').write('older text', 'older baseline');
     const view = mount();
     expect(view.result.current.recovery.version).toBe('old');
     let value;
     act(() => { value = view.result.current.restore(); });
     view.rerender({ ...initial, value, dirty: true });
     view.unmount();
-    expect(read()).toMatchObject({ value: 'older text', version: 'old' });
+    expect(read()).toMatchObject({ value: 'older text', version: 'old', baseline: 'older baseline' });
   });
 
   it('keeps newer typing when an earlier save completes', () => {
@@ -85,7 +85,7 @@ describe('local draft lifecycle', () => {
   });
 
   it('does not read or write in a read-only demo', () => {
-    openLocalDraft('alice', 'cmsPages/faq', 'old').write('existing copy');
+    openLocalDraft('alice', 'cmsPages/faq', 'old').write('existing copy', 'saved');
     const set = vi.spyOn(Storage.prototype, 'setItem');
     const view = mount({ ...initial, enabled: false, value: 'demo text', dirty: true });
     expect(view.result.current.recovery).toBeNull();

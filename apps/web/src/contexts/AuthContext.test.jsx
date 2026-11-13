@@ -76,7 +76,7 @@ afterEach(() => {
 describe('same-account OTP credential refresh', () => {
   it('clears local drafts on explicit sign-out, while unexpected session loss preserves them', async () => {
     const draft = openLocalDraft(UNVERIFIED.uid, 'cmsPages/faq', 'v1');
-    draft.write('Kept text');
+    draft.write('Kept text', 'saved');
     renderAuth();
     await act(async () => publishAuth(null));
     expect(draft.read().value).toBe('Kept text');
@@ -84,7 +84,7 @@ describe('same-account OTP credential refresh', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => expect(screen.getByLabelText('Account')).toHaveTextContent('signed out'));
     expect(draft.read()).toBeNull();
-    expect(draft.write('late editor cleanup')).toBe(false);
+    expect(draft.write('late editor cleanup', 'saved')).toBe(false);
   });
 
   it('updates the rendered verification state when Firebase replaces the same UID without an auth-state event', async () => {
