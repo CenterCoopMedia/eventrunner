@@ -34,22 +34,23 @@ account exists: per-deployment servers, sender domains, tokens, and webhooks.
 
 ## 0. Postmark's object model, in the terms this repo uses
 
-Postmark's hierarchy is **Account → Server → Message Stream**. A Server Token
-(`X-Postmark-Server-Token`) is scoped to one Server; an Account Token
-(`X-Postmark-Account-Token`) is scoped to the whole account and is the only credential the
-Domains API accepts. Message Streams live *inside* a Server (a Server can hold up to 10, including
-its two defaults) and do not carry their own token — sending and webhook registration for a stream
-both authenticate with that stream's Server's token.
+Postmark groups message activity as **Account → Server → Message Stream**. Each client has its
+own Server inside the shared CCM account, and `EMAIL_PROVIDER_API_KEY` stores that Server's token
+per deployment environment. The Server Token (`X-Postmark-Server-Token`) authenticates sending,
+message activity and webhook registration for that Server. Its streams share that token; a Server
+can hold up to ten streams including defaults. See the
+[Message Streams API](https://postmarkapp.com/developer/api/message-streams-api).
 
-Because `EMAIL_PROVIDER_API_KEY` is one secret **per deployment environment** (§2.1), and a Server
-Token is the only credential scoped tightly enough to hand one client, **each client gets its own
-Server** inside the shared account, using that Server's default `Outbound` transactional stream (or
-a client-named custom stream if you want a friendlier name than the default). One client cannot
-read another's server token, sending logs, or bounce history, and revoking a client's access is
-deleting one Server — the same isolation "one account per client" would have given, without a
-separate Postmark account (and its own billing) per client. This is the practical reading of "one
-account, per-client message streams": the *stream* is the sending surface, the *Server* is the unit
-that actually carries a distinct token, so provisioning happens at the Server level.
+**Sender signatures and verified domains belong to the Account.** A verified domain or confirmed
+sender signature can be used to send through every Server in that account. Separate Servers
+organize each client's message activity and credentials; sender-domain authorization remains
+account-wide. Postmark documents these boundaries in its
+[account and Server concepts](https://postmarkapp.com/migration-guides/amazon-ses).
+
+The Account Token (`X-Postmark-Account-Token`) manages account-level resources, including the
+[Domains API](https://postmarkapp.com/developer/api/domains-api). Keep it in operator-controlled
+storage (§3). Provision each client's Server and streams (§2–2a), then verify its sender domain
+on the shared Account (§4).
 
 ## 1. One-time: the CCM account
 
@@ -180,24 +181,28 @@ check `unknown` rather than failing, so a missing key appears as "can't tell" in
 This is `docs/CLIENT_ONBOARDING.md` §3 item 4, reproduced here with the Postmark-side and (for
 `eventrunner.org`) Cloudflare-side detail. General shape: get whoever controls DNS for the sender
 domain to publish two Postmark-issued records plus one DMARC policy; Postmark shows the exact
-values once the domain is added to the Server. **Do not invent the record values below** — they are
-per-account and Postmark generates them when you add the domain; treat the ones shown here as
+values once the domain is added to the Account. **Do not invent the record values below** — they are
+per-domain and Postmark generates them when you add the domain; treat the ones shown here as
 illustrative of the *shape*, and copy the real values from Postmark's UI.
 
 ### 4a. Add the domain in Postmark
 
-Client's Server → **Sender Signatures** (or the Server's **Domains** tab) → **Add Domain** →
-enter the sender domain (`eventrunner.org` for the dev/demo deployment; a real client's own domain
-otherwise — never a `*.eventrunner.org` subdomain unless that client specifically doesn't have their
-own). Postmark then displays:
+In the shared CCM Postmark account, choose **Sender Signatures → Add Domain or Signature → Add
+Domain**. Enter the sender domain (`eventrunner.org` for the dev/demo deployment; a real client's
+own domain otherwise) and choose **Verify Domain**. Use a `*.eventrunner.org` subdomain only for
+a client without its own sender domain. The [Postmark manual](https://postmarkapp.com/manual)
+documents this account-level path.
 
-- a **DKIM** TXT record: host something like `pm._domainkey.eventrunner.org`, value a long
-  `k=rsa; p=...` string,
-- a **Return-Path** CNAME: host `pm-bounces.eventrunner.org` (the verified Return-Path host for
-  this account), value something like `pm.mtasv.net`.
+Read that domain's generated DNS records in Postmark:
 
-Copy both exactly as shown — Postmark's UI is the source of truth for the actual host/value pair,
-not this document.
+- **DKIM TXT:** use the displayed host and text value. The Domains API exposes the new or pending
+  key as `DKIMPendingHost` / `DKIMPendingTextValue`, and the active key as `DKIMHost` / `DKIMTextValue`.
+- **Return-Path CNAME:** use this domain's `ReturnPathDomain` as the host and
+  `ReturnPathDomainCNAMEValue` as the target.
+
+The [domain details response](https://postmarkapp.com/developer/api/domains-api) defines those
+fields. Copy the actual host/value pairs from the domain record; they are specific to that domain,
+and the Return-Path host can be customized. Publish them with the DNS owner in §4b.
 
 ### 4b. Publish the records — Cloudflare (eventrunner.org)
 
