@@ -1509,6 +1509,8 @@ The `deploy-identity` step also grants `roles/editor` to each `user:<support add
 
 ### 12.2 When a build fails
 
+The seed step routes platform alerts to the monitored agent inbox, `amditisjunk@gmail.com`, through `config/providers.notifier.operatorEmail`.
+
 The review page shows each step, the failed step, its error and a link to the run. Operators get an email with the same error. Fix the cause, then select **Retry the build**.
 
 The Owners get an email saying the build did not finish, with a link to the status page. That page says the same and offers **Retry the build**, and **Reconnect** when the failed step is `tickets`. It never shows the error, the run or the step detail. An Owner can retry alone, up to a daily limit.
