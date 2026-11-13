@@ -1,20 +1,7 @@
 // The signed-in attendee's home (issue #168, CJS parity M8 issue 7).
 //
-// ONE PLACE THAT ANSWERS "WHERE DO I STAND". A signed-in attendee reaches
-// /dashboard from the header's account control and sees their name, their
-// registration status, the way back to their profile form, and whatever the
-// event is saying right now. Everything on the page reads records that
-// already exist — the account document via ProfileSidebar, the live
-// updates feed via its card — so the shell carries no data of its own and
-// no new collections.
-//
-// The two cards above the fold are the ones the site already draws:
-// ProfileSidebar is the one place an attendee sees their own status (spec
-// §4.1 keeps registration out of the public projection, so it stays on this
-// side of sign-in), and LiveUpdatesCard renders nothing at all when the
-// feed is empty or the flag is off, so an event that says nothing live
-// shows no dead frame. Beneath them: the personal schedule card and the
-// event's own resource cards (issue #169).
+// The cards own their account, schedule, reply-notification and event data.
+// The shell arranges them and carries no data or subscriptions itself.
 import { Link, useOutletContext } from 'react-router';
 import AdminEntryLink from '../components/AdminEntryLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
@@ -26,6 +13,7 @@ import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
 import RegistrationReminderCard from '../components/RegistrationReminderCard.jsx';
 import MySessionsCard from '../components/dashboard/MySessionsCard.jsx';
+import NotificationInbox from '../components/dashboard/NotificationInbox.jsx';
 import ResourceCards from '../components/dashboard/ResourceCards.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
 
@@ -72,14 +60,13 @@ export default function Dashboard() {
         <AdminEntryLink account={accountViews} />
       </header>
 
-      {/* The status card and the live feed side by side where there is
-          room; the feed is the one that yields, because the status is the
-          reason the reader came. LiveUpdatesCard renders nothing when the
-          event has no feed, so an event without updates shows one card. */}
+      {/* Account cards share the responsive grid. Each card hides itself
+          when its feature or the current account's access is unavailable. */}
       <div className="mt-xl grid items-start gap-lg lg:grid-cols-2">
         {/* Draws nothing unless questions are still unanswered (ADR 0008 §5). */}
         <RegistrationReminderCard />
         <MySessionsCard />
+        <NotificationInbox />
         <ProfileSidebar />
         {features.liveUpdates ? (
           <div className="min-w-0">
