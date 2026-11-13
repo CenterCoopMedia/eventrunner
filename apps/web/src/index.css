@@ -2403,18 +2403,8 @@
    backlight, and a handout is read across a room. */
 /* Event heroes: shared content and controls, authored preset compositions. */
 @layer components {
-  .site-header-wordmark,
   .site-header-treatment .nameplate__name > a > span {
     max-inline-size: 100%;
-  }
-  .site-header-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    min-inline-size: 0;
-    overflow: hidden;
-    overflow-wrap: normal;
-    word-break: normal;
   }
   .site-header-identity,
   .site-header-treatment .nameplate__name {
@@ -2448,7 +2438,7 @@
   }
   .site-masthead__identity {
     flex: 0 0 auto;
-    max-inline-size: 15rem;
+    max-inline-size: 28rem;
     font-size: var(--text-h3);
     line-height: 1.06;
     font-weight: 700;

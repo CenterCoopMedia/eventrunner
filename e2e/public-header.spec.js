@@ -29,13 +29,14 @@ test.beforeAll(async () => {
   const { default: tailwindcss } = await import('tailwindcss');
   const { default: autoprefixer } = await import('autoprefixer');
   const { default: tailwind } = await import('../apps/web/tailwind.config.js');
+  const { default: webConfig } = await import('../apps/web/vite.config.js');
   server = await createServer({
     configFile: false, root: path.join(ROOT, 'e2e/fixtures/public-header'),
     publicDir: path.join(ROOT, 'apps/web/public'),
     plugins: [{ name: 'public-header-baseline', enforce: 'pre', load(id) { return baseline.get(id) ?? null; } }, react()],
     css: { postcss: { plugins: [tailwindcss({ ...tailwind,
       content: [`${SOURCE}/**/*.{js,jsx}`, `!${SOURCE}/**/*.test.{js,jsx}`] }), autoprefixer()] } },
-    optimizeDeps: { include: ['react', 'react-dom/client', 'react-router', 'shared/theme', 'shared/time'] },
+    optimizeDeps: webConfig.optimizeDeps,
     define: { 'globalThis.HEADER_SOURCE': JSON.stringify(SOURCE) },
     server: { host: '127.0.0.1', port: 0, fs: { allow: [ROOT] } },
   });
@@ -79,10 +80,13 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
                   const range = globalThis.document.createRange();
                   range.setStart(text, match.index);
                   range.setEnd(text, match.index + match[0].length);
-                  words.push({ word: match[0], lines: range.getClientRects().length });
+                  words.push({ word: match[0], lines: new Set([...range.getClientRects()].map((rect) => rect.y)).size,
+                    width: range.getBoundingClientRect().width });
                 }
               }
             }
+            const logo = header.querySelector('img');
+            const logoBox = logo?.getBoundingClientRect();
             return {
               width: globalThis.innerWidth,
               scrollWidth: globalThis.document.documentElement.scrollWidth,
@@ -92,6 +96,8 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
               titleScrollHeight: title.scrollHeight,
               titleScrollWidth: title.scrollWidth,
               titleClientWidth: title.clientWidth,
+              logoRatio: logoBox ? logoBox.width / logoBox.height : null,
+              naturalLogoRatio: logo ? logo.naturalWidth / logo.naturalHeight : null,
               screenReaderOnly: style?.position === 'absolute', words,
             };
           });
@@ -100,12 +106,14 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
           if (source === 'before') continue;
           expect(measured.scrollWidth).toBeLessThanOrEqual(width);
           expect(measured.linkRight).toBeLessThanOrEqual(width);
+          if (logo !== 'none') expect(measured.logoRatio).toBeCloseTo(measured.naturalLogoRatio, 2);
           if (variant !== 'minimal' || logo === 'none') {
             expect(measured.screenReaderOnly).toBe(width === 390 && logo !== 'none');
             if (!measured.screenReaderOnly) {
               expect(measured.titleHeight).toBeGreaterThan(0);
               expect(measured.titleHeight).toBeLessThanOrEqual(measured.lineHeight * 2 + 1);
               expect(measured.words.every((word) => word.lines === 1), JSON.stringify(measured.words)).toBe(true);
+              expect(measured.titleClientWidth).toBeGreaterThanOrEqual(measured.words[0].width);
             }
           }
         }

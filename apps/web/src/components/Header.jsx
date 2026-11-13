@@ -50,15 +50,15 @@ export default function Header({
   // overlay), so an unrecognized value renders the base header.
   const treatment = THEME_HEADERS.includes(variant) ? variant : DEFAULT_HEADER;
 
-  // The repeated title takes at most two lines. Beside a mark on phones,
+  // The repeated title uses one line. Beside a mark on phones,
   // it remains available to screen readers without taking layout space.
   const title = (
-    <span className={`site-header-title${mark ? ' site-header-title--with-mark' : ''}`}>
+    <span className={`site-header-title block min-w-0 truncate${mark ? ' site-header-title--with-mark' : ''}`}>
       {name}
     </span>
   );
   const wordmark = (
-    <span className="site-header-wordmark inline-flex items-start gap-xs">
+    <span className="inline-flex max-w-full items-start gap-xs">
       {mark}
       {title}
     </span>
