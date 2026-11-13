@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
+import { onCLS, onINP, onLCP } from 'web-vitals/attribution';
+import { validSample } from 'shared/webVitals';
 
 const { snapshots } = vi.hoisted(() => ({ snapshots: new Map() }));
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}) }));
@@ -26,7 +28,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-it('keeps slow-boot counts through cached config, suspends sends, and drops only on confirmed opt-out', async () => {
+it('retains counts and metrics through cached config, sends only on confirmed opt-in, and drops on opt-out', async () => {
   vi.stubEnv('PROD', true);
   vi.stubEnv('DEV', false);
   vi.stubEnv('VITE_DEMO_MODE', '0');
@@ -73,15 +75,43 @@ it('keeps slow-boot counts through cached config, suspends sends, and drops only
 
   answer(true);
   reportHeldUp();
+  const lcp = { name: 'LCP', value: 2500, id: 'private-lcp',
+    navigationURL: 'https://site.test/speakers/private?secret=x',
+    attribution: { timeToFirstByte: 100, resourceLoadDelay: 200, resourceLoadDuration: 300,
+      elementRenderDelay: 1900, target: '#private-user', url: 'https://private.example/image' } };
+  const reportLCP = onLCP.mock.calls.at(-1)[0];
+  const reportINP = onINP.mock.calls.at(-1)[0];
+  const reportCLS = onCLS.mock.calls.at(-1)[0];
+  reportLCP(lcp);
+  reportINP({ name: 'INP', value: 200, id: 'private-inp' });
+  reportCLS({ name: 'CLS', value: 0.1, id: 'private-cls' });
+  reportLCP({ ...lcp, value: 2600 });
   expect(sent()).toHaveLength(1);
   answer(false);
-  expect(sent()).toHaveLength(2);
+  expect(sent()).toEqual([
+    { route: '/attendees/:uid', device: 'mobile', name: 'held_up', value: 1 },
+    { route: '/attendees/:uid', device: 'mobile', name: 'held_up', value: 1 },
+    { route: '/speakers/:slug', device: 'mobile', name: 'LCP', value: 2500 },
+    { route: '/speakers/:slug', device: 'mobile', name: 'LCP_TTFB', value: 100 },
+    { route: '/speakers/:slug', device: 'mobile', name: 'LCP_RESOURCE_DELAY', value: 200 },
+    { route: '/speakers/:slug', device: 'mobile', name: 'LCP_RESOURCE_DURATION', value: 300 },
+    { route: '/speakers/:slug', device: 'mobile', name: 'LCP_RENDER_DELAY', value: 1900 },
+    { route: '/attendees/:uid', device: 'mobile', name: 'INP', value: 200 },
+    { route: '/attendees/:uid', device: 'mobile', name: 'CLS', value: 0.1 },
+  ]);
+  expect(sent().every(validSample)).toBe(true);
+  expect(JSON.stringify(sent())).not.toMatch(/private|secret|navigationURL|target/);
+  reportLCP(lcp);
+  expect(sent()).toHaveLength(9);
   answer(true);
   reportHeldUp();
+  reportINP({ name: 'INP', value: 300, id: 'discarded-inp' });
+  reportCLS({ name: 'CLS', value: 0.2, id: 'discarded-cls' });
   answer(false, false);
+  reportLCP({ ...lcp, id: 'disabled-lcp' });
   answer(false);
-  expect(sent()).toHaveLength(2);
+  expect(sent()).toHaveLength(9);
   reportHeldUp();
-  expect(sent()).toHaveLength(3);
+  expect(sent()).toHaveLength(10);
   setFieldVitalsEnabled(false);
 });

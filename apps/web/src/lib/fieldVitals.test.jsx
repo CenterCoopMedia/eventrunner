@@ -165,6 +165,8 @@ describe('field performance collection', () => {
     beacon.mockImplementation(() => { throw new Error('network denied'); });
     expect(() => callback(onINP)(metric('INP', 100))).not.toThrow();
     expect(beacon).toHaveBeenCalledOnce();
+    next.collector.setEnabled(null); next.collector.setEnabled(true);
+    expect(beacon).toHaveBeenCalledOnce();
     expect(frames.size).toBe(0);
   });
 
@@ -183,13 +185,23 @@ describe('field performance collection', () => {
     expect(beacon).not.toHaveBeenCalled();
   });
 
-  it('caps all outbound observations per document', async () => {
+  it.each([true, null])('caps sent and queued observations together when enablement is %s', async (enabled) => {
     const { collector } = start();
     collector.setEnabled(true);
     await paint(); await paint();
+    for (let index = 0; index < 95; index += 1) reportHeldUp();
+    collector.setEnabled(enabled);
+    callback(onLCP)(metric('LCP', 2500, { attribution: {
+      timeToFirstByte: 100, resourceLoadDelay: 200, resourceLoadDuration: 300,
+      elementRenderDelay: 1900,
+    } }));
     for (let index = 0; index < 110; index += 1) reportHeldUp();
-    callback(onLCP)(metric('LCP', 100));
+    expect(beacon).toHaveBeenCalledTimes(enabled === true ? 100 : 95);
+    collector.setEnabled(true);
     expect(beacon).toHaveBeenCalledTimes(100);
+    expect(samples().slice(95).map(({ name }) => name)).toEqual([
+      'LCP', 'LCP_TTFB', 'LCP_RESOURCE_DELAY', 'LCP_RESOURCE_DURATION', 'LCP_RENDER_DELAY',
+    ]);
   });
 });
 
