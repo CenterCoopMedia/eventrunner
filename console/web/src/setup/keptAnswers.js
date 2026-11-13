@@ -35,6 +35,14 @@ export function removeKeptAnswer(scope, value) {
   }
 }
 
+export function clearKeptAnswer(scope, step) {
+  try {
+    window.sessionStorage.removeItem(key(scope, step));
+  } catch {
+    // Storage can be blocked.
+  }
+}
+
 export function clearKeptAnswers(userId) {
   try {
     const prefix = userPrefix(userId);

@@ -115,7 +115,7 @@ describe('useAutosave', () => {
     expect(readKeptAnswer(scope, 'event')).toBeNull();
   });
 
-  it('keeps a failed answer until its successful retry, scoped to the reader, request and step', async () => {
+  it.each([false, true])('clears a failed answer after saving its retry or correction (corrected=%s), scoped to the reader, request and step', async (corrected) => {
     const save = vi.fn().mockRejectedValueOnce(new Error('Offline')).mockResolvedValue({ saved: true });
     const value = { step: 'event', answers: { name: 'Retry me' } };
     const { result } = renderHook(() => useAutosave({ save, scope }));
@@ -125,6 +125,7 @@ describe('useAutosave', () => {
     expect(readKeptAnswer({ ...scope, userId: 'other' }, 'event')).toBeNull();
     expect(readKeptAnswer({ ...scope, appId: 'a2' }, 'event')).toBeNull();
     expect(readKeptAnswer(scope, 'email')).toBeNull();
+    if (corrected) act(() => result.current.queue({ step: 'event', answers: { name: 'Corrected answer' } }));
     await act(async () => { await result.current.flush(); });
     expect(readKeptAnswer(scope, 'event')).toBeNull();
   });

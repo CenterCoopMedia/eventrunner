@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { keepAnswer, removeKeptAnswer } from './keptAnswers.js';
+import { clearKeptAnswer, keepAnswer, removeKeptAnswer } from './keptAnswers.js';
 
 // The masthead waits for the mounted setup's save before signing out.
 export const SetupSaveContext = createContext(null);
@@ -59,8 +59,10 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
         setError('');
         if (result?.saved === false) keepUnsaved(entry, latest.current);
         else {
-          removeKeptAnswer(savedScope, value);
-          if (latest.current === entry) latest.current = undefined;
+          if (latest.current === entry) {
+            clearKeptAnswer(savedScope, value.step);
+            latest.current = undefined;
+          } else removeKeptAnswer(savedScope, value);
         }
         // A newer value queued during this save is still waiting: say so,
         // not 'saved', until its own save lands.
