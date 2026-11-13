@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { callApi } from '../../api.js';
 import { application, callsTo, emptyAnswers, serveApi } from '../../test/application.js';
 import { renderSetup } from '../../test/setupPage.jsx';
+import { keepAnswer, readKeptAnswer } from '../../setup/keptAnswers.js';
 
 vi.mock('../../api.js', () => ({ callApi: vi.fn() }));
 
@@ -21,6 +22,62 @@ function setupViewport(wide) {
 }
 
 describe('Setup', () => {
+  it.each(['use', 'discard'])('offers a failed answer after reload and lets the reader %s it explicitly', async (choice) => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    serveApi({ saveApplicationStep: () => { throw new Error('Offline'); } });
+    const first = renderSetup('organization');
+    const field = await screen.findByLabelText('Organization name');
+    fireEvent.change(field, { target: { value: 'Unsaved organization' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
+    await screen.findByText(/Not saved/);
+    await act(async () => first.unmount());
+    serveApi();
+    callApi.mockClear();
+    renderSetup('organization');
+    const use = await screen.findByRole('button', { name: 'Use kept answer' });
+    expect(screen.getByLabelText('Organization name')).toHaveValue('NC Local');
+    expect(callsTo('saveApplicationStep')).toHaveLength(0);
+    fireEvent.click(choice === 'use' ? use : screen.getByRole('button', { name: 'Discard kept answer' }));
+    expect(screen.queryByRole('button', { name: 'Use kept answer' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Organization name')).toHaveFocus();
+    if (choice === 'use') {
+      expect(screen.getByLabelText('Organization name')).toHaveValue('Unsaved organization');
+      fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
+      await screen.findByRole('heading', { name: 'Your event' });
+      expect(callsTo('saveApplicationStep')[0].answers.name).toBe('Unsaved organization');
+    }
+    expect(readKeptAnswer(scope, 'organization')).toBeNull();
+  });
+
+  it('offers no answer from another user in this tab', async () => {
+    keepAnswer({ userId: 'someone-else', orgId: 'o1', appId: 'a1' }, { step: 'organization', answers: { name: 'Private answer' } });
+    renderSetup('organization');
+    await screen.findByLabelText('Organization name');
+    expect(screen.queryByRole('button', { name: 'Use kept answer' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Organization name')).toHaveValue('NC Local');
+  });
+
+  it('keeps a refused answer after another step saves and the optimistic answer is shown again', async () => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    serveApi({ saveApplicationStep: (body) => ({ step: body.step, saved: body.step !== 'webAddress',
+      answers: body.answers, errors: body.step === 'webAddress' ? { 'webAddress.name': 'That name is taken.' } : {} }) });
+    const first = renderSetup('web-address');
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken-name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.change(await screen.findByLabelText('Event name'), { target: { value: 'Saved event edit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your web address' }));
+    expect(await screen.findByLabelText('Name')).toHaveValue('taken-name');
+    expect(screen.getByRole('button', { name: 'Use kept answer' })).toBeInTheDocument();
+    expect(readKeptAnswer(scope, 'webAddress').answers.name).toBe('taken-name');
+    await act(async () => first.unmount());
+    serveApi();
+    renderSetup('web-address');
+    expect(await screen.findByRole('button', { name: 'Use kept answer' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveValue('nclocal');
+    fireEvent.click(screen.getByRole('button', { name: 'Use kept answer' }));
+    expect(screen.getByLabelText('Name')).toHaveValue('taken-name');
+  });
+
   it('shows one step per page with a step list, its progress and the current step', async () => {
     serveApi({
       getApplication: { application: application({ progress: { organization: true, event: true, team: true } }) },

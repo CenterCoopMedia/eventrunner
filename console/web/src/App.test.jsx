@@ -7,6 +7,7 @@ import { AuthContext, RETURN_KEY } from './auth.jsx';
 import { fakeAuth } from './test/renderPage.jsx';
 import { AppRoutes } from './App.jsx';
 import { application, serveApi, team } from './test/application.js';
+import { keepAnswer, readKeptAnswer } from './setup/keptAnswers.js';
 
 vi.mock('./api.js', () => ({ callApi: vi.fn(async () => ({ operator: false, organizations: [{ id: 'o1', name: 'Org', role: 'owner' }] })) }));
 
@@ -139,6 +140,54 @@ describe('AppRoutes', () => {
     const auth = renderApp('/');
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => expect(auth.signOut).toHaveBeenCalled());
+  });
+
+  it('saves a fresh keystroke before masthead sign-out and clears only that reader’s copies', async () => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    const other = { ...scope, userId: 'dee' };
+    const old = { step: 'email', answers: { senderName: 'Kept email' } };
+    keepAnswer(scope, old);
+    keepAnswer(other, old);
+    let finish;
+    serveApi({ saveApplicationStep: (body) => new Promise((resolve) => {
+      finish = () => resolve({ step: body.step, saved: true, errors: {} });
+    }) });
+    const auth = renderApp('/organizations/o1/applications/a1/organization');
+    fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'New organization' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(finish).toBeTypeOf('function'));
+    expect(auth.signOut).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Organization name')).toBeDisabled();
+    await act(async () => finish());
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledTimes(1));
+    expect(callApi.mock.calls.find(([name]) => name === 'saveApplicationStep')[1].answers.name).toBe('New organization');
+    expect(readKeptAnswer(scope, 'email')).toBeNull();
+    expect(readKeptAnswer(scope, 'organization')).toBeNull();
+    expect(readKeptAnswer(other, 'email')).toEqual(old);
+  });
+
+  it('keeps the reader signed in with their copy when the pre-sign-out save fails', async () => {
+    serveApi({ saveApplicationStep: () => { throw new Error('Offline'); } });
+    const auth = renderApp('/organizations/o1/applications/a1/organization');
+    fireEvent.change(await screen.findByLabelText('Organization name'), { target: { value: 'Unsaved name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByText('Your answer was not saved. Save it before signing out.')).toBeInTheDocument();
+    expect(auth.signOut).not.toHaveBeenCalled();
+    expect(readKeptAnswer({ userId: 'ana', orgId: 'o1', appId: 'a1' }, 'organization').answers.name).toBe('Unsaved name');
+  });
+
+  it('allows explicit sign-out after a refused answer, including after moving to another step', async () => {
+    serveApi({ saveApplicationStep: (body) => ({ step: body.step, saved: false, errors: { 'webAddress.name': 'That name is taken.' } }) });
+    const auth = renderApp('/organizations/o1/applications/a1/web-address');
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'taken-name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByRole('heading', { name: 'Your event' });
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    expect(readKeptAnswer(scope, 'webAddress')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(auth.signOut).toHaveBeenCalledTimes(1));
+    cleanup();
+    expect(readKeptAnswer(scope, 'webAddress')).toBeNull();
   });
 
   it('forgets the saved page once a signed-in reader is past sign-in', async () => {

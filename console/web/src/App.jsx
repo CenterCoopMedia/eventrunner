@@ -7,6 +7,8 @@ import SignInFinish from './pages/SignInFinish.jsx';
 import LoadingState from './LoadingState.jsx';
 import ReportProblem from './ReportProblem.jsx';
 import RouteBoundary, { lazyPage } from './RouteBoundary.jsx';
+import { SetupSaveContext } from './setup/useAutosave.js';
+import { clearKeptAnswers } from './setup/keptAnswers.js';
 
 const AcceptInvite = lazyPage(() => import('./pages/AcceptInvite.jsx'));
 const AcceptedAgreement = lazyPage(() => import('./pages/AcceptedAgreement.jsx'));
@@ -58,7 +60,31 @@ function Layout() {
   const helpName = import.meta.env.VITE_CONSOLE_HELP_NAME?.trim();
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
+  const beforeSignOut = useRef(null);
+  const signOutPending = useRef(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
   useFocusHeadingOnNavigate();
+
+  async function leave() {
+    if (signOutPending.current) return;
+    signOutPending.current = true;
+    setSigningOut(true);
+    setSignOutError('');
+    try {
+      if (beforeSignOut.current && !await beforeSignOut.current()) {
+        setSignOutError('Your answer was not saved. Save it before signing out.');
+        return;
+      }
+      await signOut();
+      clearKeptAnswers(user.uid);
+    } catch {
+      setSignOutError('We could not sign you out. Try again.');
+    } finally {
+      signOutPending.current = false;
+      setSigningOut(false);
+    }
+  }
 
   useEffect(() => {
     // An unconfirmed reader still has to come back here from the emailed link.
@@ -75,14 +101,17 @@ function Layout() {
             <div className="account">
               <span className="account-email">{user.email}</span>
               {user.emailVerified ? <ReportProblem /> : null}
-              <button type="button" className="button quiet" onClick={() => signOut()}>Sign out</button>
+              <button type="button" className="button quiet" disabled={signingOut} onClick={leave}>Sign out</button>
             </div>
           ) : null}
         </div>
       </header>
       <main id="main" tabIndex={-1} className="page">
+        {signOutError ? <p className="message error" role="alert">{signOutError}</p> : null}
         <RouteBoundary resetKey={pathname}>
-          <Outlet />
+          <SetupSaveContext.Provider value={{ flush: beforeSignOut, signingOut }}>
+            <Outlet />
+          </SetupSaveContext.Provider>
         </RouteBoundary>
         {helpEmail ? <p className="muted section">{helpName ? `Need a hand? Email ${helpName} at ` : 'Need the hosting team? Email '}<a href={`mailto:${helpEmail}`}>{helpEmail}</a>.</p> : null}
       </main>
