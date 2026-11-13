@@ -99,14 +99,25 @@ async function saveSubmission({ db, speakerId, uid, fields, now }) {
 }
 
 async function notifyOrganizers({ db, getConfig, sendEmail, speakerId, speaker, submission }) {
-  // Recheck policy and identity after the save, before preparing private mail.
-  const policy = await checkDemoWrites({ db });
-  if (!policy.ok) return { state: 'failed' };
-  const current = await db.collection('speakers').doc(speakerId).get();
-  const stored = current.exists ? current.data() : null;
-  if (!owns(stored, speaker.uid)
-      || stored.discussionPoints?.revision !== submission.revision
-      || stored.discussionPoints?.requestId !== submission.requestId) return { state: 'unknown' };
+  const ref = db.collection('speakers').doc(speakerId);
+  const skipped = await db.runTransaction(async (tx) => {
+    const policy = await checkDemoWrites({ db, transaction: tx });
+    if (!policy.ok) return { state: 'failed' };
+    const current = await tx.get(ref);
+    const stored = current.exists ? current.data() : null;
+    if (!owns(stored, speaker.uid)) return { state: 'unknown' };
+    const saved = stored.discussionPoints;
+    if (saved?.revision === submission.revision && saved?.requestId === submission.requestId) return null;
+    // No mail was attempted for this superseded save. Release only its unused
+    // reservation, preserving the newer text and its omitted notification.
+    if (Number.isFinite(submission.notificationWindowStartedAt)
+        && saved?.notificationWindowStartedAt === submission.notificationWindowStartedAt
+        && saved?.notification?.state === 'omitted') {
+      tx.update(ref, { discussionPoints: { ...saved, notificationWindowStartedAt: null } });
+    }
+    return { state: 'unknown' };
+  });
+  if (skipped) return skipped;
   const eventSnap = await db.collection('config').doc('event').get();
   const address = eventSnap.data()?.legal?.supportEmail;
   if (typeof address !== 'string' || !address.trim()) return { state: 'omitted' };

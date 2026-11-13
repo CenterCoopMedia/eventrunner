@@ -279,6 +279,41 @@ test('one speaker cannot consume another speaker notification window', async () 
   assert.equal(h.sent.length, 2);
 });
 
+test('a superseded save releases its unused window without sending either stale text or a replay', async () => {
+  const h = makeHarness();
+  const transaction = h.db.runTransaction.bind(h.db);
+  let superseded = false;
+  let newer;
+  h.db.runTransaction = async (fn) => {
+    const result = await transaction(fn);
+    if (!superseded && result?.submission?.requestId === REQUEST_1) {
+      superseded = true;
+      newer = await h.save('owner', body('Newer question.', REQUEST_2, 1));
+    }
+    return result;
+  };
+
+  const older = await h.save('owner', body('Superseded question.'));
+  assert.equal(older.statusCode, 409);
+  assert.equal(newer.statusCode, 200);
+  assert.equal(newer.body.submission.notification.state, 'omitted');
+  const current = h.db.read('speakers', 's1').discussionPoints;
+  assert.equal(current.text, 'Newer question.');
+  assert.equal(current.revision, 2);
+  assert.equal(current.notificationWindowStartedAt, null);
+  assert.equal(h.sent.length, 0, 'superseded text and the omitted newer update do not send');
+
+  const replay = await h.save('owner', body('Newer question.', REQUEST_2, 1));
+  assert.equal(replay.body.replay, true);
+  assert.equal(replay.body.submission.notification.state, 'omitted');
+  assert.equal(h.sent.length, 0, 'replay does not resend the newer update');
+  const next = await h.save('owner', body('Next explicit update.', 'request_next_update', 2));
+  assert.equal(next.statusCode, 200);
+  assert.equal(next.body.submission.notification.state, 'accepted');
+  assert.equal(h.sent.length, 1, 'an explicit update can use the released window immediately');
+  assert.equal(h.db.read('speakers', 's1').discussionPoints.text, 'Next explicit update.');
+});
+
 test('failed and ambiguous notification attempts keep their window while later saves still store', async () => {
   for (const result of [{ status: 'failed' }, { status: 'failed', ambiguous: true }]) {
     let sends = 0;
