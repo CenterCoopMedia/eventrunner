@@ -10,7 +10,8 @@ const attribution = new RegExp(RULESET_PATTERN.slice(5), 'im');
 const MODEL = String.raw`(?:claude|opus|sonnet|haiku|codex|gpt(?:[- ]?\d[\w.-]*)?|chatgpt|openai|anthropic|gemini|copilot|cursor|grok|kimi|qwen|deepseek|llama|windsurf|aider)`;
 const LINE_START = String.raw`^[ \t]*(?:(?:[-*+>]|\d+[.)]|#{1,6})[ \t]+)?[*_\[]*`;
 const namedModel = new RegExp(String.raw`^[ \t*_:\[(]*(?:(?:passed|completed|performed|provided|verified|by|with|using|via|the)[ \t:()_*\[]+)*${MODEL}\b`, 'i');
-const parenthesizedModel = new RegExp(String.raw`^[ \t]*\([ \t]*${MODEL}\b(?:[ \t]+(?:${MODEL}|v?\d[\w.-]*|code|low|medium|high|xhigh)){0,6}[ \t]*\)[ \t]*$`, 'i');
+const EFFORT = String.raw`(?:low|medium|high|xhigh)(?:[ \t]+effort)?`;
+const parenthesizedModel = new RegExp(String.raw`^[ \t]*\([ \t]*${MODEL}\b(?:[ \t]+(?:${MODEL}|v?\d[\w.-]*|code)){0,6}(?:(?:[ \t]*,[ \t]*|[ \t]+)(?:${EFFORT}|\([ \t]*${EFFORT}[ \t]*\)))?[ \t]*\)[ \t]*$`, 'i');
 const reviewLabel = new RegExp(String.raw`${LINE_START}(?:(?:independent|full[- ]diff|cross[- ](?:model|family)|local|code|security|final|peer|automated)[ \t]+)*(?:(?:review(?:er|ed)?|credits?|attribution)\b([^\r\n]*?)(?::|=|[ \t]+-[ \t]+|\bby\b|\bwith\b|\busing\b)|(?:written|authored|generated|checked|approved)[ \t]+(?:by|with|using)\b|co[- ]authored[- ]by[ \t]*:)([^\r\n]*)`, 'i');
 const reviewerFirst = new RegExp(String.raw`${LINE_START}\b${MODEL}\b(?:[ \t]+(?:${MODEL}|v?\d[\w.-]*|\((?:low|medium|high|xhigh)\)|code|cross[- ](?:model|family)|full[- ]diff|security|independent|local)){0,6}[*_\]]*[ \t]+(?:review(?:ed|er)?|authored|generated|wrote|checked|approved)\b`, 'i');
 
