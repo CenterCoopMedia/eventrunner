@@ -151,7 +151,13 @@ test('email preview stays isolated and version disclosures show stored text', as
   const preview = log.locator('iframe');
   await expect(preview).toHaveAttribute('sandbox', '');
   await expect(preview).toHaveAttribute('referrerpolicy', 'no-referrer');
-  await expect(preview.contentFrame().locator('a[href], img, script')).toHaveCount(0);
+  const previewDocument = preview.contentFrame();
+  await expect(previewDocument.locator('a[href], area[href]')).toHaveCount(0);
+  await expect(previewDocument.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute('content', /default-src 'none'; img-src data:/);
+  // Stored images remain in the document. CSP blocks their remote fetch;
+  // the page request guard also fails if a request escapes that boundary.
+  await expect(previewDocument.getByAltText('Example image')).toHaveAttribute('src', 'https://example.test/image.png');
+  expect(await previewDocument.getByAltText('Example image').evaluate((image) => image.naturalWidth)).toBe(0);
   await log.getByLabel('Email preview example state').selectOption('error');
   await log.getByRole('button', { name: 'Retry preview' }).click();
   await expect(log.locator('iframe')).toBeVisible();

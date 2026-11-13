@@ -212,5 +212,8 @@ These shared rules apply to Admin record lists and title bands:
 - Admin session day labels use `resolveDayLabel` in `apps/web/src/admin/sessionDoc.js`; an empty label receives the formatted date.
 - Admin record states keep their words. `Live` uses normal weight; draft, unpublished, caution and error states keep their emphasis. Generic success and access-tier badges are unchanged.
 - Admin title descriptions use `text-wrap: pretty`, for short and long copy at phone and desktop widths.
+
+## 12. Defects noticed on the way
+
 - Media widgets read `brand-*` names instead of tier 2 roles. Filed as an issue.
 - The motif asset test measures only the fauna set. Wave 3 extends it.

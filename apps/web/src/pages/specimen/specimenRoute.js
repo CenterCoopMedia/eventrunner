@@ -6,9 +6,9 @@
 // compile to a constant, so a client production build drops the branch and
 // never emits the chunk.
 //
-// The page's dynamic import lives here, beside the gate, and routes.jsx is the
-// only caller. The gate is also a pure function so a test can state the
-// whole truth table without a build.
+// The page imports live here, beside the gate. The route registry and root
+// document selector use these loaders. The gate is also a pure function so
+// a test can state the whole truth table without a build.
 import { IS_DEMO } from '../../lib/demoMode.js';
 
 /** The route path, relative to the site root. */

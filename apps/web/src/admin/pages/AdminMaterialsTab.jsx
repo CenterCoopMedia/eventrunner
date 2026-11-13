@@ -42,10 +42,8 @@ import { MAX_ARCHIVE_FILES, downloadMaterialsArchive } from '../materialsArchive
 import {
   Panel,
   ServerErrorSummary,
-  SelectField,
   TextField,
   Notice,
-  linkButtonClass,
   primaryButtonClass,
   rowMetaClass,
   rowTitleLinkClass,
