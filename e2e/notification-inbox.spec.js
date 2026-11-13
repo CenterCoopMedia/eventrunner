@@ -110,7 +110,7 @@ test.describe.serial('reply notification inbox', () => {
     else if (savedBootstrap) await db.doc('config/bootstrap').delete();
   });
 
-  test('only the root owner receives the reply notification', async ({}, testInfo) => {
+  test('only the root owner receives the reply notification', async ({ browserName }, testInfo) => {
     await Promise.all([ownerPage, replierPage, thirdPage].map((page) => page.goto('/dashboard')));
     await expect(list(ownerPage).getByRole('listitem')).toHaveCount(1);
     await expect(rowForRoot(ownerPage, rootId)).toContainText('Someone replied to your post.');
@@ -122,15 +122,15 @@ test.describe.serial('reply notification inbox', () => {
     await db.doc('config/features').set({ ...openFeatures, socialFeed: false, attendeeDirectory: false });
     await expect(panel(ownerPage)).toHaveCount(0);
     await ownerPage.setViewportSize({ width: 390, height: 844 });
-    await capture(ownerPage, 'phone-baseline-flags-off', testInfo);
+    await capture(ownerPage, `phone-baseline-flags-off-${browserName}`, testInfo);
     await ownerPage.setViewportSize({ width: 1280, height: 800 });
-    await capture(ownerPage, 'desktop-baseline-flags-off', testInfo);
+    await capture(ownerPage, `desktop-baseline-flags-off-${browserName}`, testInfo);
     await db.doc('config/features').set(openFeatures);
     await expect(rowForRoot(ownerPage, rootId)).toBeVisible();
     await ownerPage.setViewportSize({ width: 390, height: 844 });
-    await capture(ownerPage, 'phone-result', testInfo);
+    await capture(ownerPage, `phone-result-${browserName}`, testInfo);
     await ownerPage.setViewportSize({ width: 1280, height: 800 });
-    await capture(ownerPage, 'desktop-result', testInfo);
+    await capture(ownerPage, `desktop-result-${browserName}`, testInfo);
   });
 
   test('keyboard read survives a retry and reload', async () => {
