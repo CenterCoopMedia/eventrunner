@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { JSDOM } from 'jsdom';
 import { isDemoModeFlag } from './src/lib/demoModeFlag.js';
 import { snapshotViewport } from './src/lib/snapshotViewport.js';
 
@@ -56,11 +57,14 @@ export function snapshotHtml() {
 }
 
 export function injectSnapshotHtml(html, { routes, attributes, display }) {
-  const modules = [];
-  const page = html.replace(/<script\b(?=[^>]*\btype=["']module["'])[^>]*>[\s\S]*?<\/script>|<link\b(?=[^>]*\brel=["']modulepreload["'])[^>]*>/gi, (tag) => {
-    modules.push(tag);
-    return '';
+  const dom = new JSDOM(html);
+  const modules = [...dom.window.document.querySelectorAll('script[type="module"], link[rel="modulepreload"]')].map((tag) => {
+    const markup = tag.outerHTML;
+    tag.remove();
+    return markup;
   });
+  const page = dom.serialize();
+  dom.window.close();
   // Keep Vite's exact resource tags in the document (and bundle budget),
   // but let the static content paint before starting their requests.
   const entry = `<template id="app-modules">${modules.join('\n')}</template>`;
@@ -101,11 +105,13 @@ export function injectSnapshotHtml(html, { routes, attributes, display }) {
   const bootstrap = `<script>
     (() => {
       const entry = document.getElementById('app-modules');
+      let paintObserver;
       const onVisibility = () => {
         if (document.visibilityState === 'hidden') startEntry();
       };
       const startEntry = () => {
         if (!entry.isConnected) return;
+        paintObserver?.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);
         for (const source of entry.content.children) {
           const tag = document.createElement(source.localName);
@@ -138,10 +144,13 @@ export function injectSnapshotHtml(html, { routes, attributes, display }) {
       for (const [name, value] of Object.entries(attributes)) {
         if (value) document.documentElement.setAttribute(name, value);
       }
-      if (document.visibilityState === 'hidden') startEntry();
+      if (document.visibilityState === 'hidden' || !window.PerformanceObserver?.supportedEntryTypes?.includes('paint')) startEntry();
       else {
         document.addEventListener('visibilitychange', onVisibility);
-        window.requestAnimationFrame(() => window.requestAnimationFrame(startEntry));
+        paintObserver = new window.PerformanceObserver((list) => {
+          if (list.getEntries().some(({ name }) => name === 'first-contentful-paint')) startEntry();
+        });
+        paintObserver.observe({ type: 'paint', buffered: true });
       }
     })();
   </script>`;
