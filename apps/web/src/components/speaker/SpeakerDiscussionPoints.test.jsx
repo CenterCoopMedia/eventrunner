@@ -63,6 +63,20 @@ describe('speaker-wide private discussion draft', () => {
     expect(screen.getByRole('status')).not.toHaveTextContent('Your discussion points are saved.');
   });
 
+  it('keeps the discussion field and keyboard focus when a session becomes visible', async () => {
+    fetch.mockResolvedValueOnce(response({ submission: null }));
+    const mounted = render(hub(OWNER, 'speaker-own', []));
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled());
+    edit('Keep this draft while scheduling changes.');
+    const field = screen.getByRole('textbox');
+    field.focus();
+    mounted.rerender(hub());
+    expect(screen.getByRole('tab', { name: 'Discussion points' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('textbox')).toHaveValue('Keep this draft while scheduling changes.');
+    expect(field).toHaveFocus();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('does not announce a successful save after a 400 refusal', async () => {
     fetch.mockResolvedValueOnce(response({ submission: STORED })).mockResolvedValueOnce(failure(400));
     render(hub()); openDiscussion(); await screen.findByDisplayValue(STORED.text);

@@ -92,7 +92,7 @@ function SpeakerSessionHubContent({
     [eventConfig, scheduleData, speakerId],
   );
   const [selectedId, setSelectedId] = useState(() => sessions[0]?.id ?? '');
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState(() => sessions.length ? 'details' : 'discussion');
   const openedFromLink = useRef(false);
   const selectedSession = sessions.find((session) => session.id === selectedId) ?? sessions[0] ?? null;
   const requestedTargetId = sessions.find((session) => session.id === requestedSessionId)?.id ?? null;
@@ -103,6 +103,7 @@ function SpeakerSessionHubContent({
   useEffect(() => {
     const nextId = selectedSession?.id ?? '';
     if (selectedId !== nextId) setSelectedId(nextId);
+    if (!selectedSession) setActiveTab('discussion');
   }, [selectedId, selectedSession]);
 
   useEffect(() => {
@@ -134,7 +135,7 @@ function SpeakerSessionHubContent({
         <div className="mt-md">
           <Tabs value={selectedSession ? activeTab : 'discussion'} onChange={setActiveTab}
             tabs={selectedSession ? TAB_IDS : ['discussion']}>
-            <TabList label="Session information and speaker discussion points">
+            <TabList label={selectedSession ? 'Session information and speaker discussion points' : 'Speaker discussion points'}>
               {selectedSession ? (
                 <>
                   <Tab id="details">Details</Tab>

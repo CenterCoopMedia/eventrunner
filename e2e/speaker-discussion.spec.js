@@ -114,7 +114,7 @@ test.describe.serial('speaker discussion points', () => {
     const field = page.getByRole('textbox', { name: 'Discussion points' });
     await expect(field).toBeEnabled();
     await field.fill('Discussion points before my session is public.');
-    await page.getByRole('button', { name: 'Replace saved discussion points' }).click();
+    await page.getByRole('button', { name: /^(Save discussion points|Replace saved discussion points)$/ }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Your discussion points are saved.' })).toBeVisible();
     const read = await callFunction('getSpeakerDiscussionPoints', { speakerId }, await idTokenFor(uid));
     expect(read.status).toBe(200);
