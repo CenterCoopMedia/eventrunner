@@ -119,7 +119,7 @@ function validateOverridePayload(id, payload) {
   const errors = [];
   for (const key of Object.keys(payload)) {
     if (OVERRIDE_KEYS.includes(key)) continue;
-    if (['tokens', 'requiredTokens', 'storeRendered'].includes(key)) {
+    if (['tokens', 'requiredTokens', 'storeRendered', 'redactAuditErrors'].includes(key)) {
       errors.push(`${key} may not be overridden`);
     } else {
       errors.push(`unknown key: ${key}`);

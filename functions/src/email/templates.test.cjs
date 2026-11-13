@@ -549,12 +549,14 @@ test('rejects protected keys by name and unknown keys', () => {
     tokens: ['code'],
     requiredTokens: [],
     storeRendered: true,
+    redactAuditErrors: true,
     banana: 'x',
   });
   assert.equal(res.ok, false);
   assert.ok(res.errors.includes('tokens may not be overridden'));
   assert.ok(res.errors.includes('requiredTokens may not be overridden'));
   assert.ok(res.errors.includes('storeRendered may not be overridden'));
+  assert.ok(res.errors.includes('redactAuditErrors may not be overridden'));
   assert.ok(res.errors.includes('unknown key: banana'));
 });
 

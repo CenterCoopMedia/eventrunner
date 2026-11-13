@@ -45,4 +45,5 @@ module.exports = {
   ],
   requiredTokens: ['speaker_name', 'discussion_points', 'submission_revision', 'submitted_at'],
   storeRendered: false,
+  redactAuditErrors: true,
 };

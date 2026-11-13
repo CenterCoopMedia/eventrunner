@@ -215,7 +215,9 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
   /**
    * @param {object} message EmailMessage (spec §3.1): { to, from?, replyTo?,
    *   subject, text?, html?, headers?, tag?, onceKey?, idempotencyKey?,
-   *   source?, storeRendered?, auditRedact?, cc?, attachments?, sendId? }. `auditRedact` is a list of
+   *   source?, storeRendered?, redactAuditErrors?, auditRedact?, cc?, attachments?, sendId? }.
+   *   `redactAuditErrors` omits provider failure details from the audit only;
+   *   core validation errors remain visible. `auditRedact` is a list of
    *   { find, replace } pairs applied to the bodies the audit row stores,
    *   never to the mail sent: a per-recipient secret such as a signed
    *   unsubscribe link stays out of the admin-readable log. `cc` is one
@@ -230,7 +232,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    * One sent_emails row per permitted send() call, whatever the outcome.
    * @returns {Promise<boolean>} whether the row was written
    */
-  async function writeAuditRow(message, fromEmail, toEmail, outcome) {
+  async function writeAuditRow(message, fromEmail, toEmail, outcome, providerError = false) {
     const bodyStored = message.storeRendered !== false;
     const redact = (body) => (typeof body === 'string' && Array.isArray(message.auditRedact)
       ? message.auditRedact.reduce((out, { find, replace }) => (find ? out.split(find).join(replace ?? '') : out), body)
@@ -252,9 +254,9 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         // A private template can carry submitted prose. Providers and relays
         // may echo request content in a refusal, so its raw error belongs to
         // the caller's immediate result only, never the admin-readable audit.
-        error: bodyStored
-          ? outcome.error ?? null
-          : outcome.error == null ? null : 'Private message failure details omitted.',
+        error: message.redactAuditErrors === true && providerError && outcome.error != null
+          ? 'Private message failure details omitted.'
+          : outcome.error ?? null,
         retries: outcome.retries,
         bodyStored,
         html: html.value,
@@ -363,7 +365,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     };
 
     // Audit what was actually handed to the adapter (footer included).
-    await writeAuditRow(fullMessage, fullMessage.from?.email || null, toEmail, outcome);
+    await writeAuditRow(fullMessage, fullMessage.from?.email || null, toEmail, outcome, true);
     return outcome;
   }
 
@@ -477,6 +479,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     claimed.sort((a, b) => a - b);
 
     const attemptsOf = new Map();
+    const providerErrors = new Set();
     let pending = claimed;
     let attempt = 0;
     while (pending.length > 0 && attempt < MAX_ATTEMPTS) {
@@ -487,6 +490,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       } catch (err) {
         for (const index of pending) {
           attemptsOf.set(index, attempt);
+          providerErrors.add(index);
           results[index] = {
             providerMessageId: null,
             status: 'failed',
@@ -500,6 +504,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       const retry = [];
       pending.forEach((index, position) => {
         attemptsOf.set(index, attempt);
+        providerErrors.delete(index);
         const result = Array.isArray(answer) ? answer[position] : undefined;
         if (!result || typeof result !== 'object') {
           results[index] = {
@@ -511,6 +516,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
           return;
         }
         results[index] = result;
+        providerErrors.add(index);
         if (isRetryable(result) && attempt < MAX_ATTEMPTS) retry.push(index);
       });
       pending = retry;
@@ -534,7 +540,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       const message = resolved[index];
       // A lost audit row never changes the provider's answer; the caller
       // reports the gap (issue #497).
-      if (!await writeAuditRow(message, message.from?.email || null, recipientEmail(message), outcome)) {
+      if (!await writeAuditRow(message, message.from?.email || null, recipientEmail(message), outcome, providerErrors.has(index))) {
         outcome.auditFailed = true;
       }
       return [index, outcome];

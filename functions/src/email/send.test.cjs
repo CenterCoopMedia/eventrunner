@@ -4,6 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { createEmailCore, createDeliveryWebhookHandler, internals } = require('./send.cjs');
+const { render } = require('./render.cjs');
+const { getDefaultTemplate, listTemplateIds } = require('./templates.cjs');
 
 // --- Fakes -----------------------------------------------------------------
 
@@ -212,39 +214,76 @@ test('storeRendered:false suppresses body storage (auth mail)', async () => {
   assert.equal(row.templateId, null);
 });
 
-test('storeRendered:false keeps provider errors containing private text out of the audit row', async () => {
-  const secret = 'Private discussion point: <do not publish>';
-  const db = fakeDb();
-  const { core: c } = core({
-    db,
-    provider: {
-      name: 'x',
-      send: async () => ({
-        providerMessageId: null,
-        status: 'failed',
-        providerStatus: 422,
-        error: `Provider rejected: ${secret}`,
-      }),
-    },
-  });
-  const result = await c.send({
-    to: 'organizer@example.org',
-    subject: `New submission: ${secret}`,
-    html: `<p>${secret}</p>`,
-    text: secret,
-    tag: 'speaker.discussion_points',
-    storeRendered: false,
-  });
+for (const thrown of [false, true]) {
+  test(`discussion-points provider ${thrown ? 'exceptions' : 'refusals'} stay out of the audit row`, async () => {
+    const secret = 'Private discussion point: <do not publish>';
+    const db = fakeDb();
+    const { core: c } = core({
+      db,
+      provider: {
+        name: 'x',
+        send: async () => {
+          if (thrown) throw new Error(`Provider rejected: ${secret}`);
+          return { providerMessageId: null, status: 'failed', providerStatus: 422, error: `Provider rejected: ${secret}` };
+        },
+      },
+    });
+    const result = await c.send({
+      ...render({ template: getDefaultTemplate('speaker.discussion_points'), config: CONFIG }),
+      to: 'organizer@example.org',
+      subject: `New submission: ${secret}`,
+      html: `<p>${secret}</p>`,
+      text: secret,
+      tag: 'speaker.discussion_points',
+      storeRendered: false,
+    });
 
-  assert.equal(result.error, `Provider rejected: ${secret}`);
-  const row = db.state.sentRows[0];
-  assert.equal(row.status, 'failed');
-  assert.equal(row.providerStatus, 422);
-  assert.equal(row.subject, null);
-  assert.equal(row.html, null);
-  assert.equal(row.text, null);
-  assert.equal(row.error, 'Private message failure details omitted.');
-  assert.doesNotMatch(JSON.stringify(row), /Private discussion point/);
+    assert.equal(result.error, `Provider rejected: ${secret}`);
+    const row = db.state.sentRows[0];
+    assert.equal(row.status, 'failed');
+    assert.equal(row.providerStatus, thrown ? null : 422);
+    assert.equal(row.subject, null);
+    assert.equal(row.html, null);
+    assert.equal(row.text, null);
+    assert.equal(row.error, 'Private message failure details omitted.');
+    assert.doesNotMatch(JSON.stringify(row), /Private discussion point/);
+  });
+}
+
+for (const id of ['auth.otp', 'speaker.invite', 'ticket.order_confirmation', 'ticket.attendee_confirmation']) {
+  for (const thrown of [false, true]) {
+    test(`${id} provider ${thrown ? 'exceptions' : 'refusals'} remain visible in the audit row`, async () => {
+      const error = 'Inactive recipient';
+      const { db, core: c } = core({
+        provider: { name: 'x', send: async () => {
+          if (thrown) throw new Error(error);
+          return { providerMessageId: null, status: 'failed', providerStatus: 422, error };
+        } },
+      });
+      const result = await c.send({
+        ...render({ template: getDefaultTemplate(id), config: CONFIG }),
+        to: 'a@example.org', tag: id,
+      });
+      assert.equal(result.error, error);
+      assert.equal(db.state.sentRows[0].error, error);
+      assert.equal(db.state.sentRows[0].bodyStored, false);
+    });
+  }
+}
+
+test('core errors remain visible for every template, including discussion points', async () => {
+  let calls = 0;
+  const { db, core: c } = core({ provider: { name: 'x', send: async () => { calls += 1; } } });
+  for (const id of listTemplateIds()) {
+    const rendered = render({ template: getDefaultTemplate(id), config: CONFIG });
+    for (const [extra, error] of [[{}, 'no recipient'], [{ to: 'a@example.org', cc: 'copy@example.org' }, 'cc-unsupported']]) {
+      const result = await c.send({ ...rendered, tag: id, ...extra });
+      assert.equal(result.error, error, id);
+      assert.equal(db.state.sentRows.at(-1).error, error, id);
+    }
+  }
+  assert.equal(calls, 0);
+  assert.equal(db.state.sentRows.length, listTemplateIds().length * 2);
 });
 
 test('stored bodies are truncated at 100KB with bodyTruncated', async () => {
