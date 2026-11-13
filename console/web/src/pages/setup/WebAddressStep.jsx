@@ -48,6 +48,7 @@ export default function WebAddressStep({ value, errors, onChange, appId }) {
         label="Name"
         hint="3 to 27 lowercase letters, numbers and hyphens. For example, localnews"
         autoComplete="off"
+        enterKeyHint="next" autoCapitalize="none" spellCheck={false}
         maxLength={27}
         value={value.name}
         onChange={(next) => onChange({ name: next.toLowerCase() })}

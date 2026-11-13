@@ -10,6 +10,7 @@ export default function OrganizationStep({ value, errors, onChange }) {
         path="organization.name"
         label="Organization name"
         autoComplete="organization"
+        enterKeyHint="next"
         value={value.name}
         onChange={set('name')}
         error={errors['organization.name']}
@@ -21,6 +22,7 @@ export default function OrganizationStep({ value, errors, onChange }) {
         type="url"
         inputMode="url"
         autoComplete="url"
+        enterKeyHint="next" autoCapitalize="none" spellCheck={false}
         value={value.website}
         onChange={set('website')}
         error={errors['organization.website']}

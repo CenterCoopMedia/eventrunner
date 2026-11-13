@@ -15,11 +15,13 @@ function describedBy(id, hint, error) {
 /**
  * @param {{ path: string, label: string, value: string, onChange: (value: string) => void,
  *   error?: string, hint?: string, type?: string, multiline?: boolean,
- *   autoComplete?: string, inputMode?: string, maxLength?: number, children?: any }} props
+ *   autoComplete?: string, inputMode?: string, maxLength?: number, enterKeyHint?: string,
+ *   autoCapitalize?: string, spellCheck?: boolean, children?: any }} props
  */
 export function TextField({
   path, label, value, onChange, error, hint, type = 'text', multiline = false,
   autoComplete = 'off', inputMode, maxLength = 1000, className = '',
+  enterKeyHint, autoCapitalize, spellCheck,
 }) {
   const id = fieldId(path);
   const common = {
@@ -29,6 +31,9 @@ export function TextField({
     onChange: (e) => onChange(e.target.value),
     autoComplete,
     maxLength,
+    enterKeyHint,
+    autoCapitalize,
+    spellCheck,
     'aria-invalid': error ? 'true' : undefined,
     'aria-describedby': describedBy(id, hint, error),
   };

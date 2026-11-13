@@ -223,6 +223,9 @@ export default function Setup() {
   const next = open.includes(STEPS[index + 1]?.id) || (step.id === 'review' && refused.length > 0) ? STEPS[index + 1] : null;
   const View = STEP_VIEWS[step.id];
   const shownErrors = showAll ? stepErrors : {};
+  const continueStep = fromReview ? stepById('review') : next;
+  const formId = `setup-${step.id}`;
+  const continueSetup = () => go(setupPath(orgId, appId, continueStep), fromReview ? 'review' : 'next');
 
   return (
     <div className="setup">
@@ -247,10 +250,11 @@ export default function Setup() {
         {error ? <ActionFeedback kind="error"><p>{error}</p><IconControl icon="refresh" label="Reload setup" onClick={() => reload().catch(() => {})} /></ActionFeedback> : null}
         {View && showAll ? <Problems fields={shownErrors} orgId={orgId} appId={appId} fromReview={fromReview} /> : null}
         <fieldset disabled={navigating || signingOut || recovering} className="console-feedback-fields">
-        {View ? <KeptAnswer key={`${user?.uid}/${orgId}/${appId}/${step.id}`} scope={scope} step={step.id}
-          onUse={onChange}
-          onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} /> : null}
         {View ? (
+          <form id={formId} noValidate onSubmit={(event) => { event.preventDefault(); if (continueStep) continueSetup(); }}>
+          <KeptAnswer key={`${user?.uid}/${orgId}/${appId}/${step.id}`} scope={scope} step={step.id}
+          onUse={onChange}
+          onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} />
           <Suspense fallback={<LoadingState>Loading your setup.</LoadingState>}>
           <StepErrorFocus showAll={showAll} visit={location.key} />
           <View
@@ -265,6 +269,7 @@ export default function Setup() {
             onConnections={onConnections}
           />
           </Suspense>
+          </form>
         ) : null}
         {step.id === 'team' ? <TeamStep orgId={orgId} onOwnersNeeded={onOwnersNeeded} /> : null}
         {step.id === 'review' ? (
@@ -297,8 +302,9 @@ export default function Setup() {
           {recoveryError ? <ActionFeedback kind="error">{recoveryError}</ActionFeedback> : null}
           <div className="step-actions">
             {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous), 'leave')}>Back</button> : null}
-            {fromReview ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, stepById('review')), 'review')}>Back to Review</button>
-              : next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next: {next.title}</button> : null}
+            {continueStep ? <button type={View ? 'submit' : 'button'} form={View ? formId : undefined}
+              className="button primary" disabled={navigating} onClick={View ? undefined : continueSetup}>
+              {fromReview ? 'Back to Review' : `Next: ${continueStep.title}`}</button> : null}
             {saveStatus === 'error' && failure?.status === 401 ? (
               <button type="button" className="button" disabled={recovering || navigating} onClick={signInAgain}>Sign in again</button>
             ) : saveStatus === 'error' && ([0, 408, 429].includes(failure?.status) || failure?.status >= 500) ? (
