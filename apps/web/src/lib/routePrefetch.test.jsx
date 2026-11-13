@@ -153,6 +153,13 @@ describe('route intent', () => {
 });
 
 describe('route import lifecycle', () => {
+  it('prefetches a named-export helper without requiring a page default', async () => {
+    const helper = routePage(() => import('./routePrefetch.js'));
+    const module = await helper.prefetch();
+    expect(module.installRoutePrefetch).toBe(installRoutePrefetch);
+    expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+  });
+
   it.each([
     ['public', undefined], ['public', {}], ['admin', undefined], ['admin', {}],
   ])('recovers once across fresh %s loads of a missing module %j', async (kind, module) => {

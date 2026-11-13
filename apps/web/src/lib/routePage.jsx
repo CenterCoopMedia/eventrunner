@@ -16,6 +16,8 @@ function requirePageModule(module) {
   return module;
 }
 
+// Only a successful lazy Admin leaf re-arms the budget. Static Admin screens
+// retain a spent budget and keep the manual retry available.
 export function lazyPage(importer) {
   return lazy(() => importer().then((module) => {
     const page = requirePageModule(module);
@@ -32,11 +34,20 @@ export function routePage(importer, { clearReloadOnLoad = true } = {}) {
   let pending;
   let speculation;
   function load() {
-    return pending ||= importer().then((module) => (loaded = requirePageModule(module)));
+    // Prefetch also serves named-export helpers; only rendering needs default.
+    return pending ||= importer().then((module) => (loaded = module));
   }
-  const Component = lazy(() => loaded ? {
-    then(resolve) { if (clearReloadOnLoad) clearReloadFlag(); resolve(loaded); },
-  } : load().then((module) => { if (clearReloadOnLoad) clearReloadFlag(); return module; }));
+  const Component = lazy(() => {
+    if (loaded) {
+      const page = requirePageModule(loaded);
+      return { then(resolve) { if (clearReloadOnLoad) clearReloadFlag(); resolve(page); } };
+    }
+    return load().then((module) => {
+      const page = requirePageModule(module);
+      if (clearReloadOnLoad) clearReloadFlag();
+      return page;
+    });
+  });
   function prefetch() {
     if (loaded || speculation) return speculation;
     speculativeLoads += 1;
