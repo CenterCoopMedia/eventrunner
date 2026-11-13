@@ -7,7 +7,7 @@ import {
 } from '../../setup/steps.js';
 import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
 import ActionFeedback from '../../ActionFeedback.jsx';
-import AgreementStep from './AgreementStep.jsx';
+import { lazyPage } from '../../RouteBoundary.jsx';
 import EmailStep from './EmailStep.jsx';
 import EventStep, { browserTimeZone, NEW_DAY } from './EventStep.jsx';
 import OrganizationStep from './OrganizationStep.jsx';
@@ -21,6 +21,8 @@ import StepList from '../../setup/StepList.jsx';
 import { rememberReturn, useAuth } from '../../auth.jsx';
 import KeptAnswer from '../../setup/KeptAnswer.jsx';
 import { readKeptAnswer } from '../../setup/keptAnswers.js';
+
+const AgreementStep = lazyPage(() => import('./AgreementStep.jsx'));
 
 const STEP_VIEWS = {
   organization: OrganizationStep,
