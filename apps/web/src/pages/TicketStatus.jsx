@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import TicketDocuments from '../components/TicketDocuments.jsx';
+import LoadingState from '../components/LoadingState.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
@@ -98,7 +99,7 @@ export default function TicketStatus() {
 
   const heading = <h1 className="font-heading text-h1 font-semibold">Order status</h1>;
   if (demo) return <article className="space-y-md">{heading}<p>This event demo does not create orders or take payments.</p></article>;
-  if (authLoading) return <p role="status">Checking your sign-in…</p>;
+  if (authLoading) return <LoadingState label="Checking your sign-in…" rows={0} />;
   if (!user) return <article className="space-y-md">{heading}<h2 className="font-heading text-h2">Sign in to view your order</h2><p>Use the purchaser’s verified email. Your order number and return link do not give other people access to your order.</p><SignInPanel /></article>;
   if (!user.emailVerified) return <article className="space-y-md">{heading}<p>A verified email is required to view an order. Sign in with an emailed code.</p><Link to="/signin" className={secondaryActionClass}>Open sign-in</Link></article>;
   if (!(orderId || requestId)) return <article className="space-y-md">{heading}<p>Open the order link from your confirmation, or view tickets assigned to your account.</p><Link to="/tickets/mine" className={secondaryActionClass}>View your tickets</Link></article>;
@@ -114,7 +115,8 @@ export default function TicketStatus() {
     <article className="ticket-print-page min-w-0 space-y-lg text-body text-text-primary">
       {heading}
       {error ? <div className="space-y-sm no-print"><p role="alert" className="text-danger">{error.message}</p><button type="button" className={secondaryActionClass} onClick={() => setRefresh((value) => value + 1)}>Retry order status</button>{error.status === 404 && requestId && stored?.requestId === requestId ? <><p>No order is recorded for this saved request. If another tab is still submitting it, let that request finish before choosing tickets again.</p><button type="button" className={secondaryActionClass} onClick={startAnother}>Return to ticket selection</button></> : null}</div> : null}
-      {!order && !error ? <p role="status">Loading your order…</p> : null}
+      {!order && !error ? <LoadingState label="Loading your order…" rows={0} /> : null}
+      <section aria-label="Order status content" aria-busy={busy || (!order && !error)} className="space-y-lg">
       {order ? <>
         <section className="space-y-sm" aria-labelledby="payment-status-heading">
           <SectionHead title={complete ? 'Your order is confirmed' : needsReview ? 'Your order needs organizer review' : refunded ? 'Your order has been refunded' : terminal ? 'This order is closed' : 'We are confirming your order'} id="payment-status-heading" />
@@ -145,6 +147,7 @@ export default function TicketStatus() {
           {complete || terminal || refunded ? <button type="button" className={secondaryActionClass} onClick={startAnother}>Choose tickets for a new order</button> : <p>Finish this checkout or wait for its confirmed expiry before starting another order. Contact the organizers if it remains unresolved.</p>}
         </section>
       </> : null}
+      </section>
       <p className="no-print"><Link to="/ticket/claim" className="underline">Claim a ticket with your attendee email</Link></p>
     </article>
   );
