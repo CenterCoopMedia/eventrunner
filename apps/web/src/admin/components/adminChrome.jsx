@@ -60,7 +60,7 @@ const STATE_TONE = Object.freeze({
 export function StatusBadge({ tone = 'neutral', className = '', children, ...rest }) {
   return (
     <span
-      className={`admin-status-badge inline-flex items-center rounded-admin-small px-xs py-3xs text-admin-xs font-semibold leading-tight data-[record-state=live]:font-normal ${
+      className={`admin-status-badge inline-flex items-center rounded-admin-small px-xs py-3xs text-admin-xs ${rest['data-record-state'] === 'live' ? 'font-normal' : 'font-semibold'} leading-tight ${
         BADGE_TONES[tone] ?? BADGE_TONES.neutral
       } ${className}`}
       {...rest}

@@ -22,10 +22,16 @@ test.beforeAll(async () => {
   if (base) {
     const chrome = execFileSync('git', ['show', `${base}:apps/web/src/admin/components/adminChrome.jsx`], { encoding: 'utf8' });
     const { createServer } = await import('vite');
+    const { default: tailwindcss } = await import('tailwindcss');
+    const { default: autoprefixer } = await import('autoprefixer');
+    const { default: tailwind } = await import('../apps/web/tailwind.config.js');
     const { default: configureWeb } = await import('../apps/web/vite.config.js');
     const webConfig = configureWeb({ command: 'serve', mode: 'development', isSsrBuild: false });
     server = await createServer({ ...webConfig, configFile: false, root: path.join(ROOT, 'apps/web'), base: '/',
       plugins: [{ name: 'admin-specimen-base-chrome', enforce: 'pre', load(id) { return id.split('?')[0] === CHROME ? chrome : null; } }, ...webConfig.plugins],
+      css: { postcss: { plugins: [tailwindcss({ ...tailwind,
+        content: [path.join(ROOT, 'apps/web/index.html'), path.join(ROOT, 'apps/web/src/**/*.{js,jsx}'), `!${path.join(ROOT, 'apps/web/src/**/*.test.{js,jsx}')}`],
+      }), autoprefixer()] } },
       optimizeDeps: webConfig.optimizeDeps,
       server: { ...webConfig.server, host: '127.0.0.1', port: 0, strictPort: false },
     });
