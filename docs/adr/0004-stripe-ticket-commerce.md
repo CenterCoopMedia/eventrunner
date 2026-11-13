@@ -366,7 +366,8 @@ its own routes whose accounts are no longer named by the private connection row.
 retries retain the releasing application's identity and work row until token and route cleanup finish.
 An active connection-change lease preserves routes
 while a replacement can still roll back. The provider-revocation decision runs first; cleanup
-failures are logged while completed connection changes keep their normal reply.
+failures are logged and leave a routes-only retry for retention, while completed connection
+changes keep their normal reply.
 
 The builder keeps the site's `TICKETING_WEBHOOK_SECRET` in the site's Secret Manager and
 copies it to the Console secret `stripe-webhook-{appId}`. Firestore stores no signing secret.

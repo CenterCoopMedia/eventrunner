@@ -5,7 +5,7 @@ const { createHash } = require('node:crypto');
 const { test } = require('node:test');
 const {
   STATE_TTL_MS, chooseEventbriteEvent, completeConnection, connectionSecretId, deleteStoredConnection, disconnectAccount,
-  listEventbriteEvents, readStoredConnection, startConnection,
+  listEventbriteEvents, readStoredConnection, retryTokenDeletions, startConnection,
 } = require('./connections.cjs');
 const { getApplication } = require('./applications.cjs');
 const { acceptAgreement } = require('./agreementAcceptance.cjs');
@@ -657,10 +657,11 @@ test('a released Stripe account can connect and route to another request', async
 test('completed connection changes keep their reply when route cleanup fails', async (t) => {
   for (const operation of ['connect', 'disconnect', 'built']) await t.test(operation, async () => {
     const route = { appId: 'a1', projectId: 'er-first', region: 'us-central1' };
-    const { db, log, deps } = setup({
+    const { db, log, secrets, deps } = setup({
       application: { status: operation === 'built' ? 'ready' : 'draft', connections: { stripe: stripeConnection() } },
       extra: { 'console_stripe_routes/acct_client1': route },
     });
+    secrets.store.set('connection-eventbrite-a1', EB_TOKEN);
     const collection = db.collection;
     db.collection = (path) => {
       const ref = collection(path);
@@ -681,6 +682,13 @@ test('completed connection changes keep their reply when route cleanup fails', a
     assert.equal(log.errors.length, 1);
     assert.match(JSON.stringify(log.errors), /console could not release Stripe routes.*route lookup unavailable/);
     assert.ok(!JSON.stringify(log.errors).includes(TOKEN));
+    assert.equal(db.read('console_token_deletions/a1').routesOnly, true);
+    // Retention retries only the route release; the request's tokens stay.
+    db.collection = collection;
+    await retryTokenDeletions(deps, 10);
+    assert.equal(db.read('console_stripe_routes/acct_client1'), undefined);
+    assert.equal(db.read('console_token_deletions/a1'), undefined);
+    assert.equal(secrets.store.get('connection-eventbrite-a1'), EB_TOKEN);
   });
 });
 

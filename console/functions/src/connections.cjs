@@ -182,22 +182,44 @@ async function revokeIfUnused({ db, connectors, log = console }, provider, accou
 }
 
 /** Release this app's routes only after its private row stops naming the account. */
-async function releaseStripeRoutes({ db, log = console, now = Date.now }, appId) {
+async function releaseStripeRoutes({ db, log = console, now = Date.now }, appId, { clearRetry = false } = {}) {
   try {
     return await db.runTransaction(async (tx) => {
-      const [account, routes, app] = await Promise.all([
+      const retryRef = db.collection(DELETION_COLLECTION).doc(appId);
+      const [account, routes, app, retry] = await Promise.all([
         tx.get(accountsRef(db, appId)),
         tx.get(db.collection(STRIPE_ROUTE_COLLECTION).where('appId', '==', appId)),
         tx.get(db.collection('applications').doc(appId)),
+        clearRetry ? tx.get(retryRef) : null,
       ]);
       if (connectionChanging(app.data()?.connections, now(), ['stripe'])) return false;
       const accountId = accountsOf(account).stripe?.accountId;
       for (const doc of routes.docs) if (doc.id !== accountId) tx.delete(doc.ref);
+      // In the same transaction, so a release failing after this read records its own row.
+      if (retry?.data()?.routesOnly) tx.delete(retryRef);
       return true;
     });
   } catch (err) {
     log.error('console could not release Stripe routes', appId, err.message);
     return false;
+  }
+}
+
+/**
+ * A completed connection change whose route release failed leaves a routes-only
+ * deletion row, so retention retries the release without touching tokens.
+ */
+async function releaseStripeRoutesOrRecord(deps, appId) {
+  if (await releaseStripeRoutes(deps, appId)) return;
+  const { db, log = console, now = Date.now } = deps;
+  try {
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection(DELETION_COLLECTION).doc(appId);
+      // A close or delete row already releases routes and must keep its accounts.
+      if (!(await tx.get(ref)).exists) tx.set(ref, { connected: [], routesOnly: true, at: new Date(now()) });
+    });
+  } catch (err) {
+    log.error('console could not record a Stripe route release', appId, err.message);
   }
 }
 
@@ -373,7 +395,7 @@ async function completeConnection(deps, { body, user }) {
   // Connecting a different account ends the older one, when nothing else uses it.
   const older = previous.account?.accountId;
   if (older && older !== answer.accountId) await revokeIfUnused(deps, provider, older, { releasingAppId: appId });
-  if (provider === 'stripe') await releaseStripeRoutes(deps, appId);
+  if (provider === 'stripe') await releaseStripeRoutesOrRecord(deps, appId);
   return { body: { connected: true, provider, orgId, appId } };
 }
 
@@ -427,7 +449,7 @@ async function endBuiltConnection(deps, { orgId, appId, provider, user }) {
   } catch (err) {
     log.error('console could not finish a disconnect', provider, err.message);
   }
-  await releaseStripeRoutes(deps, appId);
+  await releaseStripeRoutesOrRecord(deps, appId);
   return { body: { ...reply, revoked: Boolean(accountId), shared: false } };
 }
 
@@ -469,7 +491,7 @@ async function disconnectAccount(deps, { body, user }) {
   const ended = previous.account?.accountId
     ? await revokeIfUnused(deps, provider, previous.account.accountId, { releasingAppId: appId })
     : { revoked: false, shared: false };
-  if (provider === 'stripe') await releaseStripeRoutes(deps, appId);
+  if (provider === 'stripe') await releaseStripeRoutesOrRecord(deps, appId);
   return { body: { ...reply, ...ended } };
 }
 
@@ -585,13 +607,13 @@ async function deleteRecordedTokens(deps, appId, connected) {
   if (await releaseStripeRoutes(deps, appId)) await deps.db.collection(DELETION_COLLECTION).doc(appId).delete();
 }
 
-/** Try again for the rows an earlier delete left. Each failure is logged; the next run tries again. */
+/** Try again for the rows an earlier delete or route release left. Each failure is logged; the next run tries again. */
 async function retryTokenDeletions(deps, batchSize) {
   const { db, log = console } = deps;
   try {
     const snap = await db.collection(DELETION_COLLECTION).limit(batchSize).get();
     for (const doc of snap.docs) {
-      await deleteRecordedTokens(deps, doc.id, doc.data().connected || [])
+      await (doc.data().routesOnly ? releaseStripeRoutes(deps, doc.id, { clearRetry: true }) : deleteRecordedTokens(deps, doc.id, doc.data().connected || []))
         .catch((err) => log.error('console could not delete stored tokens', doc.id, err.message));
     }
   } catch (err) {
