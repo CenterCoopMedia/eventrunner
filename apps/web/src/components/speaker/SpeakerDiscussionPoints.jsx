@@ -83,7 +83,7 @@ export function useSpeakerDiscussion({ user, speakerId }) {
     });
     if (!validation.ok) {
       const form = event.currentTarget;
-      setState((value) => ({ ...value, fieldError: validation.errors.join(' ').replace(/^text: /, '') }));
+      setState((value) => ({ ...value, fieldError: validation.errors.map((message) => message.replace(/^text: /, '')).join(' ') }));
       // Focus after the field's aria-invalid state has rendered.
       requestAnimationFrame(() => focusFirstError(form));
       return;
@@ -130,7 +130,8 @@ export default function SpeakerDiscussionPoints({ discussion }) {
     return (
       <div>
         <p role="alert" className="text-body text-danger">{error || 'Sign in with your speaker account to access discussion points.'}</p>
-        <button type="button" className={`${secondaryActionClass} mt-sm`} disabled={phase === 'loading'} onClick={load}>
+        <button type="button" className={`${secondaryActionClass} mt-sm`} disabled={phase === 'loading'}
+          aria-busy={phase === 'loading'} onClick={load}>
           {phase === 'loading' ? 'Checking access…' : 'Check access'}
         </button>
       </div>
@@ -142,7 +143,7 @@ export default function SpeakerDiscussionPoints({ discussion }) {
     <form onSubmit={save} aria-label="Speaker discussion points" aria-busy={waiting} className="space-y-md">
       <p className="text-body text-text-secondary">
         These notes are private to you and the organizers. One submission covers all your sessions.
-        Each save replaces your current saved discussion points.
+        Each save replaces your current saved discussion points. These notes do not appear on your public profile or site.
       </p>
       <TextAreaField
         label="Discussion points" value={draft} onChange={changeDraft} rows={8}

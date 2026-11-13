@@ -192,6 +192,7 @@ describe('speaker-wide private discussion draft', () => {
 
   it.each([
     ['empty', ' \n\t '], ['over limit', 'a'.repeat(10001)], ['control character', 'Question\u0000with control'],
+    ['over limit with control character', `${'a'.repeat(10001)}\u0000`],
   ])('rejects %s text before a save and focuses the field', async (_name, text) => {
     fetch.mockResolvedValueOnce(response({ submission: null }));
     render(hub()); openDiscussion();
@@ -199,6 +200,7 @@ describe('speaker-wide private discussion draft', () => {
     edit(text); submit();
     await waitFor(() => expect(screen.getByRole('textbox')).toHaveFocus());
     expect(screen.getByRole('textbox')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('textbox').parentElement).not.toHaveTextContent('text:');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

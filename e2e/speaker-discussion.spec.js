@@ -95,7 +95,10 @@ test.describe.serial('speaker discussion points', () => {
       const publicProfile = (await adminDb().collection('speakers_public').doc(speakerId).get()).data();
       expect(publicProfile?.discussionPoints).toBeUndefined();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-      await testInfo.attach(`discussion-${width}px`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await testInfo.attach(`discussion-${width}px`, {
+        body: await page.screenshot({ path: `test-results/admin-visual-evidence/speaker-discussion-${width}.png`, fullPage: true }),
+        contentType: 'image/png',
+      });
     });
   }
 
