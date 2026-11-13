@@ -1,7 +1,8 @@
 // Profile allocation is server-mediated and bounded per account. Keep the
 // Storage SDK lazy for owner deletes; reads still use token-free URLs.
 import { connectStorageEmulator, deleteObject, getStorage, ref } from 'firebase/storage';
-import { app, auth, useEmulators } from '../firebase.js';
+import { app, auth } from '../firebase.js';
+import { useEmulators } from './firebaseSettings.js';
 import { PROFILE_PHOTO_MAX_BYTES, PROFILE_PHOTO_TYPES, checkFile, fileToBase64 } from './mediaSource.js';
 
 import { callAdminEndpoint } from '../admin/adminApi.js';

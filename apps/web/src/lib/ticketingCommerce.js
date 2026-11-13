@@ -1,5 +1,5 @@
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
-import { appCheckHeaders } from '../firebase.js';
+import { functionsOrigin } from './firebaseSettings.js';
+import { appCheckHeaders } from './firebaseLoader.js';
 
 const ID_RE = /^[A-Za-z0-9_-]{1,160}$/;
 

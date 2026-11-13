@@ -10,6 +10,10 @@ import {
   disableNetwork,
 } from 'firebase/firestore';
 import { IS_DEMO } from './lib/demoMode.js';
+import { useEmulators, appCheckSiteKey } from './lib/firebaseSettings.js';
+
+export { GoogleAuthProvider, onAuthStateChanged, signInWithCustomToken, signInWithPopup, signOut } from 'firebase/auth';
+export { collection, doc, getDoc, getDocFromServer, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -23,18 +27,6 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-
-// Storage has NO client here on purpose (docs/performance/public-bundle-budget.md).
-// Nothing a visitor sees on first paint talks to the Storage service: the
-// media URLs on every page are built as strings from the bucket name below,
-// and the only call that needs the SDK is deleting an attendee's own photo
-// on /profile. So the Storage client is created inside
-// lib/photoUpload.js, which that route alone imports, and the ~34 kB SDK
-// rides in the /profile chunk instead of the chunk every visitor downloads.
-// `useEmulators` is exported for the same reason: the emulator wiring for
-// Storage has to happen wherever the client is made.
-export const useEmulators =
-  import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true';
 
 // --- Demo mode (VITE_DEMO_MODE=1, lib/demoMode.js) --------------------------
 // The static GitHub Pages demo has no Firebase project behind it, so every
@@ -62,21 +54,6 @@ if (useEmulators) {
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
 }
 
-// --- Storage download origin ------------------------------------------------
-// lib/mediaSource.js builds object URLs itself rather than calling
-// getDownloadURL(), so it needs the bucket and the origin serving it. Both
-// hosts below expose the same REST shape:
-//
-//   {origin}/v0/b/{bucket}/o/{encoded object path}?alt=media
-//
-// A request to that endpoint WITHOUT a download token is evaluated against
-// storage.rules, which is exactly the property the media library wants (see
-// lib/mediaSource.js for why tokens are not used).
-export const storageBucketName = firebaseConfig.storageBucket ?? '';
-export const storageDownloadOrigin = useEmulators
-  ? 'http://127.0.0.1:9199'
-  : 'https://firebasestorage.googleapis.com';
-
 // --- App Check (issue #45) ---------------------------------------------------
 // Attests that OTP requests come from this web app rather than from a script,
 // so the unauthenticated sendOtpCode/verifyOtpCode endpoints are not an open
@@ -91,12 +68,6 @@ export const storageDownloadOrigin = useEmulators
 // server-side trace.
 // Never in the demo build: reCAPTCHA is a third-party network fetch, and the
 // demo has no OTP endpoint to attest to in the first place.
-const appCheckSiteKey = IS_DEMO
-  ? ''
-  : (import.meta.env.VITE_FIREBASE_APP_CHECK_SITE_KEY || '').trim();
-
-export const appCheckEnabled = Boolean(appCheckSiteKey);
-
 const appCheckReady = appCheckSiteKey
   ? import('firebase/app-check')
       .then(({ initializeAppCheck, ReCaptchaV3Provider }) => {

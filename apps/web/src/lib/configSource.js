@@ -5,8 +5,7 @@
 // gate. This is the one seam between EventConfigProvider and Firebase:
 // tests mock this module instead of the SDK, and the provider itself stays
 // free of Firestore types.
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { subscribeToFirebase } from './firebaseLoader.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 
 /**
@@ -28,30 +27,32 @@ import { subscribeWithRetry } from './retrySubscription.js';
  * answer that the server merely confirms only to such a listener.
  */
 export function subscribeConfigDoc(docId, onNext, onStatus) {
-  const next = (snapshot) => {
-    if (snapshot.exists()) {
-      onNext(snapshot.data());
-      onStatus?.(snapshot.metadata?.fromCache === false ? 'confirmed' : 'cached');
-    } else {
-      onStatus?.('gone');
-    }
-  };
-  const ref = doc(db, 'config', docId);
-  return subscribeWithRetry(
-    (onError) =>
-      onStatus
-        ? onSnapshot(ref, { includeMetadataChanges: true }, next, onError)
-        : onSnapshot(ref, next, onError),
-    (error) => {
-      onStatus?.('gone');
-      // Fail soft: the generated snapshot (or last-known overlay) keeps
-      // rendering. The SDK has already torn this listener down, so
-      // subscribeWithRetry schedules a fresh one rather than staying
-      // silently dead.
-      console.warn(
-        `config/${docId} subscription failed; keeping snapshot values and retrying.`,
-        error,
-      );
-    },
-  );
+  return subscribeToFirebase(({ db, doc, onSnapshot }) => {
+    const next = (snapshot) => {
+      if (snapshot.exists()) {
+        onNext(snapshot.data());
+        onStatus?.(snapshot.metadata?.fromCache === false ? 'confirmed' : 'cached');
+      } else {
+        onStatus?.('gone');
+      }
+    };
+    const ref = doc(db, 'config', docId);
+    return subscribeWithRetry(
+      (onError) =>
+        onStatus
+          ? onSnapshot(ref, { includeMetadataChanges: true }, next, onError)
+          : onSnapshot(ref, next, onError),
+      (error) => {
+        onStatus?.('gone');
+        // Fail soft: the generated snapshot (or last-known overlay) keeps
+        // rendering. The SDK has already torn this listener down, so
+        // subscribeWithRetry schedules a fresh one rather than staying
+        // silently dead.
+        console.warn(
+          `config/${docId} subscription failed; keeping snapshot values and retrying.`,
+          error,
+        );
+      },
+    );
+  }, () => onStatus?.('gone'));
 }

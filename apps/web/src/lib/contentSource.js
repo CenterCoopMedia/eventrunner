@@ -11,8 +11,7 @@
 //
 // This is the one seam between ContentProvider and Firebase: tests mock this
 // module instead of the SDK, and the provider stays free of Firestore types.
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { subscribeToFirebase } from './firebaseLoader.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
 import { demoUpdates } from './demoCommunity.js';
@@ -47,19 +46,21 @@ const NO_OVERLAY = () => {};
  */
 export function subscribeSpeakersPublic(onNext) {
   if (IS_DEMO) return NO_OVERLAY;
-  return subscribeWithRetry(
-    (onError) =>
-      onSnapshot(
-        collection(db, 'speakers_public'),
-        (snapshot) => {
-          onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-        },
-        onError,
-      ),
-    (error) => {
-      console.warn('speakers_public subscription failed; keeping snapshot values and retrying.', error);
-    },
-  );
+  return subscribeToFirebase(({ db, collection, onSnapshot }) => {
+    return subscribeWithRetry(
+      (onError) =>
+        onSnapshot(
+          collection(db, 'speakers_public'),
+          (snapshot) => {
+            onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+          },
+          onError,
+        ),
+      (error) => {
+        console.warn('speakers_public subscription failed; keeping snapshot values and retrying.', error);
+      },
+    );
+  });
 }
 
 /**
@@ -81,28 +82,30 @@ export function subscribeContentCollection(name, readSource, onNext) {
     if (name === 'cmsUpdates') onNext(demoUpdates);
     return NO_OVERLAY;
   }
-  const target =
-    readSource === 'draft'
-      ? collection(db, `${name}_drafts`)
-      : query(collection(db, name), where('visible', '==', true));
-  return subscribeWithRetry(
-    (onError) =>
-      onSnapshot(
-        target,
-        (snapshot) => {
-          onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-        },
-        onError,
-      ),
-    (error) => {
-      // Fail soft: the generated snapshot (or last-known live values) keeps
-      // rendering. The SDK has already torn this listener down, so
-      // subscribeWithRetry schedules a fresh one rather than staying
-      // silently dead.
-      console.warn(
-        `${name} (${readSource}) subscription failed; keeping snapshot values and retrying.`,
-        error,
-      );
-    },
-  );
+  return subscribeToFirebase(({ db, collection, onSnapshot, query, where }) => {
+    const target =
+      readSource === 'draft'
+        ? collection(db, `${name}_drafts`)
+        : query(collection(db, name), where('visible', '==', true));
+    return subscribeWithRetry(
+      (onError) =>
+        onSnapshot(
+          target,
+          (snapshot) => {
+            onNext(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+          },
+          onError,
+        ),
+      (error) => {
+        // Fail soft: the generated snapshot (or last-known live values) keeps
+        // rendering. The SDK has already torn this listener down, so
+        // subscribeWithRetry schedules a fresh one rather than staying
+        // silently dead.
+        console.warn(
+          `${name} (${readSource}) subscription failed; keeping snapshot values and retrying.`,
+          error,
+        );
+      },
+    );
+  });
 }

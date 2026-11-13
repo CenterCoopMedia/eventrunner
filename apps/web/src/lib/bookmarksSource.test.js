@@ -11,9 +11,7 @@ vi.mock('firebase/firestore', () => ({
   getDocFromServer: (...args) => getDocFromServerMock(...args),
 }));
 vi.mock('../firebase.js', () => ({ db: {} }));
-vi.mock('../contexts/AuthContext.jsx', () => ({
-  functionsOrigin: () => 'https://fake-functions.example',
-}));
+vi.mock('./firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), functionsOrigin: () => 'https://fake-functions.example' }));
 
 const { BookmarkRequestError, readBookmarkImportVisibility, setSessionBookmarked, subscribeMyBookmarks } = await import(
   './bookmarksSource.js'

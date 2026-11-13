@@ -17,6 +17,7 @@ import { isRoutePrefetchPending } from './lib/routePage.jsx';
 import { startRecentMessages } from './lib/recentMessages.js';
 import { initFieldVitals } from './lib/fieldVitals.js';
 import { fieldVitalsRoute } from './lib/fieldVitalsRoute.js';
+import { isFirebaseLoading } from './lib/firebaseLoader.js';
 
 // Recent warnings and errors ride along with a "Report a problem" report.
 startRecentMessages();
@@ -32,7 +33,7 @@ initFieldVitals(fieldVitalsRoute);
 // current bundle. The flag that limits it to one is cleared where the chunk
 // loads for navigation (lib/routePage.jsx), not here — clearing it on every entry load would
 // re-arm the reload on the very page the reload landed on, and loop.
-installChunkReload(globalThis, { isPrefetching: isRoutePrefetchPending });
+installChunkReload(globalThis, { isPrefetching: () => isRoutePrefetchPending() || isFirebaseLoading() });
 
 // Real deployments are served by Firebase Hosting, which rewrites every path
 // to index.html, so the app uses real URLs (BrowserRouter). The static demo

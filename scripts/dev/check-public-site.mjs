@@ -258,9 +258,15 @@ async function main() {
         javaScriptEnabled: options.javaScriptEnabled !== false, serviceWorkers: 'block',
       });
       await context.routeWebSocket('**/*', (socket) => socket.close());
-      await context.route('**/*', (route) => {
+      await context.route('**/*', async (route) => {
         const request = route.request();
         const url = new URL(request.url());
+        if (options.blockFirebase && /\/assets\/firebase-sdk-[^/]+\.js$/.test(url.pathname)) {
+          record.blockedSdkRequests = (record.blockedSdkRequests || 0) + 1;
+          record.firstPaintAtSdkRequest = await page.evaluate(() =>
+            globalThis.performance.getEntriesByName('first-contentful-paint')[0]?.startTime || 0);
+          return route.abort('blockedbyclient');
+        }
         if (url.origin === server.origin && ['GET', 'HEAD'].includes(request.method())) return route.continue();
         // Absolute canonical site links still use this checkout's exact bytes.
         const asset = url.origin === SITE.origin && ['GET', 'HEAD'].includes(request.method()) ? assetFor(url.pathname) : null;
@@ -299,6 +305,22 @@ async function main() {
       assert.equal(response.status(), 200, `Page did not load: ${route || '/'}`);
       await ready(page, options);
     };
+
+    for (const route of ['', '#/schedule']) {
+      await run(`demo-sdk-failure-${route ? 'schedule' : 'home'}`, VIEWS[1], 'light', async (page, record) => {
+        let navigations = 0;
+        page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations += 1; });
+        await page.goto(`${server.origin}${SITE.demoBase}${route}`, { waitUntil: 'load' });
+        await expect(page.locator('main h1')).toBeVisible();
+        await expect(page.locator('.event-hero__art')).toBeVisible();
+        await expect.poll(() => record.blockedSdkRequests || 0).toBeGreaterThan(0);
+        assert.ok(record.firstPaintAtSdkRequest > 0, 'SDK fetch must start after content first paints');
+        await page.evaluate(() => new Promise((resolve) =>
+          globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(resolve))));
+        await expect(page.locator('main h1')).toBeVisible();
+        assert.equal(navigations, 1, 'A failed background SDK must not reload the snapshot');
+      }, { blockFirebase: true });
+    }
 
     for (const view of VIEWS) {
       for (const mode of ['light', 'dark']) {

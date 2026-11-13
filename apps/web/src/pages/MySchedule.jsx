@@ -6,7 +6,8 @@
 // are ruled rectangles rather than filled pill buttons.
 import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';

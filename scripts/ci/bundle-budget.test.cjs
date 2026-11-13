@@ -16,6 +16,24 @@ test('parseStaticImports excludes dynamic imports', () => {
   );
 });
 
+test('only the named deferred SDK chunk gets its own measured ceiling', () => {
+  const measurement = {
+    initial: { raw: 1, gzip: 1 }, initialCss: { raw: 1, gzip: 1 },
+    lazyChunks: [
+      { file: 'assets/firebase-sdk-abc.js', raw: 300000, gzip: 80000 },
+      { file: 'assets/another-sdk-abc.js', raw: 180001, gzip: 50001 },
+    ],
+  };
+  const budget = {
+    initial: { raw: 2, gzip: 2 }, initialCss: { raw: 2, gzip: 2 },
+    lazyChunk: { raw: 180000, gzip: 50000 }, firebaseSdkChunk: { raw: 300000, gzip: 80000 },
+  };
+  assert.deepEqual(checkBudget(measurement, budget), [
+    'assets/another-sdk-abc.js raw: 180001 > 180000',
+    'assets/another-sdk-abc.js gzip: 50001 > 50000',
+  ]);
+});
+
 test('measureBundle follows only the initial static graph', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bundle-budget-'));
   fs.mkdirSync(path.join(root, 'assets'));
@@ -121,6 +139,16 @@ test('the first-paint source graph does not reach the Firebase Storage SDK', () 
     false,
     'lib/photoUpload.js must stay behind the lazy /profile route',
   );
+});
+
+test('Firebase clients and runtime stay outside the snapshot first-paint graph', () => {
+  for (const entry of ['main.jsx', 'pages/Schedule.jsx', 'pages/Speakers.jsx']) {
+    const { files, packages } = eagerSourceGraph(path.join(WEB_SRC, entry));
+    assert.equal(files.has(path.join(WEB_SRC, 'lib', 'firebaseSettings.js')), true, entry);
+    assert.equal(files.has(path.join(WEB_SRC, 'lib', 'firebaseLoader.js')), true, entry);
+    assert.equal(files.has(path.join(WEB_SRC, 'firebase.js')), false, entry);
+    assert.deepEqual([...packages].filter((name) => name.startsWith('firebase/')), [], entry);
+  }
 });
 
 // Issue #198: the public site carries one edit link per section for a

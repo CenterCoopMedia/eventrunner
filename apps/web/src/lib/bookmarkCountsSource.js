@@ -10,8 +10,7 @@
 // the programme rather than with the page.
 //
 // Tests mock this module rather than the SDK (lib/contentSource.js rule).
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { subscribeToFirebase } from './firebaseLoader.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 
 /**
@@ -25,6 +24,7 @@ import { subscribeWithRetry } from './retrySubscription.js';
  * @param {(error: unknown) => void} [onError]
  */
 export function subscribeBookmarkCounts(onNext, onError) {
+  return subscribeToFirebase(({ db, collection, onSnapshot }) => {
   return subscribeWithRetry(
     (onListenerError) =>
       onSnapshot(
@@ -44,4 +44,5 @@ export function subscribeBookmarkCounts(onNext, onError) {
       onError?.(error);
     },
   );
+  }, onError);
 }

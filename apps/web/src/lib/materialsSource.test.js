@@ -8,9 +8,7 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: (...args) => onSnapshotMock(...args),
 }));
 vi.mock('../firebase.js', () => ({ db: {} }));
-vi.mock('../contexts/AuthContext.jsx', () => ({
-  functionsOrigin: () => 'https://fake-functions.example',
-}));
+vi.mock('./firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), functionsOrigin: () => 'https://fake-functions.example' }));
 
 const {
   MaterialRequestError,

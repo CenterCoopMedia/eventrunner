@@ -8,9 +8,8 @@
 //
 // This is the one module that talks to Firestore/fetch for bookmarks; tests
 // mock this module rather than the SDK, matching lib/contentSource.js.
-import { collection, doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase.js';
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { loadFirebase, subscribeToFirebase } from './firebaseLoader.js';
+import { functionsOrigin } from './firebaseSettings.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 
 /**
@@ -40,6 +39,7 @@ export function subscribeMyBookmarks(uid, onNext, onError) {
     onNext(new Set());
     return () => {};
   }
+  return subscribeToFirebase(({ db, collection, onSnapshot }) => {
   return subscribeWithRetry(
     (onListenerError) =>
       onSnapshot(
@@ -52,10 +52,12 @@ export function subscribeMyBookmarks(uid, onNext, onError) {
       onError?.(error);
     },
   );
+  }, onError);
 }
 
 /** An import must never infer private consent from an old local cache. */
 export async function readBookmarkImportVisibility(uid) {
+  const { db, doc, getDocFromServer } = await loadFirebase();
   const snapshot = await getDocFromServer(doc(db, `schedule_shares/${uid}`));
   const visibility = snapshot.data()?.scheduleVisibility;
   return ['public', 'attendees_only'].includes(visibility) ? visibility : 'private';

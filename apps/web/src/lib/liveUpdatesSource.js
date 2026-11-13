@@ -16,8 +16,7 @@
 // practical cap and merged with the capped "recent" query;
 // LiveUpdatesCard still partitions pinned-first from the merged, id-deduped,
 // postedAt-sorted result this module hands it.
-import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { db } from '../firebase.js';
+import { subscribeToFirebase } from './firebaseLoader.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 
 const RECENT_CAP = 20;
@@ -63,69 +62,71 @@ function postedAtMs(doc) {
  * @returns {() => void} unsubscribe
  */
 export function subscribeLiveUpdates(audiences, onNext) {
-  // null = no snapshot yet from that listener; both must report at least
-  // once before emitting, same convention as admin/useAdminPages.js — an
-  // empty array is a legitimate answer, a still-null one is not.
-  let pinnedDocs = null;
-  let recentDocs = null;
+  return subscribeToFirebase(({ db, collection, limit, onSnapshot, orderBy, query, where }) => {
+    // null = no snapshot yet from that listener; both must report at least
+    // once before emitting, same convention as admin/useAdminPages.js — an
+    // empty array is a legitimate answer, a still-null one is not.
+    let pinnedDocs = null;
+    let recentDocs = null;
 
-  function emit() {
-    if (pinnedDocs === null || recentDocs === null) return;
-    const merged = new Map();
-    for (const d of recentDocs) merged.set(d.id, d);
-    for (const d of pinnedDocs) merged.set(d.id, d); // pinned wins on id clash (same doc either way)
-    onNext([...merged.values()].sort((a, b) => postedAtMs(b) - postedAtMs(a)));
-  }
+    function emit() {
+      if (pinnedDocs === null || recentDocs === null) return;
+      const merged = new Map();
+      for (const d of recentDocs) merged.set(d.id, d);
+      for (const d of pinnedDocs) merged.set(d.id, d); // pinned wins on id clash (same doc either way)
+      onNext([...merged.values()].sort((a, b) => postedAtMs(b) - postedAtMs(a)));
+    }
 
-  // Both queries need a composite index (firestore.indexes.json): the
-  // audience `in` filter beside the postedAt order.
-  const pinnedQuery = query(
-    collection(db, 'live_updates'),
-    where('pinned', '==', true),
-    where('audience', 'in', audiences),
-    orderBy('postedAt', 'desc'),
-    limit(PINNED_CAP),
-  );
-  const recentQuery = query(
-    collection(db, 'live_updates'),
-    where('audience', 'in', audiences),
-    orderBy('postedAt', 'desc'),
-    limit(RECENT_CAP),
-  );
+    // Both queries need a composite index (firestore.indexes.json): the
+    // audience `in` filter beside the postedAt order.
+    const pinnedQuery = query(
+      collection(db, 'live_updates'),
+      where('pinned', '==', true),
+      where('audience', 'in', audiences),
+      orderBy('postedAt', 'desc'),
+      limit(PINNED_CAP),
+    );
+    const recentQuery = query(
+      collection(db, 'live_updates'),
+      where('audience', 'in', audiences),
+      orderBy('postedAt', 'desc'),
+      limit(RECENT_CAP),
+    );
 
-  const onListenerError = (label) => (error) => {
-    // Fail soft: the caller keeps its last-known merged rows;
-    // subscribeWithRetry re-attaches a fresh listener after a delay.
-    console.warn(`live_updates (${label}) subscription failed; keeping last-known rows and retrying.`, error);
-  };
+    const onListenerError = (label) => (error) => {
+      // Fail soft: the caller keeps its last-known merged rows;
+      // subscribeWithRetry re-attaches a fresh listener after a delay.
+      console.warn(`live_updates (${label}) subscription failed; keeping last-known rows and retrying.`, error);
+    };
 
-  const unsubPinned = subscribeWithRetry(
-    (onError) =>
-      onSnapshot(
-        pinnedQuery,
-        (snapshot) => {
-          pinnedDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          emit();
-        },
-        onError,
-      ),
-    onListenerError('pinned'),
-  );
-  const unsubRecent = subscribeWithRetry(
-    (onError) =>
-      onSnapshot(
-        recentQuery,
-        (snapshot) => {
-          recentDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          emit();
-        },
-        onError,
-      ),
-    onListenerError('recent'),
-  );
+    const unsubPinned = subscribeWithRetry(
+      (onError) =>
+        onSnapshot(
+          pinnedQuery,
+          (snapshot) => {
+            pinnedDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+            emit();
+          },
+          onError,
+        ),
+      onListenerError('pinned'),
+    );
+    const unsubRecent = subscribeWithRetry(
+      (onError) =>
+        onSnapshot(
+          recentQuery,
+          (snapshot) => {
+            recentDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+            emit();
+          },
+          onError,
+        ),
+      onListenerError('recent'),
+    );
 
-  return () => {
-    unsubPinned();
-    unsubRecent();
-  };
+    return () => {
+      unsubPinned();
+      unsubRecent();
+    };
+  });
 }

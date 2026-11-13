@@ -1,3 +1,4 @@
+vi.mock('../../lib/firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), storageBucketName: 'demo.appspot.com', storageDownloadOrigin: 'https://firebasestorage.example' }));
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -6,8 +7,6 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 // Storage, and nothing here needs a bucket.
 vi.mock('../../firebase.js', () => ({
   app: {}, auth: {}, db: {}, storage: {},
-  storageBucketName: 'demo.appspot.com',
-  storageDownloadOrigin: 'https://firebasestorage.example',
   appCheckEnabled: false,
   appCheckHeaders: async () => ({}),
 }));

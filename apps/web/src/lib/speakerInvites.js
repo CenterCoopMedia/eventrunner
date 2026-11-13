@@ -11,8 +11,8 @@
 // deliberately gives every failure the same status so a network log cannot
 // be read as an oracle — so `valid` is the field to branch on, not
 // `response.ok`.
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
-import { appCheckHeaders } from '../firebase.js';
+import { functionsOrigin } from './firebaseSettings.js';
+import { appCheckHeaders } from './firebaseLoader.js';
 import { IS_DEMO } from './demoMode.js';
 
 /**
