@@ -76,6 +76,7 @@ import { AdminEmptyState } from './components/adminChrome.jsx';
 import AdminIcon from './components/AdminIcon.jsx';
 import AdminIconControl from './components/AdminIconControl.jsx';
 import PendingChangesBanner from './components/PendingChangesBanner.jsx';
+import AdminOfflineNotice from './components/AdminOfflineNotice.jsx';
 import ReportProblemDialog from './components/ReportProblemDialog.jsx';
 import AdminCommandMenu, { commandShortcut } from './components/AdminCommandMenu.jsx';
 import { CommandMenuAccount } from './commandMenuRecents.js';
@@ -857,6 +858,7 @@ function AdminDesk() {
         {/* Above the stone, never inside it: the title band pulls itself
             up by the stone's top padding and would slide over it. */}
         <PendingChangesBanner />
+        <AdminOfflineNotice />
         <div className="admin-stone w-full">
           {/* The tour is the one thing in the stone before the page:
               `.admin-tour` (index.css) keeps room under it for the title
