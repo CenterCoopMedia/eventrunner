@@ -71,6 +71,7 @@ export const SOURCE_LABELS = Object.freeze({
   'speaker-invite': 'Speaker invitation',
   'speaker-accept': 'Speaker acceptance',
   'speaker-confirmation': 'Speaker confirmation',
+  'speaker-discussion-points': 'Speaker discussion points',
   feedback: 'Feedback receipt',
   'operator-notify': 'Operator alert',
   'ticketing-registration-prompt': 'Ticket prompt',

@@ -215,6 +215,7 @@ describe('AdminEmailLog', () => {
       invoice: 'Invoice',
       'speaker-reminder': 'Speaker reminder',
       'speaker-profile': 'Speaker profile request',
+      'speaker-discussion-points': 'Speaker discussion points',
       'admin-access': 'Admin access',
       'change-requests': 'Change request notice',
       'attendee-approval': 'Attendee approval',

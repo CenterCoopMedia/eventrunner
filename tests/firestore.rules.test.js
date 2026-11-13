@@ -3,6 +3,7 @@
 // public config (minus config/bootstrap), visibility-gated published CMS
 // collections, admin-only drafts and bookkeeping, deny-all everywhere else.
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertFails,
@@ -27,6 +28,8 @@ import {
 
 const ADMIN_EMAIL = "admin@example.com";
 const STAFF_EMAIL = "staff@example.com";
+const require = createRequire(import.meta.url);
+const { buildPublicSpeaker } = require("../packages/shared/src/speaker.cjs");
 
 /**
  * Every collection an admin may read directly from the browser, with the
@@ -1589,7 +1592,7 @@ describe("speakers canonical store and speakers_public projection (spec §4.3)",
   beforeAll(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
-      await setDoc(doc(db, "speakers/spk-1"), {
+      const canonical = {
         firstName: "Demo",
         lastName: "Speaker",
         slug: "demo-speaker",
@@ -1598,18 +1601,18 @@ describe("speakers canonical store and speakers_public projection (spec §4.3)",
         status: "approved",
         uid: "speaker-1",
         approvedAt: new Date(),
-      });
+        discussionPoints: {
+          text: "Private preparation notes.",
+          revision: 1,
+          requestId: "request_12345678",
+          submittedAt: new Date(),
+          notification: { state: "accepted" },
+        },
+      };
+      await setDoc(doc(db, "speakers/spk-1"), canonical);
       await setDoc(doc(db, "speakers_public/spk-1"), {
         speakerId: "spk-1",
-        firstName: "Demo",
-        lastName: "Speaker",
-        displayName: "Demo Speaker",
-        slug: "demo-speaker",
-        bio: "",
-        headshotPath: null,
-        organization: "",
-        jobTitle: "",
-        socialHandles: {},
+        ...buildPublicSpeaker(canonical),
       });
     });
   });
@@ -1635,6 +1638,9 @@ describe("speakers canonical store and speakers_public projection (spec §4.3)",
     await assertFails(setDoc(doc(admin(), "speakers/spk-2"), { firstName: "New" }));
     await assertFails(updateDoc(doc(admin(), "speakers/spk-1"), { status: "removed" }));
     await assertFails(updateDoc(doc(admin(), "speakers/spk-1"), { uid: "attendee-1" }));
+    await assertFails(updateDoc(doc(attendee("speaker-1"), "speakers/spk-1"), {
+      discussionPoints: { text: "Direct owner write.", revision: 2 },
+    }));
     await assertFails(deleteDoc(doc(admin(), "speakers/spk-1")));
     await assertFails(setDoc(doc(nonAdmin(), "speakers/spk-1"), { firstName: "Hijacked" }));
   });
@@ -1667,7 +1673,8 @@ describe("speakers canonical store and speakers_public projection (spec §4.3)",
   });
 
   it("allows anyone to read the public projection", async () => {
-    await assertSucceeds(getDoc(doc(anon(), "speakers_public/spk-1")));
+    const projected = await assertSucceeds(getDoc(doc(anon(), "speakers_public/spk-1")));
+    expect(projected.data()).not.toHaveProperty("discussionPoints");
     await assertSucceeds(getDoc(doc(nonAdmin(), "speakers_public/spk-1")));
     await assertSucceeds(getDocs(collection(anon(), "speakers_public")));
   });

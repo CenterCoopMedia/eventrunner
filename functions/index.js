@@ -47,6 +47,7 @@ const usersApproval = require('./src/users/approval.cjs');
 const usersExport = require('./src/users/export.cjs');
 const usersRecords = require('./src/users/records.cjs');
 const speakersProfile = require('./src/speakers/profile.cjs');
+const speakersDiscussionPoints = require('./src/speakers/discussionPoints.cjs');
 const speakersProfileSteps = require('./src/speakers/profileSteps.cjs');
 const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
 const speakersProjection = require('./src/speakers/projection.cjs');
@@ -129,6 +130,7 @@ module.exports = {
   ...usersExport.handlers,
   ...usersRecords.handlers,
   ...speakersProfile.handlers,
+  ...speakersDiscussionPoints.handlers,
   ...speakersProfileSteps.handlers,
   ...speakersLifecycle.handlers,
   ...speakersProjection.handlers,

@@ -98,6 +98,7 @@ test('listTemplateIds includes account, speaker, claim, and native ticket confir
     // (issue #21, issue #22).
     'speaker.accepted',
     'speaker.confirmation',
+    'speaker.discussion_points',
     'speaker.invite',
     // ADR 0008 §3: a submitted speaker profile.
     'speaker.profile_received',
@@ -127,6 +128,7 @@ test('storeRendered flags match the spec', () => {
   assert.equal(getDefaultTemplate('speaker.invite').storeRendered, false);
   assert.equal(getDefaultTemplate('speaker.accepted').storeRendered, true);
   assert.equal(getDefaultTemplate('speaker.confirmation').storeRendered, true);
+  assert.equal(getDefaultTemplate('speaker.discussion_points').storeRendered, false);
   // A reminder carries no credential, so the email log keeps its body.
   assert.equal(getDefaultTemplate('speaker.reminder').storeRendered, true);
   // The approval email carries links, never a credential.
@@ -142,6 +144,9 @@ test('required tokens match the spec', () => {
   assert.deepEqual(getDefaultTemplate('speaker.invite').requiredTokens, ['invite_url']);
   assert.deepEqual(getDefaultTemplate('speaker.accepted').requiredTokens, ['profile_wizard_url']);
   assert.deepEqual(getDefaultTemplate('speaker.confirmation').requiredTokens, ['session_title']);
+  assert.deepEqual(getDefaultTemplate('speaker.discussion_points').requiredTokens, [
+    'speaker_name', 'discussion_points', 'submission_revision', 'submitted_at',
+  ]);
   assert.deepEqual(getDefaultTemplate('speaker.reminder').requiredTokens, ['dashboard_url']);
   assert.deepEqual(getDefaultTemplate('speaker.profile_received').requiredTokens, ['profile_url']);
   // registration_url is optional: empty when the form asks no questions.
