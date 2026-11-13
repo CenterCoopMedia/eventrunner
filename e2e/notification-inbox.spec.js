@@ -74,6 +74,10 @@ test.describe.serial('reply notification inbox', () => {
     [ownerUid, replierUid, thirdUid] = await Promise.all([OWNER, REPLIER, THIRD].map(ensureUser));
     await Promise.all([ownerUid, replierUid, thirdUid].map((uid) =>
       db.doc(`users/${uid}`).set({ registrationStatus: 'approved', speakerId: null, role: 'attendee' })));
+    // Account switching must not race the separate profile-setup redirect.
+    await db.doc(`users/${thirdUid}`).set({
+      displayName: 'Fictional third attendee', profileVisibility: 'private',
+    }, { merge: true });
     await Promise.all([ownerUid, replierUid, thirdUid].map((uid) =>
       clear(db.collection(`users/${uid}/notifications`))));
     ownerToken = await idTokenFor(ownerUid);
