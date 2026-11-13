@@ -1,6 +1,6 @@
 import PageHeading from '../PageHeading.jsx';
 import { useRef, useState } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useLocation } from 'react-router';
 import { signInErrorMessage, peekReturn, useAuth } from '../auth.jsx';
 import { isEmail } from '../text.js';
 import IconControl from '../IconControl.jsx';
@@ -13,6 +13,11 @@ function signInProviders() {
 export default function SignIn() {
   const providers = signInProviders();
   const auth = useAuth();
+  const location = useLocation();
+  // Another tab can finish an emailed sign-in and clear the shared return
+  // path first. This tab must still return to its own kept setup answer.
+  const [returnTo] = useState(() => peekReturn(`${window.location.origin}${location.pathname}${location.search}`));
+  const recovering = new URLSearchParams(location.search).get('recovery') === '1';
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState('');
   const [error, setError] = useState('');
@@ -20,7 +25,7 @@ export default function SignIn() {
   const [busy, setBusy] = useState('');
   const fieldRef = useRef(null);
 
-  if (auth.user) return <Navigate to={peekReturn()} replace />;
+  if (auth.user) return <Navigate to={returnTo} replace />;
 
   async function run(method, action = 'provider') {
     if (busy) return;
@@ -53,6 +58,7 @@ export default function SignIn() {
     <section className="panel narrow" aria-labelledby="signin-title">
       <PageHeading id="signin-title" tabIndex={-1}>Sign in to Event Runner</PageHeading>
       <p className="lead">Set up and manage your event sites.</p>
+      {recovering ? <p>Your unsaved answer stays in this setup tab. If the email link opens another tab, return to this tab after signing in.</p> : null}
 
       {error ? <p className="message error" role="alert">{error}</p> : null}
 

@@ -18,7 +18,7 @@ import WebAddressStep from './WebAddressStep.jsx';
 import LoadingState from '../../LoadingState.jsx';
 import IconControl from '../../IconControl.jsx';
 import StepList from '../../setup/StepList.jsx';
-import { useAuth } from '../../auth.jsx';
+import { rememberReturn, useAuth } from '../../auth.jsx';
 import KeptAnswer from '../../setup/KeptAnswer.jsx';
 
 const STEP_VIEWS = {
@@ -67,7 +67,7 @@ function withStepErrors(app, step, stepErrors) {
  * types. A teammate can open the same address and continue.
  */
 export default function Setup() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { orgId, appId, step: stepPath } = useParams();
   const [search] = useSearchParams();
   const navigate = useNavigate();
@@ -79,6 +79,10 @@ export default function Setup() {
   const [navigating, setNavigating] = useState(false);
   const navigationPending = useRef(false);
   const actionArea = useRef(null);
+  const saveMessage = useRef(null);
+  const recoveryPending = useRef(false);
+  const [recovering, setRecovering] = useState(false);
+  const [recoveryError, setRecoveryError] = useState('');
   // Steps whose last save the server refused (saved: false), for example a
   // taken web address. The server keeps the older answer, so the review
   // holds the request until a new answer saves.
@@ -89,7 +93,7 @@ export default function Setup() {
   const fromReview = search.get('from') === 'review' && (ANSWER_STEPS.includes(step?.id) || step?.id === 'team');
 
   const scope = { userId: user?.uid, orgId, appId };
-  const { queue, flush, status: saveStatus, error: saveError, signingOut } = useAutosave({
+  const { queue, flush, keepForSignIn, status: saveStatus, error: saveError, failure, signingOut } = useAutosave({
     scope,
     save: (value, options) => callApi('saveApplicationStep', { orgId, appId, step: value.step, answers: value.answers }, options),
     onResult: (result) => {
@@ -101,6 +105,25 @@ export default function Setup() {
       setApp((prev) => withStepErrors(prev, result.step, result.errors));
     },
   });
+
+  async function signInAgain() {
+    if (recoveryPending.current) return;
+    recoveryPending.current = true;
+    setRecovering(true);
+    setRecoveryError('');
+    keepForSignIn();
+    const returnPath = `${location.pathname}${location.search}${location.hash}`;
+    rememberReturn(returnPath);
+    try {
+      await signOut();
+      navigate(`/signin?next=${encodeURIComponent(returnPath)}&recovery=1`, { replace: true });
+    } catch {
+      setRecoveryError('We could not restart sign-in. Try again. Your answer is kept in this tab.');
+    } finally {
+      recoveryPending.current = false;
+      setRecovering(false);
+    }
+  }
 
   const onChange = useCallback((value) => {
     if (!step || !ANSWER_STEPS.includes(step.id)) return;
@@ -140,6 +163,10 @@ export default function Setup() {
       actionArea.current?.focus();
       return;
     }
+    if (action === 'next' && step?.id === 'review' && !openStepIds(applicationNow.current, refusedNow.current).includes('agreement')) {
+      (document.getElementById('review-not-saved') || actionArea.current)?.focus();
+      return;
+    }
     if (action === 'next' && Object.keys(errorsOfStep(applicationNow.current?.errors, step?.id)).length > 0) {
       navigate(`${setupPath(orgId, appId, step)}?check=1`);
       return;
@@ -163,7 +190,7 @@ export default function Setup() {
 
   const index = STEPS.indexOf(step);
   const previous = open.includes(STEPS[index - 1]?.id) ? STEPS[index - 1] : null;
-  const next = open.includes(STEPS[index + 1]?.id) ? STEPS[index + 1] : null;
+  const next = open.includes(STEPS[index + 1]?.id) || (step.id === 'review' && refused.length > 0) ? STEPS[index + 1] : null;
   const View = STEP_VIEWS[step.id];
   const shownErrors = showAll ? stepErrors : {};
 
@@ -189,7 +216,7 @@ export default function Setup() {
         </div>
         {error ? <ActionFeedback kind="error"><p>{error}</p><IconControl icon="refresh" label="Reload setup" onClick={() => reload().catch(() => {})} /></ActionFeedback> : null}
         {View && showAll ? <Problems fields={shownErrors} orgId={orgId} appId={appId} fromReview={fromReview} /> : null}
-        <fieldset disabled={navigating || signingOut} className="console-feedback-fields">
+        <fieldset disabled={navigating || signingOut || recovering} className="console-feedback-fields">
         {View ? <KeptAnswer key={`${user?.uid}/${orgId}/${appId}/${step.id}`} scope={scope} step={step.id}
           onUse={onChange}
           onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} /> : null}
@@ -229,14 +256,21 @@ export default function Setup() {
         ) : null}
         </fieldset>
         <div className="console-feedback-actions" ref={actionArea} tabIndex={-1} aria-label="Save and continue">
+          <div ref={saveMessage} tabIndex={-1} role="group" aria-label="Save status">
           {saveStatus === 'error' || saveStatus === 'unsaved' ? (
             <ActionFeedback kind="error">{saveStatusText(saveStatus, saveError)}</ActionFeedback>
           ) : <p className="save-status" role="status" aria-live="polite">{saveStatusText(saveStatus, saveError)}</p>}
+          </div>
+          {recoveryError ? <ActionFeedback kind="error">{recoveryError}</ActionFeedback> : null}
           <div className="step-actions">
             {previous ? <button type="button" className="button" disabled={navigating} onClick={() => go(setupPath(orgId, appId, previous), 'leave')}>Back</button> : null}
             {fromReview ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, stepById('review')), 'review')}>Back to Review</button>
               : next ? <button type="button" className="button primary" disabled={navigating} onClick={() => go(setupPath(orgId, appId, next))}>Next: {next.title}</button> : null}
-            {saveStatus === 'error' ? <button type="button" className="button" disabled={navigating} onClick={async () => { await flush(); actionArea.current?.focus(); }}>Save</button> : null}
+            {saveStatus === 'error' && failure?.status === 401 ? (
+              <button type="button" className="button" disabled={recovering || navigating} onClick={signInAgain}>Sign in again</button>
+            ) : saveStatus === 'error' && (failure?.status === 0 || failure?.status >= 500) ? (
+              <button type="button" className="button" disabled={navigating} onClick={async () => { saveMessage.current?.focus(); await flush(); saveMessage.current?.focus(); }}>Save again</button>
+            ) : null}
           </div>
         </div>
       </section>

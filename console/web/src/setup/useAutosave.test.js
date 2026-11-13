@@ -18,11 +18,13 @@ describe('useAutosave', () => {
     expect(ok).toBe(false);
     expect(result.current.status).toBe('error');
     expect(result.current.error).toBe('No connection.');
+    expect(result.current.failure).toEqual({ status: 0, code: 'network' });
     await act(async () => { ok = await result.current.flush(); });
     expect(ok).toBe(true);
     expect(save).toHaveBeenCalledTimes(2);
     expect(save.mock.calls[1][0]).toEqual({ step: 'organization', answers: { website: 'x.org' } });
     expect(result.current.status).toBe('saved');
+    expect(result.current.failure).toBeNull();
   });
 
   it('sends a newer value instead of the failed one', async () => {

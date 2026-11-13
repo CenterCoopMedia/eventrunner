@@ -30,6 +30,7 @@ function keepUnsaved(entry, latest) {
 export function useAutosave({ save, onResult, scope, delay = 800 }) {
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
+  const [failure, setFailure] = useState(null);
   const pending = useRef(undefined);
   const latest = useRef(undefined);
   const scopeRef = useRef(scope);
@@ -57,6 +58,7 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
       try {
         const result = await saveRef.current(value, options);
         setError('');
+        setFailure(null);
         if (result?.saved === false) keepUnsaved(entry, latest.current);
         else {
           if (latest.current === entry) {
@@ -75,6 +77,7 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
         keepUnsaved(entry, latest.current);
         if (latest.current === entry && pending.current === undefined) pending.current = entry;
         setError(err.message);
+        setFailure({ status: err.status ?? 0, code: err.code ?? 'network' });
         setStatus('error');
         return false;
       }
@@ -89,6 +92,16 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
     timer.current = setTimeout(flush, delay);
     setStatus('waiting');
   }, [flush, delay]);
+
+  const keepForSignIn = useCallback(() => {
+    clearTimeout(timer.current);
+    timer.current = null;
+    if (latest.current) keepUnsaved(latest.current, latest.current);
+    // Authentication is about to end. Recovery reopens the copy explicitly,
+    // without an unmount retry against the signed-out session.
+    pending.current = undefined;
+    latest.current = undefined;
+  }, []);
 
   useEffect(() => {
     const beforeUnload = (event) => {
@@ -133,7 +146,7 @@ export function useAutosave({ save, onResult, scope, delay = 800 }) {
     flush();
   }, [flush]);
 
-  return { status, error, queue, flush, signingOut: signOut?.signingOut || false };
+  return { status, error, failure, queue, flush, keepForSignIn, signingOut: signOut?.signingOut || false };
 }
 
 /** The quiet words beside the step, for a screen reader too. */

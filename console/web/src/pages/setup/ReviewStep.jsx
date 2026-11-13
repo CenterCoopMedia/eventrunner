@@ -96,7 +96,7 @@ export function Problems({ fields, orgId, appId, fromReview = false }) {
 function NotSaved({ steps, orgId, appId }) {
   if (steps.length === 0) return null;
   return (
-    <div className="message error">
+    <div className="message error" id="review-not-saved" tabIndex={-1}>
       {steps.map((step) => (
         <p key={step.id}>
           <Link to={`${setupPath(orgId, appId, step)}?check=1&from=review`}>{step.title}</Link> is not saved. Fix it before you continue.
