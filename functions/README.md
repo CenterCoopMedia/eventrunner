@@ -49,7 +49,8 @@ node scripts/refresh-ticket-emails.cjs --dry-run
 
 Review the project id and both result rows. Only existing copies with
 `seeded: true` and `updatedBy: init-event-script` can refresh. `edited` copies
-are reported and preserved; missing copies are not created. The operator then
+are reported and preserved; missing copies are not created. This command handles
+ticket copies only; review any saved speaker wording separately. The operator then
 runs the approved refresh with the theme and logo changes:
 
 ```bash
