@@ -71,7 +71,7 @@ test.describe.serial('speaker discussion points', () => {
       const save = page.getByRole('button', { name: /^(Save discussion points|Replace saved discussion points)$/ });
       await expect(save).toBeFocused();
       const focus = await save.evaluate((element) => {
-        const style = getComputedStyle(element);
+        const style = globalThis.getComputedStyle(element);
         return { width: parseFloat(style.outlineWidth), style: style.outlineStyle };
       });
       expect(focus.width).toBeGreaterThan(0);
@@ -94,7 +94,7 @@ test.describe.serial('speaker discussion points', () => {
       expect(stored.pendingEdits).toBeUndefined();
       const publicProfile = (await adminDb().collection('speakers_public').doc(speakerId).get()).data();
       expect(publicProfile?.discussionPoints).toBeUndefined();
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth)).toBe(true);
       await testInfo.attach(`discussion-${width}px`, {
         body: await page.screenshot({ path: `test-results/admin-visual-evidence/speaker-discussion-${width}.png`, fullPage: true }),
         contentType: 'image/png',
