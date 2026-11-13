@@ -8,9 +8,8 @@
 //
 // This is the one module that talks to Firestore/fetch for reactions; tests
 // mock this module rather than the SDK, matching lib/bookmarksSource.js.
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase.js';
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { subscribeToFirebase } from './firebaseLoader.js';
+import { functionsOrigin } from './firebaseSettings.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 
 /** The fixed reaction vocabulary — must match functions/src/schedule/reactions.cjs REACTION_KINDS. */
@@ -42,6 +41,7 @@ export function subscribeSessionReactions(sessionId, onNext, onError) {
     onNext(emptyCounts());
     return () => {};
   }
+  return subscribeToFirebase(({ db, doc, onSnapshot }) => {
   return subscribeWithRetry(
     (onListenerError) =>
       onSnapshot(
@@ -57,6 +57,7 @@ export function subscribeSessionReactions(sessionId, onNext, onError) {
       onError?.(error);
     },
   );
+  }, onError);
 }
 
 /**
@@ -75,6 +76,7 @@ export function subscribeMySessionReaction(sessionId, uid, onNext, onError) {
     onNext(null);
     return () => {};
   }
+  return subscribeToFirebase(({ db, doc, onSnapshot }) => {
   return subscribeWithRetry(
     (onListenerError) =>
       onSnapshot(
@@ -90,6 +92,7 @@ export function subscribeMySessionReaction(sessionId, uid, onNext, onError) {
       onError?.(error);
     },
   );
+  }, onError);
 }
 
 /** Thrown by {@link setSessionReaction} on any non-2xx response. */

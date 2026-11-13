@@ -1,3 +1,4 @@
+vi.mock('../lib/firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), storageBucketName: 'demo.appspot.com', storageDownloadOrigin: 'https://firebasestorage.example' }));
 // Pages tests (spec §5.2, issue #52): Home renders its cmsPages sections
 // through the block registry, generic pages render at their own root-level
 // `path` via the catch-all route, and unknown paths get the same designed
@@ -42,8 +43,6 @@ vi.mock('../firebase.js', () => ({
   // way (lib/mediaSource.js), so its marks build a URL too — a mark is
   // decorative either way, so the wall says nothing about it and the names
   // under the marks are what this test reads.
-  storageBucketName: 'demo.appspot.com',
-  storageDownloadOrigin: 'https://firebasestorage.example',
   // App Check is unconfigured in a credential-free run, which is also its
   // production default: no site key, no attestation header (issue #45).
   appCheckEnabled: false,

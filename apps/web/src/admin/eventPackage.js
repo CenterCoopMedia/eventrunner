@@ -5,7 +5,7 @@
 // still takes AdminApiError's shape and the server's words, the same way
 // materialsArchive.js states them. The zip lives only in the response body
 // and in the browser's download folder.
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { saveBlobAs } from '../lib/materialsSource.js';
 import { AdminApiError } from './adminApi.js';
 

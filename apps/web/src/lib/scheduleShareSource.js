@@ -8,7 +8,7 @@
 // Tests mock this module rather than the SDK (lib/contentSource.js rule).
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase.js';
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { functionsOrigin } from './firebaseSettings.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 
 /** The closed list the rules read. One definition, mirrored server-side. */

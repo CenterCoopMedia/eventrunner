@@ -49,34 +49,11 @@ import {
   useMemo,
   useState,
 } from 'react';
-import {
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  signInWithCustomToken,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-} from 'firebase/auth';
-import { collection, getDocs, limit, query } from 'firebase/firestore';
-import { appCheckHeaders, auth, db } from '../firebase.js';
+import { appCheckHeaders, loadFirebase, subscribeToFirebase, rememberSignedIn } from '../lib/firebaseLoader.js';
+import { functionsOrigin } from '../lib/firebaseSettings.js';
+import { secondaryButtonClass } from '../components/controlClasses.js';
 
 const AuthContext = createContext(null);
-
-/** Base URL for the deployed HTTP functions (see module comment). */
-export function functionsOrigin() {
-  const override = import.meta.env.VITE_FUNCTIONS_ORIGIN;
-  if (override) return override.replace(/\/+$/, '');
-  const region = import.meta.env.VITE_FIREBASE_REGION || 'us-central1';
-  const project = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  if (!project) {
-    // A deploy missing this env var would otherwise silently fetch
-    // us-central1-undefined.cloudfunctions.net and surface as a mystery
-    // network error at sign-in time — fail loudly and specifically instead.
-    console.error(
-      'VITE_FIREBASE_PROJECT_ID is not set; cannot build the functions origin.',
-    );
-  }
-  return `https://${region}-${project}.cloudfunctions.net`;
-}
 
 /**
  * Error shape every OTP endpoint failure is normalized to. `code` mirrors the
@@ -162,6 +139,8 @@ export function AuthProvider({ children }) {
   // is refused on a guess (the server decides regardless).
   const [verdict, setVerdict] = useState({ user: null, status: 'unknown', tier: null, confirmed: false });
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  const retryAuth = useCallback(() => globalThis.location.reload(), []);
   // Bumped by refreshAdminStatus: the probes run again for the same user,
   // keeping the current verdict until the new one lands. The Access page
   // asks for this after an operator changes their OWN standing, so the rail
@@ -169,10 +148,12 @@ export function AuthProvider({ children }) {
   const [probeRun, setProbeRun] = useState(0);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (nextUser) => {
+    return subscribeToFirebase(({ auth, onAuthStateChanged }) => onAuthStateChanged(auth, (nextUser) => {
+      rememberSignedIn(Boolean(nextUser));
       setUser(nextUser);
+      setAuthError(null);
       setLoading(false);
-    });
+    }), () => setAuthError('Sign-in could not load. Reload this page to try again.'));
   }, []);
 
   // Admin probes (see module comment). Run once per signed-in user, and
@@ -182,8 +163,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!user) return undefined;
     let cancelled = false;
-    const probe = (name) =>
-      getDocs(query(collection(db, name), limit(1))).then(
+    const probe = (name) => loadFirebase().then(({ db, getDocs, query, collection, limit }) =>
+      getDocs(query(collection(db, name), limit(1)))).then(
         // A cache answer still counts for the admin shell, as before; it is
         // recorded so a consumer that needs the server's word can tell.
         (snapshot) => (snapshot?.metadata?.fromCache === false ? 'ok' : 'ok-cached'),
@@ -238,7 +219,10 @@ export function AuthProvider({ children }) {
   }, [awaitingServerVerdict]);
 
   const signInWithGoogle = useCallback(
-    () => signInWithPopup(auth, new GoogleAuthProvider()),
+    async () => {
+      const { auth, signInWithPopup, GoogleAuthProvider } = await loadFirebase();
+      return signInWithPopup(auth, new GoogleAuthProvider());
+    },
     [],
   );
 
@@ -253,6 +237,7 @@ export function AuthProvider({ children }) {
   // Step 2: one failure shape for every miss (no oracle), then the custom
   // token signs the browser in.
   const verifyOtpCode = useCallback(async ({ challengeId, email, code }) => {
+    const { auth, signInWithCustomToken } = await loadFirebase();
     const requestUser = auth.currentUser;
     const { token } = await postJson('verifyOtpCode', {
       challengeId,
@@ -279,7 +264,11 @@ export function AuthProvider({ children }) {
     return credential;
   }, []);
 
-  const signOut = useCallback(() => firebaseSignOut(auth), []);
+  const signOut = useCallback(async () => {
+    const { auth, signOut } = await loadFirebase();
+    await signOut(auth);
+    rememberSignedIn(false);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -290,6 +279,8 @@ export function AuthProvider({ children }) {
       adminTier,
       adminConfirmed,
       loading,
+      authError,
+      retryAuth,
       refreshAdminStatus,
       signInWithGoogle,
       sendOtpCode,
@@ -304,6 +295,8 @@ export function AuthProvider({ children }) {
       adminStatus,
       adminTier,
       loading,
+      authError,
+      retryAuth,
       refreshAdminStatus,
       signInWithGoogle,
       sendOtpCode,
@@ -312,7 +305,13 @@ export function AuthProvider({ children }) {
     ],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>
+    {authError ? <div role="alert" className="space-y-sm border-hairline border-rule-hairline bg-surface-alt p-md">
+      <p>{authError}</p>
+      <button type="button" className={secondaryButtonClass} onClick={retryAuth}>Reload this page</button>
+    </div> : null}
+    {children}
+  </AuthContext.Provider>;
 }
 
 export function useAuth() {

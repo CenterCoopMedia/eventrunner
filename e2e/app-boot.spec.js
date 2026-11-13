@@ -22,7 +22,7 @@ test.beforeAll(async () => {
   await fs.writeFile(path.join(FIXTURE, 'index.html'), source.replace('src="/src/main.jsx"', 'src="/main.jsx"'));
   output = await fs.mkdtemp(path.join(os.tmpdir(), 'eventrunner-app-boot-'));
   const config = {
-    ...appConfig,
+    ...appConfig({ command: 'build', mode: 'production', isSsrBuild: false }),
     configFile: false,
     mode: 'production',
     root: FIXTURE,

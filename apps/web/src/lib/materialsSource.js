@@ -9,9 +9,8 @@
 // the embargo gate server-side and is safe to call anonymously — a
 // post-embargo approved material is a discovery grant for anyone, not
 // only signed-in attendees (functions/src/materials/access.cjs).
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase.js';
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { subscribeToFirebase } from './firebaseLoader.js';
+import { functionsOrigin } from './firebaseSettings.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 
 // --- shared collection-wide subscription (issue #23 follow-up) -------------
@@ -46,15 +45,16 @@ function regroupSnapshot(snapshot) {
 }
 
 function attachSharedListener() {
+  const failed = (error) => {
+    console.warn('session_materials_public subscription failed; keeping last-known lists.', error);
+    for (const sub of subscribers) sub.onError?.(error);
+  };
+  return subscribeToFirebase(({ db, collection, onSnapshot }) => {
   return subscribeWithRetry(
     (onListenerError) => onSnapshot(collection(db, 'session_materials_public'), regroupSnapshot, onListenerError),
-    (error) => {
-      // Fail-soft (matching bookmarksSource.js): keep whatever each
-      // subscriber last rendered rather than flashing empty.
-      console.warn('session_materials_public subscription failed; keeping last-known lists.', error);
-      for (const sub of subscribers) sub.onError?.(error);
-    },
+    failed,
   );
+  }, failed);
 }
 
 /**

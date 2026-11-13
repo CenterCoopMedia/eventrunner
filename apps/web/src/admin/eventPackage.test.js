@@ -1,9 +1,7 @@
 // The browser half of the event data package (issue #329).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../contexts/AuthContext.jsx', () => ({
-  functionsOrigin: () => 'https://fake-functions.example',
-}));
+vi.mock('../lib/firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), functionsOrigin: () => 'https://fake-functions.example' }));
 
 const { downloadEventPackage, packageFilename, STOPPED_MESSAGE } = await import('./eventPackage.js');
 const { AdminApiError } = await import('./adminApi.js');

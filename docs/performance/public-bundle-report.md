@@ -2,6 +2,31 @@
 
 The report measures the entry module and each static JavaScript import required before route interaction. Dynamic route chunks are separate.
 
+## 2026-11-12: Firebase loads after the public snapshot (#625)
+
+Hosted CI run [43343621985](https://github.com/CenterCoopMedia/eventrunner/actions/runs/43343621985) measured `367809f5` against the stack base `1110f947`. The normal Web build and demo build use the same budget script and gzip level 9. Each initial graph has three chunks.
+
+| Build | Initial raw before | Initial raw after | Initial gzip before | Initial gzip after |
+| --- | ---: | ---: | ---: | ---: |
+| Normal | 958,565 | 412,245 | 288,934 | 129,479 |
+| Demo | 963,643 | 416,582 | 290,064 | 130,440 |
+
+The named SDK chunk includes its runtime wrapper and adds 548,017 raw / 160,309 gzip bytes in normal mode and 548,413 / 160,419 in demo mode. The initial-plus-SDK subtotal is 960,262 raw / 289,788 gzip bytes for normal mode and 964,995 / 290,859 for the demo. These subtotals include the automatic SDK load and exclude route-specific and optional feature chunks. The initial transfer falls by about 55%; the combined subtotal stays close to the parent initial graph.
+
+Auth and Firestore, their Firebase App support, and their static dependencies move into that SDK chunk. Plain storage and function URL settings remain in the initial graph without importing an SDK. Storage stays on the profile workflow; App Check remains opt-in and dynamic. The existing snapshot/provider nesting, live overlays, authorization probes and listener retries remain.
+
+The initial ceiling is 430,000 raw / 135,000 gzip bytes. The separately approved SDK ceiling is 560,000 / 165,000. Ordinary deferred chunks retain 180,000 / 50,000, and the CSS ceiling is unchanged. SDK bytes are included in the first-visit totals above even though they no longer block the snapshot render.
+
+The existing mobile Lighthouse run [43343634399](https://github.com/CenterCoopMedia/eventrunner/actions/runs/43343634399) kept its three routes, three runs per route and simulated mobile settings. Compared with the same workflow at `1110f947`:
+
+| Route | Median LCP before | Median LCP after | Median TBT before | Median TBT after | CLS after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Home | 4511 ms | 3613 ms | 252 ms | 54.5 ms | 0 |
+| Schedule | 5561 ms | 5009 ms | 688 ms | 296 ms | 0.0753 |
+| Speakers | 4312 ms | 3239 ms | 109.5 ms | 37.5 ms | 0 |
+
+All three LCP medians remain above the unchanged 2500 ms error limit. The remaining load work stays in #625 and #898; this change does not claim those issues complete. These static-demo results exclude live Firestore latency and do not supply a live-listener preview or field INP measurement.
+
 | Date | Build | Initial raw bytes | Initial gzip bytes | Initial chunks |
 | --- | --- | ---: | ---: | ---: |
 | 2026-08-24 | Normal | 1,001,709 | 266,428 | 1 |
@@ -42,8 +67,9 @@ bytes attributed through the build's own source map:
 | `@remix-run/router` | 10,133 |
 | `react-router` | 9,589 |
 
-Everything above `@firebase/storage` is either the router, React itself, or
-the Firestore and Auth clients that the shell subscribes to on first paint.
+That measurement included the router, React, and the Firestore and Auth clients
+in the initial graph. The current snapshot shell does not need Firebase to paint;
+its clients attach through the deferred runtime described above.
 `@firebase/storage` was not: no page reads media through the Storage service.
 `lib/mediaSource.js` builds object URLs as strings from the bucket name, and
 the only calls that need the SDK are one attendee uploading or removing their

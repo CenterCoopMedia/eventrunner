@@ -9,9 +9,7 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: (...args) => onSnapshotMock(...args),
 }));
 vi.mock('../firebase.js', () => ({ db: { name: 'db' } }));
-vi.mock('../contexts/AuthContext.jsx', () => ({
-  functionsOrigin: () => 'http://localhost',
-}));
+vi.mock('./firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), functionsOrigin: () => 'http://localhost' }));
 
 const { subscribeOwnScheduleShare, subscribeScheduleShare } = await import('./scheduleShareSource.js');
 

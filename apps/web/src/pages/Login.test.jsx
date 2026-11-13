@@ -4,9 +4,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { signInWithCustomToken } from 'firebase/auth';
+import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import App from '../App.jsx';
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { appCheckHeaders } from '../firebase.js';
 
 // Exercise the existing OTP suite as an ordinary deployed client. The
@@ -74,6 +74,14 @@ describe('functions origin convention', () => {
 });
 
 describe('emailed-code sign-in', () => {
+  it('states an SDK startup failure and offers an explicit page reload', async () => {
+    vi.mocked(onAuthStateChanged).mockImplementationOnce(() => { throw new Error('SDK unavailable'); });
+    renderSignIn();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in could not load');
+    expect(screen.getByRole('button', { name: 'Reload this page' })).toBeVisible();
+    expect(screen.queryByLabelText('Email address')).toBeNull();
+  });
+
   it('walks send → verify → signInWithCustomToken and lands on home', async () => {
     fetch
       .mockResolvedValueOnce(

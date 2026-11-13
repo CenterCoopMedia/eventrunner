@@ -2,7 +2,8 @@ import {
   collection, connectFirestoreEmulator, doc, documentId, getDoc, getDocs,
   getFirestore, limit, orderBy, query, startAfter,
 } from 'firebase/firestore/lite';
-import { app, useEmulators } from '../firebase.js';
+import { app } from '../firebase.js';
+import { useEmulators } from '../lib/firebaseSettings.js';
 
 // This lazy staff screen needs fresh reads, not an offline store. Keeping
 // its query APIs in the Lite module also keeps them out of the public SDK

@@ -457,7 +457,9 @@ export default function SignInPanel(props) {
   const { eventConfig } = useEventConfig();
   const readOnly = isReadOnlyDemo(eventConfig);
   const adminEntry = adminReturnPath(useLocation().state?.from);
+  const { authError } = useAuth();
   if (readOnly && !adminEntry) return <DemoSignInNotice />;
+  if (authError) return null;
   const allowGoogle = eventConfig?.auth?.googleProviderEnabled === true || (readOnly && Boolean(adminEntry));
   return <SignInForm {...props} allowEmailCode={!readOnly} allowGoogle={allowGoogle} />;
 }

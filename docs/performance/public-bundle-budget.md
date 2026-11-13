@@ -1,11 +1,15 @@
 # Public bundle budget
 
-The budget measures the JavaScript graph required for the first public route. It does not hide weight by moving the same required code into a large vendor file.
+The budget measures the JavaScript graph required to render the first public snapshot. The Firebase runtime starts after that paint and has a separate ceiling. The report gives both costs and their combined first-visit download.
+
+The read-only static demo also renders Home, Program and Speakers to HTML at build time, using the same React components and snapshot data. Its document includes compact, standard and wide layouts; a short inline selector installs the requested route and viewport before entry modules execute. Matching routes hydrate those nodes. Different preview styles, filtered Program URLs and other routes use the live renderer. Client deployments retain their runtime render.
+
+The generated head preloads the hero source and any responsive candidates the rendered image offers. Heading, body and data fonts remain preloaded with `font-display: swap`; the Speakers paragraph can paint from the HTML without waiting for its route module. Hosted browser checks block the entry module at phone, tablet and desktop widths, then verify that normal hydration preserves the painted main and hero nodes.
 
 ## Measurement
 
 - Build the normal deployment and the static demo.
-- Record the raw and gzip size of the entry chunk and every chunk that it imports before route interaction.
+- Record the raw and gzip size of the entry chunk and its static imports, then the automatic after-paint Firebase chunk separately. Report their combined first-visit download too.
 - Report the largest modules in the initial graph before and after a split.
 - Exclude lazy route chunks from the initial total, but give each lazy chunk its own ceiling.
 - Keep the measurement script deterministic and run it in CI after the web build.
@@ -23,9 +27,18 @@ node scripts/ci/bundle-budget.cjs --dist docs/demo
 
 The committed limits are:
 
-- 1,080,000 raw bytes and 293,550 gzip bytes for the initial graph.
+- 430,000 raw bytes and 135,000 gzip bytes for the initial graph.
 - 190,000 raw bytes and 28,000 gzip bytes for the stylesheets `index.html` names, which block first paint.
 - 180,000 raw bytes and 50,000 gzip bytes for each deferred chunk.
+- 560,000 raw bytes and 165,000 gzip bytes for the named `firebase-sdk` chunk. This exception covers the static dependencies of the deferred Firebase runtime. Storage, Firestore Lite and dynamic App Check remain outside that group and retain the ordinary deferred ceiling.
+
+### 2026-11-12: Firebase starts after snapshot paint (#625)
+
+The public snapshot needs neither Auth nor Firestore to render. Those clients now attach after a painted frame, with no timer or idle delay. Signed-in routes and a stored sign-in hint start the load immediately. The hint grants no authority; the existing Firebase user, rules and server-confirmation checks still decide access.
+
+The owner approved a separately named SDK ceiling in #625. Hosted CI run [43343621985](https://github.com/CenterCoopMedia/eventrunner/actions/runs/43343621985), at `367809f5`, measured the normal initial graph at 412,245 raw / 129,479 gzip bytes and the demo at 416,582 / 130,440. The SDK chunk, including its runtime wrapper, is 548,017 / 160,309 in normal mode and 548,413 / 160,419 in demo mode. The ceilings above leave about three percent of headroom. No other deferred ceiling or CSS ceiling changes.
+
+This changes when visitors fetch the SDK, rather than removing it from the first visit. The [bundle report](public-bundle-report.md) includes the combined bytes. A source-graph contract pins every Firebase package and `firebase.js` out of the entry, Schedule and Speakers graphs. Hosted browser checks block the SDK request and require the snapshot to remain readable without an automatic reload.
 
 ### 2026-11-10: initial gzip limit 292,000 to 293,550 (#788)
 

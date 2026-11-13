@@ -18,18 +18,8 @@
 // rule, so asking for documents the requester may not read fails the whole
 // query rather than dropping rows. `includeAttendeesOnly` therefore mirrors
 // the requester's own access — the rules, not this filter, are the boundary.
-import {
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where,
-} from 'firebase/firestore';
 import { SELF_EDITABLE_PROFILE_FIELDS, validateProfileBounds } from 'shared/profile';
-import { db } from '../firebase.js';
+import { loadFirebase, subscribeToFirebase } from './firebaseLoader.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
 import { demoAttendees } from './demoCommunity.js';
@@ -57,20 +47,22 @@ const USERS_PUBLIC = 'users_public';
  * @returns {() => void} unsubscribe
  */
 export function subscribeOwnProfile(uid, onNext, onConfirmed) {
-  const ref = doc(db, USERS, uid);
-  const next = (snapshot) => {
-    onNext(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
-    onConfirmed?.(snapshot.metadata?.fromCache === false);
-  };
-  return subscribeWithRetry(
-    (onError) =>
-      onConfirmed
-        ? onSnapshot(ref, { includeMetadataChanges: true }, next, onError)
-        : onSnapshot(ref, next, onError),
-    (error) => {
-      console.warn('own profile subscription failed; retrying.', error);
-    },
-  );
+  return subscribeToFirebase(({ db, doc, onSnapshot }) => {
+    const ref = doc(db, USERS, uid);
+    const next = (snapshot) => {
+      onNext(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null);
+      onConfirmed?.(snapshot.metadata?.fromCache === false);
+    };
+    return subscribeWithRetry(
+      (onError) =>
+        onConfirmed
+          ? onSnapshot(ref, { includeMetadataChanges: true }, next, onError)
+          : onSnapshot(ref, next, onError),
+      (error) => {
+        console.warn('own profile subscription failed; retrying.', error);
+      },
+    );
+  });
 }
 
 /**
@@ -98,8 +90,10 @@ export function saveOwnProfile(uid, fields) {
     }
   }
   validateProfileBounds(payload);
-  payload.updatedAt = serverTimestamp();
-  return updateDoc(doc(db, USERS, uid), payload);
+  return loadFirebase().then(({ db, serverTimestamp, updateDoc, doc }) => {
+    payload.updatedAt = serverTimestamp();
+    return updateDoc(doc(db, USERS, uid), payload);
+  });
 }
 
 /**
@@ -117,26 +111,28 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
     onNext(demoAttendees);
     return () => {};
   }
-  const target = includeAttendeesOnly
-    ? query(
-        collection(db, USERS_PUBLIC),
-        where('profileVisibility', 'in', ['public', 'attendees_only']),
-      )
-    : query(collection(db, USERS_PUBLIC), where('profileVisibility', '==', 'public'));
-  return subscribeWithRetry(
-    (onError) =>
-      onSnapshot(
-        target,
-        (snapshot) => {
-          onNext(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-        },
-        onError,
-      ),
-    (error) => {
-      console.warn('attendee directory subscription failed; retrying.', error);
-      onFail?.(error);
-    },
-  );
+  return subscribeToFirebase(({ db, collection, onSnapshot, query, where }) => {
+    const target = includeAttendeesOnly
+      ? query(
+          collection(db, USERS_PUBLIC),
+          where('profileVisibility', 'in', ['public', 'attendees_only']),
+        )
+      : query(collection(db, USERS_PUBLIC), where('profileVisibility', '==', 'public'));
+    return subscribeWithRetry(
+      (onError) =>
+        onSnapshot(
+          target,
+          (snapshot) => {
+            onNext(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+          },
+          onError,
+        ),
+      (error) => {
+        console.warn('attendee directory subscription failed; retrying.', error);
+        onFail?.(error);
+      },
+    );
+  }, onFail);
 }
 
 /**
@@ -150,6 +146,7 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
 export async function fetchPublicProfile(uid) {
   if (IS_DEMO) return demoAttendees.find((profile) => profile.id === uid) ?? null;
   try {
+    const { db, doc, getDoc } = await loadFirebase();
     const snapshot = await getDoc(doc(db, USERS_PUBLIC, uid));
     return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
   } catch (error) {

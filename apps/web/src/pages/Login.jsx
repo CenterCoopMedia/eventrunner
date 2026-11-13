@@ -19,9 +19,10 @@ import { primaryButtonClass, secondaryButtonClass } from '../components/controlC
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { adminReturnPath } from '../lib/adminReturnPath.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
+import LoadingState from '../components/LoadingState.jsx';
 
 export default function Login() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, signOut, authError, retryAuth } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { eventConfig } = useEventConfig();
@@ -37,11 +38,16 @@ export default function Login() {
     );
   }
 
+  if (authError) {
+    return <article className="mx-auto max-w-md">
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in</h1>
+      <div className="mt-lg"><SignInPanel /></div>
+    </article>;
+  }
+
   if (loading) {
     return (
-      <p role="status" className="font-data text-caption text-text-secondary">
-        Checking your sign-in…
-      </p>
+      <LoadingState label="Checking your sign-in…" rows={0} onRetry={retryAuth} />
     );
   }
 

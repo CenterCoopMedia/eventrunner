@@ -1,3 +1,4 @@
+vi.mock('../../lib/firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), functionsOrigin: () => 'https://functions.example.test' }));
 // AdminTicketing (issue #31): provider status, CSV import (mapping, dry-run
 // preview, commit), and the ticket search list. Mocks adminApi directly,
 // same convention as AdminFeedback.test.jsx — the server contract is what
@@ -8,8 +9,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
 vi.mock('../../contexts/AuthContext.jsx', () => ({
-  useAuth: () => ({ isOperator: false, user: { uid: 'staff-synthetic' } }),
-  functionsOrigin: () => 'https://functions.example.test',
+  useAuth: () => ({ isOperator: false, user: { uid: 'staff-synthetic' } })
 }));
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig: { name: 'Synthetic event', timezone: 'UTC' } }),

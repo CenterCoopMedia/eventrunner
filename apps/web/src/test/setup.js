@@ -20,17 +20,38 @@ vi.mock('@/firebase.js', () => ({
   app: {},
   auth: {},
   db: {},
-  useEmulators: false,
-  // lib/mediaSource.js builds object URLs from these two rather than calling
-  // getDownloadURL (Admin-SDK-written objects carry no download token), so a
-  // test run needs them or every asset resolves to "missing".
-  storageBucketName: 'demo-run-of-show.appspot.com',
-  storageDownloadOrigin: 'https://firebasestorage.googleapis.com',
   // App Check is unconfigured in a credential-free test run, which is also
   // its production default: no site key, no attestation header.
   appCheckEnabled: false,
   appCheckHeaders: vi.fn(async () => ({})),
 }));
+
+vi.mock('@/lib/firebaseSettings.js', async (importOriginal) => ({
+  ...await importOriginal(),
+  useEmulators: false,
+  storageBucketName: 'demo-run-of-show.appspot.com',
+  storageDownloadOrigin: 'https://firebasestorage.googleapis.com',
+}));
+
+// Source/provider contracts exercise their existing SDK mocks synchronously.
+// firebaseLoader.test.js exercises the real asynchronous boundary separately.
+vi.mock('@/lib/firebaseLoader.js', async () => {
+  const sdk = {
+    ...await import('@/firebase.js'),
+    ...await import('firebase/auth'),
+    ...await import('firebase/firestore'),
+  };
+  return {
+    loadFirebase: vi.fn(async () => sdk),
+    subscribeToFirebase: vi.fn((attach, onError) => {
+      try { return attach(sdk); }
+      catch (error) { onError?.(error); return () => {}; }
+    }),
+    rememberSignedIn: vi.fn(),
+    appCheckHeaders: (...args) => sdk.appCheckHeaders(...args),
+    isFirebaseLoading: () => false,
+  };
+});
 
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class GoogleAuthProvider {},

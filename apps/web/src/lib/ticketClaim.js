@@ -13,8 +13,8 @@
 // facts. This module preserves that: `code` is always 'not-found' for a
 // 404, and the page renders one generic "no ticket matches" state rather
 // than branching on which of those it might have been.
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
-import { appCheckHeaders } from '../firebase.js';
+import { functionsOrigin } from './firebaseSettings.js';
+import { appCheckHeaders } from './firebaseLoader.js';
 
 /** Error shape ticketingVerifyOrder failures normalize to. */
 export class TicketClaimError extends Error {

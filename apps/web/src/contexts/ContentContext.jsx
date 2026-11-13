@@ -171,7 +171,8 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
   useEffect(() => {
     // Switching between published and draft re-subscribes from scratch;
     // stale overlay from the other source must not linger.
-    setOverlay({ readSource, ...EMPTY_OVERLAY });
+    setOverlay((previous) => previous.readSource === readSource
+      ? previous : { readSource, ...EMPTY_OVERLAY });
     const session = { active: true, subscriptions: new Map() };
     sessionRef.current = session;
     return () => {

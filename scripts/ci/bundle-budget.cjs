@@ -130,9 +130,11 @@ function checkBudget(measurement, budget) {
     }
   }
   for (const chunk of measurement.lazyChunks) {
+    const ceiling = /^assets\/firebase-sdk-[^/]+\.js$/.test(chunk.file) && budget.firebaseSdkChunk
+      ? budget.firebaseSdkChunk : budget.lazyChunk;
     for (const metric of ['raw', 'gzip']) {
-      if (chunk[metric] > budget.lazyChunk[metric]) {
-        problems.push(`${chunk.file} ${metric}: ${chunk[metric]} > ${budget.lazyChunk[metric]}`);
+      if (chunk[metric] > ceiling[metric]) {
+        problems.push(`${chunk.file} ${metric}: ${chunk[metric]} > ${ceiling[metric]}`);
       }
     }
   }
@@ -166,6 +168,9 @@ function main(argv = process.argv.slice(2)) {
     `${measurement.initial.raw} raw bytes, ${measurement.initial.gzip} gzip bytes`,
   );
   console.log(`bundle budget: initial CSS ${measurement.initialCss.raw} raw bytes, ${measurement.initialCss.gzip} gzip bytes`);
+  for (const chunk of measurement.lazyChunks.filter((entry) => /^assets\/firebase-sdk-[^/]+\.js$/.test(entry.file))) {
+    console.log(`bundle budget: Firebase SDK ${chunk.raw} raw bytes, ${chunk.gzip} gzip bytes`);
+  }
   if (problems.length > 0) {
     for (const problem of problems) console.error(`- ${problem}`);
     return 1;

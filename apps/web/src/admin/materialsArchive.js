@@ -9,7 +9,7 @@
 // the response instead of ending it. The body read below then rejects, and
 // nothing is saved: a cut-off zip saved under the archive's name would look
 // whole until somebody opened it.
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { saveBlobAs } from '../lib/materialsSource.js';
 import { AdminApiError } from './adminApi.js';
 

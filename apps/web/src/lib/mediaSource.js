@@ -38,7 +38,7 @@
 // and a thumbnail costs no metadata round trip.
 import { imageSizePaths, readImageSizeManifest } from 'shared/imageSizes';
 import { isMediaLibraryPath, storageObjectPath } from 'shared/venue';
-import { storageBucketName, storageDownloadOrigin } from '../firebase.js';
+import { storageBucketName, storageDownloadOrigin } from './firebaseSettings.js';
 import { IS_DEMO } from './demoMode.js';
 import { bundledDemoAssetUrl } from './bundledAssets.js';
 

@@ -1,3 +1,4 @@
+vi.mock('../../lib/firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), functionsOrigin: () => 'https://fake-functions.example' }));
 // AdminDataExport — the spreadsheets and the event data package (issue #329).
 // Mocks the auth tier, adminApi, the text download, and the package fetch.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,8 +9,7 @@ import * as dataExportCjs from '../../../../../functions/src/admin/dataExport.cj
 
 let tier = 'staff';
 vi.mock('../../contexts/AuthContext.jsx', () => ({
-  useAuth: () => ({ adminTier: tier, user: { getIdToken: async () => 'id-token' } }),
-  functionsOrigin: () => 'https://fake-functions.example',
+  useAuth: () => ({ adminTier: tier, user: { getIdToken: async () => 'id-token' } })
 }));
 
 const callMock = vi.fn();

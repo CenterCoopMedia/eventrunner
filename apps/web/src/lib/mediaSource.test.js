@@ -1,3 +1,4 @@
+vi.mock('./firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), storageBucketName: 'demo-run-of-show.appspot.com', storageDownloadOrigin: 'https://firebasestorage.googleapis.com' }));
 // URL building and the upload pre-checks (issue #24 review follow-ups).
 //
 // The load-bearing decision pinned here: object URLs are BUILT, not fetched
@@ -14,8 +15,6 @@ vi.mock('../firebase.js', () => ({
   auth: {},
   db: {},
   storage: {},
-  storageBucketName: 'demo-run-of-show.appspot.com',
-  storageDownloadOrigin: 'https://firebasestorage.googleapis.com',
   appCheckEnabled: false,
   appCheckHeaders: vi.fn(async () => ({})),
 }));

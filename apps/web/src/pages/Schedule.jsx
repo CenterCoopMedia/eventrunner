@@ -11,7 +11,7 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router';
 import { pageHeading } from 'shared/page';
-import { functionsOrigin } from '../contexts/AuthContext.jsx';
+import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';

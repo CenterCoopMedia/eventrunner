@@ -12,7 +12,8 @@
 // mark the input, and its readable sentence, without the key, in `message`.
 // Screens show the segments, never the raw `field: reason` text.
 import { useCallback } from 'react';
-import { functionsOrigin, useAuth } from '../contexts/AuthContext.jsx';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { functionsOrigin } from '../lib/firebaseSettings.js';
 
 /** Leading context the server prepends before the joined field errors. */
 const MESSAGE_PREFIX_RE = /^[^:]*Invalid [a-z]+:\s*/i;

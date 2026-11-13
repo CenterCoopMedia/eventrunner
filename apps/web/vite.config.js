@@ -11,12 +11,18 @@
 import { defineConfig, normalizePath } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolveGeneratedDir } from './generatedDir.js';
+import { criticalFontTags } from './criticalFonts.js';
+import { snapshotHtml } from './snapshotHtml.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const generatedDir = resolveGeneratedDir(process.env, path.resolve(here, 'src/generated'));
 const entryModule = normalizePath(path.resolve(here, 'src/main.jsx'));
+const firebaseModule = normalizePath(path.resolve(here, 'src/firebase.js'));
+const scheduleModule = normalizePath(path.resolve(here, 'src/pages/Schedule.jsx'));
+const speakersModule = normalizePath(path.resolve(here, 'src/pages/Speakers.jsx'));
 
 // Vite 8 bundles with Rolldown. Rollup put every module the entry imports
 // statically into the entry chunk. Rolldown splits the same modules into one
@@ -25,11 +31,12 @@ const entryModule = normalizePath(path.resolve(here, 'src/main.jsx'));
 // the static import graph of src/main.jsx back into one chunk, so first paint
 // loads the entry, the Rolldown runtime and this chunk. Lazy routes still
 // split as before. CSS stays with Vite's CSS plugin.
-const initialModules = new WeakMap();
-function staticImportGraph(context) {
-  if (initialModules.has(context)) return initialModules.get(context);
+const staticModules = new WeakMap();
+function staticImportGraph(context, entry = entryModule) {
+  const cached = staticModules.get(context)?.get(entry);
+  if (cached) return cached;
   const seen = new Set();
-  const queue = [entryModule];
+  const queue = [entry];
   while (queue.length) {
     const id = queue.pop();
     if (seen.has(id)) continue;
@@ -37,12 +44,19 @@ function staticImportGraph(context) {
     const info = context.getModuleInfo(id);
     if (info) queue.push(...info.importedIds);
   }
-  initialModules.set(context, seen);
+  if (!staticModules.has(context)) staticModules.set(context, new Map());
+  staticModules.get(context).set(entry, seen);
   return seen;
 }
 
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ isSsrBuild }) => ({
+  plugins: [react(), {
+    name: 'snapshot-font-preloads',
+    transformIndexHtml: {
+      order: 'pre',
+      handler: () => criticalFontTags(readFileSync(path.join(generatedDir, 'theme.css'), 'utf8')),
+    },
+  }, snapshotHtml()],
   // `shared` is a linked workspace package whose ESM entries re-export CJS
   // sources; linked deps skip prebundling by default, which would break the
   // dev server's CJS interop. Builds and vitest handle it either way.
@@ -84,7 +98,7 @@ export default defineConfig({
       'shared/webVitals',
     ],
   },
-  build: {
+  build: isSsrBuild ? {} : {
     rolldownOptions: {
       output: {
         codeSplitting: {
@@ -93,6 +107,20 @@ export default defineConfig({
               debugName: 'initial',
               name: (id, context) =>
                 !/\.css(\?|$)/.test(id) && staticImportGraph(context).has(id) ? 'initial' : null,
+            },
+            {
+              debugName: 'firebase-sdk',
+              name: (id, context) => (id === firebaseModule || id.includes('/node_modules/'))
+                && staticImportGraph(context, firebaseModule).has(id) ? 'firebase-sdk' : null,
+            },
+            {
+              debugName: 'public-program',
+              name: (id, context) => {
+                if (/\.css(\?|$)/.test(id)) return null;
+                const schedule = staticImportGraph(context, scheduleModule).has(id);
+                const speakers = staticImportGraph(context, speakersModule).has(id);
+                return schedule && !speakers ? 'schedule' : speakers && !schedule ? 'speakers' : null;
+              },
             },
           ],
         },
@@ -110,4 +138,4 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.js'],
     css: false,
   },
-});
+}));

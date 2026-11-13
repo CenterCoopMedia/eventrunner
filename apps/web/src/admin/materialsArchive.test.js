@@ -1,9 +1,7 @@
 // The browser half of the materials archive (issue #189).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../contexts/AuthContext.jsx', () => ({
-  functionsOrigin: () => 'https://fake-functions.example',
-}));
+vi.mock('../lib/firebaseSettings.js', async (importOriginal) => ({ ...await importOriginal(), functionsOrigin: () => 'https://fake-functions.example' }));
 
 const { downloadMaterialsArchive, STOPPED_MESSAGE } = await import('./materialsArchive.js');
 const { AdminApiError } = await import('./adminApi.js');

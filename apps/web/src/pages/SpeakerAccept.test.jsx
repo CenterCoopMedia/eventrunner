@@ -218,7 +218,7 @@ describe('accepting', () => {
     expect(screen.queryByRole('button', { name: 'Accept the invitation' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with the invited address' }));
-    expect(signOutMock).toHaveBeenCalled();
+    await waitFor(() => expect(signOutMock).toHaveBeenCalled());
   });
 
   it('sends a confirmed speaker to the wizard, not the attendee profile', async () => {
@@ -261,7 +261,7 @@ describe('accepting', () => {
     // Still on the accept step: the invitation is untouched, and the way out
     // is signing in as somebody else.
     fireEvent.click(screen.getByRole('button', { name: 'Use a different account' }));
-    expect(signOutMock).toHaveBeenCalled();
+    await waitFor(() => expect(signOutMock).toHaveBeenCalled());
   });
 
   it('keeps the retry affordance when the account document is not seeded yet', async () => {
