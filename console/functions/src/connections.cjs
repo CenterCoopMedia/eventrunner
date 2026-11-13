@@ -32,9 +32,10 @@
  *     eventbrite?: { accountId, connectedBy, eventOrganizationId } }
  *
  * One account can serve several requests, and ending a connection at the
- * provider ends it for all of them, live sites included. So nothing here
- * calls a provider's revoke except revokeIfUnused. A row in that collection
- * is removed only by a disconnect or by deleting a closed request. It stays
+ * provider ends it for all of them, live sites included. The Console checks
+ * other private users and Stripe routes before ending that authorization.
+ * A private account reference is removed by a disconnect or replacement,
+ * or by closing or deleting a request. It stays
  * when the site builder moves a token, so it also speaks for a site running
  * from a client project, whatever happens to the application.
  *
@@ -177,6 +178,26 @@ async function revokeIfUnused({ db, connectors, log = console }, provider, accou
       throw failure(502, 'disconnect-failed', `We could not end your ${PROVIDER_NAMES[provider]} connection at the provider. Email info@eventrunner.org for help.`, err);
     }
     return { revoked: false, shared: false };
+  }
+}
+
+/** Release this app's routes only after its private row stops naming the account. */
+async function releaseStripeRoutes({ db, log = console, now = Date.now }, appId) {
+  try {
+    return await db.runTransaction(async (tx) => {
+      const [account, routes, app] = await Promise.all([
+        tx.get(accountsRef(db, appId)),
+        tx.get(db.collection(STRIPE_ROUTE_COLLECTION).where('appId', '==', appId)),
+        tx.get(db.collection('applications').doc(appId)),
+      ]);
+      if (connectionChanging(app.data()?.connections, now(), ['stripe'])) return false;
+      const accountId = accountsOf(account).stripe?.accountId;
+      for (const doc of routes.docs) if (doc.id !== accountId) tx.delete(doc.ref);
+      return true;
+    });
+  } catch (err) {
+    log.error('console could not release Stripe routes', appId, err.message);
+    return false;
   }
 }
 
@@ -352,6 +373,7 @@ async function completeConnection(deps, { body, user }) {
   // Connecting a different account ends the older one, when nothing else uses it.
   const older = previous.account?.accountId;
   if (older && older !== answer.accountId) await revokeIfUnused(deps, provider, older, { releasingAppId: appId });
+  if (provider === 'stripe') await releaseStripeRoutes(deps, appId);
   return { body: { connected: true, provider, orgId, appId } };
 }
 
@@ -381,8 +403,11 @@ async function endBuiltConnection(deps, { orgId, appId, provider, user }) {
   if (accountId) {
     try {
       // Stripe ends the connection for every site on the account, so one Owner cannot do that for another site.
-      const users = await db.collection(ACCOUNT_COLLECTION).where(`${provider}.accountId`, '==', accountId).limit(2).get();
-      if (users.docs.some((doc) => doc.id !== appId)) {
+      const [users, route] = await Promise.all([
+        db.collection(ACCOUNT_COLLECTION).where(`${provider}.accountId`, '==', accountId).limit(2).get(),
+        db.collection(STRIPE_ROUTE_COLLECTION).doc(accountId).get(),
+      ]);
+      if (users.docs.some((doc) => doc.id !== appId) || (route.exists && route.data().appId !== appId)) {
         throw new ConsoleError(409, 'account-shared', `Another event site uses this ${PROVIDER_NAMES[provider]} account, so disconnecting here would stop that site too. Ask ${hostName()} for help.`);
       }
       if (!connectors?.[provider]) throw new Error('not set up');
@@ -402,6 +427,7 @@ async function endBuiltConnection(deps, { orgId, appId, provider, user }) {
   } catch (err) {
     log.error('console could not finish a disconnect', provider, err.message);
   }
+  await releaseStripeRoutes(deps, appId);
   return { body: { ...reply, revoked: Boolean(accountId), shared: false } };
 }
 
@@ -443,6 +469,7 @@ async function disconnectAccount(deps, { body, user }) {
   const ended = previous.account?.accountId
     ? await revokeIfUnused(deps, provider, previous.account.accountId, { releasingAppId: appId })
     : { revoked: false, shared: false };
+  if (provider === 'stripe') await releaseStripeRoutes(deps, appId);
   return { body: { ...reply, ...ended } };
 }
 
@@ -549,13 +576,13 @@ function recordTokenDeletion(tx, db, appId, connected, at) {
 
 /**
  * After that transaction: delete the tokens, end each connection nothing else
- * uses, then the row. A token that cannot be deleted throws and leaves the row
- * for the retention job. A failed revoke is logged. Safe to repeat.
+ * uses, release its routes, then delete the row. Unfinished token or route
+ * cleanup leaves the row for retention to retry. A failed revoke is logged. Safe to repeat.
  */
 async function deleteRecordedTokens(deps, appId, connected) {
   for (const provider of PROVIDERS) await deps.secrets.deleteSecret(connectionSecretId(appId, provider));
-  for (const { provider, accountId } of connected) await revokeIfUnused(deps, provider, accountId);
-  await deps.db.collection(DELETION_COLLECTION).doc(appId).delete();
+  for (const { provider, accountId } of connected) await revokeIfUnused(deps, provider, accountId, { releasingAppId: appId });
+  if (await releaseStripeRoutes(deps, appId)) await deps.db.collection(DELETION_COLLECTION).doc(appId).delete();
 }
 
 /** Try again for the rows an earlier delete left. Each failure is logged; the next run tries again. */

@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { closeApplication, declineApplication, launchApplication } = require('./reviewDecisions.cjs');
-const { makeFakeSecrets } = require('./fakes.cjs');
+const { makeFakeConnector, makeFakeSecrets } = require('./fakes.cjs');
 const { NOW, PUBLIC_URL, ana, application, deps, fakeMailer, ops, ops2, seeded } = require('./fakeReview.cjs');
 
 const DRAFT = { status: 'draft', frozen: null };
@@ -152,6 +152,21 @@ test('closeApplication closes an accepted request whose build stopped', async ()
   assert.equal(db.read('console_token_deletions/a1'), undefined, 'the tokens went, so no row is left');
   assert.ok(d.mailer.sent.every((m) => m.status === 'declined'));
   assert.ok(db.paths('console_audit/').some((p) => db.read(p).action === 'close-request'));
+});
+
+test('closing a failed build releases its own Stripe route and preserves another application\'s route', async () => {
+  for (const routeOwner of ['a1', 'a2']) {
+    const db = closeDb();
+    const route = { appId: routeOwner, projectId: 'er-first', region: 'us-central1' };
+    await db.doc('console_stripe_routes/acct_1').set(route);
+    const stripe = makeFakeConnector();
+    const d = { ...closeDeps(db), connectors: { stripe } };
+    assert.equal((await close(d)).body.application.status, 'declined');
+    assert.deepEqual(stripe.revoked, routeOwner === 'a1' ? ['acct_1'] : []);
+    assert.deepEqual(db.read('console_stripe_routes/acct_1'), routeOwner === 'a1' ? undefined : route);
+    assert.equal(db.read('console_connections/a1'), undefined);
+    assert.equal(db.read('console_token_deletions/a1'), undefined);
+  }
 });
 
 test('closeApplication frees the name when no run ever began', async () => {

@@ -979,6 +979,19 @@ test('a second live Stripe site registers its own route without changing another
   assert.equal(fake.state.endpoints.length, 0);
 });
 
+test('a live Stripe account another site already claimed is refused before its token moves', async () => {
+  const fake = setup();
+  const winner = { appId: 'a2', projectId: 'er-second', region: 'us-central1' };
+  await fake.db.doc('console_stripe_routes/acct_1').set(winner);
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  const record = fake.db.read('console_builds/a1');
+  assert.equal(record.failedStep, 'tickets');
+  assert.match(record.error, /already routes to another site.*connect a different live account/);
+  assert.deepEqual(fake.db.read('console_stripe_routes/acct_1'), winner);
+  assert.equal(fake.clientSecrets.store.has('TICKETING_API_TOKEN'), false);
+  assert.equal(fake.consoleSecrets.store.get('connection-stripe-a1'), STRIPE_TOKEN);
+});
+
 function eventbriteRequest() {
   const frozen = { ...application().frozen, tickets: { choice: 'eventbrite' } };
   return {

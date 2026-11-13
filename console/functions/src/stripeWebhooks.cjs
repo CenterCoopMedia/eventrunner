@@ -32,7 +32,7 @@ async function registerStripeRoute({ db, secrets, appId, accountId, projectId, r
     const ref = routes.doc(accountId);
     const [current, previous] = await Promise.all([tx.get(ref), tx.get(routes.where('appId', '==', appId))]);
     if (current.exists && (current.data().appId !== appId || current.data().projectId !== projectId)) {
-      throw new Error('this Stripe account already routes to another site');
+      throw new Error('this Stripe account already routes to another site. The client must connect a different live account.');
     }
     for (const doc of previous.docs) {
       if (doc.data().projectId !== projectId) throw new Error('the Stripe route belongs to another project');
@@ -85,7 +85,14 @@ function stripeConnectWebhook({ db, secrets, endpointSecret, fetch, now = Date.n
     } catch {
       return fail('signature', 400, 'Invalid webhook signature');
     }
-    if (!accountIdValid(event?.account) || event.livemode !== true) return fail('account-mode', 400, 'Live connected account required');
+    if (!accountIdValid(event?.account) || typeof event.livemode !== 'boolean') return fail('account-mode', 400, 'Live connected account required');
+    if (event.livemode === false) {
+      log.warn('stripe Connect webhook ignored', {
+        category: 'test-mode', status: 200, accountId: event.account,
+        ...(typeof event.id === 'string' && /^evt_[A-Za-z0-9]+$/.test(event.id) ? { eventId: event.id } : {}),
+      });
+      return res.status(200).send('ignored');
+    }
     let stage = 'route-read';
     try {
       const route = (await db.collection(STRIPE_ROUTE_COLLECTION).doc(event.account).get()).data();

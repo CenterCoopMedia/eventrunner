@@ -339,10 +339,15 @@ and in live mode for the launch. `EVENT_STRIPE_MODE` follows the mode of the tok
 
 ## Amendment 2026-11-11: shared Connect webhook receiver
 
-The Console's `stripeConnectWebhook` receives live Connect snapshot events through one
+The Console's `stripeConnectWebhook` receives Connect snapshot events through one
 platform endpoint. It verifies the exact raw body with the pinned Stripe SDK and
 `CONSOLE_STRIPE_WEBHOOK_SECRET`, including the SDK's 300-second signature timestamp tolerance,
-before looking up the signed `event.account`. Missing and test-mode accounts are refused.
+before handling the signed `event.account`. Missing or invalid account IDs and non-boolean
+`livemode` values are refused. A verified test-mode event with a valid account ID receives
+`200 ignored`, with no route lookup, site-secret read, forwarding or state change. One
+structured log line contains only validated account and event IDs. Stripe's
+[Connect webhook configuration](https://support.stripe.com/questions/connect-account-webhook-configurations)
+delivers test events to live endpoints too, so these acknowledgements avoid unnecessary retries.
 A signed live account without a route is acknowledged without forwarding. The receiver logs
 its account and event IDs in a structured warning, counted by `stripe_connect_unrouted`.
 This prevents repeated failures for an unbuilt or retired site from disabling delivery for
@@ -353,8 +358,15 @@ that owns that account's route. Browser clients, including operators, cannot rea
 routes. The builder claims each account transactionally; it cannot replace another site's
 route. The Console refuses an already-routed account during connection, while distinct
 live accounts can connect independently. The build transaction also checks ownership
-to cover competing builds. A successful account change removes the application's previous route in the same
-transaction. A change to another ticket provider removes its Stripe route.
+to cover competing builds, before the build moves the token. A losing build keeps its
+Console token and fails with a refusal to connect a different live account. Registration removes the application's previous route in the same
+transaction. A change to another ticket provider removes its Stripe route. After a connection
+replacement, disconnect, operator close or recorded request deletion, the Console releases only
+its own routes whose accounts are no longer named by the private connection row. Deletion
+retries retain the releasing application's identity and work row until token and route cleanup finish.
+An active connection-change lease preserves routes
+while a replacement can still roll back. The provider-revocation decision runs first; cleanup
+failures are logged while completed connection changes keep their normal reply.
 
 The builder keeps the site's `TICKETING_WEBHOOK_SECRET` in the site's Secret Manager and
 copies it to the Console secret `stripe-webhook-{appId}`. Firestore stores no signing secret.

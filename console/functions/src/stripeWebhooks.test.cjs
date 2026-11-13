@@ -69,6 +69,7 @@ test('invalid signatures and expired replay timestamps fail before routing or re
     request('acct_one', { secret: 'whsec_wrong_fixture' }),
     request('acct_one', { timestamp: NOW / 1000 - 301 }),
     request('acct_one', { raw: false }),
+    request('acct_one', { secret: 'whsec_wrong_fixture', body: { livemode: false } }),
   ]) assert.equal((await deliver(req, { ...deps, db })).statusCode, 400);
   const unsigned = request();
   unsigned.headers = {};
@@ -90,11 +91,31 @@ test('a signed live account without a route is acknowledged and logged without f
   assert.ok(!JSON.stringify(logs).includes('private@example.test'));
 });
 
-test('a missing account and test-mode payload never reach a site', async () => {
+test('missing or invalid accounts and malformed modes are refused without forwarding', async () => {
   const { deliver, calls } = setup();
-  assert.equal((await deliver(request(null))).statusCode, 400);
-  assert.equal((await deliver(request('acct_one', { body: { livemode: false } }))).statusCode, 400);
+  for (const account of [null, 'unknown', 'acct_']) for (const livemode of [true, false]) {
+    assert.equal((await deliver(request(account, { body: { livemode } }))).statusCode, 400);
+  }
+  for (const livemode of [undefined, null, 'false', 'true', 0, 1]) {
+    assert.equal((await deliver(request('acct_one', { body: { livemode } }))).statusCode, 400);
+  }
   assert.equal(calls.length, 0);
+});
+
+test('a signed test event is acknowledged without routing, state changes or payload logging', async () => {
+  const { deliver, calls, logs } = setup();
+  let reads = 0;
+  const db = { collection() { reads += 1; throw new Error('must not read routes or change state'); } };
+  const secrets = { readSecret() { reads += 1; throw new Error('must not read site secrets'); } };
+  const res = await deliver(request('acct_one', { body: { livemode: false, data: { object: { email: 'private@example.test' } } } }), { db, secrets });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body, 'ignored');
+  assert.equal(reads, 0);
+  assert.equal(calls.length, 0);
+  assert.deepEqual(logs, [['stripe Connect webhook ignored', {
+    category: 'test-mode', status: 200, accountId: 'acct_one', eventId: 'evt_fixture',
+  }]]);
+  assert.ok(!JSON.stringify(logs).includes('private@example.test'));
 });
 
 test('an unknown HTTP path returns 404 without forwarding', async () => {

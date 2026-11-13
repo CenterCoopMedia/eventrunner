@@ -932,16 +932,19 @@ async function stepTickets(ctx) {
   }
 
   await testToken(ctx, choice, token, connection);
+  const liveStripe = choice === 'stripe' && connection.livemode !== false;
+  // The route is the one atomic claim on a live account; a request that loses it keeps its token.
+  if (liveStripe) await stripeRoute(ctx, connection, notes);
   if (await putClientSecret(ctx, TOKEN_SECRET, token)) notes.push('moved the token');
   if (consoleCopy) await deleteStoredConnection({ secrets: consoleSecrets }, appId, choice);
 
   ctx.ticketVars = ticketing(ctx, choice, connection);
   ctx.ticketOrganization = connection.eventOrganizationId || null;
   if (choice === 'stripe') {
-    if (connection.livemode === false) {
+    if (!liveStripe) {
       await clearStripeRoute(ctx);
       await stripeEndpoint(ctx, token, notes);
-    } else await stripeRoute(ctx, connection, notes);
+    }
   } else if (!(await clientSecrets.readSecret(WEBHOOK_SECRET))) {
     await putClientSecret(ctx, WEBHOOK_SECRET, randomBytes(32).toString('hex'));
     notes.push('made the ticket webhook secret');
