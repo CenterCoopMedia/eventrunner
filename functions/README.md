@@ -30,38 +30,9 @@ The plain editors for `speaker.invite`, `speaker.accepted` and
 `speaker.reminder` save `{ fields, updatedAt, updatedBy }` in
 `email_templates/{id}`. The renderer builds both bodies with the current frame;
 the editor reads and reminder approval versions use that same effective source.
-Other templates can store subject, HTML and text overrides. Token declarations,
-required links and the rendered-body storage policy remain defined in code.
-
-Before this rollout, check each client's `email_templates` collection for saved
-speaker wording and the `ticket.get_ticket` and `ticket.claim_prompt` copies
-written by setup. Saved raw source retains its own frame. A client with saved
-copies needs a reviewed migration that preserves its wording before or with
-deployment.
-
-For the two setup ticket copies, an authenticated operator runs this from the
-reviewed checkout after merge, with the target client's
-`EVENT_FIREBASE_PROJECT_ID` and the documented operator credentials already set:
-
-```bash
-node scripts/refresh-ticket-emails.cjs --dry-run
-```
-
-Review the project id and both result rows. Only existing copies with
-`seeded: true` and `updatedBy: init-event-script` can refresh. `edited` copies
-are reported and preserved; missing copies are not created. This command handles
-ticket copies only; review any saved speaker wording separately. The operator then
-runs the approved refresh with the theme and logo changes:
-
-```bash
-node scripts/refresh-ticket-emails.cjs --apply
-node scripts/refresh-ticket-emails.cjs --dry-run
-```
-
-The final read must report `current` for refreshed copies. A second apply makes
-no change to current copies. Review edited copies separately before claiming
-their emails use the new frame. The emulator contract for this step runs in
-hosted CI as `tests/refresh-ticket-emails.rules.test.js`.
+Other templates can store subject, HTML and text overrides. Saved raw source
+retains its own frame. Token declarations, required links and the rendered-body
+storage policy remain defined in code.
 
 ## Admin tiers
 
