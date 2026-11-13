@@ -85,6 +85,7 @@ function fakeCloud(options = {}) {
     servers: [],
     streams: [{ ID: 'outbound', MessageStreamType: 'Transactional' }],
     webhooks: [],
+    nextWebhookId: 1,
     mailDomain: null,
     endpoints: [...(options.endpoints || [])],
     stripeToken: options.stripeToken ?? STRIPE_TOKEN,
@@ -270,8 +271,17 @@ function fakeCloud(options = {}) {
         if (method === 'POST') {
           // Postmark tests the address and saves nothing if it does not answer.
           if (state.runs.length === 0) return answer({ Message: 'Webhook verification failed; nothing was saved.' }, 422);
-          state.webhooks.push(body);
-          return answer({ ID: 1 });
+          const hook = { ...body, ID: state.nextWebhookId++ };
+          state.webhooks.push(hook);
+          return answer(hook);
+        }
+        if (method === 'PUT') {
+          const hook = state.webhooks.find((item) => item.ID === Number(p.split('/').at(-1)));
+          if (!hook) return answer({ Message: 'Webhook not found' }, 404);
+          if (state.runs.length === 0) return answer({ Message: 'Webhook verification failed; nothing was saved.' }, 422);
+          if ('MessageStream' in body) return answer({ Message: 'An edit cannot move the webhook between streams.' }, 422);
+          Object.assign(hook, body);
+          return answer(hook);
         }
         return answer({ Webhooks: state.webhooks.filter((w) => w.MessageStream === url.searchParams.get('MessageStream')) });
       }
@@ -659,12 +669,104 @@ test('email gets a server, its streams and webhooks, and a verified sender', asy
   assert.ok(fake.state.webhooks.every((w) => w.Url === `https://us-central1-${PROJECT}.cloudfunctions.net/emailDeliveryWebhook`));
   assert.ok(fake.state.webhooks.every((w) => `${w.HttpAuth.Username}:${w.HttpAuth.Password}` === basicAuth));
   assert.equal(fake.state.webhooks.find((w) => w.MessageStream === 'announcements').Triggers.SubscriptionChange.Enabled, true);
+  assert.equal(fake.state.webhooks.find((w) => w.MessageStream === 'outbound').Triggers.SubscriptionChange.Enabled, false);
+  assert.ok(fake.state.webhooks.every((w) => w.Triggers.Open.Enabled === false && w.Triggers.Click.Enabled === false));
+  assert.ok(fake.state.webhooks.every((w) => w.Triggers.Bounce.IncludeContent === false && w.Triggers.SpamComplaint.IncludeContent === false));
   assert.equal(fake.state.mailDomain.ReturnPathDomain, `pm-bounces.${DOMAIN}`);
 
   const sender = (await fake.clientFirestore.collection('config').doc('event').get()).data().sender;
   assert.equal(sender.domainVerified, true);
   assert.equal(sender.domainVerifiedBy, 'provider-check');
   assert.equal(sender.domainVerifiedDomain, DOMAIN);
+});
+
+test('mail webhook reruns reconcile auth and triggers in place and leave unrelated hooks alone', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const step = STEPS.find((entry) => entry.id === 'mail-webhooks');
+  const ctx = { projectId: PROJECT, region: 'us-central1', clientSecrets: fake.clientSecrets, deps: fake.deps };
+  const originalIds = fake.state.webhooks.map((hook) => hook.ID);
+  const outbound = fake.state.webhooks.find((hook) => hook.MessageStream === 'outbound');
+  outbound.HttpAuth = { Username: 'old-user', Password: 'old-password' };
+  outbound.HttpHeaders = [{ Name: 'X-Existing', Value: 'header-fixture' }];
+  outbound.Triggers = { Delivery: { Enabled: false }, Open: { Enabled: true }, Bounce: { Enabled: true, IncludeContent: true } };
+  const announcements = fake.state.webhooks.find((hook) => hook.MessageStream === 'announcements');
+  announcements.Triggers.SubscriptionChange.Enabled = false;
+  const duplicate = { ID: 90, MessageStream: 'outbound', Url: `${outbound.Url}?old=1`, Triggers: {} };
+  const unrelated = { ID: 91, MessageStream: 'outbound', Url: 'https://example.org/other-webhook', Triggers: { Click: { Enabled: true } } };
+  fake.state.webhooks.push(duplicate, unrelated);
+  const unrelatedBefore = structuredClone(unrelated);
+  fake.clientSecrets.store.set('EMAIL_WEBHOOK_BASIC_AUTH', 'current-user:current-password');
+  const start = fake.calls.length;
+  await step.run(ctx);
+  const edits = fake.calls.slice(start).filter((call) => call.method === 'PUT');
+  assert.deepEqual(edits.map((call) => Number(new URL(call.url).pathname.split('/').at(-1))).sort((a, b) => a - b), [...originalIds, 90].sort((a, b) => a - b));
+  assert.ok(edits.every((call) => !('MessageStream' in call.body)), 'provider edits must retain their stream');
+  assert.equal(fake.calls.slice(start).filter((call) => call.method === 'POST').length, 0, 'repair must not create duplicate hooks');
+  assert.deepEqual(unrelated, unrelatedBefore);
+  for (const hook of [outbound, announcements, duplicate]) {
+    assert.equal(hook.Url, `https://us-central1-${PROJECT}.cloudfunctions.net/emailDeliveryWebhook`);
+    assert.deepEqual(hook.HttpAuth, { Username: 'current-user', Password: 'current-password' });
+    assert.deepEqual(hook.Triggers, {
+      Open: { Enabled: false }, Click: { Enabled: false }, Delivery: { Enabled: true },
+      Bounce: { Enabled: true, IncludeContent: false }, SpamComplaint: { Enabled: true, IncludeContent: false },
+      SubscriptionChange: { Enabled: hook.MessageStream === 'announcements' },
+    });
+  }
+  assert.deepEqual(outbound.HttpHeaders, [{ Name: 'X-Existing', Value: 'header-fixture' }]);
+  const retryStart = fake.calls.length;
+  assert.equal(await step.run(ctx), 'already right');
+  assert.ok(fake.calls.slice(retryStart).every((call) => call.method === 'GET'), 'correct hooks require no write');
+});
+
+test('a rejected webhook edit keeps the existing hook, hides reflected credentials and stays retryable', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const step = STEPS.find((entry) => entry.id === 'mail-webhooks');
+  const ctx = { projectId: PROJECT, region: 'us-central1', clientSecrets: fake.clientSecrets, deps: fake.deps };
+  const hook = fake.state.webhooks[0];
+  hook.Triggers.Delivery.Enabled = false;
+  const before = structuredClone(fake.state.webhooks);
+  const providerFetch = fake.deps.fetch;
+  const start = fake.calls.length;
+  fake.deps.fetch = async (address, init) => {
+    if (address.includes('/webhooks/') && init.method === 'PUT') return answer({ Message: 'private-reflected-credential-sentinel' }, 422);
+    return providerFetch(address, init);
+  };
+  await assert.rejects(step.run(ctx), (error) => {
+    assert.match(error.message, /update the mail webhook: HTTP 422/);
+    assert.doesNotMatch(error.message, /private-reflected/);
+    return true;
+  });
+  assert.deepEqual(fake.state.webhooks, before);
+  assert.ok(fake.calls.slice(start).every((call) => call.method !== 'POST'));
+  fake.deps.fetch = providerFetch;
+  await step.run(ctx);
+  assert.equal(hook.Triggers.Delivery.Enabled, true);
+  assert.deepEqual(fake.state.webhooks.map((item) => item.ID), before.map((item) => item.ID));
+});
+
+test('mail webhook repairs reject malformed auth and provider IDs without exposing their values', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const step = STEPS.find((entry) => entry.id === 'mail-webhooks');
+  const ctx = { projectId: PROJECT, region: 'us-central1', clientSecrets: fake.clientSecrets, deps: fake.deps };
+  const validAuth = fake.clientSecrets.store.get('EMAIL_WEBHOOK_BASIC_AUTH');
+  const start = fake.calls.length;
+  for (const malformed of ['private-sentinel', ':private-sentinel', 'private-sentinel:']) {
+    fake.clientSecrets.store.set('EMAIL_WEBHOOK_BASIC_AUTH', malformed);
+    await assert.rejects(step.run(ctx), (error) => {
+      assert.match(error.message, /auth needs a username and password/);
+      assert.doesNotMatch(error.message, /private-sentinel/);
+      return true;
+    });
+  }
+  assert.equal(fake.calls.length, start);
+  fake.clientSecrets.store.set('EMAIL_WEBHOOK_BASIC_AUTH', validAuth);
+  fake.state.webhooks[0].ID = '../private-sentinel';
+  fake.state.webhooks[0].Triggers.Delivery.Enabled = false;
+  await assert.rejects(step.run(ctx), /mail webhook has no valid provider ID/);
+  assert.ok(fake.calls.slice(start).every((call) => call.method === 'GET'));
 });
 
 test('the token is tested, moved, and deleted from the console, and the leftover goes too', async () => {

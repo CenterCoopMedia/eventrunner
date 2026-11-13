@@ -756,30 +756,48 @@ async function stepMailWebhooks(ctx) {
   const basicAuth = await ctx.clientSecrets.readSecret('EMAIL_WEBHOOK_BASIC_AUTH');
   if (!serverToken || !basicAuth) throw new Error('the mail secrets are missing');
   const separator = basicAuth.indexOf(':');
+  if (separator <= 0 || separator === basicAuth.length - 1) throw new Error('the mail webhook auth needs a username and password');
   const url = functionUrl(ctx, 'emailDeliveryWebhook');
   const { host, pathname } = new URL(url);
   for (const [stream, subscription] of [[TRANSACTIONAL_STREAM, false], [ANNOUNCEMENT_STREAM, true]]) {
-    const hooks = await postmarkServer(ctx, serverToken, 'read the mail webhooks', `/webhooks?MessageStream=${stream}`);
-    const present = (hooks.Webhooks || []).some((hook) => {
+    const desired = {
+      Url: url,
+      HttpAuth: { Username: basicAuth.slice(0, separator), Password: basicAuth.slice(separator + 1) },
+      Triggers: {
+        Open: { Enabled: false },
+        Click: { Enabled: false },
+        Delivery: { Enabled: true },
+        Bounce: { Enabled: true, IncludeContent: false },
+        SpamComplaint: { Enabled: true, IncludeContent: false },
+        SubscriptionChange: { Enabled: subscription },
+      },
+    };
+    // Provider failure bodies can echo webhook credentials or endpoint responses.
+    const hooks = await postmarkServer(ctx, serverToken, 'read the mail webhooks', `/webhooks?MessageStream=${stream}`, { quiet: true });
+    const matching = (hooks.Webhooks || []).filter((hook) => {
       const existing = new URL(hook.Url);
       return existing.host === host && existing.pathname === pathname;
     });
-    if (!present) {
+    if (matching.length === 0) {
       await postmarkServer(ctx, serverToken, 'create the mail webhook', '/webhooks', {
-        method: 'POST',
-        json: {
-          Url: url,
-          MessageStream: stream,
-          HttpAuth: { Username: basicAuth.slice(0, separator), Password: basicAuth.slice(separator + 1) },
-          Triggers: {
-            Delivery: { Enabled: true },
-            Bounce: { Enabled: true },
-            SpamComplaint: { Enabled: true },
-            ...(subscription ? { SubscriptionChange: { Enabled: true } } : {}),
-          },
-        },
+        method: 'POST', json: { ...desired, MessageStream: stream }, quiet: true,
       });
       notes.push(`added the ${stream} webhook`);
+    }
+    for (const hook of matching) {
+      const correct = hook.Url === desired.Url
+        && hook.HttpAuth?.Username === desired.HttpAuth.Username
+        && hook.HttpAuth?.Password === desired.HttpAuth.Password
+        && Object.entries(desired.Triggers).every(([trigger, settings]) => (
+          Object.entries(settings).every(([key, value]) => hook.Triggers?.[trigger]?.[key] === value)
+        ));
+      if (correct) continue;
+      if (!Number.isSafeInteger(hook.ID) || hook.ID <= 0) throw new Error('the mail webhook has no valid provider ID');
+      await postmarkServer(ctx, serverToken, 'update the mail webhook', `/webhooks/${hook.ID}`, {
+        method: 'PUT', quiet: true,
+        json: { ...desired, ...(Array.isArray(hook.HttpHeaders) ? { HttpHeaders: hook.HttpHeaders } : {}) },
+      });
+      notes.push(`updated the ${stream} webhook`);
     }
   }
   return summary(notes);
