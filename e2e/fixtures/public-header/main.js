@@ -1,6 +1,7 @@
 import { createElement as h } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
+import { quietActionClass } from '../../../apps/web/src/components/controlClasses.js';
 import '../../../apps/web/src/generated/theme.css';
 
 const params = new URLSearchParams(globalThis.location.search);
@@ -23,7 +24,9 @@ createRoot(globalThis.document.getElementById('root')).render(
   h(MemoryRouter, null,
     h('header', { className: 'bg-surface' }, h('div', { className: 'stage' },
       h(Header, { variant, name, dates: 'March 12, 2027', place: 'Raleigh, NC', mark,
-        mobileControl: h('button', { type: 'button', className: 'site-header-menu', 'data-mobile-visible': phone }, 'Menu') },
+        mobileControl: h('button', { type: 'button', className: `site-header-menu no-print ${quietActionClass}`, 'data-mobile-visible': phone },
+          'Menu', h('svg', { 'aria-hidden': 'true', viewBox: '0 0 16 16', width: 16, height: 16, className: 'disclosure-chevron' },
+            h('path', { d: 'm4 6 4 4 4-4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 }))) },
       h('nav', { className: 'site-header-nav', 'aria-label': 'Main', 'data-placement': 'top', 'data-mobile-hidden': phone },
         h('ul', null, h('li', null, h('a', { href: '/schedule' }, 'Schedule')),
           h('li', null, h('a', { href: '/speakers' }, 'Speakers'))))))),

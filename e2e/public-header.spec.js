@@ -110,7 +110,9 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
           }
         }
       }
-      await testInfo.attach('header-rendering', { body: JSON.stringify({ base, variant, logo, metrics }, null, 2), contentType: 'application/json' });
+      const evidence = JSON.stringify({ base, variant, logo, metrics }, null, 2);
+      await fs.writeFile(path.join(EVIDENCE, `public-header-${variant}-${logo}.json`), evidence);
+      await testInfo.attach('header-rendering', { body: evidence, contentType: 'application/json' });
     });
   }
 }
