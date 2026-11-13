@@ -4,8 +4,10 @@
  * Template registry + Firestore override loader (spec §6.1).
  *
  * Defaults ship as code so a fresh deployment can send an OTP before
- * seeding completes. `email_templates/{id}` may override subject/html/text
- * only — never tokens, requiredTokens, or storeRendered.
+ * seeding completes. Speaker editors store plain fields in
+ * `email_templates/{id}`; the renderer builds them with the current frame.
+ * Other templates store subject/html/text. Tokens, requiredTokens and
+ * storeRendered stay fixed in code.
  *
  * validateOverridePayload is the save-time gate for saveEmailTemplate: it
  * rejects the write with specific messages so a broken override never

@@ -106,3 +106,13 @@ test('the version a render reports is the version of the wording it used', () =>
   assert.equal(out.usedFallback, true);
   assert.equal(wordingVersion(broken), wordingVersion(null));
 });
+
+test('saved plain fields change the reminder approval version when their wording changes', () => {
+  const { defaultSpeakerWordingFields } = require('../email/templates/speakerWordingFields.cjs');
+  const { wordingVersion } = require('./reminderCore.cjs');
+  const fields = defaultSpeakerWordingFields('speaker.reminder');
+  const version = wordingVersion({ fields });
+  assert.match(version, /^[0-9a-f]{32}$/);
+  assert.notEqual(wordingVersion({ fields: { ...fields, introduction: 'Please send the missing items.' } }), version);
+  assert.equal(wordingVersion({ fields: { subject: 'Incomplete' } }), wordingVersion(null));
+});

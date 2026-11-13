@@ -44,6 +44,7 @@ const source = buildSpeakerWording('speaker.reminder');
 
 module.exports = {
   id: 'speaker.reminder',
+  buildWording: (fields) => buildSpeakerWording('speaker.reminder', fields),
   ...source,
   tokens: [
     ...GLOBAL_TOKEN_NAMES,

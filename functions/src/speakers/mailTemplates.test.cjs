@@ -44,6 +44,13 @@ const NEW_INVITE = {
   text: 'Dear {{speaker_name}}, accept here: {{invite_url}}',
 };
 
+const NEW_INVITE_FIELDS = {
+  ...defaultSpeakerWordingFields('speaker.invite'),
+  subject: NEW_INVITE.subject,
+  greeting: 'Dear {{speaker_name}},',
+  buttonLabel: 'accept',
+};
+
 function makeDb(seed = {}) {
   return makeBareSpeakersDb({
     'config/bootstrap': { adminEmails: ['operator@example.org'], staffEmails: [STAFF.email] },
@@ -153,11 +160,12 @@ test('save refuses an unknown token, a dropped invite link and a locked key, and
 test('save stores only the wording fields, records who saved, and writes an admin log row', async () => {
   const db = makeDb();
   const res = await call(db, {
-    action: 'saveTemplate', templateId: 'speaker.invite', ...NEW_INVITE, storeRendered: true, tokens: ['x'],
+    action: 'saveTemplate', templateId: 'speaker.invite', fields: NEW_INVITE_FIELDS, storeRendered: true, tokens: ['x'],
   });
   assert.equal(res.statusCode, 200);
   const stored = db.read('email_templates', 'speaker.invite');
-  assert.deepEqual(Object.keys(stored).sort(), ['html', 'subject', 'text', 'updatedAt', 'updatedBy']);
+  assert.deepEqual(Object.keys(stored).sort(), ['fields', 'updatedAt', 'updatedBy']);
+  assert.deepEqual(stored.fields, NEW_INVITE_FIELDS);
   assert.equal(stored.updatedBy, STAFF.email);
   assert.equal(res.body.template.id, 'speaker.invite');
   assert.equal(res.body.template.saved.subject, NEW_INVITE.subject);
@@ -180,12 +188,15 @@ test('plain fields save fixed links, brand structure and matching text', async (
   const res = await call(db, { action: 'saveTemplate', templateId: 'speaker.invite', fields });
   assert.equal(res.statusCode, 200);
   const stored = db.read('email_templates', 'speaker.invite');
-  assert.ok(stored.html.includes('href="{{invite_url}}"'));
-  assert.ok(stored.html.includes('Hello {{speaker_name}} &amp; friends,'));
-  assert.ok(stored.html.includes('>Join the event</a>'));
-  assert.ok(stored.html.includes('{{postal_address_html}}'));
-  assert.ok(stored.text.includes('Hello {{speaker_name}} & friends,'));
-  assert.ok(stored.text.includes('Join the event:\n{{invite_url}}'));
+  assert.deepEqual(stored.fields, fields);
+  assert.deepEqual(Object.keys(stored).sort(), ['fields', 'updatedAt', 'updatedBy']);
+  const source = res.body.template.saved;
+  assert.ok(source.html.includes('href="{{invite_url}}"'));
+  assert.ok(source.html.includes('Hello {{speaker_name}} &amp; friends,'));
+  assert.ok(source.html.includes('>Join the event</a>'));
+  assert.ok(source.html.includes('{{postal_address_html}}'));
+  assert.ok(source.text.includes('Hello {{speaker_name}} & friends,'));
+  assert.ok(source.text.includes('Join the event:\n{{invite_url}}'));
   assert.deepEqual(res.body.template.editor, { kind: 'plain', fields });
 });
 
@@ -196,7 +207,7 @@ test('a save of one field keeps the shipped copy for the others', async () => {
   const shipped = getDefaultTemplate('speaker.accepted');
   assert.equal(res.body.template.saved.subject, 'Welcome to {{event_name}}');
   assert.equal(res.body.template.saved.html, shipped.html);
-  assert.deepEqual(Object.keys(db.read('email_templates', 'speaker.accepted')).sort(), ['subject', 'updatedAt', 'updatedBy']);
+  assert.deepEqual(Object.keys(db.read('email_templates', 'speaker.accepted')).sort(), ['fields', 'updatedAt', 'updatedBy']);
 });
 
 // Links are compared whole. A substring check would also pass for a link
@@ -268,7 +279,7 @@ test('preview of saved wording that fails its check says the shipped wording is 
 
 test('reset deletes the saved wording, logs it, and the shipped copy applies again', async () => {
   const db = makeDb();
-  await call(db, { action: 'saveTemplate', templateId: 'speaker.invite', ...NEW_INVITE });
+  await call(db, { action: 'saveTemplate', templateId: 'speaker.invite', fields: NEW_INVITE_FIELDS });
   const res = await call(db, { action: 'resetTemplate', templateId: 'speaker.invite' });
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.template.saved, null);
@@ -283,7 +294,7 @@ test('a historical demo refuses save and reset before anything is stored, and st
     'config/event': { name: 'Example Summit', historicalDemo: true },
     'email_templates/speaker.accepted': { subject: 'Kept {{event_name}}' },
   });
-  const save = await call(db, { action: 'saveTemplate', templateId: 'speaker.invite', ...NEW_INVITE });
+  const save = await call(db, { action: 'saveTemplate', templateId: 'speaker.invite', fields: NEW_INVITE_FIELDS });
   assert.equal(save.statusCode, 403);
   assert.equal(save.body.error.code, 'read-only-demo');
   const reset = await call(db, { action: 'resetTemplate', templateId: 'speaker.accepted' });
@@ -298,7 +309,7 @@ test('Done when: edited wording is used by the next invite, after the old copy w
   const db = makeDb();
   // An earlier render puts the shipped copy in the loader's cache.
   await loadTemplate({ db, id: 'speaker.invite', now: NOW });
-  const save = await call(db, { action: 'saveTemplate', templateId: 'speaker.invite', ...NEW_INVITE });
+  const save = await call(db, { action: 'saveTemplate', templateId: 'speaker.invite', fields: NEW_INVITE_FIELDS });
   assert.equal(save.statusCode, 200);
 
   const sent = [];
@@ -314,7 +325,8 @@ test('Done when: edited wording is used by the next invite, after the old copy w
   assert.equal(res.statusCode, 200);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].subject, 'Will you speak at Example Summit?');
-  assert.match(sent[0].text, /^Dear Rae Okonkwo, accept here: https:\/\/summit\.example\.org\/speaker\/accept\?token=/);
+  assert.match(sent[0].text, /^Dear Rae Okonkwo,/);
+  assert.match(sent[0].text, /\naccept:\nhttps:\/\/summit\.example\.org\/speaker\/accept\?token=/);
   // The invite body holds a bearer link, so it is never stored.
   assert.equal(sent[0].storeRendered, false);
 });
@@ -329,8 +341,11 @@ test('Done when: edited acceptance wording is used by the next acceptance mail',
   await call(db, {
     action: 'saveTemplate',
     templateId: 'speaker.accepted',
-    subject: 'Thanks, {{speaker_name}}',
-    text: 'Write your profile: {{profile_wizard_url}}',
+    fields: {
+      ...defaultSpeakerWordingFields('speaker.accepted'),
+      subject: 'Thanks, {{speaker_name}}',
+      greeting: 'Write your profile: {{profile_wizard_url}}',
+    },
   });
   const sent = [];
   await sendAcceptedEmail({

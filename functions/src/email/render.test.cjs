@@ -323,8 +323,19 @@ test('buildGlobalTokens derives urls, dates, and year', () => {
   assert.equal(tokens.site_url, 'https://summit.example.org');
   assert.equal(tokens.login_url, 'https://summit.example.org/signin');
   assert.equal(tokens.event_dates, 'May 13, 2027 to May 14, 2027');
+  assert.equal(tokens.event_details, 'May 13, 2027 to May 14, 2027 · Hall');
   assert.equal(tokens.current_year, '2027');
   assert.equal(tokens.venue_address, '1 Main St, Springfield, IL, 11111, USA');
+});
+
+test('event details omit the separator when dates or venue are absent', () => {
+  for (const [days, venue, expected] of [
+    [[], undefined, ''],
+    [[], { name: 'Online' }, 'Online'],
+    [[{ date: '2027-03-12' }], undefined, 'March 12, 2027'],
+  ]) {
+    assert.equal(buildGlobalTokens({ event: { days, venue } }).event_details, expected);
+  }
 });
 
 test('event dates keep their calendar day and render readable single days and ranges', (t) => {

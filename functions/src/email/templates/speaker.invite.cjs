@@ -30,6 +30,7 @@ const source = buildSpeakerWording('speaker.invite');
 
 module.exports = {
   id: 'speaker.invite',
+  buildWording: (fields) => buildSpeakerWording('speaker.invite', fields),
   ...source,
   // The full §6.2 global vocabulary is declared so admin overrides may
   // reference any global token without tripping the unknown-token check.

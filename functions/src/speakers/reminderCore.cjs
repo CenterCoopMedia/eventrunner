@@ -99,12 +99,9 @@ function wordingDigest(source) {
 function wordingVersion(override, shipped = null) {
   const template = shipped ?? require('../email/templates.cjs').getDefaultTemplate(TEMPLATE_ID);
   if (override) {
-    const candidate = {};
-    for (const key of ['subject', 'html', 'text']) {
-      candidate[key] = typeof override[key] === 'string' ? override[key] : template[key];
-    }
-    const { validateTemplateBody } = require('../email/render.cjs');
-    if (validateTemplateBody(template, candidate).ok) return wordingDigest(candidate);
+    const { resolveTemplateSource } = require('../email/render.cjs');
+    const resolved = resolveTemplateSource(template, override);
+    if (!resolved.usedFallback) return wordingDigest(resolved.source);
   }
   return `${SHIPPED_WORDING_PREFIX}${wordingDigest(template)}`;
 }
