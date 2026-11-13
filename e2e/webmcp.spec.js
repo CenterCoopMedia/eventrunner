@@ -238,7 +238,7 @@ test.describe.serial('Read-only WebMCP browser integration', () => {
     await page.getByRole('link', { name: /^view site$/i }).click();
     const publicPage = await opened;
     await expect(publicPage).toHaveURL(/\/$/);
-    expect(await publicPage.evaluate(() => window.opener === null)).toBe(true);
+    expect(await publicPage.evaluate(() => globalThis.opener === null)).toBe(true);
     await expect(page).toHaveURL(new RegExp(`/admin/pages/${pageId}$`));
     await expectToolSet(page, ADMIN_NAMES);
     await expectToolSet(publicPage, PUBLIC_NAMES);
