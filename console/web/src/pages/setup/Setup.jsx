@@ -63,6 +63,17 @@ function withStepErrors(app, step, stepErrors) {
   };
 }
 
+/** Focus only after a suspended step has mounted its fields. */
+function StepErrorFocus({ showAll, visit }) {
+  const focusedVisit = useRef(null);
+  useEffect(() => {
+    if (!showAll || focusedVisit.current === visit) return;
+    focusedVisit.current = visit;
+    document.querySelector('.step-body [aria-invalid="true"], .step-body [data-group-error]')?.focus?.();
+  }, [showAll, visit]);
+  return null;
+}
+
 /**
  * The guided setup (ADR 0007 §3): one step per page at its own address,
  * a step list with progress, Back and Next, and autosave as the client
@@ -164,16 +175,6 @@ export default function Setup() {
     setApp((prev) => (prev.ownersNeeded === ownersNeeded ? prev : { ...prev, ownersNeeded }));
   }, [setApp]);
 
-  // With ?check=1 the first field with an error takes the focus, once for
-  // each visit to the step. Later saves and keystrokes leave the focus alone.
-  const focusedVisit = useRef(null);
-  useEffect(() => {
-    if (!showAll || !app || focusedVisit.current === location.key) return;
-    focusedVisit.current = location.key;
-    const first = document.querySelector('.step-body [aria-invalid="true"], .step-body [data-group-error]');
-    first?.focus?.();
-  }, [showAll, app, location.key]);
-
   // Next checks the latest server errors after saving. Returning to Review
   // skips validation but keeps an answer here until the server saves it.
   const go = useCallback(async (target, action = 'next') => {
@@ -251,6 +252,7 @@ export default function Setup() {
           onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} /> : null}
         {View ? (
           <Suspense fallback={<LoadingState>Loading your setup.</LoadingState>}>
+          <StepErrorFocus showAll={showAll} visit={location.key} />
           <View
             value={preset?.visit === location.key && preset.step === step.id ? preset.answers : app.answers[step.id]}
             answers={app.answers}
