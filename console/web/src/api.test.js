@@ -8,6 +8,18 @@ afterEach(() => {
 });
 
 describe('callApi', () => {
+  it.each([['small', 10, true], ['oversized', 30000, false]])('uses keepalive only when the %s UTF-8 body fits the browser budget', async (_size, length, keepalive) => {
+    auth.currentUser = { getIdToken: async () => 't' };
+    const fetch = vi.fn(async () => ({ ok: true, json: async () => ({ saved: true }) }));
+    vi.stubGlobal('fetch', fetch);
+    const body = { answers: { name: '界'.repeat(length) } };
+    await callApi('saveApplicationStep', body, { keepalive: true });
+    const options = fetch.mock.calls[0][1];
+    expect(options.keepalive === true).toBe(keepalive);
+    expect(options.body).toBe(JSON.stringify(body));
+    expect(new TextEncoder().encode(options.body).byteLength <= 65536).toBe(keepalive);
+  });
+
   it('posts JSON to /api/<name> with the ID token', async () => {
     auth.currentUser = { getIdToken: vi.fn(async () => 'id-token') };
     const fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ organizations: [] }) }));

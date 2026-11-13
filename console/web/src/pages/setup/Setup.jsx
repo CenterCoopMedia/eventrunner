@@ -18,6 +18,8 @@ import WebAddressStep from './WebAddressStep.jsx';
 import LoadingState from '../../LoadingState.jsx';
 import IconControl from '../../IconControl.jsx';
 import StepList from '../../setup/StepList.jsx';
+import { useAuth } from '../../auth.jsx';
+import KeptAnswer from '../../setup/KeptAnswer.jsx';
 
 const STEP_VIEWS = {
   organization: OrganizationStep,
@@ -65,6 +67,7 @@ function withStepErrors(app, step, stepErrors) {
  * types. A teammate can open the same address and continue.
  */
 export default function Setup() {
+  const { user } = useAuth();
   const { orgId, appId, step: stepPath } = useParams();
   const [search] = useSearchParams();
   const navigate = useNavigate();
@@ -85,8 +88,10 @@ export default function Setup() {
   const showAll = search.get('check') === '1';
   const fromReview = search.get('from') === 'review' && (ANSWER_STEPS.includes(step?.id) || step?.id === 'team');
 
-  const { queue, flush, status: saveStatus, error: saveError } = useAutosave({
-    save: (value) => callApi('saveApplicationStep', { orgId, appId, step: value.step, answers: value.answers }),
+  const scope = { userId: user?.uid, orgId, appId };
+  const { queue, flush, status: saveStatus, error: saveError, signingOut } = useAutosave({
+    scope,
+    save: (value, options) => callApi('saveApplicationStep', { orgId, appId, step: value.step, answers: value.answers }, options),
     onResult: (result) => {
       const others = refusedNow.current.filter((id) => id !== result.step);
       refusedNow.current = result.saved === false ? [...others, result.step] : others;
@@ -184,7 +189,10 @@ export default function Setup() {
         </div>
         {error ? <ActionFeedback kind="error"><p>{error}</p><IconControl icon="refresh" label="Reload setup" onClick={() => reload().catch(() => {})} /></ActionFeedback> : null}
         {View && showAll ? <Problems fields={shownErrors} orgId={orgId} appId={appId} fromReview={fromReview} /> : null}
-        <fieldset disabled={navigating} className="console-feedback-fields">
+        <fieldset disabled={navigating || signingOut} className="console-feedback-fields">
+        {View ? <KeptAnswer key={`${user?.uid}/${orgId}/${appId}/${step.id}`} scope={scope} step={step.id}
+          answer={app.answers[step.id]} onUse={onChange}
+          onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} /> : null}
         {View ? (
           <View
             value={app.answers[step.id]}

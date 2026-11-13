@@ -25,7 +25,7 @@ export class ApiError extends Error {
  * @returns {Promise<object>} the response body
  * @throws {ApiError} with a message that is safe to show
  */
-export async function callApi(name, body = {}) {
+export async function callApi(name, body = {}, { keepalive = false } = {}) {
   const user = auth.currentUser;
   if (!user) throw new ApiError(401, 'unauthorized', 'Sign in to continue.');
   let token;
@@ -37,12 +37,17 @@ export async function callApi(name, body = {}) {
     }
     throw new ApiError(401, 'unauthorized', 'We could not confirm your sign-in. Sign out, then sign in again.');
   }
+  const serialized = JSON.stringify(body);
+  // Fetch keepalive has a shared 64 KiB body budget. The lifecycle handler
+  // has already kept the answer; large answers use the ordinary save too.
+  const canKeepAlive = keepalive && new TextEncoder().encode(serialized).byteLength <= 64 * 1024;
   let response;
   try {
     response = await fetch(`${BASE}/api/${name}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
+      body: serialized,
+      ...(canKeepAlive ? { keepalive: true } : {}),
     });
   } catch {
     throw new ApiError(0, 'network', 'We could not reach the server. Check your connection and try again.');

@@ -24,6 +24,7 @@ afterEach(() => {
   vi.clearAllMocks();
   try {
     window.localStorage.clear();
+    window.sessionStorage.clear();
   } catch {
     // Storage can be missing; nothing to clear then.
   }

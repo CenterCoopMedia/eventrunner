@@ -17,6 +17,25 @@ beforeEach(() => {
 });
 
 describe('Your event step', () => {
+  it('measures a full 14-day step at every text maxLength against the keepalive body budget', async () => {
+    const days = Array.from({ length: 14 }, (_, i) => ({ date: `2027-05-${String(i + 1).padStart(2, '0')}`, startTime: '00:00', endTime: '23:59', label: '' }));
+    serveApi(withEvent({ days }));
+    const { container } = renderSetup('event');
+    await screen.findByLabelText('Event name');
+    const fields = container.querySelectorAll('input[type="text"], textarea');
+    expect(fields).toHaveLength(19);
+    for (const field of fields) {
+      // Three UTF-8 bytes per UTF-16 code unit is the largest encoding of
+      // ordinary text; dates/times retain their constrained native values.
+      fireEvent.change(field, { target: { value: '界'.repeat(field.maxLength) } });
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your web address' }));
+    await screen.findByRole('heading', { name: 'Your web address' });
+    const bytes = new TextEncoder().encode(JSON.stringify(callsTo('saveApplicationStep').at(-1))).byteLength;
+    expect(bytes).toBeGreaterThan(57000);
+    expect(bytes).toBeLessThan(65536);
+  });
+
   it('asks for the name, short name, description and time zone', async () => {
     renderSetup('event');
     expect(await screen.findByLabelText('Event name')).toBeInTheDocument();
