@@ -43,6 +43,8 @@
     "getOwnSpeakerProfile",
     "updateOwnSpeakerProfile",
     "saveOwnSpeakerLogistics",
+    "getSpeakerDiscussionPoints",
+    "saveSpeakerDiscussionPoints",
     "submitOwnSpeakerProfile",
     "applySpeakerPendingEdits",
     "discardSpeakerPendingEdits",

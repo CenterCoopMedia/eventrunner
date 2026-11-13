@@ -152,12 +152,14 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
       // that module's upload machinery, not because they belong to a
       // different collection.
       'getOwnSpeakerProfile',
+      'getSpeakerDiscussionPoints',
       'listSpeakerInvites',
       'onSpeakerWritten',
       'resendSpeakerInvite',
       // The profile steps' Logistics save (ADR 0008 §3,
       // speakers/profileSteps.cjs): writes speaker_logistics, never speakers.
       'saveOwnSpeakerLogistics',
+      'saveSpeakerDiscussionPoints',
       'sendSpeakerInvite',
       // Staff wording of the invite and acceptance mail (issue #204,
       // speakers/mailTemplates.cjs): read, preview, save, reset.

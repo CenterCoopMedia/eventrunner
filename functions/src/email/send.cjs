@@ -249,7 +249,12 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         providerMessageId: outcome.providerMessageId,
         status: outcome.status,
         providerStatus: outcome.providerStatus ?? null,
-        error: outcome.error ?? null,
+        // A private template can carry submitted prose. Providers and relays
+        // may echo request content in a refusal, so its raw error belongs to
+        // the caller's immediate result only, never the admin-readable audit.
+        error: bodyStored
+          ? outcome.error ?? null
+          : outcome.error == null ? null : 'Private message failure details omitted.',
         retries: outcome.retries,
         bodyStored,
         html: html.value,

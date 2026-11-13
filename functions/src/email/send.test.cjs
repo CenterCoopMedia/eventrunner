@@ -212,6 +212,41 @@ test('storeRendered:false suppresses body storage (auth mail)', async () => {
   assert.equal(row.templateId, null);
 });
 
+test('storeRendered:false keeps provider errors containing private text out of the audit row', async () => {
+  const secret = 'Private discussion point: <do not publish>';
+  const db = fakeDb();
+  const { core: c } = core({
+    db,
+    provider: {
+      name: 'x',
+      send: async () => ({
+        providerMessageId: null,
+        status: 'failed',
+        providerStatus: 422,
+        error: `Provider rejected: ${secret}`,
+      }),
+    },
+  });
+  const result = await c.send({
+    to: 'organizer@example.org',
+    subject: `New submission: ${secret}`,
+    html: `<p>${secret}</p>`,
+    text: secret,
+    tag: 'speaker.discussion_points',
+    storeRendered: false,
+  });
+
+  assert.equal(result.error, `Provider rejected: ${secret}`);
+  const row = db.state.sentRows[0];
+  assert.equal(row.status, 'failed');
+  assert.equal(row.providerStatus, 422);
+  assert.equal(row.subject, null);
+  assert.equal(row.html, null);
+  assert.equal(row.text, null);
+  assert.equal(row.error, 'Private message failure details omitted.');
+  assert.doesNotMatch(JSON.stringify(row), /Private discussion point/);
+});
+
 test('stored bodies are truncated at 100KB with bodyTruncated', async () => {
   const db = fakeDb();
   const { core: c } = core({
