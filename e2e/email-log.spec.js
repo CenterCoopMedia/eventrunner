@@ -90,7 +90,7 @@ test.describe.serial('the email log', () => {
 
     // Its preview says why there is nothing to show, and draws no frame.
     await row.getByRole('button', { name: 'Preview', exact: true }).click();
-    await expect(page.getByText('This message is private because it contains a sign-in code or invitation link.')).toBeVisible();
+    await expect(page.getByText('This message is private. Its body is not stored in the email log.')).toBeVisible();
     await expect(page.locator('iframe')).toHaveCount(0);
   });
 
