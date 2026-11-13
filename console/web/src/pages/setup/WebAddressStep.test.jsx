@@ -10,12 +10,17 @@ beforeEach(() => {
 });
 
 describe('Your web address step', () => {
-  it('shows name.eventrunner.org as the reader types', async () => {
-    renderSetup('web-address');
+  it('focuses a cold step error and shows name.eventrunner.org as the reader types', async () => {
+    serveApi({ getApplication: { application: application({ answers: emptyAnswers(),
+      errors: { 'webAddress.name': 'Enter a web address.' } }) } });
+    renderSetup('web-address', { query: '?check=1' });
     const field = await screen.findByLabelText('Name');
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Web address preview')).toHaveTextContent('your-name.eventrunner.org');
     fireEvent.change(field, { target: { value: 'NCLocal' } });
     expect(field).toHaveValue('nclocal');
+    expect(field).toHaveFocus();
     expect(screen.getByLabelText('Web address preview')).toHaveTextContent('nclocal.eventrunner.org');
   });
 

@@ -1,5 +1,5 @@
 import PageHeading from '../../PageHeading.jsx';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
 import {
@@ -9,17 +9,19 @@ import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
 import ActionFeedback from '../../ActionFeedback.jsx';
 import AgreementStep from './AgreementStep.jsx';
 import EmailStep from './EmailStep.jsx';
-import EventStep from './EventStep.jsx';
+import EventStep, { browserTimeZone, NEW_DAY } from './EventStep.jsx';
 import OrganizationStep from './OrganizationStep.jsx';
 import ReviewStep, { Problems } from './ReviewStep.jsx';
 import TeamStep from './TeamStep.jsx';
 import TicketsStep from './TicketsStep.jsx';
-import WebAddressStep from './WebAddressStep.jsx';
 import LoadingState from '../../LoadingState.jsx';
 import IconControl from '../../IconControl.jsx';
 import StepList from '../../setup/StepList.jsx';
 import { rememberReturn, useAuth } from '../../auth.jsx';
 import KeptAnswer from '../../setup/KeptAnswer.jsx';
+import { readKeptAnswer } from '../../setup/keptAnswers.js';
+
+const WebAddressStep = lazy(() => import('./WebAddressStep.jsx'));
 
 const STEP_VIEWS = {
   organization: OrganizationStep,
@@ -61,6 +63,17 @@ function withStepErrors(app, step, stepErrors) {
   };
 }
 
+/** Focus only after a suspended step has mounted its fields. */
+function StepErrorFocus({ showAll, visit }) {
+  const focusedVisit = useRef(null);
+  useEffect(() => {
+    if (!showAll || focusedVisit.current === visit) return;
+    focusedVisit.current = visit;
+    document.querySelector('.step-body [aria-invalid="true"], .step-body [data-group-error]')?.focus?.();
+  }, [showAll, visit]);
+  return null;
+}
+
 /**
  * The guided setup (ADR 0007 §3): one step per page at its own address,
  * a step list with progress, Back and Next, and autosave as the client
@@ -76,6 +89,8 @@ export default function Setup() {
   const { app, setApp, error, reload } = useApplication(orgId, appId);
   const applicationNow = useRef(app);
   applicationNow.current = app;
+  const [preset, setPreset] = useState(null);
+  const presetStep = useRef(null);
   const [navigating, setNavigating] = useState(false);
   const navigationPending = useRef(false);
   const actionArea = useRef(null);
@@ -130,9 +145,27 @@ export default function Setup() {
 
   const onChange = useCallback((value) => {
     if (!step || !ANSWER_STEPS.includes(step.id)) return;
-    setApp((prev) => ({ ...prev, answers: { ...prev.answers, [step.id]: value } }));
+    setPreset(null);
+    applicationNow.current = { ...applicationNow.current,
+      answers: { ...applicationNow.current.answers, [step.id]: value } };
+    setApp(applicationNow.current);
     queue({ step: step.id, answers: value });
   }, [step, setApp, queue]);
+
+  useEffect(() => {
+    if (!app || !step || presetStep.current === step.id) return;
+    presetStep.current = step.id;
+    // Later edits and explicit recovery own the answer after this preset.
+    if (readKeptAnswer(scope, step.id)) return;
+    const value = app.answers[step.id];
+    let answers;
+    if (step.id === 'event') answers = { ...value,
+      timezone: value.timezone || browserTimeZone(), days: value.days.length ? value.days : [{ ...NEW_DAY }] };
+    if (step.id === 'email') answers = { ...value,
+      senderName: value.senderName || app.answers.event.shortName || app.answers.event.name,
+      replyTo: value.replyTo || (user?.emailVerified ? user.email : '') };
+    if (answers && JSON.stringify(answers) !== JSON.stringify(value)) setPreset({ visit: location.key, step: step.id, answers });
+  }, [app, step, location.key, scope, user]);
 
   const onConnections = useCallback(({ connections, errors }) => {
     setApp((prev) => ({ ...withStepErrors(prev, 'tickets', errors), connections }));
@@ -142,22 +175,16 @@ export default function Setup() {
     setApp((prev) => (prev.ownersNeeded === ownersNeeded ? prev : { ...prev, ownersNeeded }));
   }, [setApp]);
 
-  // With ?check=1 the first field with an error takes the focus, once for
-  // each visit to the step. Later saves and keystrokes leave the focus alone.
-  const focusedVisit = useRef(null);
-  useEffect(() => {
-    if (!showAll || !app || focusedVisit.current === location.key) return;
-    focusedVisit.current = location.key;
-    const first = document.querySelector('.step-body [aria-invalid="true"], .step-body [data-group-error]');
-    first?.focus?.();
-  }, [showAll, app, location.key]);
-
   // Next checks the latest server errors after saving. Returning to Review
   // skips validation but keeps an answer here until the server saves it.
   const go = useCallback(async (target, action = 'next') => {
     if (navigationPending.current) return;
     navigationPending.current = true;
     setNavigating(true);
+    if (preset?.visit === location.key && preset.step === step?.id && (action === 'next' || action === 'review')) {
+      onChange(preset.answers);
+    }
+    setPreset(null);
     const saved = await flush();
     navigationPending.current = false;
     setNavigating(false);
@@ -180,7 +207,7 @@ export default function Setup() {
       return;
     }
     navigate(target);
-  }, [flush, navigate, orgId, appId, step]);
+  }, [flush, onChange, navigate, orgId, appId, step, preset, location.key]);
 
   const stepErrors = useMemo(() => (app && step ? errorsOfStep(app.errors, step.id) : {}), [app, step]);
 
@@ -224,8 +251,10 @@ export default function Setup() {
           onUse={onChange}
           onDone={() => document.querySelector('.step-body input, .step-body select')?.focus()} /> : null}
         {View ? (
+          <Suspense fallback={<LoadingState>Loading your setup.</LoadingState>}>
+          <StepErrorFocus showAll={showAll} visit={location.key} />
           <View
-            value={app.answers[step.id]}
+            value={preset?.visit === location.key && preset.step === step.id ? preset.answers : app.answers[step.id]}
             answers={app.answers}
             errors={shownErrors}
             onChange={onChange}
@@ -235,6 +264,7 @@ export default function Setup() {
             flush={flush}
             onConnections={onConnections}
           />
+          </Suspense>
         ) : null}
         {step.id === 'team' ? <TeamStep orgId={orgId} onOwnersNeeded={onOwnersNeeded} /> : null}
         {step.id === 'review' ? (

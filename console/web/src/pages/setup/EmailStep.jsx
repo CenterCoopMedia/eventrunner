@@ -9,7 +9,6 @@ export function senderPreview(senderName, siteName) {
 /** Step 6: the sender name and the address that gets replies. */
 export default function EmailStep({ value, errors, onChange, answers }) {
   const set = (key) => (next) => onChange({ ...value, [key]: next });
-  const fallbackName = value.senderName || answers.event.shortName || answers.event.name;
   return (
     <div className="stack">
       <p className="lead">Choose the sender name and where replies go.</p>
@@ -19,7 +18,7 @@ export default function EmailStep({ value, errors, onChange, answers }) {
         type="email" inputMode="email" autoComplete="email"
         value={value.replyTo} onChange={set('replyTo')} error={errors['email.replyTo']} />
       <div className="preview" aria-label="Email preview">
-        <p><span className="preview-label">From</span> <span className="preview-value">{senderPreview(fallbackName, answers.webAddress.name)}</span></p>
+        <p><span className="preview-label">From</span> <span className="preview-value">{senderPreview(value.senderName, answers.webAddress.name)}</span></p>
         <p><span className="preview-label">Replies go to</span> <span className="preview-value">{value.replyTo || 'your reply address'}</span></p>
       </div>
     </div>

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { GroupError, SelectField, TextField, fieldId } from '../../setup/Field.jsx';
 import { MAX_DAYS } from '../../setup/steps.js';
 import IconControl from '../../IconControl.jsx';
 
-const NEW_DAY = Object.freeze({ date: '', startTime: '09:00', endTime: '17:00' });
+export const NEW_DAY = Object.freeze({ date: '', startTime: '09:00', endTime: '17:00' });
 
 /** The browser's time zone, for the preset. */
 export function browserTimeZone() {
@@ -58,15 +58,6 @@ export default function EventStep({ value, errors, onChange }) {
   const set = (key) => (next) => onChange({ ...value, [key]: next });
   const full = value.days.length >= MAX_DAYS;
   const setVenue = (key) => (next) => onChange({ ...value, venue: { ...value.venue, [key]: next } });
-
-  // ADR 0007 §3: the time zone is preset from the browser.
-  const preset = useRef(false);
-  useEffect(() => {
-    if (preset.current || value.timezone) return;
-    preset.current = true;
-    const zone = browserTimeZone();
-    if (zone) onChange({ ...value, timezone: zone });
-  }, [value, onChange]);
 
   function onDay(index, day) {
     onChange({ ...value, days: value.days.map((d, i) => (i === index ? day : d)) });
