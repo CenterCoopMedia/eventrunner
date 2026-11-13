@@ -18,6 +18,7 @@
 // asset detail on top of its library. Only the topmost receives cancel.
 // Pending writes use the same dismissal guard for Escape, X, and Cancel.
 import { useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { secondaryButtonClass } from '../formControls.jsx';
 import AdminIconControl from '../AdminIconControl.jsx';
 import useModalDialog, { wrapModalTab } from '../useModalDialog.js';
@@ -28,7 +29,8 @@ export default function ModalShell({ title, description = null, onClose, busy = 
   const panelRef = useRef(null);
   useModalDialog(panelRef, { returnFocusRef });
 
-  return (
+  return createPortal(
+    <div className="admin-room">
       <dialog
         ref={panelRef}
         aria-labelledby={headingId}
@@ -36,9 +38,8 @@ export default function ModalShell({ title, description = null, onClose, busy = 
         tabIndex={-1}
         className="admin-modal max-w-3xl rounded-admin-panel border-admin-strong border-admin-rule-strong bg-admin-ground-raised p-md font-admin-ui text-admin-base text-admin-ink"
         onKeyDown={wrapModalTab}
-        // The dialog is not portalled, so it can sit inside a page's form
-        // (Branding, the block editor). React bubbles a submit through the
-        // component tree: an upload form in here would also submit the page.
+        // Keep dialog forms outside page forms in the DOM. Portal events
+        // still bubble through React, so stop them before the page handler.
         onSubmit={(event) => event.stopPropagation()}
         onCancel={(event) => {
           event.preventDefault();
@@ -66,5 +67,7 @@ export default function ModalShell({ title, description = null, onClose, busy = 
         </div>
         <div className="mt-sm">{children}</div>
       </dialog>
+    </div>,
+    document.body,
   );
 }
