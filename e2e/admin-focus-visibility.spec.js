@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, APP_BASE_URL, adminDb, signIn } from './helpers.mjs';
+import { ADMIN_EMAIL, APP_BASE_URL, adminDb, ensureUser, signIn } from './helpers.mjs';
 
 const VIEWPORTS = [
   { width: 640, height: 900 }, { width: 768, height: 900 },
@@ -109,32 +109,42 @@ for (const kind of ['page', 'invoice', 'session']) {
 }
 
 test('reverse-tab focus clears a scrolling table head and admin padding ends at public navigation', async ({ page }) => {
-  const headers = { 'access-control-allow-origin': APP_BASE_URL, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type, x-firebase-appcheck' };
-  const rows = Array.from({ length: 25 }, (_, index) => ({
-    id: `focus-log-${index}`, sentAt: Date.now() - index * 60000,
-    to: `reader-${index}@example.test`, subject: `Synthetic guide ${index + 1}`,
-    source: 'announcement', status: 'sent', bodyStored: false,
-  }));
-  await page.route('**/listSentEmails', async (route) => {
-    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
-    return route.fulfill({ status: 200, headers, json: { rows, nextCursor: null, scanned: rows.length } });
-  });
-  await signIn(page, ADMIN_EMAIL);
-  await page.goto('/admin/email-log');
-  const table = page.getByRole('region', { name: 'Sent messages', exact: true });
-  await expect(table.getByRole('button', { name: 'Preview', exact: true })).toHaveCount(rows.length);
-  for (const viewport of [VIEWPORTS[1], VIEWPORTS[3], { width: 390, height: 844 }]) {
-    await page.setViewportSize(viewport);
-    await reverseThrough(page, table);
+  const profileRef = adminDb().doc(`users/${await ensureUser(ADMIN_EMAIL)}`);
+  const profile = await profileRef.get();
+  await profileRef.set({ registrationStatus: 'approved' }, { merge: true });
+  try {
+    const headers = { 'access-control-allow-origin': APP_BASE_URL, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type, x-firebase-appcheck' };
+    const rows = Array.from({ length: 25 }, (_, index) => ({
+      id: `focus-log-${index}`, sentAt: Date.now() - index * 60000,
+      to: `reader-${index}@example.test`, subject: `Synthetic guide ${index + 1}`,
+      source: 'announcement', status: 'sent', bodyStored: false,
+    }));
+    await page.route('**/listSentEmails', async (route) => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+      return route.fulfill({ status: 200, headers, json: { rows, nextCursor: null, scanned: rows.length } });
+    });
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/email-log');
+    const table = page.getByRole('region', { name: 'Sent messages', exact: true });
+    await expect(table.getByRole('button', { name: 'Preview', exact: true })).toHaveCount(rows.length);
+    for (const viewport of [VIEWPORTS[1], VIEWPORTS[3], { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      await reverseThrough(page, table);
+    }
+    await page.setViewportSize(VIEWPORTS[1]);
+    await page.getByRole('link', { name: 'Skip to main content', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    expect(await page.locator('#admin-content').evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThanOrEqual(-1);
+    expect(await page.evaluate(() => document.scrollingElement.scrollTop)).toBe(0);
+    await page.setViewportSize(VIEWPORTS[2]);
+    await page.getByRole('combobox', { name: 'View', exact: true }).selectOption('attendee');
+    await page.getByRole('link', { name: 'Open', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.locator('.admin-room')).toHaveCount(0);
+    expect(await page.locator('html').evaluate((element) => getComputedStyle(element).scrollPaddingTop)).toMatch(/^(auto|0px)$/);
+    expect(await page.locator('html').evaluate((element) => element.style.getPropertyValue('--admin-header-scroll-padding'))).toBe('');
+  } finally {
+    if (profile.exists) await profileRef.set(profile.data());
+    else await profileRef.delete();
   }
-  await page.setViewportSize(VIEWPORTS[1]);
-  await page.getByRole('link', { name: 'Skip to main content', exact: true }).focus();
-  await page.keyboard.press('Enter');
-  expect(await page.locator('#admin-content').evaluate((element) => element.getBoundingClientRect().top)).toBeGreaterThanOrEqual(-1);
-  expect(await page.evaluate(() => document.scrollingElement.scrollTop)).toBe(0);
-  await page.setViewportSize(VIEWPORTS[2]);
-  await page.getByRole('link', { name: 'View site', exact: true }).click();
-  await expect(page.locator('.admin-room')).toHaveCount(0);
-  expect(await page.locator('html').evaluate((element) => getComputedStyle(element).scrollPaddingTop)).toMatch(/^(auto|0px)$/);
-  expect(await page.locator('html').evaluate((element) => element.style.getPropertyValue('--admin-header-scroll-padding'))).toBe('');
 });

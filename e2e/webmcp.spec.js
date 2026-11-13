@@ -74,8 +74,13 @@ test.describe.serial('Read-only WebMCP browser integration', () => {
     const features = await featuresRef.get();
     await replaceFixture(featuresRef, { ...features.data(), webmcpPublic: true, webmcpAdmin: true });
 
-    // Use a real seeded page and restore its draft after the suite. No publish
-    // queue, attendee, invitation, email, or provider fixture is changed.
+    // Use a real seeded page and restore its draft after the suite. The
+    // admin also has an attendee view for same-document route-exit coverage.
+    const adminProfile = db.doc(`users/${await ensureUser(ADMIN_EMAIL)}`);
+    const profile = await adminProfile.get();
+    await replaceFixture(adminProfile, {
+      ...profile.data(), displayName: 'WebMCP admin', profileVisibility: 'private', registrationStatus: 'approved',
+    });
     const pages = await db.collection('cmsPages').get();
     const publicPage = pages.docs.find((doc) => /^[A-Za-z0-9_-]{1,64}$/.test(doc.id) && doc.id !== 'new');
     if (!publicPage) throw new Error('The emulator seed has no page to validate.');
@@ -195,7 +200,7 @@ test.describe.serial('Read-only WebMCP browser integration', () => {
 
   test('admin tools invoke real diagnostics, redact output, and clean up on route exit and sign-out', async ({ page }) => {
     test.setTimeout(120_000);
-    await page.addInitScript(installWebMcpHarness);
+    await page.context().addInitScript(installWebMcpHarness);
     await signIn(page, ADMIN_EMAIL);
     await page.goto(`/admin/pages/${pageId}`);
     await expect(page.getByRole('button', { name: /^sign out$/i })).toBeVisible();
@@ -227,11 +232,23 @@ test.describe.serial('Read-only WebMCP browser integration', () => {
     await featuresRef.update({ webmcpAdmin: true });
     await expectToolSet(page, ADMIN_NAMES);
 
-    // A client-side route change must tear down the admin set. A page.goto
-    // here would discard the document and could hide broken effect cleanup.
+    // View site keeps this Admin document and its tools in the original tab.
     const documentId = await page.evaluate(() => globalThis.__eventrunnerWebMcpTest.documentId);
+    const opened = page.waitForEvent('popup');
     await page.getByRole('link', { name: /^view site$/i }).click();
-    await expect(page).not.toHaveURL(/\/admin(?:\/|$)/);
+    const publicPage = await opened;
+    await expect(publicPage).toHaveURL(/\/$/);
+    expect(await publicPage.evaluate(() => window.opener === null)).toBe(true);
+    await expect(page).toHaveURL(new RegExp(`/admin/pages/${pageId}$`));
+    await expectToolSet(page, ADMIN_NAMES);
+    await expectToolSet(publicPage, PUBLIC_NAMES);
+    await publicPage.close();
+
+    // An account-view route change must tear down the admin set. A page.goto
+    // here would discard the document and could hide broken effect cleanup.
+    await page.getByRole('combobox', { name: 'View', exact: true }).selectOption('attendee');
+    await page.getByRole('link', { name: 'Open', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
     await expectToolSet(page, PUBLIC_NAMES);
     expect(await page.evaluate(() => globalThis.__eventrunnerWebMcpTest.documentId)).toBe(documentId);
     await page.goBack();
