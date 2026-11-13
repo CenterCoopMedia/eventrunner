@@ -220,6 +220,7 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
     event_short_name: event.shortName || '',
     event_tagline: event.tagline || '',
     event_dates: formatEventDates(event),
+    event_details: [formatEventDates(event), event.venue?.name].filter(Boolean).join(' · '),
     event_timezone: event.timezone || '',
     venue_name: event.venue?.name || '',
     venue_address: formatVenueAddress(event.venue),
@@ -378,23 +379,8 @@ function substitute(body, kind, values, config, warnings) {
   });
 }
 
-/**
- * Render a template with an optional Firestore override.
- *
- * A failed override check falls back to the code default for this render
- * (spec §6.1 step 4) and reports the errors so the caller can log a
- * system_errors row and fire an OperatorEvent — the client's mail keeps
- * working on the shipped copy.
- *
- * @param {{ template: object, override?: object|null,
- *           tokenValues?: Record<string, string>, config: object,
- *           now?: () => Date }} args
- * @returns {{ subject: string, html: string, text: string,
- *             usedFallback: boolean, overrideErrors: string[],
- *             warnings: string[] }}
- */
-function render({ template, override = null, tokenValues = {}, config, now }) {
-  const warnings = [];
+/** Build saved plain fields with the current frame, then check the effective source. */
+function resolveTemplateSource(template, override = null) {
   let overrideErrors = [];
   let usedFallback = false;
 
@@ -405,10 +391,20 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
   };
 
   if (override) {
+    let source = override;
+    if (Object.hasOwn(override, 'fields')) {
+      try {
+        if (typeof template.buildWording !== 'function') throw new Error('This template has no plain wording fields.');
+        if (['subject', 'html', 'text'].some((key) => key in override)) throw new Error('Store plain fields without raw source.');
+        source = template.buildWording(override.fields);
+      } catch (err) {
+        return { source: effective, usedFallback: true, overrideErrors: [`fields: ${err.message}`] };
+      }
+    }
     const candidate = {
-      subject: typeof override.subject === 'string' ? override.subject : template.subject,
-      html: typeof override.html === 'string' ? override.html : template.html,
-      text: typeof override.text === 'string' ? override.text : template.text,
+      subject: typeof source.subject === 'string' ? source.subject : template.subject,
+      html: typeof source.html === 'string' ? source.html : template.html,
+      text: typeof source.text === 'string' ? source.text : template.text,
     };
     const check = validateTemplateBody(template, candidate);
     if (check.ok) {
@@ -419,6 +415,17 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
     }
   }
 
+  return { source: effective, usedFallback, overrideErrors };
+}
+
+/**
+ * Render the effective source. Invalid saved wording uses the shipped copy
+ * and reports errors so callers can record the failure without stopping mail.
+ */
+function render({ template, override = null, tokenValues = {}, config, now }) {
+  const warnings = [];
+  const { source: effective, usedFallback, overrideErrors } = resolveTemplateSource(template, override);
+
   // Reject any attempt to pass an `_html` value per-send (invariant §6.1).
   const values = { ...buildGlobalTokens(config, { now: now || (() => new Date()) }) };
   for (const [key, value] of Object.entries(tokenValues)) {
@@ -428,6 +435,7 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
     }
     values[key.toLowerCase()] = value;
   }
+  values.host_label = values.logo_url ? 'Hosted by' : values.operator_name ? `Hosted by ${values.operator_name}` : '';
 
   return {
     subject: substitute(effective.subject, 'text', values, config, warnings),
@@ -453,10 +461,11 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
 /**
  * Every global token name (spec §6.2) — the vocabulary templates declare so
  * overrides may reference any of them without tripping the unknown-token
- * check. Derived from buildGlobalTokens plus the global `_html` resolvers.
+ * check. Includes config, presentation and global `_html` values.
  */
 const GLOBAL_TOKEN_NAMES = Object.freeze([
   ...Object.keys(buildGlobalTokens({})),
+  'host_label',
   'postal_address_html',
   'social_links_html',
 ]);
@@ -464,6 +473,7 @@ const GLOBAL_TOKEN_NAMES = Object.freeze([
 module.exports = {
   render,
   validateTemplateBody,
+  resolveTemplateSource,
   buildGlobalTokens,
   GLOBAL_TOKEN_NAMES,
   internals: {

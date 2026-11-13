@@ -19,6 +19,7 @@ const {
 } = require('../functions/src/speakers/reminders.cjs');
 const { createEmailCore, internals: { claimIdForOnceKey } } = require('../functions/src/email/send.cjs');
 const { resetTemplateCacheForTest } = require('../functions/src/email/templates.cjs');
+const { defaultSpeakerWordingFields } = require('../functions/src/email/templates/speakerWordingFields.cjs');
 
 const PROJECT_ID = 'demo-run-of-show';
 const OPERATOR_EMAIL = 'reminder-operator@example.test';
@@ -431,8 +432,11 @@ describe('wording', () => {
     await call({ action: 'preview', speakerIds: ['ada'] });
     const saved = await call({
       action: 'saveTemplate',
-      subject: 'Please finish your page for {{event_name}}',
-      text: 'Dear {{speaker_name}}: {{dashboard_url}}',
+      fields: {
+        ...defaultSpeakerWordingFields('speaker.reminder'),
+        subject: 'Please finish your page for {{event_name}}',
+        greeting: 'Dear {{speaker_name}}:',
+      },
     });
     expect(saved.statusCode).toBe(200);
     expect(saved.body.saved).toMatchObject({ subject: 'Please finish your page for {{event_name}}', updatedBy: STAFF_EMAIL });
@@ -440,7 +444,8 @@ describe('wording', () => {
 
     const preview = await call({ action: 'preview', speakerIds: ['ada'] });
     expect(preview.body.recipients[0].subject).toBe('Please finish your page for Example Event');
-    expect(preview.body.recipients[0].text.startsWith('Dear Ada Lee: https://site.example.test/speaker/dashboard')).toBe(true);
+    expect(preview.body.recipients[0].text.startsWith('Dear Ada Lee:')).toBe(true);
+    expect(preview.body.recipients[0].text).toContain('https://site.example.test/speaker/dashboard');
     await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1, wordingVersion: preview.body.wordingVersion });
     expect(outbox[0].subject).toBe('Please finish your page for Example Event');
 

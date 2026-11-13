@@ -6,8 +6,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { readWording, readDraft, renderWording, WordingError } = require('./templateWording.cjs');
-const { resetTemplateCacheForTest, loadTemplate } = require('./templates.cjs');
+const { readWording, readDraft, saveWording, renderWording, WordingError } = require('./templateWording.cjs');
+const { getDefaultTemplate, resetTemplateCacheForTest, loadTemplate } = require('./templates.cjs');
 const { defaultSpeakerWordingFields } = require('./templates/speakerWordingFields.cjs');
 const { makeSpeakersDb } = require('../speakers/speakersFake.cjs');
 
@@ -19,6 +19,42 @@ const CONFIG = {
 const VALUES = { speaker_name: 'Sample Speaker', profile_wizard_url: 'https://summit.example.org/speaker/profile' };
 
 test.beforeEach(() => resetTemplateCacheForTest());
+
+test('saved speaker fields remain editable and keep required links when rendered', async () => {
+  const db = makeSpeakersDb({ 'config/event': { historicalDemo: false } });
+  for (const id of ['speaker.invite', 'speaker.accepted', 'speaker.reminder']) {
+    const fields = { ...defaultSpeakerWordingFields(id), greeting: 'Welcome {{speaker_name}} & friends,' };
+    await saveWording({ db, id, body: { fields }, actor: { uid: 'staff', email: 'staff@example.org' } });
+    const stored = db.read('email_templates', id);
+    assert.deepEqual(Object.keys(stored).sort(), ['fields', 'updatedAt', 'updatedBy']);
+    assert.deepEqual(stored.fields, fields);
+    const wording = await readWording({ db, id });
+    assert.deepEqual(wording.editor, { kind: 'plain', fields });
+    const out = await renderWording({
+      db, id, config: CONFIG,
+      tokenValues: { ...VALUES, invite_url: 'https://summit.example.org/accept', dashboard_url: 'https://summit.example.org/dashboard' },
+    });
+    assert.equal(out.usedFallback, false);
+    assert.match(out.html, /Welcome Sample Speaker &amp; friends,/);
+    assert.match(out.html, /Questions\? Write to/);
+    for (const token of getDefaultTemplate(id).requiredTokens) {
+      const expected = { invite_url: 'https://summit.example.org/accept', profile_wizard_url: VALUES.profile_wizard_url, dashboard_url: 'https://summit.example.org/dashboard' }[token];
+      assert.ok(out.html.includes(expected));
+      assert.ok(out.text.includes(expected));
+    }
+  }
+});
+
+test('invalid saved speaker fields fall back and are reported to the editor', async () => {
+  const db = makeSpeakersDb({ 'email_templates/speaker.accepted': { fields: { subject: 'Incomplete' } } });
+  const wording = await readWording({ db, id: 'speaker.accepted' });
+  assert.equal(wording.editor.kind, 'unsupported');
+  assert.ok(wording.savedErrors.length > 0);
+  const out = await renderWording({ db, id: 'speaker.accepted', config: CONFIG, tokenValues: VALUES });
+  assert.equal(out.usedFallback, true);
+  assert.ok(out.overrideErrors.length > 0);
+  assert.ok(out.html.includes(VALUES.profile_wizard_url));
+});
 
 test('readDraft returns null for a body with no wording only when a draft is optional', () => {
   assert.equal(readDraft('speaker.accepted', { action: 'preview' }, { required: false }), null);
@@ -66,6 +102,15 @@ test('readWording marks valid custom structure as unsupported without changing i
   assert.deepEqual(wording.savedErrors, []);
   assert.equal(wording.saved.html, '<p><a href="{{invite_url}}">Custom invitation</a></p>');
   assert.equal(wording.editor.kind, 'unsupported');
+});
+
+test('speaker saves refuse custom markup instead of storing a wrapper', async () => {
+  const db = makeSpeakersDb({ 'config/event': { historicalDemo: false } });
+  await assert.rejects(saveWording({
+    db, id: 'speaker.invite', actor: { email: 'staff@example.org' },
+    body: { html: '<p><a href="{{invite_url}}">Custom invitation</a></p>' },
+  }), (err) => err instanceof WordingError && /plain wording fields/.test(err.message));
+  assert.equal(db.read('email_templates', 'speaker.invite'), undefined);
 });
 
 test('renderWording reads saved wording fresh, past a cached older copy', async () => {

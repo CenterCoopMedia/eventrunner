@@ -5,7 +5,8 @@
  * `email_templates/{id}` override (spec §6.1). Read, save, reset and
  * render, for any shipped template id. The tokens a template declares and
  * the tokens it requires stay fixed in code; only subject, html and text
- * are saved.
+ * are saved for raw templates. Speaker field editors save their plain fields;
+ * the current template builds the subject and both bodies at render time.
  *
  * Save runs validateOverridePayload (templates.cjs), so an unknown token,
  * a malformed placeholder or a dropped required link is refused before
@@ -16,7 +17,7 @@
  */
 
 const { getDefaultTemplate, loadTemplate, validateOverridePayload } = require('./templates.cjs');
-const { validateTemplateBody } = require('./render.cjs');
+const { validateTemplateBody, resolveTemplateSource } = require('./render.cjs');
 const {
   SpeakerWordingFieldsError,
   buildSpeakerWording,
@@ -84,22 +85,29 @@ async function readWording({ db, id }) {
   let saved = null;
   let savedErrors = [];
   if (data) {
+    const fieldSource = Object.hasOwn(data, 'fields') ? resolveTemplateSource(template, data) : null;
+    const source = fieldSource ? fieldSource.source : data;
     saved = {
-      subject: typeof data.subject === 'string' ? data.subject : template.subject,
-      html: typeof data.html === 'string' ? data.html : template.html,
-      text: typeof data.text === 'string' ? data.text : template.text,
+      subject: typeof source.subject === 'string' ? source.subject : template.subject,
+      html: typeof source.html === 'string' ? source.html : template.html,
+      text: typeof source.text === 'string' ? source.text : template.text,
       updatedAt: isoOrNull(data.updatedAt),
       updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : null,
     };
-    const check = validateOverridePayload(id, storedWording(data));
-    if (!check.ok) savedErrors = check.errors;
+    if (fieldSource) savedErrors = fieldSource.overrideErrors;
+    else {
+      const check = validateOverridePayload(id, storedWording(data));
+      if (!check.ok) savedErrors = check.errors;
+    }
   }
   return {
     id,
     shipped: { subject: template.subject, html: template.html, text: template.text },
     saved,
     savedErrors,
-    editor: wordingEditor(id, saved ?? template),
+    editor: savedErrors.length && typeof template.buildWording === 'function'
+      ? { kind: 'unsupported', reason: 'The saved wording is invalid. Use the shipped wording before editing.' }
+      : wordingEditor(id, saved ?? template),
     tokens: template.tokens.filter((name) => !GLOBAL_TOKEN_NAMES.includes(name)),
     globalTokens: [...GLOBAL_TOKEN_NAMES],
     requiredTokens: [...template.requiredTokens],
@@ -152,9 +160,18 @@ async function requireWritable(db) {
 async function saveWording({ db, id, body, actor, now = Date.now, log = console }) {
   const { logAdminAction } = require('../cms/store.cjs');
   const payload = readDraft(id, body);
+  const template = getDefaultTemplate(id);
+  let stored = payload;
+  if (typeof template.buildWording === 'function') {
+    const fields = body.fields !== undefined
+      ? readSpeakerWordingFields(id, body.fields)
+      : parseSpeakerWording(id, { subject: template.subject, html: template.html, text: template.text, ...payload });
+    if (!fields) fail(400, 'bad-request', 'fields: Save plain wording fields without changing the email structure.');
+    stored = { fields };
+  }
   await requireWritable(db);
   await db.collection(TEMPLATES).doc(id).set({
-    ...payload,
+    ...stored,
     updatedAt: new Date(now()),
     updatedBy: actor.email,
   });

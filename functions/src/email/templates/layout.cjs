@@ -18,24 +18,26 @@ const LAYOUT_TOKENS = [
   'brand_primary',
   'logo_url',
   'event_name',
+  'event_details',
+  'operator_name',
+  'host_label',
   'postal_address_html',
   'social_links_html',
   'social_links_text',
   'support_email',
-  'current_year',
 ];
 
 /**
- * The plain-text footer every template's text body ends with: the postal
- * block, then the event's social accounts, one "Service: link" line each
+ * The plain-text footer every template's text body ends with: the event,
+ * venue and host's postal block, then social accounts, one "Service: link" line each
  * (config/event.social.handles, #231).
  *
  * The accounts sit inside `{{#if social_links_text}}`, blank line and all,
- * so an event that lists none gets exactly the footer it had before: no
- * separator and no trailing blank line.
+ * so an event that lists none gets no extra separator or trailing blank line.
  */
 const TEXT_FOOTER = [
   '--',
+  '{{event_name}}{{#if event_details}}\n{{event_details}}{{/if}}{{#if operator_name}}\nHosted by {{operator_name}}{{/if}}',
   '{{postal_address_html}}{{#if social_links_text}}',
   '',
   '{{social_links_text}}{{/if}}',
@@ -45,33 +47,40 @@ const TEXT_FOOTER = [
  * Wrap inner body HTML in the shared header/footer chrome.
  *
  * @param {string} innerHtml template-specific content; tokens unrendered
+ * @param {{ preheader?: string }} [options] optional inbox preview; tokens unrendered
  * @returns {string} full HTML document with tokens unrendered
  */
-function wrap(innerHtml) {
+function wrap(innerHtml, { preheader = '' } = {}) {
   return [
     '<!doctype html>',
-    '<html>',
+    '<html lang="en">',
+    '<head>',
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<meta name="color-scheme" content="light">',
+    '<meta name="supported-color-schemes" content="light">',
+    '</head>',
     '<body style="margin:0;padding:0;background-color:#f4f4f4;">',
+    preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader}</div>` : '',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;">',
-    '<tr><td align="center" style="padding:24px 12px;">',
-    '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background-color:#ffffff;border:1px solid #e0e0e0;">',
-    // The client's uploaded logo, on white so any logo colour reads, above
-    // the brand-colour band. No logo, no row.
-    '{{#if logo_url}}<tr><td style="background-color:#ffffff;padding:20px 32px 16px 32px;"><img src="{{logo_url}}" alt="{{event_name}}" height="48" style="display:block;height:48px;width:auto;max-width:240px;border:0;"></td></tr>{{/if}}',
-    '<tr><td style="background-color:{{brand_primary}};padding:20px 32px;">',
-    '<span style="font-family:Helvetica,Arial,sans-serif;font-size:20px;font-weight:bold;color:#ffffff;">{{event_name}}</span>',
+    '<tr><td align="center" style="padding:24px 0;">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-top:6px solid {{brand_primary}};">',
+    '<tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:28px 32px 20px 32px;border-bottom:1px solid #e6e6e6;">',
+    '<p style="margin:0;font-family:Merriweather,Georgia,\'Times New Roman\',serif;font-size:22px;line-height:1.3;font-weight:bold;color:{{brand_primary}};">{{event_name}}</p>',
+    '{{#if event_details}}<p style="margin:6px 0 0 0;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.4;color:#555555;">{{event_details}}</p>{{/if}}',
     '</td></tr>',
-    '<tr><td style="padding:32px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5;color:#333333;">',
+    '<tr><td style="padding:28px 32px 32px 32px;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55;color:#111111;">',
     innerHtml,
     '</td></tr>',
-    '<tr><td style="padding:20px 32px;border-top:1px solid #e0e0e0;font-family:Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#777777;">',
+    // Keep the host's uploaded raster logo on a white cell in mail clients.
+    '<tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:20px 32px 28px 32px;border-top:1px solid #e6e6e6;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#676767;">',
+    '{{#if host_label}}<p style="margin:0 0 6px 0;">{{host_label}}</p>{{/if}}{{#if logo_url}}<img src="{{logo_url}}" alt="{{operator_name}}" width="120" style="display:block;width:120px;height:auto;border:0;margin:0 0 14px 0;">{{/if}}',
     '<p style="margin:0 0 8px 0;">{{postal_address_html}}</p>',
     // The event's social accounts (#231). Guarded on the TEXT token because
     // `{{#if}}` reads plain values only; both are empty together, so an
     // event with no account gets no row at all rather than an empty one.
     '{{#if social_links_text}}<p style="margin:0 0 8px 0;">{{social_links_html}}</p>{{/if}}',
-    '<p style="margin:0;">Questions? Write to <a href="mailto:{{support_email}}" style="color:#777777;">{{support_email}}</a>.</p>',
-    '<p style="margin:8px 0 0 0;">&copy; {{current_year}} {{event_name}}</p>',
+    '<p style="margin:0;">Questions? Write to <a href="mailto:{{support_email}}" style="color:#676767;">{{support_email}}</a>.</p>',
     '</td></tr>',
     '</table>',
     '</td></tr>',

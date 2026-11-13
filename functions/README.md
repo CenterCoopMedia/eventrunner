@@ -18,6 +18,51 @@ Landed so far (M2 backend foundation):
 - `src/materials/` — session materials: The canonical store, review, the embargo gate, the public projection, and the per-file `downloadSessionMaterial`. A file must be no larger than 9 MiB because the function streams it through a 10 MB response boundary. Registration checks the authoritative Storage size, and download checks again for older records. `bulk.cjs` holds the staff-tier `listAllSessionMaterials` (every material, at most 2,000, without `createdBy`) and `downloadSessionMaterialsArchive`, which streams one stored zip of up to 50 selected files and 9 MiB through the function with `yazl`. There is no signed URL: Signing needs `signBlob` (`roles/iam.serviceAccountTokenCreator`), which a fresh client project does not grant, so the bytes go through the function, as `downloadSessionMaterial` already does. Every check runs before the first byte, one `admin_logs` row per file is committed first and the archive is refused without them, and a failure after the first byte destroys the response so the browser saves nothing.
 - `src/imports/` — the staff-tier `importRecordsCsv`: a CSV import of speakers, sessions and organizations that follows `ticketingImportCsv` (column mapping, one pipeline for the dry run and the commit, a commit that must send back the dry run's digest). Every new record is a draft: a speaker in `draft` status, a session or organization through `store.writeDraft` with `visible: false`. A speaker has no draft revision, so a change to an approved speaker goes into `pendingEdits` (the queue `applySpeakerPendingEdits` and `discardSpeakerPendingEdits` serve), never onto the fields `onSpeakerWritten` projects, and its slug is not changed. Rows go through the editors' validators (`shared/speaker` `validateSpeaker`, `validateSessionStructure` and `validateSpeakerReferences`, `validateOrganizationFields`). The server-only `record_imports/{type}__{sha256(externalId)}` maps each external ID to its document and keeps a digest of each value the last import wrote (no raw values, no external ID), for a three-way merge per mapped field: an unchanged file value never writes, a changed one writes only a field staff have not edited, and an unmapped field is never written. A row with no key whose slug or session ID belongs to a record no key points at is linked to that record instead of making a second one. One transaction per row; 500 rows and 5000 characters per mapped cell at most; one `admin_logs` row per commit, written before the first record write. No mail, no invitation, no live write.
 
+## Transactional email
+
+Shipped templates use the shared event masthead and host footer in
+`src/email/templates/layout.cjs`. Brand colors and the uploaded raster logo come
+from the client configuration. The sign-in email has an outlined code panel and
+an expiry-only inbox preview. Its code stays ungrouped and is not stored in the
+rendered-email log.
+
+The plain editors for `speaker.invite`, `speaker.accepted` and
+`speaker.reminder` save `{ fields, updatedAt, updatedBy }` in
+`email_templates/{id}`. The renderer builds both bodies with the current frame;
+the editor reads and reminder approval versions use that same effective source.
+Other templates can store subject, HTML and text overrides. Token declarations,
+required links and the rendered-body storage policy remain defined in code.
+
+Before this rollout, check each client's `email_templates` collection for saved
+speaker wording and the `ticket.get_ticket` and `ticket.claim_prompt` copies
+written by setup. Saved raw source retains its own frame. A client with saved
+copies needs a reviewed migration that preserves its wording before or with
+deployment.
+
+For the two setup ticket copies, an authenticated operator runs this from the
+reviewed checkout after merge, with the target client's
+`EVENT_FIREBASE_PROJECT_ID` and the documented operator credentials already set:
+
+```bash
+node scripts/refresh-ticket-emails.cjs --dry-run
+```
+
+Review the project id and both result rows. Only existing copies with
+`seeded: true` and `updatedBy: init-event-script` can refresh. `edited` copies
+are reported and preserved; missing copies are not created. This command handles
+ticket copies only; review any saved speaker wording separately. The operator then
+runs the approved refresh with the theme and logo changes:
+
+```bash
+node scripts/refresh-ticket-emails.cjs --apply
+node scripts/refresh-ticket-emails.cjs --dry-run
+```
+
+The final read must report `current` for refreshed copies. A second apply makes
+no change to current copies. Review edited copies separately before claiming
+their emails use the new frame. The emulator contract for this step runs in
+hosted CI as `tests/refresh-ticket-emails.rules.test.js`.
+
 ## Admin tiers
 
 `setAdminAccess` sends `admin.access_granted` only after a new account grant commits. `resendAdminAccessInstructions { email, sendId }` is operator-only and sends the current role only while the account has active access. Its client keeps one `sendId` through lost-response retries; the existing email-core `onceKey` claim prevents another provider send. Both paths use the event layout/footer, configured `tierA.publicUrl` plus `/admin`, exact granted address, emailed-code instructions and transactional-stream guard. Email results are `accepted`, `failed` or `uncertain`, independent of the saved grant. Acceptance is not delivery, and a skipped claim is uncertain. The access-change audit precedes mail; a `sendAdminAccessInstructions` audit row records the automatic email result separately, including setup failures with no `sent_emails` row. Resends record their result on `resendAdminAccessInstructions` rows. Diagnostics use safe reason codes without raw exception text. Only these two access endpoints bind send secrets; listing and the expiry sweep do not.

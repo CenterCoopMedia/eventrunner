@@ -39,6 +39,7 @@ const source = buildSpeakerWording('speaker.accepted');
 
 module.exports = {
   id: 'speaker.accepted',
+  buildWording: (fields) => buildSpeakerWording('speaker.accepted', fields),
   ...source,
   tokens: [...GLOBAL_TOKEN_NAMES, 'speaker_name', 'profile_wizard_url', 'deadline'],
   requiredTokens: ['profile_wizard_url'],
