@@ -40,12 +40,15 @@ export function createFieldVitalsCollector({
     } catch { /* Performance reporting must not become an application error. */ }
   }
 
-  function heldUp() {
+  function collect(sample) {
     if (!sampled || stopped || enabled === false || pending.length + sent >= MAX_SAMPLES) return;
-    const sample = { route: routePattern(win.location.href),
-      device: win.innerWidth < 768 ? 'mobile' : 'desktop', name: 'held_up', value: 1 };
     if (reporter && enabled === true) send(sample);
     else pending.push(sample);
+  }
+
+  function heldUp() {
+    collect({ route: routePattern(win.location.href),
+      device: win.innerWidth < 768 ? 'mobile' : 'desktop', name: 'held_up', value: 1 });
   }
 
   function flushPending() {
@@ -62,7 +65,7 @@ export function createFieldVitalsCollector({
           const module = await load();
           if (stopped) return;
           reporter = module;
-          module.startVitalsReporter({ send, routePattern, initialURL, window: win });
+          module.startVitalsReporter({ send: collect, routePattern, initialURL, window: win });
           if (enabled === true) flushPending();
         } catch {
           pending.length = 0;
