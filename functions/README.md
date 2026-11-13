@@ -39,6 +39,29 @@ written by setup. Saved raw source retains its own frame. A client with saved
 copies needs a reviewed migration that preserves its wording before or with
 deployment.
 
+For the two setup ticket copies, an authenticated operator runs this from the
+reviewed checkout after merge, with the target client's
+`EVENT_FIREBASE_PROJECT_ID` and the documented operator credentials already set:
+
+```bash
+node scripts/refresh-ticket-emails.cjs --dry-run
+```
+
+Review the project id and both result rows. Only existing copies with
+`seeded: true` and `updatedBy: init-event-script` can refresh. `edited` copies
+are reported and preserved; missing copies are not created. The operator then
+runs the approved refresh with the theme and logo changes:
+
+```bash
+node scripts/refresh-ticket-emails.cjs --apply
+node scripts/refresh-ticket-emails.cjs --dry-run
+```
+
+The final read must report `current` for refreshed copies. A second apply makes
+no change to current copies. Review edited copies separately before claiming
+their emails use the new frame. The emulator contract for this step runs in
+hosted CI as `tests/refresh-ticket-emails.rules.test.js`.
+
 ## Admin tiers
 
 `setAdminAccess` sends `admin.access_granted` only after a new account grant commits. `resendAdminAccessInstructions { email, sendId }` is operator-only and sends the current role only while the account has active access. Its client keeps one `sendId` through lost-response retries; the existing email-core `onceKey` claim prevents another provider send. Both paths use the event layout/footer, configured `tierA.publicUrl` plus `/admin`, exact granted address, emailed-code instructions and transactional-stream guard. Email results are `accepted`, `failed` or `uncertain`, independent of the saved grant. Acceptance is not delivery, and a skipped claim is uncertain. The access-change audit precedes mail; a `sendAdminAccessInstructions` audit row records the automatic email result separately, including setup failures with no `sent_emails` row. Resends record their result on `resendAdminAccessInstructions` rows. Diagnostics use safe reason codes without raw exception text. Only these two access endpoints bind send secrets; listing and the expiry sweep do not.
