@@ -28,9 +28,11 @@ import HelpTooltip from '../components/HelpTooltip.jsx';
 // registry describes.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import { useAuth } from '../../contexts/AuthContext.jsx';
+import { isReadOnlyDemo } from '../../lib/readOnlyDemo.js';
 import { useAdminApi } from '../adminApi.js';
 import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
@@ -43,6 +45,7 @@ import {
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
 import { moveItem, nextStoredOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { useLocalDraft } from '../useLocalDraft.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import {
   PAGE_LAYOUT_DEFAULTS,
@@ -181,7 +184,15 @@ function slotValue(slot) {
 }
 
 export default function AdminPageEditor({ mode }) {
+  const { user } = useAuth();
   const { pageId } = useParams();
+  return <PageEditor key={JSON.stringify([user?.uid, mode, pageId])} mode={mode} />;
+}
+
+function PageEditor({ mode }) {
+  const { pageId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const call = useAdminApi();
   const reportDeleted = useDeletedRecord();
   const { rows, ready, error: listenerError, findRow } = useAdminPages();
@@ -189,7 +200,7 @@ export default function AdminPageEditor({ mode }) {
   // What the site is set to, so the "follow the site" option can say what
   // following it means instead of sending the operator to another tab to
   // find out.
-  const { theme } = useEventConfig();
+  const { theme, eventConfig } = useEventConfig();
   const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
   const [page, setPage] = useState(() => blankPage());
@@ -203,6 +214,7 @@ export default function AdminPageEditor({ mode }) {
   // Set once a create has landed, so the form switches to editing that
   // document instead of trying to create it again.
   const [savedId, setSavedId] = useState(null);
+  const [loadedVersion, setLoadedVersion] = useState('new');
   // The individual layout variants, behind their own disclosure. Closed by
   // default: the template above is the answer for almost every page.
   const [layoutOpen, setLayoutOpen] = useState(false);
@@ -222,6 +234,14 @@ export default function AdminPageEditor({ mode }) {
   const rejectedPageIds = useRef(new Set());
 
   const row = mode === 'edit' ? findRow(pageId) : null;
+  const localDraft = useLocalDraft({
+    accountId: user?.uid,
+    docPath: `cmsPages/${savedId ?? pageId ?? 'new'}`,
+    version: loadedVersion,
+    value: pageSnapshot(page),
+    dirty: unsaved,
+    enabled: !isReadOnlyDemo(eventConfig) && (mode === 'create' || loadedIdRef.current === pageId),
+  });
 
   useEffect(() => {
     if (mode !== 'edit') return;
@@ -231,6 +251,8 @@ export default function AdminPageEditor({ mode }) {
     if (!found) return;
     loadedIdRef.current = pageId;
     const editable = toEditablePage(found.draft ?? found.live);
+    const source = found.draft ?? found.live;
+    setLoadedVersion(JSON.stringify([source.updatedAt ?? null, source.basedOnRevision ?? source.revision ?? null]));
     editable.sections = editable.sections.map((section) => ({ ...section, [EDITOR_SECTION_KEY]: nextSectionKey.current++ }));
     setPage(editable);
     setSavedSnapshot(pageSnapshot(editable));
@@ -382,6 +404,7 @@ export default function AdminPageEditor({ mode }) {
     }));
 
   async function save({ publish }) {
+    if (localDraft.recovery) return;
     setError(null);
     setErrorTitle(undefined);
     setStatus('');
@@ -414,6 +437,7 @@ export default function AdminPageEditor({ mode }) {
         if (typeof revision?.section === 'string' && revision.section) sectionIds.add(revision.section);
       }
     }
+    const beforeAssignment = pageSnapshot(page);
     let assigned = assignPageIds(page, { pageIds, sectionIds });
     if (creating) assigned = { ...assigned, order: nextStoredOrder(rows) };
     if (pageSnapshot(assigned) !== pageSnapshot(page)) setPage(assigned);
@@ -422,6 +446,7 @@ export default function AdminPageEditor({ mode }) {
     let stage = 'save';
     try {
       await call('cmsSavePage', creating ? { page: payload, create: true } : { page: payload });
+      localDraft.saved(pageSnapshot(assigned), beforeAssignment);
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt: a failed publish must not leave the id editable,
       // because retrying under a different id would create a second document
@@ -452,6 +477,7 @@ export default function AdminPageEditor({ mode }) {
         return;
       }
       setError(err);
+      if (err?.code === 'unauthenticated') localDraft.flush();
       // A part-way publish failure carries the queue row to resume from.
       if (err?.queueId) setResumeQueueId(err.queueId);
     } finally {
@@ -494,6 +520,7 @@ export default function AdminPageEditor({ mode }) {
     setErrorTitle(undefined);
     try {
       const deleted = await call('cmsDeletePage', { id: page.id });
+      localDraft.discard();
       reportDeleted({ ...deleted, collection: 'cmsPages', docId: page.id, editorPath: `/admin/pages/${encodeURIComponent(page.id)}` }, '/admin/pages');
     } catch (err) {
       setErrorTitle('The server refused the delete');
@@ -537,13 +564,13 @@ export default function AdminPageEditor({ mode }) {
             <Link to=".." relative="path" className={linkButtonClass}>
               Back to pages
             </Link>
-            <button type="submit" className={secondaryButtonClass} disabled={busy !== null} aria-busy={busy === 'draft' || undefined}>
+            <button type="submit" className={secondaryButtonClass} disabled={busy !== null || Boolean(localDraft.recovery)} aria-busy={busy === 'draft' || undefined}>
               <ActionLabel busy={busy === 'draft'} pending="Saving…">Save draft</ActionLabel>
             </button>
             <button
               type="button"
               className={primaryButtonClass}
-              disabled={busy !== null}
+              disabled={busy !== null || Boolean(localDraft.recovery)}
               aria-busy={busy === 'publish' || undefined}
               onClick={() => save({ publish: true })}
             >
@@ -554,15 +581,48 @@ export default function AdminPageEditor({ mode }) {
       />
 
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
+      {error?.code === 'unauthenticated' && unsaved ? (
+        <Notice tone="caution" message={localDraft.kept
+          ? 'Your text is kept on this browser. Sign in again, return to this page, and choose Restore.'
+          : 'A local copy could not be confirmed. Copy your text before signing in again.'}>
+          <button type="button" className={linkButtonClass} onClick={() => {
+            localDraft.flush();
+            navigate('/signin', { state: { from: `/admin/pages/${pageId ?? 'new'}` } });
+          }}>Sign in again</button>
+        </Notice>
+      ) : null}
+      {localDraft.recovery ? (
+        <Panel title="Unsaved text found on this browser">
+          <p>{localDraft.recovery.version !== loadedVersion
+            ? 'This page changed since this copy was kept. Restoring replaces the editor with the older copy; review it before saving.'
+            : 'Restore your unsaved text, or discard this local copy and use the saved page.'}</p>
+          <div className="flex flex-wrap gap-sm">
+            <button type="button" className={primaryButtonClass} onClick={() => {
+              try {
+                const value = localDraft.restore();
+                if (value === null) return;
+                const restored = toEditablePage(JSON.parse(value));
+                restored.sections = restored.sections.map((section) => ({ ...section, [EDITOR_SECTION_KEY]: nextSectionKey.current++ }));
+                setPage(restored);
+              } catch {
+                localDraft.discard();
+                setError({ message: 'This local copy could not be read. The saved page has not changed.' });
+              }
+            }}>Restore</button>
+            <button type="button" className={secondaryButtonClass} onClick={localDraft.discard}>Discard local copy</button>
+          </div>
+        </Panel>
+      ) : null}
       {leaveGuard.pending ? createPortal(
         <UnsavedChangesDialog
           onStay={leaveGuard.stay}
-          onDiscard={leaveGuard.discard}
+          onDiscard={() => { localDraft.discard(); leaveGuard.discard(); }}
           canDiscard={leaveGuard.canDiscard}
         />,
         document.body,
       ) : null}
 
+      <fieldset disabled={Boolean(localDraft.recovery)} className="min-w-0 border-0 p-0 flex flex-col gap-md">
       <div className="admin-page-basics">
       <Panel help="How the page is identified and linked." title="Page" description="How the page is identified and linked." className="admin-page-identity">
         <div className="admin-page-fields">
@@ -972,6 +1032,7 @@ export default function AdminPageEditor({ mode }) {
           )
         ) : null}
       </div>
+      </fieldset>
     </form>
   );
 }

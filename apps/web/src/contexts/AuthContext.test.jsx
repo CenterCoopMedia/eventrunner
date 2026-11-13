@@ -5,6 +5,7 @@ import { onAuthStateChanged, signInWithCustomToken, signOut as firebaseSignOut }
 import { getDocs } from 'firebase/firestore';
 import { auth } from '../firebase.js';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
+import { openLocalDraft } from '../lib/localDraft.js';
 
 const UNVERIFIED = { uid: 'existing-attendee', email: 'attendee@example.test', emailVerified: false };
 let authListener;
@@ -51,6 +52,7 @@ function renderAuth() { return render(<AuthProvider><AuthConsumer /></AuthProvid
 function verify() { fireEvent.click(screen.getByRole('button', { name: 'Verify emailed code' })); }
 
 beforeEach(() => {
+  localStorage.clear();
   vi.clearAllMocks();
   vi.stubEnv('VITE_FUNCTIONS_ORIGIN', 'https://functions.example.test');
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ token: 'verified-custom-token' }) })));
@@ -72,6 +74,19 @@ afterEach(() => {
 });
 
 describe('same-account OTP credential refresh', () => {
+  it('clears local drafts on explicit sign-out, while unexpected session loss preserves them', async () => {
+    const draft = openLocalDraft(UNVERIFIED.uid, 'cmsPages/faq', 'v1');
+    draft.write('Kept text');
+    renderAuth();
+    await act(async () => publishAuth(null));
+    expect(draft.read().value).toBe('Kept text');
+    await act(async () => publishAuth({ ...UNVERIFIED }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(screen.getByLabelText('Account')).toHaveTextContent('signed out'));
+    expect(draft.read()).toBeNull();
+    expect(draft.write('late editor cleanup')).toBe(false);
+  });
+
   it('updates the rendered verification state when Firebase replaces the same UID without an auth-state event', async () => {
     const verified = { ...UNVERIFIED, emailVerified: true };
     vi.mocked(signInWithCustomToken).mockImplementation(async () => customTokenResult(verified));
