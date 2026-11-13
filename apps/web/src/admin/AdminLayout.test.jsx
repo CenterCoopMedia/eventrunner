@@ -523,7 +523,13 @@ describe('the admin shell', () => {
     expect(ADMIN_TIERS).toEqual(['operator', 'staff']);
   });
 
-  it('classifies the sections: every group but Settings is staff; the registration form, features, branding, access and system errors are operator', () => {
+  it('groups Registration form with tickets and keeps the operator sections restricted', () => {
+    expect(DOCKET.find((group) => group.id === 'registration').items.map((item) => item.label)).toEqual([
+      'Attendees', 'Ticketing', 'Registration form', 'Invoices', 'Badges',
+    ]);
+    expect(DOCKET.find((group) => group.id === 'settings').items.map((item) => item.label)).toEqual([
+      'Event', 'Features', 'Branding', 'Web address', 'Access', 'System errors',
+    ]);
     const byTier = (tier) =>
       DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.to);
     expect(byTier('operator')).toEqual(['registration-form', 'features', 'branding', 'web-address', 'access', 'system-errors']);
@@ -681,7 +687,12 @@ describe('the admin shell', () => {
     // A button holds the control height everywhere (2.75rem), so touch gets
     // its 44px without a coarse-pointer special case.
     await renderAdmin();
-    expect(screen.getByRole('link', { name: 'View site' }).className).toContain(
+    const viewSite = screen.getByRole('link', { name: 'View site' });
+    expect(viewSite).toHaveAttribute('href', '/');
+    expect(viewSite).toHaveAttribute('target', '_blank');
+    expect(viewSite).toHaveAttribute('rel', 'noopener');
+    expect(viewSite).toHaveAccessibleDescription('Opens in a new tab.');
+    expect(viewSite.className).toContain(
       'min-h-admin-control',
     );
     expect(screen.getByRole('button', { name: 'Sign out' }).className).toContain(

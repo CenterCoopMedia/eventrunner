@@ -14,7 +14,7 @@ Open **Session pitches** to review private proposals. Share `/pitch` for public 
 
 **On a phone, the compact top bar names the event and current section.** Open **Menu** to use the grouped admin sections and account controls in a full-screen sheet. The groups open and close there too. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
 
-**Choose an account view at the foot of the rail.** If your account has more than one view, choose **Attendee**, **Speaker**, or **Admin**, as available, in **View**, then select **Open**. Changing the selection does not leave the page. A view changes where you work, not your permissions. The read-only demo has no view selector. Below your account details, **Take the tour**, **Report a problem**, and **View site** share one row. **Sign out** fills the row below them. Each icon shows its name on hover or keyboard focus.
+**Choose an account view at the foot of the rail.** If your account has more than one view, choose **Attendee**, **Speaker**, or **Admin**, as available, in **View**, then select **Open**. Changing the selection does not leave the page. A view changes where you work, not your permissions. The read-only demo has no view selector. Below your account details, **Take the tour**, **Report a problem**, and **View site** share one row. **View site** opens the public site in a new tab and keeps the Admin open. **Sign out** fills the row below them. Each icon shows its name on hover or keyboard focus.
 
 ## Find your way: The tour
 
@@ -521,7 +521,7 @@ Approve and revoke always go through the server endpoints. Every registration fi
 | Social handles | `label: handle` pairs, sorted by label |
 | Profile visibility | The stored value: `public`, `attendees_only`, or `private` |
 
-After these nine, the file has one column for each question **Settings → Registration form** asks, headed `Answer: ` and the question's name (for example `Answer: Dietary needs`), in the order attendees see them. A cell holds the account's answer as text, or is empty. An account that holds more than one ticket shows the answers of its first ticket. These columns include diet and access needs, so keep the file private.
+After these nine, the file has one column for each question **Registration and tickets → Registration form** asks, headed `Answer: ` and the question's name (for example `Answer: Dietary needs`), in the order attendees see them. A cell holds the account's answer as text, or is empty. An account that holds more than one ticket shows the answers of its first ticket. These columns include diet and access needs, so keep the file private.
 
 A cell with more than one entry joins them with a semicolon. The file carries no account id, pronouns, bio, photo, or dates. The status and visibility columns keep the stored words, so a spreadsheet filter on them stays stable.
 
@@ -551,6 +551,8 @@ The server refuses a delete in four cases, and says why:
 **If a delete stops part way.** When the account has left the directory but some of its data did not clear, the page keeps a notice with **Try the delete again**. The page does the same when the answer does not arrive, for example after a timeout or a dropped connection, because the delete may have started. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log. For up to an hour after the delete, the person's open session can still claim a ticket; a retry also releases a ticket claim made after the delete. A refusal made before anything was deleted, such as a speaker-linked account, shows in the record itself.
 
 ## Ticketing
+
+Open **Registration and tickets → Ticketing** to manage tickets. With Stripe, attendees answer the questions from **Registration form** at checkout after you publish tickets. With other providers, attendees answer on **Complete your registration** after signing in.
 
 The workspace follows the deployment's configured provider ([`CLIENT_ONBOARDING.md`](CLIENT_ONBOARDING.md) §3 item 5):
 
@@ -1131,9 +1133,11 @@ Select **Add milestone**. Focus moves to the new row's name field. Each mileston
 
 With no milestones and no goal, the Overview shows no milestone panel at all.
 
-## Settings → Registration form
+## Registration and tickets → Registration form
 
 Operators only. This page sets the questions each attendee answers when they register (ADR 0008 §4). The editor is on the left and a preview of the attendee's view is on the right; the preview follows every change before you save, and **Check answers** runs the same check the server will. The site's own style applies on the live page.
+
+With Stripe, attendees answer these questions at checkout after you publish tickets in **Registration and tickets → Ticketing**. With other providers, attendees answer on **Complete your registration** after signing in.
 
 - **Standard questions** have fixed wording: organization, job title, dietary needs (choices plus Other), access needs, photo consent, and the attendee directory. Turn on the ones you need and make any of them required. Dietary and access answers are private to staff. The directory answer sets the attendee's profile visibility.
 - **Your questions**: up to 10, each a short answer, long answer, one choice, several choices, or yes or no. A question has a label (up to 200 characters), optional help text (up to 300), and for a choice question 2 to 20 choices, one per line. Move up and Move down set the order; attendees see your questions after the standard ones.

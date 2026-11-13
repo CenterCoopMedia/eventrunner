@@ -671,6 +671,7 @@ export default function AdminTicketing() {
         description="Manage ticket sales, registration records, and attendee admission."
       />
 
+      <p className={rowMetaClass}>For Stripe tickets, attendees answer the Registration form questions at checkout after you publish tickets; other attendees answer on Complete your registration.</p>
       <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} call={call} />
       {confirmedProvider === 'stripe' ? <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
         <StripeTicketingWorkspace call={call} />
