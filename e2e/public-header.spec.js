@@ -29,7 +29,9 @@ test.beforeAll(async () => {
   const { default: tailwindcss } = await import('tailwindcss');
   const { default: autoprefixer } = await import('autoprefixer');
   const { default: tailwind } = await import('../apps/web/tailwind.config.js');
-  const { default: webConfig } = await import('../apps/web/vite.config.js');
+  const { default: configureWeb } = await import('../apps/web/vite.config.js');
+  const webConfig = configureWeb({ command: 'serve', mode: 'development', isSsrBuild: false });
+  expect(webConfig.optimizeDeps.include).toEqual(expect.arrayContaining(['shared/theme', 'shared/time']));
   server = await createServer({
     configFile: false, root: path.join(ROOT, 'e2e/fixtures/public-header'),
     publicDir: path.join(ROOT, 'apps/web/public'),
