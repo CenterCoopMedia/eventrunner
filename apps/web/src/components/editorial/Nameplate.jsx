@@ -32,7 +32,7 @@ export function buildNameplate(eventConfig, { compact = false } = {}) {
 
 /**
  * @param {{
- *   name: string,
+ *   name: import('react').ReactNode,
  *   dates?: string | null,
  *   edition?: string | null,
  *   variant?: 'full' | 'compact',

@@ -105,15 +105,9 @@ describe('Header treatments', () => {
     expect(container.textContent).toContain('October 14–16, 2026');
   });
 
-  it('lets the wordmark break a word too long for the stage at 320px', () => {
-    // The base header's wordmark is the same shape as the nameplate's and
-    // carries the same rule: a flex row is sized from its longest word, so
-    // a name with a long word in it ran past the stage at 320px instead of
-    // wrapping inside it. The measurement is in editorial/Nameplate.test.jsx.
-    const { container } = renderHeader({ variant: 'standard' });
-    const row = container.querySelector('a > span.inline-flex');
-    expect(row, 'the wordmark is not one flex row').toBeTruthy();
-    expect(row.className).toContain('wrap-anywhere');
+  it.each([...THEME_HEADERS])('%s keeps the full home link name beside a logo', (variant) => {
+    renderHeader({ variant, name: '2027 NC News & Information Summit', mark: <img src="/branding/mark.svg" alt="" /> });
+    expect(screen.getByRole('link', { name: '2027 NC News & Information Summit', exact: true })).toHaveAttribute('href', '/');
   });
 
   it.each([...THEME_HEADERS].filter((variant) => variant !== 'minimal'))('%s keeps the mark beside the first line when the wordmark wraps', (variant) => {
@@ -124,7 +118,7 @@ describe('Header treatments', () => {
     // jsdom lays flex out only through the class, so the alignment class is
     // what is asserted — the same shape the nameplate's own test pins.
     const { container } = renderHeader({ variant, mark: <img src="/branding/mark.svg" alt="" /> });
-    const row = container.querySelector('span.inline-flex.wrap-anywhere');
+    const row = container.querySelector('span.inline-flex');
     expect(row, 'the wordmark is not one flex row').toBeTruthy();
     expect(row.className).toContain('items-start');
     expect(row.className).not.toContain('items-center');
