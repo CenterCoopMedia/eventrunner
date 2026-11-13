@@ -10,6 +10,8 @@ const ROOT = process.cwd();
 const COMPONENTS = path.join(ROOT, 'apps/web/src/admin/components');
 const EVIDENCE = path.join(ROOT, 'test-results/admin-visual-evidence');
 const FAMILIES = ['materials', 'queue', 'figures', 'email', 'versions', 'pending', 'access', 'invoices', 'rich-text'];
+const BASE_OWNERS = ['adminChrome.jsx', 'AdminTableScroll.jsx'];
+const loadedBaseOwners = new Set();
 let server;
 let beforeOrigin;
 let base;
@@ -20,7 +22,7 @@ test.beforeAll(async () => {
   const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(await fs.readFile(process.env.GITHUB_EVENT_PATH, 'utf8')) : null;
   base = event?.pull_request?.base?.sha;
   if (base) {
-    const baseline = new Map(['adminChrome.jsx', 'AdminTableScroll.jsx'].map((file) => [path.join(COMPONENTS, file),
+    const baseline = new Map(BASE_OWNERS.map((file) => [path.join(COMPONENTS, file),
       execFileSync('git', ['show', `${base}:apps/web/src/admin/components/${file}`], { encoding: 'utf8' })]));
     const { createServer } = await import('vite');
     const { default: tailwindcss } = await import('tailwindcss');
@@ -29,7 +31,12 @@ test.beforeAll(async () => {
     const { default: configureWeb } = await import('../apps/web/vite.config.js');
     const webConfig = configureWeb({ command: 'serve', mode: 'development', isSsrBuild: false });
     server = await createServer({ ...webConfig, configFile: false, root: path.join(ROOT, 'apps/web'), base: '/',
-      plugins: [{ name: 'admin-specimen-base-presentation', enforce: 'pre', load(id) { return baseline.get(id.split('?')[0]) ?? null; } }, ...webConfig.plugins],
+      plugins: [{ name: 'admin-specimen-base-presentation', enforce: 'pre', load(id) {
+        const file = id.split('?')[0];
+        const source = baseline.get(file);
+        if (source !== undefined) loadedBaseOwners.add(path.basename(file));
+        return source ?? null;
+      } }, ...webConfig.plugins],
       css: { postcss: { plugins: [tailwindcss({ ...tailwind,
         content: [path.join(ROOT, 'apps/web/index.html'), path.join(ROOT, 'apps/web/src/**/*.{js,jsx}'), `!${path.join(ROOT, 'apps/web/src/**/*.test.{js,jsx}')}`],
       }), autoprefixer()] } },
@@ -118,8 +125,7 @@ for (const width of [1440, 390]) {
         }, null, 2));
         await page.screenshot({ path: path.join(EVIDENCE, `admin-specimen--${source}--${mode}--${width}.png`), fullPage: true, animations: 'disabled' });
         if (source === 'before') {
-          expect(measurement.liveWeight).toBe('600');
-          expect(measurement.descriptionWrap).not.toBe('pretty');
+          expect([...loadedBaseOwners].sort()).toEqual([...BASE_OWNERS].sort());
           continue;
         }
         expect(measurement.mode).toBe(mode);
