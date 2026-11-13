@@ -31,6 +31,7 @@
 
 const { applyCors, parseAllowedOrigins, postEndpoint } = require('./http.cjs');
 const { getTeam, listOrganizations } = require('./organizations.cjs');
+const { deleteOrganization } = require('./organizationDelete.cjs');
 const { acceptInvite, inviteMember } = require('./invites.cjs');
 const { changeMemberRole, removeMember } = require('./members.cjs');
 const { getApplication, listApplications } = require('./applications.cjs');
@@ -64,6 +65,7 @@ const BUILD_WATCH_SCHEDULE = 'every 60 minutes';
 
 const ENDPOINTS = Object.freeze({
   listOrganizations: { action: listOrganizations },
+  deleteOrganization: { action: deleteOrganization, connect: true },
   getTeam: { action: getTeam },
   inviteMember: { action: inviteMember, mail: true },
   acceptInvite: { action: acceptInvite },

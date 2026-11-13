@@ -27,7 +27,7 @@ The console uses plain words. It never says Firebase, project, tenant, environme
 
 | Document | Fields | Written by |
 |---|---|---|
-| `organizations/{orgId}` | `name`, `createdAt`, `createdBy` (uid) | `redeemSignupLink` |
+| `organizations/{orgId}` | `name`, `createdAt`, `createdBy` (uid) | `redeemSignupLink`; deleted with its members and unused requests by `deleteOrganization` |
 | `organizations/{orgId}/members/{uid}` | `uid`, `email` (lowercase), `role` (`owner` or `editor`), `joinedAt` | `redeemSignupLink`, `acceptInvite`, `changeMemberRole`, `removeMember` |
 | `invites/{inviteId}` | `orgId`, `email` (lowercase), `role`, `tokenHash` (SHA-256 of the token), `status` (`pending`, `accepted` or `replaced`), `invitedBy`, `invitedByEmail`, `createdAt`, `expiresAt`, and after use `acceptedBy` and `acceptedAt` | `inviteMember`, `acceptInvite` |
 | `signup_links/{linkId}` | `organizationName`, `tokenHash` (SHA-256 of the token), `status` (`open`, `used` or `revoked`), `createdBy`, `createdAt`, `expiresAt`, and after use `usedBy`, `usedEmail`, `usedAt`, `orgId` and `appId`. No browser can read it. | `createSignupLink`, `revokeSignupLink`, `redeemSignupLink` |
@@ -43,7 +43,7 @@ The console uses plain words. It never says Firebase, project, tenant, environme
 | `agreement_acceptances/{id}` | `version`, `sha256`, `typedName`, `legalName`, `title`, `email` (verified), `uid`, `orgId`, `appId`, `at`. Created once, never changed, and kept when the request is deleted. | `acceptAgreement` |
 | `console_rate_limits/{key}` | `count`, `windowStart` | The functions |
 | `console_builds/{appId}` | The build record: `state` (`queued`, `running`, `failed` or `done`), `runUrl`, `testMode`, `startedAt`, `updatedAt`, `finishedAt`, `failedStep`, `error`, `ownersEmailedAt`, `steps` (a list of `{ id, label, state, at, detail }`). No browser can read it: an operator sees it through `getApplicationForReview`, and a client sees only the status. | `scripts/provision-client.cjs`, `retryBuild` |
-| `console_audit/{id}` | `action`, `appId` or `linkId`, `by` (a uid, `retention`, `console`, `build` or `build-watch`), `at`, and `version` on `save-agreement`. No client data. | `saveConsoleSettings`, `saveAgreement`, `createSignupLink`, `revokeSignupLink`, `closeApplication`, `deleteSpamApplication`, `retryBuild`, the retention job, the build watch, and a build that does not start |
+| `console_audit/{id}` | `action`, `appId`, `linkId` or `orgId`, `by` (a uid, `retention`, `console`, `build` or `build-watch`), `at`, and `version` on `save-agreement`. No client data. Organization deletion writes only `action: delete-organization`, `orgId`, `by` and `at`. | `deleteOrganization`, `saveConsoleSettings`, `saveAgreement`, `createSignupLink`, `revokeSignupLink`, `closeApplication`, `deleteSpamApplication`, `retryBuild`, the retention job, the build watch, and a build that does not start |
 
 An application is one event and one site. The client sees it as "your request". Its statuses are `draft`, `approved`, `building`, `ready`, `launched`, `withdrawn`, `declined` and `archived` (ADR 0007, the invoice and signup link amendment). One module, `packages/shared/src/consoleRequest.cjs`, holds the list, the groups the code checks, the moves the code makes and both sets of labels. An application is open unless it is `withdrawn` or `declined`. The hosting team moves a `ready` site to `launched` with **Mark as launched** when the event site opens to the public. `archived` is written by `scripts/decommission-client.cjs`.
 
@@ -89,6 +89,7 @@ Each function is an HTTP POST with a JSON body and the person's ID token. The we
 | Function | Who | What it does |
 |---|---|---|
 | `listOrganizations` | Anyone signed in | Lists my organizations. An operator also gets every organization. |
+| `deleteOrganization` | Operators only | Requires `orgId` and `confirm: true`. One transaction checks that every request is draft, withdrawn or declined and was never approved, built or launched, with no build record, client project settings or retained agreement acceptance. Deletes the organization, members, invites, explicitly linked signup links, unused requests, reserved names, private connection rows and pending connection states. Writes a minimal audit entry. Stored account tokens use the existing durable cleanup and retention retry. |
 | `getSignupLink` | Anyone signed in, with the token | Says whether a signup link can be used. See "Signup links". |
 | `redeemSignupLink` | Anyone signed in, with the token | Uses the link: makes the organization, its Owner and a draft request in one transaction. See "Signup links". |
 | `getTeam` | Members and operators | Lists the members, the open invites, and how many Owners launch still needs. |

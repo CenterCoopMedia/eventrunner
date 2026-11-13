@@ -7,6 +7,7 @@ import IconControl from '../IconControl.jsx';
 import { BUILD_FAILED_LABEL, STATUS_LABELS, statusPath } from '../setup/steps.js';
 import { SIGNUP_LINK_HELP } from '../text.js';
 import { CONSOLE_REQUEST_GROUPS } from 'shared/consoleRequest';
+import DeleteOrganization from './DeleteOrganization.jsx';
 
 /** One organization and its event sites. Each event is its own request and its own site (ADR 0007 §2). */
 export default function OrganizationHome() {
@@ -55,6 +56,7 @@ export default function OrganizationHome() {
         </div>
       )}
       {data.applications.length > 0 ? <p className="muted section">{SIGNUP_LINK_HELP}</p> : null}
+      {data.operator ? <DeleteOrganization organization={data.organization} /> : null}
     </section>
   );
 }

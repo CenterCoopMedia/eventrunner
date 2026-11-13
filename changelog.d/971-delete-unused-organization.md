@@ -1,0 +1,1 @@
+Operators can delete an unused Console organization after a named confirmation. The server refuses organizations with any approval, build, or site history, removes related unused records, and keeps a minimal audit entry. Owners cannot delete organizations.
