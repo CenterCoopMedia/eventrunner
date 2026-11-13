@@ -1,8 +1,9 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { application, callsTo, emptyAnswers, serveApi } from '../../test/application.js';
 import { renderSetup } from '../../test/setupPage.jsx';
 import { browserTimeZone } from './EventStep.jsx';
+import { keepAnswer, readKeptAnswer } from '../../setup/keptAnswers.js';
 
 vi.mock('../../api.js', () => ({ callApi: vi.fn() }));
 
@@ -54,11 +55,9 @@ describe('Your event step', () => {
     expect(callsTo('saveApplicationStep').at(-1).answers.timezone).toBe(zone);
   });
 
-  it('adds a day, focuses its date, and saves the days', async () => {
+  it('presets the first day with editable times and saves it without Add a day', async () => {
     renderSetup('event');
-    fireEvent.click(await screen.findByRole('button', { name: 'Add a day' }));
-    const date = screen.getByLabelText('Date');
-    await waitFor(() => expect(date).toHaveFocus());
+    const date = await screen.findByLabelText('Date');
     expect(screen.getByLabelText('Starts')).toHaveValue('09:00');
     expect(screen.getByLabelText('Ends')).toHaveValue('17:00');
     fireEvent.change(date, { target: { value: '2027-05-13' } });
@@ -67,6 +66,44 @@ describe('Your event step', () => {
     expect(callsTo('saveApplicationStep').at(-1).answers.days).toEqual([
       { date: '2027-05-13', startTime: '09:00', endTime: '17:00' },
     ]);
+  });
+
+  it('adds another day, focuses its date, and preserves the first day', async () => {
+    serveApi(withEvent({ days: [{ date: '2027-05-13', startTime: '10:00', endTime: '18:00' }] }));
+    renderSetup('event');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a day' }));
+    const second = within(screen.getByRole('group', { name: 'Day 2' }));
+    const date = second.getByLabelText('Date');
+    await waitFor(() => expect(date).toHaveFocus());
+    expect(second.getByLabelText('Starts')).toHaveValue('09:00');
+    expect(second.getByLabelText('Ends')).toHaveValue('17:00');
+    fireEvent.change(date, { target: { value: '2027-05-14' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your web address' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your web address' });
+    expect(callsTo('saveApplicationStep').at(-1).answers.days).toEqual([
+      { date: '2027-05-13', startTime: '10:00', endTime: '18:00' },
+      { date: '2027-05-14', startTime: '09:00', endTime: '17:00' },
+    ]);
+  });
+
+  it('does not autosave a preset over an answer kept for recovery', async () => {
+    const scope = { userId: 'ana', orgId: 'o1', appId: 'a1' };
+    const kept = { step: 'event', answers: { ...emptyAnswers().event,
+      days: [{ date: '2027-06-10', startTime: '11:00', endTime: '16:00' }] } };
+    keepAnswer(scope, kept);
+    vi.useFakeTimers();
+    try {
+      await act(async () => { renderSetup('event'); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(callsTo('saveApplicationStep')).toHaveLength(0);
+      expect(readKeptAnswer(scope, 'event')).toEqual(kept);
+      fireEvent.click(screen.getByRole('button', { name: 'Use kept answer' }));
+      expect(screen.getByLabelText('Date')).toHaveValue('2027-06-10');
+      expect(screen.getByLabelText('Starts')).toHaveValue('11:00');
+      expect(screen.getByLabelText('Ends')).toHaveValue('16:00');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stops Add a day at 14 days and says why', async () => {

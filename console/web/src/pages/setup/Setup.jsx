@@ -227,6 +227,8 @@ export default function Setup() {
           <View
             value={app.answers[step.id]}
             answers={app.answers}
+            scope={scope}
+            replyTo={user?.emailVerified ? user.email : ''}
             errors={shownErrors}
             onChange={onChange}
             app={app}
