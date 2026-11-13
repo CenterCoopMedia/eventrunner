@@ -66,18 +66,21 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
           await expect(home).toBeFocused();
           if (width === 390) await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
           const measured = await page.locator('header').evaluate((header) => {
-            const title = header.querySelector('.site-header-title');
             const link = header.querySelector('a');
+            const title = header.querySelector('.site-header-title, .sr-only')
+              ?? link.querySelector('.inline-flex') ?? link;
             const box = title?.getBoundingClientRect();
             const style = title && globalThis.getComputedStyle(title);
             const words = [];
             if (title && style.position !== 'absolute') {
-              const text = title.firstChild;
-              for (const match of text.textContent.matchAll(/\S+/g)) {
-                const range = globalThis.document.createRange();
-                range.setStart(text, match.index);
-                range.setEnd(text, match.index + match[0].length);
-                words.push({ word: match[0], lines: range.getClientRects().length });
+              for (const text of title.childNodes) {
+                if (text.nodeType !== globalThis.Node.TEXT_NODE) continue;
+                for (const match of text.textContent.matchAll(/\S+/g)) {
+                  const range = globalThis.document.createRange();
+                  range.setStart(text, match.index);
+                  range.setEnd(text, match.index + match[0].length);
+                  words.push({ word: match[0], lines: range.getClientRects().length });
+                }
               }
             }
             return {
@@ -86,6 +89,9 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
               linkRight: link.getBoundingClientRect().right,
               titleHeight: box?.height ?? 0,
               lineHeight: style ? parseFloat(style.lineHeight) : 0,
+              titleScrollHeight: title.scrollHeight,
+              titleScrollWidth: title.scrollWidth,
+              titleClientWidth: title.clientWidth,
               screenReaderOnly: style?.position === 'absolute', words,
             };
           });
