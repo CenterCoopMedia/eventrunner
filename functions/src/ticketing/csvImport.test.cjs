@@ -57,6 +57,18 @@ test('mapRow: id doubles as orderId when no separate order column is mapped', ()
   assert.equal(mapped.ticket.externalId, 'ord-1');
   assert.equal(mapped.ticket.orderId, 'ord-1');
   assert.equal(mapped.ticket.status, 'valid'); // unmapped status defaults to valid — an admin roster is asserted good
+  assert.equal(mapped.ticket.ticketClassId, null);
+});
+
+test('mapRow keeps a separately mapped class ID and refuses a malformed ID without using the label', () => {
+  const mapping = { ...MAPPING, ticketClassId: 'Type ID' };
+  const row = { Email: 'riley@example.test', 'Order ID': 'seat-555', Type: 'Full event', 'Type ID': 'workshop-only' };
+  const mapped = mapRow({ row, mapping });
+  assert.equal(mapped.ok, true);
+  assert.equal(mapped.ticket.ticketClass, 'Full event');
+  assert.equal(mapped.ticket.ticketClassId, 'workshop-only');
+  assert.equal(mapRow({ row: { ...row, 'Type ID': '../full' }, mapping }).ok, false);
+  assert.equal(mapRow({ row, mapping: MAPPING }).ticket.ticketClassId, null);
 });
 
 test('mapRow: a distinct order column overrides the id-as-orderId default', () => {
@@ -205,13 +217,14 @@ test('ticketingImportCsv: dry run writes nothing', async () => {
 test('ticketingImportCsv: commit upserts through sync.cjs semantics and logs an admin action', async () => {
   const db = makeFakeDb();
   const { auth, getConfig } = makeAuthDeps();
-  const handler = createTicketingImportCsvHandler({ db, auth, getConfig, now: () => T0, log: QUIET });
+  const handler = createTicketingImportCsvHandler({ db, auth, getConfig, eventId: 'server-event', now: () => T0, log: QUIET });
   const res = makeRes();
   await handler(req({
     body: {
-      mapping: MAPPING,
+      mapping: { ...MAPPING, ticketClassId: 'Type ID' },
       dryRun: false,
-      rows: [{ Email: 'A@Example.com', 'Order ID': 'ord-1', Name: 'Ada Lovelace' }],
+      eventId: 'browser-event',
+      rows: [{ Email: 'A@Example.com', 'Order ID': 'ord-1', Name: 'Ada Lovelace', 'Type ID': 'workshop-only' }],
     },
   }), res);
   assert.equal(res.statusCode, 200);
@@ -222,6 +235,8 @@ test('ticketingImportCsv: commit upserts through sync.cjs semantics and logs an 
   assert.equal(ticket.email, 'a@example.com'); // lowercased by sync.cjs's normalizeTicket
   assert.equal(ticket.provider, 'manual');
   assert.equal(ticket.firstName, 'Ada');
+  assert.equal(ticket.ticketClassId, 'workshop-only');
+  assert.equal(ticket.eventId, 'server-event', 'the browser cannot choose the event scope');
   assert.equal(ticket.claimedByUid, null); // server-owned field, initialized on create
   assert.deepEqual(ticket.createdAt, T0);
 

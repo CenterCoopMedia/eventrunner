@@ -1,6 +1,7 @@
 'use strict';
 
 const { TICKET_TERMINAL_STATUSES } = require('shared/ticketCommerce');
+const { normalizeTicketClassId } = require('shared/ticketAccess');
 const { randomUUID } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { millis } = require('./stripeCommerce.cjs');
@@ -87,10 +88,10 @@ function backoffMsFor(attempts) {
  * (§3.3), and it confers no entitlement (§3.4 counts only `valid`), so the
  * conservative mapping is also the safe one.
  *
- * @param {object} record @param {string} providerName
+ * @param {object} record @param {string} providerName @param {string|null} eventId trusted provider scope
  * @returns {object|null}
  */
-function normalizeTicket(record, providerName) {
+function normalizeTicket(record, providerName, eventId = null) {
   const externalId = safeDocId(record?.externalId);
   if (!externalId) return null;
   const email = typeof record?.email === 'string' ? record.email.trim().toLowerCase() : '';
@@ -104,6 +105,8 @@ function normalizeTicket(record, providerName) {
     firstName: str(record?.firstName),
     lastName: str(record?.lastName),
     ticketClass: str(record?.ticketClass),
+    ticketClassId: normalizeTicketClassId(record?.ticketClassId),
+    eventId: normalizeTicketClassId(record?.eventId ?? eventId),
     quantity,
     purchasedAt: str(record?.purchasedAt),
     status,
@@ -160,16 +163,16 @@ async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPol
  * Upsert a provider's ticket list. Unkeyable records are counted and
  * skipped, never guessed at.
  *
- * @param {{ db: object, tickets: object[], providerName: string,
+ * @param {{ db: object, tickets: object[], providerName: string, eventId?: string|null,
  *           now?: () => Date, log?: Pick<Console,'warn'> }} deps
  * @returns {Promise<{ created: number, updated: number, skipped: number }>}
  */
-async function upsertTickets({ db, tickets, providerName, now = () => new Date(), log = console, respectDemoPolicy = false }) {
+async function upsertTickets({ db, tickets, providerName, eventId = null, now = () => new Date(), log = console, respectDemoPolicy = false }) {
   let created = 0;
   let updated = 0;
   let skipped = 0;
   for (const record of Array.isArray(tickets) ? tickets : []) {
-    const normalized = normalizeTicket(record, providerName);
+    const normalized = normalizeTicket(record, providerName, eventId);
     if (!normalized) {
       skipped += 1;
       log.warn('ticketing: skipped a ticket with no usable externalId');
@@ -351,7 +354,7 @@ async function drainTicketSyncQueue({
     }
 
     if (!provider.ownsTicketPersistence) {
-      const upserted = await upsertTickets({ db, tickets: order.tickets, providerName: provider.name, now, log, respectDemoPolicy: true });
+      const upserted = await upsertTickets({ db, tickets: order.tickets, providerName: provider.name, eventId: provider.externalEventId, now, log, respectDemoPolicy: true });
       if (upserted.blocked) return summary;
     }
     // Only now: the row is the only durable record that this order still
@@ -417,7 +420,7 @@ async function runFullSync({ db, provider, since, cursor, now = () => new Date()
         totals.updated += result?.tickets?.length || 0;
       } else {
         for (const record of Array.isArray(result?.tickets) ? result.tickets : []) {
-          const counts = await upsertTickets({ db, tickets: [record], providerName: provider.name, now, log, respectDemoPolicy: true });
+          const counts = await upsertTickets({ db, tickets: [record], providerName: provider.name, eventId: provider.externalEventId, now, log, respectDemoPolicy: true });
           totals.created += counts.created;
           totals.updated += counts.updated;
           totals.skipped += counts.skipped;

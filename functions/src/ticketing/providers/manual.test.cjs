@@ -46,7 +46,7 @@ test('verifyWebhook always refuses — no webhook, ever (§3.3)', async () => {
 
 test('listTickets serves from the imported tickets set (§3.3), scoped to provider === manual', async () => {
   const db = makeFakeDb({
-    'tickets/tkt-1': manualTicket('ord-1'),
+    'tickets/tkt-1': manualTicket('ord-1', { ticketClassId: 'class-7', eventId: 'evt-1' }),
     'tickets/tkt-2': manualTicket('ord-2', { email: 'b@example.com' }),
     'tickets/tkt-3': { ...manualTicket('ord-9'), provider: 'eventbrite' },
   });
@@ -55,6 +55,9 @@ test('listTickets serves from the imported tickets set (§3.3), scoped to provid
   assert.equal(tickets.length, 2);
   assert.equal(nextPageToken, null);
   assert.ok(tickets.every((t) => ['tkt-1', 'tkt-2'].includes(t.externalId)));
+  const stable = tickets.find((entry) => entry.externalId === 'tkt-1');
+  assert.equal(stable.ticketClassId, 'class-7');
+  assert.equal(stable.eventId, 'evt-1');
 });
 
 test('lookupByOrderNumber is an exact match on imported rows', async () => {

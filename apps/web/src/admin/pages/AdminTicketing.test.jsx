@@ -263,7 +263,7 @@ describe('AdminTicketing', () => {
     render(<AdminTicketing />);
     await waitFor(() => expect(screen.getByText('Manual list')).toBeInTheDocument());
 
-    const file = csvFile('Email,Order ID,Name\na@example.com,ord-1,Ada Lovelace\n');
+    const file = csvFile('ticketClassId,Email,Order ID,Name\nclass-workshop,a@example.com,ord-1,Ada Lovelace\n');
     const input = document.getElementById('ticketing-csv-file');
     await act(async () => {
       fireEvent.change(input, { target: { files: [file] } });
@@ -271,6 +271,10 @@ describe('AdminTicketing', () => {
     });
 
     await waitFor(() => expect(screen.getByText(/1 row/)).toBeInTheDocument());
+    const typeId = screen.getByRole('combobox', { name: 'Ticket type ID (if your export has one)' });
+    typeId.focus();
+    expect(typeId).toHaveFocus();
+    expect(typeId).toHaveValue('ticketClassId');
 
     callMock.mockImplementationOnce(() => Promise.resolve({
       ok: true,
@@ -286,7 +290,7 @@ describe('AdminTicketing', () => {
     expect(callMock).toHaveBeenCalledWith(
       'ticketingImportCsv',
       expect.objectContaining({
-        mapping: expect.objectContaining({ email: 'Email', id: 'Order ID' }),
+        mapping: expect.objectContaining({ email: 'Email', id: 'Order ID', ticketClassId: 'ticketClassId' }),
         dryRun: true,
       }),
     );

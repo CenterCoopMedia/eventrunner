@@ -58,6 +58,7 @@ const MAPPING_FIELDS = [
   { id: 'firstName', label: 'First name (if separate from full name)', required: false },
   { id: 'lastName', label: 'Last name (if separate from full name)', required: false },
   { id: 'ticketClass', label: 'Ticket type', required: false },
+  { id: 'ticketClassId', label: 'Ticket type ID (if your export has one)', required: false },
   { id: 'status', label: 'Status', required: false },
   { id: 'purchasedAt', label: 'Purchase date', required: false },
 ];
@@ -395,7 +396,7 @@ function ImportPanel({ call, onImported }) {
       for (const field of MAPPING_FIELDS) {
         const hit = headers.find((h) => h.toLowerCase() === field.id.toLowerCase() ||
           (field.id === 'email' && /e-?mail/i.test(h)) ||
-          (field.id === 'id' && /order.*id|ticket.*id|order.*#/i.test(h)));
+          (field.id === 'id' && !/ticket.*(?:class|type).*id/i.test(h) && /order.*id|ticket.*id|order.*#/i.test(h)));
         if (hit) guess[field.id] = hit;
       }
       setMapping(guess);

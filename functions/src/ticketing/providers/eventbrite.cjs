@@ -95,6 +95,7 @@ const crypto = require('node:crypto');
 const { resolveRegistrationAction } = require('shared/registration');
 
 const API_BASE = 'https://www.eventbriteapi.com/v3';
+const { normalizeTicketClassId } = require('shared/ticketAccess');
 
 /** The only host an `api_url` may name (judgment call 1, above). */
 const API_HOST = new URL(API_BASE).hostname;
@@ -343,8 +344,9 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
    * an attendee with no usable id — sync.cjs's normalizeTicket would drop
    * it anyway, but skipping here avoids fabricating a partial record.
    * @param {object} attendee @param {string} orderId @param {string} purchasedAt
+   * @param {string|null} eventId the containing order's event scope
    */
-  function ticketRecordFromAttendee(attendee, orderId, purchasedAt) {
+  function ticketRecordFromAttendee(attendee, orderId, purchasedAt, eventId) {
     const externalId = attendee?.id != null ? String(attendee.id) : null;
     if (!externalId) return null;
     const profile = attendee?.profile || {};
@@ -367,6 +369,8 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       firstName: typeof profile.first_name === 'string' ? profile.first_name : null,
       lastName: typeof profile.last_name === 'string' ? profile.last_name : null,
       ticketClass: typeof attendee?.ticket_class_name === 'string' ? attendee.ticket_class_name : null,
+      ticketClassId: normalizeTicketClassId(attendee?.ticket_class_id),
+      eventId: normalizeTicketClassId(attendee?.event_id ?? eventId),
       // Eventbrite's Attendee resource is one row per ticket, not per
       // order — quantity is always 1 at this level (§3.3 TicketRecord).
       quantity: 1,
@@ -386,7 +390,7 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
     const purchasedAt = typeof order?.created === 'string' ? order.created : null;
     const attendees = Array.isArray(order?.attendees) ? order.attendees : [];
     return attendees
-      .map((a) => ticketRecordFromAttendee(a, orderId, purchasedAt))
+      .map((a) => ticketRecordFromAttendee(a, orderId, purchasedAt, order?.event_id))
       .filter((t) => t !== null);
   }
 
