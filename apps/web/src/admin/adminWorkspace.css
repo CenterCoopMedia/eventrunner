@@ -232,7 +232,9 @@
   border-inline-start: var(--admin-nav-active-marker-width) solid transparent;
   border-radius: var(--admin-radius); color: rgb(var(--admin-rail-ink-muted-rgb));
 }
-.admin-rail-section-icon:hover { background: rgb(var(--admin-rail-ground-hover-rgb)); color: rgb(var(--admin-rail-ink-rgb)); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-rail-section-icon:hover { background: rgb(var(--admin-rail-ground-hover-rgb)); color: rgb(var(--admin-rail-ink-rgb)); }
+}
 .admin-rail-section-icon[aria-current='page'], .admin-rail-section-icon[data-current='true'] {
   border-inline-start-color: rgb(var(--admin-nav-active-marker-rgb));
   background: rgb(var(--admin-rail-current-rgb)); color: rgb(var(--admin-rail-ink-rgb));

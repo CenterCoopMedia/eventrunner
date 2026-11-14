@@ -27,9 +27,11 @@
 
 .admin-communications__channel[aria-selected='true'] {
   border-color: rgb(var(--admin-action-rgb));
+  border-block-end-width: 3px;
+  padding-block-end: calc(var(--space-sm) - 2px);
   background: rgb(var(--admin-action-soft-rgb));
   color: rgb(var(--admin-ink-link-rgb));
-  box-shadow: inset 0 -3px 0 rgb(var(--admin-action-rgb));
+  border-block-end-color: rgb(var(--admin-action-rgb));
 }
 
 .admin-communications__channel:focus-visible {

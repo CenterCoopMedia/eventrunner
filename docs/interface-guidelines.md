@@ -208,7 +208,7 @@ The public loading component supports rows, schedule, and directory placeholders
 
 ### Verification
 
-`apps/web/src/lib/motionContract.test.js` checks the shared stylesheet and shipped class strings. The interaction checks additionally cover the dedicated public controls, admin controls, and loading styles. They require motion preference guards, explicit properties, and scoped waiting loops. Hosted browser checks verify computed motion, focus, viewport fit, and static reduced-motion behavior.
+`apps/web/src/lib/motionContract.test.js` discovers every stylesheet under `apps/web/src` except generated and test fixtures, and scans shipped class strings. It checks motion preference guards, transform/opacity keyframes, explicit transition properties, token durations, hover guards, flat paint, and scoped waiting loops. Compact shared controls retain their explicit paint transitions. `console/web/src/motionContract.test.js`, included in `npm run test:console`, checks every non-generated console stylesheet for motion guards, transform/opacity keyframes, and loops restricted to the existing waiting indicators. Hosted browser checks verify computed motion, focus, viewport fit, and static reduced-motion behavior.
 
 These checks support source review; they do not prove screen-reader behavior, real-device usability, or all visual states. Verify consequential flows with keyboard input, narrow layouts, zoom, slow responses, and failure recovery.
 

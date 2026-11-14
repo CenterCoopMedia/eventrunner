@@ -7,8 +7,8 @@
 // class string undoes: one `transition-all`, one `animate-pulse`, one hover
 // tint that a phone holds lit for the rest of the session.
 //
-// So the rules are read off the SOURCE. This file parses `index.css` and
-// the shared control, dialog and loading stylesheets with
+// So the rules are read off the SOURCE. This file parses every shipped,
+// non-generated stylesheet with
 // PostCSS, walks every rule with its at-rule ancestry intact, and scans
 // every shipped `.js` and `.jsx` under `apps/web/src`. It knows nothing
 // about components; it knows what the stylesheet and the class strings are
@@ -23,6 +23,7 @@
 // new exception is a change to the design system, and it belongs in the
 // binding brief before it belongs here.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
@@ -30,22 +31,18 @@ import { describe, expect, it } from 'vitest';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(here, '..');
-const INDEX_CSS = path.join(SRC, 'index.css');
-
-const css = fs.readFileSync(INDEX_CSS, 'utf8');
-const root = postcss.parse(css, { from: INDEX_CSS });
 
 /** Every shipped source file. Tests are excluded — see the note above. */
-function sourceFiles(dir = SRC) {
+function sourceFiles(dir = SRC, extension = /\.jsx?$/) {
   const found = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name === 'generated' || entry.name === 'test') continue;
-      found.push(...sourceFiles(full));
+      found.push(...sourceFiles(full, extension));
       continue;
     }
-    if (!/\.jsx?$/.test(entry.name)) continue;
+    if (!extension.test(entry.name)) continue;
     if (/\.test\.jsx?$/.test(entry.name)) continue;
     found.push(full);
   }
@@ -56,6 +53,58 @@ const SOURCES = sourceFiles().map((file) => ({
   file: path.relative(SRC, file),
   text: fs.readFileSync(file, 'utf8'),
 }));
+const STYLESHEETS = sourceFiles(SRC, /\.css$/).map((file) => (
+  postcss.parse(fs.readFileSync(file, 'utf8'), { from: file })
+));
+const CONTROL_PAINT = new Set(['background-color', 'border-color', 'color']);
+const CONTROL_STYLES = new Set(['components/publicControls.css', 'admin/components/adminControls.css']);
+const ANIMATABLE = new Set(['transform', 'opacity']);
+function inQuery(node, needle) {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type === 'atrule' && parent.name === 'media' && parent.params.includes(needle)) return true;
+  }
+  return false;
+}
+const motionAllowed = (node) => inQuery(node, 'prefers-reduced-motion: no-preference');
+const motionReduced = (node) => inQuery(node, 'prefers-reduced-motion: reduce');
+function place(node) {
+  const file = node.source?.input.file ?? 'fixture';
+  return `${file}:${node.source?.start?.line ?? 1} ${node.parent?.selector ?? node.parent?.name} { ${node.prop}: ${node.value} }`;
+}
+function motionProblems(stylesheet, loopAllowed = () => false, paintAllowed = () => false) {
+  const problems = [];
+  stylesheet.walkDecls((decl) => {
+    if (!/^(transition|animation)(-|$)/.test(decl.prop)) return;
+    if (decl.value !== 'none' && !motionAllowed(decl)) problems.push(`motion preference: ${place(decl)}`);
+    if (/^animation(?:-|$)/.test(decl.prop) && /\binfinite\b/.test(decl.value) && !loopAllowed(decl)) {
+      problems.push(`ambient loop: ${place(decl)}`);
+    }
+    if (decl.prop === 'transition' || decl.prop === 'transition-property') {
+      for (const part of topLevelParts(decl.value)) {
+        const property = part.trim().split(/\s+/)[0];
+        const controlPaint = CONTROL_PAINT.has(property) && paintAllowed(decl);
+        if (property !== 'none' && !ANIMATABLE.has(property) && !controlPaint) problems.push(`transition property: ${place(decl)}`);
+      }
+    }
+  });
+  stylesheet.walkAtRules(/^(?:-webkit-)?keyframes$/, (keyframes) => {
+    keyframes.walkDecls((decl) => {
+      if (!ANIMATABLE.has(decl.prop)) problems.push(`keyframe property: ${place(decl)}`);
+    });
+  });
+  return problems;
+}
+const stylesheetFile = (node) => path.relative(SRC, node.source.input.file);
+const controlPaint = (decl) => CONTROL_STYLES.has(stylesheetFile(decl));
+const pendingLoop = (decl) => {
+  const selector = decl.parent.selector ?? '';
+  return (stylesheetFile(decl) === 'components/loadingState.css'
+    && decl.value === 'loading-status-turn 1.2s linear infinite'
+    && selector.split(',').every((part) => /^\.loading-status\[data-loading-stage='(?:active|slow)'\] \.loading-status__activity$/.test(part.trim())))
+    || (stylesheetFile(decl) === 'admin/components/adminInteraction.css'
+      && selector === '.admin-busy-mark'
+      && decl.value === 'admin-request-spin 900ms linear infinite');
+};
 
 /**
  * The files allowed to draw a full round (`rounded-full`): compact chips
@@ -83,38 +132,17 @@ function chipProblems(text) {
   return problems;
 }
 
-/** The at-rule ancestry of a node, innermost last. */
-function ancestry(node) {
-  const chain = [];
-  for (let parent = node.parent; parent; parent = parent.parent) {
-    if (parent.type === 'atrule') chain.unshift(`@${parent.name} ${parent.params}`);
-  }
-  return chain;
-}
-
-const inQuery = (node, needle) => ancestry(node).some((at) => at.includes(needle));
-const motionAllowed = (node) => inQuery(node, 'prefers-reduced-motion: no-preference');
-const motionReduced = (node) => inQuery(node, 'prefers-reduced-motion: reduce');
 const hoverGuarded = (node) => inQuery(node, 'hover: hover');
-
-/** Where a failing declaration is, in words a reader can act on. */
-function place(node) {
-  const rule = node.parent?.selector ?? node.parent?.name ?? 'unknown';
-  return `${rule} { ${node.prop}: ${node.value} }`;
-}
 
 /** Every declaration in the stylesheet, with its node. */
 const DECLARATIONS = [];
-root.walkDecls((decl) => DECLARATIONS.push(decl));
+STYLESHEETS.forEach((root) => root.walkDecls((decl) => DECLARATIONS.push(decl)));
 
 /** Every rule selector, with its node. */
 const RULES = [];
-root.walkRules((rule) => RULES.push(rule));
+STYLESHEETS.forEach((root) => root.walkRules((rule) => RULES.push(rule)));
 
 const MOTION_PROPS = /^(transition|animation)(-|$)/;
-/** Page movement uses compositor-friendly properties. Compact controls also
- * transition explicit paint properties, checked in their own styles below. */
-const ANIMATABLE = new Set(['transform', 'opacity']);
 /** The only durations the system owns. */
 const DURATION_TOKENS = ['--motion-fast', '--motion-base', '--motion-slow', '--motion-signature'];
 
@@ -134,29 +162,25 @@ describe('the stylesheet', () => {
       if (decl.prop !== 'transition' && decl.prop !== 'transition-property') continue;
       // `transition: transform 160ms ease, opacity 160ms ease` — the property
       // is the first word of each comma-separated part.
-      for (const part of decl.value.split(',')) {
+      for (const part of topLevelParts(decl.value)) {
         const property = part.trim().split(/\s+/)[0];
         if (!property || property === 'none') continue;
-        if (!ANIMATABLE.has(property)) offenders.push(`${place(decl)} → ${property}`);
+        if (!ANIMATABLE.has(property) && !(CONTROL_STYLES.has(stylesheetFile(decl)) && CONTROL_PAINT.has(property))) {
+          offenders.push(`${place(decl)} → ${property}`);
+        }
       }
     }
     expect(offenders, 'paint transitions belong to compact shared controls').toEqual([]);
   });
 
-  it('keeps every move inside the no-preference query', () => {
-    const offenders = DECLARATIONS.filter(
-      (decl) =>
-        MOTION_PROPS.test(decl.prop) && !motionAllowed(decl) && !motionReduced(decl),
-    ).map(place);
-    // The global reduce block is the one exception, and it is the block that
-    // takes motion AWAY. Everything else has to be opted into.
-    expect(offenders, 'a reader who asked for less motion would still get this').toEqual([]);
+  it('guards every move, checks keyframes and permits only request-owned loops', () => {
+    expect(STYLESHEETS.flatMap((root) => motionProblems(root, pendingLoop, controlPaint))).toEqual([]);
   });
 
   it('spends no duration the token file does not own', () => {
     const offenders = [];
     for (const decl of DECLARATIONS) {
-      if (motionReduced(decl)) continue;
+      if (motionReduced(decl) || pendingLoop(decl)) continue;
       for (const match of decl.value.matchAll(/(?<![\w-])(\d+(?:\.\d+)?)(ms|s)(?![\w-])/g)) {
         offenders.push(`${place(decl)} → ${match[0]}`);
       }
@@ -167,7 +191,7 @@ describe('the stylesheet', () => {
   it('names a motion token wherever it spends time', () => {
     const offenders = [];
     for (const decl of DECLARATIONS) {
-      if (!MOTION_PROPS.test(decl.prop) || motionReduced(decl)) continue;
+      if (!MOTION_PROPS.test(decl.prop) || motionReduced(decl) || decl.value === 'none' || pendingLoop(decl)) continue;
       if (decl.prop === 'transition-property' || decl.prop === 'animation-name') continue;
       if (!DURATION_TOKENS.some((token) => decl.value.includes(token))) {
         offenders.push(place(decl));
@@ -183,15 +207,6 @@ describe('the stylesheet', () => {
     // A tap registers as a hover and stays until the reader taps elsewhere,
     // so an unguarded hover tint reads as a selection nobody made.
     expect(offenders, 'wrap it in @media (hover: hover) and (pointer: fine)').toEqual([]);
-  });
-
-  it('keeps ambient loops out of page styles', () => {
-    const looping = DECLARATIONS.filter(
-      (decl) =>
-        (decl.prop === 'animation' || decl.prop === 'animation-iteration-count')
-        && decl.value.includes('infinite'),
-    ).map(place);
-    expect(looping, 'a pending loop belongs to its request-owned component').toEqual([]);
   });
 
   it('removes reduced-motion animation instead of compressing its duration', () => {
@@ -267,7 +282,7 @@ function topLevelParts(text) {
  * percentage, a calc(), or a token — the map grid rules at
  * `var(--rule-hairline-width)`, which is a position like any other.
  */
-const LENGTH = '(?:-?[\\d.]+(?:px|%|r?em|vh|vw)|calc\\([^)]*\\)|var\\([^)]*\\))';
+const LENGTH = '(?:-?[\\d.]+(?:px|%|r?em|vh|vw)|0|calc\\([^)]*\\)|var\\([^)]*\\))';
 const POSITION = new RegExp(`\\s(${LENGTH}(?:\\s+${LENGTH})*)$`);
 
 /** Whether a gradient blends one colour into another across a distance. */
@@ -277,17 +292,63 @@ function shades(argumentText) {
   const stops = parts.filter(
     (part) => !/^(to\b|-?[\d.]+deg|circle\b|ellipse\b|at\b|closest|farthest|in\s)/.test(part),
   );
-  const colours = new Set();
-  const positions = new Set();
-  for (const stop of stops) {
+  const parsed = stops.map((stop) => {
     const found = stop.match(POSITION);
-    positions.add(found ? found[1].trim() : '');
-    colours.add((found ? stop.slice(0, found.index) : stop).trim());
-  }
-  if (colours.size <= 1) return false;
-  // Two colours at one position is a hard stop: a pattern, never a blend.
-  return positions.size > 1 || positions.has('');
+    const positions = found ? found[1].trim().match(new RegExp(LENGTH, 'g')) : [];
+    return { colour: (found ? stop.slice(0, found.index) : stop).trim(), positions };
+  });
+  // A two-position stop is one flat band. Adjacent bands only blend if
+  // their meeting edges differ or one is unstated.
+  return parsed.slice(1).some((stop, index) => {
+    const previous = parsed[index];
+    if (previous.colour === stop.colour) return false;
+    return !previous.positions.length || !stop.positions.length
+      || previous.positions.at(-1) !== stop.positions[0];
+  });
 }
+
+describe('adversarial stylesheet fixtures', () => {
+  it('discovers nested stylesheets without reading generated or test fixtures', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'motion-contract-'));
+    try {
+      for (const folder of ['pages', 'admin', 'components', 'styles', 'generated', 'test']) {
+        fs.mkdirSync(path.join(dir, folder));
+        fs.writeFileSync(path.join(dir, folder, 'fixture.css'), '.fixture { animation: x 1s infinite; }');
+      }
+      const files = sourceFiles(dir, /\.css$/);
+      expect(files.map((file) => path.relative(dir, file)).sort()).toEqual([
+        'admin/fixture.css', 'components/fixture.css', 'pages/fixture.css', 'styles/fixture.css',
+      ]);
+      for (const file of files) {
+        expect(motionProblems(postcss.parse(fs.readFileSync(file, 'utf8'), { from: file })))
+          .toEqual([expect.stringContaining('motion preference:'), expect.stringContaining('ambient loop:')]);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+  it.each(['pages/fixture.css', 'admin/fixture.css', 'components/fixture.css', 'styles/fixture.css'])(
+    'rejects an unguarded infinite animation in %s', (file) => {
+      const root = postcss.parse('.fixture { animation: x 1s infinite; }', { from: path.join(SRC, file) });
+      expect(motionProblems(root, pendingLoop)).toEqual([
+        expect.stringContaining('motion preference:'), expect.stringContaining('ambient loop:'),
+      ]);
+    },
+  );
+  it('rejects layout animation, including prefixed keyframes', () => {
+    for (const name of ['keyframes', '-webkit-keyframes']) {
+      expect(motionProblems(postcss.parse(`@${name} x { to { height: 20px; } }`)))
+        .toEqual([expect.stringContaining('keyframe property:')]);
+    }
+  });
+  it('accepts adjacent hard stops and rejects blended colours', () => {
+    expect(shades('90deg, currentColor 0 2px, transparent 2px 4px, currentColor 4px 5px, transparent 5px 9px')).toBe(false);
+    expect(shades('to right, red 0%, blue 100%')).toBe(true);
+    expect(shades('to right, red, blue')).toBe(true);
+    expect(shades('to right, red 0 2px, blue 3px 4px')).toBe(true);
+    expect(shades('to right, red 50%, blue 50%')).toBe(false);
+  });
+});
 
 describe('every class string the app ships', () => {
   /** @param {RegExp} pattern @returns {string[]} `file:line` for each hit */
@@ -387,8 +448,6 @@ const INTERACTION_STYLES = [
   'admin/components/adminInteraction.css',
   'admin/components/adminLoading.css',
 ];
-const CONTROL_PAINT = new Set(['background-color', 'border-color', 'color']);
-const CONTROL_STYLES = new Set(['components/publicControls.css', 'admin/components/adminControls.css']);
 
 describe.each(INTERACTION_STYLES)('shared interaction motion: %s', (file) => {
   const filename = path.join(SRC, file);
