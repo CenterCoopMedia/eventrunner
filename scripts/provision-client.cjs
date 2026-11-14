@@ -842,6 +842,8 @@ async function testToken(ctx, choice, token, connection) {
 
 /** Direct test accounts own their endpoints and signing secrets. */
 async function stripeEndpoint(ctx, token, notes) {
+  // Webhook payloads must use the same version as the receiving SDK.
+  const apiVersion = require('stripe').API_VERSION;
   const headers = { Authorization: `Bearer ${token}` };
   const url = functionUrl(ctx, 'ticketingWebhook');
   const listed = await call(ctx, 'read the payment webhooks', `${STRIPE}/webhook_endpoints?limit=100`, { headers, quiet: true });
@@ -849,7 +851,8 @@ async function stripeEndpoint(ctx, token, notes) {
   const secret = await ctx.clientSecrets.readSecret(WEBHOOK_SECRET);
   // Stripe shows a signing secret once, so only the endpoint recorded with it is known to match.
   const good = secret && existing.find((endpoint) => (
-    endpoint.id === ctx.stripeEndpointId && endpoint.status === 'enabled' && WEBHOOK_EVENTS.every((type) => endpoint.enabled_events?.includes(type))
+    endpoint.id === ctx.stripeEndpointId && endpoint.status === 'enabled' && endpoint.api_version === apiVersion &&
+    WEBHOOK_EVENTS.every((type) => endpoint.enabled_events?.includes(type))
   ));
   const owner = 'account';
   if (good) {
@@ -863,7 +866,7 @@ async function stripeEndpoint(ctx, token, notes) {
   for (const endpoint of existing) {
     await call(ctx, 'remove the payment webhook', `${STRIPE}/webhook_endpoints/${endpoint.id}`, { method: 'DELETE', headers, quiet: true });
   }
-  const form = new URLSearchParams({ url });
+  const form = new URLSearchParams({ url, api_version: apiVersion });
   for (const type of WEBHOOK_EVENTS) form.append('enabled_events[]', type);
   const created = await call(ctx, 'create the payment webhook', `${STRIPE}/webhook_endpoints`, { method: 'POST', headers, form, quiet: true });
   ctx.stripeEndpointOwner = owner;
