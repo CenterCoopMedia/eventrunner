@@ -10,6 +10,18 @@ const savedContent = {
 };
 
 describe('contentEditIsDirty', () => {
+  it('counts translation-only edits and removals, preserving the saved comparison independently', () => {
+    const paired = { ...savedContent, translations: { es: { label: 'Inscríbete' } } };
+    const saved = contentEditSnapshot('register', paired);
+    expect(contentEditIsDirty(saved, 'register', paired)).toBe(false);
+    expect(contentEditIsDirty(saved, 'register', { ...paired, translations: {} })).toBe(true);
+    paired.translations.es.label = 'Reserva tu lugar';
+    expect(contentEditIsDirty(saved, 'register', paired)).toBe(true);
+    expect(saved.translations.es.label).toBe('Inscríbete');
+    const english = contentEditSnapshot('register', savedContent);
+    expect(contentEditIsDirty(english, 'register', paired)).toBe(true);
+    expect(contentEditIsDirty(english, 'register', { ...savedContent, translations: {} })).toBe(false);
+  });
   it('stays clean before a snapshot exists and when the form matches it', () => {
     expect(contentEditIsDirty(null, 'register', savedContent)).toBe(false);
     const saved = contentEditSnapshot('register', savedContent);

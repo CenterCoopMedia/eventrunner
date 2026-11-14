@@ -127,6 +127,9 @@ const optional = (value) => {
 
 export function sessionFields(form) {
   return {
+    ...(Object.hasOwn(form, 'translations') ? {
+      translations: Object.keys(form.translations ?? {}).length ? form.translations : '__cms_delete_field__',
+    } : {}),
     title: String(form.title ?? '').trim(),
     description: String(form.description ?? '').trim(),
     dayId: String(form.dayId ?? '').trim(),

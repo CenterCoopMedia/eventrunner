@@ -144,6 +144,8 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
       eventConfig: overlay.event
         ? {
             ...snapshotEventConfig, ...overlay.event,
+            // A removed locale must not come back from an older snapshot.
+            contentLanguages: overlay.event.contentLanguages,
             // An older client config must not inherit the demo's account gate.
             historicalDemo: overlay.event.historicalDemo === true,
           }

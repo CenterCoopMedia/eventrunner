@@ -279,6 +279,7 @@ beforeAll(async () => {
     for (const c of PUBLISHABLE) {
       await setDoc(doc(db, `${c}/pub`), {
         body: "published",
+        translations: { es: { label: "Texto publicado" } },
         visible: true,
         revision: 1,
       });
@@ -289,6 +290,7 @@ beforeAll(async () => {
       });
       await setDoc(doc(db, `${c}_drafts/pub`), {
         body: "draft",
+        translations: { es: { label: "PRIVATE_UNPUBLISHED_TRANSLATION" } },
         visible: true,
         status: "dirty",
         basedOnRevision: 1,
@@ -519,7 +521,8 @@ describe("the version history record list (issue 195)", () => {
 for (const c of PUBLISHABLE) {
   describe(`${c} two-revision model`, () => {
     it("allows anonymous read of a visible live doc", async () => {
-      await assertSucceeds(getDoc(doc(anon(), `${c}/pub`)));
+      const published = await assertSucceeds(getDoc(doc(anon(), `${c}/pub`)));
+      expect(published.data().translations).toEqual({ es: { label: "Texto publicado" } });
     });
 
     it("denies anonymous read of a visible:false live doc", async () => {

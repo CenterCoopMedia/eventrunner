@@ -8,6 +8,13 @@ import {
 } from './sessionDoc.js';
 
 describe('session document helpers', () => {
+  it('keeps translations beside the same session and explicitly clears a removed variant', () => {
+    const form = { title: 'Talk', description: 'About the talk', location: 'Hall 2',
+      translations: { es: { title: 'Charla', description: 'Sobre la charla' } } };
+    expect(sessionFields(form)).toMatchObject(form);
+    expect(sessionFields({ ...form, translations: {} }).translations).toBe('__cms_delete_field__');
+    expect(sessionFields({ title: 'Talk' })).not.toHaveProperty('translations');
+  });
   it('merges revisions and keeps children directly below their parent', () => {
     const live = [
       { id: 'later', dayId: 'day-1', startTime: '10:00', title: 'Later' },

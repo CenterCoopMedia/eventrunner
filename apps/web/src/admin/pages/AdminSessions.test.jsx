@@ -146,7 +146,7 @@ describe('admin Sessions workspace', () => {
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
       .toEqual(['Public session', 'Time and structure', 'Location', 'Speaker materials', 'Publishing']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
-      'Public title', 'Public description', 'Recording link',
+      'Public title', 'Public description', 'Spanish public title', 'Spanish public description', 'Recording link',
       'Event day', 'Parent session', 'Start time', 'End time', 'Track',
       'Room', 'Location label', 'Request speaker materials',
       'Show on the schedule',

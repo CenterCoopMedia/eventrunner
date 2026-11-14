@@ -76,6 +76,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import EditorDisclosure from '../components/EditorDisclosure.jsx';
+import ContentTranslations from '../components/ContentTranslations.jsx';
 import { OrderAnnouncement, ReorderControls, bindReorderDrop } from '../components/ReorderControls.jsx';
 import { EditorActionFeedback } from '../components/ActionFeedback.jsx';
 import AdminPageHeader, {
@@ -682,6 +683,8 @@ function PageEditor({ mode }) {
             help={pathHelp}
             hint={pathHelp}
           />
+          <ContentTranslations kind="page" record={page} onChange={(translations) => update({ translations })}
+            labels={{ label: 'navigation label', title: 'page heading' }} errorFor={errorFor} />
           <div className="flex flex-col justify-center gap-xs">
             <CheckboxField help="Include this content on the public site after publishing."
               label="Visible"
@@ -866,6 +869,10 @@ function PageEditor({ mode }) {
                       onChange={(value) => updateSection(sectionIndex, { label: value })}
                       error={errorFor(`${at}.label`)}
                     />
+                    <ContentTranslations kind="section" record={section}
+                      onChange={(translations) => updateSection(sectionIndex, { translations })}
+                      labels={{ label: `section ${sectionIndex + 1} label` }}
+                      errorFor={(field) => errorFor(`${at}.${field}`)} />
                     <TextField help="Limit how many content blocks staff can add to this section."
                       label={`Section ${sectionIndex + 1} max blocks`}
                       type="number"

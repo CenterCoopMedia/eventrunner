@@ -9,6 +9,7 @@ const {
   isSafeRichTextHref,
 } = require('shared/richText');
 const { BLOCK_TYPES } = require('./blockTypes.cjs');
+const { richVariantFields } = require('shared/contentLanguages');
 
 const SANITIZE_OPTIONS = Object.freeze({
   allowedTags: RICH_TEXT_ALLOWED_TAGS,
@@ -54,11 +55,25 @@ function sanitizeRichTextFields(fields) {
       clean[field.id] = sanitizeRichTextHtml(clean[field.id]);
     }
   }
+  return sanitizeRichTextVariants(clean);
+}
+
+/** The publisher uses the same sanitizer for translated values. */
+function sanitizeRichTextVariants(clean) {
+  if (clean.translations?.es && typeof clean.translations.es === 'object'
+      && [Object.prototype, null].includes(Object.getPrototypeOf(clean.translations.es))) {
+    const spanish = { ...clean.translations.es };
+    for (const field of richVariantFields(clean)) {
+      if (typeof spanish[field] === 'string') spanish[field] = sanitizeRichTextHtml(spanish[field]);
+    }
+    return { ...clean, translations: { ...clean.translations, es: spanish } };
+  }
   return clean;
 }
 
 module.exports = {
   sanitizeRichTextHtml,
   sanitizeRichTextFields,
+  sanitizeRichTextVariants,
   internals: { SANITIZE_OPTIONS },
 };

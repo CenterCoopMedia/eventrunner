@@ -69,6 +69,7 @@ export function toEditableContent(doc, blockTypeId) {
     order: typeof doc?.order === 'number' ? doc.order : '',
     visible: doc?.visible !== false,
     values,
+    ...(doc?.translations ? { translations: doc.translations } : {}),
   };
 }
 
@@ -93,6 +94,9 @@ export function blankContent(blockTypeId = '') {
  */
 export function toContentFields(content) {
   const fields = { blockType: content.blockType };
+  if (Object.hasOwn(content, 'translations')) {
+    fields.translations = Object.keys(content.translations ?? {}).length ? content.translations : DELETE_FIELD_SENTINEL;
+  }
   if (content.order !== '' && content.order !== null && content.order !== undefined) {
     const order = Number(content.order);
     fields.order = Number.isFinite(order) ? order : content.order;

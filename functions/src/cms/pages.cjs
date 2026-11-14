@@ -37,6 +37,7 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { PAGE_PATH_SEGMENT_RE, isReservedPathSegment } = require('shared/routing');
 const { builtInSectionBlockTypes } = require('shared/page');
+const { collectionVariantErrors } = require('shared/contentLanguages');
 
 const PAGES_COLLECTION = 'cmsPages';
 const PAGES_DRAFTS = 'cmsPages_drafts';
@@ -51,8 +52,8 @@ const DOC_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 // straight into Firestore around it.
 
 /** Keys a cmsPages doc may carry — anything else is rejected by name. */
-const PAGE_KEYS = Object.freeze(['id', 'label', 'title', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template']);
-const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot']);
+const PAGE_KEYS = Object.freeze(['id', 'label', 'title', 'path', 'icon', 'order', 'visible', 'systemPage', 'sections', 'layout', 'template', 'translations']);
+const SECTION_KEYS = Object.freeze(['id', 'label', 'description', 'allowedBlocks', 'maxBlocks', 'reorderable', 'defaultBlocks', 'slot', 'translations']);
 const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
 
 /**
@@ -131,6 +132,7 @@ function validatePageDoc(doc) {
   if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) {
     return { ok: false, errors: ['page: must be an object'] };
   }
+  errors.push(...collectionVariantErrors(doc, PAGES_COLLECTION));
   for (const key of Object.keys(doc)) {
     if (!PAGE_KEYS.includes(key)) errors.push(`${key}: unknown field`);
   }

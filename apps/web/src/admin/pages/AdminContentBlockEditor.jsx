@@ -26,6 +26,7 @@ import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
 import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
+import ContentTranslations from '../components/ContentTranslations.jsx';
 import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
@@ -418,6 +419,7 @@ export default function AdminContentBlockEditor({ mode }) {
       ...blankContent(nextType),
       order: current.order,
       visible: current.visible,
+      ...(Object.hasOwn(current, 'translations') ? { translations: {} } : {}),
     }));
   }
 
@@ -614,6 +616,10 @@ export default function AdminContentBlockEditor({ mode }) {
         features={features}
         pageRows={pagesLoading ? null : pageRows}
       />
+      <ContentTranslations kind="block" record={{ ...content.values, blockType: content.blockType, translations: content.translations }}
+        onChange={(translations) => setContent((current) => ({ ...current, translations }))}
+        labels={Object.fromEntries(valueFieldsOf(content.blockType).map((field) => [field.id, editorialFieldLabel(content.blockType, field.id)]))}
+        errorFor={errorFor} />
     </Panel>
   );
 

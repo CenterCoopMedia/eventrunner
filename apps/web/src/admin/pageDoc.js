@@ -25,6 +25,7 @@ export const PAGE_KEYS = Object.freeze([
   'sections',
   'layout',
   'template',
+  'translations',
 ]);
 
 export const SECTION_KEYS = Object.freeze([
@@ -36,6 +37,7 @@ export const SECTION_KEYS = Object.freeze([
   'reorderable',
   'defaultBlocks',
   'slot',
+  'translations',
 ]);
 
 export const DEFAULT_BLOCK_KEYS = Object.freeze(['field', 'blockType', 'description']);
@@ -93,6 +95,7 @@ export function toEditablePage(doc) {
     // to match "Long read" has not chosen Long read, and an editor that
     // showed one would be reporting a decision nobody made.
     template: templateOf(base),
+    translations: base.translations ?? {},
     sections: Array.isArray(base.sections)
       ? base.sections.map((section) => {
           const s = pick(section ?? {}, SECTION_KEYS);
@@ -100,6 +103,7 @@ export function toEditablePage(doc) {
             id: s.id ?? '',
             label: s.label ?? '',
             description: typeof s.description === 'string' ? s.description : '',
+            translations: s.translations ?? {},
             allowedBlocks: [...(builtInSectionBlockTypes(base, s) ?? [])],
             maxBlocks: Number.isInteger(s.maxBlocks) ? s.maxBlocks : 1,
             reorderable: s.reorderable !== false,
@@ -174,12 +178,14 @@ export function toPagePayload(page) {
     // always sent: "no template" is an answer the server accepts, and
     // sending it makes clearing one possible at all.
     template: templateOf(page),
+    ...(page.translations && Object.keys(page.translations).length ? { translations: page.translations } : {}),
     sections: (page.sections ?? []).map((section) => {
       const maxBlocks = Number(section.maxBlocks);
       return {
         id: section.id ?? '',
         label: section.label ?? '',
         description: section.description ? section.description : null,
+        ...(section.translations && Object.keys(section.translations).length ? { translations: section.translations } : {}),
         allowedBlocks: [...(builtInSectionBlockTypes(page, section) ?? [])],
         maxBlocks: Number.isInteger(maxBlocks) ? maxBlocks : section.maxBlocks,
         reorderable: Boolean(section.reorderable),
