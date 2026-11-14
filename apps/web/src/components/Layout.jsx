@@ -426,15 +426,15 @@ export default function Layout() {
       id={accountActionsId}
       ref={accountActionsRef}
       hidden={readOnlyDemo}
-      className={`site-header-account-actions no-print${compactHeader && menuOpen ? ' motion-enter' : ''}`}
+      className={`site-header-account-actions no-print${compactHeader ? ' w-full' : ''}${compactHeader && menuOpen ? ' motion-enter' : ''}`}
       data-mobile-hidden={compactHeader && settledCompactHeader && !menuOpen}
       onKeyDown={closeMenuOnEscape}
       onClick={closeMenuOnLink}
     >
       {!readOnlyDemo && accountViews.views.length > 1 ? (
-        <li><Suspense fallback={null}><AccountMenu account={accountViews} /></Suspense></li>
+        <li className={compactHeader ? 'grid w-full' : undefined}><Suspense fallback={null}><AccountMenu account={accountViews} /></Suspense></li>
       ) : null}
-      <li>
+      <li className={compactHeader ? 'grid w-full' : undefined}>
         <NavLink to={account.to} end={account.end} className={accountClass}>
           {account.label}
         </NavLink>
@@ -453,7 +453,7 @@ export default function Layout() {
       data-mobile-hidden={compactHeader && settledCompactHeader && !menuOpen}
       onKeyDown={closeMenuOnEscape}
       onClick={closeMenuOnLink}
-      data-placement={navPlacement}
+      data-placement={compactHeader ? 'compact' : navPlacement}
       className={
         navPlacement === 'side'
           ? 'site-header-nav relative border-b-hairline border-b-rule-hairline lg:w-48 lg:shrink-0 lg:self-stretch lg:border-b-0 lg:border-e-hairline lg:border-e-rule-hairline lg:pe-md lg:pt-xl'
@@ -462,14 +462,16 @@ export default function Layout() {
     >
       <ul
         className={[
-          navPlacement === 'side'
+          compactHeader
+            ? 'flex w-full flex-col'
+            : navPlacement === 'side'
             ? 'flex flex-wrap items-center gap-x-md lg:flex-col lg:items-start lg:gap-x-0'
             : 'flex flex-wrap items-center gap-x-md',
           compactHeader && menuOpen ? 'motion-enter' : '',
         ].filter(Boolean).join(' ')}
       >
         {primaryNavItems.map((item) => (
-          <li key={item.to}>
+          <li key={item.to} className={compactHeader ? 'grid' : undefined}>
             <NavLink to={item.to} end={item.end} className={navClass}>
               {item.label}
             </NavLink>
