@@ -13,9 +13,13 @@ describe('Your organization step', () => {
   it('asks for the name, the website and the mailing address, with the name preset', async () => {
     renderSetup('organization');
     expect(await screen.findByLabelText('Organization name')).toHaveValue('NC Local');
+    expect(screen.getByLabelText('Organization name')).toHaveAttribute('enterkeyhint', 'next');
     expect(screen.getByLabelText('Website (optional)')).toHaveAttribute('type', 'url');
+    expect(screen.getByLabelText('Website (optional)')).toHaveAttribute('autocapitalize', 'none');
+    expect(screen.getByLabelText('Website (optional)')).toHaveAttribute('spellcheck', 'false');
     const address = screen.getByLabelText('Mailing address');
     expect(address.tagName).toBe('TEXTAREA');
+    expect(address).not.toHaveAttribute('enterkeyhint');
     expect(address).toHaveAccessibleDescription(/This address appears at the bottom of your event emails/);
   });
 

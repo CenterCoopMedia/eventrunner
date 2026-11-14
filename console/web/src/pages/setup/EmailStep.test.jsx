@@ -24,6 +24,10 @@ describe('Email step', () => {
     const preview = await screen.findByLabelText('Email preview');
     expect(screen.getByLabelText('Sender name')).toHaveValue('NC Local News Summit');
     expect(screen.getByLabelText('Reply address')).toHaveValue('ana@example.org');
+    expect(screen.getByLabelText('Sender name')).toHaveAttribute('enterkeyhint', 'next');
+    expect(screen.getByLabelText('Reply address')).toHaveAttribute('enterkeyhint', 'next');
+    expect(screen.getByLabelText('Reply address')).toHaveAttribute('autocapitalize', 'none');
+    expect(screen.getByLabelText('Reply address')).toHaveAttribute('spellcheck', 'false');
     expect(preview).toHaveTextContent('NC Local News Summit <hello@nclocal.eventrunner.org>');
     fireEvent.change(screen.getByLabelText('Sender name'), { target: { value: 'NC Local' } });
     fireEvent.change(screen.getByLabelText('Reply address'), { target: { value: 'ops@nclocal.org' } });

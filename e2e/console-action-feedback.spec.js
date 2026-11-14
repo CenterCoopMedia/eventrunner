@@ -346,6 +346,57 @@ test('setup Leave retains a failed save and retries only the waiting answers', a
   expect(errors).toEqual([]);
 });
 
+test('answer forms submit with Enter, keep textarea newlines, and return edits to Review', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const current = application();
+  const saves = [];
+  const errors = await intercept(page, async (name, body) => {
+    if (name === 'getApplication') return { application: current };
+    if (name === 'saveApplicationStep') {
+      saves.push(body);
+      current.answers[body.step] = body.answers;
+      const fields = body.step === 'email' && body.answers.replyTo === 'not-an-email'
+        ? { 'email.replyTo': 'Use a complete reply address.' } : {};
+      return { ...body, saved: true, errors: fields };
+    }
+  });
+  await page.goto(`${origin}${APP_PATH}/organization`);
+  const address = page.getByLabel('Mailing address');
+  await address.fill('1 Keyboard Street');
+  await address.press('Enter');
+  await page.keyboard.type('Raleigh');
+  await expect(address).toHaveValue('1 Keyboard Street\nRaleigh');
+  await expect(page).toHaveURL(`${origin}${APP_PATH}/organization`);
+  await page.getByLabel('Organization name').fill('Keyboard newsroom');
+  await page.getByLabel('Organization name').press('Enter');
+  await expect(page).toHaveURL(`${origin}${APP_PATH}/event`);
+  expect(saves.filter((body) => body.step === 'organization').at(-1).answers).toMatchObject({
+    name: 'Keyboard newsroom', address: '1 Keyboard Street\nRaleigh',
+  });
+
+  await page.goto(`${origin}${APP_PATH}/email`);
+  const reply = page.getByLabel('Reply address');
+  await reply.fill('not-an-email');
+  await reply.press('Enter');
+  await expect(page).toHaveURL(`${origin}${APP_PATH}/email?check=1`);
+  await expect(reply).toHaveAttribute('aria-invalid', 'true');
+  await expect(reply).toBeFocused();
+  await reply.fill('keyboard@example.test');
+  await page.getByLabel('Sender name').fill('Keyboard team');
+  await page.getByLabel('Sender name').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Email', exact: true })).toContainText('keyboard@example.test');
+  await page.getByRole('link', { name: 'Edit email', exact: true }).click();
+  await page.getByLabel('Sender name').fill('Keyboard revision');
+  await page.getByLabel('Sender name').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Email', exact: true })).toContainText('Keyboard revision');
+  expect(saves.filter((body) => body.step === 'email').at(-1).answers).toEqual({
+    senderName: 'Keyboard revision', replyTo: 'keyboard@example.test',
+  });
+  expect(errors).toEqual([]);
+});
+
 test('revoke failure retains the last row confirmation on a long mobile list', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });

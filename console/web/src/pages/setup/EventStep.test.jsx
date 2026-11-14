@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { application, callsTo, emptyAnswers, serveApi } from '../../test/application.js';
+import { application, callsTo, emptyAnswers, fullAnswers, serveApi } from '../../test/application.js';
 import { renderSetup } from '../../test/setupPage.jsx';
 import { browserTimeZone } from './EventStep.jsx';
 import { keepAnswer, readKeptAnswer } from '../../setup/keptAnswers.js';
@@ -174,5 +174,26 @@ describe('Your event step', () => {
     expect(await screen.findByRole('heading', { name: 'Venue (optional)' })).toBeInTheDocument();
     expect(screen.getByLabelText('Venue name')).toBeInTheDocument();
     expect(screen.getByLabelText('Venue address')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Use organization mailing address' })).not.toBeInTheDocument();
+  });
+
+  it('copies the current mailing address once, keeps it independent, and saves an edited venue on Review', async () => {
+    const answers = fullAnswers();
+    answers.event.venue.address = '';
+    serveApi({ getApplication: { application: application({ answers }) } });
+    renderSetup('event');
+    fireEvent.click(await screen.findByRole('button', { name: 'Use organization mailing address' }));
+    expect(screen.getByLabelText('Venue address')).toHaveValue(answers.organization.address);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    fireEvent.change(await screen.findByLabelText('Mailing address'), { target: { value: '99 New Office Street' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Your event' }));
+    expect(await screen.findByLabelText('Venue address')).toHaveValue(answers.organization.address);
+    fireEvent.change(screen.getByLabelText('Venue address'), { target: { value: '7 Event Hall Road' } });
+    fireEvent.click(screen.getByRole('link', { name: /Review/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Review' });
+    expect(screen.getByRole('region', { name: 'Your event' })).toHaveTextContent('7 Event Hall Road');
+    expect(callsTo('saveApplicationStep').at(-1)).toMatchObject({
+      step: 'event', answers: { venue: { address: '7 Event Hall Road' } },
+    });
   });
 });

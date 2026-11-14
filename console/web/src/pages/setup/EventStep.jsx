@@ -35,13 +35,14 @@ function DayRow({ day, index, errors, onDay, onRemove, canRemove }) {
     <li className="day">
       <fieldset className="day-fields">
         <legend>Day {index + 1}</legend>
-        <TextField path={`${base}.date`} label="Date" type="date" value={day.date}
+        <TextField path={`${base}.date`} label="Date" type="date" value={day.date} enterKeyHint="next"
           onChange={set('date')} error={errors[`${base}.date`]} />
-        <TextField path={`${base}.startTime`} label="Starts" type="time" value={day.startTime}
+        <TextField path={`${base}.startTime`} label="Starts" type="time" value={day.startTime} enterKeyHint="next"
           onChange={set('startTime')} error={errors[`${base}.startTime`]} />
-        <TextField path={`${base}.endTime`} label="Ends" type="time" value={day.endTime}
+        <TextField path={`${base}.endTime`} label="Ends" type="time" value={day.endTime} enterKeyHint="next"
           onChange={set('endTime')} error={errors[`${base}.endTime`]} />
         <TextField path={`${base}.label`} label="Name of the day (optional)" hint="For example, Workshops"
+          enterKeyHint="next"
           value={day.label || ''} onChange={set('label')} error={errors[`${base}.label`]} />
         {canRemove ? (
           <IconControl icon="remove" label={`Remove day ${index + 1}`} onClick={() => onRemove(index)} />
@@ -52,7 +53,7 @@ function DayRow({ day, index, errors, onDay, onRemove, canRemove }) {
 }
 
 /** Step 2: the event, its days, its time zone and its venue. */
-export default function EventStep({ value, errors, onChange }) {
+export default function EventStep({ value, errors, onChange, answers }) {
   const zones = useMemo(() => timeZones(value.timezone), [value.timezone]);
   const addButton = useRef(null);
   const set = (key) => (next) => onChange({ ...value, [key]: next });
@@ -81,10 +82,13 @@ export default function EventStep({ value, errors, onChange }) {
     <div className="stack">
       <p className="lead">Add the event details your attendees will see.</p>
       <TextField path="event.name" label="Event name" hint="For example, 2027 Local News Summit"
+        enterKeyHint="next"
         value={value.name} onChange={set('name')} error={errors['event.name']} />
       <TextField path="event.shortName" label="Short name" hint="Used in email subjects. For example, News Summit"
+        enterKeyHint="next"
         value={value.shortName} onChange={set('shortName')} error={errors['event.shortName']} />
       <TextField path="event.tagline" label="One-line description (optional)"
+        enterKeyHint="next"
         value={value.tagline} onChange={set('tagline')} error={errors['event.tagline']} />
       <SelectField path="event.timezone" label="Time zone" hint="Use the time zone where the event takes place."
         value={value.timezone} options={zones} onChange={set('timezone')} error={errors['event.timezone']} />
@@ -108,7 +112,10 @@ export default function EventStep({ value, errors, onChange }) {
       <section aria-labelledby="venue-title" className="stack">
         <h2 id="venue-title">Venue (optional)</h2>
         <TextField path="event.venue.name" label="Venue name" value={value.venue.name}
+          enterKeyHint="next"
           onChange={setVenue('name')} error={errors['event.venue.name']} />
+        {answers.organization.address.trim() ? <p><button type="button" className="button"
+          onClick={() => setVenue('address')(answers.organization.address)}>Use organization mailing address</button></p> : null}
         <TextField path="event.venue.address" label="Venue address" multiline value={value.venue.address}
           onChange={setVenue('address')} error={errors['event.venue.address']} />
       </section>

@@ -15,6 +15,9 @@ describe('Your web address step', () => {
       errors: { 'webAddress.name': 'Enter a web address.' } }) } });
     renderSetup('web-address', { query: '?check=1' });
     const field = await screen.findByLabelText('Name');
+    expect(field).toHaveAttribute('enterkeyhint', 'next');
+    expect(field).toHaveAttribute('autocapitalize', 'none');
+    expect(field).toHaveAttribute('spellcheck', 'false');
     await waitFor(() => expect(field).toHaveFocus());
     expect(field).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Web address preview')).toHaveTextContent('your-name.eventrunner.org');
