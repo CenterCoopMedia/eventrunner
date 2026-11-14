@@ -44,7 +44,8 @@ function responseFor(name) {
   if (name === 'listApplicationsForReview') return { applications: [{ id: 'visual-gathering',
     eventName: 'Community News Gathering', organizationName: 'Community Newsroom', updatedAt: '2026-11-01T12:00:00.000Z' }] };
   if (name === 'getApplicationForReview') return { application: { ...application(), status: 'submitted', revision: 1, history: [], review: null },
-    organization: { name: 'Community Newsroom' }, team: { members: [], invites: [] }, connection: null, canRetryBuild: false, build: null };
+    organization: { name: 'Community Newsroom' }, team: { members: [], invites: [] },
+    connection: { state: 'none', label: 'No account to connect' }, canRetryBuild: false, build: null };
   throw new Error(`Unexpected console fixture action: ${name}`);
 }
 
@@ -106,7 +107,7 @@ test.afterAll(async () => {
   if (scratch) await fs.rm(scratch, { recursive: true });
 });
 
-async function open(page, phase, route = TEAM_PATH) {
+async function open(page, phase, route = TEAM_PATH, title = 'Team') {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.unroute('**/*');
@@ -117,7 +118,7 @@ async function open(page, phase, route = TEAM_PATH) {
     return request.fulfill({ json: responseFor(url.pathname.split('/').at(-1)) });
   });
   await page.goto(`${previews[phase].origin}${route}`);
-  await expect(page.locator('main h1')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
   await page.evaluate(async () => { await globalThis.document.fonts.ready; });
   expect(errors).toEqual([]);
 }
@@ -153,9 +154,10 @@ for (const width of [375, 1280]) for (const mode of ['light', 'dark']) {
 }
 
 test('console captions follow all five page headings', async ({ page }) => {
-  for (const route of [TEAM_PATH, '/review', '/review/settings', '/review/visual-gathering', '/review/links']) {
-    await open(page, 'after', route);
-    await expect(page.locator('main .folio')).toBeVisible();
+  for (const [route, title] of [[TEAM_PATH, 'Team'], ['/review', 'Review requests'],
+    ['/review/settings', 'Console settings'], ['/review/visual-gathering', 'Community News Gathering'], ['/review/links', 'Signup links']]) {
+    await open(page, 'after', route, title);
+    await expect(page.locator('main .folio'), route).toBeVisible();
     const heading = await page.locator('main h1').boundingBox();
     const caption = await page.locator('main .folio').boundingBox();
     expect(caption.y).toBeGreaterThanOrEqual(heading.y + heading.height);
@@ -195,7 +197,7 @@ test('console controls keep focus, a static pressed tint and guarded movement', 
 });
 
 test('console steps use rules and the base radius', async ({ page }) => {
-  await open(page, 'after', `${APP_PATH}/organization`);
+  await open(page, 'after', `${APP_PATH}/organization`, 'Your organization');
   const current = page.locator('.steps a[aria-current="step"]');
   await expect(current).toHaveCSS('box-shadow', 'none');
   await expect(current).toHaveCSS('border-inline-start-width', '4px');
