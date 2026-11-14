@@ -12,6 +12,7 @@
 // state sits in a hairline-ruled block tinted by --color-surface-alt, the
 // same flat-tint device SignInPanel itself uses — never a shadowed,
 // rounded card.
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
@@ -28,6 +29,7 @@ export default function Login() {
   const { eventConfig } = useEventConfig();
   const readOnlyDemo = isReadOnlyDemo(eventConfig);
   const returnPath = adminReturnPath(location.state?.from);
+  const [reauthenticateUid, setReauthenticateUid] = useState(null);
 
   if (readOnlyDemo && !returnPath) {
     return (
@@ -62,10 +64,20 @@ export default function Login() {
           <Link to={returnPath || '/'} className={primaryButtonClass}>
             {returnPath ? 'Go to the admin CMS' : 'Go to the home page'}
           </Link>
+          {returnPath && user.email && !readOnlyDemo ? (
+            <button type="button" onClick={() => setReauthenticateUid(user.uid)} className={secondaryButtonClass}>
+              Continue as {user.email}
+            </button>
+          ) : null}
           <button type="button" onClick={() => signOut()} className={secondaryButtonClass}>
             Sign out
           </button>
         </div>
+        {reauthenticateUid === user.uid ? (
+          <div className="mt-lg">
+            <SignInPanel initialEmail={user.email} onSignedIn={() => navigate(returnPath || '/', { replace: true })} />
+          </div>
+        ) : null}
       </article>
     );
   }
