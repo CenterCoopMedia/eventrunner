@@ -23,6 +23,7 @@
  */
 
 const { hostName } = require('./hostName.cjs');
+const { setTimeout: delay } = require('node:timers/promises');
 const { agreementPdf, formatAcceptedAt } = require('./agreementPdf.cjs');
 const { button, detailsTable, fineprint, heading, kicker, note, paragraph, wrapConsoleEmail } = require('./emailLayout.cjs');
 
@@ -174,14 +175,14 @@ async function agreementAttachment(copy) {
 }
 
 /**
- * @param {{ token: string, from: string, fetch: typeof globalThis.fetch }} deps
+ * @param {{ token: string, from: string, fetch: typeof globalThis.fetch, sleep?: (ms: number) => Promise<void> }} deps
  */
-function createPostmarkMailer({ token, from, fetch }) {
+function createPostmarkMailer({ token, from, fetch, sleep = delay }) {
   if (typeof token !== 'string' || !token) throw new TypeError('createPostmarkMailer: token is required');
   if (typeof from !== 'string' || !from) throw new TypeError('createPostmarkMailer: from is required');
 
-  async function send(to, message, tag, what, attachments = []) {
-    const response = await fetch(POSTMARK_URL, {
+  async function send(to, message, tag, what, attachments = [], attempts = 1) {
+    const request = {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -200,15 +201,29 @@ function createPostmarkMailer({ token, from, fetch }) {
         TrackOpens: false,
         ...(attachments.length ? { Attachments: attachments } : {}),
       }),
-    });
-    if (!response.ok) {
-      let code = '';
+    };
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      let response;
+      let failure;
       try {
-        code = ` (code ${(await response.json()).ErrorCode})`;
-      } catch {
-        code = '';
+        response = await fetch(POSTMARK_URL, request);
+      } catch (err) {
+        if (!(err instanceof TypeError) && err?.name !== 'AbortError') throw err;
+        failure = err;
       }
-      throw new Error(`Postmark refused the ${what} email: HTTP ${response.status}${code}`);
+      if (response?.ok) return;
+      if (response) {
+        let code = '';
+        try {
+          code = ` (code ${(await response.json()).ErrorCode})`;
+        } catch {
+          code = '';
+        }
+        failure = new Error(`Postmark refused the ${what} email: HTTP ${response.status}${code}`);
+        if (response.status !== 429 && !(response.status >= 500 && response.status < 600)) throw failure;
+      }
+      if (attempt + 1 === attempts) throw failure;
+      await sleep(1000 * 2 ** attempt);
     }
   }
 
@@ -216,7 +231,7 @@ function createPostmarkMailer({ token, from, fetch }) {
     sendInvite: (invite) => send(invite.to, inviteMessage(invite), 'console-invite', 'invite'),
     sendStatusChange: (change) => send(change.to, statusChangeMessage(change), 'console-status', 'status'),
     sendOperatorNotice: (notice) => send(notice.to, operatorNoticeMessage(notice), 'console-operator', 'operator notice'),
-    sendAgreementCopy: async (copy) => send(copy.to, agreementCopyMessage(copy), 'console-agreement', 'agreement copy', [await agreementAttachment(copy)]),
+    sendAgreementCopy: async (copy) => send(copy.to, agreementCopyMessage(copy), 'console-agreement', 'agreement copy', [await agreementAttachment(copy)], 3),
   };
 }
 

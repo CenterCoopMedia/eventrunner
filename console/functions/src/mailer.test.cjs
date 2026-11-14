@@ -154,6 +154,73 @@ const COPY = Object.freeze({
   link: 'https://x.example/a',
 });
 
+test('agreement delivery retries temporary failures with the same dated PDF and message', async () => {
+  for (const first of [429, 500, 503, 'network', 'aborted']) {
+    const requests = [];
+    const waits = [];
+    const mailer = createPostmarkMailer({
+      token: 'pm-token', from: 'a@b.example', sleep: async (ms) => waits.push(ms),
+      fetch: async (url, request) => {
+        requests.push({ url, ...request });
+        if (requests.length === 1) {
+          if (first === 'network') throw new TypeError('network unavailable');
+          if (first === 'aborted') throw Object.assign(new Error('request aborted'), { name: 'AbortError' });
+          return { ok: false, status: first, json: async () => ({ ErrorCode: 100 }) };
+        }
+        return { ok: true, status: 200 };
+      },
+    });
+    await mailer.sendAgreementCopy(COPY);
+    assert.equal(requests.length, 2, first);
+    assert.deepEqual(requests[1], requests[0], first);
+    assert.deepEqual(waits, [1000], first);
+    const sent = JSON.parse(requests[1].body);
+    assert.equal(sent.To, 'ana@example.org');
+    assert.match(sent.TextBody, /Version: 3/);
+    assert.match(sent.TextBody, /November 4, 2026 at 10:00 AM EST/);
+    const pdf = await PDFDocument.load(Buffer.from(sent.Attachments[0].Content, 'base64'));
+    assert.equal(pdf.getTitle(), 'Test agreement, version 3');
+  }
+});
+
+test('agreement retries stop after three attempts and leave permanent refusals alone', async () => {
+  for (const status of [401, 404, 413, 415, 422, 429, 503]) {
+    let calls = 0;
+    const waits = [];
+    const mailer = createPostmarkMailer({
+      token: 'pm-token', from: 'a@b.example', sleep: async (ms) => waits.push(ms),
+      fetch: async () => { calls += 1; return { ok: false, status, json: async () => ({ ErrorCode: 300 }) }; },
+    });
+    await assert.rejects(mailer.sendAgreementCopy(COPY), (err) => {
+      assert.match(err.message, new RegExp(`HTTP ${status}`));
+      assert.ok(!err.message.includes('pm-token'));
+      return true;
+    });
+    const temporary = status === 429 || status === 503;
+    assert.equal(calls, temporary ? 3 : 1, status);
+    assert.deepEqual(waits, temporary ? [1000, 2000] : [], status);
+  }
+});
+
+test('the copy retry does not repeat other mail or unknown programming errors', async () => {
+  let calls = 0;
+  const waits = [];
+  const mailer = createPostmarkMailer({
+    token: 'pm-token', from: 'a@b.example', sleep: async (ms) => waits.push(ms),
+    fetch: async () => { calls += 1; return { ok: false, status: 503, json: async () => ({ ErrorCode: 100 }) }; },
+  });
+  await assert.rejects(mailer.sendInvite(invite), /HTTP 503/);
+  assert.equal(calls, 1);
+  assert.deepEqual(waits, []);
+  const broken = createPostmarkMailer({
+    token: 'pm-token', from: 'a@b.example', sleep: async (ms) => waits.push(ms),
+    fetch: async () => { calls += 1; throw new Error('unexpected adapter error'); },
+  });
+  await assert.rejects(broken.sendAgreementCopy(COPY), /unexpected adapter error/);
+  assert.equal(calls, 2);
+  assert.deepEqual(waits, []);
+});
+
 test('the agreement note says who accepted, when and which version, with escaped HTML and no text or hash', () => {
   const message = agreementCopyMessage(COPY);
   assert.equal(message.subject, 'Your copy of the agreement: Summit');
