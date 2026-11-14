@@ -335,7 +335,7 @@ function fakeCloud(options = {}) {
     }
     const params = new URLSearchParams(body);
     state.endpointsMade = (state.endpointsMade || 0) + 1;
-    const created = { id: `we_${state.endpointsMade}`, url: params.get('url'), status: 'enabled', enabled_events: params.getAll('enabled_events[]'), secret: 'whsec_fixture' };
+    const created = { id: `we_${state.endpointsMade}`, url: params.get('url'), api_version: params.get('api_version'), status: 'enabled', enabled_events: params.getAll('enabled_events[]'), secret: 'whsec_fixture' };
     state.endpoints.push(created);
     return answer(created);
   }
@@ -1055,7 +1055,35 @@ test('a test-mode run builds with a test-mode connection, and records that it di
   assert.equal(await provision({ appId: 'a1', testMode: true, deps: fake.deps }), 0);
   assert.equal(fake.db.read('console_builds/a1').testMode, true);
   assert.equal(fake.state.endpoints.length, 1);
+  assert.equal(fake.state.endpoints[0].api_version, require('stripe').API_VERSION);
   assert.equal(fake.state.variables.EVENT_STRIPE_MODE, 'test');
+});
+
+test('direct test Stripe endpoint retries replace version drift and reuse the pinned endpoint', async () => {
+  const fake = setup({
+    accounts: { stripe: { accountId: 'acct_1', livemode: false, connectedBy: 'ana' } },
+    secrets: { 'connection-stripe-a1': TEST_TOKEN },
+    cloud: { stripeToken: TEST_TOKEN },
+  });
+  const retry = async () => {
+    await fake.db.doc('applications/a1').update({ status: 'building' });
+    return provision({ appId: 'a1', testMode: true, deps: fake.deps });
+  };
+  assert.equal(await provision({ appId: 'a1', testMode: true, deps: fake.deps }), 0);
+  for (const apiVersion of [null, '2020-08-27']) {
+    const oldId = fake.state.endpoints[0].id;
+    fake.state.endpoints[0].api_version = apiVersion;
+    assert.equal(await retry(), 0);
+    assert.equal(fake.state.endpoints.length, 1);
+    const endpoint = fake.state.endpoints[0];
+    assert.notEqual(endpoint.id, oldId);
+    assert.equal(endpoint.api_version, require('stripe').API_VERSION);
+    assert.equal(fake.db.read('console_builds/a1').stripeEndpointId, endpoint.id);
+    const made = fake.state.endpointsMade;
+    assert.equal(await retry(), 0);
+    assert.equal(fake.state.endpointsMade, made, 'a matching version and saved secret need no replacement');
+    assert.equal(fake.state.endpoints[0].id, endpoint.id);
+  }
 });
 
 test('a direct test Stripe endpoint whose signing secret is lost is replaced', async () => {
