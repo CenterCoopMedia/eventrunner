@@ -215,8 +215,8 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
   /**
    * @param {object} message EmailMessage (spec §3.1): { to, from?, replyTo?,
    *   subject, text?, html?, headers?, tag?, onceKey?, idempotencyKey?,
-   *   source?, storeRendered?, redactAuditErrors?, auditRedact?, cc?, attachments?, sendId? }.
-   *   `redactAuditErrors` omits provider failure details from the audit only;
+   *   source?, storeRendered?, auditRedact?, cc?, attachments?, sendId? }.
+   *   Private mail omits provider failure details from the audit;
    *   core validation errors remain visible. `auditRedact` is a list of
    *   { find, replace } pairs applied to the bodies the audit row stores,
    *   never to the mail sent: a per-recipient secret such as a signed
@@ -251,10 +251,11 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         providerMessageId: outcome.providerMessageId,
         status: outcome.status,
         providerStatus: outcome.providerStatus ?? null,
-        // A private template can carry submitted prose. Providers and relays
+        // Private mail can carry bearer credentials or submitted prose.
+        // Providers and relays
         // may echo request content in a refusal, so its raw error belongs to
         // the caller's immediate result only, never the admin-readable audit.
-        error: message.redactAuditErrors === true && providerError && outcome.error != null
+        error: !bodyStored && providerError && outcome.error != null
           ? 'Private message failure details omitted.'
           : outcome.error ?? null,
         retries: outcome.retries,

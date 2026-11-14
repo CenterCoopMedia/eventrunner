@@ -200,7 +200,6 @@ test('a new submission saves revision 1 and sends safely through the real email 
   assert.equal(mail.to, 'help@example.test');
   assert.equal(mail.tag, 'speaker.discussion_points');
   assert.equal(mail.storeRendered, false);
-  assert.equal(mail.redactAuditErrors, true);
   assert.doesNotMatch(mail.html, /<img src=x/i);
   assert.match(mail.html, /&lt;img src=x onerror=alert\(1\)&gt;/);
 

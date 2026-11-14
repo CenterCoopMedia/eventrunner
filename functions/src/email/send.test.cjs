@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { createEmailCore, createDeliveryWebhookHandler, internals } = require('./send.cjs');
 const { render } = require('./render.cjs');
 const { getDefaultTemplate, listTemplateIds } = require('./templates.cjs');
+const { createWebhookProvider } = require('./providers/webhook.cjs');
 
 // --- Fakes -----------------------------------------------------------------
 
@@ -252,8 +253,8 @@ for (const thrown of [false, true]) {
 
 for (const id of ['auth.otp', 'speaker.invite', 'ticket.order_confirmation', 'ticket.attendee_confirmation']) {
   for (const thrown of [false, true]) {
-    test(`${id} provider ${thrown ? 'exceptions' : 'refusals'} remain visible in the audit row`, async () => {
-      const error = 'Inactive recipient';
+    test(`${id} provider ${thrown ? 'exceptions' : 'refusals'} keep bearer values out of the audit row`, async () => {
+      const error = 'Provider echoed bearer fixture-token-123456';
       const { db, core: c } = core({
         provider: { name: 'x', send: async () => {
           if (thrown) throw new Error(error);
@@ -265,11 +266,36 @@ for (const id of ['auth.otp', 'speaker.invite', 'ticket.order_confirmation', 'ti
         to: 'a@example.org', tag: id,
       });
       assert.equal(result.error, error);
-      assert.equal(db.state.sentRows[0].error, error);
+      assert.equal(db.state.sentRows[0].error, 'Private message failure details omitted.');
+      assert.equal(db.state.sentRows[0].providerStatus, thrown ? null : 422);
       assert.equal(db.state.sentRows[0].bodyStored, false);
+      assert.doesNotMatch(JSON.stringify(db.state.sentRows[0]), /fixture-token-123456/);
     });
   }
 }
+
+test('a webhook refusal that echoes an OTP never stores the bearer value in the audit', async () => {
+  const code = '123456';
+  const provider = createWebhookProvider({
+    env: { EMAIL_WEBHOOK_URL: 'https://relay.example.test/send', EMAIL_WEBHOOK_SECRET: 'fixture-signing-key' },
+    fetchImpl: async (_url, request) => {
+      const payload = JSON.parse(request.body);
+      assert.match(payload.text, /123456/);
+      return { status: 422, text: async () => `Rejected payload: ${payload.text}` };
+    },
+  });
+  const { db, core: c } = core({ provider });
+  const result = await c.send({
+    ...render({ template: getDefaultTemplate('auth.otp'), tokenValues: { code }, config: CONFIG }),
+    to: 'owner@example.test', tag: 'auth.otp',
+  });
+  assert.match(result.error, /123456/);
+  const row = db.state.sentRows[0];
+  assert.equal(row.status, 'failed');
+  assert.equal(row.providerStatus, 422);
+  assert.equal(row.error, 'Private message failure details omitted.');
+  assert.doesNotMatch(JSON.stringify(row), /123456/);
+});
 
 test('core errors remain visible for every template, including discussion points', async () => {
   let calls = 0;

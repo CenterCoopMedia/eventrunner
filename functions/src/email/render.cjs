@@ -446,9 +446,6 @@ function render({ template, override = null, tokenValues = {}, config, now }) {
     // site re-attaching the flag — an auth.otp render must never persist
     // the code in admin-readable sent_emails (spec §3.1, §6.1).
     storeRendered: template.storeRendered !== false,
-    // Provider errors can echo submitted prose; only templates carrying
-    // that private content opt in. Overrides cannot change this policy.
-    redactAuditErrors: template.redactAuditErrors === true,
     // Footer flags are DERIVED per body from the effective (possibly
     // overridden) source, never assumed: a valid override that drops
     // {{postal_address_html}} must not tell the send core the footer is
