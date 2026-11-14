@@ -33,6 +33,66 @@ describe('local admin draft storage', () => {
     expect(localStorage.getItem(key)).toBeNull();
   });
 
+  it('expires unopened accounts, documents and versions at seven days without offering their text', () => {
+    const pending = openLocalDraft('alice', 'cmsPages/faq', 'v1');
+    pending.write('Alice first', 'saved');
+    openLocalDraft('alice', 'cmsPages/faq', 'v2').write('Alice second', 'saved');
+    openLocalDraft('bob', 'cmsPages/home', 'v1').write('Bob old', 'saved');
+    const old = new Map(Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)]));
+    vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000 - 1);
+    expect(openLocalDraft('charlie', 'cmsPages/new', 'v1').read()).toBeNull();
+    for (const [key, raw] of old) expect(localStorage.getItem(key)).toBe(raw);
+    openLocalDraft('bob', 'cmsPages/fresh', 'v1').write('Bob fresh', 'saved');
+    const freshKey = Object.keys(localStorage).find((key) => !old.has(key));
+    const freshRaw = localStorage.getItem(freshKey);
+    const signOutKey = 'eventrunner:admin-draft-signout:alice';
+    localStorage.setItem(signOutKey, 'signed out in another tab');
+    localStorage.setItem('another-app', 'untouched');
+    vi.advanceTimersByTime(1);
+    expect(openLocalDraft('charlie', 'cmsPages/new', 'v1').read()).toBeNull();
+    for (const key of old.keys()) expect(localStorage.getItem(key)).toBeNull();
+    expect(localStorage.getItem(freshKey)).toBe(freshRaw);
+    expect(localStorage.getItem(signOutKey)).toBe('signed out in another tab');
+    expect(localStorage.getItem('another-app')).toBe('untouched');
+    expect(pending.write('late typing after sign-out', 'saved')).toBe(false);
+  });
+
+  it.each(['getItem', 'removeItem'])('continues expiry after malformed copies and a %s failure', (method) => {
+    openLocalDraft('charlie', 'cmsPages/current', 'v1').write('current', 'saved');
+    const expired = JSON.stringify({ value: 'old', baseline: 'saved', version: 'v1', savedAt: Date.now() - 7 * 24 * 60 * 60 * 1000 });
+    const blockedKey = 'eventrunner:admin-draft:alice:unopened:v1';
+    const removableKey = 'eventrunner:admin-draft:bob:unopened:v1';
+    localStorage.setItem('eventrunner:admin-draft:broken', '{broken');
+    localStorage.setItem(blockedKey, expired);
+    localStorage.setItem(removableKey, expired);
+    const original = Storage.prototype[method];
+    const failed = vi.spyOn(Storage.prototype, method).mockImplementation(function (key) {
+      if (key === blockedKey) throw new Error('storage unavailable');
+      return original.call(this, key);
+    });
+    try {
+      expect(openLocalDraft('charlie', 'cmsPages/current', 'v1').read().value).toBe('current');
+    } finally { failed.mockRestore(); }
+    expect(localStorage.getItem(blockedKey)).toBe(expired);
+    expect(localStorage.getItem(removableKey)).toBeNull();
+  });
+
+  it('preserves a copy refreshed by another tab during the expiry check', () => {
+    openLocalDraft('alice', 'cmsPages/faq', 'v1').write('old', 'saved');
+    const key = Object.keys(localStorage)[0];
+    vi.advanceTimersByTime(7 * 24 * 60 * 60 * 1000);
+    const fresh = JSON.stringify({ value: 'new typing', baseline: 'saved', version: 'v1', savedAt: Date.now() });
+    const get = Storage.prototype.getItem;
+    const refreshed = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (requested) {
+      const raw = get.call(this, requested);
+      if (requested === key) this.setItem(key, fresh);
+      return raw;
+    });
+    try { expect(openLocalDraft('bob', 'cmsPages/home', 'v1').read()).toBeNull(); }
+    finally { refreshed.mockRestore(); }
+    expect(localStorage.getItem(key)).toBe(fresh);
+  });
+
   it('clears only the signing-out account and revokes even a session with no write yet', () => {
     const pending = openLocalDraft('alice', 'cmsPages/faq', 'v1');
     openLocalDraft('alice', 'cmsPages/home', 'v2').write('Alice', 'saved');
