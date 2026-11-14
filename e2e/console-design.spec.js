@@ -201,14 +201,20 @@ test('console steps use rules and the base radius', async ({ page }) => {
   await expect(current).toHaveCSS('border-inline-start-width', '4px');
   await expect(current.locator('.step-number')).toHaveCSS('border-radius', '6px');
   await page.emulateMedia({ forcedColors: 'active' });
-  const markers = await page.locator('.steps a').evaluateAll((links) => links.map((link) => ({
-    current: link.getAttribute('aria-current') === 'step',
-    border: globalThis.getComputedStyle(link).borderInlineStartColor,
-    ground: globalThis.getComputedStyle(globalThis.document.body).backgroundColor,
-  })));
-  expect(markers.some((marker) => !marker.current)).toBe(true);
-  for (const marker of markers) {
-    if (marker.current) expect(marker.border).not.toBe(marker.ground);
-    else expect(marker.border).toBe(marker.ground);
+  for (const disabled of [false, true]) {
+    await page.locator('.steps a').evaluateAll((links, value) => links.forEach((link) => {
+      if (value) link.setAttribute('aria-disabled', 'true');
+      else link.removeAttribute('aria-disabled');
+    }), disabled);
+    const markers = await page.locator('.steps a').evaluateAll((links) => links.map((link) => ({
+      current: link.getAttribute('aria-current') === 'step',
+      border: globalThis.getComputedStyle(link).borderInlineStartColor,
+      ground: globalThis.getComputedStyle(globalThis.document.body).backgroundColor,
+    })));
+    expect(markers.some((marker) => !marker.current)).toBe(true);
+    for (const marker of markers) {
+      if (marker.current) expect(marker.border).not.toBe(marker.ground);
+      else expect(marker.border).toBe(marker.ground);
+    }
   }
 });
