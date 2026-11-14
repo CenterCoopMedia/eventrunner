@@ -438,11 +438,24 @@ test('purge refuses a different project owner or environment owner', async () =>
   assert.equal(wrongEnv.state.project.state, 'ACTIVE');
 });
 
-test('purge respects database delete protection', async () => {
-  const s = archived({ protectedDatabase: true });
-  assert.equal(await s.run('purge'), 1);
-  assert.ok(s.logs.some((line) => line.includes('delete protection')));
-  assert.equal(s.state.database, true);
+test('manual and scheduled purges refuse protected databases before any irreversible work', async () => {
+  for (const mode of ['purge', 'purge-due', 'immediate', 'resumed']) {
+    const tomb = { resources: RESOURCES, stepsCompleted: [], purgeStartedAt: new Date(NOW) };
+    const options = { protectedDatabase: true, ...(mode === 'resumed' ? { seed: { 'console_deleted_sites/a1': tomb } } : {}) };
+    const s = mode === 'immediate' ? setup(options) : archived(options);
+    const before = structuredClone(s.state);
+    const app = s.db.read('applications/a1');
+    const secrets = [...s.secrets.store];
+    const clientSecrets = [...s.clientSecrets.store];
+    assert.equal(mode === 'purge-due' ? await purgeDue({ deps: s.deps }) : await s.run('purge', mode === 'immediate'), 1);
+    assert.ok(s.logs.some((line) => line.includes('delete protection')), mode);
+    assert.equal(mutations(s).length, 0, mode);
+    assert.deepEqual(s.db.read('console_deleted_sites/a1'), mode === 'resumed' ? tomb : undefined, mode);
+    assert.deepEqual(s.db.read('applications/a1'), app, mode);
+    assert.deepEqual(s.state, before, mode);
+    assert.deepEqual([...s.secrets.store], secrets, mode);
+    assert.deepEqual([...s.clientSecrets.store], clientSecrets, mode);
+  }
 });
 
 test('purge-due selects only expired archives and continues after a failed application', async () => {

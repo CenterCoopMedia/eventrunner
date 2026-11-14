@@ -574,12 +574,16 @@ async function buckets(ctx) {
   }
 }
 
+async function readDeletableDatabase(ctx) {
+  const data = await google(ctx, 'Firestore database', `${FIRESTORE}/projects/${ctx.resources.projectId}/databases/(default)`, { allow: [404] });
+  // Delete protection is deliberate. Report it, rather than silently weakening it.
+  if (data?.deleteProtectionState === 'DELETE_PROTECTION_ENABLED') throw new Error('database: turn off database delete protection before purge');
+  return data;
+}
+
 async function database(ctx) {
   const base = `${FIRESTORE}/projects/${ctx.resources.projectId}/databases/(default)`;
-  const data = await google(ctx, 'Firestore database', base, { allow: [404] });
-  if (!data) return;
-  // Delete protection is deliberate. Report it, rather than silently weakening it.
-  if (data.deleteProtectionState === 'DELETE_PROTECTION_ENABLED') throw new Error('database: turn off database delete protection before purge');
+  if (!(await readDeletableDatabase(ctx))) return;
   const op = await google(ctx, 'delete Firestore database', base, { method: 'DELETE' });
   await finish(ctx, 'delete Firestore database', FIRESTORE, op);
   if (await google(ctx, 'verify deleted database', base, { allow: [404] })) throw new Error('database: database remains');
@@ -782,6 +786,13 @@ async function purge(ctx, now, confirmSite) {
     // Discover with reads only. An ownership or legacy inventory failure must
     // leave the recovery option available and the build record repairable.
     if (ctx.resources.projectId) await discover(ctx);
+  } else if (ctx.resources.projectId && !ctx.completed.includes('project')) await project(ctx);
+  // Refuse before the tombstone or any destructive step, including on a
+  // resumed purge. Recheck at database deletion for concurrent changes.
+  if (ctx.resources.projectId && !ctx.projectDeleting && !ctx.completed.includes('database') && !ctx.completed.includes('project')) {
+    await readDeletableDatabase(ctx);
+  }
+  if (!ctx.tomb) {
     // One transaction checks the window and makes purge irreversible to restore.
     await ctx.deps.db.runTransaction(async (tx) => {
       const [snap, buildSnap, tomb] = await Promise.all([tx.get(appRef(ctx)), tx.get(buildRef(ctx)), tx.get(tombRef(ctx))]);
@@ -809,7 +820,7 @@ async function purge(ctx, now, confirmSite) {
         ...(app.archive?.restoring ? { archive: { ...(archiving.archive || app.archive), restoring: false } } : {}),
       });
     });
-  } else if (ctx.resources.projectId && !ctx.completed.includes('project')) await project(ctx);
+  }
   for (const step of STEPS) {
     if (ctx.completed.includes(step.id)) continue;
     if (!ctx.resources.projectId && ['ticket-webhooks', 'buckets', 'database', 'custom-domain', 'project'].includes(step.id)) continue;
