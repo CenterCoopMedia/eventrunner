@@ -5,10 +5,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import { test, expect } from '@playwright/test';
+import theme from '../scripts/lib/shared-theme.cjs';
 
-const { contrastRatio } = createRequire(import.meta.url)('../scripts/lib/shared-theme.cjs');
+const { contrastRatio } = theme;
 const ROOT = process.cwd();
 const CONSOLE_SRC = path.join(ROOT, 'console/web/src');
 const FIXTURE = path.join(ROOT, 'e2e/fixtures/console-feedback');
