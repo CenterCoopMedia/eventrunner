@@ -44,6 +44,7 @@
     "./seed": { "require": "./src/seed.cjs", "import": "./src/seed.mjs" },
     "./imageSizes": { "require": "./src/imageSizes.cjs", "import": "./src/imageSizes.mjs" },
     "./consoleRequest": { "require": "./src/consoleRequest.cjs", "import": "./src/consoleRequest.mjs" },
-    "./webVitals": { "require": "./src/webVitals.cjs", "import": "./src/webVitals.mjs" }
+    "./webVitals": { "require": "./src/webVitals.cjs", "import": "./src/webVitals.mjs" },
+    "./contentLanguages": { "require": "./src/contentLanguages.cjs", "import": "./src/contentLanguages.mjs" }
   }
 }

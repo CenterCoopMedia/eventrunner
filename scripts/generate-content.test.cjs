@@ -64,6 +64,24 @@ function readFake({ config = {}, collections = {}, failing = [] } = {}) {
 
 const CONFIG = { event: { name: 'x' }, features: {}, theme: { colors: {} } };
 
+test('deployment reads include approved paired text and never private draft translations', async () => {
+  const translations = { es: { label: 'Texto publicado' } };
+  const unpublished = { es: { label: 'PRIVATE_UNPUBLISHED_TRANSLATION' } };
+  const db = readFake({ config: CONFIG, collections: {
+    cmsPages: [{ __id: 'visit', path: '/visit', visible: true, translations }],
+    cmsPages_drafts: [{ __id: 'visit', path: '/visit', translations: unpublished }],
+    cmsContent: [{ __id: 'hero__title', visible: true, translations }],
+    cmsContent_drafts: [{ __id: 'hero__title', translations: unpublished }],
+    cmsSchedule: [{ __id: 'talk', visible: true, translations }],
+    cmsSchedule_drafts: [{ __id: 'talk', translations: unpublished }],
+  } });
+  const snapshot = await readDeployment({ db });
+  for (const records of [snapshot.pages, snapshot.content, snapshot.sessions]) {
+    assert.deepEqual(records[0].translations, translations);
+  }
+  assert.ok(!JSON.stringify(snapshot).includes('PRIVATE_UNPUBLISHED_TRANSLATION'));
+});
+
 function quietly(fn) {
   const log = console.log;
   const error = console.error;

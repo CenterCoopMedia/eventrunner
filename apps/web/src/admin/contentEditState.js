@@ -18,12 +18,18 @@ export function contentEditSnapshot(fieldId, content) {
     const value = source[key];
     values[key] = typeof value === 'boolean' || typeof value === 'number' ? value : (value ?? '');
   }
+  const translations = {};
+  for (const language of Object.keys(content?.translations ?? {}).sort()) {
+    const variant = content.translations[language];
+    translations[language] = Object.fromEntries(Object.keys(variant ?? {}).sort().map((key) => [key, variant[key]]));
+  }
   return {
     fieldId: fieldId ?? '',
     blockType: content?.blockType ?? '',
     order: content?.order ?? '',
     visible: content?.visible !== false,
     values,
+    translations,
   };
 }
 

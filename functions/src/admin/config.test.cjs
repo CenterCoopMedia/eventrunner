@@ -212,6 +212,24 @@ function makeRes() {
 
 const ACTOR = { uid: 'admin-1', email: ADMIN_EMAIL };
 
+test('event language settings validate the merged saved object and explicitly remove Spanish', async () => {
+  const deps = makeDeps();
+  const handler = createUpdateEventConfigHandler(deps);
+  const bilingual = { default: 'es', available: ['en', 'es'] };
+  let res = makeRes();
+  await handler(makeReq({ event: { contentLanguages: bilingual } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').contentLanguages, bilingual);
+  res = makeRes();
+  await handler(makeReq({ event: { contentLanguages: { available: ['en'] } } }), res);
+  assert.equal(res.statusCode, 400); // The merged default is still es.
+  assert.deepEqual(deps.db.docs.get('config/event').contentLanguages, bilingual);
+  res = makeRes();
+  await handler(makeReq({ event: { contentLanguages: { default: 'en', available: ['en'] } } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(deps.db.docs.get('config/event').contentLanguages, { default: 'en', available: ['en'] });
+});
+
 // ------------------------------------------------- document allowlist (§2)
 
 test('bootstrap and providers doc ids are rejected by name', async () => {

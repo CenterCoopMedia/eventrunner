@@ -153,6 +153,23 @@ beforeEach(() => {
 });
 
 describe('page editor server adoption', () => {
+  it('saves and removes a paired translation through the existing draft action without changing English', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Spanish translation', exact: true })[0]);
+    fireEvent.change(screen.getByLabelText('Spanish navigation label'), { target: { value: 'Becas' } });
+    fetch.mockResolvedValueOnce(okResponse({ status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.label).toBe('Scholarships');
+    expect(bodyOf(0).page.translations).toEqual({ es: { label: 'Becas' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Spanish translation' }));
+    fetch.mockResolvedValueOnce(okResponse({ status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft', exact: true }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).page).not.toHaveProperty('translations');
+    expect(bodyOf(1).page.sections[0].id).toBe('intro');
+  });
   it.each(['live', 'drafts'])('ignores cached revisions until both server answers arrive (%s first)', async (first) => {
     silentCollections = ['cmsPages', 'cmsPages_drafts'];
     await renderAt('/admin/pages/scholarships', { waitForHeading: false });

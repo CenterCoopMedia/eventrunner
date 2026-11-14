@@ -56,6 +56,13 @@ describe('valueFieldsOf', () => {
 });
 
 describe('toEditableContent / toContentFields round-trip', () => {
+  it('preserves a paired variant and sends an explicit deletion when it is removed', () => {
+    const translations = { es: { value: 'Bienvenidos' } };
+    const editable = toEditableContent({ blockType: 'text', value: 'Welcome', translations });
+    expect(toContentFields(editable)).toMatchObject({ value: 'Welcome', translations });
+    expect(toContentFields({ ...editable, translations: {} }).translations).toBe(DELETE_FIELD_SENTINEL);
+    expect(toContentFields(blankContent('text'))).not.toHaveProperty('translations');
+  });
   it('reads a doc’s value fields and the shared order back out unchanged', () => {
     const doc = {
       blockType: 'stat',

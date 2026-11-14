@@ -51,6 +51,7 @@ const {
 const { TIMELINE_COLLECTION, validateTimelineFields } = require('./timeline.cjs');
 const { readOrganizationAccess, removeOrganizationAccess } = require('./organizationRepresentatives.cjs');
 const { sanitizeRichTextFields } = require('./richText.cjs');
+const { collectionVariantErrors } = require('shared/contentLanguages');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const PAGE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -285,8 +286,8 @@ function sponsorPackageErrors(fields) {
  * @returns {{ ok: true } | { ok: false, message: string }}
  */
 function checkBlockContract({ collection, fields }) {
-  if (collection !== 'cmsContent') return { ok: true };
-  const errors = [...requiredBlockErrors(fields), ...sponsorPackageErrors(fields)];
+  const errors = collectionVariantErrors(fields, collection);
+  if (collection === 'cmsContent') errors.push(...requiredBlockErrors(fields), ...sponsorPackageErrors(fields));
   if (errors.length > 0) return { ok: false, message: errors.join('; ') };
   return { ok: true };
 }

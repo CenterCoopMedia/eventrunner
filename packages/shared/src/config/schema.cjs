@@ -10,6 +10,7 @@
  */
 
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
+const { languageConfigErrors } = require('../contentLanguages.cjs');
 const { safeUrlHref } = require('../urlSafety.cjs');
 const { MAX_SOCIAL_LABEL_LENGTH, httpsUrlHref, isHttpsUrl, isValidCalendarDate } = require('./values.cjs');
 // Deliberately loose (local@domain.tld) — deliverability is the sender
@@ -190,6 +191,7 @@ function validateEventConfig(event) {
   if (!event || typeof event !== 'object') {
     return { ok: false, errors: ['event: must be an object'] };
   }
+  errors.push(...languageConfigErrors(event.contentLanguages));
 
   if (!isNonEmptyString(event.name)) errors.push('name: must be a nonempty string');
   if (!isNonEmptyString(event.shortName)) errors.push('shortName: must be a nonempty string');

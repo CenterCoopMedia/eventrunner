@@ -23,6 +23,8 @@
  */
 
 const { draftCollectionFor } = require('./blockTypes.cjs');
+const { collectionVariantErrors } = require('shared/contentLanguages');
+const { sanitizeRichTextVariants } = require('./richText.cjs');
 const {
   countsAfterPublish,
   ensurePendingCounts,
@@ -381,7 +383,9 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
           ? live.revision
           : historyRevisions.get(docId);
         const revision = baseRevision + 1;
-        const contentFields = contentFieldsOf(draft);
+        const contentFields = sanitizeRichTextVariants(contentFieldsOf(draft));
+        const variantErrors = collectionVariantErrors(contentFields, collection);
+        if (variantErrors.length) throw new Error(`Invalid translated content: ${variantErrors.join('; ')}`);
         const visible = isVisible(draft);
         // Carried over from the CURRENT live doc, not the draft — see the
         // RESERVED_FIELDS comment on 'materialCount'. Absent on a doc with

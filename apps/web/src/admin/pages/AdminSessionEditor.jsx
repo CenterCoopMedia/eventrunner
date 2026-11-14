@@ -10,6 +10,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useDeletedRecord } from '../deletionUndo.jsx';
 import RecordRecovery from '../components/RecordRecovery.jsx';
+import ContentTranslations from '../components/ContentTranslations.jsx';
 import { summarizePublish } from '../publishResult.js';
 import {
   lockSessionId,
@@ -74,6 +75,7 @@ function toForm(row) {
     recordingUrl: session.recordingUrl ?? '',
     materialsNotNeeded: session.materialsNotNeeded === true,
     visible: session.visible !== false,
+    ...(session.translations ? { translations: session.translations } : {}),
   };
 }
 
@@ -397,6 +399,8 @@ export default function AdminSessionEditor({ mode }) {
               error={errorFor('description')}
               required
             />
+            <ContentTranslations kind="session" record={form} onChange={(translations) => set({ translations })}
+              labels={{ title: 'public title', description: 'public description' }} errorFor={errorFor} />
             <TextField help="Add the public recording when it is ready to watch."
               label="Recording link"
               type="url"

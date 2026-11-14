@@ -63,6 +63,10 @@ describe('toEditablePage', () => {
       sections: [{ ...STORED.sections[0], seeded: true, defaultBlocks: [{ field: 'a', blockType: 'text', description: '', seeded: true }] }],
     });
     expect(Object.keys(page.sections[0])).not.toContain('seeded');
+    expect(page.translations).toEqual({});
+    expect(page.sections[0].translations).toEqual({});
+    expect(toPagePayload(page)).not.toHaveProperty('translations');
+    expect(toPagePayload(page).sections[0]).not.toHaveProperty('translations');
     expect(Object.keys(page.sections[0].defaultBlocks[0])).toEqual([
       'field',
       'blockType',

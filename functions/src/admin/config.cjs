@@ -118,6 +118,7 @@ const EVENT_EDITABLE_KEYS = Object.freeze([
   'legal',
   'social',
   'speakerResources',
+  'contentLanguages',
   // The overview's dated markers (issue #180). The registration goal sits
   // inside `registration`, which is already editable.
   'milestones',
