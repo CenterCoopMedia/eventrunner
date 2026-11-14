@@ -455,6 +455,8 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 
 @media (forced-colors: active) {
   .button, .filter { border-color: ButtonText; }
+  .steps a { border-inline-start-color: Canvas; }
+  .steps a[aria-current="step"] { border-inline-start-color: Highlight; }
   .button:disabled:not([aria-busy="true"]),
   .button[aria-disabled="true"]:not([aria-busy="true"]),
   .steps a[aria-disabled="true"] { color: GrayText; border-color: GrayText; }

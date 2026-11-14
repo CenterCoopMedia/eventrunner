@@ -40,6 +40,7 @@ function responseFor(name) {
     invites: [{ id: 'visual-invite', email: 'invited-editor@example.test', role: 'editor', expiresAt: '2027-05-01T12:00:00.000Z' }] };
   if (name === 'getApplication') return { application: application() };
   if (name === 'getConsoleSettings') return { settings: { gcpFolder: '', billingAccount: '', region: '' }, agreement: null };
+  if (name === 'listSignupLinks') return { links: [] };
   if (name === 'listApplicationsForReview') return { applications: [{ id: 'visual-gathering',
     eventName: 'Community News Gathering', organizationName: 'Community Newsroom', updatedAt: '2026-11-01T12:00:00.000Z' }] };
   if (name === 'getApplicationForReview') return { application: { ...application(), status: 'submitted', revision: 1, history: [], review: null },
@@ -151,8 +152,8 @@ for (const width of [375, 1280]) for (const mode of ['light', 'dark']) {
   });
 }
 
-test('console captions follow all four page headings', async ({ page }) => {
-  for (const route of [TEAM_PATH, '/review', '/review/settings', '/review/visual-gathering']) {
+test('console captions follow all five page headings', async ({ page }) => {
+  for (const route of [TEAM_PATH, '/review', '/review/settings', '/review/visual-gathering', '/review/links']) {
     await open(page, 'after', route);
     await expect(page.locator('main .folio')).toBeVisible();
     const heading = await page.locator('main h1').boundingBox();
@@ -199,4 +200,15 @@ test('console steps use rules and the base radius', async ({ page }) => {
   await expect(current).toHaveCSS('box-shadow', 'none');
   await expect(current).toHaveCSS('border-inline-start-width', '4px');
   await expect(current.locator('.step-number')).toHaveCSS('border-radius', '6px');
+  await page.emulateMedia({ forcedColors: 'active' });
+  const markers = await page.locator('.steps a').evaluateAll((links) => links.map((link) => ({
+    current: link.getAttribute('aria-current') === 'step',
+    border: globalThis.getComputedStyle(link).borderInlineStartColor,
+    ground: globalThis.getComputedStyle(globalThis.document.body).backgroundColor,
+  })));
+  expect(markers.some((marker) => !marker.current)).toBe(true);
+  for (const marker of markers) {
+    if (marker.current) expect(marker.border).not.toBe(marker.ground);
+    else expect(marker.border).toBe(marker.ground);
+  }
 });
