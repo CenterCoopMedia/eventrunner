@@ -138,6 +138,16 @@ for (const width of [375, 1280]) for (const mode of ['light', 'dark']) {
       await page.screenshot({ path: path.join(EVIDENCE, `console-design-${phase}-${width}-${mode}.png`), fullPage: true });
       page.off('response', fontResponse);
       if (phase === 'before') continue;
+      if (width === 375) {
+        const email = await page.locator('.account-email').boundingBox();
+        const brand = await page.locator('.brand').boundingBox();
+        const report = await page.getByRole('button', { name: 'Report a problem', exact: true }).boundingBox();
+        const signOut = await page.getByRole('button', { name: 'Sign out', exact: true }).boundingBox();
+        expect(email.y + email.height).toBeLessThanOrEqual(report.y);
+        expect(signOut.y).toBeCloseTo(report.y, 1);
+        expect(report.x).toBeCloseTo(email.x, 1);
+        expect(email.x).toBeCloseTo(brand.x, 1);
+      }
       expect(fontResponses).toContain(200);
       expect(await page.evaluate(() => [...globalThis.document.fonts].some((face) => face.family.replace(/["']/g, '') === 'Source Sans 3' && face.status === 'loaded'))).toBe(true);
       const colors = await page.evaluate(() => {
