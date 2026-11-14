@@ -24,8 +24,8 @@ export default function Team() {
 
   return (
     <section aria-labelledby="team-title">
-      <p className="folio">{data.organization.name}</p>
       <PageHeading id="team-title" tabIndex={-1}>Team</PageHeading>
+      <p className="folio">{data.organization.name}</p>
       <p><Link to={`/organizations/${orgId}`}>Back to event sites</Link></p>
       <TeamSections team={team} myUid={user?.uid} />
     </section>

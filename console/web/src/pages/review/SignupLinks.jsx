@@ -162,11 +162,11 @@ export default function SignupLinks() {
 
   return (
     <section aria-labelledby="links-title">
-      <p className="folio">Hosting team</p>
       <div className="directory-heading">
         <PageHeading id="links-title" tabIndex={-1}>Signup links</PageHeading>
         <IconControl icon="refresh" label="Refresh links" disabled={busy || Boolean(pending) || loading} onClick={load} />
       </div>
+      <p className="folio">Hosting team</p>
       <p>Create a signup link after the client's invoice is paid. Each link can be used once within 30 days. Anyone with the link can use it.</p>
 
       <form noValidate onSubmit={onSubmit} className="stack section">
