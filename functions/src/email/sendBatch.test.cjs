@@ -10,6 +10,8 @@ const assert = require('node:assert/strict');
 const { createEmailCore, EmailBatchError } = require('./send.cjs');
 const { createPostmarkProvider } = require('./providers/postmark.cjs');
 const { createConsoleProvider } = require('./providers/console.cjs');
+const { render } = require('./render.cjs');
+const { getDefaultTemplate } = require('./templates.cjs');
 
 function alreadyExistsError() {
   const err = new Error('6 ALREADY_EXISTS: Document already exists');
@@ -235,6 +237,33 @@ test('a short 2xx answer leaves the missing entry uncertain and never replays it
   assert.equal(results[1].status, 'failed');
   assert.equal(results[1].uncertain, true);
   assert.equal(db.state.claims.size, 2, 'the uncertain claim stays in place');
+});
+
+test('batch audit redacts private provider errors and preserves core and public errors', async () => {
+  const db = fakeDb();
+  const provider = {
+    name: 'x',
+    sendBatch: async () => [
+      { status: 'failed', error: 'Provider echoed private discussion points' },
+      undefined,
+      { status: 'failed', providerStatus: 422, error: 'Provider echoed bearer fixture-token-123456' },
+      { status: 'failed', error: 'Inactive recipient' },
+    ],
+  };
+  const core = createEmailCore({ db, provider, getConfig: async () => CONFIG });
+  const ids = ['speaker.discussion_points', 'speaker.discussion_points', 'auth.otp'];
+  const results = await core.sendBatch(ids.map((id, index) => message(index, {
+    ...render({ template: getDefaultTemplate(id), config: CONFIG }), tag: id,
+  })).concat(message(3)));
+  assert.equal(results[0].error, 'Provider echoed private discussion points');
+  assert.deepEqual(db.state.sentRows.map((row) => row.error), [
+    'Private message failure details omitted.',
+    'The provider response has no result for this message.',
+    'Private message failure details omitted.',
+    'Inactive recipient',
+  ]);
+  assert.equal(db.state.sentRows[2].providerStatus, 422);
+  assert.doesNotMatch(JSON.stringify(db.state.sentRows), /fixture-token-123456/);
 });
 
 test('invalid JSON on a 2xx and a thrown fetch are uncertain, with no retry', async () => {
