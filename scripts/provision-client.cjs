@@ -1122,11 +1122,17 @@ async function deploymentHasRevision(ctx, run) {
  * and mode, which is how a run is found again. A run that already succeeded
  * counts, a run in progress is waited for, and a failed one is run again a
  * bounded number of times, because a first deploy's failures are often transient.
- * A run older than `after`, or missing this run's code revision, cannot count.
+ * A run before this request or `after`, without a valid timestamp, or missing
+ * this run's code revision cannot count.
  * New requests and retries therefore inherit the patches on main.
  */
-async function deploy(ctx, { bootstrap, after = Number.NaN }) {
+async function deploy(ctx, { bootstrap, after }) {
   const { deps: { env, sleep }, settings: { environment } } = ctx;
+  const applicationCreatedAt = toMillis(ctx.app.createdAt);
+  if (!Number.isFinite(applicationCreatedAt)) throw new Error('the request has no valid creation time');
+  const cutoff = Number.isFinite(after) ? Math.max(applicationCreatedAt, after) : applicationCreatedAt;
+  // GitHub's run timestamps have second precision.
+  const earliest = Math.floor(cutoff / 1000) * 1000;
   const headers = { ...GITHUB_HEADERS, Authorization: `Bearer ${env.GITHUB_TOKEN}` };
   const workflow = `${GITHUB}/repos/${env.GITHUB_REPOSITORY}/actions/workflows/deploy.yml`;
   const title = `Deploy ${environment}${bootstrap ? ' (bootstrap)' : ''}`;
@@ -1135,9 +1141,10 @@ async function deploy(ctx, { bootstrap, after = Number.NaN }) {
   for (let poll = 0; poll < DEPLOY_POLLS; poll += 1) {
     const listed = await call(ctx, 'read the deploy runs', `${workflow}/runs?event=workflow_dispatch&branch=main&per_page=50`, { headers });
     const latest = (listed.workflow_runs || []).find((run) => run.display_title === title) || null;
-    const current = !(Date.parse(latest?.created_at) < after);
+    const createdAt = Date.parse(latest?.created_at);
+    const current = Number.isFinite(createdAt) && createdAt >= earliest;
     const containsRevision = await deploymentHasRevision(ctx, latest);
-    const counts = latest && containsRevision && (dispatches === 0 ? current : latest.id !== previous);
+    const counts = latest && current && containsRevision && (dispatches === 0 || latest.id !== previous);
     if (counts && latest.status !== 'completed') {
       await sleep(DEPLOY_WAIT_MS);
     } else if (counts && latest.conclusion === 'success') {

@@ -356,7 +356,7 @@ function fakeCloud(options = {}) {
         status: 'completed',
         conclusion: failed ? 'failure' : 'success',
         html_url: `https://github.example/run/${state.runs.length + 1}`,
-        created_at: new Date(state.clock).toISOString(),
+        created_at: new Date(Math.floor(state.clock / 1000) * 1000).toISOString(),
         inputs: body.inputs,
       });
       return new Response(null, { status: 204 });
@@ -1245,6 +1245,57 @@ test('a retry after a code update redeploys bootstrap and full site instead of r
   assert.equal(fake.state.runs.length, 4);
   assert.ok(fake.state.runs.slice(2).every((run) => run.head_sha === patched));
   assert.ok(fake.calls.filter((c) => c.url.endsWith('/dispatches')).every((c) => c.body.ref === 'main'));
+});
+
+for (const bootstrap of [true, false]) {
+  for (const date of ['old', 'missing', 'invalid']) {
+    test(`${bootstrap ? 'bootstrap' : 'full'} deployment does not reuse a run with an ${date} creation time`, async () => {
+      const fake = setup();
+      const cutoff = bootstrap ? fake.db.read('applications/a1').createdAt.getTime() : NOW;
+      fake.state.runs.push({
+        id: 1, head_sha: ENV.GITHUB_SHA,
+        display_title: `Deploy nclocal${bootstrap ? ' (bootstrap)' : ''}`,
+        status: 'completed', conclusion: 'success',
+        ...(date !== 'missing' ? { created_at: date === 'old' ? new Date(cutoff - 1000).toISOString() : 'invalid' } : {}),
+      });
+      assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+      const dispatches = fake.calls.filter((call) => call.url.endsWith('/dispatches'));
+      assert.deepEqual(dispatches.map((call) => call.body.inputs.bootstrap || 'full'), ['true', 'full']);
+    });
+  }
+}
+
+test('deployment timestamps use provider precision and same-request successful runs stay reusable', async () => {
+  const fake = setup({ app: { createdAt: new Date(NOW + 123) } });
+  fake.state.clock = NOW + 456;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.ok(fake.state.runs.every((run) => run.created_at === new Date(NOW).toISOString()));
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.runs.length, 2, 'a retry reuses both successful runs from this request');
+});
+
+test('a newly dispatched run still needs a valid creation time', async () => {
+  const fake = setup();
+  const fetch = fake.deps.fetch;
+  fake.deps.fetch = async (url, init) => {
+    const response = await fetch(url, init);
+    if (url.includes('/actions/workflows/deploy.yml/runs')) {
+      const body = await response.json();
+      return answer({ ...body, workflow_runs: body.workflow_runs.map((run) => ({ ...run, created_at: 'invalid' })) });
+    }
+    return response;
+  };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.equal(fake.db.read('console_builds/a1').failedStep, 'first-deploy');
+  assert.equal(fake.state.runs.length, 1, 'a bad timestamp cannot prove dispatch completion or start another run');
+});
+
+test('a request without a creation time fails before dispatching a deployment', async () => {
+  const fake = setup({ app: { createdAt: null } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.match(fake.db.read('console_builds/a1').error, /no valid creation time/);
+  assert.equal(fake.state.runs.length, 0);
 });
 
 test('a deployment from a newer main revision is accepted only with proven ancestry', async () => {
