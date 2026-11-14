@@ -286,15 +286,19 @@ export default function Layout() {
   const navRef = useRef(null);
   const accountActionsId = useId();
   const accountActionsRef = useRef(null);
+  const headerFocusRef = useRef(null);
   const compactHeader = useMediaQuery('(max-width: 639px)');
   const [settledCompactHeader, setSettledCompactHeader] = useState(compactHeader);
   useLayoutEffect(() => {
     const menu = menuButtonRef.current;
     const doc = menu?.ownerDocument;
     const activeElement = doc?.activeElement;
-    if (compactHeader && (navRef.current?.contains(activeElement) || accountActionsRef.current?.contains(activeElement))) {
+    // Responsive placement can replace a focused control before this effect.
+    const previousControl = headerFocusRef.current;
+    const lostHeaderFocus = activeElement === doc?.body && previousControl && !previousControl.isConnected;
+    if (compactHeader && (navRef.current?.contains(activeElement) || accountActionsRef.current?.contains(activeElement) || lostHeaderFocus)) {
       menu?.focus();
-    } else if (!compactHeader && activeElement === menu) {
+    } else if (!compactHeader && (activeElement === menu || lostHeaderFocus)) {
       // Both controls remain visible for this layout pass. Move focus
       // before the next render hides Menu; More uses its visible summary.
       const candidates = [
@@ -302,7 +306,10 @@ export default function Layout() {
         ...(accountActionsRef.current?.querySelectorAll('a[href], summary, button:not([disabled])') ?? []),
       ]
         .filter((element) => !element.closest('[hidden]'));
-      const current = candidates.find((element) => element.getAttribute('aria-current') === 'page')
+      const replacement = lostHeaderFocus ? candidates.find((element) => previousControl.getAttribute('href')
+        ? element.getAttribute('href') === previousControl.getAttribute('href')
+        : element.tagName === previousControl.tagName && element.textContent === previousControl.textContent) : null;
+      const current = replacement ?? candidates.find((element) => element.getAttribute('aria-current') === 'page')
         ?? candidates[0];
       const disclosure = current?.closest('details:not([open])');
       (disclosure?.querySelector('summary') ?? current ?? doc?.getElementById('main-content'))?.focus();
@@ -396,8 +403,9 @@ export default function Layout() {
     features,
     pages,
   });
-  const primaryNavItems = navPlacement === 'side' ? navItems : navItems.slice(0, 5);
-  const moreNavItems = navPlacement === 'side' ? [] : navItems.slice(5);
+  const primaryNavItems = compactHeader || navPlacement === 'side' ? navItems : navItems.slice(0, 5);
+  const moreNavItems = compactHeader || navPlacement === 'side' ? [] : navItems.slice(5);
+  const accountInHeader = navPlacement === 'side' && !compactHeader;
   const moreIsActive = moreNavItems.some((item) => matchPath({ path: item.to, end: item.end }, pathname));
 
   // The event's own social accounts, if it has recorded any (M7 issue 3,
@@ -434,9 +442,9 @@ export default function Layout() {
     </ul>
   );
 
-  // Top navigation shares a row with the account group. A side placement
-  // keeps its page links beside the content and its account group in Header.
-  const nav = navPlacement !== 'side' || navItems.length ? (
+  // Desktop top navigation shares a row with the account group; side
+  // placement keeps accounts in Header. Compact menus put accounts last.
+  const nav = navPlacement !== 'side' || navItems.length || compactHeader ? (
     <nav
       aria-label="Main"
       id={navId}
@@ -491,7 +499,7 @@ export default function Layout() {
           </li>
         ) : null}
       </ul>
-      {navPlacement === 'side' ? null : accountActions}
+      {accountInHeader ? null : accountActions}
     </nav>
   ) : null;
 
@@ -525,7 +533,13 @@ export default function Layout() {
   );
 
   return (
-    <div className="page-surface flex min-h-screen min-h-svh flex-col" data-historical-demo={historicalDemo && theme?.preset === 'newsroom' ? 'nclocal' : undefined}>
+    <div className="page-surface flex min-h-screen min-h-svh flex-col" data-historical-demo={historicalDemo && theme?.preset === 'newsroom' ? 'nclocal' : undefined}
+      onFocusCapture={(event) => {
+        const target = event.target;
+        headerFocusRef.current = navRef.current?.contains(target) || accountActionsRef.current?.contains(target) ? target : null;
+      }}
+      onBlurCapture={() => { headerFocusRef.current = null; }}
+    >
       {IS_DEMO || features.webmcpPublic === true ? (
         <Suspense fallback={null}>
           <PublicWebMcpRegistration />
@@ -548,7 +562,7 @@ export default function Layout() {
                 className={`site-header-menu no-print ${quietActionClass}`}
                 aria-expanded={menuOpen}
                 data-mobile-visible={compactHeader || settledCompactHeader}
-                aria-controls={navPlacement === 'side' ? `${navItems.length ? `${navId} ` : ''}${accountActionsId}` : navId}
+                aria-controls={accountInHeader ? `${navItems.length ? `${navId} ` : ''}${accountActionsId}` : navId}
                 onClick={() => setMenuOpen((open) => !open)}
                 onKeyDown={closeMenuOnEscape}
               >
@@ -561,7 +575,7 @@ export default function Layout() {
             variant={headerVariant}
             actions={navPlacement === 'side' ? (
               <div className="site-header-actions no-print">
-                {accountActions}
+                {accountInHeader ? accountActions : null}
                 <RegistrationAction placement="header" />
               </div>
             ) : null}
