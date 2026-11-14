@@ -14,8 +14,8 @@
  * of `title`, two line feeds and `body`.
  *
  * A build's settings are { gcpFolder, billingAccount, region, projectId,
- * environment }. The project id and the environment name are made from the
- * web-address name, so no value is typed, and every value is checked here.
+ * environment }. The project id includes the web-address name and a digest
+ * of the application id. The environment uses the web-address name.
  */
 
 const { createHash } = require('node:crypto');
@@ -34,7 +34,6 @@ const PROJECT_ID_RE = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 const ENVIRONMENT_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const PROJECT_PREFIX = 'er-';
 const PROJECT_MAX = 30;
-const PROJECT_MIN = 6;
 
 const MESSAGES = Object.freeze({
   gcpFolder: 'Enter the Google Cloud folder number, for example folders/123456789012.',
@@ -74,16 +73,14 @@ function normalizeEnvironment(value) {
 }
 
 /**
- * The default project id for a web-address name: `er-<name>`. siteNames.cjs
- * limits a name so this fits whole, so two names never share a project. Other
- * text is cut and made long enough, and the result always passes the
- * project-id rules.
+ * A request keeps its project id through retries. A later request for the same
+ * web address needs a different id because Google never reuses deleted ids.
  */
-function projectIdFor(name) {
+function projectIdFor(name, appId) {
+  if (typeof appId !== 'string' || !appId) throw new Error('An application id is required for a project id.');
+  const suffix = createHash('sha256').update(appId, 'utf8').digest('hex').slice(0, 16);
   const safe = String(name || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  let id = `${PROJECT_PREFIX}${safe}`.slice(0, PROJECT_MAX).replace(/-+$/, '');
-  if (id.length < PROJECT_MIN) id = `${id}-site`.slice(0, PROJECT_MAX);
-  return id;
+  return `${PROJECT_PREFIX}${safe.slice(0, PROJECT_MAX - PROJECT_PREFIX.length - suffix.length - 1)}-${suffix}`;
 }
 
 /** The default environment name for a web-address name. */
@@ -100,12 +97,12 @@ async function readConsoleSettings(db) {
 }
 
 /** The build values for a web-address name. */
-function approvalDefaults(settings, siteName) {
+function approvalDefaults(settings, siteName, appId) {
   return {
     gcpFolder: settings.gcpFolder,
     billingAccount: settings.billingAccount,
     region: settings.region,
-    projectId: siteName ? projectIdFor(siteName) : '',
+    projectId: siteName ? projectIdFor(siteName, appId) : '',
     environment: siteName ? environmentFor(siteName) : '',
   };
 }

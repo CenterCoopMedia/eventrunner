@@ -1397,7 +1397,7 @@ Each step reads the current state and does nothing when it is already right, so 
 
 | Step | Work |
 |---|---|
-| `project` | Project `er-<name>` in the client folder, billing, APIs |
+| `project` | Project `er-<name prefix>-<application digest>` in the client folder, billing, APIs |
 | `firebase` | Firebase, Firestore, the default bucket, the Hosting site, the web app, sign-in |
 | `deploy-identity` | Deploy account, roles, its own identity pool, the agent grants, the image cleanup policy |
 | `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records, the wait for the certificate (up to an hour). Hosting can report `CERT_PROPAGATING` long after it serves the certificate, so that state passes once the address answers over HTTPS |
@@ -1523,7 +1523,7 @@ The Owners get an email saying the build did not finish, with a link to the stat
 | `exists outside the client folder` | The name's project already exists somewhere else. It needs a person. |
 | `the run has no value for ...` | A setting from section 12.1 is missing. |
 
-To close an accepted request that should not go on, such as a signup link that reached the wrong person, cancel its run if one is going, along with any `Deploy <name>` run in the Actions tab, because the console only knows about the build run. Wait for them to stop, then select **Close this request** on its review page. That ends the console's connections and deletes the tokens it holds. It frees the web address only if no build ever began. It removes nothing the build already made. A Stripe connection is revoked, but Eventbrite has no revoke call, so an Eventbrite token the build moved stays usable in the client project until you delete that project. Read the build record to see how far it got, then remove by hand what exists: the Google Cloud project, the DNS records for its address, the GitHub Environment, and the sender domain. Once the build has made a project, that name can't be built again through the console, even after the project is deleted, because Google never reuses a project id and the build refuses a project it didn't make. So retry a failed build rather than close it, unless the client is finished with that name.
+To close an accepted request that should not go on, such as a signup link that reached the wrong person, cancel its run if one is going, along with any `Deploy <name>` run in the Actions tab, because the console only knows about the build run. Wait for them to stop, then select **Close this request** on its review page. That ends the console's connections and deletes the tokens it holds. It frees the web address only if no build ever began. It removes nothing the build already made. A Stripe connection is revoked, but Eventbrite has no revoke call, so an Eventbrite token the build moved stays usable in the client project until you delete that project. Read the build record to see how far it got, then remove by hand what exists: the Google Cloud project, the DNS records for its address, the GitHub Environment, and the sender domain. Built web-address names stay reserved. New applications derive a distinct cloud project id from the application id; retries keep the saved project. Retry a failed build unless the client is finished with that name.
 
 To run a rehearsal with a test-mode connection, set `CONSOLE_TEST_MODE` to `true` in the `console` Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts. A test-mode build still makes real, billed resources: a Google Cloud project, DNS records and a deployment. Only the ticket account is in test mode.
 
@@ -1651,8 +1651,9 @@ The final console cleanup removes the application, build, signup links,
 private connections, and OAuth state rows. It keeps an infrastructure-only
 `console_deleted_sites/{applicationId}` tombstone with timestamps and completed
 steps. Legal acceptance records and organization memberships keep their
-existing retention rules. Built names stay reserved because Google never
-reuses a project id; draft names are released.
+existing retention rules. Built web-address names stay reserved; draft names
+are released. Each new application's cloud project id includes a stable digest
+suffix, while retries and cleanup use the recorded project id.
 
 Each step reads and checks its result. Retry a failed purge with the same id.
 The script does not turn off Firestore delete protection or Storage retention.

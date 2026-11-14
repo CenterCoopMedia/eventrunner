@@ -19,8 +19,7 @@
 const crypto = require('node:crypto');
 const { ConsoleError, sendError } = require('./http.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
-const { siteNameOf } = require('./reviewAccess.cjs');
-const { projectIdFor } = require('./consoleSettings.cjs');
+const { BUILD_COLLECTION } = require('./buildRetry.cjs');
 
 const CATEGORIES = Object.freeze(['bug', 'suggestion', 'question']);
 const LEVELS = Object.freeze(['log', 'info', 'warn', 'error']);
@@ -122,15 +121,12 @@ let builtProjects = { at: -Infinity, ids: new Set(), db: null };
 
 async function readBuiltProjects(db) {
   const snap = await db.collection('applications').where('status', 'in', BUILD_BEGAN_STATUSES).get();
-  return new Set(snap.docs.flatMap((doc) => {
+  const projects = await Promise.all(snap.docs.map(async (doc) => {
     const app = doc.data();
-    // Set only on a request an operator approved before ADR 0007's
-    // 2026-11-04 amendment; new requests store null.
-    const stored = app.review?.settings?.projectId;
-    const name = siteNameOf(app);
-    if (stored) return [stored];
-    return name ? [projectIdFor(name)] : [];
+    const build = await db.collection(BUILD_COLLECTION).doc(doc.id).get();
+    return build.data()?.resources?.projectId || app.review?.settings?.projectId;
   }));
+  return new Set(projects.filter((id) => typeof id === 'string' && PROJECT_ID_RE.test(id)));
 }
 
 /** True when this console built a site in that project, or the operator listed it. */

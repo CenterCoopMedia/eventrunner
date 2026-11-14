@@ -329,8 +329,9 @@ each change, and each one also sends an email.
 the build. The start comes before any email, so a slow email cannot lose a build. A failed start does
 not undo the acceptance: the status page shows it, and the operators get a notice. No cloud resource
 exists before acceptance, and only a link an operator issued reaches acceptance, which is the control
-against cost and abuse. The project id and environment name come from the web-address name, and the
-folder, billing account and region from console settings.
+against cost and abuse. The project id combines a web-address name prefix with a stable application-id
+digest. The environment uses the web-address name. The folder, billing account and region come from
+console settings. Retries retain the saved project identity.
 
 **Closed by default.** Sign-ups open only with a usable agreement, a folder, a billing account and a
 region, so nothing starts that cannot build. Until then no link can be created, and using a link or
