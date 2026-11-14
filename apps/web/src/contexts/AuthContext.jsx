@@ -52,6 +52,7 @@ import {
 import { appCheckHeaders, loadFirebase, subscribeToFirebase, rememberSignedIn } from '../lib/firebaseLoader.js';
 import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { secondaryButtonClass } from '../components/controlClasses.js';
+import { clearLocalDrafts } from '../lib/localDraft.js';
 
 const AuthContext = createContext(null);
 
@@ -266,9 +267,10 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     const { auth, signOut } = await loadFirebase();
+    clearLocalDrafts(auth.currentUser?.uid ?? user?.uid);
     await signOut(auth);
     rememberSignedIn(false);
-  }, []);
+  }, [user?.uid]);
 
   const value = useMemo(
     () => ({
