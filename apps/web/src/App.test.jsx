@@ -2,7 +2,7 @@
 // snapshot — providers nest, routes resolve, and the snapshot content
 // reaches the DOM with no Firebase connection (spec §2.4 first-paint path).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
@@ -146,9 +146,10 @@ describe('app shell', () => {
   ])('scopes a direct anonymous visit to %s, including existing shell and route listeners', async (path, heading, expected, sdkNames, total) => {
     renderAt(path);
     await screen.findByRole('heading', { level: 1, name: heading });
+    // A lazy route can commit its heading before its passive listeners attach.
+    await waitFor(() => expect([...sdkSubscriptions.values()].sort()).toEqual(sdkNames));
     expect([...configSubscriptions.keys()].sort()).toEqual(['event', 'features', 'launch', 'theme']);
     expect([...contentSubscriptions.keys()].sort()).toEqual(expected.sort());
-    expect([...sdkSubscriptions.values()].sort()).toEqual(sdkNames);
     expect(configSubscriptions.size + contentSubscriptions.size + sdkSubscriptions.size).toBe(total);
     expect(total).toBeLessThan(11);
   });
