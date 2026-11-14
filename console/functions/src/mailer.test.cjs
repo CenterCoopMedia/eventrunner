@@ -230,7 +230,7 @@ test('every console email is in the Event Runner frame with its link as a button
   const messages = [
     inviteMessage({ organizationName: 'NC Local', inviterEmail: 'a@b.example', role: 'owner', link: 'https://x.example/i', expiresInDays: 7 }),
     ...Object.keys(STATUS_WORDS).map((status) => statusChangeMessage({ ...change, status, note: 'Use the new logo.' })),
-    ...['started', 'build-failed', 'build-run-failed'].map((kind) => operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a', kind, problem: 'No certificate.' })),
+    ...['started', 'build-waiting', 'build-failed', 'build-run-failed'].map((kind) => operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a', kind, problem: 'No certificate.' })),
     agreementCopyMessage(COPY),
   ];
   for (const { subject, html } of messages) {
