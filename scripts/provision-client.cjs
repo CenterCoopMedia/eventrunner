@@ -1500,9 +1500,9 @@ async function recordFailure(ctx, step, message) {
  * live there, so a console setting changed since then must not move them.
  * The billing account is read again, so a retry can use a new one.
  */
-async function buildSettings(db, app, saved = {}) {
+async function buildSettings(db, appId, app, saved = {}) {
   const stored = app.review?.settings;
-  const defaults = stored || approvalDefaults(await readConsoleSettings(db), siteNameOf(app));
+  const defaults = stored || approvalDefaults(await readConsoleSettings(db), siteNameOf(app), appId);
   const chosen = saved?.projectId
     ? Object.fromEntries(['projectId', 'region', 'gcpFolder', 'environment'].filter((field) => saved[field]).map((field) => [field, saved[field]]))
     : {};
@@ -1614,7 +1614,7 @@ async function provision({ appId, testMode = false, deps }) {
   try {
     const missing = REQUIRED_ENV.filter((name) => !(env[name] || '').trim());
     if (missing.length > 0) throw new Error(`the run has no value for ${missing.join(', ')}`);
-    ctx.settings = await buildSettings(db, app, ctx.resources);
+    ctx.settings = await buildSettings(db, appId, app, ctx.resources);
     ctx.projectId = ctx.settings.projectId;
     ctx.region = ctx.settings.region;
     ctx.domain = siteAddress(ctx.name);

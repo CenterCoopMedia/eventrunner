@@ -8,7 +8,7 @@ const { RECOVERY_MS, STEPS, decommission, dueApplications, main, parseArgs, purg
 
 const NOW = Date.parse('2026-11-05T12:00:00Z');
 const DOMAIN = 'show.eventrunner.org';
-const PROJECT = 'er-show';
+const PROJECT = 'er-show-f55ff16f66f43360';
 const BUCKET = `${PROJECT}.firebasestorage.app`;
 const SITE = 'show-hosting';
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });

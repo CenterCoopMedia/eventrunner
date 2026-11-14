@@ -26,7 +26,7 @@ const { privateKey } = generateKeyPairSync('rsa', {
   publicKeyEncoding: { type: 'spki', format: 'pem' },
 });
 
-const PROJECT = 'er-nclocal';
+const PROJECT = 'er-nclocal-f55ff16f66f43360';
 const NUMBER = '555000111';
 const DOMAIN = 'nclocal.eventrunner.org';
 const COMPUTE = `${NUMBER}-compute@developer.gserviceaccount.com`;
@@ -1517,7 +1517,25 @@ test('a retry builds in the region and folder the first run chose, even after th
   const retried = fake.db.read('console_builds/a1').resources;
   assert.equal(retried.region, first.region, 'the project and its data stay where the first run put them');
   assert.equal(retried.gcpFolder, first.gcpFolder);
+  assert.equal(retried.projectId, first.projectId);
+  assert.equal(retried.environment, first.environment);
 });
+
+for (const source of ['resources', 'approval']) {
+  test(`a saved project ID from ${source} wins over the new naming default`, async () => {
+    const settings = { projectId: 'er-nclocal', region: 'us-central1', environment: 'nclocal', gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01' };
+    const fake = setup({ app: source === 'approval' ? { review: { settings } } : {} });
+    if (source === 'resources') await fake.db.doc('console_builds/a1').set({ resources: settings });
+    const projectReads = [];
+    fake.deps.fetch = async (url) => {
+      projectReads.push(url);
+      return answer({}, 401);
+    };
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+    assert.deepEqual(projectReads, ['https://cloudresourcemanager.googleapis.com/v3/projects/er-nclocal']);
+    assert.equal(fake.db.read('console_builds/a1').resources.projectId, 'er-nclocal');
+  });
+}
 
 test('brandingProblem reads the line init-event prints', () => {
   assert.equal(brandingProblem('  branding/         4 uploaded, 0 protected, 0 errors\n'), null);

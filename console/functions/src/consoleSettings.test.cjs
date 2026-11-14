@@ -11,19 +11,22 @@ const { NOW, ana, ops, seeded } = require('./fakeReview.cjs');
 
 const PROJECT_ID_RULE = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 
-test('projectIdFor makes er-<name> and always meets the project-id rules', () => {
-  assert.equal(projectIdFor('nclocal'), 'er-nclocal');
+test('project IDs bind the application to a valid name and remain stable for retries', () => {
+  // SHA-256's standard "abc" vector supplies the expected suffix.
+  assert.equal(projectIdFor('nclocal', 'abc'), 'er-nclocal-ba7816bf8f01cfea');
+  assert.notEqual(projectIdFor('nclocal', 'a1'), projectIdFor('nclocal', 'a2'));
   assert.equal(environmentFor('nclocal'), 'nclocal');
   for (const name of ['a', 'ab', 'nc', 'x'.repeat(40), 'abc-def-ghi-jkl-mno-pqr-stu-vwx', 'a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-', 'NCLocal']) {
-    const id = projectIdFor(name);
+    const id = projectIdFor(name, 'abc');
     assert.match(id, PROJECT_ID_RULE, `${name} -> ${id}`);
     assert.ok(id.length >= 6 && id.length <= 30, id);
     assert.ok(!id.endsWith('-'), id);
   }
-  assert.equal(projectIdFor('ab'), 'er-ab-site');
+  assert.equal(projectIdFor('ab', 'abc'), 'er-ab-ba7816bf8f01cfea');
   const longest = 'a'.repeat(27);
   assert.equal(siteNameProblem(longest), null);
-  assert.equal(projectIdFor(longest), `er-${longest}`);
+  assert.equal(projectIdFor(longest, 'abc'), `er-${'a'.repeat(10)}-ba7816bf8f01cfea`);
+  assert.throws(() => projectIdFor('nclocal'), /application id is required/);
 });
 
 test('normalizeProjectId follows the GCP rules', () => {
@@ -42,12 +45,12 @@ test('the folder and billing account accept the forms people paste, and store on
 });
 
 test('checkSettings uses the default, lets the operator change it, and names a bad field', () => {
-  const defaults = approvalDefaults({ gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' }, 'nclocal');
+  const defaults = approvalDefaults({ gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' }, 'nclocal', 'abc');
   assert.deepEqual(checkSettings(APPROVAL_FIELDS, defaults), {
     gcpFolder: 'folders/123456789012',
     billingAccount: '012345-6789AB-CDEF01',
     region: 'us-central1',
-    projectId: 'er-nclocal',
+    projectId: 'er-nclocal-ba7816bf8f01cfea',
     environment: 'nclocal',
   });
   assert.equal(checkSettings(APPROVAL_FIELDS, defaults, { region: 'europe-west1' }).region, 'europe-west1');

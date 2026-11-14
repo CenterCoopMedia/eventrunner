@@ -42,16 +42,21 @@ test('a console user report is forwarded with the verified email, no query and r
 });
 
 test('a client admin is accepted only for a project this console built or listed', async () => {
-  const built = { 'applications/a1': { status: 'ready', answers: { webAddress: { name: 'nclocal' } } } };
-  let s = setup({ seed: built });
-  let res = makeRes();
-  await reportProblemHandler(s.deps)(makeReq({ token: jwt('er-nclocal'), body: BODY }), res);
-  assert.equal(res.statusCode, 200);
-  assert.equal(s.sent[0].body.site, 'er-nclocal', 'the site is the verified project, not the browser value');
-  assert.equal(s.sent[0].body.surface, 'admin');
+  for (const projectId of ['er-nclocal', 'er-nclocal-f55ff16f66f43360']) {
+    const built = {
+      'applications/a1': { status: 'ready', answers: { webAddress: { name: 'nclocal' } } },
+      'console_builds/a1': { resources: { projectId } },
+    };
+    const s = setup({ seed: built });
+    const res = makeRes();
+    await reportProblemHandler(s.deps)(makeReq({ token: jwt(projectId), body: BODY }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(s.sent[0].body.site, projectId, 'the site is the recorded project, not the browser value');
+    assert.equal(s.sent[0].body.surface, 'admin');
+  }
 
-  s = setup({ seed: { 'applications/a1': { status: 'draft', answers: { webAddress: { name: 'nclocal' } } } } });
-  res = makeRes();
+  let s = setup({ seed: { 'applications/a1': { status: 'draft', answers: { webAddress: { name: 'nclocal' } } }, 'console_builds/a1': { resources: { projectId: 'er-nclocal' } } } });
+  let res = makeRes();
   await reportProblemHandler(s.deps)(makeReq({ token: jwt('er-nclocal'), body: BODY }), res);
   assert.equal(res.statusCode, 401);
   assert.equal(s.clientAuth.calls.length, 0, 'an unknown project is never verified');
@@ -61,6 +66,21 @@ test('a client admin is accepted only for a project this console built or listed
   res = makeRes();
   await reportProblemHandler(s.deps)(makeReq({ token: jwt('legacy-site'), body: BODY }), res);
   assert.equal(res.statusCode, 200);
+});
+
+test('client report identity uses saved build resources before approved settings and never guesses a project', async () => {
+  const app = { status: 'ready', review: { settings: { projectId: 'er-approved' } }, answers: { webAddress: { name: 'nclocal' } } };
+  for (const [build, projectId] of [[undefined, 'er-approved'], [{ resources: { projectId: 'er-recorded' } }, 'er-recorded']]) {
+    const s = setup({ seed: { 'applications/a1': app, ...(build ? { 'console_builds/a1': build } : {}) } });
+    const res = makeRes();
+    await reportProblemHandler(s.deps)(makeReq({ token: jwt(projectId), body: BODY }), res);
+    assert.equal(res.statusCode, 200);
+  }
+  const s = setup({ seed: { 'applications/a1': { ...app, review: null } } });
+  const res = makeRes();
+  await reportProblemHandler(s.deps)(makeReq({ token: jwt('er-nclocal'), body: BODY }), res);
+  assert.equal(res.statusCode, 401);
+  assert.equal(s.clientAuth.calls.length, 0);
 });
 
 test('no token, a bad token or an unverified email is refused before anything is sent', async () => {

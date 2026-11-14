@@ -173,7 +173,7 @@ async function load(appId, deps) {
   else {
     const name = siteNameOf(ctx.app);
     if (name && siteNameProblem(name)) throw new Error('setup: invalid site name');
-    const settings = ctx.app.review?.settings || approvalDefaults(await readConsoleSettings(deps.db), name);
+    const settings = ctx.app.review?.settings || approvalDefaults(await readConsoleSettings(deps.db), name, appId);
     // A draft with no build has not created the derived project id.
     ctx.resources = {
       projectId: ctx.app.status === 'draft' && !build.exists ? null : settings.projectId || null,

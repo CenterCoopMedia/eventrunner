@@ -17,7 +17,6 @@
 const SITE_DOMAIN = 'eventrunner.org';
 const COLLECTION = 'site_names';
 const NAME_MIN = 3;
-// The longest that fits a project id whole: `er-` and 27 is the limit of 30.
 const NAME_MAX = 27;
 const NAME_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
