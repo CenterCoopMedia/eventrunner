@@ -262,6 +262,27 @@ describe('ReviewApplication', () => {
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
 
+    it('shows waiting without an error and lets an operator check again', async () => {
+      let waiting = true;
+      callApi.mockImplementation(async (name) => {
+        if (name === 'retryBuild') { waiting = false; return { started: true }; }
+        return { ...request({ status: 'building' }), canRetryBuild: waiting, build: {
+          state: waiting ? 'waiting' : 'queued', error: null,
+          steps: waiting ? [{ id: 'web-address', state: 'waiting', detail: 'certificate is validating' }] : [],
+        } };
+      });
+      page();
+      const button = await screen.findByRole('button', { name: 'Check again' });
+      expect(screen.getByRole('list', { name: 'Site setup' })).toHaveTextContent('Web address: Waiting');
+      expect(screen.getByRole('list', { name: 'Site setup' })).toHaveTextContent('certificate is validating');
+      expect(screen.queryByText('Site setup stopped')).not.toBeInTheDocument();
+      expect(screen.queryByText('Needs attention')).not.toBeInTheDocument();
+      fireEvent.click(button);
+      expect(callApi).toHaveBeenCalledWith('retryBuild', { appId: 'a1' });
+      expect(await screen.findByText('Site setup started again.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
+    });
+
     it('shows build errors, step details and test mode to the hosting team', async () => {
       serve({
         ...request({ status: 'building' }),

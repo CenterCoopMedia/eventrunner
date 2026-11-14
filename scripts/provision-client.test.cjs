@@ -103,6 +103,7 @@ function fakeCloud(options = {}) {
     policyRefusals: options.policyRefusals || 0,
     certNever: options.certNever || false,
     certPropagating: options.certPropagating || false,
+    certState: options.certState || null,
     httpsServing: options.httpsServing ?? true,
   };
   const calls = [];
@@ -115,10 +116,10 @@ function fakeCloud(options = {}) {
     ];
     const live = !state.certNever && hasDns('A', DOMAIN) && hasDns('TXT', `_acme-challenge.${DOMAIN}`);
     return {
-      hostState: live ? 'HOST_ACTIVE' : 'HOST_PENDING',
+      hostState: live ? 'HOST_ACTIVE' : 'HOST_UNHOSTED',
       ownershipState: 'OWNERSHIP_ACTIVE',
       cert: {
-        state: !live ? 'CERT_PENDING' : state.certPropagating ? 'CERT_PROPAGATING' : 'CERT_ACTIVE',
+        state: state.certState || (!live ? 'CERT_VALIDATING' : state.certPropagating ? 'CERT_PROPAGATING' : 'CERT_ACTIVE'),
         verification: { dns: { desired: live ? [] : [{ records: [need[1]] }] } },
       },
       requiredDnsUpdates: { desired: live ? [] : [{ records: [need[0]] }] },
@@ -667,16 +668,32 @@ test('the web address goes through v1beta1 and the zone, and sign-in allows it',
   assert.deepEqual(fake.state.auth.authorizedDomains, ['localhost', DOMAIN, `${PROJECT}.web.app`, `${PROJECT}.firebaseapp.com`]);
 });
 
-test('a certificate that never arrives fails with a record, and a second run after it arrives finishes', async () => {
-  const fake = setup({ cloud: { certNever: true } });
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
-  assert.match(fake.db.read('console_builds/a1').error, /certificate is not active/);
-  assert.equal(fake.db.read('applications/a1').status, 'building');
+for (const certState of ['CERT_PREPARING', 'CERT_VALIDATING']) {
+  test(`a ${certState} certificate waits without failure notices and a later run finishes`, async () => {
+    const fake = setup({ cloud: { certNever: true, certState } });
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    const waiting = fake.db.read('console_builds/a1');
+    assert.equal(waiting.state, 'waiting');
+    assert.equal(waiting.error, null);
+    assert.equal(waiting.failedStep, null);
+    assert.equal(waiting.steps.at(-1).id, 'web-address');
+    assert.equal(waiting.steps.at(-1).state, 'waiting');
+    assert.equal(fake.db.read('applications/a1').status, 'building');
+    assert.equal(fake.db.read('applications/a1').buildStart.state, 'started');
+    assert.equal(notices(fake.mailer).length, 0);
+    assert.ok(!statusMail(fake.mailer).includes('build-failed'));
+    assert.equal(fake.state.runs.length, 0, 'later deploy steps did not start');
+    await markStopped({ appId: 'a1', runId: ENV.GITHUB_RUN_ID, deps: fake.deps });
+    assert.deepEqual(fake.db.read('console_builds/a1'), waiting, 'a workflow finalizer preserves the reported wait');
 
-  fake.state.certNever = false;
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
-  assert.equal(fake.db.read('applications/a1').status, 'ready');
-});
+    fake.state.certNever = false;
+    fake.state.certState = null;
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    assert.equal(fake.db.read('applications/a1').status, 'ready');
+    assert.equal(fake.db.read('console_builds/a1').state, 'done');
+    assert.ok(!statusMail(fake.mailer).includes('build-failed'));
+  });
+}
 
 test('a certificate that Hosting still calls propagating does not stop the build once it is served', async () => {
   const fake = setup({ cloud: { certPropagating: true } });
@@ -684,10 +701,28 @@ test('a certificate that Hosting still calls propagating does not stop the build
   assert.equal(fake.db.read('applications/a1').status, 'ready');
 });
 
-test('a propagating certificate that is not served yet still fails the step', async () => {
+test('a propagating certificate that is not served yet waits for another check', async () => {
   const fake = setup({ cloud: { certPropagating: true, httpsServing: false } });
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
-  assert.match(fake.db.read('console_builds/a1').error, /certificate is not active/);
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.db.read('console_builds/a1').state, 'waiting');
+  assert.equal(fake.db.read('applications/a1').status, 'building');
+  assert.equal(notices(fake.mailer).length, 0);
+});
+
+test('expired certificates and provider refusals still fail with notices', async () => {
+  for (const refusal of [false, true]) {
+    const fake = setup({ cloud: { certState: 'CERT_EXPIRED' } });
+    if (refusal) {
+      const fetch = fake.deps.fetch;
+      fake.deps.fetch = (url, init) => url.includes('/customDomains')
+        ? Promise.resolve(answer({ error: { message: 'provider refusal' } }, 403)) : fetch(url, init);
+    }
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+    assert.equal(fake.db.read('console_builds/a1').state, 'failed');
+    assert.equal(fake.db.read('console_builds/a1').failedStep, 'web-address');
+    assert.ok(notices(fake.mailer).length > 0);
+    assert.ok(statusMail(fake.mailer).includes('build-failed'));
+  }
 });
 
 test('a record for this site alone: a name outside it is refused', async () => {

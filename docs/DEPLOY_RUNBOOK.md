@@ -1400,7 +1400,7 @@ Each step reads the current state and does nothing when it is already right, so 
 | `project` | Project `er-<name prefix>-<application digest>` in the client folder, billing, APIs |
 | `firebase` | Firebase, Firestore, the default bucket, the Hosting site, the web app, sign-in |
 | `deploy-identity` | Deploy account, roles, its own identity pool, the agent grants, the image cleanup policy |
-| `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records, the wait for the certificate (up to an hour). Hosting can report `CERT_PROPAGATING` long after it serves the certificate, so that state passes once the address answers over HTTPS |
+| `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records and an initial certificate check of up to an hour. Pending preparation, validation or propagation then records `waiting` for a later check. Hosting can report `CERT_PROPAGATING` long after it serves the certificate, so that state passes once the address answers over HTTPS |
 | `sign-in` | Authorized domains |
 | `email` | Postmark server, streams, sender domain, its DNS records, the wait for verification (up to 30 minutes) |
 | `tickets` | Tests the chosen token, moves it to the client project, deletes the console's copy and any leftover, sets up the Stripe webhook endpoint |
@@ -1511,13 +1511,15 @@ The `deploy-identity` step also grants `roles/editor` to each `user:<support add
 
 ### 12.2 When a build fails
 
+Certificate preparation, validation or propagation can outlast the initial check. The run records **Waiting** and ends successfully, while the request stays **Building**. Owners and operators see **Check again** on the request. Wait for DNS and certificate setup, then use that action to resume through the existing retry checks. The run preserves its completed steps and sends no failure email. The silent-build watch leaves it alone. Provider/API errors and expired certificates still follow the failure path below.
+
 The review page shows each step, the failed step, its error and a link to the run. Operators get an email with the same error. Fix the cause, then select **Retry the build**.
 
 The Owners get an email saying the build did not finish, with a link to the status page. That page says the same and offers **Retry the build**, and **Reconnect** when the failed step is `tickets`. It never shows the error, the run or the step detail. An Owner can retry alone, up to a daily limit.
 
 | Error | Meaning |
 |---|---|
-| A certificate or sender domain that is not ready | DNS is still moving. Retry later. |
+| A sender domain that is not ready | DNS is still moving. Retry later. |
 | `the deploy failed 3 times` | Read the linked run. A first deploy's quota and Eventarc failures are usually transient, so a retry often clears them. |
 | A token that fails its test, or a test-mode connection | The client connects the account again from the status page, then retries. They can do this alone: an Owner can reconnect the chosen account, and only that one, while the build has failed. The frozen answers stay as they are. A retry without reconnecting fails the same way, because the step deletes a test-mode token. |
 | `exists outside the client folder` | The name's project already exists somewhere else. It needs a person. |
