@@ -518,7 +518,9 @@ test('a late result from an older request cannot overwrite the current notificat
   const newer = h.save('owner', body('Newer question.', REQUEST_2, 1));
   await secondStarted;
   finishFirst({ status: 'failed', error: 'late refusal' });
-  await older;
+  const olderResponse = await older;
+  assert.equal(olderResponse.statusCode, 409, 'the older save committed before the notification-result conflict');
+  assert.equal(olderResponse.body.error.code, 'revision-conflict');
 
   const pending = h.db.read('speakers', 's1').discussionPoints;
   assert.equal(pending.revision, 2);

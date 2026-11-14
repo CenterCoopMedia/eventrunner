@@ -35,6 +35,10 @@ Invite by email. They accept with a login code, the same way attendees sign in. 
 
 The signed-in speaker dashboard lists a missing biography or headshot and any assigned public session that has no submitted materials awaiting review or approved. Each item opens the profile editor or that session's Materials tab. A session with only rejected materials stays on the list until a replacement is sent. Profile edits from an approved speaker wait for organizer review; the checklist counts those submitted edits as work the speaker has done.
 
+In **Your sessions**, speakers can open **Discussion points** to save private notes for the organizers, including before they have a visible assigned session. One submission covers all their sessions. Switching sessions or tabs keeps an unsaved draft; each new save replaces the current saved notes. The field accepts 1 to 10,000 characters, including line breaks. These notes do not appear on a public profile.
+
+The result states whether the notes were saved and whether an organizer email was accepted, omitted, failed, or remains unconfirmed. Provider acceptance does not confirm receipt. If no email was sent for an update, the saved notes still changed. Retrying an unconfirmed save repeats the same request and does not resend a notification. When a conflict occurs, **Load current submission** keeps the local draft and shows the last confirmed saved text. The **Last confirmed submission** status describes that saved version; it does not confirm a save of the current draft. The speaker must select **Replace saved discussion points** to replace it. An account change clears the private draft.
+
 ## Custom badges
 
 Custom badges are off by default. If enabled in Features, attendees can write up to three badges of 24 characters each. Reserved role words and the event block list are refused. In Attendees, select the removal action beside a custom badge and confirm it. The removal is recorded in the admin log. Turning the feature off hides these badges and keeps other profile fields editable.

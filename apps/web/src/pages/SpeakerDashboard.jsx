@@ -157,6 +157,7 @@ export default function SpeakerDashboard() {
       />
 
       <SpeakerSessionHub
+        user={user}
         eventConfig={eventConfig}
         scheduleData={scheduleData}
         speakerId={speakerId}

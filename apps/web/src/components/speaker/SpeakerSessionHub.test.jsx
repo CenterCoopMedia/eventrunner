@@ -128,6 +128,10 @@ describe('SpeakerSessionHub', () => {
     expect(details).toHaveFocus();
     expect(details).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(details, { key: 'End' });
+    const discussion = screen.getByRole('tab', { name: 'Discussion points' });
+    expect(discussion).toHaveFocus();
+    expect(discussion).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(discussion, { key: 'ArrowLeft' });
     expect(materials).toHaveFocus();
     expect(materials).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Materials for session-one')).toBeInTheDocument();
@@ -154,7 +158,8 @@ describe('SpeakerSessionHub', () => {
 
     expect(screen.getByText('No sessions are assigned to you.')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Session' })).toBeNull();
-    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getByRole('tab', { name: 'Discussion points' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('opens a linked session materials tab without reopening it after a schedule update', () => {

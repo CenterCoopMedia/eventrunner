@@ -11,8 +11,9 @@ import { useSessionSpeakerNames } from '../SessionCard.jsx';
 import { formatSessionTimeRange } from '../../lib/eventTime.js';
 import { selectOwnSpeakerSessions } from '../../lib/speakerSessions.js';
 import SpeakerSessionMaterials from './SpeakerSessionMaterials.jsx';
+import SpeakerDiscussionPoints, { useSpeakerDiscussion } from './SpeakerDiscussionPoints.jsx';
 
-const TAB_IDS = Object.freeze(['details', 'co-speakers', 'materials']);
+const TAB_IDS = Object.freeze(['details', 'co-speakers', 'materials', 'discussion']);
 
 function Detail({ term, children, className = '' }) {
   return (
@@ -78,15 +79,20 @@ function CoSpeakers({ session, speakerId }) {
   );
 }
 
-export default function SpeakerSessionHub({
-  eventConfig, scheduleData, speakerId, requestedSessionId, requestedTab, navigationKey, onMaterialsChanged,
+export default function SpeakerSessionHub(props) {
+  return <SpeakerSessionHubContent key={JSON.stringify([props.user?.uid ?? '', props.speakerId ?? ''])} {...props} />;
+}
+
+function SpeakerSessionHubContent({
+  eventConfig, scheduleData, speakerId, user, requestedSessionId, requestedTab, navigationKey, onMaterialsChanged,
 }) {
+  const discussion = useSpeakerDiscussion({ user, speakerId });
   const sessions = useMemo(
     () => selectOwnSpeakerSessions(scheduleData, speakerId, eventConfig),
     [eventConfig, scheduleData, speakerId],
   );
   const [selectedId, setSelectedId] = useState(() => sessions[0]?.id ?? '');
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState(() => sessions.length ? 'details' : 'discussion');
   const openedFromLink = useRef(false);
   const selectedSession = sessions.find((session) => session.id === selectedId) ?? sessions[0] ?? null;
   const requestedTargetId = sessions.find((session) => session.id === requestedSessionId)?.id ?? null;
@@ -97,6 +103,7 @@ export default function SpeakerSessionHub({
   useEffect(() => {
     const nextId = selectedSession?.id ?? '';
     if (selectedId !== nextId) setSelectedId(nextId);
+    if (!selectedSession) setActiveTab('discussion');
   }, [selectedId, selectedSession]);
 
   useEffect(() => {
@@ -114,41 +121,54 @@ export default function SpeakerSessionHub({
   return (
     <section aria-labelledby="speaker-sessions-heading" className="mt-xl">
       <SectionHead id="speaker-sessions-heading" title="Your sessions" />
-      {selectedSession ? (
-        <div className="mt-md">
+      <div className="mt-md">
+        {selectedSession ? (
           <SelectField
             label="Session"
             value={selectedSession.id}
             onChange={setSelectedId}
             options={sessions.map((session) => ({ value: session.id, label: session.title }))}
           />
-          <div className="mt-md">
-            <Tabs value={activeTab} onChange={setActiveTab} tabs={TAB_IDS}>
-              <TabList label={`${selectedSession.title} information`}>
-                <Tab id="details">Details</Tab>
-                <Tab id="co-speakers">Co-speakers</Tab>
-                <Tab id="materials">Materials</Tab>
-              </TabList>
-              <TabPanel id="details">
-                <SessionDetails eventConfig={eventConfig} session={selectedSession} />
-              </TabPanel>
-              <TabPanel id="co-speakers">
-                <CoSpeakers session={selectedSession} speakerId={speakerId} />
-              </TabPanel>
-              <TabPanel id="materials">
-                <SpeakerSessionMaterials
-                  key={`${speakerId}:${selectedSession.id}`}
-                  sessionId={selectedSession.id}
-                  speakerId={speakerId}
-                  onMaterialsChanged={onMaterialsChanged}
-                />
-              </TabPanel>
-            </Tabs>
-          </div>
+        ) : (
+          <p className="text-body text-text-secondary">No sessions are assigned to you.</p>
+        )}
+        <div className="mt-md">
+          <Tabs value={selectedSession ? activeTab : 'discussion'} onChange={setActiveTab}
+            tabs={selectedSession ? TAB_IDS : ['discussion']}>
+            <TabList label={selectedSession ? 'Session information and speaker discussion points' : 'Speaker discussion points'}>
+              {selectedSession ? (
+                <>
+                  <Tab id="details">Details</Tab>
+                  <Tab id="co-speakers">Co-speakers</Tab>
+                  <Tab id="materials">Materials</Tab>
+                </>
+              ) : null}
+              <Tab id="discussion">Discussion points</Tab>
+            </TabList>
+            <TabPanel id="discussion">
+              <SpeakerDiscussionPoints discussion={discussion} />
+            </TabPanel>
+            {selectedSession ? (
+              <>
+                <TabPanel id="details">
+                  <SessionDetails eventConfig={eventConfig} session={selectedSession} />
+                </TabPanel>
+                <TabPanel id="co-speakers">
+                  <CoSpeakers session={selectedSession} speakerId={speakerId} />
+                </TabPanel>
+                <TabPanel id="materials">
+                  <SpeakerSessionMaterials
+                    key={`${speakerId}:${selectedSession.id}`}
+                    sessionId={selectedSession.id}
+                    speakerId={speakerId}
+                    onMaterialsChanged={onMaterialsChanged}
+                  />
+                </TabPanel>
+              </>
+            ) : null}
+          </Tabs>
         </div>
-      ) : (
-        <p className="mt-md text-body text-text-secondary">No sessions are assigned to you.</p>
-      )}
+      </div>
     </section>
   );
 }
