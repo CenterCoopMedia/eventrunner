@@ -34,6 +34,7 @@ const DEFAULTS = {
   'speaker.invite': require('./templates/speaker.invite.cjs'),
   'speaker.accepted': require('./templates/speaker.accepted.cjs'),
   'speaker.confirmation': require('./templates/speaker.confirmation.cjs'),
+  'speaker.discussion_points': require('./templates/speaker.discussion_points.cjs'),
   // ADR 0008 §3: a submitted speaker profile (speakers/profileSteps.cjs).
   'speaker.profile_received': require('./templates/speaker.profile_received.cjs'),
   'speaker.reminder': require('./templates/speaker.reminder.cjs'),

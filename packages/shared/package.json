@@ -13,6 +13,7 @@
     "./socialPost": { "require": "./src/socialPost.cjs", "import": "./src/socialPost.mjs" },
     "./delivery": { "require": "./src/delivery.cjs", "import": "./src/delivery.mjs" },
     "./pitchForm": { "require": "./src/pitchForm.cjs", "import": "./src/pitchForm.mjs" },
+    "./speakerDiscussion": { "require": "./src/speakerDiscussion.cjs", "import": "./src/speakerDiscussion.mjs" },
     "./speakerLogistics": { "require": "./src/speakerLogistics.cjs", "import": "./src/speakerLogistics.mjs" },
     "./registrationForm": { "require": "./src/registrationForm.cjs", "import": "./src/registrationForm.mjs" },
     "./time": { "require": "./src/time.cjs", "import": "./src/time.mjs" },

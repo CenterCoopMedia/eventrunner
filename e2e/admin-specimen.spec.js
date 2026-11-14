@@ -202,7 +202,7 @@ test('email preview stays isolated and version disclosures show stored text', as
   await log.getByRole('button', { name: 'Retry preview' }).click();
   await expect(log.locator('iframe')).toBeVisible();
   await log.getByLabel('Email preview example state').selectOption('private');
-  await expect(log.getByText('This message is private because it contains a sign-in code or invitation link.')).toBeVisible();
+  await expect(log.getByText('This message is private. Its body is not stored in the email log.')).toBeVisible();
   await expect(log.locator('iframe')).toHaveCount(0);
   const versions = page.locator('[data-admin-specimen="versions"]');
   const disclosure = versions.getByText(/^Show all \d+ characters$/);
@@ -419,7 +419,7 @@ for (const mode of ['light', 'dark']) {
         continue;
       }
       if (state === 'private') {
-        await expect(log.getByText('This message is private because it contains a sign-in code or invitation link.')).toBeVisible();
+        await expect(log.getByText('This message is private. Its body is not stored in the email log.')).toBeVisible();
         await expect(log.locator('iframe')).toHaveCount(0);
       }
       if (state === 'text') {

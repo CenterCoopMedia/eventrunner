@@ -13,6 +13,7 @@ export const SOURCE_LABELS = Object.freeze({
   'speaker-invite': 'Speaker invitation',
   'speaker-accept': 'Speaker acceptance',
   'speaker-confirmation': 'Speaker confirmation',
+  'speaker-discussion-points': 'Speaker discussion points',
   feedback: 'Feedback receipt',
   'operator-notify': 'Operator alert',
   'ticketing-registration-prompt': 'Ticket prompt',
@@ -207,7 +208,7 @@ function PreviewBody({ row, detail, onRetry }) {
   if (!row.bodyStored) {
     return (
       <p className="text-admin-sm text-admin-ink">
-        This message is private because it contains a sign-in code or invitation link.
+        This message is private. Its body is not stored in the email log.
       </p>
     );
   }
