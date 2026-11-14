@@ -41,6 +41,7 @@ const { isValidTransition } = require('shared/registration');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
+const { internals: { GRANTS } } = require('../ticketing/resourceGrants.cjs');
 
 const USERS = 'users';
 
@@ -141,15 +142,18 @@ async function applyRevokeUser({ db, uid, now = () => new Date() }) {
     }
     const data = snap.data() || {};
     const current = data.registrationStatus ?? null;
+    const grantRef = db.collection(GRANTS).doc(uid);
+    const grant = await tx.get(grantRef);
 
     if (current === 'revoked') {
+      if (grant.exists) tx.delete(grantRef);
       if (data.revocationReason === 'entitlement_lost') {
         tx.set(ref, { revocationReason: 'admin_revocation', updatedAt: now() }, { merge: true });
         return { ok: true, changed: true, registrationStatus: 'revoked', approvalSource: null, previousStatus: current };
       }
       return {
         ok: true,
-        changed: false,
+        changed: grant.exists,
         registrationStatus: 'revoked',
         approvalSource: null,
         previousStatus: current,
@@ -168,6 +172,7 @@ async function applyRevokeUser({ db, uid, now = () => new Date() }) {
       { registrationStatus: 'revoked', approvalSource: null, revocationReason: 'admin_revocation', updatedAt: now() },
       { merge: true },
     );
+    if (grant.exists) tx.delete(grantRef);
     return {
       ok: true,
       changed: true,

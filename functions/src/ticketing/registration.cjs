@@ -22,7 +22,6 @@
  * parses a provider payload, only the normalized TicketRecord shape.
  */
 
-const { isValidTransition } = require('shared/registration');
 const { isCommerceOrderId } = require('shared/ticketCommerce');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
@@ -30,7 +29,7 @@ const {
   internals: { TICKETS, safeDocId },
 } = require('./index.cjs');
 const { upsertTickets } = require('./sync.cjs');
-const { holdsPaidTicket } = require('./entitlement.cjs');
+const { recomputeEntitlement } = require('./entitlement.cjs');
 const { ANSWERS, HOLDS } = require('./ticketAnswers.cjs');
 const { ORDERS } = require('./stripeCommerce.cjs');
 
@@ -54,44 +53,9 @@ const MAX_ORDER_NUMBER_LEN = 128;
  *           now?: () => Date }} deps
  * @returns {Promise<{ registrationStatus: string|null, changed: boolean }>}
  */
-async function applyTicketClaimToUser({ db, uid, now = () => new Date() }) {
-  const ref = db.collection(USERS).doc(uid);
-
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists) return { registrationStatus: null, changed: false };
-    const current = snap.data()?.registrationStatus ?? null;
-
-    // A refund can commit after claimTicket but before this transaction.
-    // Read the live entitlement in the same transaction as the user write
-    // so a concurrent refund also invalidates this transaction's read set.
-    const validTickets = await tx.get(db.collection(TICKETS)
-      .where('claimedByUid', '==', uid).where('status', '==', 'valid').limit(1));
-    if (validTickets.empty) return { registrationStatus: current, changed: false };
-
-    // Authorization policy belongs in the transaction read set, never the TTL cache.
-    const features = await tx.get(db.collection('config').doc('features'));
-    const autoApprove = features.data()?.autoApproveTicketHolders === true;
-
-    let next = current;
-    const patch = { updatedAt: now() };
-    if (snap.data()?.revocationReason === 'entitlement_lost' && isValidTransition(current, 'ticketed', 'ticket_restored')) {
-      next = 'ticketed';
-      patch.revocationReason = null;
-    }
-    if (isValidTransition(current, 'ticketed', 'ticket_claimed')) {
-      next = 'ticketed';
-    }
-    if (autoApprove && isValidTransition(next, 'approved', 'auto_approve') && await holdsPaidTicket({ db, tx, uid })) {
-      next = 'approved';
-      patch.approvalSource = 'ticket';
-    }
-    if (next === current) return { registrationStatus: current, changed: false };
-
-    patch.registrationStatus = next;
-    tx.set(ref, patch, { merge: true });
-    return { registrationStatus: next, changed: true };
-  });
+async function applyTicketClaimToUser({ db, uid, env = process.env, now = () => new Date() }) {
+  const result = await recomputeEntitlement({ db, uid, env, now });
+  return { registrationStatus: result.registrationStatus, changed: result.action === 'updated' };
 }
 
 /**
@@ -206,7 +170,7 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
  * @param {{ db: object, uid: string, email?: string|null, externalIds: string[],
  *           now?: () => Date }} deps
  */
-async function claimTicketsForUser({ db, uid, email = null, externalIds, now = () => new Date() }) {
+async function claimTicketsForUser({ db, uid, email = null, externalIds, env = process.env, now = () => new Date() }) {
   const claimed = [];
   const refused = [];
   for (const externalId of Array.isArray(externalIds) ? externalIds : []) {
@@ -215,7 +179,7 @@ async function claimTicketsForUser({ db, uid, email = null, externalIds, now = (
     else refused.push({ externalId, reason: result.reason });
   }
   const state = claimed.length > 0
-    ? await applyTicketClaimToUser({ db, uid, now })
+    ? await applyTicketClaimToUser({ db, uid, env, now })
     : { registrationStatus: null, changed: false };
   return { claimed, refused, ...state };
 }

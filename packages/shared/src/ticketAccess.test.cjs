@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   MAX_POLICY_BYTES, normalizeTicketClassId, ticketClassIdentity,
-  validateTicketAccessPolicy, resolveTicketClassGrant,
+  validateTicketAccessPolicy, resolveTicketClassGrant, deriveTicketResourceGrant,
 } = require('./ticketAccess.cjs');
 const { validateCheckoutRequest } = require('./ticketCommerce.cjs');
 
@@ -161,4 +161,26 @@ test('the ESM entry exposes the same validated contract', async () => {
   const esm = await import('./ticketAccess.mjs');
   assert.deepEqual(esm.resolveTicketClassGrant(policy(), ticket('paid-full'), context),
     resolveTicketClassGrant(policy(), ticket('paid-full'), context));
+});
+
+test('the current claimed set unions independent contributions and settles unresolved tickets without retaining old rights', () => {
+  const mine = (id, patch = {}) => ticket(id, { claimedByUid: 'holder', status: 'valid', ...patch });
+  const derive = (tickets, registration = {}) => deriveTicketResourceGrant({ policy: policy(), context,
+    uid: 'holder', tickets, registration });
+  const day = mine('day-pass');
+  const workshop = mine('workshop-pass');
+  const grant = derive([day, workshop, mine('awards-pass', { claimedByUid: 'other' }), mine('unknown')]);
+  assert.deepEqual(grant.classIds, ['one-day', 'workshop']);
+  assert.deepEqual(grant.resources.sessions, partial(['friday'], ['workshop']));
+  for (const status of ['refunded', 'cancelled', 'pending_info']) {
+    const remaining = derive([day, { ...workshop, status }]);
+    assert.deepEqual(remaining.classIds, ['one-day'], status);
+    assert.deepEqual(remaining.resources.sessions, partial(['friday']), status);
+  }
+  const full = derive([day, mine('paid-full')]);
+  assert.deepEqual(full.resources.sessions, { all: true, dayIds: [], sessionIds: [] });
+  const revoked = derive([day, workshop], { registrationStatus: 'revoked', revocationReason: 'admin_revocation' });
+  assert.deepEqual(revoked.classIds, []);
+  assert.equal(revoked.resources.directory, false);
+  assert.deepEqual(derive([...Array(50).fill(day), workshop]), derive([workshop, day]), 'no truncation, duplicate or order-dependent rights');
 });

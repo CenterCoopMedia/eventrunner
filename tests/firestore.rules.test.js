@@ -668,6 +668,8 @@ describe("server-only collections stay deny-all", () => {
     "ticket_catalog",
     "ticket_inventory",
     "ticket_orders",
+    "ticket_access_policies",
+    "ticket_access_grants",
     "ticket_payment_attempts",
     "ticket_promo_codes",
     "ticket_answer_holds",

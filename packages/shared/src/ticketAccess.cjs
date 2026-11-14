@@ -161,8 +161,41 @@ function resolveTicketClassGrant(policy, ticket, context) {
     classId: selected.id, resources: selected.resources };
 }
 
+/** Complete current claimed set; pending/unknown tickets contribute nothing. */
+function deriveTicketResourceGrant({ policy, context, tickets, uid, registration }) {
+  const checked = validateTicketAccessPolicy(policy, context);
+  if (!checked.ok || typeof uid !== 'string' || !uid || !Array.isArray(tickets)) return null;
+  const resources = { sessions: { all: false, dayIds: [], sessionIds: [] },
+    directory: false, attendeeUpdates: false, interactions: false, protectedMaterials: 'existing-embargo' };
+  const classes = new Map(checked.value.classes.map((entry) => [entry.id, entry.resources]));
+  const mappings = new Map(checked.value.mappings.map((entry) => [entry.sourceClassId, entry.classId]));
+  const classIds = new Set();
+  const days = new Set();
+  const sessions = new Set();
+  const explicitlyRevoked = registration?.registrationStatus === 'revoked' && registration?.revocationReason !== 'entitlement_lost';
+  for (const ticket of explicitlyRevoked ? [] : tickets) {
+    if (ticket?.claimedByUid !== uid || ticket?.status !== 'valid') continue;
+    const identity = ticketClassIdentity(ticket);
+    if (!identity || identity.provider !== context.provider || identity.eventId !== context.eventId) continue;
+    const classId = mappings.get(identity.classId);
+    const contribution = classes.get(classId);
+    if (!contribution) continue;
+    classIds.add(classId);
+    resources.sessions.all ||= contribution.sessions.all;
+    for (const day of contribution.sessions.dayIds) days.add(day);
+    for (const session of contribution.sessions.sessionIds) sessions.add(session);
+    for (const field of ['directory', 'attendeeUpdates', 'interactions']) resources[field] ||= contribution[field];
+  }
+  if (!resources.sessions.all) {
+    resources.sessions.dayIds = [...days].sort();
+    resources.sessions.sessionIds = [...sessions].sort();
+  }
+  return { schemaVersion: TICKET_ACCESS_VERSION, provider: context.provider, eventId: context.eventId,
+    policyRevision: checked.value.revision, classIds: [...classIds].sort(), resources };
+}
+
 module.exports = {
   TICKET_ACCESS_VERSION, MAX_POLICY_BYTES, MAX_CLASS_MAPPINGS, MAX_RESOURCE_REFS,
   TICKET_ACCESS_PROVIDERS, normalizeTicketClassId, ticketClassIdentity,
-  validateTicketAccessPolicy, resolveTicketClassGrant,
+  validateTicketAccessPolicy, resolveTicketClassGrant, deriveTicketResourceGrant,
 };

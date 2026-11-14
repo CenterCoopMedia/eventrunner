@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const { reconcileStripeOrder } = require('./stripeReconcile.cjs');
 const { recomputeEntitlement } = require('./entitlement.cjs');
+const { publishTicketAccessPolicy } = require('./resourceGrants.cjs');
 
 const T0 = new Date('2026-10-13T00:00:00.000Z');
 const SCOPE = { name: 'stripe', externalEventId: 'conference-1', stripeAccountId: 'acct_fixture', livemode: false };
@@ -81,16 +82,27 @@ test('successful full refund invalidates every seat, keeps sold capacity, and pr
   await db.collection('tickets').doc(ORDER.ticketIds[1]).set({ claimedByUid: 'press' }, { merge: true });
   await db.collection('users').doc('attendee').set({ registrationStatus: 'approved', approvalSource: 'ticket' });
   await db.collection('users').doc('press').set({ registrationStatus: 'approved', approvalSource: 'admin' });
+  await db.collection('config').doc('features').set({ autoApproveTicketHolders: true });
+  await db.collection('config').doc('event').set({ days: [{ id: 'friday' }] }, { merge: true });
+  await db.collection('cmsSchedule').doc('workshop').set({ dayId: 'friday' });
+  const policy = { ...structuredClone(require('./__fixtures__/resource-policy.json')), provider: 'stripe', eventId: ORDER.eventId };
+  const env = { EVENT_TICKETING_PROVIDER: 'stripe', EVENT_TICKETING_EVENT_ID: ORDER.eventId };
+  const purchased = db.read('ticket_orders', ORDER.id);
+  await publishTicketAccessPolicy({ db, policy, expectedRevision: 0, env });
+  assert.deepEqual(db.read('ticket_access_grants', 'attendee').classIds, ['day']);
+  assert.deepEqual(db.read('ticket_orders', ORDER.id), purchased);
   provider.readFinancialState = async () => ({ ...state(), refunds: [refund()] });
   const result = await reconcile();
   assert.ok(result.tickets.every((ticket) => ticket.status === 'refunded'));
   assert.equal(db.read('ticket_orders', ORDER.id).refundedAmount, 3000);
   assert.equal(db.read('ticket_orders', ORDER.id).status, 'refunded');
   assert.equal(db.read('ticket_inventory', 'current').sold, 2);
-  await recomputeEntitlement({ db, uid: 'attendee' });
-  await recomputeEntitlement({ db, uid: 'press' });
+  await recomputeEntitlement({ db, uid: 'attendee', env });
+  await recomputeEntitlement({ db, uid: 'press', env });
   assert.equal(db.read('users', 'attendee').registrationStatus, 'revoked');
   assert.equal(db.read('users', 'press').registrationStatus, 'approved');
+  assert.deepEqual(db.read('ticket_access_grants', 'attendee').classIds, []);
+  assert.deepEqual(db.read('ticket_access_grants', 'press').classIds, []);
 });
 
 test('a successful full refund supersedes old failed refund attention but retains history and disputes', async () => {
