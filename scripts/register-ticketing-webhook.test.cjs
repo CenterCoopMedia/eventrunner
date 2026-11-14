@@ -123,6 +123,38 @@ test('registerWebhook throwing exits 1, and stamps nothing', async () => {
   assert.equal((await db.collection('config').doc('providers').get()).exists, false);
 });
 
+test('Stripe OAuth refusal directs the operator to Console while direct-account verification still works', async () => {
+  const db = makeFakeDb();
+  const previous = { ticketing: { provider: 'stripe', webhookId: 'we_previous', webhookRegisteredAt: '2026-11-01T00:00:00.000Z' } };
+  await db.collection('config').doc('providers').set(previous);
+  const env = { ...ENV, EVENT_TICKETING_PROVIDER: 'stripe', EVENT_STRIPE_MODE: 'live' };
+  const providerDetail = 'fixture-private-provider-detail';
+  const provider = { name: 'stripe', registerWebhook: async () => {
+    throw Object.assign(new Error(providerDetail), { code: 'oauth_not_supported', statusCode: 403 });
+  } };
+  let initialized = false;
+  const deps = { getTicketingProvider: () => provider, initFirebase: () => { initialized = true; return { db }; } };
+  const printed = [];
+  const { log, error } = console;
+  let code;
+  console.log = (...args) => printed.push(args.join(' '));
+  console.error = (...args) => printed.push(args.join(' '));
+  try {
+    code = await run({ args: {}, env, deps });
+  } finally {
+    Object.assign(console, { log, error });
+  }
+  assert.equal(code, 1);
+  assert.equal(initialized, false);
+  assert.deepEqual((await db.collection('config').doc('providers').get()).data(), previous);
+  assert.match(printed.join('\n'), /oauth_not_supported.*Console provisioning/);
+  assert.equal(printed.join('\n').includes(providerDetail), false);
+
+  const direct = { name: 'stripe', registerWebhook: async () => ({ webhookId: 'we_verified' }) };
+  assert.equal(await run({ args: {}, env, deps: fakeDeps({ provider: direct, db }) }), 0);
+  assert.equal((await db.collection('config').doc('providers').get()).data().ticketing.webhookId, 'we_verified');
+});
+
 test('a webhookId-less result exits 1', async () => {
   const db = makeFakeDb();
   const provider = { name: 'eventbrite', registerWebhook: async () => ({}) };

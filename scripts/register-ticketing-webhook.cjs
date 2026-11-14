@@ -12,8 +12,9 @@
  *
  * CAPABILITY, NOT ENABLEMENT (§3.3). Webhook registration applies only to
  * providers that implement `registerWebhook` — `eventbrite` and `stripe`.
- * Stripe verifies an existing Dashboard endpoint because its generated
- * signing secret must be bound before verification. `manual` has no webhook
+ * Stripe verifies an existing direct-account Dashboard endpoint because its
+ * generated signing secret must be bound before verification. Console
+ * provisioning manages Stripe Connect webhooks. `manual` has no webhook
  * to register and `none` has no provider at
  * all, so this script exits 0 with an explanatory message for either,
  * rather than failing a checklist item a CSV deployment could never
@@ -22,12 +23,11 @@
  * `scripts/lib/readiness.cjs` use.
  *
  * On success, `config/providers.ticketing.webhookRegisteredAt` and
- * `.webhookId` are stamped — this script is the SANCTIONED writer of that
- * pair, the ticketing analog of `verify-sender-domain.cjs` stamping
- * `config/event.sender.domainVerified`. `admin/config.cjs` never accepts
- * `providers.*` from the panel (spec §1.3 item 3), so there is exactly one
- * writer, and `readTicketingStatus` / `scripts/lib/readiness.cjs`'s
- * ticketing row are the two readers.
+ * `.webhookId` are stamped, the ticketing analog of `verify-sender-domain.cjs`
+ * stamping `config/event.sender.domainVerified`. Console provisioning writes
+ * the Connect webhook stamp. `admin/config.cjs` never accepts `providers.*`
+ * from the panel (spec §1.3 item 3). `readTicketingStatus` and
+ * `scripts/lib/readiness.cjs` read the ticketing stamp.
  *
  * The callback URL defaults to the deployed `ticketingWebhook` function's
  * URL, built from `EVENT_FIREBASE_PROJECT_ID` / `EVENT_FIREBASE_REGION`
@@ -105,7 +105,8 @@ function usage() {
     '  TICKETING_API_TOKEN         required for eventbrite or stripe',
     '  TICKETING_WEBHOOK_SECRET    required for eventbrite or stripe',
     '  Eventbrite: a random secret of 32+ characters; it is registered in the webhook URL.',
-    '  Stripe: create the Dashboard endpoint and bind its generated signing secret first.',
+    '  Stripe direct accounts: create the Dashboard endpoint and bind its generated signing secret first.',
+    '  Stripe Connect sites: Console provisioning manages the webhook; check the Console build record.',
     '  EVENT_FIREBASE_PROJECT_ID   the project whose config/providers is read and stamped',
     '  EVENT_FIREBASE_REGION       default us-central1',
   ].join('\n');
@@ -156,7 +157,10 @@ async function run({ args, env = process.env, deps = {} }) {
   try {
     result = await provider.registerWebhook({ callbackUrl, events: webhookEvents });
   } catch (err) {
-    console.error(`\nRegistration failed: ${err.message}`);
+    const detail = provider.name === 'stripe' && err.code === 'oauth_not_supported'
+      ? 'Stripe rejected webhook management (oauth_not_supported). Console provisioning manages Stripe Connect webhooks; check this site\'s Console build record.'
+      : err.message;
+    console.error(`\nRegistration failed: ${detail}`);
     return 1;
   }
   if (!result || typeof result.webhookId !== 'string' || !result.webhookId) {
