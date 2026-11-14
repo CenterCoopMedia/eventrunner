@@ -684,8 +684,12 @@ for (const certState of ['CERT_PREPARING', 'CERT_VALIDATING']) {
     assert.equal(waiting.steps.at(-1).state, 'waiting');
     assert.equal(fake.db.read('applications/a1').status, 'building');
     assert.equal(fake.db.read('applications/a1').buildStart.state, 'started');
-    assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), ['build-waiting']);
-    assert.deepEqual(statusMail(fake.mailer), ['build-waiting']);
+    assert.deepEqual(notices(fake.mailer).map(({ to, noticeKind }) => [to, noticeKind]), [
+      ['ops@ccm.example', 'build-waiting'], ['ops2@ccm.example', 'build-waiting'],
+    ]);
+    assert.deepEqual(fake.mailer.sent.filter((mail) => mail.kind === 'status').map(({ to, status }) => [to, status]), [
+      ['ana@example.org', 'build-waiting'], ['bo@example.org', 'build-waiting'],
+    ]);
     assert.ok(!statusMail(fake.mailer).includes('build-failed'));
     assert.equal(fake.state.runs.length, 0, 'later deploy steps did not start');
     await markStopped({ appId: 'a1', runId: ENV.GITHUB_RUN_ID, deps: fake.deps });
@@ -712,8 +716,8 @@ test('a propagating certificate that is not served yet waits for another check',
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.db.read('console_builds/a1').state, 'waiting');
   assert.equal(fake.db.read('applications/a1').status, 'building');
-  assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), ['build-waiting']);
-  assert.deepEqual(statusMail(fake.mailer), ['build-waiting']);
+  assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), ['build-waiting', 'build-waiting']);
+  assert.deepEqual(statusMail(fake.mailer), ['build-waiting', 'build-waiting']);
 });
 
 test('a pending certificate still fails for host, ownership or reported provider errors', async () => {
@@ -734,7 +738,7 @@ test('a pending certificate still fails for host, ownership or reported provider
     assert.equal(fake.db.read('console_builds/a1').failedStep, 'web-address');
     assert.ok(statusMail(fake.mailer).includes('build-failed'));
     assert.ok(!statusMail(fake.mailer).includes('build-waiting'));
-    assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), ['build-run-failed']);
+    assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), ['build-run-failed', 'build-run-failed']);
   }
 });
 
@@ -744,8 +748,8 @@ test('missing or pending ownership can wait, and every unfinished manual check s
     for (let check = 1; check <= 2; check += 1) {
       assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
       assert.equal(fake.db.read('console_builds/a1').state, 'waiting');
-      assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), Array(check).fill('build-waiting'));
-      assert.deepEqual(statusMail(fake.mailer), Array(check).fill('build-waiting'));
+      assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), Array(check * 2).fill('build-waiting'));
+      assert.deepEqual(statusMail(fake.mailer), Array(check * 2).fill('build-waiting'));
     }
   }
 });
