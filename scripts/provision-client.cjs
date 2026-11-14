@@ -427,14 +427,22 @@ async function stepFirebase(ctx) {
   }
 
   const database = `${FIRESTORE}/projects/${projectId}/databases`;
-  if (!(await google(ctx, 'read Firestore', `${database}/(default)`, { allow: [404] }))) {
+  const current = await google(ctx, 'read Firestore', `${database}/(default)`, { allow: [404] });
+  if (!current) {
     const op = await google(ctx, 'create Firestore', `${database}?databaseId=(default)`, {
       method: 'POST',
       // A multi-region that holds us-central1, as on the rehearsed site.
-      json: { type: 'FIRESTORE_NATIVE', locationId: region === 'us-central1' ? 'nam5' : region },
+      json: { type: 'FIRESTORE_NATIVE', locationId: region === 'us-central1' ? 'nam5' : region, deleteProtectionState: 'DELETE_PROTECTION_ENABLED' },
     });
     await finish(ctx, 'create Firestore', FIRESTORE, op);
     notes.push('created Firestore');
+  } else if (current.deleteProtectionState !== 'DELETE_PROTECTION_ENABLED') {
+    const op = await google(ctx, 'enable Firestore delete protection', `${database}/(default)?updateMask=deleteProtectionState`, {
+      method: 'PATCH',
+      json: { deleteProtectionState: 'DELETE_PROTECTION_ENABLED', ...(current.etag ? { etag: current.etag } : {}) },
+    });
+    await finish(ctx, 'enable Firestore delete protection', FIRESTORE, op);
+    notes.push('enabled Firestore delete protection');
   }
 
   const bucketUrl = `${FIREBASE_STORAGE}/projects/${projectId}/defaultBucket`;

@@ -182,6 +182,14 @@ function fakeCloud(options = {}) {
         state.firestore = body;
         return done();
       }
+      if (method === 'PATCH') {
+        assert.equal(p, `/v1/projects/${PROJECT}/databases/(default)`);
+        assert.equal(url.searchParams.get('updateMask'), 'deleteProtectionState');
+        assert.deepEqual(Object.keys(body).sort(), ['deleteProtectionState', ...(state.firestore.etag ? ['etag'] : [])].sort());
+        if (state.firestore.etag) assert.equal(body.etag, state.firestore.etag);
+        state.firestore = { ...state.firestore, deleteProtectionState: body.deleteProtectionState };
+        return done(state.firestore);
+      }
       return state.firestore ? answer(state.firestore) : answer({}, 404);
     }
     if (url.host === 'firebasestorage.googleapis.com') {
@@ -523,7 +531,50 @@ test('the project is in the client folder, on the billing account, with every AP
   for (const service of ['cloudbilling.googleapis.com', 'compute.googleapis.com', 'firebasestorage.googleapis.com']) {
     assert.ok(fake.state.services.has(service), service);
   }
-  assert.deepEqual(fake.state.firestore, { type: 'FIRESTORE_NATIVE', locationId: 'nam5' });
+  assert.deepEqual(fake.state.firestore, { type: 'FIRESTORE_NATIVE', locationId: 'nam5', deleteProtectionState: 'DELETE_PROTECTION_ENABLED' });
+});
+
+test('existing Firestore databases gain delete protection without changing other settings', async () => {
+  for (const deleteProtectionState of [undefined, 'DELETE_PROTECTION_DISABLED']) {
+    const fake = setup();
+    const original = {
+      type: 'FIRESTORE_NATIVE', locationId: 'nam5', concurrencyMode: 'PESSIMISTIC',
+      pointInTimeRecoveryEnablement: 'POINT_IN_TIME_RECOVERY_ENABLED', etag: 'database-revision-1',
+      ...(deleteProtectionState ? { deleteProtectionState } : {}),
+    };
+    fake.state.firestore = original;
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    assert.deepEqual(fake.state.firestore, { ...original, deleteProtectionState: 'DELETE_PROTECTION_ENABLED' });
+    const writes = fake.calls.filter((call) => new URL(call.url).host === 'firestore.googleapis.com' && call.method !== 'GET');
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].method, 'PATCH');
+    assert.equal(writes[0].body.etag, original.etag);
+  }
+});
+
+test('a protected Firestore database needs no write', async () => {
+  const fake = setup();
+  const original = { type: 'FIRESTORE_NATIVE', locationId: 'nam5', deleteProtectionState: 'DELETE_PROTECTION_ENABLED' };
+  fake.state.firestore = original;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.deepEqual(fake.state.firestore, original);
+  assert.equal(fake.calls.filter((call) => new URL(call.url).host === 'firestore.googleapis.com' && call.method !== 'GET').length, 0);
+});
+
+test('a rejected Firestore protection update stops the build and remains retryable', async () => {
+  const fake = setup();
+  const original = { type: 'FIRESTORE_NATIVE', locationId: 'nam5', deleteProtectionState: 'DELETE_PROTECTION_DISABLED' };
+  fake.state.firestore = original;
+  const fetch = fake.deps.fetch;
+  fake.deps.fetch = (address, init) => new URL(address).host === 'firestore.googleapis.com' && init?.method === 'PATCH'
+    ? Promise.resolve(answer({ error: { message: 'provider refusal' } }, 403)) : fetch(address, init);
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.equal(fake.db.read('console_builds/a1').failedStep, 'firebase');
+  assert.deepEqual(fake.state.firestore, original);
+  assert.equal(fake.state.bucket, null, 'later provisioning did not begin');
+  fake.deps.fetch = fetch;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.firestore.deleteProtectionState, 'DELETE_PROTECTION_ENABLED');
 });
 
 test('each grant the rehearsal missed is made up front', async () => {
