@@ -1340,9 +1340,9 @@ async function stepSeed(ctx) {
     }
     const file = await writeAnswers({ ...answers, providers: {
       email: { announcementStream: ANNOUNCEMENT_STREAM },
-      // The host specified this work inbox for platform alerts on every site.
+      // Platform alerts use the monitored agent inbox.
       // Site Owners are resolved from the current bootstrap access list.
-      notifier: { operatorEmail: 'amditisj@montclair.edu' },
+      notifier: { operatorEmail: 'amditisjunk@gmail.com' },
     } });
     const args = [
       'scripts/init-event.cjs', '--answers', file,

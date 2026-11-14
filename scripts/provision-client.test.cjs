@@ -1199,7 +1199,7 @@ test('it deploys in the bootstrap order, and seeds between the two deploys', asy
   ]);
   assert.equal(fake.answersWritten[0].providers.email.announcementStream, 'announcements');
   assert.deepEqual(fake.answersWritten[0].providers.notifier, {
-    operatorEmail: 'amditisj@montclair.edu',
+    operatorEmail: 'amditisjunk@gmail.com',
   });
   assert.equal(fake.answersWritten[0].event.sender.email.endsWith(`@${DOMAIN}`), true);
 });
