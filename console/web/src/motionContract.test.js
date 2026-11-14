@@ -3,7 +3,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
-import { motionProblems } from '../../../scripts/lib/motion-contract.mjs';
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 function stylesheets(dir = SRC) {
@@ -31,6 +30,40 @@ const waitingLoop = (decl) => path.relative(SRC, decl.source.input.file) === 'st
   && WAITING_LOOPS.get(decl.parent.selector) === decl.value;
 const controlPaint = (decl) => path.relative(SRC, decl.source.input.file) === 'styles.css'
   && decl.parent.selector === '.button:not(.danger)';
+
+// Keep this check inside the isolated console workspace (ADR 0007).
+function motionProblems(stylesheet, loopAllowed = () => false, paintAllowed = () => false) {
+  const problems = [];
+  const compositor = new Set(['transform', 'opacity']);
+  const place = (decl) => `${decl.source?.input.file ?? 'fixture'}:${decl.source?.start?.line ?? 1} ${decl.prop}: ${decl.value}`;
+  const motionAllowed = (node) => {
+    for (let parent = node.parent; parent; parent = parent.parent) {
+      if (parent.type === 'atrule' && parent.name === 'media' && parent.params.includes('prefers-reduced-motion: no-preference')) return true;
+    }
+    return false;
+  };
+  stylesheet.walkDecls((decl) => {
+    if (!/^(transition|animation)(-|$)/.test(decl.prop)) return;
+    if (decl.value !== 'none' && !motionAllowed(decl)) problems.push(`motion preference: ${place(decl)}`);
+    if (/^animation(?:-|$)/.test(decl.prop) && /\binfinite\b/.test(decl.value) && !loopAllowed(decl)) {
+      problems.push(`ambient loop: ${place(decl)}`);
+    }
+    if (decl.prop === 'transition' || decl.prop === 'transition-property') {
+      const properties = decl.value.replace(/\([^)]*\)/g, '()').split(',');
+      for (const part of properties) {
+        const property = part.trim().split(/\s+/)[0];
+        const controlPaint = ['background-color', 'border-color', 'color'].includes(property) && paintAllowed(decl);
+        if (property !== 'none' && !compositor.has(property) && !controlPaint) problems.push(`transition property: ${place(decl)}`);
+      }
+    }
+  });
+  stylesheet.walkAtRules(/^(?:-webkit-)?keyframes$/, (keyframes) => {
+    keyframes.walkDecls((decl) => {
+      if (!compositor.has(decl.prop)) problems.push(`keyframe property: ${place(decl)}`);
+    });
+  });
+  return problems;
+}
 
 describe('console motion contract', () => {
   it.each(stylesheets())('checks motion guards, loops and keyframes in %s', (file) => {
