@@ -1,6 +1,7 @@
 import { formatPublishedAt } from '../versionHistory.js';
 import { versionAuthor, versionFieldLabel, versionValue } from '../pages/versionDisplay.js';
 import HelpTooltip from './HelpTooltip.jsx';
+import AdminTableScroll from './AdminTableScroll.jsx';
 
 /** A value longer than this shows its start, and the rest behind a disclosure. */
 const SHOWN_CHARACTERS = 300;
@@ -28,7 +29,7 @@ function ValueCell({ value, time, timeZone, path }) {
   );
 }
 
-/** The what-changed entry: a table that never scrolls sideways. */
+/** Published changes keep a readable measure in their own scroll region. */
 function ChangeTable({ entry, timeZone }) {
   const first = entry.previousRevision === null;
   const allChanges = Array.isArray(entry.changes) ? entry.changes : [];
@@ -48,7 +49,8 @@ function ChangeTable({ entry, timeZone }) {
       ) : changes.length === 0 ? (
         <p className="text-admin-sm text-admin-ink">{allChanges.length ? 'Other content changed.' : 'No content changed in this publish.'}</p>
       ) : (
-        <table className="w-full table-fixed border-collapse text-admin-sm">
+        <AdminTableScroll role="region" aria-label={`What changed in version ${entry.revision}`} tabIndex={0} className="overflow-auto">
+        <table className="w-full min-w-[40rem] table-fixed border-collapse text-admin-sm">
           <caption className="sr-only">{`What changed in version ${entry.revision}`}</caption>
           <thead>
             <tr>
@@ -81,6 +83,7 @@ function ChangeTable({ entry, timeZone }) {
             ))}
           </tbody>
         </table>
+        </AdminTableScroll>
       )}
       {changes.length > 0 && allChanges.length > changes.length ? <p className="text-admin-sm text-admin-ink-secondary">Other content changed.</p> : null}
       {more > 0 && !entry.changeValuesOmitted ? (

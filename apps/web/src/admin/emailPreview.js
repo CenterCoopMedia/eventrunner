@@ -48,9 +48,9 @@ export const PREVIEW_POLICY =
   "default-src 'none'; img-src data:; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'";
 
 const CANVAS_STYLE = ':root{background:Canvas;color:CanvasText}';
-// The announcement workspace can be narrower than the standard mail wrapper.
+// Narrow preview panels fit the standard mail wrapper to their own viewport.
 // Adapt that one presentation table, leaving nested buttons and the stored
-// message untouched. The default email-log preview keeps its original layout.
+// message untouched. Callers request this through fitWidth.
 const FIT_WIDTH_STYLE = 'body{overflow-wrap:anywhere}table[role="presentation"][width="600"]{width:100%!important;max-width:600px!important;table-layout:fixed}';
 const DOCTYPE = '<!DOCTYPE html>';
 const MATHML_NS = 'http://www.w3.org/1998/Math/MathML';

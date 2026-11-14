@@ -1,0 +1,3 @@
+### Fixed
+
+- Admin Access, Email log and Version history keep account text, actions and comparison values readable in their own scrolling tables on phones. Email details stay in view when Preview is opened from the table's right edge. (#974)

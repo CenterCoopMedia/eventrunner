@@ -32,6 +32,9 @@ import AdminAccess, { describeChange, describeResult, nextEndReloadDelay } from 
 import { formatEndTime } from '../components/AdminAccessList.jsx';
 import { TIER_SCOPE } from '../AdminLayout.jsx';
 
+// The account list has its own region; every other region is a confirmation.
+const CONFIRMATION_REGION = { name: /^(?!Admin accounts and their roles$)/ };
+
 const LIST = {
   accounts: [
     { email: 'ops@example.org', tier: 'operator' },
@@ -183,7 +186,7 @@ describe('AdminAccess', () => {
     expect(screen.getByText('Enter an email address.')).toBeInTheDocument();
     expect(email).toHaveAttribute('aria-invalid', 'true');
     await waitFor(() => expect(document.activeElement).toBe(email));
-    expect(screen.queryByRole('region')).toBeNull();
+    expect(screen.queryByRole('region', CONFIRMATION_REGION)).toBeNull();
     expect(setCalls()).toHaveLength(0);
   });
 
@@ -224,7 +227,7 @@ describe('AdminAccess', () => {
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'desk@example.org' } });
     fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
     expect(screen.getByText('desk@example.org already has staff access.')).toBeInTheDocument();
-    expect(screen.queryByRole('region')).toBeNull();
+    expect(screen.queryByRole('region', CONFIRMATION_REGION)).toBeNull();
     expect(setCalls()).toHaveLength(0);
   });
 
@@ -278,7 +281,7 @@ describe('AdminAccess', () => {
     expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Change second@example.org to staff' }));
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(screen.queryByRole('region')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('region', CONFIRMATION_REGION)).toBeNull());
     expect(setCalls()).toHaveLength(0);
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
@@ -523,7 +526,7 @@ describe('staff access with an end time', () => {
     fireEvent.change(field, { target: { value: localValue(new Date(Date.now() + 91 * 24 * 3_600_000).toISOString()) } });
     fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
     expect(screen.getByText('Pick a time at most 90 days from now.')).toBeInTheDocument();
-    expect(screen.queryByRole('region')).toBeNull();
+    expect(screen.queryByRole('region', CONFIRMATION_REGION)).toBeNull();
     expect(setCalls()).toHaveLength(0);
   });
 
@@ -557,7 +560,7 @@ describe('staff access with an end time', () => {
       fireEvent.change(screen.getByLabelText('Access ends (optional)'), { target: { value: localValue(ENDS) } });
       fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
       expect(screen.getByText(`demo@example.org already has staff access until ${formatEndTime(ENDS)}.`)).toBeInTheDocument();
-      expect(screen.queryByRole('region')).toBeNull();
+      expect(screen.queryByRole('region', CONFIRMATION_REGION)).toBeNull();
     } finally {
       vi.useRealTimers();
     }
