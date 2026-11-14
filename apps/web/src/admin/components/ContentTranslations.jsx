@@ -30,16 +30,15 @@ export default function ContentTranslations({ kind, record, onChange, labels = {
             label: `Spanish ${labels[field] ?? LABELS[field] ?? field}`,
             value: spanish[field] ?? '', onChange: (value) => change(field, value),
             error: errorFor?.(`translations.es.${field}`),
-            help: 'Enter the reviewed Spanish wording. Leave unfinished text in the draft until it is ready to publish.',
           };
           if (rich.includes(field)) return (
             <Suspense key={field} fallback={<p role="status">Loading formatted text editor…</p>}>
-              <RichTextEditor {...props} />
+              <RichTextEditor {...props} help="Enter the reviewed Spanish wording. Leave unfinished text in the draft until it is ready to publish." />
             </Suspense>
           );
           return field === 'description' || field === 'text'
-            ? <TextAreaField key={field} {...props} rows={4} />
-            : <TextField key={field} {...props} />;
+            ? <TextAreaField key={field} {...props} rows={4} help="Enter the reviewed Spanish wording. Leave unfinished text in the draft until it is ready to publish." />
+            : <TextField key={field} {...props} help="Enter the reviewed Spanish wording. Leave unfinished text in the draft until it is ready to publish." />;
         })}
         {record.translations && Object.keys(record.translations).length > 0 ? (
           <button type="button" className={secondaryButtonClass} onClick={() => onChange({})}>Remove Spanish translation</button>
