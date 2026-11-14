@@ -104,6 +104,9 @@ function fakeCloud(options = {}) {
     certNever: options.certNever || false,
     certPropagating: options.certPropagating || false,
     certState: options.certState || null,
+    hostState: options.hostState || null,
+    ownershipState: options.ownershipState || null,
+    domainIssues: options.domainIssues || [],
     httpsServing: options.httpsServing ?? true,
   };
   const calls = [];
@@ -116,8 +119,9 @@ function fakeCloud(options = {}) {
     ];
     const live = !state.certNever && hasDns('A', DOMAIN) && hasDns('TXT', `_acme-challenge.${DOMAIN}`);
     return {
-      hostState: live ? 'HOST_ACTIVE' : 'HOST_UNHOSTED',
-      ownershipState: 'OWNERSHIP_ACTIVE',
+      hostState: state.hostState || (live ? 'HOST_ACTIVE' : 'HOST_UNHOSTED'),
+      ownershipState: state.ownershipState || 'OWNERSHIP_ACTIVE',
+      issues: state.domainIssues,
       cert: {
         state: state.certState || (!live ? 'CERT_VALIDATING' : state.certPropagating ? 'CERT_PROPAGATING' : 'CERT_ACTIVE'),
         verification: { dns: { desired: live ? [] : [{ records: [need[1]] }] } },
@@ -680,7 +684,8 @@ for (const certState of ['CERT_PREPARING', 'CERT_VALIDATING']) {
     assert.equal(waiting.steps.at(-1).state, 'waiting');
     assert.equal(fake.db.read('applications/a1').status, 'building');
     assert.equal(fake.db.read('applications/a1').buildStart.state, 'started');
-    assert.equal(notices(fake.mailer).length, 0);
+    assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), ['build-waiting']);
+    assert.deepEqual(statusMail(fake.mailer), ['build-waiting']);
     assert.ok(!statusMail(fake.mailer).includes('build-failed'));
     assert.equal(fake.state.runs.length, 0, 'later deploy steps did not start');
     await markStopped({ appId: 'a1', runId: ENV.GITHUB_RUN_ID, deps: fake.deps });
@@ -691,6 +696,7 @@ for (const certState of ['CERT_PREPARING', 'CERT_VALIDATING']) {
     assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
     assert.equal(fake.db.read('applications/a1').status, 'ready');
     assert.equal(fake.db.read('console_builds/a1').state, 'done');
+    assert.ok(statusMail(fake.mailer).includes('ready'));
     assert.ok(!statusMail(fake.mailer).includes('build-failed'));
   });
 }
@@ -706,7 +712,42 @@ test('a propagating certificate that is not served yet waits for another check',
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.db.read('console_builds/a1').state, 'waiting');
   assert.equal(fake.db.read('applications/a1').status, 'building');
-  assert.equal(notices(fake.mailer).length, 0);
+  assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), ['build-waiting']);
+  assert.deepEqual(statusMail(fake.mailer), ['build-waiting']);
+});
+
+test('a pending certificate still fails for host, ownership or reported provider errors', async () => {
+  for (const cloud of [
+    { hostState: 'HOST_MISMATCH' },
+    { hostState: 'HOST_CONFLICT' },
+    { hostState: 'HOST_UNREACHABLE' },
+    { hostState: 'HOST_STATE_UNSPECIFIED' },
+    { ownershipState: 'OWNERSHIP_MISMATCH' },
+    { ownershipState: 'OWNERSHIP_CONFLICT' },
+    { ownershipState: 'OWNERSHIP_UNREACHABLE' },
+    { ownershipState: 'OWNERSHIP_STATE_UNSPECIFIED' },
+    { domainIssues: [{ code: 9, message: 'DNS configuration needs attention' }] },
+  ]) {
+    const fake = setup({ cloud: { certNever: true, certState: 'CERT_VALIDATING', ...cloud } });
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1, JSON.stringify(cloud));
+    assert.equal(fake.db.read('console_builds/a1').state, 'failed');
+    assert.equal(fake.db.read('console_builds/a1').failedStep, 'web-address');
+    assert.ok(statusMail(fake.mailer).includes('build-failed'));
+    assert.ok(!statusMail(fake.mailer).includes('build-waiting'));
+    assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), ['build-run-failed']);
+  }
+});
+
+test('missing or pending ownership can wait, and every unfinished manual check sends an action notice', async () => {
+  for (const ownershipState of ['OWNERSHIP_MISSING', 'OWNERSHIP_PENDING']) {
+    const fake = setup({ cloud: { certNever: true, ownershipState } });
+    for (let check = 1; check <= 2; check += 1) {
+      assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+      assert.equal(fake.db.read('console_builds/a1').state, 'waiting');
+      assert.deepEqual(notices(fake.mailer).map((notice) => notice.noticeKind), Array(check).fill('build-waiting'));
+      assert.deepEqual(statusMail(fake.mailer), Array(check).fill('build-waiting'));
+    }
+  }
 });
 
 test('expired certificates and provider refusals still fail with notices', async () => {

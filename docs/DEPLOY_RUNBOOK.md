@@ -1511,7 +1511,7 @@ The `deploy-identity` step also grants `roles/editor` to each `user:<support add
 
 ### 12.2 When a build fails
 
-Certificate preparation, validation or propagation can outlast the initial check. The run records **Waiting** and ends successfully, while the request stays **Building**. Owners and operators see **Check again** on the request. Wait for DNS and certificate setup, then use that action to resume through the existing retry checks. The run preserves its completed steps and sends no failure email. The silent-build watch leaves it alone. Provider/API errors and expired certificates still follow the failure path below.
+Certificate preparation, validation or propagation can outlast the initial check. The run records **Waiting** and ends successfully, while the request stays **Building**. Each run that ends waiting sends Owners and operators a waiting notice with the request link and the action needed to resume. Owners and operators see **Check again** on the request. Wait for DNS and certificate setup, then use that action to resume through the existing retry checks. Setup stays paused until someone checks again. The run preserves its completed steps and sends no failure email. The silent-build watch leaves it alone. Host or ownership conflicts, provider/API errors and expired certificates still follow the failure path below.
 
 The review page shows each step, the failed step, its error and a link to the run. Operators get an email with the same error. Fix the cause, then select **Retry the build**.
 

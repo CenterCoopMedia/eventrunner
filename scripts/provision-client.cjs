@@ -665,8 +665,11 @@ async function stepWebAddress(ctx) {
     }
     await ctx.deps.sleep(CERT_WAIT_MS);
   }
-  const detail = `host ${custom?.hostState || 'unknown'}, certificate ${custom?.cert?.state || 'unknown'}`;
-  if (['CERT_PREPARING', 'CERT_VALIDATING', 'CERT_PROPAGATING'].includes(custom?.cert?.state)) {
+  const detail = `host ${custom?.hostState || 'unknown'}, ownership ${custom?.ownershipState || 'unknown'}, certificate ${custom?.cert?.state || 'unknown'}`;
+  if (['HOST_ACTIVE', 'HOST_UNHOSTED'].includes(custom?.hostState)
+    && ['OWNERSHIP_ACTIVE', 'OWNERSHIP_MISSING', 'OWNERSHIP_PENDING'].includes(custom?.ownershipState)
+    && !custom?.issues?.length
+    && ['CERT_PREPARING', 'CERT_VALIDATING', 'CERT_PROPAGATING'].includes(custom?.cert?.state)) {
     throw new CertificateWaiting(`the web address is still being set up (${detail}). Check again later.`);
   }
   throw new Error(`the certificate is not active yet (${detail}). Retry the build later.`);
@@ -1652,6 +1655,12 @@ async function provision({ appId, testMode = false, deps }) {
     if (err instanceof CertificateWaiting) {
       const finishedAt = new Date(now());
       await recordRef.update({ state: 'waiting', failedStep: null, error: null, steps: ctx.steps, finishedAt, updatedAt: finishedAt });
+      await quietly(ctx, 'the waiting operator notice', () => notifyOperators(consoleDeps(ctx), {
+        orgId: app.orgId, appId, eventName: ctx.eventName, kind: 'build-waiting',
+      }));
+      await quietly(ctx, 'the waiting Owner notice', () => notifyOwners(consoleDeps(ctx), {
+        orgId: app.orgId, appId, eventName: ctx.eventName, status: 'build-waiting',
+      }));
       log.log('provision-client: waiting for the web address. Check again later.');
       return 0;
     }
