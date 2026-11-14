@@ -2,6 +2,14 @@
    civic site style's brand tokens (design/tokens), restated here because
    the console does not load a client theme. Dark is its own palette. */
 
+@font-face {
+  font-family: "Source Sans 3";
+  src: url('/fonts/source-sans-3-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --surface: 250 250 249;
@@ -13,8 +21,8 @@
   --on-accent: 250 250 249;
   --rule: 218 218 218;
   --control-border: 132 132 133;
-  --danger: 163 32 32;
-  --success: 22 101 52;
+  --danger: 162 26 36;
+  --success: 20 92 56;
   --focus: 26 82 150;
   --radius: 6px;
   --space-xs: 0.5rem;
@@ -25,6 +33,7 @@
   --motion-fast: 120ms;
   --motion-base: 180ms;
   --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  --state-pressed-share: 10%;
   font-family: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 100%;
   line-height: 1.6;
@@ -40,11 +49,12 @@
     --accent: 128 178 238;
     --accent-strong: 172 208 248;
     --on-accent: 25 26 28;
-    --rule: 64 66 70;
+    --rule: 55 56 57;
     --control-border: 136 136 136;
-    --danger: 255 138 128;
-    --success: 134 239 172;
+    --danger: 246 142 146;
+    --success: 126 204 152;
     --focus: 128 178 238;
+    --state-pressed-share: 16%;
   }
 }
 
@@ -61,12 +71,12 @@ h1, h2 { line-height: 1.2; letter-spacing: -0.01em; }
 h1 { font-size: clamp(1.75rem, 1.4rem + 1.4vw, 2.5rem); margin: 0 0 var(--space-md); }
 h2 { font-size: 1.25rem; margin: var(--space-xl) 0 var(--space-sm); }
 h1:focus { outline: none; }
-h1:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 4px; }
+h1:focus-visible { outline: 3px solid rgb(var(--focus)); outline-offset: 4px; }
 
 a { color: rgb(var(--accent)); text-underline-offset: 0.15em; }
 @media (hover: hover) { a:hover { color: rgb(var(--accent-strong)); } }
 
-:focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; }
+:focus-visible { outline: 3px solid rgb(var(--focus)); outline-offset: 2px; }
 
 .skip-link {
   position: absolute;
@@ -167,7 +177,7 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
 .button.provider { width: 100%; }
 .button:disabled:not([aria-busy="true"]), .button[aria-disabled="true"]:not([aria-busy="true"]) {
   color: rgb(var(--ink-muted)); background: rgb(var(--surface-alt));
-  border-color: rgb(var(--control-border)); cursor: not-allowed;
+  border-color: rgb(var(--control-border));
 }
 .button[aria-busy="true"] { cursor: progress; }
 .icon-control-wrap { position: relative; display: inline-flex; vertical-align: middle; flex: none; justify-self: start; }
@@ -203,6 +213,13 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
   .button.primary:hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) { background: rgb(var(--accent-strong)); }
 }
 
+.button:not(.danger):active:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+  background: color-mix(in srgb, rgb(var(--ink)) var(--state-pressed-share), rgb(var(--surface)));
+}
+.button.primary:not(.danger):active:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+  background: color-mix(in srgb, rgb(var(--on-accent)) var(--state-pressed-share), rgb(var(--accent)));
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .button:not(.danger) {
     transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
@@ -218,7 +235,7 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
 .live:empty { display: none; }
 .application-account-controls { border: 0; margin: 0; padding: 0; min-width: 0; }
 
-.note { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px solid rgb(var(--rule)); border-inline-start: 4px solid rgb(var(--accent)); border-radius: var(--radius); background: rgb(var(--surface-alt)); }
+.note { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px solid rgb(var(--rule)); border-radius: var(--radius); background: rgb(var(--surface-alt)); }
 .note p { margin: 0; }
 .note .note-title { font-weight: 700; margin-bottom: 0.25rem; }
 
@@ -235,7 +252,7 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
 }
 .card-title { font-weight: 600; flex: 1 1 14rem; min-width: 0; }
 .row-actions, .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
-.tag { font-size: 0.85rem; font-weight: 600; padding: 0.1rem 0.5rem; border: 1px solid rgb(var(--control-border)); border-radius: 999px; }
+.tag { font-size: 0.85rem; font-weight: 600; padding-block-end: 0.1rem; border-block-end: 1px solid rgb(var(--control-border)); }
 
 /* The guided setup (ADR 0007 §3): the step list beside the step on a wide
    screen, folded above it on a narrow one. */
@@ -252,11 +269,13 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
   gap: var(--space-xs);
   min-height: 44px;
   padding: 0.25rem var(--space-xs);
+  padding-inline-start: calc(var(--space-xs) - 4px);
+  border-inline-start: 4px solid transparent;
   border-radius: var(--radius);
   color: rgb(var(--ink));
   text-decoration: none;
 }
-.steps a[aria-current="step"] { font-weight: 700; background: rgb(var(--surface-alt)); box-shadow: inset 4px 0 0 rgb(var(--accent)); }
+.steps a[aria-current="step"] { font-weight: 700; background: rgb(var(--surface-alt)); border-inline-start-color: rgb(var(--accent)); }
 @media (hover: hover) { .steps a:hover { text-decoration: underline; } }
 .step-locked {
   display: flex;
@@ -278,7 +297,7 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
   height: 1.75rem;
   flex: none;
   border: 1px solid rgb(var(--control-border));
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 0.85rem;
 }
 .step-body { min-width: 0; }

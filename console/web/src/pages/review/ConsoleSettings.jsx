@@ -84,8 +84,8 @@ export default function ConsoleSettings() {
 
   return (
     <section aria-labelledby="settings-title">
-      <p className="folio">Hosting team</p>
       <PageHeading id="settings-title" tabIndex={-1}>Console settings</PageHeading>
+      <p className="folio">Hosting team</p>
       {!agreement || !FIELDS.every((field) => saved?.[field]) ? (
         <aside className="note" role="note">
           <p className="note-title">Sign-ups are closed</p>

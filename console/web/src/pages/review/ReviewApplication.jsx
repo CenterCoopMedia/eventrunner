@@ -233,11 +233,11 @@ export default function ReviewApplication() {
   const { application: app, organization, team, connection } = data;
   return (
     <section aria-labelledby="review-title">
-      <p className="folio">{organization.name}</p>
       <div className="directory-heading">
         <PageHeading id="review-title" tabIndex={-1}>{app.answers?.event?.name || 'Request'}</PageHeading>
         <IconControl icon="refresh" label="Refresh request" disabled={Boolean(working) || refreshing} onClick={refresh} />
       </div>
+      <p className="folio">{organization.name}</p>
       <p><span className="tag">{STATUS_LABELS[app.status] || 'In progress'}</span></p>
       {refreshError && !retryResult && !decisionResult ? <p className="message error" role="alert">{refreshError}</p> : null}
 

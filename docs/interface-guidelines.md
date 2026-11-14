@@ -212,6 +212,18 @@ The public loading component supports rows, schedule, and directory placeholders
 
 These checks support source review; they do not prove screen-reader behavior, real-device usability, or all visual states. Verify consequential flows with keyboard input, narrow layouts, zoom, slow responses, and failure recovery.
 
+## Client console
+
+The isolated console uses Source Sans 3 from its own bundled WOFF2, with the
+same civic colour values, 3px focus ring, disabled ink and control states as
+the public system. Keep its stylesheet and assets within `console/`; its
+palette check compares the restated colours with the civic source tokens.
+Use words and rules for state labels, the base radius for step numbers, and
+a leading rule for the current step. Put organization and hosting-team
+captions below the page heading. A plain note has a full rule; danger and
+success messages retain their named state and edge. The November 6 motion
+direction above applies, including the guarded 1px console press.
+
 ## Typography
 
 - Ship only `.woff2` — never TTF or OTF on the web. Fonts are self-hosted in `apps/web/public/fonts/` (spec §7.4).
