@@ -40,6 +40,18 @@ export function clearLocalDrafts(accountId) {
 }
 
 export function openLocalDraft(accountId, docPath, version) {
+  const cutoff = Date.now() - WEEK;
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(PREFIX)) continue;
+      try {
+        const raw = localStorage.getItem(key);
+        const copy = JSON.parse(raw);
+        if (Number.isFinite(copy?.savedAt) && copy.savedAt <= cutoff
+          && localStorage.getItem(key) === raw) localStorage.removeItem(key);
+      } catch { /* One unreadable copy must not prevent the remaining expiry checks. */ }
+    }
+  } catch { /* The form still works without storage. */ }
   const prefix = `${accountPrefix(accountId)}${encodeURIComponent(docPath)}:`;
   const initialMarker = marker(accountId);
   const generation = generations.get(accountId) ?? 0;
