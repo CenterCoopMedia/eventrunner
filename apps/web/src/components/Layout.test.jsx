@@ -1586,24 +1586,26 @@ describe('Layout mobile navigation', () => {
 });
 
 
-describe('nested mobile navigation disclosures', () => {
-  it('closes More on first Escape and Menu on second Escape', () => {
-    renderShell({}, { pageDocs: [...FIXTURE_PAGES,
+describe('compact page navigation', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each(['top', 'side'])('lists all pages before the account action in the %s compact menu', (navPlacement) => {
+    vi.stubGlobal('matchMedia', (query) => ({ matches: query === '(max-width: 639px)', addEventListener() {}, removeEventListener() {} }));
+    const { container } = renderShell({}, { themeDoc: { navPlacement }, pageDocs: [...FIXTURE_PAGES,
       { id: 'about', label: 'About', path: '/about', order: 6, visible: true },
       { id: 'contact', label: 'Contact', path: '/contact', order: 7, visible: true },
     ] });
     const menu = screen.getByRole('button', { name: 'Menu' });
     const nav = screen.getByRole('navigation', { name: 'Main' });
-    const more = within(nav).getByText('More');
     fireEvent.click(menu);
-    more.closest('details').open = true;
+    expect(within(nav).queryByText('More')).toBeNull();
+    expect(within(nav).getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Home', 'Schedule', 'Travel', 'FAQ', 'About', 'Contact', 'Sign in',
+    ]);
+    expect(container.querySelectorAll('.site-header-account-actions')).toHaveLength(1);
+    expect(within(nav).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
     const contact = within(nav).getByRole('link', { name: 'Contact' });
     contact.focus();
     fireEvent.keyDown(contact, { key: 'Escape' });
-    expect(more.closest('details').open).toBe(false);
-    expect(more).toHaveFocus();
-    expect(menu).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.keyDown(more, { key: 'Escape' });
     expect(menu).toHaveAttribute('aria-expanded', 'false');
     expect(menu).toHaveFocus();
   });
@@ -1663,5 +1665,35 @@ describe('mobile Menu focus across breakpoints', () => {
     skip.focus();
     resize(1165);
     expect(skip).toHaveFocus();
+  });
+
+  it.each(['top', 'side'])('keeps focus when the %s header replaces a desktop control on phones', (navPlacement) => {
+    const resize = viewport(1280);
+    renderShell({}, { themeDoc: { navPlacement }, pageDocs: [...FIXTURE_PAGES,
+      { id: 'about', label: 'About', path: '/about', order: 6, visible: true },
+      { id: 'contact', label: 'Contact', path: '/contact', order: 7, visible: true },
+    ] });
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    const control = navPlacement === 'top'
+      ? within(nav).getByText('More')
+      : screen.getByRole('link', { name: 'Sign in' });
+    control.focus();
+    resize(390);
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveFocus();
+  });
+
+  it.each(['top', 'side'])('restores a replaced %s phone link at desktop width', (navPlacement) => {
+    const resize = viewport(390);
+    renderShell({}, { themeDoc: { navPlacement }, pageDocs: [...FIXTURE_PAGES,
+      { id: 'about', label: 'About', path: '/about', order: 6, visible: true },
+      { id: 'contact', label: 'Contact', path: '/contact', order: 7, visible: true },
+    ] });
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    within(nav).getByRole('link', { name: navPlacement === 'top' ? 'Contact' : 'Sign in' }).focus();
+    resize(1280);
+    expect(navPlacement === 'top'
+      ? within(nav).getByText('More')
+      : screen.getByRole('link', { name: 'Sign in' })).toHaveFocus();
   });
 });
