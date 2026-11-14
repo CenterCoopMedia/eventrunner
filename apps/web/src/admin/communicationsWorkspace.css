@@ -16,7 +16,6 @@
   min-height: var(--admin-control-height);
   padding: var(--space-sm) var(--space-md);
   border: 1px solid rgb(var(--admin-rule-control-rgb));
-  border-block-end-width: 3px;
   border-radius: var(--admin-radius);
   background: rgb(var(--admin-ground-raised-rgb));
   color: rgb(var(--admin-ink-rgb));
@@ -28,6 +27,8 @@
 
 .admin-communications__channel[aria-selected='true'] {
   border-color: rgb(var(--admin-action-rgb));
+  border-block-end-width: 3px;
+  padding-block-end: calc(var(--space-sm) - 2px);
   background: rgb(var(--admin-action-soft-rgb));
   color: rgb(var(--admin-ink-link-rgb));
   border-block-end-color: rgb(var(--admin-action-rgb));
