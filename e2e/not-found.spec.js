@@ -22,6 +22,8 @@ test('404 drag remains active at zero angle and keyboard replay preserves focus'
   await openMissingPage(page);
   const control = page.getByRole('button', { name: controlName });
   const hanging = page.locator('.not-found__hanging');
+  await expect(hanging).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.not-found__ticket')).toHaveCSS('box-shadow', 'none');
   await expect(control).toHaveCSS('touch-action', 'pan-y pinch-zoom');
   await control.scrollIntoViewIfNeeded();
   const box = await control.boundingBox();
@@ -46,11 +48,23 @@ test('404 drag remains active at zero angle and keyboard replay preserves focus'
     await control.press(key);
     await expect(hanging).not.toHaveAttribute('data-replay-marker', 'before');
     await expect(control).toBeFocused();
+    await expect(hanging).toHaveCSS('animation-name', 'ticket-swing');
   }
   await settleTicket(page);
   await page.locator('.not-found').screenshot({ path: 'test-results/admin-visual-evidence/not-found-desktop.png' });
   await page.getByRole('link', { name: 'Go to the home page' }).click();
   await expect(page).toHaveURL(/\/$/);
+});
+
+test('404 artwork stays still on arrival in both colour modes', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  for (const mode of ['light', 'dark']) {
+    await openMissingPage(page);
+    await page.evaluate((value) => { document.documentElement.dataset.mode = value; }, mode);
+    await expect(page.locator('.not-found__hanging')).toHaveCSS('animation-name', 'none');
+    await expect(page.locator('.not-found__ticket')).toHaveCSS('box-shadow', 'none');
+    await page.locator('.not-found').screenshot({ path: `test-results/admin-visual-evidence/not-found-${mode}.png` });
+  }
 });
 
 test('404 reduced motion removes the control and reacts safely during a gesture', async ({ page }) => {

@@ -21,9 +21,9 @@ function subscribeMotion(onChange) {
   return () => query?.removeListener?.(onChange);
 }
 
-function TicketArtwork({ name, angle = 0, dragging = false }) {
+function TicketArtwork({ name, angle = 0, dragging = false, replay = false }) {
   return (
-    <span className="not-found__hanging" data-dragging={dragging}
+    <span className="not-found__hanging" data-dragging={dragging} data-replay={replay}
       style={{ '--ticket-angle': `${angle}deg` }} aria-hidden="true">
       <span className="not-found__cord" />
       <span className="not-found__ticket bg-surface text-text-primary">
@@ -89,7 +89,7 @@ function SwingingTicket({ name }) {
         moved.current = false;
       }}
     >
-      <TicketArtwork key={swing} name={name} angle={angle} dragging={dragging} />
+      <TicketArtwork key={swing} name={name} angle={angle} dragging={dragging} replay={swing > 0} />
     </button>
   );
 }

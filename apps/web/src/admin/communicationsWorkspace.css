@@ -16,6 +16,7 @@
   min-height: var(--admin-control-height);
   padding: var(--space-sm) var(--space-md);
   border: 1px solid rgb(var(--admin-rule-control-rgb));
+  border-block-end-width: 3px;
   border-radius: var(--admin-radius);
   background: rgb(var(--admin-ground-raised-rgb));
   color: rgb(var(--admin-ink-rgb));
@@ -29,7 +30,7 @@
   border-color: rgb(var(--admin-action-rgb));
   background: rgb(var(--admin-action-soft-rgb));
   color: rgb(var(--admin-ink-link-rgb));
-  box-shadow: inset 0 -3px 0 rgb(var(--admin-action-rgb));
+  border-block-end-color: rgb(var(--admin-action-rgb));
 }
 
 .admin-communications__channel:focus-visible {
