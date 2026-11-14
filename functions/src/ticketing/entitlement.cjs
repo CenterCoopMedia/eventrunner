@@ -40,6 +40,9 @@ const {
   internals: { TICKETS },
 } = require('./index.cjs');
 const { ORDERS } = require('./stripeCommerce.cjs');
+const { deriveTicketResourceGrant } = require('shared/ticketAccess');
+const { readTicketResourcePolicy, internals: { GRANTS } } = require('./resourceGrants.cjs');
+const { isDeepStrictEqual } = require('node:util');
 
 const USERS = 'users';
 
@@ -84,14 +87,12 @@ function affectedUids(before, after) {
  *
  * Reads only, inside the caller's transaction.
  *
- * @param {{ db: object, tx: object, uid: string }} deps
+ * @param {{ db: object, tx: object, tickets: object[] }} deps current valid set
  * @returns {Promise<boolean>}
  */
-async function holdsPaidTicket({ db, tx, uid }) {
-  const valid = await tx.get(db.collection(TICKETS)
-    .where('claimedByUid', '==', uid).where('status', '==', VALID));
-  for (const ticket of valid.docs) {
-    const { orderId, externalId } = ticket.data() || {};
+async function holdsPaidTicket({ db, tx, tickets }) {
+  for (const ticket of tickets) {
+    const { orderId, externalId } = ticket;
     if (!isCommerceOrderId(orderId)) return true;
     const order = (await tx.get(db.collection(ORDERS).doc(orderId))).data();
     const seat = order?.seats?.find((entry) => entry?.externalId === externalId);
@@ -144,19 +145,13 @@ async function holdsPaidTicket({ db, tx, uid }) {
  * @returns {Promise<{ uid: string, action: 'updated'|'unchanged'|'held'|'missing',
  *                     registrationStatus: string|null, approvalSource: string|null }>}
  */
-async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
+async function recomputeEntitlement({ db, uid, env = process.env, now = () => new Date() }) {
   if (typeof uid !== 'string' || uid.length === 0) {
     return { uid: '', action: 'missing', registrationStatus: null, approvalSource: null };
   }
 
   const userRef = db.collection(USERS).doc(uid);
   const claimed = db.collection(TICKETS).where('claimedByUid', '==', uid);
-  // Two `limit(1)` existence probes rather than a scan of the user's whole
-  // ticket set: both are served by the one composite index this query shape
-  // needs (firestore.indexes.json, tickets: claimedByUid + status), and the
-  // answer either way is a boolean.
-  const validQuery = claimed.where('status', '==', VALID).limit(1);
-  const undecidedQuery = claimed.where('status', '==', UNDECIDED).limit(1);
 
   return db.runTransaction(async (tx) => {
     // Reads first, all inside the transaction: the account document and the
@@ -168,14 +163,18 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
     }
     const features = await tx.get(db.collection('config').doc('features'));
     const autoApprove = features.data()?.autoApproveTicketHolders === true;
-    const validSnap = await tx.get(validQuery);
+    const tickets = (await tx.get(claimed)).docs.map((ticket) => ticket.data() || {});
+    const validTickets = tickets.filter((ticket) => ticket.status === VALID);
+    const resourcePolicy = await readTicketResourcePolicy({ db, tx, env });
+    const grantRef = db.collection(GRANTS).doc(uid);
+    const storedGrant = resourcePolicy ? (await tx.get(grantRef)).data() : null;
     const data = userSnap.data() || {};
     const current = data.registrationStatus ?? null;
     const approvalSource = data.approvalSource ?? null;
 
-    const hasValidTicket = validSnap.empty === true ? false : validSnap.size > 0;
+    const hasValidTicket = validTickets.length > 0;
     const entitled = computeEntitlement({ hasValidTicket, approvalSource });
-    const paidFor = autoApprove && hasValidTicket && await holdsPaidTicket({ db, tx, uid });
+    const paidFor = autoApprove && hasValidTicket && await holdsPaidTicket({ db, tx, tickets: validTickets });
 
     let next = current;
     let nextSource = approvalSource;
@@ -202,13 +201,9 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
         nextSource = 'ticket';
       }
     } else {
-      const undecidedSnap = await tx.get(undecidedQuery);
-      const hasUndecidedTicket = undecidedSnap.empty === true ? false : undecidedSnap.size > 0;
-      if (hasUndecidedTicket) {
-        if (next === current) {
-          return { uid, action: 'held', registrationStatus: current, approvalSource };
-        }
-      }
+      const hasUndecidedTicket = tickets.some((ticket) => ticket.status === UNDECIDED);
+      // Binary status remains held for pending information. Granular
+      // contributions still settle to the current valid set below.
       if (!hasUndecidedTicket && isValidTransition(current, 'revoked', 'entitlement_lost')) {
         next = 'revoked';
         // The grant that is gone stops being recorded. `approvalSource` says
@@ -220,16 +215,24 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
       }
     }
 
-    if (next === current && nextSource === approvalSource) {
-      return { uid, action: 'unchanged', registrationStatus: current, approvalSource };
+    const grant = resourcePolicy && deriveTicketResourceGrant({ ...resourcePolicy, tickets, uid,
+      registration: { ...data, registrationStatus: next } });
+    const grantChanged = resourcePolicy && !isDeepStrictEqual(grant, storedGrant ?? null);
+    const userChanged = next !== current || nextSource !== approvalSource;
+    if (grantChanged) {
+      if (grant === null) tx.delete(grantRef);
+      else tx.set(grantRef, grant);
     }
-    tx.set(
+    if (userChanged) tx.set(
       userRef,
       { registrationStatus: next, approvalSource: nextSource,
         revocationReason: next === 'revoked' ? 'entitlement_lost' : null, updatedAt: now() },
       { merge: true },
     );
-    return { uid, action: 'updated', registrationStatus: next, approvalSource: nextSource };
+    const held = !entitled && tickets.some((ticket) => ticket.status === UNDECIDED);
+    return { uid, action: userChanged || grantChanged ? 'updated' : held ? 'held' : 'unchanged',
+      registrationStatus: next, approvalSource: nextSource,
+      ...(resourcePolicy && grant === null ? { grantStatus: 'invalid' } : {}) };
   });
 }
 
@@ -250,13 +253,13 @@ async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
  * @returns {(change: { before?: object|null, after?: object|null }) =>
  *   Promise<{ recomputed: Array<object> }>}
  */
-function createOnTicketWritten({ db, now = () => new Date(), log = console, notifyOperator }) {
+function createOnTicketWritten({ db, env = process.env, now = () => new Date(), log = console, notifyOperator }) {
   return async function onTicketWritten({ before = null, after = null } = {}) {
     const uids = affectedUids(before, after);
     const recomputed = [];
     for (const uid of uids) {
       try {
-        const result = await recomputeEntitlement({ db, uid, now });
+        const result = await recomputeEntitlement({ db, uid, env, now });
         recomputed.push(result);
         const newlyValid = after?.claimedByUid === uid && after?.status === VALID &&
           (before?.claimedByUid !== uid || before?.status !== VALID);
@@ -280,7 +283,7 @@ function createOnTicketWritten({ db, now = () => new Date(), log = console, noti
  * grants transactionally, so retries, delayed events, and admin decisions
  * made during the sweep cannot overwrite newer authorization state.
  */
-function createOnApprovalPolicyWritten({ db, now = () => new Date() }) {
+function createOnApprovalPolicyWritten({ db, env = process.env, now = () => new Date() }) {
   return async function onApprovalPolicyWritten({ after = null } = {}) {
     if (after?.autoApproveTicketHolders === true) return;
     let cursor = null;
@@ -291,7 +294,7 @@ function createOnApprovalPolicyWritten({ db, now = () => new Date() }) {
       const page = await query.get();
       if (page.empty) return;
       for (const account of page.docs) {
-        await recomputeEntitlement({ db, uid: account.id, now });
+        await recomputeEntitlement({ db, uid: account.id, env, now });
       }
       cursor = page.docs[page.docs.length - 1].id;
     }
@@ -347,7 +350,6 @@ function buildHandlers() {
 }
 
 module.exports = {
-  holdsPaidTicket,
   recomputeEntitlement,
   createOnTicketWritten,
   createOnApprovalPolicyWritten,

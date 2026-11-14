@@ -141,6 +141,7 @@ const PER_ACCOUNT_STORES = Object.freeze([
   { phase: 'sweep', kind: 'subcollection', subcollection: 'notifications', key: 'notifications' },
   { phase: 'sweep', kind: 'files', prefix: 'profile-photos', key: 'photos' },
   { phase: 'sweep', kind: 'doc', collection: 'profile_photo_uploads', key: 'photoUploads' },
+  { phase: 'sweep', kind: 'doc', collection: 'ticket_access_grants', key: 'ticketResourceGrants' },
   // The change requests the account sent (issue #188) and its rate-limit
   // window. A request is free text, so it must not outlive the identity it
   // was stored against. Sweep, not directory: the account can hold more

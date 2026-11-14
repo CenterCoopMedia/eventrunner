@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "provider": "manual",
+  "eventId": "resource-event",
+  "revision": 1,
+  "lifetime": "current-policy",
+  "classes": [
+    { "id": "day", "resources": { "sessions": { "all": false, "dayIds": ["friday"], "sessionIds": [] }, "directory": true, "attendeeUpdates": true, "interactions": false, "protectedMaterials": "existing-embargo" } },
+    { "id": "workshop", "resources": { "sessions": { "all": false, "dayIds": [], "sessionIds": ["workshop"] }, "directory": false, "attendeeUpdates": false, "interactions": true, "protectedMaterials": "existing-embargo" } }
+  ],
+  "mappings": [
+    { "sourceClassId": "day-pass", "classId": "day" },
+    { "sourceClassId": "workshop-pass", "classId": "workshop" },
+    { "sourceClassId": "general", "classId": "day" },
+    { "sourceClassId": "student", "classId": "workshop" }
+  ]
+}

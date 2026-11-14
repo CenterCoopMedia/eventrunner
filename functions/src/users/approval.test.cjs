@@ -176,6 +176,7 @@ test('approving an already admin-approved account is an unchanged no-op', async 
 
 test('revokeUser takes approved → revoked and CLEARS approvalSource (§3.4)', async () => {
   const db = seeded({ registrationStatus: 'approved', approvalSource: 'admin' });
+  await db.collection('ticket_access_grants').doc('uid-ada').set({ policyRevision: 1, resources: { directory: true } });
   const res = makeRes();
 
   await revoke(db)(req('admin'), res);
@@ -184,6 +185,7 @@ test('revokeUser takes approved → revoked and CLEARS approvalSource (§3.4)', 
   const stored = db.read('users', 'uid-ada');
   assert.equal(stored.registrationStatus, 'revoked');
   assert.equal(stored.approvalSource, null);
+  assert.equal(db.read('ticket_access_grants', 'uid-ada'), undefined);
 });
 
 test('revokeUser takes ticketed → revoked', async () => {

@@ -268,6 +268,7 @@ async function fullySeeded(overrides = {}) {
   const db = makeFakeDb({
     'users/uid-ada': account(overrides),
     'users_public/uid-ada': { displayName: 'Ada Quill', profileVisibility: 'public' },
+    'ticket_access_grants/uid-ada': { policyRevision: 1, resources: { directory: true } },
     'schedule_shares/uid-ada': { sessionIds: ['s1', 's2'], scheduleVisibility: 'public' },
     'sessionBookmarks/s1': { count: 3 },
     'sessionBookmarks/s2': { count: 0 },
@@ -390,7 +391,7 @@ test('the per-account store list is one named constant the delete reads', () => 
     PER_ACCOUNT_STORES.map((store) => store.collection ?? store.subcollection ?? store.prefix),
     [
       'users_public', 'schedule_shares', 'organization_representatives', 'tickets', 'bookmarks',
-      'sessionNotes', 'notifications', 'profile-photos', 'profile_photo_uploads', 'change_requests', 'change_request_rate_limits',
+      'sessionNotes', 'notifications', 'profile-photos', 'profile_photo_uploads', 'ticket_access_grants', 'change_requests', 'change_request_rate_limits',
       'organization_edit_requests', 'ticket_answers', 'session_pitch_rate_limits', 'session_pitches',
       'social_posts', 'social_reports',
     ],
@@ -412,6 +413,7 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
     uid: 'uid-ada',
     removed: {
       tickets: 1, bookmarks: 2, notes: 1, notifications: 2, photos: 2, photoUploads: 1, changeRequests: 2,
+      ticketResourceGrants: 1,
       changeRequestLimits: 1, organizationEdits: 1, registrationAnswers: 1, sessionPitches: 2, sessionPitchLimits: 1,
       socialPosts: 2, socialReports: 1,
     },
@@ -426,6 +428,7 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
   assert.deepEqual(db.read('session_pitch_rate_limits', rateLimitIdFor('uid-ada')), { accountDeletedAt: T0 });
   // Out of the directory, and no longer a representative.
   assert.equal(db.read('users', 'uid-ada'), undefined);
+  assert.equal(db.read('ticket_access_grants', 'uid-ada'), undefined);
   assert.equal(db.read('organization_representatives', 'uid-ada'), undefined);
   assert.equal(db.read('organization_edit_requests', 'beacon-fund'), undefined);
   assert.equal(db.read('users_public', 'uid-ada'), undefined);
@@ -766,6 +769,7 @@ test('the sweep clears more than one page of every store, a page at a time', asy
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.deepEqual(res.body.removed, {
     tickets: 0, bookmarks: 250, notes: 450, notifications: 0, photos: 501, photoUploads: 0, changeRequests: 450,
+    ticketResourceGrants: 0,
     changeRequestLimits: 0, organizationEdits: 0, registrationAnswers: 0, sessionPitches: 0, sessionPitchLimits: 0,
     socialPosts: 0, socialReports: 0,
   });
