@@ -77,6 +77,8 @@ const APP_ID_RE = /^[A-Za-z0-9_-]{1,200}$/;
 const BY = 'build';
 const TIMEOUT_MS = 60_000;
 
+class CertificateWaiting extends Error {}
+
 const MINUTE = 60_000;
 const OPERATION_WAIT_MS = 5_000;
 const OPERATION_POLLS = 240;
@@ -663,7 +665,14 @@ async function stepWebAddress(ctx) {
     }
     await ctx.deps.sleep(CERT_WAIT_MS);
   }
-  throw new Error(`the certificate is not active yet (host ${custom?.hostState || 'unknown'}, certificate ${custom?.cert?.state || 'unknown'}). Retry the build later.`);
+  const detail = `host ${custom?.hostState || 'unknown'}, ownership ${custom?.ownershipState || 'unknown'}, certificate ${custom?.cert?.state || 'unknown'}`;
+  if (['HOST_ACTIVE', 'HOST_UNHOSTED'].includes(custom?.hostState)
+    && ['OWNERSHIP_ACTIVE', 'OWNERSHIP_MISSING', 'OWNERSHIP_PENDING'].includes(custom?.ownershipState)
+    && !custom?.issues?.length
+    && ['CERT_PREPARING', 'CERT_VALIDATING', 'CERT_PROPAGATING'].includes(custom?.cert?.state)) {
+    throw new CertificateWaiting(`the web address is still being set up (${detail}). Check again later.`);
+  }
+  throw new Error(`the certificate is not active yet (${detail}). Retry the build later.`);
 }
 
 /** ADR §6.4: emailed sign-in codes work from these addresses. */
@@ -1537,7 +1546,7 @@ async function runSteps(ctx) {
       row.at = new Date(now());
       await save();
     } catch (err) {
-      row.state = 'failed';
+      row.state = err instanceof CertificateWaiting ? 'waiting' : 'failed';
       row.at = new Date(now());
       row.detail = err.message;
       err.step = step;
@@ -1643,6 +1652,18 @@ async function provision({ appId, testMode = false, deps }) {
     await moveStatus(ctx, 'approved', 'building');
     await runSteps(ctx);
   } catch (err) {
+    if (err instanceof CertificateWaiting) {
+      const finishedAt = new Date(now());
+      await recordRef.update({ state: 'waiting', failedStep: null, error: null, steps: ctx.steps, finishedAt, updatedAt: finishedAt });
+      await quietly(ctx, 'the waiting operator notice', () => notifyOperators(consoleDeps(ctx), {
+        orgId: app.orgId, appId, eventName: ctx.eventName, kind: 'build-waiting',
+      }));
+      await quietly(ctx, 'the waiting Owner notice', () => notifyOwners(consoleDeps(ctx), {
+        orgId: app.orgId, appId, eventName: ctx.eventName, status: 'build-waiting',
+      }));
+      log.log('provision-client: waiting for the web address. Check again later.');
+      return 0;
+    }
     log.error(`provision-client: ${err.step?.id || 'setup'} failed:`, err.message);
     await recordFailure(ctx, err.step, err.message);
     return 1;
@@ -1667,7 +1688,7 @@ async function markStopped({ appId, runId, deps }) {
   ]);
   if (!appSnap.exists || !CONSOLE_REQUEST_GROUPS.building.includes(appSnap.data().status)) return 0;
   const record = recordSnap.exists ? recordSnap.data() : {};
-  if (record.state === 'failed') return 0;
+  if (['failed', 'waiting'].includes(record.state)) return 0;
   if (record.state === 'queued' && runId && record.runUrl?.endsWith(`/actions/runs/${runId}`)) return 0;
   const app = appSnap.data();
   await recordFailure({

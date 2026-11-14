@@ -94,7 +94,7 @@ test('statusChangeMessage says the status in plain words, with the note and the 
 
 test('statusChangeMessage has words for every status after draft and refuses an unknown one', () => {
   assert.deepEqual(Object.keys(STATUS_WORDS).sort(), [
-    'approved', 'build-failed', 'declined', 'launched', 'ready', 'withdrawn',
+    'approved', 'build-failed', 'build-waiting', 'declined', 'launched', 'ready', 'withdrawn',
   ]);
   for (const status of Object.keys(STATUS_WORDS)) {
     assert.ok(statusChangeMessage({ ...change, status, note: null }).text.length > 0, status);
@@ -104,6 +104,13 @@ test('statusChangeMessage has words for every status after draft and refuses an 
   assert.match(accepted, /building your site/);
   assert.match(accepted, /email you when it is ready/);
   assert.match(statusChangeMessage({ ...change, status: 'build-failed', note: null }).text, /did not finish building/);
+  const waiting = statusChangeMessage({ ...change, status: 'build-waiting', note: null });
+  assert.match(waiting.subject, /^Your web address needs more time:/);
+  assert.match(waiting.text, /Setup is paused/);
+  assert.match(waiting.text, /select Check again to resume setup/);
+  assert.match(waiting.text, /must check again before setup can continue/);
+  assert.match(waiting.html, /select Check again/);
+  assert.ok(!/failed|did not finish/.test(waiting.text));
   assert.ok(!statusChangeMessage({ ...change, link: '' }).text.includes('Open your request'));
   assert.throws(() => statusChangeMessage({ ...change, status: 'lost' }), TypeError);
 });
@@ -122,7 +129,14 @@ test('operatorNoticeMessage says what happened to a build, and nothing about a p
   assert.match(failed.subject, /^Build failed:/);
   assert.match(failed.text, /Web address: no certificate\./);
   assert.match(failed.text, /Retry the build/);
-  for (const text of [notStarted, failed.text]) assert.ok(!/pay/i.test(text), text);
+  const waiting = operatorNoticeMessage({ ...notice, kind: 'build-waiting' });
+  assert.match(waiting.subject, /^Waiting for the web address:/);
+  assert.match(waiting.text, /Setup is paused/);
+  assert.match(waiting.text, /select Check again to resume setup/);
+  assert.match(waiting.text, /must check again before setup can continue/);
+  assert.match(waiting.html, /select Check again/);
+  assert.ok(!/failed|did not finish/.test(waiting.text));
+  for (const text of [notStarted, failed.text, waiting.text]) assert.ok(!/pay/i.test(text), text);
 });
 
 const COPY = Object.freeze({
@@ -216,7 +230,7 @@ test('every console email is in the Event Runner frame with its link as a button
   const messages = [
     inviteMessage({ organizationName: 'NC Local', inviterEmail: 'a@b.example', role: 'owner', link: 'https://x.example/i', expiresInDays: 7 }),
     ...Object.keys(STATUS_WORDS).map((status) => statusChangeMessage({ ...change, status, note: 'Use the new logo.' })),
-    ...['started', 'build-failed', 'build-run-failed'].map((kind) => operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a', kind, problem: 'No certificate.' })),
+    ...['started', 'build-waiting', 'build-failed', 'build-run-failed'].map((kind) => operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a', kind, problem: 'No certificate.' })),
     agreementCopyMessage(COPY),
   ];
   for (const { subject, html } of messages) {

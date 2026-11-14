@@ -58,25 +58,26 @@ function buildWentSilent(app, build, at) {
 }
 
 /**
- * A start or a run that failed, or a run that went silent, on a request still
- * waiting for its site. A dispatch whose answer was lost is flagged failed
+ * A failed, waiting or silent run on a request still waiting for its site.
+ * A dispatch whose answer was lost is flagged failed
  * while its run goes on, so a live run wins over the flag.
  */
 function canRetryBuild(app, build, at) {
   if (build?.state === 'running' && !runWentSilent(build, at)) return false;
   return RETRY_STATUSES.includes(app.status)
-    && (app.buildStart?.state === 'failed' || build?.state === 'failed' || buildWentSilent(app, build, at));
+    && (app.buildStart?.state === 'failed' || ['failed', 'waiting'].includes(build?.state) || buildWentSilent(app, build, at));
 }
 
 /** Safe, factual progress. Queued retries cannot reuse the previous run's completed rows. */
 function clientProgress(app, build, at) {
-  const rows = build?.state === 'running' && Array.isArray(build.steps) ? build.steps : [];
+  const hasProgress = ['running', 'waiting'].includes(build?.state);
+  const rows = hasProgress && Array.isArray(build.steps) ? build.steps : [];
   const last = rows.at(-1);
   const index = BUILD_IDS.indexOf(last?.id);
   const current = index >= 0 ? last.id : null;
   const phase = CONSOLE_BUILD_PHASES.find((item) => item.steps.includes(current));
   const done = new Set(rows.filter((row) => row.state === 'done' && BUILD_IDS.includes(row.id)).map((row) => row.id)).size;
-  const started = new Date(toMillis(build?.state === 'running' ? build.startedAt : app.buildStart?.at));
+  const started = new Date(toMillis(hasProgress ? build.startedAt : app.buildStart?.at));
   return {
     current,
     done,
@@ -90,13 +91,16 @@ function clientProgress(app, build, at) {
 
 /** What a client may know: never the error text, the run address or the step detail. */
 function buildForClient(app, build, at, { testMode = false } = {}) {
-  const failed = canRetryBuild(app, build, at);
+  const retryable = canRetryBuild(app, build, at);
+  const waiting = retryable && build?.state === 'waiting';
+  const failed = retryable && !waiting;
   // A retry whose dispatch failed leaves the record `queued`, with the failed step still on it.
   const ticketsFailed = build?.failedStep === TICKETS_STEP;
   // The same check a retry makes, so the page offers a way out of every connection refusal.
   const refused = Boolean(connectionProblem(reviewedAnswers(app)?.tickets?.choice, app.connections, { testMode }));
   return {
-    failed, needsReconnect: failed && (ticketsFailed || refused),
+    failed, needsReconnect: retryable && (ticketsFailed || refused),
+    ...(waiting ? { waiting: true } : {}),
     ...(!failed && RETRY_STATUSES.includes(app.status) ? clientProgress(app, build, at) : {}),
   };
 }

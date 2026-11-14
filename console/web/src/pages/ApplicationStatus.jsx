@@ -32,7 +32,7 @@ function Stages({ app }) {
         const stopped = i === at && app.build?.failed;
         let state = 'Not started';
         if (i < at) state = 'Done';
-        if (i === at) state = stopped ? 'Did not finish' : 'Now';
+        if (i === at) state = stopped ? 'Did not finish' : app.build?.waiting ? 'Waiting' : 'Now';
         if (finished && i === at) state = 'Done';
         const now = i === at && !finished;
         return (
@@ -146,33 +146,39 @@ function Withdraw({ onWithdraw }) {
 }
 
 /**
- * A build that did not finish, in plain words (#608). Never the error text:
+ * A waiting or failed build, in plain words (#608). Never the error text:
  * the client gets the next step, and the hosting team reads the record.
  * Reconnect comes first when the ticket account is why, so a retry that
  * cannot work does not use up the Owner's daily retries.
  */
-function BuildFailed({ app, provider, retrying, onRetry, disabled }) {
+function BuildRecovery({ app, provider, retrying, onRetry, disabled }) {
+  const waiting = app.build?.waiting === true;
   const name = provider ? PROVIDER_COPY[provider].name : null;
   const mayRetry = app.myRole === 'owner' || app.operator;
   const waitsForAccount = Boolean(provider) && !app.connections[provider].connected;
-  let words = 'Your site setup did not finish. Select Retry to continue.';
+  let words = waiting
+    ? 'Your web address needs more time. Wait, then select Check again to continue setup.'
+    : 'Your site setup did not finish. Select Retry to continue.';
   if (provider) {
-    words = waitsForAccount
+    if (waiting) words = `Reconnect your ${name} account below before continuing setup. Then select Check again.`;
+    else words = waitsForAccount
       ? `We did not finish building your site, because we could not use your ${name} account. Reconnect the account below. You can then retry the build.`
       : `We did not finish building your site, because we could not use your ${name} account. Reconnect the account below if you have not, then retry the build.`;
   }
   return (
     <aside className="note stack" role="note">
-      <p className="note-title">The build did not finish</p>
+      <p className="note-title">{waiting ? 'Waiting for your web address' : 'The build did not finish'}</p>
       <p>{words}</p>
       {mayRetry && !waitsForAccount ? (
         <div>
           <button type="button" className="button primary" disabled={retrying || disabled} aria-busy={retrying || undefined} onClick={onRetry}>
-            {retrying ? 'Starting…' : 'Retry'}
+            {retrying ? 'Starting…' : waiting ? 'Check again' : 'Retry'}
           </button>
         </div>
       ) : null}
-      {mayRetry ? null : <p className="muted">Only an Owner can reconnect an account or retry the build. Ask an Owner on your team to open this page.</p>}
+      {mayRetry ? null : <p className="muted">{waiting
+        ? 'Only an Owner can check setup again. Ask an Owner on your team to open this page.'
+        : 'Only an Owner can reconnect an account or retry the build. Ask an Owner on your team to open this page.'}</p>}
     </aside>
   );
 }
@@ -214,10 +220,11 @@ export default function ApplicationStatus() {
 
   const status = app?.status;
   const buildFailed = app?.build?.failed === true;
-  // A failed build can recover externally; only terminal request statuses stop.
+  const buildWaiting = app?.build?.waiting === true;
+  // Paused or failed builds can resume externally; only terminal statuses stop.
   useEffect(() => {
     if (!status || [...CONSOLE_REQUEST_GROUPS.built, ...CONSOLE_REQUEST_GROUPS.closed, 'archived'].includes(status)) return undefined;
-    const delay = !buildFailed && CONSOLE_REQUEST_GROUPS.building.includes(status) ? BUILD_REFRESH_MS : REFRESH_MS;
+    const delay = !buildFailed && !buildWaiting && CONSOLE_REQUEST_GROUPS.building.includes(status) ? BUILD_REFRESH_MS : REFRESH_MS;
     let live = true;
     const poll = async () => {
       await load();
@@ -225,7 +232,7 @@ export default function ApplicationStatus() {
     };
     let timer = setTimeout(poll, delay);
     return () => { live = false; clearTimeout(timer); };
-  }, [load, status, buildFailed]);
+  }, [load, status, buildFailed, buildWaiting]);
 
   const runStartedAt = app?.build?.startedAt;
   const hasBuildProgress = Boolean(app?.build?.current || app?.build?.done);
@@ -299,9 +306,10 @@ export default function ApplicationStatus() {
   const choice = app.answers.tickets.choice;
   const accounts = PROVIDERS.filter((provider) => connectionResults[provider] || app.connections[provider].connected || app.connections[provider].unfinished || (provider === choice && !closed));
   // An account that is gone blocks a retry whichever step failed, so it needs the same way back.
-  const reconnectProvider = app.build?.failed && PROVIDERS.includes(choice) && (app.build.needsReconnect || !app.connections[choice].connected) ? choice : null;
+  const recoverable = buildFailed || buildWaiting;
+  const reconnectProvider = recoverable && PROVIDERS.includes(choice) && (app.build.needsReconnect || !app.connections[choice].connected) ? choice : null;
   const canReconnect = Boolean(reconnectProvider) && app.myRole === 'owner';
-  const underway = CONSOLE_REQUEST_GROUPS.building.includes(app.status) && !app.build?.failed;
+  const underway = CONSOLE_REQUEST_GROUPS.building.includes(app.status) && !recoverable;
   const live = CONSOLE_REQUEST_GROUPS.built.includes(app.status);
   return (
     <section aria-labelledby="status-title" className="console-workspace application-workspace">
@@ -309,7 +317,7 @@ export default function ApplicationStatus() {
         <div className="application-summary">
           <header className="workspace-heading">
             <PageHeading id="status-title" tabIndex={-1}>{title}</PageHeading>
-            <p className="lead application-state">{app.build?.failed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status]}</p>
+            <p className="lead application-state">{buildWaiting ? 'Waiting for your web address' : buildFailed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status]}</p>
           </header>
           {/* The address shows once the site answers there, so nobody opens it to a hosting error page mid-build. */}
           {live && app.address ? (
@@ -320,7 +328,7 @@ export default function ApplicationStatus() {
           {error ? <p className="message error" role="alert">{error}</p> : null}
 
           {state?.copyFailed ? <p className="message error">We could not email your copy of the agreement. Your acceptance is saved, and you can read it below.</p> : null}
-          {app.build?.failed ? <BuildFailed app={app} provider={reconnectProvider} retrying={retrying} onRetry={retry} disabled={Boolean(retryResult?.refreshError)} /> : null}
+          {recoverable ? <BuildRecovery app={app} provider={reconnectProvider} retrying={retrying} onRetry={retry} disabled={Boolean(retryResult?.refreshError)} /> : null}
           <ActionNotice result={retryResult} onRefresh={() => refreshResult('retry')} refreshing={refreshing === 'retry'} />
           {underway ? <BuildUnderway app={app} restarted={restarted} /> : null}
           {app.status === 'declined' && app.note ? (

@@ -7,9 +7,9 @@
  *   mailer.sendInvite({ to, organizationName, inviterEmail, role, link, expiresInDays })
  *   mailer.sendStatusChange({ to, organizationName, eventName, status, link, note })
  *     to a client Owner, when the status of a request changes (ADR 0007 §3)
- *     `status` can also be 'build-failed', when a build stops
+ *     `status` can also be 'build-failed' or 'build-waiting', when a build stops
  *   mailer.sendOperatorNotice({ to, organizationName, eventName, link, kind, problem })
- *     to a CCM operator. `kind` is 'started', 'build-failed' or
+ *     to a CCM operator. `kind` is 'started', 'build-waiting', 'build-failed' or
  *     'build-run-failed', which carries the `problem` text
  *   mailer.sendAgreementCopy({ to, organizationName, eventName, title, version, body, sha256, typedName, legalName, signerTitle, acceptedAt, link })
  *     to the person who accepted the agreement, with a PDF of the text attached
@@ -70,6 +70,7 @@ const STATUS_WORDS = Object.freeze({
   withdrawn: { subject: 'Your request was withdrawn', line: 'An Owner withdrew your request. We will not build this site.' },
   declined: { subject: 'We cannot build this site', line: 'We cannot build this site. Read the note for the reason.' },
   'build-failed': { subject: 'Your site did not finish building', line: 'Your site did not finish building. Open your request to see what to do next.' },
+  'build-waiting': { subject: 'Your web address needs more time', line: 'Your web address needs more time. Setup is paused. Wait, then open your request and select Check again to resume setup. An Owner or the hosting team must check again before setup can continue.' },
 });
 
 const breaks = (text) => escapeHtml(text).replace(/\n/g, '<br>');
@@ -118,6 +119,9 @@ function operatorNoticeMessage({ organizationName, eventName, link, kind = 'star
   const who = `${eventName} from ${organizationName}`;
   const words = {
     started: [`Build started: ${who}`, [`${organizationName} accepted the agreement for ${eventName}. The build is starting.`]],
+    'build-waiting': [`Waiting for the web address: ${who}`, [
+      'The web address needs more time. Setup is paused. Wait, then open the request and select Check again to resume setup. An Owner or operator must check again before setup can continue.',
+    ]],
     'build-failed': [`Build did not start: ${who}`, ['The agreement stands and the request stays approved, but the build did not start. Read the function logs and fix the cause, then select Retry the build on the request.']],
     'build-run-failed': [`Build failed: ${who}`, [
       `The build stopped. ${problem}`,

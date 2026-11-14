@@ -56,6 +56,7 @@ function Team({ team }) {
 const BUILD_STATE_LABELS = Object.freeze({
   queued: 'Waiting',
   running: 'In progress',
+  waiting: 'Waiting',
   done: 'Finished',
   failed: 'Needs attention',
 });
@@ -110,7 +111,7 @@ function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onR
       {canRetry ? (
         <p>
           <button type="button" className="button primary" disabled={retrying || disabled} aria-busy={retrying || undefined} onClick={onRetry}>
-            {retrying ? 'Retrying…' : 'Retry'}
+            {retrying ? 'Retrying…' : build?.state === 'waiting' ? 'Check again' : 'Retry'}
           </button>
         </p>
       ) : null}

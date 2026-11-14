@@ -407,6 +407,50 @@ describe('ApplicationStatus', () => {
     expect(await screen.findByText(/could not email your copy of the agreement/)).toBeInTheDocument();
   });
 
+  describe('a waiting build', () => {
+    const WAITING = { status: 'building', myRole: 'owner', canEdit: false, canWithdraw: false,
+      build: { ...progressAt(3), waiting: true } };
+
+    it('explains waiting without failure wording and resumes through the existing action', async () => {
+      let waiting = true;
+      serveApi({
+        getApplication: () => ({ application: application({ ...WAITING, build: { ...progressAt(3), ...(waiting ? { waiting: true } : {}) } }) }),
+        retryBuild: () => { waiting = false; return { started: true }; },
+      });
+      page();
+      const button = await screen.findByRole('button', { name: 'Check again' });
+      expect(screen.getByRole('note')).toHaveTextContent('Your web address needs more time');
+      expect(screen.queryByText('The build did not finish')).not.toBeInTheDocument();
+      expect(screen.queryByText('You can close this page')).not.toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      const stages = screen.getAllByRole('listitem').filter((item) => item.classList.contains('stage'));
+      expect(stages[1]).toHaveTextContent('Waiting');
+      button.focus();
+      expect(button).toHaveFocus();
+      fireEvent.click(button);
+      expect(await screen.findByText(/We started the build again/)).toBeInTheDocument();
+      expect(callsTo('retryBuild')).toEqual([{ orgId: 'o1', appId: 'a1' }]);
+      expect(screen.getByText('You can close this page')).toBeInTheDocument();
+    });
+
+    it('shows an Editor the wait while keeping the resume action with Owners', async () => {
+      serveStatus({ ...WAITING, myRole: 'editor' });
+      page();
+      expect(await screen.findByRole('note')).toHaveTextContent('Only an Owner can check setup again');
+      expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
+      expect(screen.queryByText('The build did not finish')).not.toBeInTheDocument();
+    });
+
+    it('keeps reconnect recovery available if an account expires during the wait', async () => {
+      serveStatus({ ...WAITING, build: { ...WAITING.build, needsReconnect: true },
+        connections: connections({ stripe: { available: true, connected: false, displayName: null, connectedAt: null }, canChange: true, canDisconnect: true }) });
+      page();
+      expect(await screen.findByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
+      expect(screen.queryByText('The build did not finish')).not.toBeInTheDocument();
+    });
+  });
+
   describe('a failed build', () => {
     const notConnected = { available: true, connected: false, displayName: null, connectedAt: null };
     const FAILED = { status: 'building', canEdit: false, canWithdraw: false, connections: connections({ canChange: false, canDisconnect: false }) };

@@ -26,6 +26,11 @@ const FAILED_RECORD = {
   ],
 };
 
+const WAITING_RECORD = {
+  ...FAILED_RECORD, state: 'waiting', failedStep: null, error: null,
+  steps: FAILED_RECORD.steps.map((row) => row.state === 'failed' ? { ...row, state: 'waiting', detail: 'private certificate detail' } : row),
+};
+
 function setup({ app = {}, record = null, startBuild, extra = {} } = {}) {
   const db = seeded({
     'applications/a1': application({ status: 'approved', buildStart: { state: 'failed', at: new Date(NOW - 500) }, ...app }),
@@ -85,6 +90,46 @@ test('an operator can retry a run that failed while building, and a second click
   assert.equal(db.read('console_builds/a1').state, 'queued');
   await assert.rejects(retryBuild(d, { body: { appId: 'a1' }, user: ops }), { status: 409, code: 'not-retryable' });
   assert.equal(started.length, 1);
+});
+
+test('waiting preserves safe progress without failure or silent-run notices', async () => {
+  const app = application({ status: 'building', buildStart: { state: 'started', at: new Date(NOW - 1000) } });
+  const client = buildForClient(app, WAITING_RECORD, NOW);
+  assert.equal(client.failed, false);
+  assert.equal(client.waiting, true);
+  assert.equal(client.current, 'web-address');
+  assert.equal(client.done, 1);
+  assert.equal(client.needsReconnect, false);
+  assert.ok(!JSON.stringify(client).includes('private certificate detail'));
+  assert.ok(!JSON.stringify(client).includes('github.example'));
+  const { deps: d } = setup({ app, record: WAITING_RECORD });
+  assert.deepEqual(await reportSilentBuilds({ ...d, now: () => NOW + 7 * 60 * 60 * 1000 }), { flagged: [], failed: [] });
+  assert.ok(!d.mailer.sent.some((mail) => mail.status === 'build-failed'));
+});
+
+test('an Owner resumes waiting while an Editor and duplicate retry are refused', async () => {
+  const { db, deps: d, started } = setup({
+    app: { status: 'building', buildStart: { state: 'started', at: new Date(NOW - 1000) } }, record: WAITING_RECORD,
+  });
+  await assert.rejects(retryBuild(d, { body: { appId: 'a1' }, user: ben }), { status: 403 });
+  assert.equal(started.length, 0);
+  await retryBuild(d, { body: { appId: 'a1' }, user: ana });
+  assert.equal(started.length, 1);
+  assert.equal(db.read('console_builds/a1').state, 'queued');
+  await assert.rejects(retryBuild(d, { body: { appId: 'a1' }, user: ana }), { status: 409, code: 'not-retryable' });
+  assert.equal(started.length, 1);
+});
+
+test('waiting still requires an eligible request and usable ticket connection', async () => {
+  for (const status of ['draft', 'ready', 'declined']) {
+    assert.equal(canRetryBuild(application({ status }), WAITING_RECORD, NOW), false);
+  }
+  const { deps: d, started } = setup({ app: { status: 'building', connections: {} }, record: WAITING_RECORD });
+  const client = buildForClient(application({ status: 'building', connections: {} }), WAITING_RECORD, NOW);
+  assert.equal(client.failed, false);
+  assert.equal(client.needsReconnect, true);
+  await assert.rejects(retryBuild(d, { body: { appId: 'a1' }, user: ana }), { status: 409, code: 'connection-needed' });
+  assert.equal(started.length, 0);
 });
 
 test('a failed dispatch answers started false, and can be retried again', async () => {
