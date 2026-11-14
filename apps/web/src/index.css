@@ -2669,6 +2669,21 @@
     .site-header-nav { inline-size: 100%; flex-basis: 100%; }
     .site-header-actions { inline-size: 100%; flex-basis: 100%; }
     .site-header-nav > ul { gap: 0 var(--space-sm); padding-block: var(--space-xs); }
+    .site-header-nav[data-mobile-open="true"] { display: block; }
+    .site-header-nav[data-mobile-open="true"] > ul:first-child {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+    }
+    .site-header-account-actions {
+      inline-size: 100%;
+      margin-inline-start: 0;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .site-header-nav[data-mobile-open="true"] > ul:first-child > li > a,
+    .site-header-account-actions > li > a,
+    .site-header-account-actions > li > button { inline-size: 100%; }
     .site-header-treatment .site-header-identity,
     .site-header-treatment .site-masthead__identity,
     .site-header-identity-row > .nameplate {
