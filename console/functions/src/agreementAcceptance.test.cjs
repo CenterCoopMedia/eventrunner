@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { acceptAgreement, getAgreement } = require('./agreementAcceptance.cjs');
 const { agreementHash, saveAgreement } = require('./consoleSettings.cjs');
+const { createPostmarkMailer } = require('./mailer.cjs');
 const { NOW, ana, applicationDoc, ben, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers, zed } = require('./testData.cjs');
 
 const NAME_HELD = { 'site_names/nclocal': { appId: 'a1', orgId: 'o1', reservedAt: new Date(NOW) } };
@@ -226,6 +227,46 @@ test('the build starts before any email goes out', async () => {
   let sentAtStart = null;
   await accept(deps(db, { mailer, startBuild: async () => { sentAtStart = mailer.sent.length; } }));
   assert.equal(sentAtStart, 0);
+});
+
+test('a transient copy failure retries the accepted version without another acceptance or build', async () => {
+  const db = ready();
+  const mailer = fakeMailer();
+  const requests = [];
+  const starts = [];
+  const waits = [];
+  const transport = createPostmarkMailer({
+    token: 'pm-token', from: 'a@b.example', sleep: async (ms) => waits.push(ms),
+    fetch: async (url, request) => {
+      requests.push({ url, ...request });
+      if (requests.length === 1) {
+        await saveAgreement({ db, now: () => NOW + 60_000 }, {
+          body: { agreement: { title: 'Next agreement', body: 'A changed test paragraph.' } }, user: ops,
+        });
+        return { ok: false, status: 503, json: async () => ({ ErrorCode: 100 }) };
+      }
+      return { ok: true, status: 200 };
+    },
+  });
+  mailer.sendAgreementCopy = transport.sendAgreementCopy;
+  const result = await accept(deps(db, { mailer, startBuild: async (input) => starts.push(input) }));
+  assert.equal(result.body.copySent, true);
+  assert.equal(result.body.buildStarted, true);
+  assert.equal(result.body.status, 'approved');
+  assert.deepEqual(starts, [{ orgId: 'o1', appId: 'a1' }]);
+  assert.equal(records(db).length, 1);
+  assert.equal(records(db)[0].version, 1);
+  assert.deepEqual(records(db)[0].at, new Date(NOW));
+  assert.equal(db.read('console_config/agreement').version, 2);
+  assert.deepEqual(requests[1], requests[0]);
+  assert.equal(requests.length, 2);
+  assert.deepEqual(waits, [1000]);
+  const sent = JSON.parse(requests[1].body);
+  assert.match(sent.TextBody, /Version: 1/);
+  assert.match(sent.TextBody, /November 4, 2026 at 10:00 AM EST/);
+  assert.equal(sent.Attachments[0].Name, 'Event Runner agreement, version 1.pdf');
+  assert.equal(mailer.sent.filter((mail) => mail.kind === 'status').length, 1);
+  assert.equal(mailer.sent.filter((mail) => mail.kind === 'operator').length, 2);
 });
 
 test('a failed start still accepts: the client is told through the status, not an error', async () => {
