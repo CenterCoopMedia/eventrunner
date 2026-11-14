@@ -126,8 +126,9 @@ export const ADMIN_DESKTOP_VIEWPORT = '(min-width: 1024px)';
  * The Overview is staff work: it shows counts only, and the rows behind the
  * unresolved error count stay on the operator-only System errors page.
  *
- * Every group but Settings is staff work. Under Settings, the event
- * settings admit staff (dates, venue, places and social handles are content
+ * Most sections admit staff. The registration form is operator work.
+ * Under Settings, the event settings admit staff (dates, venue, places and
+ * social handles are content
  * an organizer runs; the server holds the sender address back for an
  * operator); features, branding, access and system errors are the
  * operator's, because each one changes what the deployment is rather than
@@ -177,6 +178,7 @@ export const DOCKET = Object.freeze([
     items: [
       { to: 'attendees', label: 'Attendees', tier: 'staff' },
       { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
+      { to: 'registration-form', label: 'Registration form', tier: 'operator' },
       { to: 'invoices', label: 'Invoices', tier: 'staff' },
       { to: 'badges', label: 'Badges', tier: 'staff' },
     ],
@@ -210,9 +212,6 @@ export const DOCKET = Object.freeze([
     icon: 'settings',
     items: [
       { to: 'settings', label: 'Event', tier: 'staff' },
-      // The questions attendees answer (ADR 0008 §4). An operator sets them,
-      // so they sit with the other operator settings.
-      { to: 'registration-form', label: 'Registration form', tier: 'operator' },
       { to: 'features', label: 'Features', tier: 'operator' },
       { to: 'branding', label: 'Branding', tier: 'operator' },
       { to: 'web-address', label: 'Web address', tier: 'operator' },
@@ -831,7 +830,8 @@ function AdminDesk() {
                   onClick={() => setReporting(true)}
                   className={railButtonClass}
                 />
-                <AdminIconControl as={NavLink} to="/" label="View site" icon="globe" className={railButtonClass} />
+                <AdminIconControl as={NavLink} to="/" target="_blank" rel="noopener" label="View site" tooltip="View site (opens in a new tab)" aria-describedby="admin-view-site-hint" icon="globe" className={railButtonClass} />
+                <span id="admin-view-site-hint" className="sr-only">Opens in a new tab.</span>
                 <AdminIconControl onClick={signOut} label="Sign out" icon="signOut" data-admin-action="sign-out" className={railButtonClass} />
               </div>
             </div>

@@ -81,8 +81,8 @@ function StepBody({ step }) {
   if (step.id === 'site') {
     return (
       <p>
-        Open the site with View site. While you are signed in as an admin, each section of a page
-        shows an Edit section link. It opens the editor for that section here.
+        Open the site in a new tab with View site. While you are signed in as an admin, each section of a page
+        shows an Edit section link. It opens the editor for that section in that tab.
       </p>
     );
   }

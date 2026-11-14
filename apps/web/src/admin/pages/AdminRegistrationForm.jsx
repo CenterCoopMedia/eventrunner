@@ -135,6 +135,7 @@ export default function AdminRegistrationForm() {
         // in a preview answer can never save the form.
         actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}>{busy ? 'Saving…' : 'Save'}</button>}
       />
+      <p className={fieldHintClass}>For Stripe tickets, attendees answer the Registration form questions at checkout after you publish tickets; other attendees answer on Complete your registration.</p>
       {listError ? <Notice tone="caution" message="The saved form did not load. Trying again…" /> : null}
       {conflict ? (
         <div className="flex flex-col gap-xs">
