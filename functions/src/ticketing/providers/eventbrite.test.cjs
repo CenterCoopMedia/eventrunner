@@ -412,8 +412,11 @@ test('verifyWebhook: an unrecognized action still verifies (secret+shape ok) but
 // ---------------------------------------------------------------------------
 
 test('fetchOrder: complete order maps attendees to TicketRecord[] (§3.3)', async () => {
+  const source = structuredClone(fixture('order-complete.json'));
+  source.attendees[0].ticket_class_id = 'class-7';
+  source.attendees[0].event_id = 'evt-1';
   const fetchImpl = fakeFetch({
-    'GET /orders/ord-2001/': fixture('order-complete.json'),
+    'GET /orders/ord-2001/': source,
   });
   const p = provider({ fetchImpl });
   const order = await p.fetchOrder('ord-2001');
@@ -426,8 +429,12 @@ test('fetchOrder: complete order maps attendees to TicketRecord[] (§3.3)', asyn
   assert.equal(t1.email, 'ada.lovelace@example.com');
   assert.equal(t1.status, 'valid');
   assert.equal(t1.quantity, 1);
+  assert.equal(t1.ticketClassId, 'class-7');
+  assert.equal(t1.eventId, 'evt-1');
+  assert.deepEqual(t1.raw, source.attendees[0]);
   assert.equal(t1.purchasedAt, '2026-08-01T12:00:00Z');
   assert.equal(t2.email, 'grace.hopper@example.com');
+  assert.equal(t2.eventId, 'evt-1', 'expanded attendees inherit their containing order event');
 });
 
 test('fetchOrder: attendees key absent (processing) → complete: false, empty tickets, drives sync retry', async () => {

@@ -10,7 +10,7 @@
  * "Attendee Email"…), so this endpoint does not assume a header shape. The
  * browser parses the file and sends `{ mapping, rows }`: `mapping` maps our
  * fixed vocabulary (`email`, `id`, `orderId`, `firstName`, `lastName`,
- * `name`, `ticketClass`, `status`, `purchasedAt`) to the CSV's own column
+ * `name`, `ticketClass`, `ticketClassId`, `status`, `purchasedAt`) to the CSV's own column
  * names, and `rows` are the parsed records keyed by THOSE original column
  * names. Only `email` and `id` are required — "order/ticket id" is
  * deliberately one field: most CSV exports have one row per ticket with no
@@ -40,6 +40,7 @@ const {
 } = require('./index.cjs');
 const { upsertTickets } = require('./sync.cjs');
 const { iso } = require('./stripeCommerce.cjs');
+const { normalizeTicketClassId } = require('shared/ticketAccess');
 
 const PROVIDER_NAME = 'manual';
 
@@ -53,7 +54,7 @@ const MAX_CELL_LENGTH = 500;
 /** Every mapping target the admin may point at a CSV column. */
 const REQUIRED_MAPPING_FIELDS = ['email', 'id'];
 const OPTIONAL_MAPPING_FIELDS = [
-  'orderId', 'firstName', 'lastName', 'name', 'ticketClass', 'status', 'purchasedAt',
+  'orderId', 'firstName', 'lastName', 'name', 'ticketClass', 'ticketClassId', 'status', 'purchasedAt',
 ];
 const MAPPING_FIELDS = [...REQUIRED_MAPPING_FIELDS, ...OPTIONAL_MAPPING_FIELDS];
 
@@ -165,6 +166,9 @@ function mapRow({ row, mapping }) {
   }
 
   const ticketClass = mapping.ticketClass ? cell(row[mapping.ticketClass]) || null : null;
+  const classIdCell = mapping.ticketClassId ? cell(row[mapping.ticketClassId]) : '';
+  const ticketClassId = normalizeTicketClassId(classIdCell);
+  if (classIdCell && !ticketClassId) return { ok: false, reasons: ['ticket type ID is not usable as an identifier'] };
   const purchasedAt = mapping.purchasedAt ? cell(row[mapping.purchasedAt]) || null : null;
   const status = normalizeStatus(mapping.status ? cell(row[mapping.status]) : '');
 
@@ -177,6 +181,7 @@ function mapRow({ row, mapping }) {
       firstName,
       lastName,
       ticketClass,
+      ticketClassId,
       quantity: 1,
       purchasedAt,
       status,
@@ -255,8 +260,8 @@ async function gateAdminPost({ auth, db, getConfig }, req, res) {
   return { uid: verdict.uid, email: verdict.email };
 }
 
-/** @param {{ db, auth, getConfig, now?, log? }} deps */
-function createTicketingImportCsvHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+/** @param {{ db, auth, getConfig, eventId?, now?, log? }} deps */
+function createTicketingImportCsvHandler({ db, auth, getConfig, eventId = null, now = Date.now, log = console }) {
   return async function ticketingImportCsv(req, res) {
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
@@ -285,7 +290,7 @@ function createTicketingImportCsvHandler({ db, auth, getConfig, now = Date.now, 
       // `now` returns epoch milliseconds (the admin log's clock); the upsert
       // stores what its clock returns, and a ticket date must be a Date.
       counts = await upsertTickets({
-        db, tickets: preview.validTickets, providerName: PROVIDER_NAME, now: () => new Date(now()), log,
+        db, tickets: preview.validTickets, providerName: PROVIDER_NAME, eventId, now: () => new Date(now()), log,
       });
     } catch (err) {
       log.error('ticketingImportCsv commit failed', err);
@@ -391,6 +396,8 @@ function rowOf(data = {}) {
     firstName: data.firstName ?? null,
     lastName: data.lastName ?? null,
     ticketClass: data.ticketClass ?? null,
+    ticketClassId: data.ticketClassId ?? null,
+    eventId: data.eventId ?? null,
     quantity: data.quantity ?? 1,
     status: data.status ?? null,
     provider: data.provider ?? null,
@@ -424,7 +431,8 @@ function buildHandlers() {
     const { getAuth } = require('firebase-admin/auth');
     const { getEventConfig } = require('../core/config.cjs');
     const db = getDb();
-    return { db, auth: getAuth(), getConfig: () => getEventConfig({ db }), now: Date.now, log: console };
+    return { db, auth: getAuth(), getConfig: () => getEventConfig({ db }),
+      eventId: normalizeTicketClassId(process.env.EVENT_TICKETING_EVENT_ID), now: Date.now, log: console };
   };
 
   return {

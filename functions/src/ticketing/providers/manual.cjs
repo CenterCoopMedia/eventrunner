@@ -74,6 +74,8 @@ function ticketRecordFromDoc(doc) {
     firstName: typeof data.firstName === 'string' ? data.firstName : null,
     lastName: typeof data.lastName === 'string' ? data.lastName : null,
     ticketClass: typeof data.ticketClass === 'string' ? data.ticketClass : null,
+    ticketClassId: typeof data.ticketClassId === 'string' ? data.ticketClassId : null,
+    eventId: typeof data.eventId === 'string' ? data.eventId : null,
     quantity: Number.isInteger(data.quantity) && data.quantity > 0 ? data.quantity : 1,
     purchasedAt: typeof data.purchasedAt === 'string' ? data.purchasedAt : null,
     status: typeof data.status === 'string' ? data.status : 'pending_info',

@@ -348,7 +348,7 @@ test("an order for a different event is dropped, not retried", async () => {
 
 test('the upsert is idempotent and never unclaims a ticket', async () => {
   const db = makeFakeDb();
-  const record = fakeTicket();
+  const record = { ...fakeTicket(), ticketClassId: 'class-7', eventId: 'evt-1' };
 
   await upsertTickets({ db, tickets: [record], providerName: 'eventbrite', now: () => T0, log: QUIET });
   await db.collection('tickets').doc('tkt-1').set(
@@ -369,6 +369,8 @@ test('the upsert is idempotent and never unclaims a ticket', async () => {
   const ticket = db.read('tickets', 'tkt-1');
   assert.equal(ticket.status, 'refunded');
   assert.equal(ticket.ticketClass, 'VIP');
+  assert.equal(ticket.ticketClassId, 'class-7', 'renaming a label does not change the class identity');
+  assert.equal(ticket.eventId, 'evt-1');
   assert.equal(ticket.claimedByUid, 'uid-1', 'a re-sync unclaimed a ticket');
   assert.deepEqual(ticket.claimPromptSentAt, T0);
   assert.deepEqual(ticket.createdAt, T0);
@@ -398,7 +400,7 @@ test('a refund racing a valid upsert commit is preserved on transaction retry', 
   assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
 });
 
-test('normalizeTicket refuses an unkeyable record and buckets unknown statuses', () => {
+test('normalizeTicket refuses an unkeyable record, retains scoped class identity and buckets unknown statuses', () => {
   assert.equal(internals.normalizeTicket({ email: 'a@b.c' }, 'manual'), null);
   assert.equal(internals.normalizeTicket({ externalId: '../x' }, 'manual'), null);
 
@@ -411,6 +413,13 @@ test('normalizeTicket refuses an unkeyable record and buckets unknown statuses',
   assert.equal(normalized.email, 'a@b.c');
   assert.equal(normalized.provider, 'manual');
   assert.equal(normalized.firstName, null);
+  assert.equal(normalized.ticketClassId, null, 'historical labels are not class identifiers');
+  const scoped = internals.normalizeTicket({ externalId: 'tkt-10', ticketClass: 'Full event',
+    ticketClassId: 'workshop-only', eventId: 'original-event', resourceGrant: { all: true } }, 'manual', 'configured-event');
+  assert.equal(scoped.ticketClassId, 'workshop-only');
+  assert.equal(scoped.eventId, 'original-event', 'sync preserves an existing source event identity');
+  assert.equal(Object.hasOwn(scoped, 'resourceGrant'), false);
+  assert.equal(internals.normalizeTicket({ externalId: 'tkt-11' }, 'manual', 'configured-event').eventId, 'configured-event');
 });
 
 test('unkeyable tickets are counted as skipped, not written under a made-up id', async () => {

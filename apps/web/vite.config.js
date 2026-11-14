@@ -97,6 +97,7 @@ export default defineConfig(({ isSsrBuild }) => ({
       'shared/invoice',
       'shared/imageSizes',
       'shared/ticketCommerce',
+      'shared/ticketAccess',
       'shared/webVitals',
     ],
   },
