@@ -164,7 +164,7 @@ function fakeCloud(options = {}) {
         state.batches.push(body.serviceIds);
         for (const name of body.serviceIds) state.services.add(name);
         // Google gives the default compute account Editor when Compute is turned on.
-        if (body.serviceIds.includes('compute.googleapis.com')) {
+        if (body.serviceIds.some((id) => id === 'compute.googleapis.com')) {
           const key = `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`;
           state.policies[key] = [...(state.policies[key] || []), { role: 'roles/editor', members: [`serviceAccount:${COMPUTE}`] }];
         }
