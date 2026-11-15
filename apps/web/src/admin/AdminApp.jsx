@@ -13,12 +13,13 @@
 // from answering before the probe has. Which TIER the admin holds is
 // AdminLayout's concern: each docket item declares the tier it needs, and
 // the layout hides the rest and refuses their routes (issue #186).
-import { Suspense } from 'react';
+import { Suspense, useContext, useEffect } from 'react';
 import { lazyPage as lazy } from '../lib/routePage.jsx';
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
+import { clearReloadFlag } from '../lib/chunkReload.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
-import AdminLayout from './AdminLayout.jsx';
+import AdminLayout, { AdminRecoveryReadyContext } from './AdminLayout.jsx';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import AdminPagesList from './pages/AdminPagesList.jsx';
 import AdminSpeakersList from './pages/AdminSpeakersList.jsx';
@@ -119,6 +120,15 @@ function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
 }
 
+// A static leaf can re-arm recovery after its children commit and the shell's
+// required tour code succeeds. Pending or failed code keeps the reload attempt.
+function StaticAdminPage({ children }) {
+  const { key } = useLocation();
+  const ready = useContext(AdminRecoveryReadyContext);
+  useEffect(() => { if (ready) clearReloadFlag(); }, [key, ready]);
+  return children;
+}
+
 export function AdminGate({ children }) {
   const { user, adminStatus, loading } = useAuth();
   const location = useLocation();
@@ -187,7 +197,7 @@ export default function AdminApp() {
           <Route path="pitches/settings" element={<DeferredAdminPage label="pitch call settings"><AdminPitchSettings /></DeferredAdminPage>} />
           <Route path="pitches/import" element={<DeferredAdminPage label="pitch import"><AdminPitchImport /></DeferredAdminPage>} />
           <Route path="pitches/:pitchId" element={<DeferredAdminPage label="session pitch"><AdminSessionPitch /></DeferredAdminPage>} />
-          <Route path="pages" element={<AdminPagesList />} />
+          <Route path="pages" element={<StaticAdminPage><AdminPagesList /></StaticAdminPage>} />
           <Route path="pages/new" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="create" /></DeferredAdminPage>} />
           <Route path="pages/:pageId" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="edit" /></DeferredAdminPage>} />
           <Route
@@ -231,8 +241,8 @@ export default function AdminApp() {
             path="timeline/:entryId"
             element={<DeferredAdminPage label="entry"><AdminTimelineEditor mode="edit" /></DeferredAdminPage>}
           />
-          <Route path="speakers" element={<AdminSpeakersList />} />
-          <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />
+          <Route path="speakers" element={<StaticAdminPage><AdminSpeakersList /></StaticAdminPage>} />
+          <Route path="speakers/new" element={<StaticAdminPage><AdminSpeakerEditor mode="create" /></StaticAdminPage>} />
           {/* Two segments, so no speaker id can shadow it: an id holds no slash. */}
           <Route
             path="speakers/reminders/send"
@@ -242,7 +252,7 @@ export default function AdminApp() {
             path="speakers/mail/wording"
             element={<DeferredAdminPage label="speaker email wording"><AdminSpeakerMail /></DeferredAdminPage>}
           />
-          <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
+          <Route path="speakers/:speakerId" element={<StaticAdminPage><AdminSpeakerEditor mode="edit" /></StaticAdminPage>} />
           {/* The rail links to the section; the attendee schedule (#518)
               joins the same page, so the section opens on it. */}
           <Route path="reminders" element={<Navigate to="scheduled" replace />} />
@@ -264,9 +274,9 @@ export default function AdminApp() {
             path="updates/:updateId"
             element={<DeferredAdminPage label="update"><AdminUpdateEditor mode="edit" /></DeferredAdminPage>}
           />
-          <Route path="content" element={<AdminContentPages />} />
-          <Route path="content/:pageId" element={<AdminContentSections />} />
-          <Route path="content/:pageId/:sectionId" element={<AdminContentSection />} />
+          <Route path="content" element={<StaticAdminPage><AdminContentPages /></StaticAdminPage>} />
+          <Route path="content/:pageId" element={<StaticAdminPage><AdminContentSections /></StaticAdminPage>} />
+          <Route path="content/:pageId/:sectionId" element={<StaticAdminPage><AdminContentSection /></StaticAdminPage>} />
           {/* '_new', not 'new': a cmsContent field id may legitimately BE
               'new' (SECTION_FIELD_RE only requires an alnum first
               character), which would collide with a static 'new' segment —
@@ -291,11 +301,11 @@ export default function AdminApp() {
               </DeferredAdminPage>
             }
           />
-          <Route path="features" element={<AdminFeatureSettings />} />
+          <Route path="features" element={<StaticAdminPage><AdminFeatureSettings /></StaticAdminPage>} />
           <Route path="badges" element={<DeferredAdminPage label="badges"><AdminBadgeSettings /></DeferredAdminPage>} />
           <Route path="registration-form" element={<DeferredAdminPage label="registration form"><AdminRegistrationForm /></DeferredAdminPage>} />
           <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
-          <Route path="media" element={<AdminMedia />} />
+          <Route path="media" element={<StaticAdminPage><AdminMedia /></StaticAdminPage>} />
           <Route
             path="materials"
             element={<DeferredAdminPage label="materials"><AdminMaterialsTab /></DeferredAdminPage>}
@@ -342,12 +352,12 @@ export default function AdminApp() {
             path="import"
             element={<DeferredAdminPage label="the record import"><AdminRecordImport /></DeferredAdminPage>}
           />
-          <Route path="live-updates" element={<AdminLiveUpdates />} />
+          <Route path="live-updates" element={<StaticAdminPage><AdminLiveUpdates /></StaticAdminPage>} />
           <Route
             path="announcements"
             element={<DeferredAdminPage label="announcements"><AdminAnnouncements /></DeferredAdminPage>}
           />
-          <Route path="feedback" element={<AdminFeedback />} />
+          <Route path="feedback" element={<StaticAdminPage><AdminFeedback /></StaticAdminPage>} />
           <Route
             path="feed-moderation"
             element={<DeferredAdminPage label="feed moderation"><AdminFeedModeration /></DeferredAdminPage>}
@@ -364,16 +374,16 @@ export default function AdminApp() {
             path="data-export"
             element={<DeferredAdminPage label="data export"><AdminDataExport /></DeferredAdminPage>}
           />
-          <Route path="system-errors" element={<AdminSystemErrors />} />
-          <Route path="access" element={<AdminAccess />} />
+          <Route path="system-errors" element={<StaticAdminPage><AdminSystemErrors /></StaticAdminPage>} />
+          <Route path="access" element={<StaticAdminPage><AdminAccess /></StaticAdminPage>} />
           <Route path="web-address" element={<DeferredAdminPage label="web address"><AdminWebAddress /></DeferredAdminPage>} />
           <Route
             path="*"
             element={
-              <AdminEmptyState
+              <StaticAdminPage><AdminEmptyState
                 title="Admin page not found"
                 description="That admin screen doesn’t exist. Pick a section from the docket."
-              />
+              /></StaticAdminPage>
             }
           />
           </Route>

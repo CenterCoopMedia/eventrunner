@@ -6,12 +6,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { Suspense } from 'react';
+import { lazyPage } from '../lib/routePage.jsx';
+import { RELOAD_FLAG } from '../lib/chunkReload.js';
+import ErrorBoundary from '../components/ErrorBoundary.jsx';
 
 let pageRenderFails = false;
+let pageRenderPending = null;
 vi.mock('./pages/AdminPagesList.jsx', async (importOriginal) => {
   const actual = await importOriginal();
   return { ...actual, default: (props) => {
     if (pageRenderFails) throw new Error('Synthetic admin page render failure');
+    if (pageRenderPending) throw pageRenderPending;
     return <actual.default {...props} />;
   } };
 });
@@ -153,6 +159,8 @@ async function renderAt(path) {
 
 beforeEach(() => {
   pageRenderFails = false;
+  pageRenderPending = null;
+  sessionStorage.removeItem(RELOAD_FLAG);
   adminProbeShouldSucceed = true;
   operatorProbeShouldSucceed = true;
   operatorProbeError = null;
@@ -171,8 +179,10 @@ describe('admin route gating', () => {
     const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       pageRenderFails = true;
+      sessionStorage.setItem(RELOAD_FLAG, '1');
       await renderAt('/admin/pages');
       expect(await screen.findByRole('heading', { name: 'This admin page could not be shown' })).toBeInTheDocument();
+      expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
       expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
       openEveryGroup();
       fireEvent.click(screen.getByRole('link', { name: 'Overview', exact: true }));
@@ -181,6 +191,43 @@ describe('admin route gating', () => {
     } finally {
       quiet.mockRestore();
     }
+  });
+
+  it('re-arms recovery after a successful static leaf, then reloads only once for later missing lazy leaves', async () => {
+    sessionStorage.setItem(RELOAD_FLAG, '1');
+    const healthy = await renderAt('/admin/pages');
+    await waitFor(() => expect(sessionStorage.getItem(RELOAD_FLAG)).toBeNull());
+    healthy.unmount();
+    const reload = vi.fn();
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let missing;
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const Missing = lazyPage(() => Promise.resolve(undefined));
+        await act(async () => {
+          missing = render(<MemoryRouter><ErrorBoundary reload={reload}><Suspense fallback={<p>Loading the leaf</p>}><Missing /></Suspense></ErrorBoundary></MemoryRouter>);
+        });
+        expect(reload).toHaveBeenCalledTimes(1);
+        expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+        expect(screen.getByRole('button', { name: 'Reload the page' })).toBeInTheDocument();
+        missing.unmount();
+      }
+    } finally { missing?.unmount(); quiet.mockRestore(); }
+  });
+
+  it('preserves the spent budget until a pending static leaf commits', async () => {
+    await import('./AdminApp.jsx');
+    sessionStorage.setItem(RELOAD_FLAG, '1');
+    let finish;
+    pageRenderPending = new Promise((resolve) => { finish = resolve; });
+    let pending;
+    await act(async () => {
+      pending = render(<MemoryRouter initialEntries={['/admin/pages']}><App /></MemoryRouter>);
+    });
+    expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+    await act(async () => { pageRenderPending = null; finish(); });
+    await waitFor(() => expect(sessionStorage.getItem(RELOAD_FLAG)).toBeNull());
+    pending.unmount();
   });
 
   it('routes an unauthenticated visitor to sign-in instead of the admin area', async () => {

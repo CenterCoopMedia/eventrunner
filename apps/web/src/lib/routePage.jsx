@@ -16,8 +16,8 @@ function requirePageModule(module) {
   return module;
 }
 
-// Only a successful lazy Admin leaf re-arms the budget. Static Admin screens
-// retain a spent budget and keep the manual retry available.
+// A loaded lazy Admin leaf re-arms the budget. AdminApp re-arms static leaves
+// after their successful render commits and the shell's startup code succeeds.
 export function lazyPage(importer) {
   return lazy(() => importer().then((module) => {
     const page = requirePageModule(module);
