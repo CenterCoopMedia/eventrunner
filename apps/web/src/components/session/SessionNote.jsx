@@ -30,10 +30,10 @@ const STATE_TEXT = {
 export default function SessionNote({ uid, sessionId, noteId }) {
   const { draft, state, maxLength, edit, flush, saveNow, discard, unsaved } = useSessionNote(uid, sessionId);
   const labelId = `note-${noteId ?? sessionId}`;
-  const discardRef = useRef(null);
-  // Moving to Discard must not save the text first.
+  const actionsRef = useRef(null);
+  // Moving to Save now or Discard must not save the text first.
   const onBlur = (event) => {
-    if (!discardRef.current || event.relatedTarget !== discardRef.current) flush();
+    if (!actionsRef.current?.contains(event.relatedTarget)) flush();
   };
 
   return (
@@ -62,12 +62,11 @@ export default function SessionNote({ uid, sessionId, noteId }) {
       </p>
       {/* Unsaved text is kept in this browser until it saves or the reader drops it (#1007). */}
       {unsaved ? (
-        <div className="mt-3xs flex flex-wrap gap-x-md">
+        <div ref={actionsRef} className="mt-3xs flex flex-wrap gap-x-md">
           <button type="button" className={quietActionClass} onClick={saveNow}>
             Save now
           </button>
           <button
-            ref={discardRef}
             type="button"
             className={quietActionClass}
             // Keep focus in the field, so a pointer discard does not save first.

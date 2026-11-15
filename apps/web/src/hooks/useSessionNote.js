@@ -8,9 +8,9 @@
 // wait for a submit that may never come.
 //
 // UNSAVED TEXT SURVIVES NAVIGATION (#1007). Each edit also goes to a
-// browser-only recovery copy (lib/localDraft.js), cleared once the server
-// saved that text, when a server answer already holds it, on discard, and
-// at sign-out. A refused save (the ticket grant is updating or does not
+// browser-only recovery copy (lib/localDraft.js), cleared only once the
+// server confirmed a save of that text, on discard, at sign-out, or after a
+// week. A refused save (the ticket grant is updating or does not
 // include the session) keeps the copy. The next visit shows a differing
 // copy as unsaved text and never saves it on its own: the note may have
 // changed since, so only the reader's "Save now" or new typing saves it.
@@ -130,7 +130,7 @@ export function useSessionNote(uid, sessionId) {
     const unsubscribe = subscribeSessionNote(
       uid,
       sessionId,
-      (text, { pending = false } = {}) => {
+      (text) => {
         if (identityRef.current !== identity) return;
         const recoveredListenerError = listenerErrorRef.current;
         listenerErrorRef.current = false;
@@ -141,6 +141,8 @@ export function useSessionNote(uid, sessionId) {
           // An edit typed before this first answer is newer than any copy.
           const typing = latestEditRef.current?.identity === identity;
           const copy = typing ? null : store.read();
+          // A copy that matches the note shows nothing and stays: only a
+          // confirmed save, discard or sign-out removes it.
           if (copy && copy.value !== text) {
             latestEditRef.current = {
               identity, text: copy.value, timer: null, queued: false, force: false, cancelled: false,
@@ -151,8 +153,6 @@ export function useSessionNote(uid, sessionId) {
             setUnsaved(true);
             return;
           }
-          // Held by a server answer (a pending local write may still fail).
-          if (copy && !pending) store.clear();
         }
         setState((current) => {
           if (current === 'loading') return 'saved';

@@ -34,8 +34,7 @@ export function subscribeSessionNote(uid, sessionId, onNext, onError) {
         doc(db, `users/${uid}/sessionNotes/${sessionId}`),
         (snapshot) => {
           const text = snapshot.exists() ? snapshot.data()?.text : '';
-          // `pending`: this tab's own write is not yet confirmed by the server.
-          onNext(typeof text === 'string' ? text : '', { pending: snapshot.metadata?.hasPendingWrites === true });
+          onNext(typeof text === 'string' ? text : '');
         },
         onListenerError,
       ),

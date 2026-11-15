@@ -479,9 +479,12 @@ describe('useSessionNote', () => {
       await vi.advanceTimersByTimeAsync(900);
     });
     expect(saveMock).toHaveBeenCalledTimes(1);
+    // The first tab stop after the field is Save now, then Discard.
+    const saveNow = view.getByRole('button', { name: 'Save now' });
     const discard = view.getByRole('button', { name: 'Discard unsaved text' });
     await act(async () => {
-      fireEvent.blur(textarea, { relatedTarget: discard });
+      fireEvent.blur(textarea, { relatedTarget: saveNow });
+      fireEvent.blur(saveNow, { relatedTarget: discard });
       await Promise.resolve();
     });
     expect(saveMock).toHaveBeenCalledTimes(1);
@@ -490,7 +493,7 @@ describe('useSessionNote', () => {
     expect(Object.keys(localStorage).filter((key) => key.includes('sessionNotes'))).toHaveLength(0);
   });
 
-  it('keeps a copy that matches only a pending local write, and clears it once saved', async () => {
+  it('keeps a copy that matches the note until a confirmed save, without showing it', async () => {
     const copies = () => Object.keys(localStorage).filter((key) => key.includes('sessionNotes'));
     saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
     const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
@@ -499,21 +502,30 @@ describe('useSessionNote', () => {
       await vi.advanceTimersByTimeAsync(900);
     });
     first.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     expect(copies()).toHaveLength(1);
 
+    // A cached or pending answer with the same text proves nothing: the copy stays.
     subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
-      onNext('offline text', { pending: true });
+      onNext('offline text');
       return () => {};
     });
-    render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' })).unmount();
+    const second = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    expect(second.queryByRole('button', { name: 'Save now' })).toBeNull();
+    second.unmount();
     expect(copies()).toHaveLength(1);
 
-    subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
-      onNext('offline text', { pending: false });
-      return () => {};
+    // A save the server confirms removes it.
+    saveMock.mockReset().mockImplementation(async () => {});
+    const third = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    fireEvent.change(third.getByLabelText('Private note'), { target: { value: 'offline text, saved' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
     });
-    render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' })).unmount();
     expect(copies()).toHaveLength(0);
+    third.unmount();
   });
 
   it('keeps the latest text when an earlier pending save and the latest save are both refused', async () => {
