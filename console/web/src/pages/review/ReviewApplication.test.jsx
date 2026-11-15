@@ -246,40 +246,23 @@ describe('ReviewApplication', () => {
       expect(note).toHaveTextContent('Read the function logs');
     });
 
-    it('offers a retry when the build did not start, and shows the result', async () => {
-      let calls = 0;
-      callApi.mockImplementation(async (name) => {
-        if (name === 'retryBuild') {
-          calls += 1;
-          return { started: true };
-        }
-        return { ...request({ buildStart: { state: 'failed', at: '2026-11-04T15:00:00.000Z' } }), canRetryBuild: calls === 0, build: null };
-      });
+    it('links to Deployments to retry a build that did not start', async () => {
+      serve({ ...request({ buildStart: { state: 'failed', at: '2026-11-04T15:00:00.000Z' } }), canRetryBuild: true, build: null });
       page();
-      fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
-      expect(callApi).toHaveBeenCalledWith('retryBuild', { appId: 'a1' });
-      expect(await screen.findByText('Site setup started again.')).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: 'Open Deployments to retry the build' })).toHaveAttribute('href', '/review/deployments');
       expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
 
-    it('shows waiting without an error and lets an operator check again', async () => {
-      let waiting = true;
-      callApi.mockImplementation(async (name) => {
-        if (name === 'retryBuild') { waiting = false; return { started: true }; }
-        return { ...request({ status: 'building' }), canRetryBuild: waiting, build: {
-          state: waiting ? 'waiting' : 'queued', error: null,
-          steps: waiting ? [{ id: 'web-address', state: 'waiting', detail: 'certificate is validating' }] : [],
-        } };
-      });
+    it('shows waiting without an error and links to Deployments to check again', async () => {
+      serve({ ...request({ status: 'building' }), canRetryBuild: true, build: {
+        state: 'waiting', error: null, steps: [{ id: 'web-address', state: 'waiting', detail: 'certificate is validating' }],
+      } });
       page();
-      const button = await screen.findByRole('button', { name: 'Check again' });
+      await screen.findByRole('link', { name: 'Open Deployments to retry the build' });
       expect(screen.getByRole('list', { name: 'Site setup' })).toHaveTextContent('Web address: Waiting');
       expect(screen.getByRole('list', { name: 'Site setup' })).toHaveTextContent('certificate is validating');
       expect(screen.queryByText('Site setup stopped')).not.toBeInTheDocument();
       expect(screen.queryByText('Needs attention')).not.toBeInTheDocument();
-      fireEvent.click(button);
-      expect(callApi).toHaveBeenCalledWith('retryBuild', { appId: 'a1' });
-      expect(await screen.findByText('Site setup started again.')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
     });
 

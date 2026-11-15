@@ -1166,7 +1166,8 @@ async function deploy(ctx, { bootstrap, after }) {
   let previous = null;
   for (let poll = 0; poll < DEPLOY_POLLS; poll += 1) {
     const listed = await call(ctx, 'read the deploy runs', `${workflow}/runs?event=workflow_dispatch&branch=main&per_page=50`, { headers });
-    const latest = (listed.workflow_runs || []).find((run) => run.display_title === title) || null;
+    const latest = (listed.workflow_runs || []).find((run) => run.display_title === title ||
+      (run.display_title?.startsWith(`${title} [build `) && /^\d+\]$/.test(run.display_title.slice(title.length + 8)))) || null;
     const createdAt = Date.parse(latest?.created_at);
     const current = Number.isFinite(createdAt) && createdAt >= earliest;
     const containsRevision = await deploymentHasRevision(ctx, latest);
@@ -1184,7 +1185,7 @@ async function deploy(ctx, { bootstrap, after }) {
       await call(ctx, 'start the deploy', `${workflow}/dispatches`, {
         method: 'POST',
         headers,
-        json: { ref: 'main', inputs: { client: environment, ...(bootstrap ? { provision: 'true', bootstrap: 'true' } : {}) } },
+        json: { ref: 'main', inputs: { client: environment, ...(env.GITHUB_RUN_ID ? { provision_run_id: env.GITHUB_RUN_ID } : {}), ...(bootstrap ? { provision: 'true', bootstrap: 'true' } : {}) } },
       });
       dispatches += 1;
       await sleep(DEPLOY_WAIT_MS);

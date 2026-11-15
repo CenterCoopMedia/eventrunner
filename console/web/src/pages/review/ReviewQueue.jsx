@@ -77,6 +77,7 @@ export default function ReviewQueue() {
       ) : null}
 
       <p className="section"><Link to="/review/links">Signup links</Link></p>
+      <p><Link to="/review/deployments">Deployments</Link></p>
       <p><Link to="/review/settings">Console settings</Link></p>
     </section>
   );

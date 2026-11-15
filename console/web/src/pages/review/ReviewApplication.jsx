@@ -2,7 +2,6 @@ import PageHeading from '../../PageHeading.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { callApi } from '../../api.js';
-import { ActionResult } from '../../ActionFeedback.jsx';
 import { ROLE_LABELS, formatDate } from '../../text.js';
 import { STATUS_LABELS, TICKET_LABELS, formatDateTime } from '../../reviewText.js';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
@@ -78,8 +77,8 @@ const SETUP_STEP_LABELS = Object.freeze({
 });
 
 /** The build record, in full. Only the hosting team sees it. */
-function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onRefresh, refreshing }) {
-  if (!build && !canRetry && !result) return null;
+function BuildRecord({ build, canRetry }) {
+  if (!build && !canRetry) return null;
   return (
     <>
       <h2 id="build-title">Site setup</h2>
@@ -108,14 +107,7 @@ function BuildRecord({ build, canRetry, retrying, onRetry, disabled, result, onR
           {build.runUrl ? <p><a href={build.runUrl}>View setup details</a></p> : null}
         </>
       ) : null}
-      {canRetry ? (
-        <p>
-          <button type="button" className="button primary" disabled={retrying || disabled} aria-busy={retrying || undefined} onClick={onRetry}>
-            {retrying ? 'Retrying…' : build?.state === 'waiting' ? 'Check again' : 'Retry'}
-          </button>
-        </p>
-      ) : null}
-      <ActionResult result={result} onRefresh={onRefresh} refreshing={refreshing} refreshLabel="Refresh site setup" />
+      <p><Link to="/review/deployments">Open Deployments{canRetry ? ' to retry the build' : ''}</Link></p>
     </>
   );
 }
@@ -144,7 +136,6 @@ export default function ReviewApplication() {
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [decisionResult, setDecisionResult] = useState(null);
-  const [retryResult, setRetryResult] = useState(null);
   const [working, setWorking] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [stale, setStale] = useState(false);
@@ -194,26 +185,6 @@ export default function ReviewApplication() {
     }
   }, [appId, data, load, navigate, stale]);
 
-  const retry = useCallback(async () => {
-    if (inFlight.current || stale) return;
-    inFlight.current = true;
-    setWorking('retry');
-    setRetryResult(null);
-    try {
-      const { started } = await callApi('retryBuild', { appId });
-      const problem = await load();
-      setStale(Boolean(problem));
-      setRetryResult({ kind: started ? 'success' : 'error',
-        message: started ? 'Site setup started again.' : 'Site setup did not start. Review the setup details, then retry.',
-        refreshError: problem ? `Site setup could not be refreshed. ${problem}` : '' });
-    } catch (err) {
-      setRetryResult({ kind: 'error', message: err.message });
-    } finally {
-      inFlight.current = false;
-      setWorking('');
-    }
-  }, [appId, load, stale]);
-
   async function refresh() {
     setRefreshing(true);
     const problem = await load();
@@ -221,7 +192,6 @@ export default function ReviewApplication() {
     const message = problem ? `We could not refresh the request. ${problem}` : '';
     setRefreshError(message);
     const update = (current) => current ? { ...current, refreshError: message } : current;
-    setRetryResult(update);
     setDecisionResult(update);
     setRefreshing(false);
   }
@@ -240,7 +210,7 @@ export default function ReviewApplication() {
       </div>
       <p className="folio">{organization.name}</p>
       <p><span className="tag">{STATUS_LABELS[app.status] || 'In progress'}</span></p>
-      {refreshError && !retryResult && !decisionResult ? <p className="message error" role="alert">{refreshError}</p> : null}
+      {refreshError && !decisionResult ? <p className="message error" role="alert">{refreshError}</p> : null}
 
       {app.buildStart?.state === 'failed' && data.build?.state !== 'failed' ? (
         <aside className="note" role="note">
@@ -248,8 +218,7 @@ export default function ReviewApplication() {
           <p>The request stays approved. Read the function logs and fix the cause, then retry the build.</p>
         </aside>
       ) : null}
-      <BuildRecord build={data.build} canRetry={data.canRetryBuild} retrying={working === 'retry'} onRetry={retry}
-        disabled={Boolean(working) || stale || refreshing} result={retryResult} onRefresh={refresh} refreshing={refreshing} />
+      <BuildRecord build={data.build} canRetry={data.canRetryBuild} />
 
       <h2 id="decision-title">Decision</h2>
       {app.review?.note ? (
@@ -259,7 +228,7 @@ export default function ReviewApplication() {
         </aside>
       ) : null}
       <ReviewActions key={app.status} status={app.status} canClose={data.canRetryBuild} onDecide={decide}
-        busy={working === 'decision'} disabled={stale || working === 'retry' || refreshing}
+        busy={working === 'decision'} disabled={stale || Boolean(working) || refreshing}
         result={decisionResult} onRefresh={refresh} refreshing={refreshing} />
 
       <h2 id="answers-title">Answers</h2>

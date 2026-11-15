@@ -365,7 +365,7 @@ function fakeCloud(options = {}) {
       state.runs.push({
         id: state.runs.length + 1,
         head_sha: state.sourceRevision,
-        display_title: `Deploy ${body.inputs.client}${body.inputs.bootstrap === 'true' ? ' (bootstrap)' : ''}`,
+        display_title: `Deploy ${body.inputs.client}${body.inputs.bootstrap === 'true' ? ' (bootstrap)' : ''}${body.inputs.provision_run_id ? ` [build ${body.inputs.provision_run_id}]` : ''}`,
         status: 'completed',
         conclusion: failed ? 'failure' : 'success',
         html_url: `https://github.example/run/${state.runs.length + 1}`,
@@ -1384,8 +1384,8 @@ test('it deploys in the bootstrap order, and seeds between the two deploys', asy
   const fake = setup();
   await provision({ appId: 'a1', deps: fake.deps });
   assert.deepEqual(fake.state.runs.map((r) => [r.display_title, r.inputs.bootstrap]), [
-    ['Deploy nclocal (bootstrap)', 'true'],
-    ['Deploy nclocal', undefined],
+    ['Deploy nclocal (bootstrap) [build 42]', 'true'],
+    ['Deploy nclocal [build 42]', undefined],
   ]);
   const init = fake.commands.find((c) => c.args[0] === 'scripts/init-event.cjs');
   assert.deepEqual(init.args, [
@@ -1484,7 +1484,7 @@ test('a failed first deploy is run again, because its failures are usually trans
   const fake = setup({ cloud: { deployFailures: 2 } });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   const titles = fake.state.runs.map((r) => r.display_title);
-  assert.deepEqual(titles.slice(0, 3), Array(3).fill('Deploy nclocal (bootstrap)'));
+  assert.deepEqual(titles.slice(0, 3), Array(3).fill('Deploy nclocal (bootstrap) [build 42]'));
   assert.match(fake.db.read('console_builds/a1').steps.find((s) => s.id === 'first-deploy').detail, /try 3/);
 });
 
@@ -1660,7 +1660,7 @@ test('a retry on a replaced token deploys again, or the site keeps the old one',
     fake.state.clock += 3600000;
     return provision({ appId: 'a1', deps: fake.deps });
   };
-  const fullDeploys = () => fake.state.runs.filter((r) => r.display_title === 'Deploy nclocal').length;
+  const fullDeploys = () => fake.state.runs.filter((r) => r.display_title === 'Deploy nclocal [build 42]').length;
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fullDeploys(), 1);
   assert.equal(await again(), 0);
@@ -1691,7 +1691,7 @@ test('a retry on another Eventbrite event registers its webhook and records the 
   const { ticketing } = (await fake.clientFirestore.collection('config').doc('providers').get()).data();
   assert.equal(ticketing.externalEventId, '666');
   assert.ok(ticketing.webhookRegisteredAt);
-  assert.equal(fake.state.runs.filter((r) => r.display_title === 'Deploy nclocal').length, 2);
+  assert.equal(fake.state.runs.filter((r) => r.display_title === 'Deploy nclocal [build 42]').length, 2);
 });
 
 test('init-event gets no foreign quota project, and no credential it does not need', async () => {

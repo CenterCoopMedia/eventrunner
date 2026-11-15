@@ -132,9 +132,9 @@ test('operatorNoticeMessage says what happened to a build, and nothing about a p
   const waiting = operatorNoticeMessage({ ...notice, kind: 'build-waiting' });
   assert.match(waiting.subject, /^Waiting for the web address:/);
   assert.match(waiting.text, /Setup is paused/);
-  assert.match(waiting.text, /select Check again to resume setup/);
-  assert.match(waiting.text, /must check again before setup can continue/);
-  assert.match(waiting.html, /select Check again/);
+  assert.match(waiting.text, /open Deployments and select Retry the build to resume setup/);
+  assert.match(waiting.text, /An Owner can also check again on the request status page/);
+  assert.match(waiting.html, /select Retry the build/);
   assert.ok(!/failed|did not finish/.test(waiting.text));
   for (const text of [notStarted, failed.text, waiting.text]) assert.ok(!/pay/i.test(text), text);
 });
@@ -297,7 +297,7 @@ test('every console email is in the Event Runner frame with its link as a button
   const messages = [
     inviteMessage({ organizationName: 'NC Local', inviterEmail: 'a@b.example', role: 'owner', link: 'https://x.example/i', expiresInDays: 7 }),
     ...Object.keys(STATUS_WORDS).map((status) => statusChangeMessage({ ...change, status, note: 'Use the new logo.' })),
-    ...['started', 'build-waiting', 'build-failed', 'build-run-failed'].map((kind) => operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a', kind, problem: 'No certificate.' })),
+    ...['started', 'build-waiting', 'build-failed', 'build-run-failed', 'site-unavailable'].map((kind) => operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a', kind, problem: 'No certificate.' })),
     agreementCopyMessage(COPY),
   ];
   for (const { subject, html } of messages) {

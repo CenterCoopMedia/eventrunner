@@ -23,6 +23,7 @@ const ConsoleSettings = lazyPage(() => import('./pages/review/ConsoleSettings.js
 const ReviewApplication = lazyPage(() => import('./pages/review/ReviewApplication.jsx'));
 const ReviewQueue = lazyPage(() => import('./pages/review/ReviewQueue.jsx'));
 const SignupLinks = lazyPage(() => import('./pages/review/SignupLinks.jsx'));
+const Deployments = lazyPage(() => import('./pages/review/Deployments.jsx'));
 
 const MARK = (
   <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false" className="mark">
@@ -191,6 +192,7 @@ export function AppRoutes() {
           <Route path="/review" element={<ReviewQueue />} />
           <Route path="/review/settings" element={<ConsoleSettings />} />
           <Route path="/review/links" element={<SignupLinks />} />
+          <Route path="/review/deployments" element={<Deployments />} />
           <Route path="/review/:appId" element={<ReviewApplication />} />
         </Route>
         <Route path="*" element={<NotFound />} />

@@ -32,7 +32,7 @@ test('the deploy barrel exports the same endpoints', () => {
 });
 
 test('the scheduled jobs have no Hosting rewrite', () => {
-  assert.deepEqual(Object.keys(SCHEDULED), ['runApplicationRetention', 'runBuildWatch']);
+  assert.deepEqual(Object.keys(SCHEDULED), ['runApplicationRetention', 'runBuildWatch', 'runSiteHealth']);
   for (const name of Object.keys(SCHEDULED)) {
     assert.ok(!firebaseJson.hosting.rewrites.some((r) => r.function?.functionId === name), name);
     assert.equal(typeof buildHandlers()[name], 'function', name);

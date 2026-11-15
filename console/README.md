@@ -4,6 +4,33 @@ The client console is where a client opens a signup link, names its organization
 
 This folder holds sign-in, organizations and the team (P4), the guided setup with its status page (P5), account connections (P6), operator review (P7), signup links and the agreement (ADR 0007, amendments of 2026-11-04), and the start of the site builder (P8). The builder itself is `scripts/provision-client.cjs`, run by `.github/workflows/provision-client.yml`.
 
+## Deployments
+
+The hosting team's **Deployments** page, linked from the review queue, lists every
+site whose build has started or failed to start. It shows the build step, elapsed
+time, last error and run link. **Retry the build** lives here; the request's review
+page links here. Owners retain their retry on the request status page.
+
+The page refreshes once a minute while visible and stops when closed. Recent
+deploy runs include manual dispatches and automatic main deployments, matched
+to the clients in their jobs. **Check earlier runs** pages through earlier GitHub
+runs; an empty page for a site does not mean the site has never deployed.
+
+**Stop the build** requires confirmation, waits for the parent provision run to
+stop, then cancels its tagged deploy runs. If cancellation is still in progress,
+the page reports that and the operator can retry. Created resources stay in
+place. **Redeploy site** requires confirmation and dispatches the recorded
+environment from main for a ready or launched site.
+
+Every 15 minutes, `runSiteHealth` reads each ready or launched site's recorded
+Event Runner address and its admin page. It stores HTTP status and check time,
+and emails the existing console operator list once per outage. Successful
+recipients are recorded; failed recipients are tried again after ten minutes.
+A successful check rearms the next outage notice. The health job has a nine-minute
+execution limit so a slow address does not consume the default one-minute limit.
+It follows no redirects and stores no response text. A redirect counts as an
+answer. These checks do not prove page rendering, sign-in or ticket processing.
+
 ## What is here
 
 | Path | What it is |
