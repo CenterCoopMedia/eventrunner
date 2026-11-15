@@ -665,11 +665,47 @@ test('the web address goes through v1beta1 and the zone, and sign-in allows it',
       ['A', DOMAIN, '192.0.2.1'],
       ['CNAME', `pm-bounces.${DOMAIN}`, 'pm.mtasv.net'],
       ['TXT', `_acme-challenge.${DOMAIN}`, 'cert-proof'],
+      ['TXT', `_dmarc.${DOMAIN}`, 'v=DMARC1; p=none; rua=mailto:info@eventrunner.org'],
       ['TXT', `pm._domainkey.${DOMAIN}`, 'k=rsa; p=key'],
     ].sort(),
   );
   assert.ok(fake.state.dns.every((r) => r.proxied === false));
   assert.deepEqual(fake.state.auth.authorizedDomains, ['localhost', DOMAIN, `${PROJECT}.web.app`, `${PROJECT}.firebaseapp.com`]);
+});
+
+test('a new sender gets one owned DMARC monitoring record in its own subdomain', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const records = fake.state.dns.filter((record) => record.name === `_dmarc.${DOMAIN}`);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].type, 'TXT');
+  assert.equal(records[0].content, 'v=DMARC1; p=none; rua=mailto:info@eventrunner.org');
+  assert.equal(records[0].proxied, false);
+  assert.ok(fake.db.read('console_builds/a1').resources.dnsRecords.some((record) => record.id === records[0].id));
+  assert.ok(!fake.calls.some((call) => call.body?.name === '_dmarc.eventrunner.org'));
+});
+
+for (const policy of ['none', 'quarantine', 'reject']) {
+  test(`an existing client DMARC ${policy} policy stays operator-owned`, async () => {
+    const fake = setup();
+    const record = { id: 'operator-dmarc', type: 'TXT', name: `_dmarc.${DOMAIN}`, content: `"v=DMARC1; p=${policy}; rua=mailto:owner@example.org"` };
+    fake.state.dns.push(record);
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    assert.deepEqual(fake.state.dns.filter((item) => item.name === record.name), [record]);
+    assert.ok(!fake.calls.some((call) => call.method !== 'GET' && call.body?.name === record.name));
+    assert.ok(!fake.db.read('console_builds/a1').resources.dnsRecords.some((item) => item.name === record.name));
+  });
+}
+
+test('multiple client DMARC policies refuse without replacing or adding a policy', async () => {
+  const fake = setup();
+  const records = ['none', 'reject'].map((policy) => ({ id: policy, type: 'TXT', name: `_dmarc.${DOMAIN}`, content: `v=DMARC1; p=${policy}` }));
+  fake.state.dns.push(...records);
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.equal(fake.db.read('console_builds/a1').failedStep, 'email');
+  assert.match(fake.db.read('console_builds/a1').error, /multiple DMARC policies/);
+  assert.deepEqual(fake.state.dns.filter((item) => item.name === `_dmarc.${DOMAIN}`), records);
+  assert.equal(fake.state.runs.length, 0);
 });
 
 for (const certState of ['CERT_PREPARING', 'CERT_VALIDATING']) {
@@ -1921,23 +1957,26 @@ test('the private resource inventory retains deletion identities and DNS proof a
   assert.deepEqual(fake.db.read('console_builds/a1').resources, resources, 'completed verification no longer exposes its original proof, so the inventory must persist');
 });
 
-test('a DNS write with a lost response retains its intent and records its id on retry', async () => {
-  const fake = setup({ initCode: 1 });
-  const fetch = fake.deps.fetch;
-  let loseResponse = true;
-  fake.deps.fetch = async (url, init) => {
-    const response = await fetch(url, init);
-    if (loseResponse && new URL(url).host === 'api.cloudflare.com' && init.method === 'POST') {
-      loseResponse = false;
-      throw new Error('lost response');
-    }
-    return response;
-  };
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
-  const intent = fake.db.read('console_builds/a1').resources.dnsRecords[0];
-  assert.equal(intent.id, undefined);
-  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1, 'the retry reaches the later seed failure');
-  const saved = fake.db.read('console_builds/a1').resources.dnsRecords.find((r) => r.type === intent.type && r.name === intent.name && r.content === intent.content);
-  assert.equal(saved.id, fake.state.dns.find((r) => r.type === intent.type && r.name === intent.name && r.content === intent.content).id);
-  assert.equal(fake.db.read('console_builds/a1').failedStep, 'seed');
-});
+for (const host of [DOMAIN, `_dmarc.${DOMAIN}`]) {
+  test(`a DNS write to ${host} with a lost response retains its intent and records its id on retry`, async () => {
+    const fake = setup({ initCode: 1 });
+    const fetch = fake.deps.fetch;
+    let loseResponse = true;
+    fake.deps.fetch = async (url, init) => {
+      const response = await fetch(url, init);
+      if (loseResponse && new URL(url).host === 'api.cloudflare.com' && init.method === 'POST' && JSON.parse(init.body).name === host) {
+        loseResponse = false;
+        throw new Error('lost response');
+      }
+      return response;
+    };
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+    const intent = fake.db.read('console_builds/a1').resources.dnsRecords.find((record) => record.name === host);
+    assert.equal(intent.id, undefined);
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1, 'the retry reaches the later seed failure');
+    const saved = fake.db.read('console_builds/a1').resources.dnsRecords.find((r) => r.type === intent.type && r.name === intent.name && r.content === intent.content);
+    assert.equal(saved.id, fake.state.dns.find((r) => r.type === intent.type && r.name === intent.name && r.content === intent.content).id);
+    assert.equal(fake.state.dns.filter((record) => record.name === host).length, 1);
+    assert.equal(fake.db.read('console_builds/a1').failedStep, 'seed');
+  });
+}

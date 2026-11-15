@@ -347,6 +347,12 @@ async function dnsRecord(ctx, { type, name, content }) {
   const owned = ctx.resources?.dnsRecords || [];
   const matches = (record) => record.type === type && record.name === host && record.content === value;
   const existing = records.find((record) => record.type === type && record.name === host && record.content.replace(/\.$/, '').replaceAll('"', '') === value);
+  if (type === 'TXT' && host === `_dmarc.${ctx.domain}`) {
+    const policies = records.filter((record) => /^\s*v=DMARC1\s*(?:;|$)/i.test(record.content.replaceAll('"', '')));
+    if (policies.length > 1) throw new Error(`dns: multiple DMARC policies exist for ${ctx.domain}`);
+    // Preserve an operator's policy; matching saved intent still reconciles below.
+    if (policies.length === 1 && !existing) return false;
+  }
   if (existing) {
     // An existing value is ours only if a previous call saved its intent.
     if (existing.id && owned.some((record) => matches(record) && !record.id)) {
@@ -705,6 +711,9 @@ function postmarkServer(ctx, token, label, pathAndQuery, options = {}) {
 async function stepEmail(ctx) {
   const { domain, settings: { environment } } = ctx;
   const notes = [];
+  if (await dnsRecord(ctx, { type: 'TXT', name: `_dmarc.${domain}`, content: 'v=DMARC1; p=none; rua=mailto:info@eventrunner.org' })) {
+    notes.push('wrote the DMARC monitoring policy');
+  }
   const query = new URLSearchParams({ count: '500', offset: '0', name: environment });
   const servers = await postmarkAccount(ctx, 'read the mail servers', `/servers?${query}`);
   let server = (servers.Servers || []).find((item) => item.Name === environment);
