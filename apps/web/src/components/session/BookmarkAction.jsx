@@ -116,6 +116,5 @@ export default function BookmarkAction({ session, bookmarked = false }) {
       {profileLoading ? 'Checking your saved sessions…' : isBookmarked ? 'Bookmarked' : 'Bookmark'}
     </button>
   );
-  if (!ticketState) return button;
-  return <TicketAccessNote text={ticketAccessText(ticketState, 'session')}>{button}</TicketAccessNote>;
+  return <TicketAccessNote text={ticketState ? ticketAccessText(ticketState, 'session') : null}>{button}</TicketAccessNote>;
 }

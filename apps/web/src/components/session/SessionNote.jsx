@@ -26,8 +26,7 @@ const STATE_TEXT = {
  * @param {{ uid: string, sessionId: string, noteId?: string }} props
  */
 export default function SessionNote({ uid, sessionId, noteId }) {
-  const { draft, state, maxLength, edit, flush, discard } = useSessionNote(uid, sessionId);
-  const unsaved = state === 'error' || state === 'denied';
+  const { draft, state, maxLength, edit, flush, discard, unsaved } = useSessionNote(uid, sessionId);
   const labelId = `note-${noteId ?? sessionId}`;
 
   return (
@@ -56,7 +55,13 @@ export default function SessionNote({ uid, sessionId, noteId }) {
       </p>
       {/* Unsaved text is kept in this browser until it saves or the reader drops it (#1007). */}
       {unsaved ? (
-        <button type="button" className={`mt-3xs ${quietActionClass}`} onClick={discard}>
+        <button
+          type="button"
+          className={`mt-3xs ${quietActionClass}`}
+          // Keep focus in the field, so a pointer discard does not save first.
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={discard}
+        >
           Discard unsaved text
         </button>
       ) : null}

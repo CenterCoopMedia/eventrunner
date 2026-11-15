@@ -436,6 +436,56 @@ describe('useSessionNote', () => {
     second.unmount();
   });
 
+  it('keeps Discard through the blur save it starts, and discards', async () => {
+    saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const view = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    const textarea = view.getByLabelText('Private note');
+    fireEvent.change(textarea, { target: { value: 'drop me' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    const delayed = deferred();
+    saveMock.mockImplementationOnce(() => delayed.promise);
+    // Tabbing to the button blurs the field, which saves again.
+    await act(async () => {
+      fireEvent.blur(textarea);
+      await Promise.resolve();
+    });
+    expect(view.getByRole('status').textContent).toBe('Saving…');
+    fireEvent.click(view.getByRole('button', { name: 'Discard unsaved text' }));
+    expect(textarea.value).toBe('');
+    await act(async () => {
+      delayed.reject(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(textarea.value).toBe('');
+    expect(view.queryByRole('button', { name: 'Discard unsaved text' })).toBeNull();
+  });
+
+  it('keeps a copy that matches only a pending local write until the server confirms it', async () => {
+    saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    fireEvent.change(first.getByLabelText('Private note'), { target: { value: 'offline text' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    first.unmount();
+    const copies = () => Object.keys(localStorage).filter((key) => key.includes('sessionNotes'));
+    expect(copies()).toHaveLength(1);
+
+    let deliver;
+    subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
+      deliver = onNext;
+      return () => {};
+    });
+    const second = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    act(() => deliver('offline text', { pending: true }));
+    expect(copies()).toHaveLength(1);
+    act(() => deliver('offline text', { pending: false }));
+    expect(copies()).toHaveLength(0);
+    second.unmount();
+  });
+
   it('another account never sees the unsaved text', async () => {
     saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
     const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));

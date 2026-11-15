@@ -33,6 +33,7 @@ const SAVE_DEBOUNCE_MS = 800;
  *   edit: (next: string) => void,
  *   flush: () => void,
  *   discard: () => void,
+ *   unsaved: boolean,
  * }}
  */
 export function useSessionNote(uid, sessionId) {
@@ -40,6 +41,8 @@ export function useSessionNote(uid, sessionId) {
   const [loading, setLoading] = useState(Boolean(uid && sessionId));
   const [draft, setDraft] = useState(null); // null = mirror `saved`
   const [state, setState] = useState(loading ? 'loading' : 'saved');
+  // From a refused save until a save succeeds or the reader discards.
+  const [unsaved, setUnsaved] = useState(false);
   const timerRef = useRef(null);
   const identityRef = useRef(null);
   const renderedIdentityRef = useRef(null);
@@ -84,6 +87,7 @@ export function useSessionNote(uid, sessionId) {
         setSaved(editRecord.text);
         setDraft(null); // mirror the document again
         setState('saved');
+        setUnsaved(false);
       },
       (err) => {
         editRecord.queued = false;
@@ -92,6 +96,7 @@ export function useSessionNote(uid, sessionId) {
           // The rules refuse a note write when the ticket grant is updating
           // or does not include this session (#557). The draft stays.
           setState(err?.code === 'permission-denied' ? 'denied' : 'error');
+          setUnsaved(true);
         }
       },
     );
@@ -104,6 +109,7 @@ export function useSessionNote(uid, sessionId) {
     copyRef.current = null;
     setSaved('');
     setDraft(null);
+    setUnsaved(false);
 
     if (!uid || !sessionId) {
       identityRef.current = null;
@@ -122,22 +128,27 @@ export function useSessionNote(uid, sessionId) {
     const unsubscribe = subscribeSessionNote(
       uid,
       sessionId,
-      (text) => {
+      (text, { pending = false } = {}) => {
         if (identityRef.current !== identity) return;
         const recoveredListenerError = listenerErrorRef.current;
         listenerErrorRef.current = false;
         setSaved(text);
         setLoading(false);
         if (!restoreChecked) {
-          restoreChecked = true;
           // An edit typed before this first answer is newer than any copy.
           const typing = latestEditRef.current?.identity === identity;
           const copy = typing ? null : store.read();
           if (copy && copy.value !== text) {
+            restoreChecked = true;
             editRef.current?.(copy.value);
             return;
           }
-          if (copy) store.clear();
+          // A matching text that is still a pending local write is not saved
+          // yet: keep the copy and look again at the next answer.
+          if (!copy || !pending) {
+            restoreChecked = true;
+            if (copy) store.clear();
+          }
         }
         setState((current) => {
           if (current === 'loading') return 'saved';
@@ -224,6 +235,7 @@ export function useSessionNote(uid, sessionId) {
     latestEdit.copy?.clear();
     setDraft(null);
     setState('saved');
+    setUnsaved(false);
   }, []);
 
   const flush = useCallback(() => {
@@ -239,5 +251,6 @@ export function useSessionNote(uid, sessionId) {
     edit,
     flush,
     discard,
+    unsaved,
   };
 }

@@ -711,6 +711,24 @@ describe('ticket access states', () => {
     expect(screen.queryByText('Access updating. Try again in a few minutes.')).toBeNull();
   });
 
+  it('keeps the same focused bookmark button when the refusal appears and goes', async () => {
+    setSessionBookmarkedMock.mockRejectedValueOnce(refusal('ticket-resource'));
+    renderActions({ features: { sessionBookmarks: true }, ...signedIn() });
+    const button = screen.getByRole('button', { name: /bookmark/i });
+    button.focus();
+    fireEvent.click(button);
+    await screen.findByText('Your ticket does not include this session.');
+    expect(screen.getByRole('button', { name: /^Bookmark$/i })).toBe(button);
+    expect(button).toHaveFocus();
+    setSessionBookmarkedMock.mockResolvedValueOnce({ bookmarked: true, count: 1 });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(screen.queryByText('Your ticket does not include this session.')).toBeNull();
+    expect(screen.getByRole('button', { name: /bookmark/i })).toBe(button);
+    expect(button).toHaveFocus();
+  });
+
   it('says the ticket does not include the session, and forgets it for another account', async () => {
     setSessionBookmarkedMock.mockRejectedValueOnce(refusal('ticket-resource'));
     const { rerenderActions } = renderActions({ features: { sessionBookmarks: true }, ...signedIn() });

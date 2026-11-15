@@ -144,6 +144,5 @@ export default function ReactionGroup({ session }) {
       })}
     </span>
   );
-  if (!ticketState) return group;
-  return <TicketAccessNote text={ticketAccessText(ticketState, 'session')}>{group}</TicketAccessNote>;
+  return <TicketAccessNote text={ticketState ? ticketAccessText(ticketState, 'session') : null}>{group}</TicketAccessNote>;
 }
