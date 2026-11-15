@@ -10,7 +10,7 @@ const workflow = read('provision-client.yml');
 const writer = read('auto-deploy-enrollment.yml');
 const deletion = read('decommission-client.yml');
 const application = read('decommission-client-application.yml');
-const enrollment = workflow.match(/\n  enroll-auto-deploy:\n([\s\S]*?)(?=\n  [a-z0-9-]+:\n|$)/)?.[1] || '';
+const enrollment = workflow.match(/\n {2}enroll-auto-deploy:\n([\s\S]*?)(?=\n {2}[a-z0-9-]+:\n|$)/)?.[1] || '';
 
 test('only the short post-build enrollment job serializes the shared client-list update', () => {
   assert.match(enrollment, /needs: provision/);
@@ -38,7 +38,7 @@ test('decommission holds the per-application lock through automatic removal and 
   const caller = deletion.slice(deletion.indexOf('\n  decommission:'));
   assert.ok(caller.includes('group: provision-${{ matrix.application_id }}'));
   assert.match(caller, /uses: \.\/\.github\/workflows\/decommission-client-application.yml/);
-  const removal = application.match(/\n  remove-auto-deploy:\n([\s\S]*?)(?=\n  decommission:)/)?.[1] || '';
+  const removal = application.match(/\n {2}remove-auto-deploy:\n([\s\S]*?)(?=\n {2}decommission:)/)?.[1] || '';
   assert.match(removal, /inputs.event_name == 'schedule'.*inputs.mode == 'archive'.*inputs.mode == 'purge-now'/);
   assert.match(removal, /uses: \.\/\.github\/workflows\/auto-deploy-enrollment.yml/);
   assert.ok(removal.includes("inputs.event_name == 'schedule' && 'remove-due' || 'remove'"));
