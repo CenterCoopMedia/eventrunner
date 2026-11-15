@@ -21,6 +21,8 @@ const ACCESS_UPDATING = Object.freeze({ ok: false, status: 403, code: 'access-up
   message: 'Access updating. Try again in a few minutes.' });
 const NOT_INCLUDED = Object.freeze({ ok: false, status: 403, code: 'ticket-resource',
   message: 'Your ticket does not include this session.' });
+const RESOURCE_NOT_INCLUDED = Object.freeze({ ...NOT_INCLUDED,
+  message: 'Your ticket does not include this part of the event.' });
 
 const RESOURCES = Object.freeze(['interactions', 'directory', 'attendeeUpdates']);
 
@@ -61,13 +63,13 @@ function decideSessionGrant({ control, account, grant, session, sessionId, inter
  *
  * @param {{ control: object|null, account: object|null, grant: object|null,
  *           resource: 'interactions'|'directory'|'attendeeUpdates' }} input
- * @returns {{ ok: true } | typeof ACCESS_UPDATING | typeof NOT_INCLUDED}
+ * @returns {{ ok: true } | typeof ACCESS_UPDATING | typeof RESOURCE_NOT_INCLUDED}
  */
 function decideResourceGrant({ control, account, grant, resource }) {
   if (!RESOURCES.includes(resource)) throw new TypeError(`Unknown ticket resource: ${resource}`);
   const { decision, resources } = currentResources({ control, account, grant });
   if (decision) return decision;
-  return resources[resource] === true ? { ok: true } : NOT_INCLUDED;
+  return resources[resource] === true ? { ok: true } : RESOURCE_NOT_INCLUDED;
 }
 
 /** A session write the caller's ticket grant does not allow; carries the decision. */

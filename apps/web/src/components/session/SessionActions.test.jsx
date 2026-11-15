@@ -687,3 +687,45 @@ describe('ReactionGroup, on the detail surface', () => {
     );
   });
 });
+
+// #1007: after a ticket resource policy is published, the server answers 403
+// access-updating or ticket-resource (functions/src/ticketing/resourceAccess.cjs).
+describe('ticket access states', () => {
+  const refusal = (code) => Object.assign(new Error('server words'), { code, status: 403 });
+  const signedIn = (uid = 'u1') => ({ auth: { user: { uid } }, profile: { attendeeAccess: true } });
+
+  it('states access updating beside the bookmark, keeps it usable, and clears on success', async () => {
+    setSessionBookmarkedMock.mockRejectedValueOnce(refusal('access-updating'));
+    renderActions({ features: { sessionBookmarks: true }, ...signedIn() });
+    fireEvent.click(screen.getByRole('button', { name: /bookmark/i }));
+    expect(await screen.findByText('Access updating. Try again in a few minutes.')).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('alert')).toBeNull();
+    const button = screen.getByRole('button', { name: /^Bookmark$/i });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).not.toHaveAttribute('aria-disabled');
+
+    setSessionBookmarkedMock.mockResolvedValueOnce({ bookmarked: true, count: 1 });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(screen.queryByText('Access updating. Try again in a few minutes.')).toBeNull();
+  });
+
+  it('says the ticket does not include the session, and forgets it for another account', async () => {
+    setSessionBookmarkedMock.mockRejectedValueOnce(refusal('ticket-resource'));
+    const { rerenderActions } = renderActions({ features: { sessionBookmarks: true }, ...signedIn() });
+    fireEvent.click(screen.getByRole('button', { name: /bookmark/i }));
+    expect(await screen.findByText('Your ticket does not include this session.')).toBeInTheDocument();
+    rerenderActions({ features: { sessionBookmarks: true }, ...signedIn('u2') });
+    expect(screen.queryByText('Your ticket does not include this session.')).toBeNull();
+  });
+
+  it('states a reaction refusal under the reactions, not as a toast', async () => {
+    setSessionReactionMock.mockRejectedValueOnce(refusal('ticket-resource'));
+    renderActions({ surface: 'detail', features: { sessionReactions: true }, ...signedIn() });
+    fireEvent.click(screen.getByRole('button', { name: /react with 👍/i }));
+    expect(await screen.findByText('Your ticket does not include this session.')).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: /react with 👍/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+});

@@ -6,7 +6,14 @@
 // from being a write — but only just: the note is saved as the attendee
 // types, not on submit, because a browser or a battery has no obligation to
 // wait for a submit that may never come.
+//
+// UNSAVED TEXT SURVIVES NAVIGATION (#1007). Each edit also goes to a
+// browser-only recovery copy (lib/localDraft.js), cleared once the server
+// saved that text, on discard, and at sign-out. A refused save (the ticket
+// grant is updating or does not include the session) keeps the copy, and
+// the next visit restores it and tries again.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { openLocalDraft } from '../lib/localDraft.js';
 import {
   SESSION_NOTE_MAX_LENGTH,
   saveSessionNote,
@@ -25,6 +32,7 @@ const SAVE_DEBOUNCE_MS = 800;
  *   maxLength: number,
  *   edit: (next: string) => void,
  *   flush: () => void,
+ *   discard: () => void,
  * }}
  */
 export function useSessionNote(uid, sessionId) {
@@ -38,6 +46,8 @@ export function useSessionNote(uid, sessionId) {
   const latestEditRef = useRef(null);
   const listenerErrorRef = useRef(false);
   const writeQueueRef = useRef(Promise.resolve());
+  const copyRef = useRef(null); // { identity, store } for the recovery copy
+  const editRef = useRef(null);
   renderedIdentityRef.current = { uid, sessionId };
 
   const queueSave = useCallback((editRecord, force = false) => {
@@ -68,7 +78,9 @@ export function useSessionNote(uid, sessionId) {
         if (!didSave) return;
         const isLatestEdit = latestEditRef.current === editRecord;
         if (isLatestEdit) latestEditRef.current = null;
-        if (identityRef.current !== editRecord.identity || !isLatestEdit) return;
+        if (!isLatestEdit) return;
+        editRecord.copy?.clear();
+        if (identityRef.current !== editRecord.identity) return;
         setSaved(editRecord.text);
         setDraft(null); // mirror the document again
         setState('saved');
@@ -89,6 +101,7 @@ export function useSessionNote(uid, sessionId) {
     clearTimeout(timerRef.current);
     timerRef.current = null;
     listenerErrorRef.current = false;
+    copyRef.current = null;
     setSaved('');
     setDraft(null);
 
@@ -101,6 +114,9 @@ export function useSessionNote(uid, sessionId) {
 
     const identity = { uid, sessionId };
     identityRef.current = identity;
+    const store = openLocalDraft(uid, `users/${uid}/sessionNotes/${sessionId}`, 'note');
+    copyRef.current = { identity, store };
+    let restoreChecked = false;
     setLoading(true);
     setState('loading');
     const unsubscribe = subscribeSessionNote(
@@ -112,6 +128,17 @@ export function useSessionNote(uid, sessionId) {
         listenerErrorRef.current = false;
         setSaved(text);
         setLoading(false);
+        if (!restoreChecked) {
+          restoreChecked = true;
+          // An edit typed before this first answer is newer than any copy.
+          const typing = latestEditRef.current?.identity === identity;
+          const copy = typing ? null : store.read();
+          if (copy && copy.value !== text) {
+            editRef.current?.(copy.value);
+            return;
+          }
+          if (copy) store.clear();
+        }
         setState((current) => {
           if (current === 'loading') return 'saved';
           if (recoveredListenerError && current === 'error' && !latestEditRef.current) {
@@ -167,8 +194,10 @@ export function useSessionNote(uid, sessionId) {
         queued: false,
         force: false,
         cancelled: false,
+        copy: copyRef.current?.identity === identity ? copyRef.current.store : null,
       };
       latestEditRef.current = editRecord;
+      if (editRecord.copy) editRecord.copy.write(bounded, '');
       setDraft(bounded);
       setState('editing');
       clearTimeout(timerRef.current);
@@ -182,6 +211,21 @@ export function useSessionNote(uid, sessionId) {
     [queueSave, uid, sessionId],
   );
 
+  editRef.current = edit;
+
+  /** Drop the unsaved text and its recovery copy; the field shows the saved note. */
+  const discard = useCallback(() => {
+    const latestEdit = latestEditRef.current;
+    if (!latestEdit || latestEdit.identity !== identityRef.current) return;
+    clearTimeout(latestEdit.timer);
+    latestEdit.timer = null;
+    latestEdit.cancelled = true;
+    latestEditRef.current = null;
+    latestEdit.copy?.clear();
+    setDraft(null);
+    setState('saved');
+  }, []);
+
   const flush = useCallback(() => {
     const latestEdit = latestEditRef.current;
     if (latestEdit?.identity === identityRef.current) queueSave(latestEdit, true);
@@ -194,5 +238,6 @@ export function useSessionNote(uid, sessionId) {
     maxLength: SESSION_NOTE_MAX_LENGTH,
     edit,
     flush,
+    discard,
   };
 }

@@ -12,7 +12,7 @@
 // document until the reader edits, so a slow snapshot can never overwrite
 // a keystroke.
 import { useSessionNote } from '../../hooks/useSessionNote.js';
-import { inputClass } from '../controlClasses.js';
+import { inputClass, quietActionClass } from '../controlClasses.js';
 
 const STATE_TEXT = {
   editing: '',
@@ -26,7 +26,8 @@ const STATE_TEXT = {
  * @param {{ uid: string, sessionId: string, noteId?: string }} props
  */
 export default function SessionNote({ uid, sessionId, noteId }) {
-  const { draft, state, maxLength, edit, flush } = useSessionNote(uid, sessionId);
+  const { draft, state, maxLength, edit, flush, discard } = useSessionNote(uid, sessionId);
+  const unsaved = state === 'error' || state === 'denied';
   const labelId = `note-${noteId ?? sessionId}`;
 
   return (
@@ -53,6 +54,12 @@ export default function SessionNote({ uid, sessionId, noteId }) {
       >
         {STATE_TEXT[state] ?? ''}
       </p>
+      {/* Unsaved text is kept in this browser until it saves or the reader drops it (#1007). */}
+      {unsaved ? (
+        <button type="button" className={`mt-3xs ${quietActionClass}`} onClick={discard}>
+          Discard unsaved text
+        </button>
+      ) : null}
     </div>
   );
 }

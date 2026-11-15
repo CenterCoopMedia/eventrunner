@@ -16,6 +16,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { own, useAuthorNames, useSocialAccess, useSocialReports } from '../hooks/useSocialFeed.js';
 import { FEED_PAGE_SIZE, fetchOlderPage, subscribeRootFeed } from '../lib/socialFeedSource.js';
+import { FEED_ACCESS_REFUSED_TEXT } from '../lib/ticketAccess.js';
 import EmptyState from './EmptyState.jsx';
 import LoadingState from './LoadingState.jsx';
 import SocialPostEntry from './SocialPostEntry.jsx';
@@ -96,13 +97,17 @@ export default function AttendeeFeed() {
   let body;
   if (access === 'checking') {
     body = <LoadingState shape="rows" label="Loading the attendee feed…" />;
-  } else if (access === 'denied' || feed.denied) {
+  } else if (access === 'denied') {
     body = (
       <p className="max-w-prose text-body text-text-secondary">
         The attendee feed is open to approved attendees and speakers. It opens for you once your
         registration is approved.
       </p>
     );
+  } else if (feed.denied) {
+    // The account qualifies, so the rules refused the ticket grant (#1006).
+    // The listener keeps retrying and reopens the feed when the grant allows it.
+    body = <p className="max-w-prose text-body text-text-secondary">{FEED_ACCESS_REFUSED_TEXT}</p>;
   } else if (feed.failed) {
     body = (
       <EmptyState

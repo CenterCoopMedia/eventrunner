@@ -41,6 +41,7 @@ import {
 import { db } from '../firebase.js';
 import { IS_DEMO } from './demoMode.js';
 import { resolveFunctionsOrigin } from './errorReporting.js';
+import { ticketAccessState, ticketAccessText } from './ticketAccess.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 
 const POSTS = 'social_posts';
@@ -205,6 +206,8 @@ export async function reportSocialPost({ user, postId, env = import.meta.env, fe
     body = null;
   }
   if (response.ok && body?.reported === true) return { ok: true };
+  const ticket = response.status === 403 ? ticketAccessState(body?.error?.code) : null;
+  if (ticket) return { ok: false, error: ticketAccessText(ticket, 'feed') };
   const message = typeof body?.error?.message === 'string' ? body.error.message : null;
   return { ok: false, error: message || 'The report could not be sent. Try again.' };
 }
