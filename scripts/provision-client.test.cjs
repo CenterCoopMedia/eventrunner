@@ -163,6 +163,11 @@ function fakeCloud(options = {}) {
         if (body.serviceIds.length > 20) return answer({ error: { message: 'SU_MAX_BATCH_SIZE_EXCEEDED' } }, 400);
         state.batches.push(body.serviceIds);
         for (const name of body.serviceIds) state.services.add(name);
+        // Google gives the default compute account Editor when Compute is turned on.
+        if (body.serviceIds.includes('compute.googleapis.com')) {
+          const key = `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`;
+          state.policies[key] = [...(state.policies[key] || []), { role: 'roles/editor', members: [`serviceAccount:${COMPUTE}`] }];
+        }
         return done();
       }
       return answer({ services: [...state.services].map((name) => ({ name: `projects/${NUMBER}/services/${name}`, config: { name } })) });
@@ -604,6 +609,26 @@ test('each grant the rehearsal missed is made up front', async () => {
   }
   assert.equal(holds(project, 'roles/editor', `serviceAccount:${COMPUTE}`), false);
   assert.ok(holds(bindingsOf(fake, `${iam}/${COMPUTE}`), 'roles/iam.serviceAccountTokenCreator', `serviceAccount:${COMPUTE}`), 'compute signs as itself');
+});
+
+test('a new project loses the automatic compute Editor grant and keeps support Editor access', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const project = bindingsOf(fake, `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`);
+  assert.equal(holds(project, 'roles/editor', `serviceAccount:${COMPUTE}`), false);
+  assert.ok(holds(project, 'roles/editor', 'user:jamditis@gmail.com'));
+});
+
+test('a retry on a project an earlier run made leaves the compute Editor grant', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const key = `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`;
+  fake.state.policies[key].push({ role: 'roles/editor', members: [`serviceAccount:${COMPUTE}`] });
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.ok(holds(bindingsOf(fake, key), 'roles/editor', `serviceAccount:${COMPUTE}`));
+  const step = fake.db.read('console_builds/a1').steps.find((entry) => entry.id === 'deploy-identity');
+  assert.match(step.detail, /left any automatic compute Editor grant/);
 });
 
 test('a new project provisions compute secret access and actAs without an appspot account', async () => {

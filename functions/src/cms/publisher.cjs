@@ -159,7 +159,7 @@ async function invokeSitePublisher({
       detail = (await response.text()).slice(0, 300);
     } catch {
       // Body unreadable; the status alone still names the failure class
-      // (403 = the run.invoker grant, 404 = the job was never created).
+      // (403 = the job executor grant, 404 = the job was never created).
     }
     throw new Error(`Cloud Run responded ${response.status}${detail ? `: ${detail}` : ''}`);
   }

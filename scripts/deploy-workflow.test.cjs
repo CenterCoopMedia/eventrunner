@@ -228,10 +228,11 @@ test('the job environment is written with jq, because EVENT_ALLOWED_ORIGINS cont
   assert.doesNotMatch(deploy, /--set-env-vars/);
 });
 
-test('run.invoker is granted on the one job, not project-wide', () => {
-  const grant = step('Grant the functions runtime service account run.invoker on the job');
+test('the job executor role is granted on the one job, not project-wide', () => {
+  const grant = step('Grant the functions runtime service account the job executor role');
   assert.match(grant, /gcloud run jobs add-iam-policy-binding site-publisher/);
-  assert.match(grant, /--role roles\/run\.invoker/);
+  // cmsPublish starts the job with a PUBLISH_QUEUE_ID container override.
+  assert.match(grant, /--role roles\/run\.jobsExecutorWithOverrides/);
   // The default runtime identity is derived from the project NUMBER (the
   // default compute service account), not guessed from the project id.
   assert.match(grant, /-compute@developer\.gserviceaccount\.com/);
