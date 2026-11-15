@@ -142,10 +142,13 @@ function createReactToSessionHandler({ db, auth, getConfig, now = Date.now, log 
       return notFound(res, 'Session reactions are not enabled for this event.');
     }
 
-    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
+    const { sessionId, emoji } = req.body || {};
+    // Setting a reaction needs session coverage and the interactions grant;
+    // clearing one keeps the binary gate.
+    const session = emoji != null && typeof sessionId === 'string' && sessionId ? { id: sessionId, interactions: true } : undefined;
+    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req, { session });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
-    const { sessionId, emoji } = req.body || {};
     if (typeof sessionId !== 'string' || !sessionId) {
       return badRequest(res, 'sessionId: must be a non-empty string');
     }

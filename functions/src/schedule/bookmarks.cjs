@@ -118,10 +118,13 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
       return notFound(res, 'Session bookmarking is not enabled for this event.');
     }
 
-    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
+    const { sessionId, bookmarked, expectedScheduleVisibility } = req.body || {};
+    // Adding needs the caller's ticket grant for this session; removal keeps
+    // the binary gate so a downgraded attendee can still tidy their schedule.
+    const session = bookmarked === true && typeof sessionId === 'string' && sessionId ? { id: sessionId } : undefined;
+    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req, { session });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
-    const { sessionId, bookmarked, expectedScheduleVisibility } = req.body || {};
     if (typeof sessionId !== 'string' || !sessionId) {
       return badRequest(res, 'sessionId: must be a non-empty string');
     }

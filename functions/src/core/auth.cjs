@@ -48,6 +48,7 @@
  */
 
 const { hasAttendeeAccess } = require('shared/registration');
+const { checkSessionGrant } = require('../ticketing/resourceAccess.cjs');
 
 const BEARER_RE = /^Bearer\s+(\S+)$/i;
 const APP_CHECK_HEADER = 'X-Firebase-AppCheck';
@@ -416,11 +417,17 @@ async function requireAdmin({ auth, db, getConfig, now = Date.now }, req, { tier
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
  *           db: FirebaseFirestore.Firestore,
  *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[], staffEmails?: string[] } | null }> }} deps
+ * A protected write on one session also names it: `{ session: { id,
+ * interactions } }`. After the binary gate, a published ticket resource
+ * policy then requires the caller's grant to cover that session
+ * (ticketing/resourceAccess.cjs). Bootstrap admins/staff skip that check.
+ *
  * @param {object} req
+ * @param {{ session?: { id: string, interactions?: boolean } }} [request]
  * @returns {Promise<{ ok: true, uid: string, email: string|null } |
  *                    { ok: false, status: 401|403|500, code: string, message: string }>}
  */
-async function requireAttendeeAccess({ auth, db, getConfig }, req) {
+async function requireAttendeeAccess({ auth, db, getConfig }, req, { session } = {}) {
   const decoded = await verifyAuthToken({ auth }, req);
   if (!decoded?.uid) {
     return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
@@ -460,6 +467,11 @@ async function requireAttendeeAccess({ auth, db, getConfig }, req) {
       code: 'forbidden',
       message: 'Attendee access required.',
     };
+  }
+  if (session && !isBootstrapAdmin) {
+    const decision = await checkSessionGrant({ db, uid: decoded.uid, account: data,
+      sessionId: session.id, interactions: session.interactions === true });
+    if (!decision.ok) return decision;
   }
   // viaAccount: admitted through users/{uid} rather than the bootstrap list.
   // A write that must not outlive the account (a bookmark, which an account

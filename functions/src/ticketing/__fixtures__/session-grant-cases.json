@@ -1,0 +1,476 @@
+[
+ {
+  "name": "no policy keeps the binary gate",
+  "control": null,
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": null,
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": false,
+  "expected": "allow"
+ },
+ {
+  "name": "first sweep before publication keeps the binary gate",
+  "control": {
+   "effectiveRevision": 0,
+   "candidateRevision": 1
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": null,
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": false,
+  "expected": "allow"
+ },
+ {
+  "name": "day pass covers a session on its canonical day",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [
+      "friday"
+     ],
+     "sessionIds": []
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": false,
+  "expected": "allow"
+ },
+ {
+  "name": "day pass does not cover another day",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [
+      "friday"
+     ],
+     "sessionIds": []
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "workshop",
+  "session": {
+   "dayId": "saturday"
+  },
+  "interactions": false,
+  "expected": "ticket-resource"
+ },
+ {
+  "name": "workshop pass covers its named session",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [],
+     "sessionIds": [
+      "workshop"
+     ]
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "workshop",
+  "session": {
+   "dayId": "saturday"
+  },
+  "interactions": false,
+  "expected": "allow"
+ },
+ {
+  "name": "full pass covers every session",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": true,
+     "dayIds": [],
+     "sessionIds": []
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "workshop",
+  "session": {
+   "dayId": "saturday"
+  },
+  "interactions": false,
+  "expected": "allow"
+ },
+ {
+  "name": "combined day and workshop passes cover both",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [
+      "friday"
+     ],
+     "sessionIds": [
+      "workshop"
+     ]
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "workshop",
+  "session": {
+   "dayId": "saturday"
+  },
+  "interactions": false,
+  "expected": "allow"
+ },
+ {
+  "name": "unknown or refunded classes contribute nothing",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [],
+     "sessionIds": []
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": false,
+  "expected": "ticket-resource"
+ },
+ {
+  "name": "missing grant fails closed as access updating",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": null,
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": false,
+  "expected": "access-updating"
+ },
+ {
+  "name": "grant from an older revision fails closed",
+  "control": {
+   "effectiveRevision": 2,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": true,
+     "dayIds": [],
+     "sessionIds": []
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": false,
+  "expected": "access-updating"
+ },
+ {
+  "name": "sweep in progress fails closed",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": 2
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": true,
+     "dayIds": [],
+     "sessionIds": []
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": false,
+  "expected": "access-updating"
+ },
+ {
+  "name": "approved account with no approval source needs a grant",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "speakerId": null
+  },
+  "grant": null,
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": false,
+  "expected": "access-updating"
+ },
+ {
+  "name": "admin approval keeps full access",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "admin",
+   "speakerId": null
+  },
+  "grant": null,
+  "sessionId": "workshop",
+  "session": {
+   "dayId": "saturday"
+  },
+  "interactions": false,
+  "expected": "allow"
+ },
+ {
+  "name": "verified speaker keeps full access",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "pending",
+   "approvalSource": null,
+   "speakerId": "spk-1"
+  },
+  "grant": null,
+  "sessionId": "workshop",
+  "session": {
+   "dayId": "saturday"
+  },
+  "interactions": false,
+  "expected": "allow"
+ },
+ {
+  "name": "missing canonical day is not covered by a day pass",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [
+      "friday"
+     ],
+     "sessionIds": []
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "keynote",
+  "session": {},
+  "interactions": false,
+  "expected": "ticket-resource"
+ },
+ {
+  "name": "reactions need the interactions grant",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [
+      "friday"
+     ],
+     "sessionIds": []
+    },
+    "interactions": false
+   }
+  },
+  "sessionId": "keynote",
+  "session": {
+   "dayId": "friday"
+  },
+  "interactions": true,
+  "expected": "ticket-resource"
+ },
+ {
+  "name": "reactions allowed with interactions and coverage",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [],
+     "sessionIds": [
+      "workshop"
+     ]
+    },
+    "interactions": true
+   }
+  },
+  "sessionId": "workshop",
+  "session": {
+   "dayId": "saturday"
+  },
+  "interactions": true,
+  "expected": "allow"
+ },
+ {
+  "name": "interactions alone do not cover a session",
+  "control": {
+   "effectiveRevision": 1,
+   "candidateRevision": null
+  },
+  "account": {
+   "registrationStatus": "approved",
+   "approvalSource": "ticket",
+   "speakerId": null
+  },
+  "grant": {
+   "policyRevision": 1,
+   "resources": {
+    "sessions": {
+     "all": false,
+     "dayIds": [
+      "friday"
+     ],
+     "sessionIds": []
+    },
+    "interactions": true
+   }
+  },
+  "sessionId": "workshop",
+  "session": {
+   "dayId": "saturday"
+  },
+  "interactions": true,
+  "expected": "ticket-resource"
+ }
+]
