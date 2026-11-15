@@ -146,6 +146,9 @@ const COMPUTE_ROLES = Object.freeze([
   // The default build account reads source, writes images and build logs.
   // This role also covers the runtime's Storage object reads and writes.
   'roles/cloudbuild.builds.builder',
+  // Scheduler, Eventarc and Firestore trigger deliveries invoke the functions.
+  'roles/run.invoker',
+  'roles/eventarc.eventReceiver',
 ]);
 
 // Who a project or an Environment was made for, so a build never takes over another's.
@@ -267,20 +270,30 @@ async function finish(ctx, label, origin, operation) {
 }
 
 /**
- * Add the bindings a policy lacks, and write nothing when it has them all.
+ * Add the bindings a policy lacks, remove the unconditional `revoke`
+ * bindings it holds, and write nothing when there is no change.
  * A new agent or account takes minutes to reach IAM, so a refusal is tried
  * again. `agents` maps a member to the service whose agent must exist first.
  *
- * @returns {Promise<number>} how many bindings it added
+ * @returns {Promise<number>} how many bindings it added or removed
  */
-async function grant(ctx, label, resource, wanted, { readVia = 'POST', readJson = {}, agents = {} } = {}) {
+async function grant(ctx, label, resource, wanted, { readVia = 'POST', readJson = {}, agents = {}, revoke = [] } = {}) {
   for (let attempt = 1; ; attempt += 1) {
     const policy = await google(ctx, `${label}: read`, `${resource}:getIamPolicy`, readVia === 'GET' ? {} : { method: 'POST', json: readJson });
-    const bindings = (policy.bindings || []).map((binding) => ({ ...binding, members: [...(binding.members || [])] }));
+    let bindings = (policy.bindings || []).map((binding) => ({ ...binding, members: [...(binding.members || [])] }));
     const missing = wanted.filter(({ role, member }) => !bindings.some((binding) => (
       binding.role === role && !binding.condition && binding.members.includes(member)
     )));
-    if (missing.length === 0) return 0;
+    const held = revoke.filter(({ role, member }) => bindings.some((binding) => (
+      binding.role === role && !binding.condition && binding.members.includes(member)
+    )));
+    if (missing.length === 0 && held.length === 0) return 0;
+    for (const { role, member } of held) {
+      for (const binding of bindings) {
+        if (binding.role === role && !binding.condition) binding.members = binding.members.filter((m) => m !== member);
+      }
+    }
+    bindings = bindings.filter((binding) => binding.members.length > 0);
     for (const service of new Set(missing.map(({ member }) => agents[member]).filter(Boolean))) {
       const op = await google(ctx, `${label}: make the ${service} agent`, `${USAGE_BETA}/projects/${ctx.projectNumber}/services/${service}:generateServiceIdentity`, { method: 'POST', json: {} });
       await finish(ctx, `${label}: make the ${service} agent`, USAGE_BETA, op);
@@ -292,7 +305,7 @@ async function grant(ctx, label, resource, wanted, { readVia = 'POST', readJson 
     }
     try {
       await google(ctx, `${label}: write`, `${resource}:setIamPolicy`, { method: 'POST', json: { policy: { ...policy, bindings } } });
-      return missing.length;
+      return missing.length + held.length;
     } catch (err) {
       if (attempt >= IAM_ATTEMPTS || ![400, 409].includes(err.status)) throw err;
       await ctx.deps.sleep(IAM_WAIT_MS);
@@ -394,6 +407,7 @@ async function stepProject(ctx) {
     });
     await finish(ctx, 'create the project', CRM, op);
     project = await google(ctx, 'read the project', projectResource(ctx));
+    ctx.createdProject = true;
     notes.push('created the project');
   }
   if (project.parent !== settings.gcpFolder) throw new Error(`project ${projectId} exists outside the client folder`);
@@ -522,15 +536,19 @@ async function stepDeployIdentity(ctx) {
   const storageAgent = serviceAccount(`service-${projectNumber}@gs-project-accounts.iam.gserviceaccount.com`);
   const pubsubAgent = serviceAccount(`service-${projectNumber}@gcp-sa-pubsub.iam.gserviceaccount.com`);
   const rulesAgent = serviceAccount(`service-${projectNumber}@gcp-sa-firebasestorage.iam.gserviceaccount.com`);
-  const added = await grant(ctx, 'project roles', projectResource(ctx), [
+  // Google gives the compute account Editor when the Compute API is turned on.
+  // COMPUTE_ROLES and the bindings below cover what the runtime calls, so a
+  // project this run created loses that grant before its first deploy. A
+  // retry leaves it; scripts/compute-editor-plan.cjs plans older projects.
+  const revoke = ctx.createdProject ? [{ role: 'roles/editor', member: serviceAccount(compute) }] : [];
+  if (!ctx.createdProject) notes.push('left any automatic compute Editor grant on a project an earlier run made');
+  const changed = await grant(ctx, 'project roles', projectResource(ctx), [
     ...[...DEPLOY_ROLES, `projects/${projectId}/roles/${INVOKER_ROLE}`].map((name) => ({ role: name, member: deployMember })),
     ...COMPUTE_ROLES.map((role) => ({ role, member: serviceAccount(compute) })),
     ...supportAdminEmails(ctx).map((email) => ({ role: 'roles/editor', member: `user:${email}` })),
     { role: 'roles/pubsub.publisher', member: storageAgent },
     { role: 'roles/iam.serviceAccountTokenCreator', member: pubsubAgent },
     { role: 'roles/firebaserules.firestoreServiceAgent', member: rulesAgent },
-    { role: 'roles/run.invoker', member: serviceAccount(compute) },
-    { role: 'roles/eventarc.eventReceiver', member: serviceAccount(compute) },
   ], {
     readJson: { options: { requestedPolicyVersion: 3 } },
     agents: {
@@ -538,8 +556,9 @@ async function stepDeployIdentity(ctx) {
       [pubsubAgent]: 'pubsub.googleapis.com',
       [rulesAgent]: 'firebasestorage.googleapis.com',
     },
+    revoke,
   });
-  if (added > 0) notes.push(`added ${added} project roles`);
+  if (changed > 0) notes.push(`changed ${changed} project role bindings`);
 
   // Both function generations use the compute runtime account.
   const actAs = [{ role: 'roles/iam.serviceAccountUser', member: deployMember }];
@@ -1926,4 +1945,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { INVOKER_PERMISSIONS, SERVICES, STEPS, brandingProblem, deployVariables, main, markStopped, parseArgs, provision, requiredRecords, syncTeams };
+module.exports = { COMPUTE_ROLES, INVOKER_PERMISSIONS, SERVICES, STEPS, brandingProblem, deployVariables, main, markStopped, parseArgs, provision, requiredRecords, syncTeams };

@@ -65,7 +65,7 @@ const DEFAULTS = {
 /**
  * Cloud Run job name for the site publisher (spec §8.4). Fixed rather than
  * configurable: one job per client project, named the same everywhere, so
- * the workflow, the runbook, and the `run.invoker` grant cannot drift apart
+ * the workflow, the runbook, and the job executor grant cannot drift apart
  * — and so the functions runtime learns "a publisher exists here" from the
  * presence of EVENT_SITE_PUBLISHER_JOB alone.
  */

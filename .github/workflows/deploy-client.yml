@@ -536,11 +536,13 @@ jobs:
             --tasks=1 \
             --cpu=2 \
             --memory=4Gi
-      - name: Grant the functions runtime service account run.invoker on the job
+      - name: Grant the functions runtime service account the job executor role
         # The narrowest grant that lets cmsPublish start this job: one role,
         # on this ONE job resource, for one identity — not project-level,
-        # and not on every Cloud Run resource in the project. add-iam-policy-
-        # binding is idempotent, so re-running a deploy is a no-op.
+        # and not on every Cloud Run resource in the project. cmsPublish
+        # passes PUBLISH_QUEUE_ID as a container override, which needs
+        # run.jobs.runWithOverrides; roles/run.invoker lacks it. add-iam-
+        # policy-binding is idempotent, so re-running a deploy is a no-op.
         #
         # The default is the project's default COMPUTE service account —
         # what Cloud Functions v2 runs as unless a function sets
@@ -565,8 +567,8 @@ jobs:
             --region "$region" \
             --project "$EVENT_FIREBASE_PROJECT_ID" \
             --member "serviceAccount:${runtime_sa}" \
-            --role roles/run.invoker
-          echo "run.invoker granted to ${runtime_sa} on site-publisher"
+            --role roles/run.jobsExecutorWithOverrides
+          echo "run.jobsExecutorWithOverrides granted to ${runtime_sa} on site-publisher"
 
   content:
     name: Generate content snapshot

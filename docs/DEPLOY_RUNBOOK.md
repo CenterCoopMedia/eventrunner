@@ -247,7 +247,7 @@ the normal main push can start client deployments. Do not print the value or put
 | `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA v3 site key; set this before enabling App Check enforcement |
 | `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. `true` provisions the site-publisher Cloud Run job — do §9 first |
 | `EVENT_PUBLISHER_SERVICE_ACCOUNT` | required when the publisher is enabled; the job's own runtime identity (§9) |
-| `EVENT_FUNCTIONS_SERVICE_ACCOUNT` | optional; overrides the default compute service account that receives `run.invoker` (§9) |
+| `EVENT_FUNCTIONS_SERVICE_ACCOUNT` | optional; overrides the default compute service account that receives `run.jobsExecutorWithOverrides` on the publisher job (§9) |
 | `EVENT_AIRTABLE_ENABLED` | `false` by default. `true` lets staff refresh session pitches from Airtable and binds the `AIRTABLE_API_TOKEN` secret. Create the secret first ([session pitches](operator/session-pitches.md#refresh-pitches-from-airtable)) |
 
 App Check activation requires two successful deploys. First set
@@ -1040,8 +1040,8 @@ deliberately no default, because a blank would hand the job whatever identity Cl
 
 The next deploy from `main` provisions everything else automatically: the `run-of-show` Artifact
 Registry repository in this project, the image (tagged with the commit SHA), the `site-publisher`
-Cloud Run job with this client's environment, and `roles/run.invoker` for the functions runtime
-account **on that one job**. Nothing is granted project-wide.
+Cloud Run job with this client's environment, and `roles/run.jobsExecutorWithOverrides` for the functions runtime
+account **on that one job**. `cmsPublish` starts the job with a `PUBLISH_QUEUE_ID` container override, and `roles/run.invoker` does not allow overrides. Nothing is granted project-wide.
 
 **Ordering on the first enable.** The `publisher` job and the `functions` job run independently in
 the same workflow run, so for a short window the deployed `cmsPublish` may know the job's name
@@ -1057,7 +1057,7 @@ gcloud run jobs describe site-publisher \
   --region=<EVENT_FIREBASE_REGION> --project=<GCP_PROJECT_ID> \
   --format="yaml(spec.template.template.serviceAccountName, spec.template.template.containers[0].image)"
 
-# run.invoker is bound on THE JOB, to the functions runtime account only.
+# run.jobsExecutorWithOverrides is bound on THE JOB, to the functions runtime account only.
 gcloud run jobs get-iam-policy site-publisher \
   --region=<EVENT_FIREBASE_REGION> --project=<GCP_PROJECT_ID> --format="json(bindings)"
 
@@ -1088,7 +1088,7 @@ The exit code names the stage, so triage rarely needs the log:
 
 Common failures on the invoke side, from the queue row's `publisher.invoke.error`:
 
-- `Cloud Run responded 403` — the `run.invoker` grant is missing or was applied to the wrong
+- `Cloud Run responded 403` — the `run.jobsExecutorWithOverrides` grant is missing or was applied to the wrong
   identity. Re-check the runtime account against §3's `RUNTIME_SA_EMAIL`.
 - `Cloud Run responded 404` — the job does not exist in that region. Check
   `EVENT_FIREBASE_REGION` matches where the deploy created it.
@@ -1561,7 +1561,7 @@ The script does each of these, and sections 1 to 3 are wrong or silent on them. 
 - The deploy account also needs the custom role `eventrunnerDeployInvoker`, with `cloudfunctions.functions.setIamPolicy`, `firebaseextensions.instances.list`, `firebasestorage.defaultBucket.get`, `resourcemanager.projects.getIamPolicy` and `run.services.setIamPolicy`.
 - The deploy account needs `roles/iam.serviceAccountUser` on both the compute and the appspot service accounts, granted on each account and not on the project.
 - The storage service agent may not exist. Create it (`gcloud beta services identity create --service=storage.googleapis.com`), then grant it `roles/pubsub.publisher`. A new agent can take minutes to be accepted.
-- The provisioner makes the runtime grants before the first deploy. The compute account gets `roles/datastore.user` for Firestore, `roles/firebaseauth.admin` for account creation, verification and deletion, and `roles/firebasehosting.admin` for Settings and the hourly custom-domain check (§8). It also gets `roles/cloudbuild.builds.builder` for source reads, image writes and build logs; that role includes the Storage object operations the runtime uses. It needs no Editor grant. The existing Eventarc grants are `roles/run.invoker` and `roles/eventarc.eventReceiver`, and it gets `roles/iam.serviceAccountTokenCreator` on itself to sign custom tokens. The Pub/Sub agent gets `roles/iam.serviceAccountTokenCreator` for event delivery.
+- The provisioner makes the runtime grants before the first deploy. The compute account gets `roles/datastore.user` for Firestore, `roles/firebaseauth.admin` for account creation, verification and deletion, and `roles/firebasehosting.admin` for Settings and the hourly custom-domain check (§8). It also gets `roles/cloudbuild.builds.builder` for source reads, image writes and build logs; that role includes the Storage object operations the runtime uses. It needs no Editor grant: on a project the provisioner creates, the same run removes the Editor role Google gives the compute account. A retry on a project an earlier run made leaves that grant. `node scripts/compute-editor-plan.cjs --project <GCP_PROJECT_ID>` reads such a project and prints the bindings to add and remove; it writes nothing. The existing Eventarc grants are `roles/run.invoker` and `roles/eventarc.eventReceiver`, and it gets `roles/iam.serviceAccountTokenCreator` on itself to sign custom tokens. The Pub/Sub agent gets `roles/iam.serviceAccountTokenCreator` for event delivery.
 - `cloudbilling.googleapis.com` must be on, and the deploy account cannot turn it on. `gcloud services enable` takes at most 20 at a time (`SU_MAX_BATCH_SIZE_EXCEEDED`).
 - The Hosting custom domain API is `v1beta1`. Firebase REST calls need the `x-goog-user-project` header.
 - The `gcf-artifacts` repository needs the cleanup policy `firebase-functions-cleanup` (`olderThan: 86400s`), set by an owner. The deploy account cannot set it, even with `--force`, and a run without `--force` then fails.
