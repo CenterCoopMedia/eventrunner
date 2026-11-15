@@ -85,11 +85,12 @@ async function readProject({ projectId, region, request }) {
   const project = await request(`${CRM}/projects/${projectId}`);
   const compute = `${project.name.split('/')[1]}-compute@developer.gserviceaccount.com`;
   // Version 3 returns conditions; an older version names a conditional binding `_withcond_<hash>` without one.
-  const v3 = { method: 'POST', body: { options: { requestedPolicyVersion: 3 } } };
-  const policy = await request(`${CRM}/projects/${projectId}:getIamPolicy`, v3);
-  const accountPolicy = await request(`${IAM}/projects/${projectId}/serviceAccounts/${compute}:getIamPolicy`, v3);
+  // Resource Manager takes the version in the body, IAM and Cloud Run in the query.
+  const v3 = 'options.requestedPolicyVersion=3';
+  const policy = await request(`${CRM}/projects/${projectId}:getIamPolicy`, { method: 'POST', body: { options: { requestedPolicyVersion: 3 } } });
+  const accountPolicy = await request(`${IAM}/projects/${projectId}/serviceAccounts/${compute}:getIamPolicy?${v3}`, { method: 'POST', body: {} });
   const jobName = `${RUN}/projects/${projectId}/locations/${region}/jobs/${PUBLISHER_JOB}`;
-  const jobPolicy = (await request(jobName, { allow404: true })) ? await request(`${jobName}:getIamPolicy?options.requestedPolicyVersion=3`) : null;
+  const jobPolicy = (await request(jobName, { allow404: true })) ? await request(`${jobName}:getIamPolicy?${v3}`) : null;
   return { compute, projectBindings: policy.bindings || [], accountBindings: accountPolicy.bindings || [], jobBindings: jobPolicy ? jobPolicy.bindings || [] : null };
 }
 

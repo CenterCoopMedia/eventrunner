@@ -62,7 +62,12 @@ test('the plan only reads: no IAM policy is written', async () => {
   };
   const fetch = async (address, init) => {
     const url = new URL(address);
-    calls.push({ method: init.method, path: url.pathname, version: Number(url.searchParams.get('options.requestedPolicyVersion') || JSON.parse(init.body || '{}').options?.requestedPolicyVersion) });
+    // Each API's documented place for the policy version: the body for Resource Manager, the query for IAM and Cloud Run.
+    const body = JSON.parse(init.body || '{}');
+    const version = url.host === 'cloudresourcemanager.googleapis.com'
+      ? body.options?.requestedPolicyVersion
+      : Object.keys(body).length === 0 && Number(url.searchParams.get('options.requestedPolicyVersion'));
+    calls.push({ method: init.method, path: url.pathname, version });
     const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
     if (url.pathname.endsWith(':getIamPolicy')) return json({ bindings: policies[url.pathname.replace(':getIamPolicy', '')] || [] });
     if (url.host === 'run.googleapis.com') return json({ name: 'site-publisher' });
