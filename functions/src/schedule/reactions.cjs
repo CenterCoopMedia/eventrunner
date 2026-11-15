@@ -38,6 +38,7 @@
  */
 
 const { requireAttendeeAccess } = require('../core/auth.cjs');
+const { assertSessionGrant, SessionGrantError } = require('../ticketing/resourceAccess.cjs');
 const {
   sendError,
   badRequest,
@@ -81,7 +82,7 @@ function emptyCounts() {
  * @throws {SessionNotFoundError} the session does not exist or is hidden
  * @throws {InvalidReactionError} `emoji` is neither null nor in REACTION_KINDS
  */
-async function toggleSessionReaction({ db, uid, sessionId, emoji, now = Date.now }) {
+async function toggleSessionReaction({ db, uid, sessionId, emoji, checkGrant = false, bootstrapEmail = null, now = Date.now }) {
   if (emoji !== null && !REACTION_KINDS.includes(emoji)) {
     throw new InvalidReactionError(emoji);
   }
@@ -94,6 +95,11 @@ async function toggleSessionReaction({ db, uid, sessionId, emoji, now = Date.now
     const sessionSnap = await tx.get(sessionRef);
     if (!sessionSnap.exists || sessionSnap.data()?.visible !== true) {
       throw new SessionNotFoundError(sessionId);
+    }
+    // Setting a reaction needs session coverage and the interactions grant
+    // (#557); clearing one keeps the binary gate.
+    if (checkGrant && emoji !== null) {
+      await assertSessionGrant({ db, tx, uid, sessionId, session: sessionSnap.data(), interactions: true, bootstrapEmail });
     }
     const [membershipSnap, aggregateSnap] = await Promise.all([
       tx.get(membershipRef),
@@ -155,9 +161,11 @@ function createReactToSessionHandler({ db, auth, getConfig, now = Date.now, log 
 
     let result;
     try {
-      result = await toggleSessionReaction({ db, uid: gate.uid, sessionId, emoji, now });
+      result = await toggleSessionReaction({ db, uid: gate.uid, sessionId, emoji, checkGrant: true,
+        bootstrapEmail: gate.viaAccount === true ? null : gate.email, now });
     } catch (err) {
       if (err instanceof SessionNotFoundError) return notFound(res, 'Session not found.');
+      if (err instanceof SessionGrantError) return sendError(res, err.decision.status, err.decision.code, err.decision.message);
       log.error('reactToSession failed', err);
       return internal(res, 'The reaction could not be saved. Try again.');
     }

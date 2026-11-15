@@ -94,6 +94,17 @@ describe('browser save import consent', () => {
     expect(state.write).toHaveBeenCalledTimes(3);
   });
 
+  it('keeps sessions the ticket does not include and still imports covered ones', async () => {
+    for (const id of ['saturday', 'friday']) setDeviceBookmarked(id, true);
+    state.write.mockRejectedValueOnce({ code: 'ticket-resource', status: 403, message: 'Your ticket does not include this session.' })
+      .mockResolvedValueOnce({ bookmarked: true });
+    render(view());
+    await waitFor(() => expect(saved()).toEqual(['saturday']));
+    expect(await screen.findByRole('alert')).toHaveTextContent('does not include some sessions');
+    expect(state.write).toHaveBeenCalledTimes(2);
+    expect(state.write.mock.calls[1][0].sessionId).toBe('friday');
+  });
+
   it('asks again if private visibility changed, retaining the browser copy until the new choice', async () => {
     setDeviceBookmarked('one', true);
     state.read.mockResolvedValueOnce('private').mockResolvedValue('public');

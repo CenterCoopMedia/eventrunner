@@ -382,3 +382,59 @@ test('handler: a bootstrap admin admitted without an account document can still 
   );
   assert.equal(res.statusCode, 200);
 });
+
+// ------------------------------------------------ ticket resource grants (#557)
+
+const PUBLISHED = { 'ticket_access_policies/current': { effectiveRevision: 1, candidateRevision: null } };
+const DAY_PASS = { 'ticket_access_grants/u1': { policyRevision: 1,
+  resources: { sessions: { all: false, dayIds: ['friday'], sessionIds: [] }, interactions: false } } };
+
+async function bookmarkAs(seed, body) {
+  const db = fakeDb(seed);
+  const handler = createBookmarkSessionHandler({ db, auth: fakeAuth({ good: ATTENDEE_TOKEN }), getConfig: fakeGetConfig(), now });
+  const res = fakeRes();
+  await handler({ method: 'POST', headers: { authorization: 'Bearer good' }, body }, res);
+  return { db, res };
+}
+
+test('handler: a published policy limits adds to sessions on the grant canonical day', async () => {
+  const seed = { ...seedSession('fri', { dayId: 'friday' }), ...seedSession('sat', { dayId: 'saturday' }),
+    'users/u1': { registrationStatus: 'approved', approvalSource: 'ticket' }, ...PUBLISHED, ...DAY_PASS };
+  const allowed = await bookmarkAs(seed, { sessionId: 'fri', bookmarked: true });
+  assert.equal(allowed.res.statusCode, 200);
+  const denied = await bookmarkAs(seed, { sessionId: 'sat', bookmarked: true, dayId: 'friday' });
+  assert.equal(denied.res.statusCode, 403);
+  assert.equal(denied.res.body.error.code, 'ticket-resource');
+  assert.equal(denied.db.docs.has('users/u1/bookmarks/sat'), false);
+  assert.equal(denied.db.docs.has('sessionBookmarks/sat'), false);
+});
+
+test('handler: a missing grant after publication answers access-updating; removal keeps the binary gate', async () => {
+  const seed = { ...seedSession('sat', { dayId: 'saturday' }), ...PUBLISHED,
+    'users/u1': { registrationStatus: 'approved', approvalSource: 'ticket' },
+    'users/u1/bookmarks/sat': { bookmarkedAt: new Date(NOW) }, 'sessionBookmarks/sat': { count: 1 } };
+  const add = await bookmarkAs({ ...seed, 'users/u1/bookmarks/sat': undefined }, { sessionId: 'sat', bookmarked: true });
+  assert.equal(add.res.statusCode, 403);
+  assert.equal(add.res.body.error.code, 'access-updating');
+  const remove = await bookmarkAs(seed, { sessionId: 'sat', bookmarked: false });
+  assert.equal(remove.res.statusCode, 200);
+  assert.deepEqual(remove.res.body, { bookmarked: false, count: 0 });
+});
+
+test('handler: a bootstrap exemption is confirmed live, not from the cached copy', async () => {
+  const seed = { ...seedSession('sat', { dayId: 'saturday' }), ...PUBLISHED, ...DAY_PASS,
+    'users/u1': { registrationStatus: 'approved', approvalSource: 'ticket' } };
+  const cached = { adminEmails: ['attendee@example.org'] };
+  const run = async (live) => {
+    const db = fakeDb({ ...seed, ...(live ? { 'config/bootstrap': live } : {}) });
+    const handler = createBookmarkSessionHandler({ db, auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      getConfig: fakeGetConfig({}, cached), now });
+    const res = fakeRes();
+    await handler({ method: 'POST', headers: { authorization: 'Bearer good' }, body: { sessionId: 'sat', bookmarked: true } }, res);
+    return res;
+  };
+  assert.equal((await run(cached)).statusCode, 200);
+  const removed = await run({ adminEmails: [] });
+  assert.equal(removed.statusCode, 403);
+  assert.equal(removed.body.error.code, 'ticket-resource');
+});

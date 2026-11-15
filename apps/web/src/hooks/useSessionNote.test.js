@@ -92,6 +92,26 @@ describe('useSessionNote', () => {
     expect(result.current.draft).toBe('kept');
   });
 
+  it('a refused note write says access is updating or not included and keeps the text', async () => {
+    saveMock.mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const view = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    const textarea = view.getByLabelText('Private note');
+    fireEvent.change(textarea, { target: { value: 'pending text' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    expect(view.getByRole('alert').textContent).toMatch(/Access updating, or your ticket does not include this session/);
+    expect(textarea.value).toBe('pending text');
+
+    saveMock.mockRejectedValueOnce(new Error('offline'));
+    fireEvent.change(textarea, { target: { value: 'pending text, retried' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    expect(view.getByRole('alert').textContent).toBe('The note could not be saved. Try again.');
+    expect(textarea.value).toBe('pending text, retried');
+  });
+
   it('flushes the latest draft on blur without waiting for the debounce', async () => {
     const delayedSave = deferred();
     saveMock.mockImplementationOnce(() => delayedSave.promise);

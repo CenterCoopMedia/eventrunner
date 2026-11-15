@@ -372,3 +372,31 @@ test('handler: a bootstrap admin with a pending, non-speaker profile can still r
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, { emoji: THUMBS_UP, counts: countsWith({ [THUMBS_UP]: 1 }) });
 });
+
+// ------------------------------------------------ ticket resource grants (#557)
+
+test('handler: a published policy requires session coverage and the interactions grant to react', async () => {
+  const grant = (interactions) => ({ 'ticket_access_grants/u1': { policyRevision: 1,
+    resources: { sessions: { all: false, dayIds: [], sessionIds: ['s1'] }, interactions } } });
+  const base = { ...seedSession('s1', { dayId: 'friday' }), ...seedSession('s2', { dayId: 'friday' }),
+    'users/u1': { registrationStatus: 'approved', approvalSource: 'ticket' },
+    'ticket_access_policies/current': { effectiveRevision: 1, candidateRevision: null } };
+  const react = async (seed, body) => {
+    const db = fakeDb(seed);
+    const handler = createReactToSessionHandler({ db, auth: fakeAuth({ good: ATTENDEE_TOKEN }), getConfig: fakeGetConfig(), now });
+    const res = fakeRes();
+    await handler({ method: 'POST', headers: { authorization: 'Bearer good' }, body }, res);
+    return { db, res };
+  };
+  const noInteractions = await react({ ...base, ...grant(false) }, { sessionId: 's1', emoji: THUMBS_UP });
+  assert.equal(noInteractions.res.statusCode, 403);
+  assert.equal(noInteractions.res.body.error.code, 'ticket-resource');
+  assert.equal(noInteractions.db.docs.has('sessionReactions/s1/users/u1'), false);
+  const otherSession = await react({ ...base, ...grant(true) }, { sessionId: 's2', emoji: THUMBS_UP });
+  assert.equal(otherSession.res.statusCode, 403);
+  const allowed = await react({ ...base, ...grant(true) }, { sessionId: 's1', emoji: THUMBS_UP });
+  assert.equal(allowed.res.statusCode, 200);
+  const cleared = await react({ ...base, ...grant(false), 'sessionReactions/s1/users/u1': { emoji: THUMBS_UP },
+    'sessionReactions/s1': { counts: countsWith({ [THUMBS_UP]: 1 }) } }, { sessionId: 's1', emoji: null });
+  assert.equal(cleared.res.statusCode, 200);
+});

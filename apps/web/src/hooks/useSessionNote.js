@@ -21,7 +21,7 @@ const SAVE_DEBOUNCE_MS = 800;
  * @returns {{
  *   saved: string,
  *   draft: string,
- *   state: 'loading' | 'editing' | 'saving' | 'saved' | 'error',
+ *   state: 'loading' | 'editing' | 'saving' | 'saved' | 'error' | 'denied',
  *   maxLength: number,
  *   edit: (next: string) => void,
  *   flush: () => void,
@@ -73,11 +73,13 @@ export function useSessionNote(uid, sessionId) {
         setDraft(null); // mirror the document again
         setState('saved');
       },
-      () => {
+      (err) => {
         editRecord.queued = false;
         if (identityRef.current === editRecord.identity && latestEditRef.current === editRecord) {
           listenerErrorRef.current = false;
-          setState('error');
+          // The rules refuse a note write when the ticket grant is updating
+          // or does not include this session (#557). The draft stays.
+          setState(err?.code === 'permission-denied' ? 'denied' : 'error');
         }
       },
     );
