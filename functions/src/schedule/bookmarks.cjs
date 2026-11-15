@@ -21,6 +21,7 @@
  */
 
 const { requireAttendeeAccess } = require('../core/auth.cjs');
+const { assertSessionGrant, SessionGrantError } = require('../ticketing/resourceAccess.cjs');
 const {
   sendError,
   badRequest,
@@ -52,7 +53,7 @@ class ScheduleVisibilityChangedError extends Error {}
  * @returns {Promise<{ bookmarked: boolean, count: number }>}
  * @throws {SessionNotFoundError} the session does not exist or is hidden
  */
-async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount = false, now = Date.now }) {
+async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount = false, checkGrant = false, now = Date.now }) {
   const sessionRef = db.collection('cmsSchedule').doc(sessionId);
   const membershipRef = db.collection(`users/${uid}/bookmarks`).doc(sessionId);
   const aggregateRef = db.collection('sessionBookmarks').doc(sessionId);
@@ -75,6 +76,9 @@ async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, expectedS
     if (!sessionSnap.exists || sessionSnap.data()?.visible !== true) {
       throw new SessionNotFoundError(sessionId);
     }
+    // Adding needs the caller's ticket grant for this session (#557); removal
+    // keeps the binary gate so a downgraded attendee can still tidy up.
+    if (checkGrant && bookmarked) await assertSessionGrant({ db, tx, uid, sessionId, session: sessionSnap.data() });
     const [membershipSnap, aggregateSnap] = await Promise.all([
       tx.get(membershipRef),
       tx.get(aggregateRef),
@@ -118,13 +122,10 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
       return notFound(res, 'Session bookmarking is not enabled for this event.');
     }
 
-    const { sessionId, bookmarked, expectedScheduleVisibility } = req.body || {};
-    // Adding needs the caller's ticket grant for this session; removal keeps
-    // the binary gate so a downgraded attendee can still tidy their schedule.
-    const session = bookmarked === true && typeof sessionId === 'string' && sessionId ? { id: sessionId } : undefined;
-    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req, { session });
+    const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
+    const { sessionId, bookmarked, expectedScheduleVisibility } = req.body || {};
     if (typeof sessionId !== 'string' || !sessionId) {
       return badRequest(res, 'sessionId: must be a non-empty string');
     }
@@ -138,10 +139,12 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
     let result;
     try {
       result = await toggleSessionBookmark({
-        db, uid: gate.uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount: gate.viaAccount === true, now,
+        db, uid: gate.uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount: gate.viaAccount === true,
+        checkGrant: gate.viaAccount === true, now,
       });
     } catch (err) {
       if (err instanceof SessionNotFoundError) return sendError(res, 404, 'session-unavailable', 'Session not found.');
+      if (err instanceof SessionGrantError) return sendError(res, err.decision.status, err.decision.code, err.decision.message);
       if (err instanceof AccountGoneError) return sendError(res, 403, 'forbidden', 'Attendee access required.');
       if (err instanceof ScheduleVisibilityChangedError) return sendError(res, 409, 'visibility-changed', 'Your schedule visibility changed. Review it before adding browser saves.');
       log.error('bookmarkSession failed', err);

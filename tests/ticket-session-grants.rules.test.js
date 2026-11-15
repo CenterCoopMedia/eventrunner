@@ -71,3 +71,13 @@ it('a migrated limited pass gains only its day after backfill and recompute', as
   await assertSucceeds(writeNote('holder', 'keynote'));
   await assertFails(writeNote('holder', 'workshop'));
 });
+
+it('bootstrap staff keep note writes after publication without a covering grant', async () => {
+  await db.collection('config').doc('bootstrap').set({ adminEmails: [], staffEmails: ['staffer@example.test'] });
+  await db.collection('users').doc('staffer').set({ registrationStatus: 'approved', approvalSource: 'ticket' });
+  await db.collection('users').doc('reader').set({ registrationStatus: 'approved', approvalSource: 'ticket' });
+  await db.collection('cmsSchedule').doc('workshop').set({ dayId: 'saturday' });
+  await db.collection('ticket_access_policies').doc('current').set({ effectiveRevision: 1, candidateRevision: null });
+  await assertSucceeds(writeNote('staffer', 'workshop'));
+  await assertFails(writeNote('reader', 'workshop'));
+});

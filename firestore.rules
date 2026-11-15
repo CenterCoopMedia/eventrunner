@@ -469,9 +469,10 @@ service cloud.firestore {
     // functions/src/ticketing/resourceAccess.cjs; both run the cases in
     // functions/src/ticketing/__fixtures__/session-grant-cases.json. With no
     // published policy revision the binary gate above decides alone. After
-    // publication, speakers and admin-approved accounts keep full access;
-    // every other account needs its private grant for the effective revision,
-    // covering the session or its canonical cmsSchedule day. A sweep in
+    // publication, speakers, admin-approved accounts and bootstrap admins/staff
+    // (isAdmin) keep full access. Every other account needs its private grant
+    // for the effective revision, covering the session or its canonical
+    // cmsSchedule day. A sweep in
     // progress or a stale grant denies. Get() reads ignore the deny-all
     // rules on both private collections, which still block every client.
     function ticketPolicyControl() {
@@ -484,6 +485,7 @@ service cloud.firestore {
         || requesterUserDoc().get('speakerId', null) != null
         || (requesterUserDoc().get('registrationStatus', '') == 'approved'
             && requesterUserDoc().get('approvalSource', null) == 'admin')
+        || isAdmin()
         || ticketGrantCovers(sessionId);
     }
 
