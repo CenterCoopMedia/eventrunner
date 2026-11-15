@@ -19,6 +19,7 @@ const STATE_TEXT = {
   saving: 'Saving…',
   saved: 'Saved.',
   error: 'The note could not be saved. Try again.',
+  denied: 'Access updating, or your ticket does not include this session. Your note is still here. Try again later.',
 };
 
 /**
@@ -47,7 +48,7 @@ export default function SessionNote({ uid, sessionId, noteId }) {
       />
       {/* The answer is stated, and an error is announced, not painted. */}
       <p
-        role={state === 'error' ? 'alert' : 'status'}
+        role={state === 'error' || state === 'denied' ? 'alert' : 'status'}
         className="mt-3xs font-data text-caption text-text-secondary"
       >
         {STATE_TEXT[state] ?? ''}
