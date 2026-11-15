@@ -11,6 +11,7 @@
 // what the reader has already typed when it does: the hook mirrors the
 // document until the reader edits, so a slow snapshot can never overwrite
 // a keystroke.
+import { useRef } from 'react';
 import { useSessionNote } from '../../hooks/useSessionNote.js';
 import { inputClass, quietActionClass } from '../controlClasses.js';
 
@@ -28,6 +29,11 @@ const STATE_TEXT = {
 export default function SessionNote({ uid, sessionId, noteId }) {
   const { draft, state, maxLength, edit, flush, discard, unsaved } = useSessionNote(uid, sessionId);
   const labelId = `note-${noteId ?? sessionId}`;
+  const discardRef = useRef(null);
+  // Moving to Discard must not save the text first.
+  const onBlur = (event) => {
+    if (!discardRef.current || event.relatedTarget !== discardRef.current) flush();
+  };
 
   return (
     <div className="mt-sm">
@@ -44,7 +50,7 @@ export default function SessionNote({ uid, sessionId, noteId }) {
         maxLength={maxLength}
         placeholder="Only you can see this."
         onChange={(event) => edit(event.target.value)}
-        onBlur={flush}
+        onBlur={onBlur}
       />
       {/* The answer is stated, and an error is announced, not painted. */}
       <p
@@ -56,6 +62,7 @@ export default function SessionNote({ uid, sessionId, noteId }) {
       {/* Unsaved text is kept in this browser until it saves or the reader drops it (#1007). */}
       {unsaved ? (
         <button
+          ref={discardRef}
           type="button"
           className={`mt-3xs ${quietActionClass}`}
           // Keep focus in the field, so a pointer discard does not save first.

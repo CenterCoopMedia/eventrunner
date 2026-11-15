@@ -446,7 +446,7 @@ describe('useSessionNote', () => {
     });
     const delayed = deferred();
     saveMock.mockImplementationOnce(() => delayed.promise);
-    // Tabbing to the button blurs the field, which saves again.
+    // Leaving the field for anything else saves again.
     await act(async () => {
       fireEvent.blur(textarea);
       await Promise.resolve();
@@ -462,7 +462,28 @@ describe('useSessionNote', () => {
     expect(view.queryByRole('button', { name: 'Discard unsaved text' })).toBeNull();
   });
 
-  it('keeps a copy that matches only a pending local write until the server confirms it', async () => {
+  it('tabbing from the field to Discard does not save the text first', async () => {
+    saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const view = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    const textarea = view.getByLabelText('Private note');
+    fireEvent.change(textarea, { target: { value: 'drop me by keyboard' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    const discard = view.getByRole('button', { name: 'Discard unsaved text' });
+    await act(async () => {
+      fireEvent.blur(textarea, { relatedTarget: discard });
+      await Promise.resolve();
+    });
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(discard);
+    expect(textarea.value).toBe('');
+    expect(Object.keys(localStorage).filter((key) => key.includes('sessionNotes'))).toHaveLength(0);
+  });
+
+  it('keeps a copy that matches only a pending local write, and clears it once saved', async () => {
+    const copies = () => Object.keys(localStorage).filter((key) => key.includes('sessionNotes'));
     saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
     const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
     fireEvent.change(first.getByLabelText('Private note'), { target: { value: 'offline text' } });
@@ -470,19 +491,47 @@ describe('useSessionNote', () => {
       await vi.advanceTimersByTimeAsync(900);
     });
     first.unmount();
-    const copies = () => Object.keys(localStorage).filter((key) => key.includes('sessionNotes'));
     expect(copies()).toHaveLength(1);
 
-    let deliver;
     subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
-      deliver = onNext;
+      onNext('offline text', { pending: true });
+      return () => {};
+    });
+    render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' })).unmount();
+    expect(copies()).toHaveLength(1);
+
+    subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
+      onNext('offline text', { pending: false });
+      return () => {};
+    });
+    render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' })).unmount();
+    expect(copies()).toHaveLength(0);
+  });
+
+  it('drops a refused copy when the note changed since, instead of overwriting it', async () => {
+    saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    fireEvent.change(first.getByLabelText('Private note'), { target: { value: 'older refused text' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    first.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    saveMock.mockReset().mockImplementation(async () => {});
+    subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
+      onNext('newer text from another device');
       return () => {};
     });
     const second = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
-    act(() => deliver('offline text', { pending: true }));
-    expect(copies()).toHaveLength(1);
-    act(() => deliver('offline text', { pending: false }));
-    expect(copies()).toHaveLength(0);
+    expect(second.getByLabelText('Private note').value).toBe('newer text from another device');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(Object.keys(localStorage).filter((key) => key.includes('sessionNotes'))).toHaveLength(0);
     second.unmount();
   });
 
