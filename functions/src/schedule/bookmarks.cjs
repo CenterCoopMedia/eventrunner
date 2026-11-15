@@ -53,7 +53,7 @@ class ScheduleVisibilityChangedError extends Error {}
  * @returns {Promise<{ bookmarked: boolean, count: number }>}
  * @throws {SessionNotFoundError} the session does not exist or is hidden
  */
-async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount = false, checkGrant = false, now = Date.now }) {
+async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount = false, checkGrant = false, bootstrapEmail = null, now = Date.now }) {
   const sessionRef = db.collection('cmsSchedule').doc(sessionId);
   const membershipRef = db.collection(`users/${uid}/bookmarks`).doc(sessionId);
   const aggregateRef = db.collection('sessionBookmarks').doc(sessionId);
@@ -78,7 +78,7 @@ async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, expectedS
     }
     // Adding needs the caller's ticket grant for this session (#557); removal
     // keeps the binary gate so a downgraded attendee can still tidy up.
-    if (checkGrant && bookmarked) await assertSessionGrant({ db, tx, uid, sessionId, session: sessionSnap.data() });
+    if (checkGrant && bookmarked) await assertSessionGrant({ db, tx, uid, sessionId, session: sessionSnap.data(), bootstrapEmail });
     const [membershipSnap, aggregateSnap] = await Promise.all([
       tx.get(membershipRef),
       tx.get(aggregateRef),
@@ -140,7 +140,7 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
     try {
       result = await toggleSessionBookmark({
         db, uid: gate.uid, sessionId, bookmarked, expectedScheduleVisibility, requireAccount: gate.viaAccount === true,
-        checkGrant: gate.viaAccount === true, now,
+        checkGrant: true, bootstrapEmail: gate.viaAccount === true ? null : gate.email, now,
       });
     } catch (err) {
       if (err instanceof SessionNotFoundError) return sendError(res, 404, 'session-unavailable', 'Session not found.');

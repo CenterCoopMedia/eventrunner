@@ -15,6 +15,7 @@
  */
 
 const { internals: { POLICIES, GRANTS } } = require('./resourceGrants.cjs');
+const { resolveAdminTier } = require('../core/auth.cjs');
 
 const ACCESS_UPDATING = Object.freeze({ ok: false, status: 403, code: 'access-updating',
   message: 'Access updating. Try again in a few minutes.' });
@@ -54,11 +55,18 @@ class SessionGrantError extends Error {
  * Read the account, control and grant inside the caller's write transaction,
  * so a concurrent refund, revocation or publication conflicts with the write
  * and the retry decides again. `session` is the cmsSchedule data that
- * transaction already read. Throws SessionGrantError on denial.
+ * transaction already read. `bootstrapEmail` is the verified address of a
+ * caller the attendee gate admitted from its cached bootstrap copy; the
+ * exemption is confirmed here from the live document, as the note rules do.
+ * Throws SessionGrantError on denial.
  */
-async function assertSessionGrant({ db, tx, uid, sessionId, session, interactions = false }) {
+async function assertSessionGrant({ db, tx, uid, sessionId, session, interactions = false, bootstrapEmail = null }) {
   const control = (await tx.get(db.collection(POLICIES).doc('current'))).data() ?? null;
   if (!control || control.effectiveRevision === 0) return;
+  if (bootstrapEmail) {
+    const bootstrap = (await tx.get(db.collection('config').doc('bootstrap'))).data() ?? null;
+    if (resolveAdminTier(bootstrap, bootstrapEmail.trim().toLowerCase()) !== null) return;
+  }
   const [accountSnap, grantSnap] = await Promise.all([
     tx.get(db.collection('users').doc(uid)),
     tx.get(db.collection(GRANTS).doc(uid)),

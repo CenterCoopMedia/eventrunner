@@ -420,3 +420,21 @@ test('handler: a missing grant after publication answers access-updating; remova
   assert.equal(remove.res.statusCode, 200);
   assert.deepEqual(remove.res.body, { bookmarked: false, count: 0 });
 });
+
+test('handler: a bootstrap exemption is confirmed live, not from the cached copy', async () => {
+  const seed = { ...seedSession('sat', { dayId: 'saturday' }), ...PUBLISHED, ...DAY_PASS,
+    'users/u1': { registrationStatus: 'approved', approvalSource: 'ticket' } };
+  const cached = { adminEmails: ['attendee@example.org'] };
+  const run = async (live) => {
+    const db = fakeDb({ ...seed, ...(live ? { 'config/bootstrap': live } : {}) });
+    const handler = createBookmarkSessionHandler({ db, auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      getConfig: fakeGetConfig({}, cached), now });
+    const res = fakeRes();
+    await handler({ method: 'POST', headers: { authorization: 'Bearer good' }, body: { sessionId: 'sat', bookmarked: true } }, res);
+    return res;
+  };
+  assert.equal((await run(cached)).statusCode, 200);
+  const removed = await run({ adminEmails: [] });
+  assert.equal(removed.statusCode, 403);
+  assert.equal(removed.body.error.code, 'ticket-resource');
+});
