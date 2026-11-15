@@ -13,7 +13,7 @@
 // server (useAuthorNames). Each post has a Report action with a
 // confirmation step that sends only the post id (useSocialReports,
 // components/SocialPostEntry.jsx).
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { own, useAuthorNames, useSocialAccess, useSocialReports } from '../hooks/useSocialFeed.js';
 import { FEED_PAGE_SIZE, fetchOlderPage, subscribeRootFeed } from '../lib/socialFeedSource.js';
 import { FEED_ACCESS_REFUSED_TEXT } from '../lib/ticketAccess.js';
@@ -63,6 +63,11 @@ export default function AttendeeFeed() {
       unsubscribe();
     };
   }, [feedKey, through]);
+
+  // The composer's draft for this reader and access session (#1006): kept in
+  // memory across a read refusal, never across a key change or navigation.
+  const kept = useRef({ key: null, value: null });
+  if (kept.current.key !== feedKey) kept.current = { key: feedKey, value: { text: '', keys: null } };
 
   const posts = feed.posts;
   const authorMap = useAuthorNames(feedKey, activeKey, posts);
@@ -163,7 +168,7 @@ export default function AttendeeFeed() {
       {compose && !feed.denied && feedKey !== null ? (
         <div className="mt-sm">
           <Suspense fallback={<LoadingState label="Loading the post form…" />}>
-            <PostComposer key={feedKey} user={user} />
+            <PostComposer key={feedKey} user={user} kept={kept.current.value} />
           </Suspense>
         </div>
       ) : null}

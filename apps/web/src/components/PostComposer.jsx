@@ -2,11 +2,14 @@
 // loaded lazily, only for a reader who may compose (hooks/useSocialFeed.js
 // composeAccess), so it adds nothing to the first page or the demo.
 //
-// DRAFT. The text lives in React state only, never in browser storage. It
-// is cleared after a confirmed post or a deliberate discard, and kept after
+// DRAFT. The text lives in memory only, never in browser storage. It is
+// cleared after a confirmed post or a deliberate discard, and kept after
 // every refusal. The caller mounts one composer per reader and access
 // session (`key`), so an account switch or a closed feed unmounts it and
-// the draft with it; a request that completes after that is ignored.
+// the draft with it; a request that completes after that is ignored. A
+// caller may pass `kept`, its own memory for the same key, so a read
+// refusal that hides the composer (a ticket grant sweep, #1006) returns
+// the same text and submission key when the feed answers again.
 //
 // RETRIES. lib/submissionKey.js binds one key to one payload: the same
 // account, text and parent resend the same key, so a retry after a lost
@@ -52,15 +55,21 @@ export function draftError(text, parentPostId) {
  * @param {string|null} [props.parentPostId] null for a root post
  * @param {(postId: string) => void} [props.onPosted]
  * @param {() => void} [props.onUnavailable] the server refused the feed or parent root
+ * @param {{ text: string, keys: object|null }} [props.kept] the caller's memory for this key
  */
-export default function PostComposer({ user, parentPostId = null, onPosted, onUnavailable }) {
+export default function PostComposer({ user, parentPostId = null, onPosted, onUnavailable, kept = null }) {
   const reply = parentPostId !== null;
   const formRef = useRef(null);
   const messageRef = useRef(null);
   const alive = useRef(true);
   const keys = useRef(null);
-  if (keys.current === null) keys.current = createSubmissionKey();
-  const [text, setText] = useState('');
+  if (keys.current === null) keys.current = kept?.keys ?? createSubmissionKey();
+  if (kept) kept.keys = keys.current;
+  const [text, setTextState] = useState(kept?.text ?? '');
+  function setText(next) {
+    if (kept) kept.text = next;
+    setTextState(next);
+  }
   const [sending, setSending] = useState(false);
   // { field: string|null, message: string|null, focus: number }
   const [refusal, setRefusal] = useState({ field: null, message: null, focus: 0 });

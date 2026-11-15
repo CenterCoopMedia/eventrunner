@@ -118,6 +118,11 @@ export default function AttendeeThread() {
     };
   }, [feedKey, postId, pages]);
 
+  // The reply draft for this reader, access session and thread (#1006): kept
+  // in memory across a read refusal, never across a key change or navigation.
+  const kept = useRef({ key: null, value: null });
+  if (kept.current.key !== feedKey) kept.current = { key: feedKey, value: { text: '', keys: null } };
+
   const entries = thread.entries;
   const visible = root.root ? [root.root, ...(entries ?? [])] : entries;
   const authorMap = useAuthorNames(feedKey, activeKey, visible);
@@ -224,6 +229,7 @@ export default function AttendeeThread() {
                   key={feedKey}
                   user={user}
                   parentPostId={postId}
+                  kept={kept.current.value}
                   onUnavailable={() => setRootState((prev) => ({ key: feedKey, value: { ...own(prev, feedKey, NO_ROOT), root: null, failed: true } }))}
                 />
               </Suspense>

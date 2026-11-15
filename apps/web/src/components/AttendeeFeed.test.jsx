@@ -502,7 +502,9 @@ describe('what the feed shows', () => {
     expect(screen.getByRole('heading', { name: 'No posts yet' })).toBeInTheDocument();
   });
 
-  it('drops the composer, draft and late send on a feed refusal until a confirmed feed answer', async () => {
+  // Changed for #1006: a read refusal can now be a ticket grant sweep, so the
+  // same reader's draft is kept in memory and returns with the feed.
+  it('hides the composer and ignores a late send on a feed refusal, and returns the same reader\'s draft', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
     const feed = activeFeedListeners()[0];
@@ -523,6 +525,25 @@ describe('what the feed shows', () => {
     expect(screen.queryByText('Posted. Your post is at the top of the feed.')).not.toBeInTheDocument();
 
     pushPosts(feed, []);
+    expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('Private draft');
+  });
+
+  it('never shows a kept draft to another account in the same tab', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const feed = activeFeedListeners()[0];
+    pushPosts(feed, []);
+    type(await screen.findByRole('textbox', { name: 'Write a post' }), 'Ada only');
+    act(() => feed.error(Object.assign(new Error('refused'), { code: 'permission-denied' })));
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+    await openFeedAs(makeUser('bo'));
+    pushPosts(activeFeedListeners().at(-1), []);
+    expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('');
+    expect(screen.queryByDisplayValue('Ada only')).not.toBeInTheDocument();
+
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners().at(-1), []);
     expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('');
   });
 });
@@ -1050,6 +1071,20 @@ describe('the thread page', () => {
     expect(screen.getByText('Root text')).toBeInTheDocument();
     expect(field).toBeInTheDocument();
     expect(field).toHaveValue('Unsent reply');
+  });
+
+  it('keeps the same reader\'s reply draft through a thread refusal and sends nothing while refused', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(replyListener(), []);
+    type(await screen.findByRole('textbox', { name: 'Your reply' }), 'Reply kept');
+    const replies = replyListener();
+    act(() => replies.error(Object.assign(new Error('refused'), { code: 'permission-denied' })));
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+    pushPosts(replies, []);
+    expect(await screen.findByRole('textbox', { name: 'Your reply' })).toHaveValue('Reply kept');
   });
 
   it('a refusal clears the thread and stays a refusal through a later recoverable failure', async () => {
