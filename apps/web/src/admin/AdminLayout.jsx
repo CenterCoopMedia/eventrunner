@@ -63,7 +63,7 @@
 // the stone; "Take the tour" on the rail opens it again. It is its own lazy
 // chunk (components/AdminTour.jsx), and its steps are this docket.
 import './adminWorkspace.css';
-import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, createContext, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import useAccountViews from '../hooks/useAccountViews.js';
 import RoleSwitcher from '../components/RoleSwitcher.jsx';
@@ -502,7 +502,17 @@ function TourLoadFailed({ onEnd }) {
   );
 }
 
-const AdminTour = lazy(() => import('./components/AdminTour.jsx').catch(() => {
+export const AdminRecoveryReadyContext = createContext(false);
+
+const AdminTour = lazy(() => import('./components/AdminTour.jsx').then((module) => {
+  if (module?.default == null) throw new Error('The tour module did not load.');
+  const Tour = module.default;
+  function LoadedAdminTour({ onReady, ...props }) {
+    useEffect(onReady, [onReady]);
+    return <Tour {...props} />;
+  }
+  return { default: LoadedAdminTour };
+}).catch(() => {
   reloadOnce();
   return { default: TourLoadFailed };
 }));
@@ -591,6 +601,8 @@ function AdminDesk() {
   // Ending it stores the mark and gives the focus back to the rail button.
   const uid = user?.uid;
   const [tour, setTour] = useState(null);
+  const [tourReady, setTourReady] = useState(false);
+  const onTourReady = useCallback(() => setTourReady(true), []);
   const takeTourRef = useRef(null);
   const [reporting, setReporting] = useState(false);
   const reportRef = useRef(null);
@@ -865,10 +877,14 @@ function AdminDesk() {
               band's pull, so the band lands below it, never over it. */}
           {tour === null ? null : (
             <Suspense fallback={null}>
-              <AdminTour key={tour} docket={docket} takeFocus={tour > 0} onEnd={endTour} />
+              <AdminTour key={tour} docket={docket} takeFocus={tour > 0} onEnd={endTour} onReady={onTourReady} />
             </Suspense>
           )}
-          {refused ? <TierRefusal /> : <Outlet />}
+          {refused ? <TierRefusal /> : (
+            <AdminRecoveryReadyContext.Provider value={tourReady || (tour === null && (readTourDone(uid) || onSetup))}>
+              <Outlet />
+            </AdminRecoveryReadyContext.Provider>
+          )}
         </div>
       </main>
       {/* Outside the main region, which is inert while the mobile menu is open. */}
