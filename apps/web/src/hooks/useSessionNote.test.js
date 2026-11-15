@@ -444,7 +444,7 @@ describe('useSessionNote', () => {
     second.unmount();
   });
 
-  it('keeps Discard through the blur save it starts, and discards', async () => {
+  it('keeps Discard through a save it cannot withdraw, then discards', async () => {
     saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
     const view = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
     const textarea = view.getByLabelText('Private note');
@@ -460,12 +460,16 @@ describe('useSessionNote', () => {
       await Promise.resolve();
     });
     expect(view.getByRole('status').textContent).toBe('Saving…');
-    fireEvent.click(view.getByRole('button', { name: 'Discard unsaved text' }));
-    expect(textarea.value).toBe('');
+    // A write in flight cannot be withdrawn: Discard waits for its answer.
+    const discard = view.getByRole('button', { name: 'Discard unsaved text' });
+    expect(discard).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(discard);
+    expect(textarea.value).toBe('drop me');
     await act(async () => {
       delayed.reject(Object.assign(new Error('denied'), { code: 'permission-denied' }));
       await vi.advanceTimersByTimeAsync(0);
     });
+    fireEvent.click(view.getByRole('button', { name: 'Discard unsaved text' }));
     expect(textarea.value).toBe('');
     expect(view.queryByRole('button', { name: 'Discard unsaved text' })).toBeNull();
   });
@@ -526,6 +530,31 @@ describe('useSessionNote', () => {
     });
     expect(copies()).toHaveLength(0);
     third.unmount();
+  });
+
+  it('shows a copy once a later answer differs from a matching cached one', async () => {
+    saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    fireEvent.change(first.getByLabelText('Private note'), { target: { value: 'C' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    first.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    let deliver;
+    subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
+      deliver = onNext;
+      onNext('C');
+      return () => {};
+    });
+    const second = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    expect(second.queryByRole('button', { name: 'Save now' })).toBeNull();
+    act(() => deliver('B from the server'));
+    expect(second.getByLabelText('Private note').value).toBe('C');
+    expect(second.getByRole('button', { name: 'Save now' })).toBeInTheDocument();
+    second.unmount();
   });
 
   it('keeps the latest text when an earlier pending save and the latest save are both refused', async () => {

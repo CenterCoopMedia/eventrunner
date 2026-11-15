@@ -124,7 +124,6 @@ export function useSessionNote(uid, sessionId) {
     identityRef.current = identity;
     const store = openLocalDraft(uid, `users/${uid}/sessionNotes/${sessionId}`, 'note');
     copyRef.current = { identity, store };
-    let restoreChecked = false;
     setLoading(true);
     setState('loading');
     const unsubscribe = subscribeSessionNote(
@@ -136,23 +135,20 @@ export function useSessionNote(uid, sessionId) {
         listenerErrorRef.current = false;
         setSaved(text);
         setLoading(false);
-        if (!restoreChecked) {
-          restoreChecked = true;
-          // An edit typed before this first answer is newer than any copy.
-          const typing = latestEditRef.current?.identity === identity;
-          const copy = typing ? null : store.read();
-          // A copy that matches the note shows nothing and stays: only a
-          // confirmed save, discard or sign-out removes it.
-          if (copy && copy.value !== text) {
-            latestEditRef.current = {
-              identity, text: copy.value, timer: null, queued: false, force: false, cancelled: false,
-              copy: store, restored: true,
-            };
-            setDraft(copy.value);
-            setState('restored');
-            setUnsaved(true);
-            return;
-          }
+        // Every answer, while no edit of this visit is live: a cached answer
+        // can match a copy that a later server answer does not. A copy that
+        // matches shows nothing and stays; only a confirmed save, discard or
+        // sign-out removes it.
+        const copy = latestEditRef.current?.identity === identity ? null : store.read();
+        if (copy && copy.value !== text) {
+          latestEditRef.current = {
+            identity, text: copy.value, timer: null, queued: false, force: false, cancelled: false,
+            copy: store, restored: true,
+          };
+          setDraft(copy.value);
+          setState('restored');
+          setUnsaved(true);
+          return;
         }
         setState((current) => {
           if (current === 'loading') return 'saved';
@@ -230,6 +226,8 @@ export function useSessionNote(uid, sessionId) {
   const discard = useCallback(() => {
     const latestEdit = latestEditRef.current;
     if (!latestEdit || latestEdit.identity !== identityRef.current) return;
+    // A write already sent cannot be withdrawn; its answer decides.
+    if (latestEdit.queued) return;
     clearTimeout(latestEdit.timer);
     latestEdit.timer = null;
     latestEdit.cancelled = true;
