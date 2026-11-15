@@ -79,7 +79,14 @@ node scripts/ticket-grants.cjs publish --policy <policy.json> --expected-revisio
 node scripts/ticket-grants.cjs publish --policy <policy.json> --expected-revision 0 --apply --receipt <publish-1.json>
 ```
 
-Both refuse, before any write, when the expected revision is not the current effective revision, when the policy file is not valid for the deployment, or when the activation condition in section 1 fails. The receipt's `checks` shows the inventory results that the decision used. The dry run stops after the checks.
+Both refuse, before any write, when:
+
+- the expected revision is not the current effective revision;
+- another revision is being recomputed;
+- the policy revision is not above the effective revision, unless it resumes the staged revision;
+- the policy differs from a stored revision with the same number;
+- the policy file is not valid for the deployment;
+- the activation condition in section 1 fails. The receipt's `checks` shows the inventory results that the decision used. The dry run stops after the checks.
 
 With `--apply` the command stores the immutable revision, recomputes every account in pages of 100 and then sets the effective revision. The receipt has the sweep result (`sweep`) and the control document read back after it (`readback`). If the sweep stops, the receipt has `progress` and `error`. Correct the cause and run the same command again with the same policy. It continues from the last finished page. A different policy cannot replace an unfinished sweep.
 
@@ -107,6 +114,8 @@ The dry run is the default. It writes nothing and counts what it would write:
 | `accountWrites` | Accounts whose registration status would change. The ticket trigger would make the same change. If this is not 0, find out why before you apply. A common cause is automatic approval turned off, which returns ticket approvals to review. |
 | `invalid` | Accounts whose grant cannot be derived. Their uids are in `invalidUids`. Correct the policy or canonical data first. |
 
+If the backfill stops on an error, the receipt keeps the totals of the accounts it finished and `failedUid`. Run it again; finished accounts count as unchanged.
+
 Apply, then repeat the dry run:
 
 ```bash
@@ -127,7 +136,7 @@ node scripts/ticket-grants.cjs legacy --apply --receipt <legacy-1.json>
 
 With `--apply` the command writes `{ effectiveRevision: 0, candidateRevision: null, cursor: null, processed: 0, remaining: 0 }` to `ticket_access_policies/current` and reads it back. The receipt shows `legacy: true`. A project with no control document is already legacy, and the command does not create one. A running sweep stops with an error after the rollback; that is intended. Stored revisions stay as they are. After rollback, each account's next recompute removes its grant, because legacy mode has no grants.
 
-To activate again, publish (section 3) with `--expected-revision 0`. The same stored revision can be published again; the sweep recomputes every account.
+To activate again, publish (section 3) with `--expected-revision 0`. The same stored revision can be published again; the sweep recomputes every account. If a session or day that the revision names was deleted after it was stored, that revision no longer validates. Publish a new revision number with current references.
 
 ## 7. Stay in legacy mode on purpose
 

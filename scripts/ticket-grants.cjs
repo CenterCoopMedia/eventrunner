@@ -80,7 +80,7 @@ async function canonicalSessions(db) {
 const coversSessions = (grant, canonical) => {
   const sessions = grant?.resources?.sessions;
   const list = (value) => (Array.isArray(value) ? value : []);
-  return sessions?.all === true || list(sessions?.sessionIds).some((id) => canonical.ids.has(id)) ||
+  return (sessions?.all === true && canonical.ids.size > 0) || list(sessions?.sessionIds).some((id) => canonical.ids.has(id)) ||
     list(sessions?.dayIds).some((id) => canonical.days.has(id));
 };
 
@@ -88,25 +88,30 @@ const coversSessions = (grant, canonical) => {
  * The policy to project: an operator policy wins, else the staged or effective
  * revision. A policy identical to the staged revision is a resumption: it gets
  * the stored-revision semantics the helper uses, so a CMS session deleted
- * since staging removes membership instead of failing validation.
+ * since staging removes membership instead of failing validation. Any other
+ * policy is checked against current canonical data, and like the helper it
+ * cannot replace a stored revision with the same number.
  */
 async function projectionPolicy({ db, env, control, policyInput }) {
   const context = await policyContext({ db, tx: READER, env });
-  const stored = await readTicketResourcePolicy({ db, tx: READER, env });
+  // No document, or the rollback state: legacy, with no policy to read.
+  const legacy = !control || (control.effectiveRevision === 0 && (control.candidateRevision ?? null) === null);
+  const stored = legacy ? null : await readTicketResourcePolicy({ db, tx: READER, env });
   const storedIssues = stored?.policy ? [] : [{ path: 'policy', message: 'The stored revision is not valid.' }];
   if (policyInput === undefined) {
     return stored ? { source: 'stored', policy: stored.policy, context, issues: storedIssues } : { source: 'none', policy: null, context, issues: [] };
   }
   const revision = policyInput?.revision;
-  if (Number.isSafeInteger(revision) && revision === stagedRevision(control)) {
-    const raw = (await db.collection(POLICIES).doc(`revision-${revision}`).get()).data()?.policy;
+  const raw = Number.isSafeInteger(revision) && revision >= 1
+    ? (await db.collection(POLICIES).doc(`revision-${revision}`).get()).data()?.policy : undefined;
+  const differs = [{ path: 'policy', message: 'The policy differs from the stored revision with the same number.' }];
+  if (revision === stagedRevision(control)) {
     const checked = storedPolicy(policyInput, context);
-    if (!checked.ok || !isDeepStrictEqual(checked.value, raw)) {
-      return { source: 'file', policy: null, context, issues: [{ path: 'policy', message: 'The policy differs from the stored revision with the same number.' }] };
-    }
+    if (!checked.ok || !isDeepStrictEqual(checked.value, raw)) return { source: 'file', policy: null, context, issues: differs };
     return { source: 'file', policy: stored?.policy ?? null, context, issues: storedIssues };
   }
   const checked = validateTicketAccessPolicy(policyInput, context);
+  if (checked.ok && raw !== undefined && !isDeepStrictEqual(checked.value, raw)) return { source: 'file', policy: null, context, issues: differs };
   return { source: 'file', policy: checked.value, context, issues: checked.issues };
 }
 
@@ -217,8 +222,11 @@ async function backfillTicketGrants({ db, env = process.env, apply = false, now 
   const totals = { accounts: 0, unchanged: 0, held: 0, grantWrites: 0, accountWrites: 0, invalid: 0 };
   const invalidUids = [];
   const observed = observedDb(db, apply);
-  await eachDoc(db, 'users', async (doc) => {
+  let failedUid = null;
+  const recompute = async (doc) => {
+    failedUid = doc.id;
     const result = await recomputeEntitlement({ db: observed.db, uid: doc.id, env, now });
+    failedUid = null;
     if (result.action === 'missing') return; // Deleted between the page read and the transaction.
     totals.accounts += 1;
     if (result.action === 'unchanged') totals.unchanged += 1;
@@ -226,7 +234,13 @@ async function backfillTicketGrants({ db, env = process.env, apply = false, now 
     if (observed.writes.some((path) => path.startsWith(`${GRANTS}/`))) totals.grantWrites += 1;
     if (observed.writes.some((path) => path.startsWith('users/'))) totals.accountWrites += 1;
     if (result.grantStatus === 'invalid') { totals.invalid += 1; invalidUids.push(doc.id); }
-  });
+  };
+  try {
+    await eachDoc(db, 'users', recompute);
+  } catch (error) {
+    // Each account commits on its own: the receipt keeps what the run already did.
+    throw Object.assign(error, { result: { mode: apply ? 'apply' : 'dry-run', revision, totals, invalidUids, failedUid } });
+  }
   return { mode: apply ? 'apply' : 'dry-run', revision,
     control: { before: brief(before), after: brief(await readControl(db)) }, totals, invalidUids };
 }
@@ -243,9 +257,19 @@ const brief = (control) => control && { effectiveRevision: control.effectiveRevi
  */
 async function publishPolicy({ db, env = process.env, policyInput, expectedRevision, apply = false, now = () => new Date() }) {
   if (policyInput === undefined) throw new Error('publish needs --policy <file>.');
-  const effective = (await readControl(db))?.effectiveRevision ?? 0;
+  const control = await readControl(db);
+  const effective = control?.effectiveRevision ?? 0;
+  const candidate = control?.candidateRevision ?? null;
+  const revision = policyInput?.revision;
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== effective) {
     throw new Error(`--expected-revision must equal the current effective revision (${effective}).`);
+  }
+  // The helper's staging rules, checked before a dry run can pass.
+  if (candidate !== null && candidate !== revision) {
+    throw new Error(`Revision ${candidate} is being recomputed. Resume it with its own policy file.`);
+  }
+  if (candidate === null && !(Number.isSafeInteger(revision) && revision > effective)) {
+    throw new Error(`Use a policy revision above the effective revision (${effective}).`);
   }
   const inventory = await inventoryTicketGrants({ db, env, policyInput });
   const result = { mode: apply ? 'apply' : 'dry-run', expectedRevision, revision: inventory.candidateRevision,

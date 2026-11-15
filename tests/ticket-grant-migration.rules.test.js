@@ -172,6 +172,15 @@ it('publish applies and reads back; legacy rolls back without publishing; the re
   expect(updatedAt).toBeDefined();
   expect(state).toEqual({ effectiveRevision: 0, candidateRevision: null, cursor: null, processed: 0, remaining: 0 });
   expect(await policies()).toEqual(['current', 'revision-1']);
+  // The rollback state reads as legacy, not as a broken policy.
+  const afterRollback = await inventoryTicketGrants({ db, env: ENV });
+  expect(afterRollback.policy).toEqual({ source: 'none', issues: [] });
+  expect(afterRollback.candidateRevision).toBeNull();
+  // A different policy cannot take the stored revision's number.
+  const changed = structuredClone(POLICY);
+  changed.mappings = changed.mappings.slice(1);
+  expect((await inventoryTicketGrants({ db, env: ENV, policyInput: changed })).policy.issues)
+    .toEqual([{ path: 'policy', message: 'The policy differs from the stored revision with the same number.' }]);
 
   expect((await receiptOf('republish-stale', ['publish', '--policy', policyFile, '--expected-revision', '1', '--apply'])).code).toBe(1);
   const again = await receiptOf('republish', ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply']);
@@ -225,4 +234,45 @@ it('an unfinished sweep resumes after a referenced session is deleted', async ()
   await db.collection('ticket_access_policies').doc('current').update({ effectiveRevision: 0, candidateRevision: 1 });
   const report = await inventoryTicketGrants({ db, env: ENV, policyInput: changed });
   expect(report.policy.issues).toEqual([{ path: 'policy', message: 'The policy differs from the stored revision with the same number.' }]);
+});
+
+it('publish dry run refuses what the helper would refuse: another staged revision or a revision not above the effective one', async () => {
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  expect((await receiptOf('f6-publish', ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply'])).code).toBe(0);
+  const same = await receiptOf('f6-same', ['publish', '--policy', policyFile, '--expected-revision', '1']);
+  expect(same.receipt.error).toMatch(/above the effective revision \(1\)/);
+  await db.collection('ticket_access_policies').doc('current').update({ candidateRevision: 2 });
+  const third = { ...structuredClone(POLICY), revision: 3 };
+  const thirdFile = join(dir, 'policy-3.json');
+  writeFileSync(thirdFile, JSON.stringify(third));
+  const busy = await receiptOf('f6-busy', ['publish', '--policy', thirdFile, '--expected-revision', '1']);
+  expect(busy.code).toBe(1);
+  expect(busy.receipt.error).toMatch(/Revision 2 is being recomputed/);
+});
+
+it('an all-sessions grant covers nothing when the event has no sessions', async () => {
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  await db.collection('cmsSchedule').doc('keynote').delete();
+  await db.collection('cmsSchedule').doc('workshop').delete();
+  const policy = structuredClone(POLICY);
+  policy.classes[0].resources.sessions = { all: true, dayIds: [], sessionIds: [] };
+  policy.classes[1].resources.sessions = { all: false, dayIds: [], sessionIds: [] };
+  const report = await inventoryTicketGrants({ db, env: ENV, policyInput: policy });
+  expect(report.policy.issues).toEqual([]);
+  expect(report.accounts.missingApprovalSource.unresolvedUids).toEqual(['legacy']);
+  expect(report.activationReady).toBe(false);
+});
+
+it('a backfill that fails part way keeps the totals of the accounts it already wrote', async () => {
+  await publishTicketAccessPolicy({ db, policy: structuredClone(POLICY), expectedRevision: 0, env: ENV });
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  let calls = 0;
+  // The second account transaction fails as an unavailable backend would.
+  const flaky = { collection: (name) => db.collection(name),
+    runTransaction: (fn, options) => (++calls === 2 ? Promise.reject(new Error('14 UNAVAILABLE')) : db.runTransaction(fn, options)) };
+  const path = join(dir, 'partial.json');
+  expect(await run({ db: flaky, projectId: PROJECT, env: ENV, argv: ['backfill', '--apply', '--receipt', path], stdout: () => {} })).toBe(1);
+  expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ mode: 'apply', revision: 1, error: '14 UNAVAILABLE', failedUid: 'paid',
+    totals: { accounts: 1, grantWrites: 1, accountWrites: 0, invalid: 0 } });
+  expect((await db.collection('ticket_access_grants').doc('legacy').get()).data().classIds).toEqual(['day']);
 });
