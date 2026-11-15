@@ -68,22 +68,6 @@ beforeEach(() => {
 });
 
 describe('the editor tour when its chunk fails to load', () => {
-  it('retains a spent reload budget on a static leaf while the shell tour fails, including a fresh mount', async () => {
-    sessionStorage.setItem(RELOAD_FLAG, '1');
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      let view;
-      await act(async () => {
-        view = render(<MemoryRouter initialEntries={['/admin/pages']}><App /></MemoryRouter>);
-      });
-      const tour = await screen.findByRole('complementary', { name: 'Admin tour' }, { timeout: 5000 });
-      expect(tour).toHaveTextContent('The tour did not load.');
-      expect(await screen.findByRole('heading', { name: 'Pages', exact: true })).toBeInTheDocument();
-      expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
-      expect(recovery.reload).not.toHaveBeenCalled();
-      view.unmount();
-    }
-  });
-
   it('states the failure in the tour’s place, and End tour closes it and keeps Take the tour', async () => {
     let finish;
     const pending = routePage(() => new Promise((resolve) => { finish = resolve; }));
@@ -125,6 +109,24 @@ describe('the editor tour when its chunk fails to load', () => {
       finish({ default: () => null });
       await speculation;
       sessionStorage.clear();
+    }
+  });
+
+  // The first case exercises the import failure. This case keeps its cached
+  // failed tour and tests the reload landing page across fresh shell mounts.
+  it('retains a spent reload budget on a static leaf while the shell tour fails, including a fresh mount', async () => {
+    sessionStorage.setItem(RELOAD_FLAG, '1');
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let view;
+      await act(async () => {
+        view = render(<MemoryRouter initialEntries={['/admin/pages']}><App /></MemoryRouter>);
+      });
+      const tour = await screen.findByRole('complementary', { name: 'Admin tour' }, { timeout: 5000 });
+      expect(tour).toHaveTextContent('The tour did not load.');
+      expect(await screen.findByRole('heading', { name: 'Pages', exact: true })).toBeInTheDocument();
+      expect(sessionStorage.getItem(RELOAD_FLAG)).toBe('1');
+      expect(recovery.reload).not.toHaveBeenCalled();
+      view.unmount();
     }
   });
 });
