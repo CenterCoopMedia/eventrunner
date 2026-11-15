@@ -36,8 +36,9 @@
  */
 
 const { readFileSync, writeFileSync } = require('node:fs');
+const { isDeepStrictEqual } = require('node:util');
 const { ticketClassIdentity, validateTicketAccessPolicy, deriveTicketResourceGrant } = require('shared/ticketAccess');
-const { readTicketResourcePolicy, publishTicketAccessPolicy, internals: { POLICIES, GRANTS, policyContext } } = require('../functions/src/ticketing/resourceGrants.cjs');
+const { readTicketResourcePolicy, publishTicketAccessPolicy, internals: { POLICIES, GRANTS, policyContext, storedPolicy } } = require('../functions/src/ticketing/resourceGrants.cjs');
 const { recomputeEntitlement } = require('../functions/src/ticketing/entitlement.cjs');
 
 const PAGE = 200;
@@ -65,26 +66,54 @@ function stagedRevision(control) {
   return Number.isSafeInteger(revision) && revision >= 1 ? revision : null;
 }
 
-const coversSessions = (grant) => {
+/** Existing sessions and the days that have one, as decideSessionGrant reads them. */
+async function canonicalSessions(db) {
+  const ids = new Set();
+  const days = new Set();
+  for (const doc of (await db.collection('cmsSchedule').get()).docs) {
+    ids.add(doc.id);
+    if (typeof doc.data().dayId === 'string') days.add(doc.data().dayId);
+  }
+  return { ids, days };
+}
+
+const coversSessions = (grant, canonical) => {
   const sessions = grant?.resources?.sessions;
-  return sessions?.all === true || sessions?.dayIds?.length > 0 || sessions?.sessionIds?.length > 0;
+  const list = (value) => (Array.isArray(value) ? value : []);
+  return sessions?.all === true || list(sessions?.sessionIds).some((id) => canonical.ids.has(id)) ||
+    list(sessions?.dayIds).some((id) => canonical.days.has(id));
 };
 
-/** The policy to project: an operator file wins, else the staged or effective revision. */
-async function projectionPolicy({ db, env, policyFile }) {
+/**
+ * The policy to project: an operator policy wins, else the staged or effective
+ * revision. A policy identical to the staged revision is a resumption: it gets
+ * the stored-revision semantics the helper uses, so a CMS session deleted
+ * since staging removes membership instead of failing validation.
+ */
+async function projectionPolicy({ db, env, control, policyInput }) {
   const context = await policyContext({ db, tx: READER, env });
-  if (policyFile === undefined) {
-    const stored = await readTicketResourcePolicy({ db, tx: READER, env });
-    if (!stored) return { source: 'none', policy: null, context, issues: [] };
-    return { source: 'stored', policy: stored.policy, context, issues: stored.policy ? [] : [{ path: 'policy', message: 'The stored revision is not valid.' }] };
+  const stored = await readTicketResourcePolicy({ db, tx: READER, env });
+  const storedIssues = stored?.policy ? [] : [{ path: 'policy', message: 'The stored revision is not valid.' }];
+  if (policyInput === undefined) {
+    return stored ? { source: 'stored', policy: stored.policy, context, issues: storedIssues } : { source: 'none', policy: null, context, issues: [] };
   }
-  const checked = validateTicketAccessPolicy(JSON.parse(readFileSync(policyFile, 'utf8')), context);
+  const revision = policyInput?.revision;
+  if (Number.isSafeInteger(revision) && revision === stagedRevision(control)) {
+    const raw = (await db.collection(POLICIES).doc(`revision-${revision}`).get()).data()?.policy;
+    const checked = storedPolicy(policyInput, context);
+    if (!checked.ok || !isDeepStrictEqual(checked.value, raw)) {
+      return { source: 'file', policy: null, context, issues: [{ path: 'policy', message: 'The policy differs from the stored revision with the same number.' }] };
+    }
+    return { source: 'file', policy: stored?.policy ?? null, context, issues: storedIssues };
+  }
+  const checked = validateTicketAccessPolicy(policyInput, context);
   return { source: 'file', policy: checked.value, context, issues: checked.issues };
 }
 
-async function inventoryTicketGrants({ db, env = process.env, policyFile }) {
+async function inventoryTicketGrants({ db, env = process.env, policyInput }) {
   const control = await readControl(db);
-  const { source, policy, context, issues } = await projectionPolicy({ db, env, policyFile });
+  const { source, policy, context, issues } = await projectionPolicy({ db, env, control, policyInput });
+  const canonical = await canonicalSessions(db);
   if (!context.provider || !context.eventId) throw new Error('EVENT_TICKETING_PROVIDER and EVENT_TICKETING_EVENT_ID are required.');
   const revision = policy?.revision ?? stagedRevision(control);
   const mapped = new Set((policy?.mappings ?? []).map((entry) => entry.sourceClassId));
@@ -127,11 +156,13 @@ async function inventoryTicketGrants({ db, env = process.env, policyFile }) {
     if (current) accounts.currentGrant += 1;
     const projected = policy && deriveTicketResourceGrant({ policy, context,
       tickets: claimed.get(doc.id) ?? [], uid: doc.id, registration: account });
-    if (policy && !coversSessions(projected)) accounts.projectedNoSessions += 1;
+    if (policy && !coversSessions(projected, canonical)) accounts.projectedNoSessions += 1;
     if (sourceName !== 'missing') return;
     missing.count += 1;
     if (current) missing.currentGrant += 1;
-    if (coversSessions(current) || coversSessions(projected)) missing.usable += 1;
+    // With a policy, the next sweep or recompute writes the projected grant,
+    // so a cached grant does not count. Without one, the stored grant decides.
+    if (coversSessions(policy ? projected : current, canonical)) missing.usable += 1;
     else missing.unresolvedUids.push(doc.id);
   });
 
@@ -210,13 +241,13 @@ const brief = (control) => control && { effectiveRevision: control.effectiveRevi
  * written. A dry run stops there. --apply runs the helper (stage, sweep,
  * publish) and reads the control document back.
  */
-async function publishPolicy({ db, env = process.env, policyFile, expectedRevision, apply = false, now = () => new Date() }) {
-  if (!policyFile) throw new Error('publish needs --policy <file>.');
+async function publishPolicy({ db, env = process.env, policyInput, expectedRevision, apply = false, now = () => new Date() }) {
+  if (policyInput === undefined) throw new Error('publish needs --policy <file>.');
   const effective = (await readControl(db))?.effectiveRevision ?? 0;
   if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== effective) {
     throw new Error(`--expected-revision must equal the current effective revision (${effective}).`);
   }
-  const inventory = await inventoryTicketGrants({ db, env, policyFile });
+  const inventory = await inventoryTicketGrants({ db, env, policyInput });
   const result = { mode: apply ? 'apply' : 'dry-run', expectedRevision, revision: inventory.candidateRevision,
     checks: { policyIssues: inventory.policy.issues, activationReady: inventory.activationReady,
       unresolvedUids: inventory.accounts.missingApprovalSource.unresolvedUids,
@@ -226,9 +257,9 @@ async function publishPolicy({ db, env = process.env, policyFile, expectedRevisi
     throw Object.assign(new Error('Approved accounts with no approvalSource have no grant that covers a session.'), { result });
   }
   if (!apply) return result;
-  const policy = JSON.parse(readFileSync(policyFile, 'utf8'));
   try {
-    result.sweep = await publishTicketAccessPolicy({ db, policy, expectedRevision, env, now });
+    // The same parsed policy that passed the checks above.
+    result.sweep = await publishTicketAccessPolicy({ db, policy: structuredClone(policyInput), expectedRevision, env, now });
   } catch (error) {
     result.readback = brief(await readControl(db));
     throw Object.assign(error, { result });
@@ -261,9 +292,12 @@ function option(argv, name) {
 async function run({ db, projectId, env = process.env, argv, now = () => new Date(), stdout = console.log }) {
   const [command] = argv;
   const apply = argv.includes('--apply');
+  const policyPath = option(argv, '--policy');
+  // Read once: the checks and the publication use this one parsed copy.
+  const policyInput = policyPath === undefined ? undefined : JSON.parse(readFileSync(policyPath, 'utf8'));
   if (command === 'inventory') {
     const report = { projectId, readAt: now().toISOString(),
-      ...await inventoryTicketGrants({ db, env, policyFile: option(argv, '--policy') }) };
+      ...await inventoryTicketGrants({ db, env, policyInput }) };
     const out = option(argv, '--out');
     if (out) writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' });
     else stdout(JSON.stringify(report, null, 2));
@@ -271,7 +305,7 @@ async function run({ db, projectId, env = process.env, argv, now = () => new Dat
   }
   const commands = {
     backfill: () => backfillTicketGrants({ db, env, apply, now }),
-    publish: () => publishPolicy({ db, env, apply, now, policyFile: option(argv, '--policy'),
+    publish: () => publishPolicy({ db, env, apply, now, policyInput,
       expectedRevision: Number(option(argv, '--expected-revision')) }),
     legacy: () => returnToLegacy({ db, apply, now }),
   };

@@ -131,4 +131,4 @@ async function publishTicketAccessPolicy({ db, policy, expectedRevision, env = p
   }
 }
 
-module.exports = { readTicketResourcePolicy, publishTicketAccessPolicy, internals: { POLICIES, GRANTS, PAGE_SIZE, policyContext } };
+module.exports = { readTicketResourcePolicy, publishTicketAccessPolicy, internals: { POLICIES, GRANTS, PAGE_SIZE, policyContext, storedPolicy } };

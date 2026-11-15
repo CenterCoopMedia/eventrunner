@@ -54,7 +54,7 @@ afterAll(async () => {
 });
 
 it('inventory counts classes, approval sources and the missing-approvalSource accounts before publication', async () => {
-  const report = await inventoryTicketGrants({ db, env: ENV, policyFile });
+  const report = await inventoryTicketGrants({ db, env: ENV, policyInput: structuredClone(POLICY) });
   expect(report.control).toBeNull();
   expect(report.candidateRevision).toBe(1);
   expect(report.policy).toEqual({ source: 'file', issues: [] });
@@ -183,4 +183,46 @@ it('legacy does not create a control document on a project that never published'
   const result = await receiptOf('legacy-none', ['legacy', '--apply']);
   expect(result.receipt).toMatchObject({ mode: 'apply', before: null, after: null, legacy: true });
   expect(await policies()).toEqual([]);
+});
+
+it('readiness uses the grant the sweep will write, not a cached one', async () => {
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  expect((await receiptOf('f1-publish', ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply'])).code).toBe(0);
+  expect((await receiptOf('f1-legacy', ['legacy', '--apply'])).code).toBe(0);
+  // The cached revision-1 grant still covers Friday, but the ticket's class is now unmapped.
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'vip' });
+  const report = await inventoryTicketGrants({ db, env: ENV, policyInput: structuredClone(POLICY) });
+  expect(report.accounts.missingApprovalSource).toEqual({ count: 1, currentGrant: 1, usable: 0, unresolvedUids: ['legacy'] });
+  const refused = await receiptOf('f1-republish', ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply']);
+  expect(refused.code).toBe(1);
+  expect(refused.receipt.checks.unresolvedUids).toEqual(['legacy']);
+  expect((await db.collection('ticket_access_policies').doc('current').get()).data().effectiveRevision).toBe(0);
+});
+
+it('a day grant covers nothing when that day has no session', async () => {
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  await db.collection('cmsSchedule').doc('keynote').delete(); // Friday's only session.
+  const report = await inventoryTicketGrants({ db, env: ENV, policyInput: structuredClone(POLICY) });
+  expect(report.accounts.projectedNoSessions).toBe(2);
+  expect(report.accounts.missingApprovalSource.unresolvedUids).toEqual(['legacy']);
+  expect(report.activationReady).toBe(false);
+});
+
+it('an unfinished sweep resumes after a referenced session is deleted', async () => {
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  expect((await receiptOf('f3-publish', ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply'])).code).toBe(0);
+  // The state a stopped first sweep leaves: revision 1 staged, effective still 0.
+  await db.collection('ticket_access_policies').doc('current').set({ effectiveRevision: 0, candidateRevision: 1,
+    cursor: null, processed: 0, remaining: 5 });
+  await db.collection('cmsSchedule').doc('workshop').delete(); // The workshop class names it.
+  const resumed = await receiptOf('f3-resume', ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply']);
+  expect(resumed.receipt.error).toBeUndefined();
+  expect(resumed.code).toBe(0);
+  expect(resumed.receipt.readback).toEqual({ effectiveRevision: 1, candidateRevision: null });
+
+  const changed = structuredClone(POLICY);
+  changed.mappings = changed.mappings.slice(1);
+  await db.collection('ticket_access_policies').doc('current').update({ effectiveRevision: 0, candidateRevision: 1 });
+  const report = await inventoryTicketGrants({ db, env: ENV, policyInput: changed });
+  expect(report.policy.issues).toEqual([{ path: 'policy', message: 'The policy differs from the stored revision with the same number.' }]);
 });
