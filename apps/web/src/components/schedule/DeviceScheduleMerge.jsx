@@ -44,6 +44,7 @@ export default function DeviceScheduleMerge() {
         setError('');
         setDeviceMergePending(ids);
         const completed = [];
+        const uncovered = [];
         try {
           for (const sessionId of ids) {
             if (!current) break;
@@ -54,8 +55,15 @@ export default function DeviceScheduleMerge() {
               completed.push(sessionId);
             } catch (err) {
               if (err.code === 'session-unavailable') completed.push(sessionId);
+              // The ticket does not include this session: keep it here and
+              // continue with the sessions the ticket does include.
+              else if (err.code === 'ticket-resource') uncovered.push(sessionId);
               else throw err;
             }
+          }
+          if (uncovered.length && current) {
+            failedForUid.current = uid;
+            setError('Your ticket does not include some sessions saved in this browser. They are still here.');
           }
         } catch (err) {
           if (current) {
