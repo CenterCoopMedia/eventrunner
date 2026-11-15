@@ -17,7 +17,12 @@
 // LiveUpdatesCard still partitions pinned-first from the merged, id-deduped,
 // postedAt-sorted result this module hands it.
 import { subscribeToFirebase } from './firebaseLoader.js';
-import { subscribeWithRetry } from './retrySubscription.js';
+import {
+  afterServerConfirms,
+  SERVER_CONFIRMATION,
+  subscribeWithFallback,
+  subscribeWithRetry,
+} from './retrySubscription.js';
 
 const RECENT_CAP = 20;
 // Generous rather than "unlimited" — a runaway pinned count is an operator
@@ -62,71 +67,97 @@ function postedAtMs(doc) {
  * @returns {() => void} unsubscribe
  */
 export function subscribeLiveUpdates(audiences, onNext) {
-  return subscribeToFirebase(({ db, collection, limit, onSnapshot, orderBy, query, where }) => {
-    // null = no snapshot yet from that listener; both must report at least
-    // once before emitting, same convention as admin/useAdminPages.js — an
-    // empty array is a legitimate answer, a still-null one is not.
-    let pinnedDocs = null;
-    let recentDocs = null;
-
-    function emit() {
-      if (pinnedDocs === null || recentDocs === null) return;
-      const merged = new Map();
-      for (const d of recentDocs) merged.set(d.id, d);
-      for (const d of pinnedDocs) merged.set(d.id, d); // pinned wins on id clash (same doc either way)
-      onNext([...merged.values()].sort((a, b) => postedAtMs(b) - postedAtMs(a)));
-    }
-
-    // Both queries need a composite index (firestore.indexes.json): the
-    // audience `in` filter beside the postedAt order.
-    const pinnedQuery = query(
-      collection(db, 'live_updates'),
-      where('pinned', '==', true),
-      where('audience', 'in', audiences),
-      orderBy('postedAt', 'desc'),
-      limit(PINNED_CAP),
-    );
-    const recentQuery = query(
-      collection(db, 'live_updates'),
-      where('audience', 'in', audiences),
-      orderBy('postedAt', 'desc'),
-      limit(RECENT_CAP),
-    );
-
-    const onListenerError = (label) => (error) => {
-      // Fail soft: the caller keeps its last-known merged rows;
-      // subscribeWithRetry re-attaches a fresh listener after a delay.
-      console.warn(`live_updates (${label}) subscription failed; keeping last-known rows and retrying.`, error);
-    };
-
-    const unsubPinned = subscribeWithRetry(
-      (onError) =>
-        onSnapshot(
-          pinnedQuery,
-          (snapshot) => {
-            pinnedDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-            emit();
-          },
-          onError,
-        ),
-      onListenerError('pinned'),
-    );
-    const unsubRecent = subscribeWithRetry(
-      (onError) =>
-        onSnapshot(
-          recentQuery,
-          (snapshot) => {
-            recentDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-            emit();
-          },
-          onError,
-        ),
-      onListenerError('recent'),
-    );
-
-    return () => {
-      unsubPinned();
-      unsubRecent();
-    };
+  return subscribeToFirebase((sdk) => {
+    // After a ticket resource policy is published, an approved attendee whose
+    // grant lacks `attendeeUpdates` may not read `attendees` rows (issue
+    // 1005); a speaker or an admin keeps them. The grant is server-private,
+    // so a refused list shows the `everyone` rows, which the rules always
+    // allow, until the wider list is allowed again.
+    const narrower = audiences.includes('attendees') && !audiences.includes('speakers')
+      ? audiences.filter((audience) => audience !== 'attendees')
+      : null;
+    if (!narrower) return listenLiveUpdates(sdk, audiences, onNext);
+    const { db, collection, limit, onSnapshot, orderBy, query, where } = sdk;
+    return subscribeWithFallback({
+      wide: (onRefused) => listenLiveUpdates(sdk, audiences, onNext, onRefused),
+      narrow: () => listenLiveUpdates(sdk, narrower, onNext),
+      probe: (onAllowed, onError) => onSnapshot(query(
+        collection(db, 'live_updates'),
+        where('audience', 'in', audiences),
+        orderBy('postedAt', 'desc'),
+        limit(1),
+      ), SERVER_CONFIRMATION, onAllowed, onError),
+    });
   });
+}
+
+/** The pinned and recent listeners for one audience list. */
+function listenLiveUpdates({ db, collection, limit, onSnapshot, orderBy, query, where }, audiences, onNext, onRefused = null) {
+  // null = no snapshot yet from that listener; both must report at least
+  // once before emitting, same convention as admin/useAdminPages.js — an
+  // empty array is a legitimate answer, a still-null one is not.
+  let pinnedDocs = null;
+  let recentDocs = null;
+
+  function emit() {
+    if (pinnedDocs === null || recentDocs === null) return;
+    const merged = new Map();
+    for (const d of recentDocs) merged.set(d.id, d);
+    for (const d of pinnedDocs) merged.set(d.id, d); // pinned wins on id clash (same doc either way)
+    onNext([...merged.values()].sort((a, b) => postedAtMs(b) - postedAtMs(a)));
+  }
+
+  // Both queries need a composite index (firestore.indexes.json): the
+  // audience `in` filter beside the postedAt order.
+  const pinnedQuery = query(
+    collection(db, 'live_updates'),
+    where('pinned', '==', true),
+    where('audience', 'in', audiences),
+    orderBy('postedAt', 'desc'),
+    limit(PINNED_CAP),
+  );
+  const recentQuery = query(
+    collection(db, 'live_updates'),
+    where('audience', 'in', audiences),
+    orderBy('postedAt', 'desc'),
+    limit(RECENT_CAP),
+  );
+
+  // A list that a server-private grant decides waits for the server
+  // (afterServerConfirms); the narrower and exempt lists do not.
+  const listen = (target, onRows, onError) => onRefused
+    ? onSnapshot(target, SERVER_CONFIRMATION, afterServerConfirms(onRows), onError)
+    : onSnapshot(target, onRows, onError);
+
+  const onListenerError = (label) => (error) => {
+    if (onRefused && error?.code === 'permission-denied') {
+      onRefused();
+      return;
+    }
+    // Fail soft: the caller keeps its last-known merged rows;
+    // subscribeWithRetry re-attaches a fresh listener after a delay.
+    console.warn(`live_updates (${label}) subscription failed; keeping last-known rows and retrying.`, error);
+  };
+
+  const unsubPinned = subscribeWithRetry(
+    (onError) =>
+      listen(pinnedQuery, (snapshot) => {
+        pinnedDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        emit();
+      }, onError),
+    onListenerError('pinned'),
+  );
+  const unsubRecent = subscribeWithRetry(
+    (onError) =>
+      listen(recentQuery, (snapshot) => {
+        recentDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        emit();
+      }, onError),
+    onListenerError('recent'),
+  );
+
+  return () => {
+    unsubPinned();
+    unsubRecent();
+  };
 }

@@ -15,7 +15,7 @@ const { subscribeOwnScheduleShare, subscribeScheduleShare } = await import('./sc
 
 function emit(data) {
   const onNext = vi.fn();
-  onSnapshotMock.mockImplementation((_ref, onSuccess) => {
+  onSnapshotMock.mockImplementation((_ref, _options, onSuccess) => {
     onSuccess({
       exists: () => true,
       data: () => data,
@@ -56,12 +56,28 @@ describe('subscribeOwnScheduleShare', () => {
 
   it('answers null when the owner has no projection', () => {
     const onNext = vi.fn();
-    onSnapshotMock.mockImplementation((_ref, onSuccess) => {
+    onSnapshotMock.mockImplementation((_ref, _options, onSuccess) => {
       onSuccess({ exists: () => false, data: () => undefined });
       return vi.fn();
     });
     subscribeOwnScheduleShare('owner-1', onNext);
     expect(onNext).toHaveBeenCalledWith(null);
+  });
+
+  it('waits for the server before showing a cached share (issue 1004)', () => {
+    const onNext = vi.fn();
+    let onSuccess;
+    onSnapshotMock.mockImplementation((_ref, options, next) => {
+      expect(options).toEqual({ includeMetadataChanges: true });
+      onSuccess = next;
+      return vi.fn();
+    });
+    subscribeScheduleShare('owner-1', onNext);
+    const data = () => ({ scheduleVisibility: 'attendees_only', sessionIds: ['s1'] });
+    onSuccess({ exists: () => true, data, metadata: { fromCache: true } });
+    expect(onNext).not.toHaveBeenCalled();
+    onSuccess({ exists: () => true, data, metadata: { fromCache: false } });
+    expect(onNext).toHaveBeenCalledTimes(1);
   });
 
   it('answers null and does not listen when there is no uid', () => {

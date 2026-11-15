@@ -49,3 +49,78 @@ export function subscribeWithRetry(
     if (typeof detachCurrent === 'function') detachCurrent();
   };
 }
+
+/**
+ * Listen with the wider query until the rules refuse it, then listen with
+ * the narrower one, which the rules always allow, and probe the wider query
+ * after each retry delay. The first probe snapshot restores the wider
+ * listener. Used where a server-private ticket grant decides the wider
+ * query (issues 1004 and 1005), so a sweep that ends or a repaired grant
+ * restores the rows without a reload.
+ *
+ * @param {{ wide: (onRefused: () => void) => (() => void),
+ *           narrow: () => (() => void),
+ *           probe: (onAllowed: (snapshot: object) => void, onError: (error: unknown) => void) => (() => void),
+ *           retryDelayMs?: number }} listeners
+ *   `wide` calls onRefused when the rules refuse it; `probe` attaches one
+ *   small listener for the wider query with metadata changes included, so
+ *   the server confirmation arrives even when the rows match the cache.
+ * @returns {() => void} Unsubscribe
+ */
+export function subscribeWithFallback({ wide, narrow, probe, retryDelayMs = RETRY_DELAY_MS }) {
+  // Cached rows that the narrow listener holds also match the wider query,
+  // so only a server-confirmed probe snapshot proves the rules allow it.
+  let detach = attachWide();
+
+  function attachWide() {
+    let refused = false;
+    return wide(() => {
+      if (refused) return;
+      refused = true;
+      detach();
+      detach = attachNarrow();
+    });
+  }
+
+  function attachNarrow() {
+    let restored = false;
+    const detachNarrow = narrow();
+    const detachProbe = subscribeWithRetry(
+      (onError) => probe((snapshot) => {
+        if (restored || snapshot?.metadata?.fromCache) return;
+        restored = true;
+        detach();
+        detach = attachWide();
+      }, onError),
+      undefined,
+      retryDelayMs,
+    );
+    return () => {
+      detachProbe();
+      detachNarrow();
+    };
+  }
+
+  return () => detach();
+}
+
+/**
+ * A snapshot guard for a listener whose rows depend on a
+ * server-private grant: rows cached for an earlier account must not show
+ * before the server confirms this one, so cached snapshots wait for the
+ * first server-confirmed snapshot of each attach.
+ *
+ * @param {(snapshot: object) => void} onNext
+ * @returns {(snapshot: object) => void}
+ */
+export function afterServerConfirms(onNext) {
+  let confirmed = false;
+  return (snapshot) => {
+    if (!confirmed && snapshot?.metadata?.fromCache) return;
+    confirmed = true;
+    onNext(snapshot);
+  };
+}
+
+/** onSnapshot options for afterServerConfirms and the fallback probe. */
+export const SERVER_CONFIRMATION = Object.freeze({ includeMetadataChanges: true });

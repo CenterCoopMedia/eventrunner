@@ -526,7 +526,9 @@ service cloud.firestore {
     // document a client may read about somebody else. Before v1 this granted
     // `attendees_only` profiles to ANY authenticated user, so every new
     // (pending) account could enumerate the directory; the approved-attendee
-    // branch below is that fix (§3.4).
+    // branch below is that fix (§3.4). After a ticket resource policy is
+    // published, that branch also needs the directory grant (#1004); the
+    // same grant gates attendees_only shared schedules below.
     //
     // A `list` query succeeds only when every returned document satisfies a
     // rule, so the directory query filters on profileVisibility explicitly
@@ -535,7 +537,8 @@ service cloud.firestore {
       allow read: if resource.data.profileVisibility == 'public';
       allow read: if isSelf(userId);
       allow read: if resource.data.profileVisibility == 'attendees_only'
-        && requesterIsApprovedAttendee();
+        && requesterIsApprovedAttendee()
+        && ticketResourceGranted('directory');
       allow read: if isAdmin();
       allow write: if false;
     }
@@ -562,7 +565,8 @@ service cloud.firestore {
       allow read: if isSelf(userId);
       allow read: if resource.data.scheduleVisibility == 'public';
       allow read: if resource.data.scheduleVisibility == 'attendees_only'
-        && requesterIsApprovedAttendee();
+        && requesterIsApprovedAttendee()
+        && ticketResourceGranted('directory');
       allow write: if false;
     }
 
@@ -642,7 +646,9 @@ service cloud.firestore {
     // that only the card hid would still be one query away for anyone.
     //
     //   everyone   anyone, signed out included
-    //   attendees  approved attendees and speakers (requesterIsApprovedAttendee)
+    //   attendees  approved attendees and speakers (requesterIsApprovedAttendee);
+    //              after a ticket resource policy is published, an attendee
+    //              also needs the attendeeUpdates grant (#1005)
     //   speakers   accounts linked to a speaker record (users.speakerId set)
     //
     // The audiences a reader may see are a list, and the row's audience must
@@ -665,7 +671,7 @@ service cloud.firestore {
     function readableLiveUpdateAudiences() {
       return request.auth == null ? ['everyone']
         : requesterIsSpeaker() ? ['everyone', 'attendees', 'speakers']
-        : requesterIsApprovedAttendee() ? ['everyone', 'attendees']
+        : (requesterIsApprovedAttendee() && ticketResourceGranted('attendeeUpdates')) ? ['everyone', 'attendees']
         : ['everyone'];
     }
 

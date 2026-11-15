@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// profileSource's seams to Firestore are onSnapshot/getDoc/updateDoc over
+// profileSource's seams to Firestore are onSnapshot/getDocFromServer/updateDoc over
 // doc()/query() refs — mock the SDK so tests can inspect the query shape the
 // directory asks for (the visibility filter is load-bearing under the rules)
 // and drive listener callbacks directly.
@@ -10,7 +10,8 @@ const updateDocMock = vi.fn();
 vi.mock('firebase/firestore', () => ({
   collection: (_db, name) => ({ collection: name }),
   doc: (_db, name, id) => ({ path: `${name}/${id}` }),
-  getDoc: (...args) => getDocMock(...args),
+  getDocFromServer: (...args) => getDocMock(...args),
+  limit: (n) => ({ limit: n }),
   onSnapshot: (...args) => onSnapshotMock(...args),
   query: (target, ...constraints) => ({ ...target, constraints }),
   serverTimestamp: () => ({ sentinel: 'serverTimestamp' }),
@@ -125,8 +126,8 @@ describe('subscribeDirectory', () => {
 
   it('reports listener failures so the page can say the directory is unavailable', () => {
     let onError;
-    onSnapshotMock.mockImplementation((_target, _next, errorCb) => {
-      onError = errorCb;
+    onSnapshotMock.mockImplementation((_target, ...rest) => {
+      onError = rest.at(-1);
       return vi.fn();
     });
     const onFail = vi.fn();
@@ -135,9 +136,100 @@ describe('subscribeDirectory', () => {
     onError(new Error('permission denied'));
     expect(onFail).toHaveBeenCalled();
   });
+
+  it('shows public profiles while the rules refuse the full directory, then restores it (issue 1004)', () => {
+    vi.useFakeTimers();
+    try {
+      const listeners = [];
+      onSnapshotMock.mockImplementation((target, ...rest) => {
+        const options = typeof rest[0] === 'function' ? null : rest.shift();
+        const [next, errorCb] = rest;
+        listeners.push({ target, options, next, errorCb });
+        return vi.fn();
+      });
+      const onFail = vi.fn();
+      const onNext = vi.fn();
+      const denied = Object.assign(new Error('denied'), { code: 'permission-denied' });
+      subscribeDirectory({ includeAttendeesOnly: true }, onNext, onFail);
+      listeners[0].errorCb(denied);
+      // The public listener and a one-row probe of the full directory.
+      expect(listeners[1].target.constraints).toEqual([
+        { field: 'profileVisibility', op: '==', value: 'public' },
+      ]);
+      expect(listeners[2].target.constraints).toEqual([
+        { field: 'profileVisibility', op: 'in', value: ['public', 'attendees_only'] },
+        { limit: 1 },
+      ]);
+      expect(onFail).not.toHaveBeenCalled();
+
+      listeners[2].errorCb(denied);
+      vi.runOnlyPendingTimers();
+      listeners[3].next({ docs: [] });
+      expect(listeners[4].target.constraints).toEqual([
+        { field: 'profileVisibility', op: 'in', value: ['public', 'attendees_only'] },
+      ]);
+      listeners[4].next({ docs: [{ id: 'u1', data: () => ({ profileVisibility: 'attendees_only' }) }] });
+      expect(onNext).toHaveBeenLastCalledWith([{ id: 'u1', profileVisibility: 'attendees_only' }]);
+      expect(onFail).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for the server before showing the full directory', () => {
+    const listeners = [];
+    onSnapshotMock.mockImplementation((target, ...rest) => {
+      const options = typeof rest[0] === 'function' ? null : rest.shift();
+      listeners.push({ target, options, next: rest[0] });
+      return vi.fn();
+    });
+    const onNext = vi.fn();
+    subscribeDirectory({ includeAttendeesOnly: true }, onNext);
+    expect(listeners[0].options).toEqual({ includeMetadataChanges: true });
+    const rows = [{ id: 'u1', data: () => ({ profileVisibility: 'attendees_only' }) }];
+    // Rows cached for an earlier account in this tab.
+    listeners[0].next({ docs: rows, metadata: { fromCache: true } });
+    expect(onNext).not.toHaveBeenCalled();
+    listeners[0].next({ docs: rows, metadata: { fromCache: false } });
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the public directory while the probe has only cached rows', () => {
+    const listeners = [];
+    onSnapshotMock.mockImplementation((target, ...rest) => {
+      const options = typeof rest[0] === 'function' ? null : rest.shift();
+      listeners.push({ target, options, next: rest[0], errorCb: rest[1] });
+      return vi.fn();
+    });
+    subscribeDirectory({ includeAttendeesOnly: true }, vi.fn());
+    listeners[0].errorCb(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    expect(listeners[2].options).toEqual({ includeMetadataChanges: true });
+    // Public rows from the narrow listener match the probe in the cache.
+    listeners[2].next({ docs: [], metadata: { fromCache: true } });
+    expect(listeners).toHaveLength(3);
+  });
+
+  it('reports a refused public directory as unavailable', () => {
+    let onError;
+    onSnapshotMock.mockImplementation((_target, _next, errorCb) => {
+      onError = errorCb;
+      return vi.fn();
+    });
+    const onFail = vi.fn();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    subscribeDirectory({ includeAttendeesOnly: false }, vi.fn(), onFail);
+    onError(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    expect(onFail).toHaveBeenCalled();
+  });
 });
 
 describe('fetchPublicProfile', () => {
+  it('reads the profile from the server, never from the cache (issue 1004)', async () => {
+    getDocMock.mockResolvedValue({ exists: () => false });
+    await fetchPublicProfile('u1');
+    expect(getDocMock).toHaveBeenCalledWith({ path: 'users_public/u1' });
+  });
+
   it('returns the projection when it is readable', async () => {
     getDocMock.mockResolvedValue({
       exists: () => true,

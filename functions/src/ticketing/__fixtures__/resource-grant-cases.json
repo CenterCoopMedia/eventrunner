@@ -290,5 +290,197 @@
     "grant": null,
     "resource": "interactions",
     "expected": "allow"
+  },
+  {
+    "name": "no policy keeps the binary directory gate",
+    "control": null,
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "directory",
+    "expected": "allow"
+  },
+  {
+    "name": "no policy keeps the binary attendee updates gate",
+    "control": null,
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "attendeeUpdates",
+    "expected": "allow"
+  },
+  {
+    "name": "first sweep before publication keeps attendee updates",
+    "control": {
+      "effectiveRevision": 0,
+      "candidateRevision": 1
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "attendeeUpdates",
+    "expected": "allow"
+  },
+  {
+    "name": "a grant without directory does not include the directory",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": false,
+        "attendeeUpdates": true,
+        "interactions": true
+      }
+    },
+    "resource": "directory",
+    "expected": "ticket-resource"
+  },
+  {
+    "name": "a grant without attendee updates does not include them",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": true,
+        "attendeeUpdates": false,
+        "interactions": true
+      }
+    },
+    "resource": "attendeeUpdates",
+    "expected": "ticket-resource"
+  },
+  {
+    "name": "directory with a missing grant fails closed as access updating",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "directory",
+    "expected": "access-updating"
+  },
+  {
+    "name": "directory with a grant from an older revision fails closed",
+    "control": {
+      "effectiveRevision": 2,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": true,
+        "attendeeUpdates": false,
+        "interactions": false
+      }
+    },
+    "resource": "directory",
+    "expected": "access-updating"
+  },
+  {
+    "name": "attendee updates during a sweep fail closed",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": 2
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": false,
+        "attendeeUpdates": true,
+        "interactions": false
+      }
+    },
+    "resource": "attendeeUpdates",
+    "expected": "access-updating"
+  },
+  {
+    "name": "admin approval keeps the directory",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "admin",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "directory",
+    "expected": "allow"
+  },
+  {
+    "name": "verified speaker keeps attendee updates",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "pending",
+      "approvalSource": "ticket",
+      "speakerId": "spk-1"
+    },
+    "grant": null,
+    "resource": "attendeeUpdates",
+    "expected": "allow"
   }
 ]

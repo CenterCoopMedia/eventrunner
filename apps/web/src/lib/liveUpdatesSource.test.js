@@ -7,8 +7,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // registration order so each test can address "the pinned listener" vs "the
 // recent listener" by index.
 const calls = [];
-const onSnapshotMock = vi.fn((_target, onSuccess, onError) => {
-  calls.push({ onSuccess, onError });
+// A listener may pass snapshot options before its callbacks.
+const onSnapshotMock = vi.fn((_target, ...rest) => {
+  const options = typeof rest[0] === 'function' ? null : rest.shift();
+  const [onSuccess, onError] = rest;
+  calls.push({ options, onSuccess, onError });
   return vi.fn();
 });
 const collectionMock = vi.fn((_db, name) => ({ __kind: 'collection', name }));
@@ -95,6 +98,69 @@ describe('subscribeLiveUpdates', () => {
     for (const [, ...constraints] of queryMock.mock.calls) {
       expect(constraints).toContainEqual({ __kind: 'where', field: 'audience', op: 'in', value: ['everyone', 'attendees'] });
     }
+  });
+
+  it('shows everyone rows while the rules refuse attendee rows, then restores them (issue 1005)', () => {
+    vi.useFakeTimers();
+    try {
+      queryMock.mockClear();
+      const onNext = vi.fn();
+      subscribeLiveUpdates(['everyone', 'attendees'], onNext);
+      const denied = Object.assign(new Error('denied'), { code: 'permission-denied' });
+      calls[0].onError(denied);
+      calls[1].onError(denied);
+      // The everyone listeners and one probe of the wider list replace the refused pair.
+      expect(calls.length).toBe(5);
+      const audiences = queryMock.mock.calls.map(([, ...constraints]) =>
+        constraints.find((c) => c.field === 'audience').value);
+      expect(audiences).toEqual([
+        ['everyone', 'attendees'], ['everyone', 'attendees'], ['everyone'], ['everyone'], ['everyone', 'attendees'],
+      ]);
+      calls[2].onSuccess({ docs: [doc('e1', { audience: 'everyone', postedAt: new Date(1000) })] });
+      calls[3].onSuccess({ docs: [] });
+      expect(onNext.mock.calls.at(-1)[0].map((d) => d.id)).toEqual(['e1']);
+
+      // A refused probe tries again after the retry delay.
+      calls[4].onError(denied);
+      vi.runOnlyPendingTimers();
+      expect(calls.length).toBe(6);
+      // Once the wider list is allowed (a sweep ended), the full pair returns.
+      calls[5].onSuccess({ docs: [] });
+      expect(calls.length).toBe(8);
+      calls[6].onSuccess({ docs: [] });
+      calls[7].onSuccess({ docs: [doc('a1', { audience: 'attendees', postedAt: new Date(2000) })] });
+      expect(onNext.mock.calls.at(-1)[0].map((d) => d.id)).toEqual(['a1']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('waits for the server before showing attendee rows', () => {
+    const onNext = vi.fn();
+    subscribeLiveUpdates(['everyone', 'attendees'], onNext);
+    expect(calls[0].options).toEqual({ includeMetadataChanges: true });
+    const cached = { docs: [doc('a1', { audience: 'attendees', postedAt: new Date(2000) })], metadata: { fromCache: true } };
+    calls[0].onSuccess(cached);
+    calls[1].onSuccess(cached);
+    expect(onNext).not.toHaveBeenCalled();
+    calls[0].onSuccess({ ...cached, metadata: { fromCache: false } });
+    calls[1].onSuccess({ ...cached, metadata: { fromCache: false } });
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps everyone rows while the probe has only cached rows', () => {
+    subscribeLiveUpdates(['everyone', 'attendees'], vi.fn());
+    const denied = Object.assign(new Error('denied'), { code: 'permission-denied' });
+    calls[0].onError(denied);
+    calls[4].onSuccess({ docs: [], metadata: { fromCache: true } });
+    expect(calls.length).toBe(5);
+  });
+
+  it('keeps the speaker audience list after a refusal', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    subscribeLiveUpdates(['everyone', 'attendees', 'speakers'], vi.fn());
+    calls[0].onError(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    expect(calls.length).toBe(2);
   });
 });
 

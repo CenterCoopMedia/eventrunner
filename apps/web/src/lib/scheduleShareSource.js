@@ -9,7 +9,7 @@
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { functionsOrigin } from './firebaseSettings.js';
-import { subscribeWithRetry } from './retrySubscription.js';
+import { afterServerConfirms, SERVER_CONFIRMATION, subscribeWithRetry } from './retrySubscription.js';
 
 /** The closed list the rules read. One definition, mirrored server-side. */
 export const SCHEDULE_VISIBILITIES = Object.freeze(['private', 'attendees_only', 'public']);
@@ -30,9 +30,12 @@ export function subscribeOwnScheduleShare(uid, onNext, onError) {
   }
   return subscribeWithRetry(
     (onListenerError) =>
+      // A share cached for an earlier account in this tab waits for the
+      // server, which applies the directory grant (issue 1004).
       onSnapshot(
         doc(db, `schedule_shares/${uid}`),
-        (snapshot) => {
+        SERVER_CONFIRMATION,
+        afterServerConfirms((snapshot) => {
           if (!snapshot.exists()) {
             onNext(null);
             return;
@@ -48,7 +51,7 @@ export function subscribeOwnScheduleShare(uid, onNext, onError) {
             sessionIds: Array.isArray(data.sessionIds) ? data.sessionIds : [],
             displayName,
           });
-        },
+        }),
         onListenerError,
       ),
     (error) => {
