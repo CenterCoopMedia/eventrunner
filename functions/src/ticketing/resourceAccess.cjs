@@ -22,24 +22,52 @@ const ACCESS_UPDATING = Object.freeze({ ok: false, status: 403, code: 'access-up
 const NOT_INCLUDED = Object.freeze({ ok: false, status: 403, code: 'ticket-resource',
   message: 'Your ticket does not include this session.' });
 
+const RESOURCES = Object.freeze(['interactions', 'directory', 'attendeeUpdates']);
+
+/**
+ * The checks every resource shares: legacy mode and the exemptions admit,
+ * a sweep in progress or a grant from another revision is "access updating".
+ * Returns a final decision, or the current grant's resources to test.
+ */
+function currentResources({ control, account, grant }) {
+  if (!control || control.effectiveRevision === 0) return { decision: { ok: true } };
+  if (account?.speakerId != null) return { decision: { ok: true } };
+  if (account?.registrationStatus === 'approved' && account?.approvalSource === 'admin') return { decision: { ok: true } };
+  const revision = control.effectiveRevision;
+  if (!Number.isSafeInteger(revision) || revision < 1 || (control.candidateRevision ?? null) !== null) return { decision: ACCESS_UPDATING };
+  if (!grant || grant.policyRevision !== revision) return { decision: ACCESS_UPDATING };
+  return { resources: grant.resources ?? {} };
+}
+
 /**
  * @param {{ control: object|null, account: object|null, grant: object|null,
  *           session: object|null, sessionId: string, interactions?: boolean }} input
  * @returns {{ ok: true } | typeof ACCESS_UPDATING | typeof NOT_INCLUDED}
  */
 function decideSessionGrant({ control, account, grant, session, sessionId, interactions = false }) {
-  if (!control || control.effectiveRevision === 0) return { ok: true };
-  if (account?.speakerId != null) return { ok: true };
-  if (account?.registrationStatus === 'approved' && account?.approvalSource === 'admin') return { ok: true };
-  const revision = control.effectiveRevision;
-  if (!Number.isSafeInteger(revision) || revision < 1 || (control.candidateRevision ?? null) !== null) return ACCESS_UPDATING;
-  if (!grant || grant.policyRevision !== revision) return ACCESS_UPDATING;
-  const sessions = grant.resources?.sessions;
+  const { decision, resources } = currentResources({ control, account, grant });
+  if (decision) return decision;
+  const sessions = resources.sessions;
   const list = (value) => (Array.isArray(value) ? value : []);
   const covered = sessions?.all === true || list(sessions?.sessionIds).includes(sessionId) ||
     (typeof session?.dayId === 'string' && list(sessions?.dayIds).includes(session.dayId));
-  if (!covered || (interactions && grant.resources?.interactions !== true)) return NOT_INCLUDED;
+  if (!covered || (interactions && resources.interactions !== true)) return NOT_INCLUDED;
   return { ok: true };
+}
+
+/**
+ * The same decision for a resource that is not tied to a session: the
+ * social feed (`interactions`), the directory or attendee updates.
+ *
+ * @param {{ control: object|null, account: object|null, grant: object|null,
+ *           resource: 'interactions'|'directory'|'attendeeUpdates' }} input
+ * @returns {{ ok: true } | typeof ACCESS_UPDATING | typeof NOT_INCLUDED}
+ */
+function decideResourceGrant({ control, account, grant, resource }) {
+  if (!RESOURCES.includes(resource)) throw new TypeError(`Unknown ticket resource: ${resource}`);
+  const { decision, resources } = currentResources({ control, account, grant });
+  if (decision) return decision;
+  return resources[resource] === true ? { ok: true } : NOT_INCLUDED;
 }
 
 /** A session write the caller's ticket grant does not allow; carries the decision. */
@@ -54,13 +82,12 @@ class SessionGrantError extends Error {
 /**
  * Read the account, control and grant inside the caller's write transaction,
  * so a concurrent refund, revocation or publication conflicts with the write
- * and the retry decides again. `session` is the cmsSchedule data that
- * transaction already read. `bootstrapEmail` is the verified address of a
- * caller the attendee gate admitted from its cached bootstrap copy; the
- * exemption is confirmed here from the live document, as the note rules do.
- * Throws SessionGrantError on denial.
+ * and the retry decides again. `decide` receives { control, account, grant }.
+ * `bootstrapEmail` is the verified address of a caller the attendee gate
+ * admitted from its cached bootstrap copy; the exemption is confirmed here
+ * from the live document, as the rules do. Throws SessionGrantError on denial.
  */
-async function assertSessionGrant({ db, tx, uid, sessionId, session, interactions = false, bootstrapEmail = null }) {
+async function assertGrant({ db, tx, uid, bootstrapEmail, decide }) {
   const control = (await tx.get(db.collection(POLICIES).doc('current'))).data() ?? null;
   if (!control || control.effectiveRevision === 0) return;
   if (bootstrapEmail) {
@@ -71,9 +98,21 @@ async function assertSessionGrant({ db, tx, uid, sessionId, session, interaction
     tx.get(db.collection('users').doc(uid)),
     tx.get(db.collection(GRANTS).doc(uid)),
   ]);
-  const decision = decideSessionGrant({ control, account: accountSnap.data() ?? null,
-    grant: grantSnap.data() ?? null, session, sessionId, interactions });
+  const decision = decide({ control, account: accountSnap.data() ?? null, grant: grantSnap.data() ?? null });
   if (!decision.ok) throw new SessionGrantError(decision);
 }
 
-module.exports = { decideSessionGrant, assertSessionGrant, SessionGrantError };
+/** `session` is the cmsSchedule data the caller's transaction already read. */
+function assertSessionGrant({ db, tx, uid, sessionId, session, interactions = false, bootstrapEmail = null }) {
+  return assertGrant({ db, tx, uid, bootstrapEmail,
+    decide: (input) => decideSessionGrant({ ...input, session, sessionId, interactions }) });
+}
+
+function assertResourceGrant({ db, tx, uid, resource, bootstrapEmail = null }) {
+  return assertGrant({ db, tx, uid, bootstrapEmail,
+    decide: (input) => decideResourceGrant({ ...input, resource }) });
+}
+
+module.exports = {
+  decideSessionGrant, decideResourceGrant, assertSessionGrant, assertResourceGrant, SessionGrantError,
+};

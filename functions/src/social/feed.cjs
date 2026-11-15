@@ -47,6 +47,17 @@
  * change request store makes (admin/changeRequests.cjs) so content can be
  * cleared after the feature is turned off. It grants no attendee access.
  *
+ * TICKET GRANTS (#1006). After a ticket resource policy is published
+ * (ticket_access_policies/current.effectiveRevision >= 1), posting,
+ * replying, reporting and marking a notification read also need the
+ * caller's `resources.interactions` grant for that revision, checked in
+ * the same transaction by assertResourceGrant. A stale grant or a sweep
+ * in progress answers 403 access-updating; a grant without interactions
+ * answers 403 ticket-resource. Speakers, admin-approved accounts and
+ * bootstrap admins/staff are exempt, as in the rules' attendee reads.
+ * Bootstrap access still never grants composition. With no published
+ * revision nothing changes.
+ *
  * CURRENT GRANTS, NOT CACHED ONES. Each report attempt reads, inside its
  * transaction, the caller's `users/{uid}` (approved, or linked to a
  * speaker: the rules' requesterIsApprovedAttendee) and `config/bootstrap`
@@ -79,6 +90,7 @@ const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
+const { assertResourceGrant, SessionGrantError } = require('../ticketing/resourceAccess.cjs');
 const {
   MAX_SOCIAL_REQUEST_BYTES, socialRequestBytes, readSocialPost,
 } = require('shared/socialPost');
@@ -158,6 +170,27 @@ function verifiedEmail(decoded) {
   return decoded.email.trim().toLowerCase();
 }
 
+/**
+ * The ticket `interactions` grant (#1006), checked inside the caller's
+ * transaction after the flags and the binary account gate. Returns the
+ * denial decision, or null when the caller may use the feed. With no
+ * published policy revision it reads one document and admits.
+ */
+async function interactionDenial({ db, tx, uid, bootstrapEmail = null }) {
+  try {
+    await assertResourceGrant({ db, tx, uid, resource: 'interactions', bootstrapEmail });
+    return null;
+  } catch (err) {
+    if (err instanceof SessionGrantError) return err.decision;
+    throw err;
+  }
+}
+
+/** The 403 for a denial decision: access-updating or ticket-resource. */
+function sendGrantDenial(res, decision) {
+  return sendError(res, decision.status, decision.code, decision.message);
+}
+
 /** The pitch pattern: a submission key belongs to exactly one UID. */
 function postIdFor(uid, submissionKey) {
   return crypto.createHash('sha256').update(`${uid}\0${submissionKey}`, 'utf8').digest('hex');
@@ -169,7 +202,7 @@ function postIdFor(uid, submissionKey) {
  * Reading the parent orders a new reply against root removal. A replay of
  * an existing reply writes nothing, even if its root has since been removed.
  */
-async function storePost({ db, uid, submission, now }) {
+async function storePost({ db, uid, email, submission, now }) {
   const { text, parentPostId, submissionKey } = submission;
   const postId = postIdFor(uid, submissionKey);
   const postRef = db.collection(POSTS).doc(postId);
@@ -182,6 +215,8 @@ async function storePost({ db, uid, submission, now }) {
     if (!feedOpen(features.exists ? features.data() : null)) return 'closed';
     // Bootstrap staff access never grants composition access.
     if (!accountGrant(account.exists ? account.data() : null)) return 'forbidden';
+    const denial = await interactionDenial({ db, tx, uid, bootstrapEmail: email });
+    if (denial) return denial;
     if (target.exists) {
       const stored = target.data();
       if (stored.state === REMOVED) return 'removed';
@@ -224,12 +259,13 @@ function createCreateSocialPostHandler({ db, auth, now = Date.now, log = console
     if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Sign in to post.');
     let result;
     try {
-      result = await storePost({ db, uid: decoded.uid, submission, now });
+      result = await storePost({ db, uid: decoded.uid, email: verifiedEmail(decoded), submission, now });
     } catch (err) {
       log.error('createSocialPost failed', { code: err?.code ?? 'unknown' });
       return internal(res, 'The post could not be saved. Try again with the same submission key.');
     }
     const { outcome, postId } = result;
+    if (outcome?.ok === false) return sendGrantDenial(res, outcome);
     if (outcome === 'closed') return notFound(res, FEED_CLOSED_MESSAGE);
     if (outcome === 'forbidden') return sendError(res, 403, 'forbidden', 'An approved or speaker account is required to post.');
     if (outcome === 'no-root') return notFound(res, 'The original post is not available for replies.');
@@ -256,19 +292,22 @@ function createMarkSocialNotificationReadHandler({ db, auth, now = Date.now, log
     if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Sign in to read a notification.');
     let result;
     try {
-      result = await markNotificationRead({ db, uid: decoded.uid, notificationId: body.notificationId, now });
+      result = await markNotificationRead({
+        db, uid: decoded.uid, email: verifiedEmail(decoded), notificationId: body.notificationId, now,
+      });
     } catch (err) {
       log.error('markSocialNotificationRead failed', { code: err?.code ?? 'unknown' });
       return internal(res, 'The notification could not be marked read. Try again.');
     }
     if (result.outcome === 'closed') return notFound(res, FEED_CLOSED_MESSAGE);
     if (result.outcome === 'forbidden') return sendError(res, 403, 'forbidden', 'An approved or speaker account is required.');
+    if (result.outcome === 'denied') return sendGrantDenial(res, result.decision);
     if (result.outcome === 'missing') return notFound(res, 'This notification is not available.');
     res.status(200).json({ notificationId: body.notificationId, readAt: result.readAt.toISOString() });
   };
 }
 
-async function markNotificationRead({ db, uid, notificationId, now }) {
+async function markNotificationRead({ db, uid, email, notificationId, now }) {
   const item = db.collection('users').doc(uid).collection('notifications').doc(notificationId);
   return db.runTransaction(async (tx) => {
     const [features, account, notification] = await tx.getAll(
@@ -276,6 +315,8 @@ async function markNotificationRead({ db, uid, notificationId, now }) {
     );
     if (!feedOpen(features.exists ? features.data() : null)) return { outcome: 'closed' };
     if (!accountGrant(account.exists ? account.data() : null)) return { outcome: 'forbidden' };
+    const denial = await interactionDenial({ db, tx, uid, bootstrapEmail: email });
+    if (denial) return { outcome: 'denied', decision: denial };
     if (!notification.exists) return { outcome: 'missing' };
     const previous = notification.data().readAt;
     const readAt = previous === null ? new Date(clockMs(now)) : previous.toDate();
@@ -305,6 +346,11 @@ async function storeReport({ db, postId, uid, email, now }) {
     const bootstrap = bootstrapSnap.exists ? bootstrapSnap.data() : null;
     const staffGrant = Boolean(email) && resolveAdminTier(bootstrap, email, nowMs) !== null;
     if (!staffGrant && !accountGrant(accountSnap.exists ? accountSnap.data() : null)) return 'forbidden';
+    // A live staff grant is the cleanup path and needs no ticket grant.
+    if (!staffGrant) {
+      const denial = await interactionDenial({ db, tx, uid });
+      if (denial) return denial;
+    }
     if (reportSnap.exists) return 'replayed';
     if (!postSnap.exists || postSnap.data()?.state !== ACTIVE) return 'no-post';
     tx.create(reportRef, { postId, reporterUid: uid, createdAt: new Date(nowMs) });
@@ -365,6 +411,7 @@ function createReportSocialPostHandler({ db, auth, now = Date.now, log = console
       log.error('reportSocialPost failed', err);
       return internal(res, 'The report could not be saved. Try again.');
     }
+    if (outcome?.ok === false) return sendGrantDenial(res, outcome);
     if (outcome === 'closed') return notFound(res, FEED_CLOSED_MESSAGE);
     if (outcome === 'forbidden') return sendError(res, 403, 'forbidden', NO_ACCESS_MESSAGE);
     if (outcome === 'no-post') return notFound(res, NO_POST_MESSAGE);

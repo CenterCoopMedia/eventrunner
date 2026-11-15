@@ -1,0 +1,294 @@
+[
+  {
+    "name": "no policy keeps the binary gate",
+    "control": null,
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "interactions",
+    "expected": "allow"
+  },
+  {
+    "name": "first sweep before publication keeps the binary gate",
+    "control": {
+      "effectiveRevision": 0,
+      "candidateRevision": 1
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "interactions",
+    "expected": "allow"
+  },
+  {
+    "name": "interactions grant allows the feed",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": false,
+        "attendeeUpdates": false,
+        "interactions": true
+      }
+    },
+    "resource": "interactions",
+    "expected": "allow"
+  },
+  {
+    "name": "a full session pass without interactions is not included",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": false,
+        "attendeeUpdates": false,
+        "interactions": false
+      }
+    },
+    "resource": "interactions",
+    "expected": "ticket-resource"
+  },
+  {
+    "name": "directory alone does not include the feed",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": true,
+        "attendeeUpdates": false,
+        "interactions": false
+      }
+    },
+    "resource": "interactions",
+    "expected": "ticket-resource"
+  },
+  {
+    "name": "directory grant allows the directory",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": true,
+        "attendeeUpdates": false,
+        "interactions": false
+      }
+    },
+    "resource": "directory",
+    "expected": "allow"
+  },
+  {
+    "name": "attendee updates grant allows attendee updates",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": false,
+        "attendeeUpdates": true,
+        "interactions": false
+      }
+    },
+    "resource": "attendeeUpdates",
+    "expected": "allow"
+  },
+  {
+    "name": "a grant with no resources is not included",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1
+    },
+    "resource": "interactions",
+    "expected": "ticket-resource"
+  },
+  {
+    "name": "missing grant fails closed as access updating",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "interactions",
+    "expected": "access-updating"
+  },
+  {
+    "name": "grant from an older revision fails closed",
+    "control": {
+      "effectiveRevision": 2,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": false,
+        "attendeeUpdates": false,
+        "interactions": true
+      }
+    },
+    "resource": "interactions",
+    "expected": "access-updating"
+  },
+  {
+    "name": "sweep in progress fails closed",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": 2
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "ticket",
+      "speakerId": null
+    },
+    "grant": {
+      "policyRevision": 1,
+      "resources": {
+        "sessions": {
+          "all": true,
+          "dayIds": [],
+          "sessionIds": []
+        },
+        "directory": false,
+        "attendeeUpdates": false,
+        "interactions": true
+      }
+    },
+    "resource": "interactions",
+    "expected": "access-updating"
+  },
+  {
+    "name": "approved account with no approval source needs a grant",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "interactions",
+    "expected": "access-updating"
+  },
+  {
+    "name": "admin approval keeps full access",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "approved",
+      "approvalSource": "admin",
+      "speakerId": null
+    },
+    "grant": null,
+    "resource": "interactions",
+    "expected": "allow"
+  },
+  {
+    "name": "verified speaker keeps full access",
+    "control": {
+      "effectiveRevision": 1,
+      "candidateRevision": null
+    },
+    "account": {
+      "registrationStatus": "pending",
+      "approvalSource": null,
+      "speakerId": "spk-1"
+    },
+    "grant": null,
+    "resource": "interactions",
+    "expected": "allow"
+  }
+]
