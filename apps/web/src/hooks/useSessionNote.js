@@ -52,7 +52,7 @@ export function useSessionNote(uid, sessionId) {
   const listenerErrorRef = useRef(false);
   const writeQueueRef = useRef(Promise.resolve());
   const copyRef = useRef(null); // { identity, store } for the recovery copy
-  const savedRef = useRef(''); // the document text, for a copy's baseline
+  const savedRef = useRef(''); // the server-confirmed text, for a copy's baseline
   const editRef = useRef(null);
   renderedIdentityRef.current = { uid, sessionId };
 
@@ -137,7 +137,8 @@ export function useSessionNote(uid, sessionId) {
         if (identityRef.current !== identity) return;
         const recoveredListenerError = listenerErrorRef.current;
         listenerErrorRef.current = false;
-        savedRef.current = text;
+        // A pending local write may still be refused: the baseline is server text.
+        if (!pending) savedRef.current = text;
         setSaved(text);
         setLoading(false);
         if (!restoreChecked) {

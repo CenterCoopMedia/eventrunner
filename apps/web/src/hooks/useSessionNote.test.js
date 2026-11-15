@@ -508,6 +508,43 @@ describe('useSessionNote', () => {
     expect(copies()).toHaveLength(0);
   });
 
+  it('bases the copy on server text, not on a pending write that is later refused', async () => {
+    let deliver;
+    subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
+      deliver = onNext;
+      onNext('server A');
+      return () => {};
+    });
+    const pendingB = deferred();
+    saveMock.mockImplementationOnce(() => pendingB.promise)
+      .mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    const textarea = first.getByLabelText('Private note');
+    fireEvent.change(textarea, { target: { value: 'B' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    act(() => deliver('B', { pending: true }));
+    fireEvent.change(textarea, { target: { value: 'C' } });
+    await act(async () => {
+      pendingB.reject(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    act(() => deliver('server A'));
+    first.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
+      onNext('server A');
+      return () => {};
+    });
+    const second = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    expect(second.getByLabelText('Private note').value).toBe('C');
+    second.unmount();
+  });
+
   it('drops a refused copy when the note changed since, instead of overwriting it', async () => {
     saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
     const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
