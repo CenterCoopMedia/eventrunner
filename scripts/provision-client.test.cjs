@@ -95,6 +95,8 @@ function fakeCloud(options = {}) {
     environment: null,
     branchRules: [],
     variables: {},
+    repositoryVariables: options.autoDeployEnvironments === undefined ? {} : { AUTO_DEPLOY_ENVIRONMENTS: options.autoDeployEnvironments },
+    enrollmentWrites: 0,
     environmentSecrets: {},
     runs: [],
     sourceRevision: ENV.GITHUB_SHA,
@@ -381,6 +383,17 @@ function fakeCloud(options = {}) {
       return answer({ status: state.compareStatus });
     }
     if (!fromApp) return answer({ message: 'needs the App' }, 403);
+    if (p.endsWith('/actions/variables') || p.endsWith('/actions/variables/AUTO_DEPLOY_ENVIRONMENTS')) {
+      const name = 'AUTO_DEPLOY_ENVIRONMENTS';
+      if (method === 'GET') {
+        if (!(name in state.repositoryVariables)) return answer({}, 404);
+        return answer({ name, value: options.badEnrollmentReadback && state.enrollmentWrites ? 'another-client' : state.repositoryVariables[name] });
+      }
+      if (options.enrollmentRefused) return answer({ message: 'private-provider-canary' }, 403);
+      state.enrollmentWrites += 1;
+      state.repositoryVariables[body.name] = body.value;
+      return method === 'POST' ? answer({}, 201) : new Response(null, { status: 204 });
+    }
     if (p.endsWith('/secrets/public-key')) {
       return answer({ key_id: 'key-1', key: options.environmentPublicKey || Buffer.alloc(32, 7).toString('base64') });
     }
@@ -524,6 +537,200 @@ test('one approved request becomes a built site, and the record and the status s
   const ready = fake.mailer.sent.find((m) => m.status === 'ready');
   assert.equal(ready.adminLink, `https://${DOMAIN}/admin`);
 });
+
+const enroll = (fake) => main(['--application', 'a1', '--enroll-auto-deploy'], fake.deps.env, () => fake.deps);
+const removeEnrollment = (fake, extra = []) => main(['--application', 'a1', '--remove-auto-deploy', ...extra], fake.deps.env, () => fake.deps);
+
+test('enrollment creates the repository list only after this run completes its full build', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.enrollmentWrites, 0);
+  const before = fake.calls.length;
+  assert.equal(await enroll(fake), 0);
+  const calls = fake.calls.slice(before);
+  assert.deepEqual(calls.find((call) => call.url.endsWith('/access_tokens')).body, {
+    repositories: ['repo'], permissions: { actions_variables: 'write' },
+  });
+  const variables = calls.filter((call) => call.url.includes('/actions/variables'));
+  assert.deepEqual(variables.map((call) => call.method), ['GET', 'POST', 'GET']);
+  assert.deepEqual(variables[1].body, { name: 'AUTO_DEPLOY_ENVIRONMENTS', value: 'nclocal' });
+  assert.ok(variables.every((call) => call.headers.Authorization === 'Bearer provisioner-token'));
+  assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, 'nclocal');
+  assert.equal(fake.db.read('applications/a1').status, 'ready');
+  assert.equal(fake.db.read('console_builds/a1').state, 'done');
+});
+
+test('enrollment preserves the existing clients and a repeated enrollment makes no variable write', async () => {
+  const fake = setup({ cloud: { autoDeployEnvironments: ' demo, old-client ,demo,, ' } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(await enroll(fake), 0);
+  assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, 'demo,old-client,nclocal');
+  assert.equal(fake.state.enrollmentWrites, 1);
+  assert.equal(await enroll(fake), 0);
+  assert.equal(fake.state.enrollmentWrites, 1);
+  const writes = fake.calls.filter((call) => call.url.includes('/actions/variables') && call.method !== 'GET');
+  assert.deepEqual(writes.map((call) => call.method), ['PATCH']);
+});
+
+for (const kind of ['waiting', 'no-op', 'other run', 'incomplete full deploy', 'closed request', 'rehearsal']) {
+  test(`enrollment skips ${kind} without requesting an installation token`, async () => {
+    const fake = kind === 'waiting' ? setup({ cloud: { certNever: true } }) : kind === 'no-op' ? setup({ app: { status: 'ready' } }) : setup();
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    if (kind === 'other run') fake.deps.env.GITHUB_RUN_ID = 'another-run';
+    if (kind === 'incomplete full deploy') {
+      const record = fake.db.read('console_builds/a1');
+      await fake.db.doc('console_builds/a1').update({ steps: record.steps.filter((step) => step.id !== 'full-deploy') });
+    }
+    if (kind === 'closed request') await fake.db.doc('applications/a1').update({ status: 'declined' });
+    if (kind === 'rehearsal') await fake.db.doc('console_builds/a1').update({ testMode: true });
+    const before = fake.calls.length;
+    assert.equal(await enroll(fake), 0);
+    assert.equal(fake.calls.length, before);
+    assert.equal(fake.state.enrollmentWrites, 0);
+  });
+}
+
+test('enrollment refuses a malformed or mismatched Environment before requesting a token', async () => {
+  for (const environment of ['bad,another-client', 'Different', 'other-client', '']) {
+    const fake = setup();
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    const record = fake.db.read('console_builds/a1');
+    await fake.db.doc('console_builds/a1').update({ resources: { ...record.resources, githubEnvironment: environment } });
+    const before = fake.calls.length;
+    assert.equal(await enroll(fake), 1);
+    assert.equal(fake.calls.length, before);
+    assert.equal(fake.state.enrollmentWrites, 0);
+  }
+});
+
+for (const cloud of [{ enrollmentRefused: true }, { badEnrollmentReadback: true }, { autoDeployEnvironments: null }]) {
+  test(`enrollment refuses unavailable or incomplete variable evidence ${JSON.stringify(cloud)}`, async () => {
+    const fake = setup({ cloud });
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    assert.equal(await enroll(fake), 1);
+    assert.ok(!JSON.stringify(fake.deps.log.errors).includes('private-provider-canary'));
+    assert.equal(fake.db.read('applications/a1').status, 'ready');
+    assert.equal(fake.db.read('console_builds/a1').state, 'done');
+    assert.ok(fake.state.enrollmentWrites <= 1);
+  });
+}
+
+test('a lost enrollment write response reconciles from the variable without another write', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const fetch = fake.deps.fetch;
+  let lose = true;
+  fake.deps.fetch = async (url, options) => {
+    const response = await fetch(url, options);
+    if (lose && url.endsWith('/actions/variables') && options.method === 'POST') {
+      lose = false;
+      throw new Error('lost answer');
+    }
+    return response;
+  };
+  assert.equal(await enroll(fake), 1);
+  assert.equal(fake.state.enrollmentWrites, 1);
+  assert.equal(await enroll(fake), 0);
+  assert.equal(fake.state.enrollmentWrites, 1);
+  assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, 'nclocal');
+});
+
+test('removal preserves other clients, removes case variants, and reconciles a lost response', async () => {
+  const fake = setup({ cloud: { autoDeployEnvironments: 'demo,NCLOCAL,old-client,nclocal' } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const fetch = fake.deps.fetch;
+  let lose = true;
+  fake.deps.fetch = async (url, options) => {
+    const response = await fetch(url, options);
+    if (lose && url.endsWith('/actions/variables/AUTO_DEPLOY_ENVIRONMENTS') && options.method === 'PATCH') {
+      lose = false;
+      throw new Error('lost answer');
+    }
+    return response;
+  };
+  assert.equal(await removeEnrollment(fake), 1);
+  assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, 'demo,old-client');
+  assert.equal(await removeEnrollment(fake), 0);
+  assert.equal(fake.state.enrollmentWrites, 1);
+});
+
+test('removal confirms an empty final list and an absent entry needs no write', async () => {
+  for (const value of ['nclocal', 'demo', undefined]) {
+    const fake = setup({ cloud: { autoDeployEnvironments: value } });
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    assert.equal(await removeEnrollment(fake), 0);
+    assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, value === 'nclocal' ? '' : value);
+    assert.equal(fake.state.enrollmentWrites, value === 'nclocal' ? 1 : 0);
+  }
+});
+
+test('removal uses saved deletion inventory and refuses a different deletion confirmation before a token', async () => {
+  const fake = setup({ cloud: { autoDeployEnvironments: 'nclocal' } });
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const before = fake.calls.length;
+  assert.equal(await removeEnrollment(fake, ['--confirm-site', 'other']), 1);
+  assert.equal(fake.calls.length, before);
+  const record = fake.db.read('console_builds/a1');
+  await fake.db.doc('console_deleted_sites/a1').set({ resources: record.resources });
+  await fake.db.doc('applications/a1').delete();
+  await fake.db.doc('console_builds/a1').delete();
+  assert.equal(await removeEnrollment(fake, ['--confirm-site', 'nclocal']), 0);
+  assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, '');
+});
+
+test('removal skips unbuilt requests and refuses missing requests or mismatched inventory', async () => {
+  const draft = setup();
+  assert.equal(await removeEnrollment(draft), 0);
+  assert.equal(draft.calls.length, 0);
+  await draft.db.doc('applications/a1').delete();
+  assert.equal(await removeEnrollment(draft), 1);
+  assert.equal(draft.calls.length, 0);
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const record = fake.db.read('console_builds/a1');
+  await fake.db.doc('console_builds/a1').update({ resources: { ...record.resources, githubEnvironment: 'other' } });
+  assert.equal(await removeEnrollment(fake), 1);
+  assert.equal(fake.state.enrollmentWrites, 0);
+});
+
+test('restore enrollment requires this run to have completed a restore and excludes rehearsals', async () => {
+  for (const state of ['done', 'running', 'foreign', 'rehearsal']) {
+    const fake = setup();
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    fake.deps.env.GITHUB_RUN_ID = 'restore-run';
+    await fake.db.doc('console_builds/a1').update({
+      testMode: state === 'rehearsal',
+      decommission: { mode: 'restore', state: state === 'running' ? 'running' : 'done', runId: state === 'foreign' ? 'other' : 'restore-run' },
+    });
+    assert.equal(await main(['--application', 'a1', '--restore-auto-deploy'], fake.deps.env, () => fake.deps), 0);
+    assert.equal(fake.state.enrollmentWrites, state === 'done' ? 1 : 0);
+  }
+});
+
+test('scheduled removal rechecks an archive after waiting and leaves restored or not-due clients enrolled', async () => {
+  for (const kind of ['due', 'restored', 'not-due', 'restoring', 'missing-date']) {
+    const fake = setup({ cloud: { autoDeployEnvironments: 'demo,nclocal' } });
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    await fake.db.doc('applications/a1').update({
+      status: kind === 'restored' ? 'ready' : 'archived',
+      purgeAfter: kind === 'missing-date' ? null : new Date(fake.state.clock + (kind === 'not-due' ? 1000 : -1)),
+      archive: { restoring: kind === 'restoring' },
+    });
+    assert.equal(await removeEnrollment(fake, ['--if-purge-due']), 0);
+    assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, kind === 'due' ? 'demo' : 'demo,nclocal');
+    assert.equal(fake.state.enrollmentWrites, kind === 'due' ? 1 : 0);
+  }
+});
+
+for (const cloud of [{ enrollmentRefused: true }, { badEnrollmentReadback: true }, { autoDeployEnvironments: null }]) {
+  test(`removal refuses unavailable or mismatched readback ${JSON.stringify(cloud)}`, async () => {
+    const fake = setup({ cloud: { autoDeployEnvironments: 'nclocal', ...cloud } });
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+    assert.equal(await removeEnrollment(fake), 1);
+    assert.ok(!JSON.stringify(fake.deps.log.errors).includes('private-provider-canary'));
+    assert.equal(fake.db.read('applications/a1').status, 'ready');
+  });
+}
 
 test('the project is in the client folder, on the billing account, with every API, in small batches', async () => {
   const fake = setup();
@@ -1909,6 +2116,15 @@ test('--mark-stopped leaves a finished request alone', async () => {
 test('the id is checked before anything reads it', async () => {
   assert.deepEqual(parseArgs(['--application', 'app_1-A', '--test-mode']), { appId: 'app_1-A', testMode: true, markStopped: false });
   assert.deepEqual(parseArgs(['--sync-teams']), { syncTeams: true });
+  assert.deepEqual(parseArgs(['--application', 'a1', '--enroll-auto-deploy']), { appId: 'a1', testMode: false, markStopped: false, enrollAutoDeploy: true });
+  assert.equal(parseArgs(['--application', 'a1', '--enroll-auto-deploy', '--test-mode']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--enroll-auto-deploy', '--mark-stopped']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--enroll-auto-deploy', '--remove-auto-deploy']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--restore-auto-deploy', '--test-mode']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--remove-auto-deploy', '--confirm-site']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--confirm-site', 'nclocal']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--if-purge-due']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--remove-auto-deploy', '--confirm-site', 'nclocal']).confirmSite, 'nclocal');
   for (const argv of [[], ['--sync-teams', '--application', 'a1'], ['--application'], ['--application', 'a;rm -rf /'], ['--application', '../x'], ['--application', 'a', '--nope']]) {
     assert.equal(parseArgs(argv), null, argv.join(' '));
   }

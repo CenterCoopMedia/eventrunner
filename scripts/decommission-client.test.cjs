@@ -193,7 +193,11 @@ function setup(options = {}) {
         if (method === 'DELETE') { state.dns = state.dns.filter((r) => r.id !== p.split('/').pop()); return answer({ success: true }); }
       }
       if (url.host === 'api.github.com') {
-        if (p === '/app/installations/8/access_tokens') return answer({ token: 'installation-fixture', expires_at: new Date(NOW + 3600000).toISOString(), permissions: { administration: 'write', environments: 'write', actions: 'read' }, repository_selection: 'selected', repositories: [{ full_name: ENV.GITHUB_REPOSITORY }] });
+        if (p === '/app/installations/8/access_tokens') return answer({ token: 'installation-fixture', expires_at: new Date(NOW + 3600000).toISOString(), permissions: { administration: 'write', environments: 'write', actions: 'read', actions_variables: 'read' }, repository_selection: 'selected', repositories: [{ full_name: ENV.GITHUB_REPOSITORY }] });
+        if (p === '/repos/owner/repo/actions/variables/AUTO_DEPLOY_ENVIRONMENTS') {
+          return state.autoDeployEnvironments === undefined ? answer({}, 404)
+            : answer({ name: 'AUTO_DEPLOY_ENVIRONMENTS', value: state.autoDeployEnvironments });
+        }
         if (p.endsWith('/variables')) {
           const offset = (Number(url.searchParams.get('page') || 1) - 1) * 30;
           return answer({ variables: state.variables.slice(offset, offset + 30) });
@@ -215,6 +219,38 @@ function archived(options = {}) {
 }
 const mutations = (s) => s.calls.filter((c) => c.method !== 'GET' && !c.p.endsWith('/access_tokens'));
 const report = (s) => JSON.parse(s.logs.findLast((line) => line.startsWith('{')));
+
+test('archive and every purge path refuse an enrollment that removal did not clear before destructive work', async () => {
+  for (const mode of ['archive', 'purge', 'immediate', 'resumed', 'scheduled']) {
+    const s = mode === 'archive' || mode === 'immediate'
+      ? setup({ state: { autoDeployEnvironments: 'other,SHOW' } })
+      : archived({ state: { autoDeployEnvironments: 'other,show' },
+        ...(mode === 'resumed' ? { seed: { 'console_deleted_sites/a1': { resources: RESOURCES, stepsCompleted: [], purgeStartedAt: new Date(NOW) } } } : {}) });
+    const before = s.db.read('applications/a1');
+    const code = mode === 'scheduled' ? await purgeDue({ deps: s.deps, appId: 'a1' })
+      : await s.run(mode === 'archive' ? 'archive' : 'purge', mode === 'immediate');
+    assert.equal(code, 1, mode);
+    assert.equal(mutations(s).length, 0, mode);
+    assert.deepEqual(s.db.read('applications/a1'), before, mode);
+    assert.equal(Boolean(s.db.read('console_deleted_sites/a1')), mode === 'resumed', mode);
+    assert.ok(s.logs.some((line) => line.includes('serialized removal job')), mode);
+  }
+});
+
+test('decommission removal readback is read-only and refuses denied or incomplete evidence', async () => {
+  for (const evidence of ['other', null, 'denied']) {
+    const s = setup({ state: { autoDeployEnvironments: evidence } });
+    if (evidence === 'denied') s.failures.set('GET api.github.com/repos/owner/repo/actions/variables/AUTO_DEPLOY_ENVIRONMENTS', 403);
+    assert.equal(await s.run('archive'), evidence === 'other' ? 0 : 1, s.logs.join('\n'));
+    const variableCalls = s.calls.filter((call) => call.p.includes('/actions/variables'));
+    assert.deepEqual(variableCalls.map((call) => call.method), ['GET']);
+    assert.ok(s.calls.find((call) => call.p.endsWith('/access_tokens')).body.permissions.actions_variables === 'read');
+    if (evidence !== 'other') {
+      assert.equal(mutations(s).length, 0);
+      assert.equal(s.db.read('applications/a1').status, 'ready');
+    }
+  }
+});
 
 test('archive disables Hosting, preserves resources, and sets a seven-day deadline once', async () => {
   const s = setup();
