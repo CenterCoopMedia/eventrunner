@@ -188,7 +188,7 @@ No operator decision stands between a client and a build (ADR 0007, the invoice 
 - **Decline** a draft with a note. The web-address name becomes free, and each Owner gets an email. A failed email does not undo the decision, and when any Owner was not emailed, the page says so.
 - **Close request** for an accepted request once no run is alive, with a note. See `closeApplication`.
 - **Mark as launched** when a `ready` site opens to the public.
-- **Retry the build** from [Deployments](/review/deployments) when a build has failed.
+- **Retry the build** from Deployments at `/review/deployments` when a build has failed.
 - **Delete as spam**. See below.
 
 A decline sends `revision`, the length of `history` that `getApplicationForReview` gave the page. It runs in one transaction that reads the request first. When the status is not `draft`, or the history length is not the revision, the operator gets `409 status-changed` and reloads.
