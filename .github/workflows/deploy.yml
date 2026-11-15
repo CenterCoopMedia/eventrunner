@@ -2,7 +2,7 @@ name: Deploy
 
 # scripts/provision-client.cjs finds its own runs again by this title, so it
 # names the client and whether the run is a bootstrap. A push keeps its usual title.
-run-name: ${{ inputs.client && format('Deploy {0}{1}', inputs.client, inputs.bootstrap && ' (bootstrap)' || '') || github.event.head_commit.message }}
+run-name: ${{ inputs.client && format('Deploy {0}{1}{2}', inputs.client, inputs.bootstrap && ' (bootstrap)' || '', inputs.provision_run_id && format(' [build {0}]', inputs.provision_run_id) || '') || github.event.head_commit.message }}
 
 # Caller workflow (spec §8.1). `${{ inputs.client }}` is populated only on
 # workflow_dispatch — a push-triggered run would evaluate it to the empty
@@ -16,6 +16,10 @@ on:
       client:
         description: Client GitHub Environment name to deploy.
         required: true
+        type: string
+      provision_run_id:
+        description: Parent provision workflow run, when the site builder starts this deploy.
+        required: false
         type: string
       provision:
         description: Also (re)deploy firestore:rules, firestore:indexes, and storage. deploy-client.yml's provision job always runs this regardless — kept as an input for operator intent/logging only.

@@ -121,15 +121,16 @@ function operatorNoticeMessage({ organizationName, eventName, link, kind = 'star
   const words = {
     started: [`Build started: ${who}`, [`${organizationName} accepted the agreement for ${eventName}. The build is starting.`]],
     'build-waiting': [`Waiting for the web address: ${who}`, [
-      'The web address needs more time. Setup is paused. Wait, then open the request and select Check again to resume setup. An Owner or operator must check again before setup can continue.',
+      'The web address needs more time. Setup is paused. Wait, then open Deployments and select Retry the build to resume setup. An Owner can also check again on the request status page.',
     ]],
-    'build-failed': [`Build did not start: ${who}`, ['The agreement stands and the request stays approved, but the build did not start. Read the function logs and fix the cause, then select Retry the build on the request.']],
+    'build-failed': [`Build did not start: ${who}`, ['The agreement stands and the request stays approved, but the build did not start. Read the function logs and fix the cause, then select Retry the build in Deployments.']],
     'build-run-failed': [`Build failed: ${who}`, [
       `The build stopped. ${problem}`,
-      'Open the request to read the build record and fix the cause, then select Retry the build. The steps that finished are not done twice.',
+      'Open Deployments to read the build record and fix the cause, then select Retry the build. The steps that finished are not done twice.',
     ]],
+    'site-unavailable': [`Site needs attention: ${who}`, [problem, 'Open Deployments in the console to check the site and its recent runs.']],
   }[kind];
-  return compose(words[0], words[1], link, 'Open the request', { title: words[0].slice(0, words[0].length - who.length - 2), context: who, contextInText: false });
+  return compose(words[0], words[1], link, kind === 'started' ? 'Open the request' : 'Open Deployments', { title: words[0].slice(0, words[0].length - who.length - 2), context: who, contextInText: false });
 }
 
 /**

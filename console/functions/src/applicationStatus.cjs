@@ -65,14 +65,16 @@ async function notifyOwners({ db, mailer, log, publicUrl }, { orgId, appId, stat
 }
 
 /** `kind` and `problem` choose the words (mailer.cjs). */
-async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, eventName, kind, problem }) {
+async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, eventName, kind, problem, skip = [], onSent }) {
   const org = validOrgId(orgId) ? await db.collection('organizations').doc(orgId).get() : null;
   const organizationName = org?.exists ? org.data().name : '';
-  const link = reviewLink(publicUrl, appId);
+  const link = kind?.startsWith('build-') || kind === 'site-unavailable'
+    ? (publicUrl ? `${publicUrl}/review/deployments` : '') : reviewLink(publicUrl, appId);
   const operators = await operatorEmails(db);
-  return sendAll(log, operators.map((to) => () => mailer.sendOperatorNotice({
-    to, organizationName, eventName, link, kind, ...(problem ? { problem } : {}),
-  })));
+  return sendAll(log, operators.filter((to) => !skip.includes(to)).map((to) => async () => {
+    await mailer.sendOperatorNotice({ to, organizationName, eventName, link, kind, ...(problem ? { problem } : {}) });
+    if (onSent) await onSent(to);
+  }));
 }
 
 const INCOMPLETE = 'Some answers need attention before you continue.';

@@ -13,6 +13,7 @@ const READ_ACTIONS = new Set([
   'checkWebAddress', 'listSignupLinks', 'getSignupLink', 'getAgreement',
   'listApplicationsForReview', 'getApplicationForReview', 'getConsoleSettings',
   'listEventbriteEvents',
+  'listDeployments', 'deploymentHistory',
 ]);
 const READ_TIMEOUT_MS = 30000;
 

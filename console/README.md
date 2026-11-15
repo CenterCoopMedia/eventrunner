@@ -4,6 +4,33 @@ The client console is where a client opens a signup link, names its organization
 
 This folder holds sign-in, organizations and the team (P4), the guided setup with its status page (P5), account connections (P6), operator review (P7), signup links and the agreement (ADR 0007, amendments of 2026-11-04), and the start of the site builder (P8). The builder itself is `scripts/provision-client.cjs`, run by `.github/workflows/provision-client.yml`.
 
+## Deployments
+
+The hosting team's **Deployments** page, linked from the review queue, lists every
+site whose build has started or failed to start. It shows the build step, elapsed
+time, last error and run link. **Retry the build** lives here; the request's review
+page links here. Owners retain their retry on the request status page.
+
+The page refreshes once a minute while visible and stops when closed. Recent
+deploy runs include manual dispatches and automatic main deployments, matched
+to the clients in their jobs. **Check earlier runs** pages through earlier GitHub
+runs; an empty page for a site does not mean the site has never deployed.
+
+**Stop the build** requires confirmation, waits for the parent provision run to
+stop, then cancels its tagged deploy runs. If cancellation is still in progress,
+the page reports that and the operator can retry. Created resources stay in
+place. **Redeploy site** requires confirmation and dispatches the recorded
+environment from main for a ready or launched site.
+
+Every 15 minutes, `runSiteHealth` reads each ready or launched site's recorded
+Event Runner address and its admin page. It stores HTTP status and check time,
+and emails the existing console operator list once per outage. Successful
+recipients are recorded; failed recipients are tried again after ten minutes.
+A successful check rearms the next outage notice. The health job has a nine-minute
+execution limit so a slow address does not consume the default one-minute limit.
+It follows no redirects and stores no response text. A redirect counts as an
+answer. These checks do not prove page rendering, sign-in or ticket processing.
+
 ## What is here
 
 | Path | What it is |
@@ -161,18 +188,18 @@ No operator decision stands between a client and a build (ADR 0007, the invoice 
 - **Decline** a draft with a note. The web-address name becomes free, and each Owner gets an email. A failed email does not undo the decision, and when any Owner was not emailed, the page says so.
 - **Close request** for an accepted request once no run is alive, with a note. See `closeApplication`.
 - **Mark as launched** when a `ready` site opens to the public.
-- **Retry the build** when a build has failed.
+- **Retry the build** from Deployments at `/review/deployments` when a build has failed.
 - **Delete as spam**. See below.
 
 A decline sends `revision`, the length of `history` that `getApplicationForReview` gave the page. It runs in one transaction that reads the request first. When the status is not `draft`, or the history length is not the revision, the operator gets `409 status-changed` and reloads.
 
 **Build settings.** The site builder takes its settings from `console_config/settings`, the web-address name and the application id. Operators edit `gcpFolder`, `billingAccount` and `region` at `/review/settings`. A new `projectId` is `er-<name prefix>-<suffix>`, with up to ten name characters and the first 16 hexadecimal characters of the application id's SHA-256 digest. The `environment` is `<name>`. Retries keep the saved project id, region, folder and environment. A new application for the same name gets a different suffix. Project ids have 6 to 30 characters: lowercase letters, digits and hyphens, a letter first and no hyphen last. The server checks every value and names the bad field.
 
-**Starting and retrying a build.** `startBuild` dispatches `provision-client.yml` with a GitHub App token that holds `actions: write` on this one repository. With a setting missing, or a placeholder key, it refuses, and `runStartBuild` records `buildStart.state` as `failed`, writes an audit record and notifies operators. A run that fails sets the same flag, sends operators the error, and emails the Owners that it did not finish, with the status link. The status page says the same, offers **Retry the build**, and offers **Reconnect** when the failed step is `tickets`. The review page offers **Retry the build** too. `retryBuild` runs the same workflow again. One transaction checks and clears the failure, so a second click gets `409 not-retryable`. [The runbook](../docs/DEPLOY_RUNBOOK.md) section 12 has the setup and the error list.
+**Starting and retrying a build.** `startBuild` dispatches `provision-client.yml` with a GitHub App token that holds `actions: write` on this one repository. With a setting missing, or a placeholder key, it refuses, and `runStartBuild` records `buildStart.state` as `failed`, writes an audit record and notifies operators. A run that fails sets the same flag, sends operators the error, and emails the Owners that it did not finish, with the status link. The status page says the same, offers **Retry the build**, and offers **Reconnect** when the failed step is `tickets`. The hosting team's Deployments page offers **Retry the build**. `retryBuild` runs the same workflow again. One transaction checks and clears the failure, so a second click gets `409 not-retryable`. [The runbook](../docs/DEPLOY_RUNBOOK.md) section 12 has the setup and the error list.
 
 **Spam.** **Delete as spam** deletes a request that is not yet approved and frees its name, unless a build began for it before it was closed. A request that is approved or later cannot be deleted this way, because a site can exist for it.
 
-**Waiting for a web address.** If certificate preparation, validation or propagation outlasts the initial one-hour check, the run records `waiting` and ends successfully. The request stays `building`. Each run that ends waiting sends Owners and operators a waiting notice with the request link and the action needed to resume. The status and review pages offer **Check again** to an Owner or operator. Setup stays paused until someone uses that action; it uses the same retry transaction, account checks and daily limit. Completed setup stays recorded. A waiting run does not trigger failure notices or the silent-build watch. Host or ownership conflicts, provider errors and expired certificates still fail and send the existing notices.
+**Waiting for a web address.** If certificate preparation, validation or propagation outlasts the initial one-hour check, the run records `waiting` and ends successfully. The request stays `building`. Each run that ends waiting sends Owners a notice linking to their request status page and **Check again**. Operators receive a notice linking to Deployments and **Retry the build**. Setup stays paused until an Owner or operator uses the relevant action; both use the same retry transaction and account checks, with the existing daily limit for Owners. Completed setup stays recorded. A waiting run does not trigger failure notices or the silent-build watch. Host or ownership conflicts, provider errors and expired certificates still fail and send the existing notices.
 
 **Silent builds.** The scheduled function `runBuildWatch` runs every hour. A run that fails before it signs in to Google Cloud writes nothing, and a lost runner leaves its record at `running`. An hour after a start with no record, or six hours after a run started and never finished, it flags the request as failed, writes an audit record and emails the Owners and operators once. Retrying clears the flag.
 

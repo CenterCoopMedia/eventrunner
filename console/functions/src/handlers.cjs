@@ -48,6 +48,9 @@ const {
 } = require('./signupLinks.cjs');
 const { createStartBuild } = require('./buildDispatch.cjs');
 const { reportSilentBuilds, retryBuild } = require('./buildRetry.cjs');
+const { deploymentHistory, listDeployments, redeploySite, stopBuild } = require('./deployments.cjs');
+const { createDeploymentRuns } = require('./deploymentRuns.cjs');
+const { checkSiteHealth } = require('./siteHealth.cjs');
 const {
   chooseEventbriteEvent, completeConnection, disconnectAccount, listEventbriteEvents, startConnection,
 } = require('./connections.cjs');
@@ -91,6 +94,10 @@ const ENDPOINTS = Object.freeze({
   closeApplication: { action: closeApplication, mail: true, connect: true },
   launchApplication: { action: launchApplication, mail: true },
   retryBuild: { action: retryBuild, mail: true, build: true },
+  listDeployments: { action: listDeployments, deployments: true },
+  deploymentHistory: { action: deploymentHistory, deployments: true },
+  stopBuild: { action: stopBuild, deployments: true, timeoutSeconds: 300 },
+  redeploySite: { action: redeploySite, deployments: true },
   deleteSpamApplication: { action: deleteSpamApplication, connect: true },
   getConsoleSettings: { action: getConsoleSettings },
   saveConsoleSettings: { action: saveConsoleSettings },
@@ -107,6 +114,7 @@ const ENDPOINTS = Object.freeze({
 const SCHEDULED = Object.freeze({
   runApplicationRetention: { job: runRetention, schedule: RETENTION_SCHEDULE, connect: true },
   runBuildWatch: { job: reportSilentBuilds, schedule: BUILD_WATCH_SCHEDULE, mail: true },
+  runSiteHealth: { job: checkSiteHealth, schedule: 'every 15 minutes', mail: true, timeoutSeconds: 540 },
 });
 
 // "Report a problem" answers the console and every client site's admin
@@ -198,9 +206,9 @@ function buildHandlers({ startBuild } = {}) {
     const secrets = [...new Set([
       ...(spec.mail ? [postmarkToken] : []),
       ...(spec.connect ? connectSecrets : []),
-      ...(spec.build ? [githubAppKey] : []),
+      ...(spec.build || spec.deployments ? [githubAppKey] : []),
     ])];
-    const options = { region, ...(secrets.length > 0 ? { secrets } : {}) };
+    const options = { region, ...(secrets.length > 0 ? { secrets } : {}), ...(spec.timeoutSeconds ? { timeoutSeconds: spec.timeoutSeconds } : {}) };
     handlers[name] = onRequest(options, async (req, res) => {
       if (applyCors(req, res, parseAllowedOrigins(process.env.CONSOLE_ALLOWED_ORIGINS))) return;
       const { db, auth } = adminServices();
@@ -216,6 +224,7 @@ function buildHandlers({ startBuild } = {}) {
       if (spec.connect) Object.assign(deps, connectDeps());
       if (spec.mail) deps.mailer = lazyMailer();
       if (spec.build) deps.startBuild = buildStarter();
+      if (spec.deployments) deps.deployments = createDeploymentRuns({ env: process.env, privateKey: githubAppKey.value(), fetch: globalThis.fetch });
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
     });
   }
@@ -264,7 +273,9 @@ function buildHandlers({ startBuild } = {}) {
   });
   for (const [name, spec] of Object.entries(SCHEDULED)) {
     const secrets = [...(spec.mail ? [postmarkToken] : []), ...(spec.connect ? connectSecrets : [])];
-    handlers[name] = onSchedule({ region, schedule: spec.schedule, timeZone: 'America/New_York', secrets }, async () => {
+    handlers[name] = onSchedule({ region, schedule: spec.schedule, timeZone: 'America/New_York', secrets,
+      ...(spec.timeoutSeconds ? { timeoutSeconds: spec.timeoutSeconds } : {}),
+    }, async () => {
       const { db } = adminServices();
       await spec.job({
         db,

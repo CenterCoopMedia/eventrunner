@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { application, callsTo, emptyAnswers, serveApi } from '../../test/application.js';
 import { renderSetup } from '../../test/setupPage.jsx';
@@ -22,8 +22,10 @@ describe('Email step', () => {
   it('shows a preview of the sender with the web address, and where replies go', async () => {
     renderSetup('email');
     const preview = await screen.findByLabelText('Email preview');
-    expect(screen.getByLabelText('Sender name')).toHaveValue('NC Local News Summit');
-    expect(screen.getByLabelText('Reply address')).toHaveValue('ana@example.org');
+    await waitFor(() => {
+      expect(screen.getByLabelText('Sender name')).toHaveValue('NC Local News Summit');
+      expect(screen.getByLabelText('Reply address')).toHaveValue('ana@example.org');
+    });
     expect(screen.getByLabelText('Sender name')).toHaveAttribute('enterkeyhint', 'next');
     expect(screen.getByLabelText('Reply address')).toHaveAttribute('enterkeyhint', 'next');
     expect(screen.getByLabelText('Reply address')).toHaveAttribute('autocapitalize', 'none');
@@ -54,8 +56,10 @@ describe('Email step', () => {
     answers.event.shortName = 'News Summit';
     serveApi({ getApplication: { application: application({ answers }) } });
     renderSetup('email');
-    expect(await screen.findByLabelText('Sender name')).toHaveValue('News Summit');
-    expect(screen.getByLabelText('Reply address')).toHaveValue('ana@example.org');
+    await waitFor(() => {
+      expect(screen.getByLabelText('Sender name')).toHaveValue('News Summit');
+      expect(screen.getByLabelText('Reply address')).toHaveValue('ana@example.org');
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
     await screen.findByRole('heading', { level: 1, name: 'Review' });
     expect(callsTo('saveApplicationStep').at(-1)).toMatchObject({
