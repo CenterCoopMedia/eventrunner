@@ -314,3 +314,25 @@ it('a failed publication keeps its error and progress when the readback fails to
     readback: 'unavailable', checks: { activationReady: true },
     progress: { revision: 1, processed: 0, remaining: 5, complete: false } });
 });
+
+it('a finished publication keeps its sweep result when the readback fails', async () => {
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  let finished = false;
+  // Reads of the control document fail once the sweep has returned.
+  const flaky = {
+    collection: (name) => (finished && name === 'ticket_access_policies'
+      ? { doc: () => ({ get: () => Promise.reject(new Error('14 UNAVAILABLE')) }) } : db.collection(name)),
+    runTransaction: async (fn, options) => {
+      const value = await db.runTransaction(fn, options);
+      if (value?.effectiveRevision === 1 && value.candidateRevision === null) finished = true;
+      return value;
+    },
+  };
+  const path = join(dir, 'publish-readback.json');
+  expect(await run({ db: flaky, projectId: PROJECT, env: ENV, argv: ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply', '--receipt', path], stdout: () => {} })).toBe(0);
+  const receipt = JSON.parse(readFileSync(path, 'utf8'));
+  expect(receipt).toMatchObject({ mode: 'apply', revision: 1, readback: 'unavailable',
+    sweep: { revision: 1, processed: 5, remaining: 0, complete: true } });
+  expect(receipt.error).toBeUndefined();
+  expect((await db.collection('ticket_access_policies').doc('current').get()).data().effectiveRevision).toBe(1);
+});

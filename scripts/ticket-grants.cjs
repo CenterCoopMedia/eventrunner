@@ -292,7 +292,8 @@ async function publishPolicy({ db, env = process.env, policyInput, expectedRevis
     result.readback = await readControl(db).then(brief, () => 'unavailable');
     throw Object.assign(error, { result });
   }
-  result.readback = brief(await readControl(db));
+  // A failed read after a finished sweep must not lose the sweep result either.
+  result.readback = await readControl(db).then(brief, () => 'unavailable');
   return result;
 }
 
