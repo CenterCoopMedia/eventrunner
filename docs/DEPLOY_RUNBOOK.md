@@ -334,8 +334,12 @@ Value: cjs2027,summit2026
 A comma-separated list of `<CLIENT_ENV>` names. Every push to `main` fans out to each one (spec
 §8.1) — `deploy.yml`'s `resolve` job parses this (`scripts/lib/deploy-matrix.cjs`), and a client
 absent from the list only ever deploys via `workflow_dispatch`. Leave it unset (or empty) while a
-client is new and you want every deploy to be a manual, watched dispatch; add it once the client is
-comfortable auto-deploying on merge.
+client is built by hand and you want every deploy to be a manual, watched dispatch. The provisioner
+adds a new client after its successful full deploy, through a short serialized enrollment job.
+Rehearsals stay out of this list. Decommission uses the same job to remove a client before
+archive or purge, and to enroll a successfully restored client again.
+Make manual list edits while no enrollment job is running, so a read/modify/write cannot
+overwrite a simultaneous operator edit.
 
 ### Which changes need which deploy
 
@@ -1461,9 +1465,9 @@ Use placeholders from your own records. Nothing below belongs in the repository.
    | App | Repository permissions | Key lives in |
    |---|---|---|
    | Console | **Actions: write** | Secret Manager in the console project, `CONSOLE_GITHUB_APP_PRIVATE_KEY` |
-   | Provisioner | **Administration: write**, **Environments: write**, **Actions: read** | The `provisioning` Environment, `PROVISIONER_APP_PRIVATE_KEY` |
+   | Provisioner | **Administration: write**, **Environments: write**, **Actions: read**, **Variables: write** | The `provisioning` Environment, `PROVISIONER_APP_PRIVATE_KEY` |
 
-   GitHub's permission list puts creating an Environment and its branch rule under Administration, variables and Environment secrets under Environments, and reading the Environment under Actions. The provisioner writes the Stripe account identifier as an Environment secret so Actions masks it before step metadata is printed. It encrypts the identifier with GitHub's public key. Client payment credentials stay in the client's Secret Manager. Administration is broad. The key exists only in the `provisioning` Environment, and each token the script asks for is cut down to these three on this one repository.
+   GitHub's permission list puts creating an Environment and its branch rule under Administration, Environment variables and secrets under Environments, and reading the Environment under Actions. The provisioner writes the Stripe account identifier as an Environment secret so Actions masks it before step metadata is printed. It encrypts the identifier with GitHub's public key. Client payment credentials stay in the client's Secret Manager. Administration is broad. The key exists only in the `provisioning` Environment. The build token requests Administration, Environments and Actions on this repository; the enrollment job requests only Variables (`actions_variables: write`).
 
 5. **The console's settings.** Set these as variables in the `console` Environment, which `deploy-console.yml` writes to `console/functions/.env`, and store the key. The secret must exist before any deploy. Until the App exists, store a placeholder: the console then refuses to start a build, and says so to operators.
 
@@ -1537,7 +1541,15 @@ gh workflow run provision-client.yml --ref main -f application_id=<id> -f test_m
 
 A run that dies before the script starts, for example on a refused identity token, leaves no record: the request shows a started build and nothing else. Read the workflow's run list.
 
-A new client's Environment is not added to `AUTO_DEPLOY_ENVIRONMENTS`, so a push to `main` does not deploy to it. When the client's event site opens to the public, select **Mark as launched** on its review page. That moves the request from `ready` to `launched` and emails each Owner "Your site is open to the public". Then add the Environment to `AUTO_DEPLOY_ENVIRONMENTS` by hand (section 4).
+After a successful full build, the **Enroll automatic deployments** job adds its recorded Environment
+to `AUTO_DEPLOY_ENVIRONMENTS` and reads the value back. Long builds remain parallel; the enrollment
+job has one shared concurrency group, keeps running work, and queues up to 100 pending jobs. A
+waiting certificate, incomplete build, rehearsal or no-op from another run cannot enroll a client. Existing
+list entries are preserved, and retrying an enrolled client makes no variable write. If enrollment fails,
+use **Re-run failed jobs** on that same workflow run; its completed build stays ready.
+
+When the client's event site opens to the public, select **Mark as launched** on its review page.
+That moves the request from `ready` to `launched` and emails each Owner "Your site is open to the public".
 
 A new site starts in draft: `config/event.announcedAt` is null. When the client's event goes public, an operator sets **Announced** in admin **Event settings → Announce and archive**. Until then the home page shows no countdown, and registration answers do not lock.
 
@@ -1562,7 +1574,7 @@ The tests run against a fake of each service, and the fake answers as the rehear
 
 - Google Cloud: a missing project answers 403 to the provisioner and creating it succeeds. The project's creator holds owner with these credentials. `identityPlatform:initializeAuth` is the right way to turn on sign-in, and the config answers 400 or 404 before it. The custom domain's `requiredDnsUpdates` and `cert.verification` field and value shapes. The default bucket's answer holds its name. `nam5` is accepted for `us-central1`.
 - Workflow identity: `google-github-actions/auth` exports the project and quota variables the script clears from a child's environment. Its credentials keep working past an hour, for a run that waits on a certificate. Credentials from the auth action carry no `quota_project_id` of their own, and if they do, branding fails loudly.
-- GitHub: `GITHUB_TOKEN` with `actions: write` dispatches `deploy.yml` and the run starts. `display_title` follows `run-name`. An App token with the three permissions above can create an Environment.
+- GitHub: `GITHUB_TOKEN` with `actions: write` dispatches `deploy.yml` and the run starts. `display_title` follows `run-name`. The build App token creates the Environment; the separate Variables token enrolls the completed build for automatic deployment.
 - Postmark: `ApiTokens[0]` on the account's `/servers` answer. `/message-streams` accepts a `Broadcasts` stream with Postmark-managed unsubscribe. Webhooks accept `HttpAuth`, pass Postmark's test of each trigger, and list the URL back in a form this comparison matches.
 - Cloudflare: a TXT value comes back in the form it was stored. A `pm-bounces` CNAME and the certificate's records are not proxied.
 - Stripe and Eventbrite: `GET /v1/account` answers with the connected account's id for a Connect OAuth token. Verify live Stripe delivery through the shared Console receiver using the [migration runbook](runbooks/stripe-connect-receiver.md); live builds register routes without managing endpoints. `GET /users/me/` answers for a live Eventbrite token.
@@ -1606,8 +1618,14 @@ application id and mode `archive`, `restore`, `cancel-restore`, `purge-now`, or
 application; an empty or different name stops the run.
 It uses the builder's `provisioning` Environment, identity, App, and secrets.
 It refuses forks and shares the builder's concurrency group per application.
-Stop separate `Deploy <name>` runs first. Remove the name from
-`AUTO_DEPLOY_ENVIRONMENTS` if it was added there.
+Stop separate `Deploy <name>` runs first. Before archive or purge, the workflow automatically
+removes the recorded Environment from `AUTO_DEPLOY_ENVIRONMENTS` through the same serialized
+job that enrolls completed builds. It preserves every other client and confirms the write by
+readback. A failed removal stops that application's archive or purge; rerun its failed jobs.
+The per-application concurrency lock spans removal and decommission, so a build cannot
+re-enroll the site between those jobs. Decommission also reads back the absence before
+changing Hosting or starting purge. It has Variables read permission; only the short shared
+job requests Variables write permission.
 
 - **Archive:** Disables Firebase Hosting and saves the serving version and
   previous application status. It keeps the project, data, buckets, DNS,
@@ -1630,6 +1648,10 @@ Stop separate `Deploy <name>` runs first. Remove the name from
   and clears a stuck restore claim. It can delete an application that is not
   archived, subject to the existing active-build and connection-change guards.
   Once purge starts, restore is refused.
+
+A successful restore uses the same serialized job to enroll a non-rehearsal site again.
+It requires this run's completed restore record and the original completed full build.
+Retry a failed enrollment with **Re-run failed jobs**; the restored site keeps serving.
 
 Purge removes resources in this order: Ticket webhooks; Postmark webhooks,
 server and sender domain; console connection secrets; every Storage object
@@ -1696,16 +1718,19 @@ turns on server deletion through the API for the account. The purge then logs
 the refusal, removes everything else, and `verify` still lists `mail:servers`.
 Delete the server in Postmark, then run `verify` again.
 
-Operators can also use the CLI with the workflow's credentials:
+Use the workflow for archive and purge so removal and decommission share the application lock:
 
 ```sh
-node scripts/decommission-client.cjs --application <id> --archive
-node scripts/decommission-client.cjs --application <id> --restore
+gh workflow run decommission-client.yml --ref main -f application_id=<id> -f mode=archive
+gh workflow run decommission-client.yml --ref main -f application_id=<id> -f mode=purge-now -f confirm_site=<site-name>
+```
+
+Use the workflow's restore mode to restore Hosting and automatic deployments together.
+With its credentials, these read/recovery commands are also available:
+
+```sh
 node scripts/decommission-client.cjs --application <id> --cancel-restore
-node scripts/decommission-client.cjs --application <id> --purge
-node scripts/decommission-client.cjs --application <id> --purge --now --confirm-site <site-name>
 node scripts/decommission-client.cjs --application <id> --verify
-node scripts/decommission-client.cjs --purge-due
 ```
 
 **IAM:** Section 12.1 makes the provisioner Owner of each project it creates.

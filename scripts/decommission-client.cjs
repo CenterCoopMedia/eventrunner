@@ -14,6 +14,7 @@ const { ACCOUNT_COLLECTION, STATE_COLLECTION, DELETION_COLLECTION, connectionSec
 const { deleteStripeRoutes, stripeRoutes } = require('../console/functions/src/stripeWebhooks.cjs');
 const { GITHUB_HEADERS, installationToken } = require('../console/functions/src/buildDispatch.cjs');
 const { requiredRecords } = require('./provision-client.cjs');
+const { resolveClients } = require('./lib/deploy-matrix.cjs');
 
 const DELETED_COLLECTION = 'console_deleted_sites';
 const RECOVERY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -122,18 +123,37 @@ async function postmarkList(ctx, path, key) {
   }
 }
 
-async function github(ctx, suffix = '', options = {}) {
+async function githubHeaders(ctx) {
   if (!ctx.githubToken) {
     const { env, fetch, now } = ctx.deps;
     ctx.githubToken = await installationToken({
       appId: env.PROVISIONER_APP_ID, installationId: env.PROVISIONER_INSTALLATION_ID,
       privateKey: env.PROVISIONER_APP_PRIVATE_KEY, repository: env.GITHUB_REPOSITORY,
-      permissions: { administration: 'write', environments: 'write', actions: 'read' }, fetch, now,
+      permissions: { administration: 'write', environments: 'write', actions: 'read', actions_variables: 'read' }, fetch, now,
     });
   }
+  return { ...GITHUB_HEADERS, Authorization: `Bearer ${ctx.githubToken}` };
+}
+
+async function github(ctx, suffix = '', options = {}) {
   return call(ctx, 'GitHub environment', `https://api.github.com/repos/${ctx.deps.env.GITHUB_REPOSITORY}/environments/${encode(ctx.resources.environment)}${suffix}`, {
-    ...options, headers: { ...GITHUB_HEADERS, Authorization: `Bearer ${ctx.githubToken}` },
+    ...options, headers: await githubHeaders(ctx),
   });
+}
+
+/** The preceding serialized workflow job removes this entry automatically. */
+async function confirmAutoDeployRemoved(ctx) {
+  if (!ctx.resources.environment || (!ctx.projectOwned && ctx.resources.githubEnvironment !== ctx.resources.environment)) return;
+  const variable = await call(ctx, 'confirm automatic deploy removal',
+    `https://api.github.com/repos/${ctx.deps.env.GITHUB_REPOSITORY}/actions/variables/AUTO_DEPLOY_ENVIRONMENTS`,
+    { headers: await githubHeaders(ctx), allow: [404] });
+  if (variable && (variable.name !== 'AUTO_DEPLOY_ENVIRONMENTS' || typeof variable.value !== 'string')) {
+    throw new Error('automatic deploy removal: incomplete variable readback');
+  }
+  const clients = resolveClients({ eventName: 'push', autoDeployEnvironments: variable?.value });
+  if (clients.some((client) => client.toLowerCase() === ctx.resources.environment.toLowerCase())) {
+    throw new Error('automatic deploy removal: the serialized removal job has not removed this Environment');
+  }
 }
 
 async function project(ctx) {
@@ -304,6 +324,7 @@ async function archive(ctx) {
   const release = await latestRelease(ctx);
   const versionName = await restorableVersion(ctx, release);
   if (ctx.resources.site && CONSOLE_REQUEST_GROUPS.built.includes(ctx.app.status) && !versionName) throw new Error('archive: Hosting has no version to restore');
+  await confirmAutoDeployRemoved(ctx);
   // Claim the status before touching Hosting. A console retry now sees archived.
   await ctx.deps.db.runTransaction(async (tx) => {
     const [snap, buildSnap, tomb] = await Promise.all([tx.get(appRef(ctx)), tx.get(buildRef(ctx)), tx.get(tombRef(ctx))]);
@@ -787,6 +808,7 @@ async function purge(ctx, now, confirmSite) {
     // leave the recovery option available and the build record repairable.
     if (ctx.resources.projectId) await discover(ctx);
   } else if (ctx.resources.projectId && !ctx.completed.includes('project')) await project(ctx);
+  await confirmAutoDeployRemoved(ctx);
   // Refuse before the tombstone or any destructive step, including on a
   // resumed purge. Recheck at database deletion for concurrent changes.
   if (ctx.resources.projectId && !ctx.projectDeleting && !ctx.completed.includes('database') && !ctx.completed.includes('project')) {

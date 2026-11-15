@@ -8,6 +8,9 @@
  *
  *   node scripts/provision-client.cjs --application <id> [--test-mode]
  *   node scripts/provision-client.cjs --application <id> --mark-stopped
+ *   node scripts/provision-client.cjs --application <id> --enroll-auto-deploy
+ *   node scripts/provision-client.cjs --application <id> --remove-auto-deploy [--confirm-site <name> | --if-purge-due]
+ *   node scripts/provision-client.cjs --application <id> --restore-auto-deploy
  *   node scripts/provision-client.cjs --sync-teams
  *
  * Each step reads the current state and does nothing when it is already right,
@@ -49,6 +52,7 @@ const { internals: { WEBHOOK_EVENTS } } = require('../functions/src/ticketing/pr
 const { internals: { stampVerification } } = require('./verify-sender-domain.cjs');
 const { internals: { stampWebhookRegistration } } = require('./register-ticketing-webhook.cjs');
 const { EMAIL_ADDRESS_RE } = require('shared/email');
+const { resolveClients } = require('./lib/deploy-matrix.cjs');
 const { SEED_ACTOR } = require('shared/seed');
 const { STRIPE_WEBHOOK_SECRET, deleteStripeRoutes, registerStripeRoute, stripeRoutes } = require('../console/functions/src/stripeWebhooks.cjs');
 
@@ -1121,6 +1125,84 @@ async function stepEnvironment(ctx) {
   return summary(notes);
 }
 
+/** The shared serialized workflow is the only automatic list writer. */
+async function enrollAutoDeploy({ appId, remove = false, removeDue = false, restore = false, confirmSite = '', deps }) {
+  const { db, env, fetch, now, log } = deps;
+  try {
+    const [application, build, tombstone] = await Promise.all([
+      db.collection('applications').doc(appId).get(),
+      db.collection(BUILD_COLLECTION).doc(appId).get(),
+      ...(remove ? [db.collection('console_deleted_sites').doc(appId).get()] : []),
+    ]);
+    const record = build.data();
+    const runUrl = `${env.GITHUB_SERVER_URL || 'https://github.com'}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`;
+    const restoredHere = record?.decommission?.mode === 'restore' && record.decommission.state === 'done'
+      && record.decommission.runId === env.GITHUB_RUN_ID;
+    if (!remove && (record?.testMode || !CONSOLE_REQUEST_GROUPS.built.includes(application.data()?.status) || record?.state !== 'done'
+      || !env.GITHUB_RUN_ID || (restore ? !restoredHere : record.runUrl !== runUrl)
+      || !Array.isArray(record.steps) || !record.steps.some((step) => step.id === 'full-deploy' && step.state === 'done'))) {
+      log.log('auto-deploy: this run has no completed full build to enroll');
+      return 0;
+    }
+    const resources = tombstone?.data()?.resources || record?.resources;
+    if (remove) {
+      const purgeAfter = toMillis(application.data()?.purgeAfter);
+      if (removeDue && (application.data()?.status !== 'archived' || application.data()?.archive?.restoring
+        || !Number.isFinite(purgeAfter) || purgeAfter > now())) {
+        log.log('auto-deploy: this application is no longer due for deletion');
+        return 0;
+      }
+      if (!application.exists && !tombstone.exists) throw new Error('the application or deletion record is missing');
+      const name = application.exists ? siteNameOf(application.data()) : resources?.domain?.replace(/\.eventrunner\.org$/, '');
+      if (confirmSite && confirmSite !== name) throw new Error('the deletion confirmation does not match the application site name');
+      if (!resources?.githubEnvironment && (!resources?.environment || record?.environmentClaim !== resources.environment)) {
+        log.log('auto-deploy: this application has no recorded GitHub Environment to remove');
+        return 0;
+      }
+    }
+    const environment = resources?.githubEnvironment || (remove ? record?.environmentClaim : null);
+    if (typeof environment !== 'string' || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(environment)
+      || environment !== resources?.environment) {
+      throw new Error('the completed build has no valid Environment identity');
+    }
+    const token = await installationToken({
+      appId: env.PROVISIONER_APP_ID, installationId: env.PROVISIONER_INSTALLATION_ID,
+      privateKey: env.PROVISIONER_APP_PRIVATE_KEY, repository: env.GITHUB_REPOSITORY,
+      permissions: { actions_variables: 'write' }, fetch, now,
+    });
+    const headers = { ...GITHUB_HEADERS, Authorization: `Bearer ${token}` };
+    const ctx = { deps };
+    const base = `${GITHUB}/repos/${env.GITHUB_REPOSITORY}/actions/variables`;
+    const name = 'AUTO_DEPLOY_ENVIRONMENTS';
+    const target = `${base}/${name}`;
+    const current = await call(ctx, 'read automatic deploy clients', target, { headers, quiet: true, allow: [404] });
+    if (current && (current.name !== name || typeof current.value !== 'string')) {
+      throw new Error('the automatic deploy variable is incomplete');
+    }
+    const clients = resolveClients({ eventName: 'push', autoDeployEnvironments: current?.value });
+    const present = clients.some((client) => client.toLowerCase() === environment);
+    if (present !== remove) {
+      log.log(`auto-deploy: ${environment} is already ${remove ? 'absent' : 'enrolled'}`);
+      return 0;
+    }
+    const value = (remove ? clients.filter((client) => client.toLowerCase() !== environment) : [...clients, environment]).join(',');
+    const clearing = value === '';
+    await call(ctx, 'update automatic deploy clients', current ? target : base, {
+      method: clearing ? 'DELETE' : current ? 'PATCH' : 'POST', headers, quiet: true,
+      ...(clearing ? {} : { json: { name, value } }),
+    });
+    const confirmed = await call(ctx, 'confirm automatic deploy clients', target, { headers, quiet: true, allow: clearing ? [404] : [] });
+    if (clearing ? confirmed !== null : confirmed?.name !== name || confirmed.value !== value) {
+      throw new Error('the automatic deploy variable did not match its write');
+    }
+    log.log(`auto-deploy: ${remove ? 'removed' : 'enrolled'} ${environment}`);
+    return 0;
+  } catch (err) {
+    log.error('auto-deploy enrollment failed:', err.message);
+    return 1;
+  }
+}
+
 /** A reused deployment must contain this provisioning run's code revision. */
 async function deploymentHasRevision(ctx, run) {
   const { env } = ctx.deps;
@@ -1760,9 +1842,19 @@ function parseArgs(argv) {
       i += 1;
     } else if (argv[i] === '--test-mode') args.testMode = true;
     else if (argv[i] === '--mark-stopped') args.markStopped = true;
+    else if (argv[i] === '--enroll-auto-deploy') args.enrollAutoDeploy = true;
+    else if (argv[i] === '--remove-auto-deploy') args.removeAutoDeploy = true;
+    else if (argv[i] === '--restore-auto-deploy') args.restoreAutoDeploy = true;
+    else if (argv[i] === '--if-purge-due') args.removeDue = true;
+    else if (argv[i] === '--confirm-site') args.confirmSite = argv[++i] || '';
     else return null;
   }
-  return APP_ID_RE.test(args.appId) ? args : null;
+  const modes = [args.enrollAutoDeploy, args.removeAutoDeploy, args.restoreAutoDeploy].filter(Boolean).length;
+  const enrollment = modes > 0;
+  return APP_ID_RE.test(args.appId) && !(enrollment && (args.testMode || args.markStopped))
+    && modes <= 1
+    && (!args.removeDue || args.removeAutoDeploy)
+    && (args.confirmSite === undefined || (args.removeAutoDeploy && Boolean(args.confirmSite))) ? args : null;
 }
 
 function realDeps(env) {
@@ -1814,12 +1906,13 @@ function realDeps(env) {
 async function main(argv = process.argv.slice(2), env = process.env, makeDeps = realDeps) {
   const args = parseArgs(argv);
   if (!args) {
-    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped] | --sync-teams');
+    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped | --enroll-auto-deploy | --remove-auto-deploy [--confirm-site <name>] | --restore-auto-deploy] | --sync-teams');
     return 2;
   }
   const deps = makeDeps(env);
   if (args.syncTeams) return syncTeams({ deps });
   if (args.markStopped) return markStopped({ appId: args.appId, runId: env.GITHUB_RUN_ID, deps });
+  if (args.enrollAutoDeploy || args.removeAutoDeploy || args.restoreAutoDeploy) return enrollAutoDeploy({ appId: args.appId, remove: args.removeAutoDeploy, removeDue: args.removeDue, restore: args.restoreAutoDeploy, confirmSite: args.confirmSite, deps });
   return provision({ appId: args.appId, testMode: args.testMode, deps });
 }
 

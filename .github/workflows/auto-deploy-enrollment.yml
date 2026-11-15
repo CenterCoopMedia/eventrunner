@@ -1,0 +1,75 @@
+name: Update automatic deployments
+
+on:
+  workflow_call:
+    inputs:
+      application_id:
+        required: true
+        type: string
+      operation:
+        required: true
+        type: string
+      confirm_site:
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  update:
+    name: Update automatic deployments
+    runs-on: ubuntu-latest
+    environment: provisioning
+    timeout-minutes: 10
+    # Serialize only the shared variable update; the long builds stay parallel.
+    concurrency:
+      group: auto-deploy-environments
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.23.5"
+          cache: npm
+      - name: Prepare shared packages
+        run: |
+          npm run prepare:functions
+          node scripts/prepare-functions.cjs --copy
+      - run: npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Update the automatic deployment list
+        env:
+          APPLICATION_ID: ${{ inputs.application_id }}
+          OPERATION: ${{ inputs.operation }}
+          CONFIRM_SITE: ${{ inputs.confirm_site }}
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+          PROVISIONER_APP_ID: ${{ vars.PROVISIONER_APP_ID }}
+          PROVISIONER_INSTALLATION_ID: ${{ vars.PROVISIONER_INSTALLATION_ID }}
+          PROVISIONER_APP_PRIVATE_KEY: ${{ secrets.PROVISIONER_APP_PRIVATE_KEY }}
+        run: |
+          if [ "$OPERATION" = "enroll" ]; then
+            node scripts/provision-client.cjs --application "$APPLICATION_ID" --enroll-auto-deploy
+          elif [ "$OPERATION" = "remove" ] || [ "$OPERATION" = "remove-due" ]; then
+            args=(--application "$APPLICATION_ID" --remove-auto-deploy)
+            if [ "$OPERATION" = "remove-due" ]; then args+=(--if-purge-due); fi
+            if [ -n "$CONFIRM_SITE" ]; then args+=(--confirm-site "$CONFIRM_SITE"); fi
+            node scripts/provision-client.cjs "${args[@]}"
+          elif [ "$OPERATION" = "restore" ]; then
+            node scripts/provision-client.cjs --application "$APPLICATION_ID" --restore-auto-deploy
+          else
+            echo '::error::Unknown automatic deployment operation.' >&2
+            exit 1
+          fi
