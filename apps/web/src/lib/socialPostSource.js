@@ -7,6 +7,7 @@
 //   201 / 200   { postId, state: 'active' }  stored / an exact replay
 //   400         the request failed shared/socialPost readSocialPost
 //   401 / 403   no session / no approved or speaker account
+//   403         access-updating or ticket-resource: the ticket grant (#1006)
 //   404         the feed is closed, or the parent root is not active
 //   409         this submission key was used for another payload
 //   410         the post under this key was removed by staff (terminal)
@@ -14,6 +15,7 @@
 // same key. This module never throws.
 import { IS_DEMO } from './demoMode.js';
 import { resolveFunctionsOrigin } from './errorReporting.js';
+import { ticketAccessState, ticketAccessText } from './ticketAccess.js';
 
 const RETRY_MESSAGE =
   'Your post was not confirmed. Check your connection, then select the button again. Your text is kept, and sending it again does not post it twice.';
@@ -23,7 +25,8 @@ const RETRY_MESSAGE =
  *           parentPostId: string|null, submissionKey: string,
  *           env?: object, fetchImpl?: typeof fetch }} input
  * @returns {Promise<{ ok: true, postId: string }
- *   | { ok: false, kind: 'invalid'|'auth'|'forbidden'|'closed'|'conflict'|'removed'|'retry', error: string }>}
+ *   | { ok: false, kind: 'invalid'|'auth'|'forbidden'|'updating'|'not-included'|'closed'|'conflict'|'removed'|'retry',
+ *       error: string }>}
  */
 export async function createSocialPost({ user, text, parentPostId, submissionKey, env = import.meta.env, fetchImpl }) {
   if (IS_DEMO) return { ok: false, kind: 'closed', error: 'Posting is off in this read-only demo.' };
@@ -71,8 +74,11 @@ export async function createSocialPost({ user, text, parentPostId, submissionKey
       return { ok: false, kind: 'invalid', error: message.replace(/^text:\s*/, '') || 'Check the post and try again.' };
     case 401:
       return { ok: false, kind: 'auth', error: 'Your session has expired. Sign in again to post.' };
-    case 403:
+    case 403: {
+      const ticket = ticketAccessState(code);
+      if (ticket) return { ok: false, kind: ticket, error: `${ticketAccessText(ticket, 'feed')} Your text is kept.` };
       return { ok: false, kind: 'forbidden', error: 'Posting is open to approved attendees and speakers.' };
+    }
     case 404:
       return parentPostId !== null
         ? { ok: false, kind: 'closed', error: 'Replies are closed right now. Your text was not sent.' }

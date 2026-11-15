@@ -9,7 +9,9 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { setSessionBookmarked } from '../../lib/bookmarksSource.js';
 import { setDeviceBookmarked } from '../../lib/deviceBookmarks.js';
 import { useDeviceBookmarks } from '../../hooks/useDeviceBookmarks.js';
+import { ticketAccessState, ticketAccessText } from '../../lib/ticketAccess.js';
 import { rowActionClass } from './sessionActionClass.js';
+import TicketAccessNote from './TicketAccessNote.jsx';
 
 /**
  * @param {{ session: { id: string }, bookmarked?: boolean }} props
@@ -35,6 +37,11 @@ export default function BookmarkAction({ session, bookmarked = false }) {
   // instead of the server's real state, sending the inverse of what the
   // user actually sees on screen.
   const [optimistic, setOptimistic] = useState(null);
+  // A ticket refusal (#1007) stays stated beside the control for this reader
+  // and session. The control stays usable: a later try asks the server again.
+  const [ticketDenial, setTicketDenial] = useState(null);
+  const ticketState = ticketDenial && ticketDenial.uid === user?.uid && ticketDenial.sessionId === session.id
+    ? ticketDenial.state : null;
   const isBookmarked = optimistic && optimistic.uid === user?.uid && optimistic.deviceSaved === deviceSaved
     ? optimistic.value : deviceOnly ? deviceSaved : bookmarked || deviceSaved;
 
@@ -44,6 +51,9 @@ export default function BookmarkAction({ session, bookmarked = false }) {
   useEffect(() => {
     setOptimistic(null);
   }, [bookmarked, session.id, user?.uid, attendeeAccess]);
+  useEffect(() => {
+    setTicketDenial(null);
+  }, [session.id, user?.uid, attendeeAccess]);
   useEffect(() => {
     setOptimistic((previous) => previous && previous.deviceSaved !== deviceSaved ? null : previous);
   }, [deviceSaved]);
@@ -69,10 +79,13 @@ export default function BookmarkAction({ session, bookmarked = false }) {
     }
     try {
       await setSessionBookmarked({ user, sessionId: session.id, bookmarked: next });
+      setTicketDenial(null);
     } catch (err) {
       if (deviceSaved && !next) setDeviceBookmarked(session.id, true);
       setOptimistic(null);
-      showToast(err.message || 'The bookmark could not be saved. Try again.', { tone: 'error' });
+      const ticket = ticketAccessState(err.code);
+      if (ticket) setTicketDenial({ state: ticket, uid: user.uid, sessionId: session.id });
+      else showToast(err.message || 'The bookmark could not be saved. Try again.', { tone: 'error' });
     } finally {
       setPending(false);
     }
@@ -90,7 +103,7 @@ export default function BookmarkAction({ session, bookmarked = false }) {
 
   // Keep focus while an account write or browser import is in flight.
   // The click guard prevents another request, and aria-busy states the wait.
-  return (
+  const button = (
     <button
       type="button"
       className={rowActionClass}
@@ -103,4 +116,5 @@ export default function BookmarkAction({ session, bookmarked = false }) {
       {profileLoading ? 'Checking your saved sessions…' : isBookmarked ? 'Bookmarked' : 'Bookmark'}
     </button>
   );
+  return <TicketAccessNote text={ticketState ? ticketAccessText(ticketState, 'session') : null}>{button}</TicketAccessNote>;
 }

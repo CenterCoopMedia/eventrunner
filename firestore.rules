@@ -443,7 +443,8 @@ service cloud.firestore {
       match /notifications/{replyId} {
         allow read: if isSelf(userId)
           && socialFeedOpen()
-          && requesterIsApprovedAttendee();
+          && requesterIsApprovedAttendee()
+          && ticketResourceGranted('interactions');
         allow write: if false;
       }
     }
@@ -479,24 +480,39 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/ticket_access_policies/current).data;
     }
 
-    function ticketSessionGranted(sessionId) {
+    function ticketGrantExempt() {
       return !exists(/databases/$(database)/documents/ticket_access_policies/current)
         || ticketPolicyControl().get('effectiveRevision', null) == 0
         || requesterUserDoc().get('speakerId', null) != null
         || (requesterUserDoc().get('registrationStatus', '') == 'approved'
             && requesterUserDoc().get('approvalSource', null) == 'admin')
-        || isAdmin()
-        || ticketGrantCovers(sessionId);
+        || isAdmin();
     }
 
-    function ticketGrantCovers(sessionId) {
-      let grantPath = /databases/$(database)/documents/ticket_access_grants/$(request.auth.uid);
+    function ticketGrantPath() {
+      return /databases/$(database)/documents/ticket_access_grants/$(request.auth.uid);
+    }
+
+    function ticketGrantCurrent() {
       let revision = ticketPolicyControl().get('effectiveRevision', null);
       return revision is int && revision >= 1
         && ticketPolicyControl().get('candidateRevision', null) == null
-        && exists(grantPath)
-        && get(grantPath).data.get('policyRevision', null) == revision
-        && ticketSessionsCover(get(grantPath).data.get('resources', {}).get('sessions', {}), sessionId);
+        && exists(ticketGrantPath())
+        && get(ticketGrantPath()).data.get('policyRevision', null) == revision;
+    }
+
+    function ticketSessionGranted(sessionId) {
+      return ticketGrantExempt()
+        || (ticketGrantCurrent()
+            && ticketSessionsCover(get(ticketGrantPath()).data.get('resources', {}).get('sessions', {}), sessionId));
+    }
+
+    // decideResourceGrant: one boolean resource ('interactions', 'directory'
+    // or 'attendeeUpdates') with the same exemptions and revision checks.
+    function ticketResourceGranted(field) {
+      return ticketGrantExempt()
+        || (ticketGrantCurrent()
+            && get(ticketGrantPath()).data.get('resources', {}).get(field, false) == true);
     }
 
     function ticketSessionsCover(sessions, sessionId) {
@@ -703,7 +719,8 @@ service cloud.firestore {
 
     match /social_posts/{postId} {
       allow read: if isAdmin();
-      allow read: if socialFeedOpen() && requesterIsApprovedAttendee();
+      allow read: if socialFeedOpen() && requesterIsApprovedAttendee()
+        && ticketResourceGranted('interactions');
       allow write: if false;
     }
 

@@ -31,6 +31,7 @@ import { own, useAuthorNames, useSocialAccess, useSocialReports } from '../hooks
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { THREAD_PAGE_SIZE, isPostId, subscribeReplies, subscribeThreadRoot } from '../lib/socialThreadSource.js';
 import NotFound from './NotFound.jsx';
+import { FEED_ACCESS_REFUSED_TEXT } from '../lib/ticketAccess.js';
 
 const PostComposer = lazy(() => import('../components/PostComposer.jsx'));
 
@@ -117,6 +118,11 @@ export default function AttendeeThread() {
     };
   }, [feedKey, postId, pages]);
 
+  // The reply draft for this reader, access session and thread (#1006): kept
+  // in memory across a read refusal, never across a key change or navigation.
+  const kept = useRef({ key: null, value: null });
+  if (kept.current.key !== feedKey) kept.current = { key: feedKey, value: { text: '', keys: null } };
+
   const entries = thread.entries;
   const visible = root.root ? [root.root, ...(entries ?? [])] : entries;
   const authorMap = useAuthorNames(feedKey, activeKey, visible);
@@ -130,13 +136,16 @@ export default function AttendeeThread() {
   let content;
   if (access === 'checking') {
     content = <LoadingState shape="rows" label="Loading the thread…" />;
-  } else if (access === 'denied' || root.denied || thread.denied) {
+  } else if (access === 'denied') {
     content = (
       <p className="max-w-prose text-body text-text-secondary">
         The attendee feed is open to approved attendees and speakers. It opens for you once your
         registration is approved.
       </p>
     );
+  } else if (root.denied || thread.denied) {
+    // The account qualifies, so the rules refused the ticket grant (#1006).
+    content = <p className="max-w-prose text-body text-text-secondary">{FEED_ACCESS_REFUSED_TEXT}</p>;
   } else if (postId === null) {
     content = (
       <EmptyState
@@ -220,6 +229,7 @@ export default function AttendeeThread() {
                   key={feedKey}
                   user={user}
                   parentPostId={postId}
+                  kept={kept.current.value}
                   onUnavailable={() => setRootState((prev) => ({ key: feedKey, value: { ...own(prev, feedKey, NO_ROOT), root: null, failed: true } }))}
                 />
               </Suspense>

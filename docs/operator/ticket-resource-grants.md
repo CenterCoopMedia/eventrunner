@@ -18,6 +18,8 @@ Merging this runbook does not activate grants on any deployment. Activation need
 
 The first sweep activates granular mode when it finishes. There is no separate switch.
 
+The attendee feed follows the same modes and exemptions ([#1006](https://github.com/CenterCoopMedia/eventrunner/issues/1006)). In granular mode, reading posts and reply notifications, posting, replying, reporting a post and marking a notification read need the grant's `interactions` resource. Staff can still read, report and remove posts. During a later sweep the feed says access is updating, and an unsent post or reply comes back for the same reader when the feed reopens.
+
 ## Before you start
 
 Run the commands from a checkout of `main` after `npm run prepare:functions` and `npm ci`. Use the client project's operator service account. Set the client values in the shell:
@@ -97,6 +99,7 @@ For a later revision, publish at a quiet time. Accounts that need a grant get **
 1. Run the inventory again without `--policy`. Check that `control` is `{ "effectiveRevision": N, "candidateRevision": null }`, `accounts.currentGrant` equals `accounts.needGrant` and the command exits 0.
 2. Run a backfill dry run (section 5). Check that `grantWrites` and `accountWrites` are 0.
 3. Sign in with a limited test pass and confirm that a covered session accepts a bookmark and an uncovered session says the ticket does not include it.
+4. With a pass that has no `interactions`, confirm that the attendee feed says the ticket does not include it. With a pass that has `interactions`, confirm that the post form appears.
 
 ## 5. Backfill grants
 

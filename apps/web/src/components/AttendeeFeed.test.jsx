@@ -494,10 +494,17 @@ describe('what the feed shows', () => {
     act(() => feed.error(Object.assign(new Error('offline'), { code: 'unavailable' })));
     expect(screen.getByRole('heading', { name: 'The feed is unavailable right now' })).toBeInTheDocument();
     act(() => feed.error(Object.assign(new Error('no'), { code: 'permission-denied' })));
-    expect(screen.getByText(/opens for you once your registration is approved/)).toBeInTheDocument();
+    // An approved reader refused by the rules: the ticket grant (#1006, #1007).
+    expect(screen.getByText(/Your ticket does not include the attendee feed, or your access is updating/)).toBeInTheDocument();
+    expect(screen.queryByText(/opens for you once your registration is approved/)).not.toBeInTheDocument();
+    // The listener retries; a granted answer opens the feed again.
+    pushPosts(feed, []);
+    expect(screen.getByRole('heading', { name: 'No posts yet' })).toBeInTheDocument();
   });
 
-  it('drops the composer, draft and late send on a feed refusal until a confirmed feed answer', async () => {
+  // Changed for #1006: a read refusal can now be a ticket grant sweep, so the
+  // same reader's draft is kept in memory and returns with the feed.
+  it('hides the composer and ignores a late send on a feed refusal, and returns the same reader\'s draft', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
     const feed = activeFeedListeners()[0];
@@ -518,6 +525,25 @@ describe('what the feed shows', () => {
     expect(screen.queryByText('Posted. Your post is at the top of the feed.')).not.toBeInTheDocument();
 
     pushPosts(feed, []);
+    expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('Private draft');
+  });
+
+  it('never shows a kept draft to another account in the same tab', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const feed = activeFeedListeners()[0];
+    pushPosts(feed, []);
+    type(await screen.findByRole('textbox', { name: 'Write a post' }), 'Ada only');
+    act(() => feed.error(Object.assign(new Error('refused'), { code: 'permission-denied' })));
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+
+    await openFeedAs(makeUser('bo'));
+    pushPosts(activeFeedListeners().at(-1), []);
+    expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('');
+    expect(screen.queryByDisplayValue('Ada only')).not.toBeInTheDocument();
+
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners().at(-1), []);
     expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('');
   });
 });
@@ -674,6 +700,19 @@ describe('reporting a post', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('states a ticket refusal of a report in the feed words (issue 1007)', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    pushPosts(activeFeedListeners()[0], [post('p1', 'cy', 'Report me')]);
+    fireEvent.click(screen.getByRole('button', { name: 'Report post' }));
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false, status: 403,
+      json: async () => ({ error: { code: 'ticket-resource', message: 'Your ticket does not include this part of the event.' } }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send report' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your ticket does not include the attendee feed.');
+  });
+
   it('sends nothing when the reader cancels', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
@@ -776,6 +815,26 @@ describe('the post composer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Post' }));
     await waitFor(() => expect(createBodies()).toHaveLength(3));
     expect(createBodies()[2].submissionKey).not.toBe(first.submissionKey);
+  });
+
+  it('states access updating or not included on a refused post and keeps the text (issue 1007)', async () => {
+    renderFeed();
+    await openFeedAs(makeUser('ada'));
+    const field = await screen.findByRole('textbox', { name: 'Write a post' });
+    type(field, 'Hello from a day pass');
+    vi.mocked(fetch).mockResolvedValueOnce(answer(403, { error: { code: 'access-updating', message: 'x' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Access updating. Try again in a few minutes. Your text is kept.');
+    expect(field).toHaveValue('Hello from a day pass');
+
+    vi.mocked(fetch).mockResolvedValueOnce(answer(403, { error: { code: 'ticket-resource', message: 'x' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Your ticket does not include the attendee feed. Your text is kept.'));
+    expect(field).toHaveValue('Hello from a day pass');
+
+    vi.mocked(fetch).mockResolvedValueOnce(answer(403, { error: { code: 'forbidden', message: 'x' } }));
+    fireEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Posting is open to approved attendees and speakers.'));
   });
 
   it('sends once while a request runs', async () => {
@@ -1014,6 +1073,20 @@ describe('the thread page', () => {
     expect(field).toHaveValue('Unsent reply');
   });
 
+  it('keeps the same reader\'s reply draft through a thread refusal and sends nothing while refused', async () => {
+    renderThread();
+    await openFeedAs(makeUser('ada'));
+    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
+    pushPosts(replyListener(), []);
+    type(await screen.findByRole('textbox', { name: 'Your reply' }), 'Reply kept');
+    const replies = replyListener();
+    act(() => replies.error(Object.assign(new Error('refused'), { code: 'permission-denied' })));
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+    pushPosts(replies, []);
+    expect(await screen.findByRole('textbox', { name: 'Your reply' })).toHaveValue('Reply kept');
+  });
+
   it('a refusal clears the thread and stays a refusal through a later recoverable failure', async () => {
     renderThread();
     await openFeedAs(makeUser('ada'));
@@ -1026,7 +1099,8 @@ describe('the thread page', () => {
     act(() => replies.error(Object.assign(new Error('offline'), { code: 'unavailable' })));
     expect(screen.queryByText('A reply')).not.toBeInTheDocument();
     expect(screen.queryByText('Root text')).not.toBeInTheDocument();
-    expect(screen.getByText(/The attendee feed is open to approved attendees and speakers/)).toBeInTheDocument();
+    // An approved reader refused by the rules: the ticket grant (#1006, #1007).
+    expect(screen.getByText(/Your ticket does not include the attendee feed, or your access is updating/)).toBeInTheDocument();
   });
 
   it('a removed root shows "Original post removed", keeps replies readable and reportable, and closes replies', async () => {

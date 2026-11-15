@@ -11,8 +11,9 @@
 // what the reader has already typed when it does: the hook mirrors the
 // document until the reader edits, so a slow snapshot can never overwrite
 // a keystroke.
+import { useRef } from 'react';
 import { useSessionNote } from '../../hooks/useSessionNote.js';
-import { inputClass } from '../controlClasses.js';
+import { inputClass, quietActionClass } from '../controlClasses.js';
 
 const STATE_TEXT = {
   editing: '',
@@ -20,14 +21,21 @@ const STATE_TEXT = {
   saved: 'Saved.',
   error: 'The note could not be saved. Try again.',
   denied: 'Access updating, or your ticket does not include this session. Your note is still here. Try again later.',
+  restored: 'Unsaved text from your last visit. Save it now or discard it.',
 };
 
 /**
  * @param {{ uid: string, sessionId: string, noteId?: string }} props
  */
 export default function SessionNote({ uid, sessionId, noteId }) {
-  const { draft, state, maxLength, edit, flush } = useSessionNote(uid, sessionId);
+  const { draft, state, maxLength, edit, flush, saveNow, discard, unsaved } = useSessionNote(uid, sessionId);
   const labelId = `note-${noteId ?? sessionId}`;
+  const actionsRef = useRef(null);
+  const busy = state === 'saving';
+  // Moving to Save now or Discard must not save the text first.
+  const onBlur = (event) => {
+    if (!actionsRef.current?.contains(event.relatedTarget)) flush();
+  };
 
   return (
     <div className="mt-sm">
@@ -44,7 +52,7 @@ export default function SessionNote({ uid, sessionId, noteId }) {
         maxLength={maxLength}
         placeholder="Only you can see this."
         onChange={(event) => edit(event.target.value)}
-        onBlur={flush}
+        onBlur={onBlur}
       />
       {/* The answer is stated, and an error is announced, not painted. */}
       <p
@@ -53,6 +61,25 @@ export default function SessionNote({ uid, sessionId, noteId }) {
       >
         {STATE_TEXT[state] ?? ''}
       </p>
+      {/* Unsaved text is kept in this browser until it saves or the reader drops it (#1007). */}
+      {unsaved ? (
+        <div ref={actionsRef} className="mt-3xs flex flex-wrap gap-x-md">
+          {/* While a save is in flight both wait for its answer; focus stays. */}
+          <button type="button" className={quietActionClass} onClick={saveNow} aria-disabled={busy || undefined}>
+            Save now
+          </button>
+          <button
+            type="button"
+            className={quietActionClass}
+            // Keep focus in the field, so a pointer discard does not save first.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={discard}
+            aria-disabled={busy || undefined}
+          >
+            Discard unsaved text
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

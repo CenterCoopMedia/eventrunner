@@ -29,7 +29,9 @@ import { useProfile } from '../../contexts/ProfileContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { REACTION_KINDS, setSessionReaction } from '../../lib/reactionsSource.js';
 import { useSessionReactions } from '../../hooks/useSessionReactions.js';
+import { ticketAccessState, ticketAccessText } from '../../lib/ticketAccess.js';
 import { chipActionClass } from './sessionActionClass.js';
+import TicketAccessNote from './TicketAccessNote.jsx';
 
 /**
  * @param {{ session: { id: string } }} props
@@ -58,10 +60,17 @@ export default function ReactionGroup({ session }) {
   const [optimistic, setOptimistic] = useState(undefined);
   const hasOverride = optimistic !== undefined;
   const myActiveReaction = hasOverride ? optimistic : myReaction;
+  // A ticket refusal (#1007), stated under the group as BookmarkAction does.
+  const [ticketDenial, setTicketDenial] = useState(null);
+  const ticketState = ticketDenial && ticketDenial.uid === user?.uid && ticketDenial.sessionId === session.id
+    ? ticketDenial.state : null;
 
   useEffect(() => {
     setOptimistic(undefined);
   }, [myReaction, session.id, user?.uid]);
+  useEffect(() => {
+    setTicketDenial(null);
+  }, [session.id, user?.uid, attendeeAccess]);
 
   const onPick = useCallback(
     async (emoji) => {
@@ -71,9 +80,12 @@ export default function ReactionGroup({ session }) {
       setPending(true);
       try {
         await setSessionReaction({ user, sessionId: session.id, emoji: next });
+        setTicketDenial(null);
       } catch (err) {
         setOptimistic(undefined);
-        showToast(err.message || 'The reaction could not be saved. Try again.', { tone: 'error' });
+        const ticket = ticketAccessState(err.code);
+        if (ticket) setTicketDenial({ state: ticket, uid: user.uid, sessionId: session.id });
+        else showToast(err.message || 'The reaction could not be saved. Try again.', { tone: 'error' });
       } finally {
         setPending(false);
       }
@@ -95,7 +107,7 @@ export default function ReactionGroup({ session }) {
   const hasAnyCount = REACTION_KINDS.some((emoji) => (displayCounts[emoji] || 0) > 0);
   if (!interactive && !hasAnyCount) return null;
 
-  return (
+  const group = (
     <span
       className="inline-flex flex-wrap items-center gap-2xs"
       role="group"
@@ -132,4 +144,5 @@ export default function ReactionGroup({ session }) {
       })}
     </span>
   );
+  return <TicketAccessNote text={ticketState ? ticketAccessText(ticketState, 'session') : null}>{group}</TicketAccessNote>;
 }
