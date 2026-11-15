@@ -276,3 +276,41 @@ it('a backfill that fails part way keeps the totals of the accounts it already w
     totals: { accounts: 1, grantWrites: 1, accountWrites: 0, invalid: 0 } });
   expect((await db.collection('ticket_access_grants').doc('legacy').get()).data().classIds).toEqual(['day']);
 });
+
+it('a resumed sweep keeps the stored grant of accounts before its cursor, so readiness uses that grant', async () => {
+  await publishTicketAccessPolicy({ db, policy: structuredClone(POLICY), expectedRevision: 0, env: ENV });
+  // A first sweep stopped after 'legacy' (first by uid) and wrote its empty grant.
+  await db.collection('ticket_access_policies').doc('current').set({ effectiveRevision: 0, candidateRevision: 1,
+    cursor: 'legacy', processed: 1, remaining: 4 });
+  // The class ID arrives, but the ticket trigger has not run.
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  const report = await inventoryTicketGrants({ db, env: ENV, policyInput: structuredClone(POLICY) });
+  expect(report.accounts.missingApprovalSource.unresolvedUids).toEqual(['legacy']);
+  expect((await receiptOf('f7-refused', ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply'])).code).toBe(1);
+
+  expect((await receiptOf('f7-backfill', ['backfill', '--apply'])).code).toBe(0);
+  const resumed = await receiptOf('f7-resume', ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply']);
+  expect(resumed.code).toBe(0);
+  expect(resumed.receipt.readback).toEqual({ effectiveRevision: 1, candidateRevision: null });
+  expect((await db.collection('ticket_access_grants').doc('legacy').get()).data().classIds).toEqual(['day']);
+});
+
+it('a failed publication keeps its error and progress when the readback fails too', async () => {
+  await db.collection('tickets').doc('t-legacy').update({ ticketClassId: 'general' });
+  let calls = 0;
+  let down = false;
+  const unavailable = () => Promise.reject(new Error('14 UNAVAILABLE'));
+  // The backend goes away during the sweep and stays away for the readback.
+  const flaky = {
+    collection: (name) => (down ? { doc: () => ({ get: unavailable }) } : db.collection(name)),
+    runTransaction: (fn, options) => {
+      if (++calls === 2) { down = true; return unavailable(); }
+      return db.runTransaction(fn, options);
+    },
+  };
+  const path = join(dir, 'publish-outage.json');
+  expect(await run({ db: flaky, projectId: PROJECT, env: ENV, argv: ['publish', '--policy', policyFile, '--expected-revision', '0', '--apply', '--receipt', path], stdout: () => {} })).toBe(1);
+  expect(JSON.parse(readFileSync(path, 'utf8'))).toMatchObject({ mode: 'apply', revision: 1, error: '14 UNAVAILABLE',
+    readback: 'unavailable', checks: { activationReady: true },
+    progress: { revision: 1, processed: 0, remaining: 5, complete: false } });
+});

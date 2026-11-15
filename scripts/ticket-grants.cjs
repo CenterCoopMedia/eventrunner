@@ -159,15 +159,18 @@ async function inventoryTicketGrants({ db, env = process.env, policyInput }) {
     const stored = (await db.collection(GRANTS).doc(doc.id).get()).data() ?? null;
     const current = revision !== null && stored?.policyRevision === revision ? stored : null;
     if (current) accounts.currentGrant += 1;
-    const projected = policy && deriveTicketResourceGrant({ policy, context,
-      tickets: claimed.get(doc.id) ?? [], uid: doc.id, registration: account });
-    if (policy && !coversSessions(projected, canonical)) accounts.projectedNoSessions += 1;
+    // The grant in place after the next sweep. A sweep writes the projected
+    // grant, so a cached one does not count; a resumed sweep skips accounts at
+    // or before its cursor (uids are ASCII, so this order is Firestore's), and
+    // those keep the stored grant. Without a policy, the stored grant decides.
+    const resumed = control?.candidateRevision === revision && typeof control.cursor === 'string' && doc.id <= control.cursor;
+    const next = policy && !resumed ? deriveTicketResourceGrant({ policy, context,
+      tickets: claimed.get(doc.id) ?? [], uid: doc.id, registration: account }) : current;
+    if (policy && !coversSessions(next, canonical)) accounts.projectedNoSessions += 1;
     if (sourceName !== 'missing') return;
     missing.count += 1;
     if (current) missing.currentGrant += 1;
-    // With a policy, the next sweep or recompute writes the projected grant,
-    // so a cached grant does not count. Without one, the stored grant decides.
-    if (coversSessions(policy ? projected : current, canonical)) missing.usable += 1;
+    if (coversSessions(next, canonical)) missing.usable += 1;
     else missing.unresolvedUids.push(doc.id);
   });
 
@@ -285,7 +288,8 @@ async function publishPolicy({ db, env = process.env, policyInput, expectedRevis
     // The same parsed policy that passed the checks above.
     result.sweep = await publishTicketAccessPolicy({ db, policy: structuredClone(policyInput), expectedRevision, env, now });
   } catch (error) {
-    result.readback = brief(await readControl(db));
+    // Best effort: the same outage must not replace the helper's error and progress.
+    result.readback = await readControl(db).then(brief, () => 'unavailable');
     throw Object.assign(error, { result });
   }
   result.readback = brief(await readControl(db));
