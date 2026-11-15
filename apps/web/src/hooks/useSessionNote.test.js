@@ -346,8 +346,16 @@ describe('useSessionNote', () => {
     saveMock.mockReset().mockImplementation(async () => {});
     const second = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
     expect(second.getByLabelText('Private note').value).toBe('kept across pages');
+    expect(second.getByRole('status').textContent).toBe('Unsaved text from your last visit. Save it now or discard it.');
+    // Restored text never saves on its own: leaving the field sends nothing.
+    fireEvent.blur(second.getByLabelText('Private note'));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
+    });
+    expect(saveMock).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(second.getByRole('button', { name: 'Save now' }));
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(saveMock).toHaveBeenLastCalledWith('u1', 's1', 'kept across pages');
     expect(second.getByRole('status').textContent).toBe('Saved.');
@@ -379,7 +387,7 @@ describe('useSessionNote', () => {
       await vi.advanceTimersByTimeAsync(900);
     });
     expect(second.getByLabelText('Private note').value).toBe('strict text');
-    expect(second.getByRole('alert').textContent).toMatch(/Access updating/);
+    expect(second.getByRole('status').textContent).toMatch(/Unsaved text from your last visit/);
     second.unmount();
   });
 
@@ -508,7 +516,7 @@ describe('useSessionNote', () => {
     expect(copies()).toHaveLength(0);
   });
 
-  it('bases the copy on server text, not on a pending write that is later refused', async () => {
+  it('keeps the latest text when an earlier pending save and the latest save are both refused', async () => {
     let deliver;
     subscribeMock.mockImplementation((_uid, _sessionId, onNext) => {
       deliver = onNext;
@@ -545,7 +553,7 @@ describe('useSessionNote', () => {
     second.unmount();
   });
 
-  it('drops a refused copy when the note changed since, instead of overwriting it', async () => {
+  it('shows a refused copy over a changed note without saving it, until the reader chooses', async () => {
     saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
     const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
     fireEvent.change(first.getByLabelText('Private note'), { target: { value: 'older refused text' } });
@@ -563,13 +571,23 @@ describe('useSessionNote', () => {
       return () => {};
     });
     const second = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
-    expect(second.getByLabelText('Private note').value).toBe('newer text from another device');
+    const field = second.getByLabelText('Private note');
+    expect(field.value).toBe('older refused text');
     await act(async () => {
       await vi.advanceTimersByTimeAsync(900);
     });
-    expect(saveMock).not.toHaveBeenCalled();
-    expect(Object.keys(localStorage).filter((key) => key.includes('sessionNotes'))).toHaveLength(0);
     second.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(saveMock).not.toHaveBeenCalled();
+
+    const third = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    fireEvent.click(third.getByRole('button', { name: 'Discard unsaved text' }));
+    expect(third.getByLabelText('Private note').value).toBe('newer text from another device');
+    expect(Object.keys(localStorage).filter((key) => key.includes('sessionNotes'))).toHaveLength(0);
+    expect(saveMock).not.toHaveBeenCalled();
+    third.unmount();
   });
 
   it('another account never sees the unsaved text', async () => {

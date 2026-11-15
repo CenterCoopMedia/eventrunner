@@ -8,12 +8,12 @@
 // wait for a submit that may never come.
 //
 // UNSAVED TEXT SURVIVES NAVIGATION (#1007). Each edit also goes to a
-// browser-only recovery copy (lib/localDraft.js) with the saved text it
-// started from, cleared once the server saved that text, on discard, and
+// browser-only recovery copy (lib/localDraft.js), cleared once the server
+// saved that text, when a server answer already holds it, on discard, and
 // at sign-out. A refused save (the ticket grant is updating or does not
-// include the session) keeps the copy. The next visit restores it and tries
-// again only while the note still holds that starting text; a note changed
-// since then wins and the copy is dropped.
+// include the session) keeps the copy. The next visit shows a differing
+// copy as unsaved text and never saves it on its own: the note may have
+// changed since, so only the reader's "Save now" or new typing saves it.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { openLocalDraft } from '../lib/localDraft.js';
 import {
@@ -30,10 +30,11 @@ const SAVE_DEBOUNCE_MS = 800;
  * @returns {{
  *   saved: string,
  *   draft: string,
- *   state: 'loading' | 'editing' | 'saving' | 'saved' | 'error' | 'denied',
+ *   state: 'loading' | 'editing' | 'saving' | 'saved' | 'error' | 'denied' | 'restored',
  *   maxLength: number,
  *   edit: (next: string) => void,
  *   flush: () => void,
+ *   saveNow: () => void,
  *   discard: () => void,
  *   unsaved: boolean,
  * }}
@@ -52,8 +53,6 @@ export function useSessionNote(uid, sessionId) {
   const listenerErrorRef = useRef(false);
   const writeQueueRef = useRef(Promise.resolve());
   const copyRef = useRef(null); // { identity, store } for the recovery copy
-  const savedRef = useRef(''); // the server-confirmed text, for a copy's baseline
-  const editRef = useRef(null);
   renderedIdentityRef.current = { uid, sessionId };
 
   const queueSave = useCallback((editRecord, force = false) => {
@@ -87,7 +86,6 @@ export function useSessionNote(uid, sessionId) {
         if (!isLatestEdit) return;
         editRecord.copy?.clear();
         if (identityRef.current !== editRecord.identity) return;
-        savedRef.current = editRecord.text;
         setSaved(editRecord.text);
         setDraft(null); // mirror the document again
         setState('saved');
@@ -111,7 +109,6 @@ export function useSessionNote(uid, sessionId) {
     timerRef.current = null;
     listenerErrorRef.current = false;
     copyRef.current = null;
-    savedRef.current = '';
     setSaved('');
     setDraft(null);
     setUnsaved(false);
@@ -137,8 +134,6 @@ export function useSessionNote(uid, sessionId) {
         if (identityRef.current !== identity) return;
         const recoveredListenerError = listenerErrorRef.current;
         listenerErrorRef.current = false;
-        // A pending local write may still be refused: the baseline is server text.
-        if (!pending) savedRef.current = text;
         setSaved(text);
         setLoading(false);
         if (!restoreChecked) {
@@ -146,12 +141,18 @@ export function useSessionNote(uid, sessionId) {
           // An edit typed before this first answer is newer than any copy.
           const typing = latestEditRef.current?.identity === identity;
           const copy = typing ? null : store.read();
-          if (copy && copy.value !== text && copy.baseline === text) {
-            editRef.current?.(copy.value);
+          if (copy && copy.value !== text) {
+            latestEditRef.current = {
+              identity, text: copy.value, timer: null, queued: false, force: false, cancelled: false,
+              copy: store, restored: true,
+            };
+            setDraft(copy.value);
+            setState('restored');
+            setUnsaved(true);
             return;
           }
-          // Saved (a pending local write is not saved yet), or changed since.
-          if (copy && (copy.value !== text || !pending)) store.clear();
+          // Held by a server answer (a pending local write may still fail).
+          if (copy && !pending) store.clear();
         }
         setState((current) => {
           if (current === 'loading') return 'saved';
@@ -178,7 +179,7 @@ export function useSessionNote(uid, sessionId) {
       if (identityRef.current === identity) identityRef.current = null;
       if (latestEdit?.identity === identity) {
         latestEdit.timer = null;
-        if (isStillRenderedIdentity) {
+        if (isStillRenderedIdentity && !latestEdit.restored) {
           queueSave(latestEdit, true);
         } else {
           if (!latestEdit.force) latestEdit.cancelled = true;
@@ -211,7 +212,7 @@ export function useSessionNote(uid, sessionId) {
         copy: copyRef.current?.identity === identity ? copyRef.current.store : null,
       };
       latestEditRef.current = editRecord;
-      if (editRecord.copy) editRecord.copy.write(bounded, savedRef.current);
+      if (editRecord.copy) editRecord.copy.write(bounded, '');
       setDraft(bounded);
       setState('editing');
       clearTimeout(timerRef.current);
@@ -224,8 +225,6 @@ export function useSessionNote(uid, sessionId) {
     },
     [queueSave, uid, sessionId],
   );
-
-  editRef.current = edit;
 
   /** Drop the unsaved text and its recovery copy; the field shows the saved note. */
   const discard = useCallback(() => {
@@ -241,7 +240,13 @@ export function useSessionNote(uid, sessionId) {
     setUnsaved(false);
   }, []);
 
+  // Leaving the field saves typed text; restored text waits for saveNow.
   const flush = useCallback(() => {
+    const latestEdit = latestEditRef.current;
+    if (latestEdit?.identity === identityRef.current && !latestEdit.restored) queueSave(latestEdit, true);
+  }, [queueSave]);
+
+  const saveNow = useCallback(() => {
     const latestEdit = latestEditRef.current;
     if (latestEdit?.identity === identityRef.current) queueSave(latestEdit, true);
   }, [queueSave]);
@@ -253,6 +258,7 @@ export function useSessionNote(uid, sessionId) {
     maxLength: SESSION_NOTE_MAX_LENGTH,
     edit,
     flush,
+    saveNow,
     discard,
     unsaved,
   };

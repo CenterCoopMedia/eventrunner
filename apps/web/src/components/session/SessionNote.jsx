@@ -21,13 +21,14 @@ const STATE_TEXT = {
   saved: 'Saved.',
   error: 'The note could not be saved. Try again.',
   denied: 'Access updating, or your ticket does not include this session. Your note is still here. Try again later.',
+  restored: 'Unsaved text from your last visit. Save it now or discard it.',
 };
 
 /**
  * @param {{ uid: string, sessionId: string, noteId?: string }} props
  */
 export default function SessionNote({ uid, sessionId, noteId }) {
-  const { draft, state, maxLength, edit, flush, discard, unsaved } = useSessionNote(uid, sessionId);
+  const { draft, state, maxLength, edit, flush, saveNow, discard, unsaved } = useSessionNote(uid, sessionId);
   const labelId = `note-${noteId ?? sessionId}`;
   const discardRef = useRef(null);
   // Moving to Discard must not save the text first.
@@ -61,16 +62,21 @@ export default function SessionNote({ uid, sessionId, noteId }) {
       </p>
       {/* Unsaved text is kept in this browser until it saves or the reader drops it (#1007). */}
       {unsaved ? (
-        <button
-          ref={discardRef}
-          type="button"
-          className={`mt-3xs ${quietActionClass}`}
-          // Keep focus in the field, so a pointer discard does not save first.
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={discard}
-        >
-          Discard unsaved text
-        </button>
+        <div className="mt-3xs flex flex-wrap gap-x-md">
+          <button type="button" className={quietActionClass} onClick={saveNow}>
+            Save now
+          </button>
+          <button
+            ref={discardRef}
+            type="button"
+            className={quietActionClass}
+            // Keep focus in the field, so a pointer discard does not save first.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={discard}
+          >
+            Discard unsaved text
+          </button>
+        </div>
       ) : null}
     </div>
   );
