@@ -292,7 +292,7 @@ describe('ReviewApplication', () => {
       expect(note).not.toHaveTextContent('did not start');
       expect(screen.getByText('Hosting')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'View setup details' })).toHaveAttribute('href', 'https://github.example/run/1');
-      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Open Deployments to retry the build' })).toHaveAttribute('href', '/review/deployments');
     });
 
     it('has no retry while a build runs', async () => {
