@@ -41,7 +41,7 @@ The inventory only reads. Give it the candidate policy file that the organizer a
 node scripts/ticket-grants.cjs inventory --policy <policy.json> --out <inventory-1.json>
 ```
 
-Without `--policy` it uses the staged or effective revision, if there is one. Exit code 0 means the activation condition holds and the policy file is valid. Exit code 2 means it does not; read the report.
+Without `--policy` it uses the staged or effective revision, if there is one. A policy file with the same revision number as the staged or effective revision must be identical to it; the inventory then uses the stored revision, as a resumed sweep does. Exit code 0 means the activation condition holds and the policy file is valid. Exit code 2 means it does not; read the report.
 
 Read these fields:
 
@@ -55,8 +55,8 @@ Read these fields:
 | `accounts.byApprovalSource` | Approved accounts by `approvalSource`. `missing` is an account with no `approvalSource`. |
 | `accounts.needGrant` | Approved accounts that are not speakers and not admin-approved. Bootstrap admins and staff are counted here, but they keep full access. |
 | `accounts.currentGrant` | Of those, the accounts with a grant for `candidateRevision`. Before the first sweep this is 0. |
-| `accounts.projectedNoSessions` | Of those, the accounts whose grant under the policy covers no session. They lose new bookmark, reaction and note writes after activation. |
-| `accounts.missingApprovalSource.unresolvedUids` | Approved accounts with no `approvalSource` and no grant, current or projected, that covers a session. |
+| `accounts.projectedNoSessions` | Of those, the accounts whose grant under the policy covers no existing session. A day counts only when a session is on that day. These accounts lose new bookmark, reaction and note writes after activation. |
+| `accounts.missingApprovalSource.unresolvedUids` | Approved accounts with no `approvalSource` whose grant does not cover an existing session. With a policy, this is the grant the next sweep or recompute writes, not a stored grant. Without a policy, it is the stored grant. |
 | `activationReady` | True when `unresolvedUids` is empty. |
 
 ## 2. Correct the inputs
