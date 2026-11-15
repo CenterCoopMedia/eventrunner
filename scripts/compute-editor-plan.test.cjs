@@ -58,13 +58,14 @@ test('the plan only reads: no IAM policy is written', async () => {
   const policies = {
     [`/v3/projects/${PROJECT}`]: provisioned(),
     [`/v1/projects/${PROJECT}/serviceAccounts/${COMPUTE}`]: [{ role: 'roles/iam.serviceAccountTokenCreator', members: [MEMBER] }],
+    [`/v2/projects/${PROJECT}/locations/us-central1/jobs/site-publisher`]: [{ role: 'roles/run.jobsExecutorWithOverrides', members: [MEMBER] }],
   };
   const fetch = async (address, init) => {
     const url = new URL(address);
-    calls.push({ method: init.method, path: url.pathname });
+    calls.push({ method: init.method, path: url.pathname, version: Number(url.searchParams.get('options.requestedPolicyVersion') || JSON.parse(init.body || '{}').options?.requestedPolicyVersion) });
     const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body });
     if (url.pathname.endsWith(':getIamPolicy')) return json({ bindings: policies[url.pathname.replace(':getIamPolicy', '')] || [] });
-    if (url.host === 'run.googleapis.com') return json({}, 404);
+    if (url.host === 'run.googleapis.com') return json({ name: 'site-publisher' });
     if (url.host === 'cloudresourcemanager.googleapis.com') return json({ name: `projects/${NUMBER}` });
     if (url.pathname.startsWith('/v1/roles/')) return json({ includedPermissions: permissionsOf(url.pathname.slice(4)) });
     return json({}, 500);
@@ -73,8 +74,11 @@ test('the plan only reads: no IAM policy is written', async () => {
   const log = { log: (line) => lines.push(line), error: (line) => lines.push(line) };
   assert.equal(await main(['--project', PROJECT], { fetch, getAccessToken: async () => 't', log }), 0);
   assert.ok(calls.every(({ method, path }) => method === 'GET' || path.endsWith(':getIamPolicy')), JSON.stringify(calls));
+  // Version 3, so a conditional binding keeps its condition and is not read as unconditional.
+  assert.ok(calls.filter(({ path }) => path.endsWith(':getIamPolicy')).every(({ version }) => version === 3), JSON.stringify(calls));
   assert.ok(lines.includes(`${PROJECT}: ready`));
   assert.ok(lines.some((line) => line.includes('remove  roles/editor on project')));
+  assert.equal(calls.filter(({ path }) => path.endsWith(':getIamPolicy')).length, 3);
 });
 
 test('bad arguments exit 64', async () => {
