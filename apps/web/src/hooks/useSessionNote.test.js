@@ -631,6 +631,34 @@ describe('useSessionNote', () => {
     third.unmount();
   });
 
+  it('clears the copy when Save now succeeds after the reader left the page', async () => {
+    saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+    const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    fireEvent.change(first.getByLabelText('Private note'), { target: { value: 'saved late' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+    first.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const late = deferred();
+    saveMock.mockReset().mockImplementationOnce(() => late.promise);
+    const second = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));
+    await act(async () => {
+      fireEvent.click(second.getByRole('button', { name: 'Save now' }));
+      await Promise.resolve();
+    });
+    second.unmount();
+    await act(async () => {
+      late.resolve();
+      await late.promise;
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(Object.keys(localStorage).filter((key) => key.includes('sessionNotes'))).toHaveLength(0);
+  });
+
   it('another account never sees the unsaved text', async () => {
     saveMock.mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
     const first = render(createElement(SessionNote, { uid: 'u1', sessionId: 's1' }));

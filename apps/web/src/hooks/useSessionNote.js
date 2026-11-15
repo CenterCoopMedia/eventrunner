@@ -177,10 +177,12 @@ export function useSessionNote(uid, sessionId) {
         latestEdit.timer = null;
         if (isStillRenderedIdentity && !latestEdit.restored) {
           queueSave(latestEdit, true);
-        } else {
-          if (!latestEdit.force) latestEdit.cancelled = true;
+        } else if (!latestEdit.force) {
+          latestEdit.cancelled = true;
           latestEditRef.current = null;
         }
+        // A forced write in flight keeps its record, so its success can
+        // still clear the recovery copy.
       }
       unsubscribe();
     };
