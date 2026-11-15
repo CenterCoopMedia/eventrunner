@@ -18,7 +18,7 @@ test('only the short post-build enrollment job serializes the shared client-list
   assert.ok(enrollment.includes('!inputs.test_mode'));
   assert.match(enrollment, /uses: \.\/\.github\/workflows\/auto-deploy-enrollment.yml/);
   assert.match(enrollment, /operation: enroll/);
-  assert.match(writer, /concurrency:\s+group: provision-auto-deploy-enrollment\s+cancel-in-progress: false\s+queue: max/);
+  assert.match(writer, /concurrency:\s+group: auto-deploy-environments\s+cancel-in-progress: false\s+queue: max/);
   const workflowSettings = workflow.slice(0, workflow.indexOf('jobs:'));
   assert.ok(workflowSettings.includes('group: provision-${{ inputs.application_id }}'));
   assert.match(writer, /--application "\$APPLICATION_ID" --enroll-auto-deploy/);

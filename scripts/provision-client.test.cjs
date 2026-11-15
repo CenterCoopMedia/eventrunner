@@ -391,6 +391,10 @@ function fakeCloud(options = {}) {
       }
       if (options.enrollmentRefused) return answer({ message: 'private-provider-canary' }, 403);
       state.enrollmentWrites += 1;
+      if (method === 'DELETE') {
+        delete state.repositoryVariables[name];
+        return new Response(null, { status: 204 });
+      }
       state.repositoryVariables[body.name] = body.value;
       return method === 'POST' ? answer({}, 201) : new Response(null, { status: 204 });
     }
@@ -654,13 +658,18 @@ test('removal preserves other clients, removes case variants, and reconciles a l
   assert.equal(fake.state.enrollmentWrites, 1);
 });
 
-test('removal confirms an empty final list and an absent entry needs no write', async () => {
+test('removal deletes the final variable and confirms absence; an absent entry needs no write', async () => {
   for (const value of ['nclocal', 'demo', undefined]) {
     const fake = setup({ cloud: { autoDeployEnvironments: value } });
     assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
     assert.equal(await removeEnrollment(fake), 0);
-    assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, value === 'nclocal' ? '' : value);
+    assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, value === 'nclocal' ? undefined : value);
     assert.equal(fake.state.enrollmentWrites, value === 'nclocal' ? 1 : 0);
+    if (value === 'nclocal') {
+      const calls = fake.calls.filter((call) => call.url.includes('/actions/variables'));
+      assert.deepEqual(calls.map((call) => call.method), ['GET', 'DELETE', 'GET']);
+      assert.equal(calls[1].body, undefined);
+    }
   }
 });
 
@@ -675,7 +684,7 @@ test('removal uses saved deletion inventory and refuses a different deletion con
   await fake.db.doc('applications/a1').delete();
   await fake.db.doc('console_builds/a1').delete();
   assert.equal(await removeEnrollment(fake, ['--confirm-site', 'nclocal']), 0);
-  assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, '');
+  assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, undefined);
 });
 
 test('removal skips unbuilt requests and refuses missing requests or mismatched inventory', async () => {
@@ -724,7 +733,7 @@ test('scheduled removal rechecks an archive after waiting and leaves restored or
 
 for (const cloud of [{ enrollmentRefused: true }, { badEnrollmentReadback: true }, { autoDeployEnvironments: null }]) {
   test(`removal refuses unavailable or mismatched readback ${JSON.stringify(cloud)}`, async () => {
-    const fake = setup({ cloud: { autoDeployEnvironments: 'nclocal', ...cloud } });
+    const fake = setup({ cloud: { autoDeployEnvironments: 'demo,nclocal', ...cloud } });
     assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
     assert.equal(await removeEnrollment(fake), 1);
     assert.ok(!JSON.stringify(fake.deps.log.errors).includes('private-provider-canary'));

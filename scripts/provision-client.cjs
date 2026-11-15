@@ -1186,11 +1186,13 @@ async function enrollAutoDeploy({ appId, remove = false, removeDue = false, rest
       return 0;
     }
     const value = (remove ? clients.filter((client) => client.toLowerCase() !== environment) : [...clients, environment]).join(',');
+    const clearing = value === '';
     await call(ctx, 'update automatic deploy clients', current ? target : base, {
-      method: current ? 'PATCH' : 'POST', headers, quiet: true, json: { name, value },
+      method: clearing ? 'DELETE' : current ? 'PATCH' : 'POST', headers, quiet: true,
+      ...(clearing ? {} : { json: { name, value } }),
     });
-    const confirmed = await call(ctx, 'confirm automatic deploy clients', target, { headers, quiet: true });
-    if (confirmed?.name !== name || confirmed.value !== value) {
+    const confirmed = await call(ctx, 'confirm automatic deploy clients', target, { headers, quiet: true, allow: clearing ? [404] : [] });
+    if (clearing ? confirmed !== null : confirmed?.name !== name || confirmed.value !== value) {
       throw new Error('the automatic deploy variable did not match its write');
     }
     log.log(`auto-deploy: ${remove ? 'removed' : 'enrolled'} ${environment}`);

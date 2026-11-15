@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 10
     # Serialize only the shared variable update; the long builds stay parallel.
     concurrency:
-      group: provision-auto-deploy-enrollment
+      group: auto-deploy-environments
       cancel-in-progress: false
       queue: max
     permissions:
