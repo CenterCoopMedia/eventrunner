@@ -31,7 +31,10 @@ class RenderErrorBoundary extends Component {
         context: { source: 'react-boundary', componentStack: info.componentStack },
       });
     }
-    if (isChunkLoadError(error)) reloadOnce({ reload: this.reload });
+    if (!isChunkLoadError(error, info?.componentStack)) return;
+    // Chrome and Firefox lazy-module errors are known only with the stack.
+    if (!this.state.chunk) this.setState({ chunk: true });
+    reloadOnce({ reload: this.reload });
   }
 
   reload = () => {
