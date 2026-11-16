@@ -26,6 +26,10 @@ vi.mock('@/firebase.js', () => ({
   appCheckHeaders: vi.fn(async () => ({})),
 }));
 
+// jsdom does not implement navigation. AuthContext reloads the page on an
+// account change (issue 1017); its tests assert the call.
+vi.mock('@/lib/pageReload.js', () => ({ reloadPage: vi.fn() }));
+
 vi.mock('@/lib/firebaseSettings.js', async (importOriginal) => ({
   ...await importOriginal(),
   useEmulators: false,

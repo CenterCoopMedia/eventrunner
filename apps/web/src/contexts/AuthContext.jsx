@@ -53,6 +53,7 @@ import { appCheckHeaders, loadFirebase, subscribeToFirebase, rememberSignedIn } 
 import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { secondaryButtonClass } from '../components/controlClasses.js';
 import { clearLocalDrafts } from '../lib/localDraft.js';
+import { reloadPage } from '../lib/pageReload.js';
 
 const AuthContext = createContext(null);
 
@@ -149,8 +150,20 @@ export function AuthProvider({ children }) {
   const [probeRun, setProbeRun] = useState(0);
 
   useEffect(() => {
+    // The Firestore cache and the providers' state are shared by every
+    // account in this tab. When a signed-in account signs out or another
+    // account replaces it, the page reloads, so the next account starts
+    // with an empty cache and never sees rows read for the previous one,
+    // online or offline (issue 1017). The providers already drop the
+    // previous account's rows in the switch render; the reload also clears
+    // the SDK cache that their next queries would read.
+    let shownUid = null;
     return subscribeToFirebase(({ auth, onAuthStateChanged }) => onAuthStateChanged(auth, (nextUser) => {
       rememberSignedIn(Boolean(nextUser));
+      const nextUid = nextUser?.uid ?? null;
+      const accountChanged = shownUid !== null && nextUid !== shownUid;
+      shownUid = nextUid;
+      if (accountChanged) reloadPage();
       setUser(nextUser);
       setAuthError(null);
       setLoading(false);

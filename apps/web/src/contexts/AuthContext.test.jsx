@@ -6,6 +6,7 @@ import { getDocs } from 'firebase/firestore';
 import { auth } from '../firebase.js';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
 import { openLocalDraft } from '../lib/localDraft.js';
+import { reloadPage } from '../lib/pageReload.js';
 
 const UNVERIFIED = { uid: 'existing-attendee', email: 'attendee@example.test', emailVerified: false };
 let authListener;
@@ -200,5 +201,29 @@ describe('same-account OTP credential refresh', () => {
     verify();
     await waitFor(() => expect(screen.getByLabelText('OTP result')).toHaveTextContent('complete: existing-attendee'));
     expect(screen.getByLabelText('Account')).toHaveTextContent('existing-attendee: unverified');
+  });
+});
+
+// Issue 1017: the Firestore cache belongs to the tab, so a change of
+// signed-in account reloads the page and the next account's reads start
+// from an empty cache.
+describe('account change in one tab', () => {
+  it.each([
+    ['sign-out', null],
+    ['a different account', { uid: 'other-attendee', emailVerified: true }],
+  ])('reloads the page after %s', async (_change, nextUser) => {
+    renderAuth();
+    expect(screen.getByLabelText('Account')).toHaveTextContent('existing-attendee: unverified');
+    await act(async () => publishAuth(nextUser));
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload when the first account signs in or the same account refreshes', async () => {
+    auth.currentUser = null;
+    renderAuth();
+    await act(async () => publishAuth({ uid: 'new-attendee', emailVerified: false }));
+    await act(async () => publishAuth({ uid: 'new-attendee', emailVerified: true }));
+    expect(reloadPage).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Account')).toHaveTextContent('new-attendee: verified');
   });
 });
