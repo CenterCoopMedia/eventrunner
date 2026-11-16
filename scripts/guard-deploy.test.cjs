@@ -284,7 +284,7 @@ test('workflow guards execute before production writes with read-only deployment
   assert.match(guardJob, /run: node scripts\/guard-deploy\.cjs/);
   assert.match(guardJob, /fetch-depth: 0/);
   for (const name of ['provision', 'functions', 'publisher', 'hosting', 'post']) {
-    const body = client.split(`\n  ${name}:\n`)[1].split(/\n  [a-z-]+:\n/)[0];
+    const body = client.split(`\n  ${name}:\n`)[1].split(/\n {2}[a-z-]+:\n/)[0];
     assert.match(body, /needs: \[[^\]\n]*guard[^\]\n]*\]/);
   }
   assert.match(client, /needs\.guard\.result == 'success'/);
