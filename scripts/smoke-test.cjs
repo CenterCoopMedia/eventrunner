@@ -87,7 +87,13 @@ async function waitForReadiness(urls, {
     }
     if (pending.size > 0) {
       const remaining = deadline - performance.now();
-      if (remaining > 0) await sleep(Math.min(intervalMs, remaining));
+      if (remaining <= intervalMs) {
+        // A shortened final sleep ends the wait. Timer rounding must not start
+        // another preflight with only a fraction of a millisecond remaining.
+        if (remaining > 0) await sleep(Math.ceil(remaining));
+        break;
+      }
+      await sleep(intervalMs);
     }
   }
   return [...pending.values()];
