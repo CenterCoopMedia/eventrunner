@@ -6,6 +6,7 @@ import { getDocs } from 'firebase/firestore';
 import { auth } from '../firebase.js';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
 import { openLocalDraft } from '../lib/localDraft.js';
+import { reloadPage } from '../lib/pageReload.js';
 
 const UNVERIFIED = { uid: 'existing-attendee', email: 'attendee@example.test', emailVerified: false };
 let authListener;
@@ -120,7 +121,6 @@ describe('same-account OTP credential refresh', () => {
 
   it.each([
     ['sign-out', null],
-    ['account switch', { uid: 'other-attendee', emailVerified: false }],
   ])('does not exchange an old OTP token after %s during the HTTP request', async (_action, nextUser) => {
     const pendingHttp = deferred();
     const verified = { ...UNVERIFIED, emailVerified: true };
@@ -166,8 +166,26 @@ describe('same-account OTP credential refresh', () => {
     await waitFor(() => expect(signInWithCustomToken).toHaveBeenCalledTimes(1));
     await act(async () => publishAuth(replacement));
     await act(async () => pending.resolve({ user: { ...UNVERIFIED, emailVerified: true } }));
-    expect(screen.getByLabelText('Account')).toHaveTextContent('other-attendee: unverified');
+    // The switch ends the page (issue 1017); no account is shown again.
+    expect(screen.getByText('Switching accounts…')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Account')).not.toBeInTheDocument();
     expect(auth.currentUser).toBe(replacement);
+  });
+
+  it('does not exchange an old OTP token after an account switch during the HTTP request', async () => {
+    const pendingHttp = deferred();
+    vi.mocked(fetch).mockReturnValue(pendingHttp.promise);
+    vi.mocked(signInWithCustomToken).mockImplementation(async () => customTokenResult({ ...UNVERIFIED, emailVerified: true }));
+    renderAuth();
+    verify();
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const replacement = { uid: 'other-attendee', emailVerified: false };
+    await act(async () => publishAuth(replacement));
+    await act(async () => pendingHttp.resolve({ ok: true, status: 200, json: async () => ({ token: 'old-custom-token' }) }));
+    await act(async () => {});
+    expect(signInWithCustomToken).not.toHaveBeenCalled();
+    expect(auth.currentUser).toBe(replacement);
+    expect(screen.getByText('Switching accounts…')).toBeInTheDocument();
   });
 
   it('ignores a stale result when the SDK already holds a newer object for the same UID', async () => {
@@ -199,6 +217,47 @@ describe('same-account OTP credential refresh', () => {
     renderAuth();
     verify();
     await waitFor(() => expect(screen.getByLabelText('OTP result')).toHaveTextContent('complete: existing-attendee'));
+    expect(screen.getByLabelText('Account')).toHaveTextContent('existing-attendee: unverified');
+  });
+});
+
+// Issue 1017: the Firestore cache belongs to the tab. A sign-out reloads the
+// page; another account in the same document is never published to it.
+describe('account change in one tab', () => {
+  it('reloads the page after a sign-out and shows the signed-out state until then', async () => {
+    renderAuth();
+    await act(async () => publishAuth(null));
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Account')).toHaveTextContent('signed out');
+  });
+
+  it.each([
+    ['directly', [{ uid: 'other-attendee', emailVerified: true }]],
+    ['after a sign-out', [null, { uid: 'other-attendee', emailVerified: true }]],
+  ])('shows only the switching status when another account signs in %s', async (_how, sequence) => {
+    renderAuth();
+    for (const nextUser of sequence) await act(async () => publishAuth(nextUser));
+    expect(screen.getByText('Switching accounts…')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Account')).not.toBeInTheDocument();
+    expect(reloadPage).toHaveBeenCalled();
+    // A later auth event, even the first account again, does not reopen the tree.
+    await act(async () => publishAuth({ ...UNVERIFIED }));
+    expect(screen.queryByLabelText('Account')).not.toBeInTheDocument();
+  });
+
+  it('does not reload when the first account signs in or the same account refreshes', async () => {
+    auth.currentUser = null;
+    renderAuth();
+    await act(async () => publishAuth({ uid: 'new-attendee', emailVerified: false }));
+    await act(async () => publishAuth({ uid: 'new-attendee', emailVerified: true }));
+    expect(reloadPage).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Account')).toHaveTextContent('new-attendee: verified');
+  });
+
+  it('keeps the same account after a sign-out and sign-in again in this document', async () => {
+    renderAuth();
+    await act(async () => publishAuth(null));
+    await act(async () => publishAuth({ ...UNVERIFIED }));
     expect(screen.getByLabelText('Account')).toHaveTextContent('existing-attendee: unverified');
   });
 });

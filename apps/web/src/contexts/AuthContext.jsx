@@ -53,6 +53,7 @@ import { appCheckHeaders, loadFirebase, subscribeToFirebase, rememberSignedIn } 
 import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { secondaryButtonClass } from '../components/controlClasses.js';
 import { clearLocalDrafts } from '../lib/localDraft.js';
+import { reloadPage } from '../lib/pageReload.js';
 
 const AuthContext = createContext(null);
 
@@ -140,6 +141,7 @@ export function AuthProvider({ children }) {
   // is refused on a guess (the server decides regardless).
   const [verdict, setVerdict] = useState({ user: null, status: 'unknown', tier: null, confirmed: false });
   const [loading, setLoading] = useState(true);
+  const [switchingAccount, setSwitchingAccount] = useState(false);
   const [authError, setAuthError] = useState(null);
   const retryAuth = useCallback(() => globalThis.location.reload(), []);
   // Bumped by refreshAdminStatus: the probes run again for the same user,
@@ -149,8 +151,28 @@ export function AuthProvider({ children }) {
   const [probeRun, setProbeRun] = useState(0);
 
   useEffect(() => {
+    // The Firestore cache and the providers' state are shared by every
+    // account in this tab (issue 1017). A sign-out reloads the page, so the
+    // next account starts with an empty cache. The signed-out page shown
+    // until then reads only public queries. A different account in this
+    // document, directly or after a sign-out, is never published: the
+    // account tree unmounts and the page reloads.
+    let shownUid = null;
+    let lastUid = null;
+    let switching = false;
     return subscribeToFirebase(({ auth, onAuthStateChanged }) => onAuthStateChanged(auth, (nextUser) => {
       rememberSignedIn(Boolean(nextUser));
+      const nextUid = nextUser?.uid ?? null;
+      if (switching) return;
+      if (nextUid !== null && lastUid !== null && nextUid !== lastUid) {
+        switching = true;
+        setSwitchingAccount(true);
+        reloadPage();
+        return;
+      }
+      if (nextUid === null && shownUid !== null) reloadPage();
+      shownUid = nextUid;
+      if (nextUid !== null) lastUid = nextUid;
       setUser(nextUser);
       setAuthError(null);
       setLoading(false);
@@ -312,7 +334,7 @@ export function AuthProvider({ children }) {
       <p>{authError}</p>
       <button type="button" className={secondaryButtonClass} onClick={retryAuth}>Reload this page</button>
     </div> : null}
-    {children}
+    {switchingAccount ? <p role="status" className="p-md text-text-secondary">Switching accounts…</p> : children}
   </AuthContext.Provider>;
 }
 

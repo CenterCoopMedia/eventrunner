@@ -103,12 +103,14 @@ vi.mock('firebase/firestore', () => ({
 // subscription so a test can push an account document, and keep the directory
 // listener inert unless a test drives it.
 const profileSubscriptions = new Map();
+const directoryCalls = [];
 vi.mock('./lib/profileSource.js', () => ({
   subscribeOwnProfile: (uid, onNext) => {
     profileSubscriptions.set(uid, onNext);
     return () => profileSubscriptions.delete(uid);
   },
-  subscribeDirectory: (_options, onNext) => {
+  subscribeDirectory: (options, onNext) => {
+    directoryCalls.push({ options, onNext });
     onNext([]);
     return () => {};
   },
@@ -116,6 +118,8 @@ vi.mock('./lib/profileSource.js', () => ({
   saveOwnProfile: () => Promise.resolve(),
 }));
 import App from './App.jsx';
+import { collection, doc, where } from 'firebase/firestore';
+import { reloadPage } from './lib/pageReload.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import siteContent from '@generated/siteContent.js';
 import pagesData from '@generated/pagesData.js';
@@ -135,6 +139,8 @@ beforeEach(() => {
   contentSubscriptions.clear();
   configSubscriptions.clear();
   sdkSubscriptions.clear();
+  directoryCalls.length = 0;
+  vi.mocked(reloadPage).mockClear();
   adminProbeShouldSucceed = true;
 });
 
@@ -446,5 +452,64 @@ describe('section edit links on the public site', () => {
     });
     expect(screen.getByRole('heading', { name: details.label })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Edit section/ })).toBeNull();
+  });
+});
+
+// Issue 1017: a sign-out reloads the page, so the next account starts with
+// an empty Firestore cache. Until the reload replaces the document, the
+// signed-out page must read only public queries and show none of the
+// account's rows.
+describe('sign-out before the reload', () => {
+  // Collections whose reads depend on the reader's account or grants.
+  const GATED = /^(users|schedule_shares|social_posts|social_reports|session_materials_public|sessionBookmarks|admin_logs|feedback|change_requests|session_pitches|ticket_answers|cms\w*_drafts)(\/|$)/;
+
+  it('reads no attendee- or grant-gated query and shows none of the signed-out account’s rows', async () => {
+    renderAt('/attendees');
+    act(() => {
+      contentSubscriptions.get('cmsPages').onNext([
+        { id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true, sections: [] },
+        { id: 'attendees', label: 'Attendees', path: '/attendees', order: 1, visible: true, systemPage: true, sections: [] },
+      ]);
+      configSubscriptions.get('features')({ attendeeDirectory: true, publicAttendeeProfiles: true, liveUpdates: true });
+    });
+    adminProbeShouldSucceed = false;
+    await act(async () => {
+      authStateCallback({ uid: 'ada', email: 'ada@example.test', emailVerified: true });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(profileSubscriptions.has('ada')).toBe(true));
+    act(() => profileSubscriptions.get('ada')({ uid: 'ada', registrationStatus: 'approved', approvalSource: 'admin' }));
+    // The page is a lazy route: wait for its full directory query.
+    await waitFor(() => expect(directoryCalls.some((call) => call.options.includeAttendeesOnly)).toBe(true));
+    const full = directoryCalls.filter((call) => call.options.includeAttendeesOnly).at(-1);
+    act(() => full.onNext([{ id: 'cy', displayName: 'Cy Attendees Only', profileVisibility: 'attendees_only' }]));
+    expect(await screen.findByText('Cy Attendees Only')).toBeInTheDocument();
+
+    const since = {
+      collection: vi.mocked(collection).mock.calls.length,
+      doc: vi.mocked(doc).mock.calls.length,
+      where: vi.mocked(where).mock.calls.length,
+      directory: directoryCalls.length,
+    };
+    await act(async () => {
+      authStateCallback(null);
+      await Promise.resolve();
+    });
+
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Cy Attendees Only')).not.toBeInTheDocument();
+    expect(profileSubscriptions.size).toBe(0);
+    const paths = [
+      ...vi.mocked(collection).mock.calls.slice(since.collection),
+      ...vi.mocked(doc).mock.calls.slice(since.doc),
+    ].map(([, ...path]) => path.join('/'));
+    expect(paths.filter((path) => GATED.test(path))).toEqual([]);
+    // Live updates are read signed out only for everyone.
+    for (const [field, , value] of vi.mocked(where).mock.calls.slice(since.where)) {
+      if (field === 'audience') expect(value).toEqual(['everyone']);
+    }
+    for (const call of directoryCalls.slice(since.directory)) {
+      expect(call.options.includeAttendeesOnly).toBe(false);
+    }
   });
 });

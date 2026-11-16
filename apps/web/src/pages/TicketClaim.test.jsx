@@ -283,9 +283,9 @@ describe('signed in', () => {
 
     await act(async () => setAuthUser({ ...signedInUser, uid: 'u2', email: 'other@example.org' }));
     await act(async () => resolveClaim(jsonResponse(200, { ok: true, claimed: 3, registrationStatus: 'ticketed' })));
+    // The switch ends the page and reloads it (issue 1017); the order stays in the URL.
+    expect(screen.getByText('Switching accounts…')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Ticket claimed' })).not.toBeInTheDocument();
-    expect(screen.getByText(/You are signed in as other@example.org/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Order number')).toHaveValue('group-order-123');
     expect(claimRequests()).toHaveLength(1);
   });
 

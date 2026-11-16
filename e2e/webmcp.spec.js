@@ -256,7 +256,10 @@ test.describe.serial('Read-only WebMCP browser integration', () => {
     expect(await page.evaluate(() => globalThis.__eventrunnerWebMcpTest.documentId)).toBe(documentId);
     await page.getByRole('button', { name: /^sign out$/i }).click();
     await expect(page).toHaveURL(/\/signin$/);
+    // Sign-out reloads the page (issue 1017), so the admin tools end with
+    // the old document and the new one registers only the public set.
+    await expect.poll(() => page.evaluate(() => globalThis.__eventrunnerWebMcpTest?.documentId).catch(() => documentId))
+      .not.toBe(documentId);
     await expectToolSet(page, PUBLIC_NAMES);
-    expect(await page.evaluate(() => globalThis.__eventrunnerWebMcpTest.documentId)).toBe(documentId);
   });
 });
