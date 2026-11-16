@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes } from 'react-router';
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import ErrorBoundary from './ErrorBoundary.jsx';
 import {
   RELOAD_FLAG,
@@ -20,6 +20,16 @@ function Boom({ error }) {
 
 const safariMissingLazyModuleMessage = "undefined is not an object (evaluating 'e._result.default')";
 const chromeDefaultPropertyMessage = "Cannot read properties of undefined (reading 'default')";
+
+const firefoxMissingLazyModuleMessage = 'can\'t access property "default", e is undefined';
+
+// A React.lazy whose module read throws `message`, as a stale build's absent
+// module does in each browser: the boundary sees React's own Lazy frame
+// under Suspense.
+function LazyMissingModule({ message }) {
+  const Missing = lazy(() => Promise.resolve({ get default() { throw new TypeError(message); } }));
+  return <Suspense fallback={<p>Loading</p>}><Missing /></Suspense>;
+}
 
 function renderBoundary(children, props = {}) {
   return render(<MemoryRouter><ErrorBoundary {...props}>{children}</ErrorBoundary></MemoryRouter>);
@@ -133,6 +143,29 @@ describe('ErrorBoundary', () => {
   it('does not reload for an ordinary Chrome default-property render error', () => {
     const reload = vi.fn();
     renderBoundary(<Boom error={new TypeError(chromeDefaultPropertyMessage)} />, { reload });
+    expect(reload).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Reload the page to try again.');
+  });
+
+  it.each([
+    ['Chrome', chromeDefaultPropertyMessage],
+    ['Firefox', firefoxMissingLazyModuleMessage],
+    ['Safari', safariMissingLazyModuleMessage],
+  ])('reloads once when a lazy module is missing in %s (issue 1024)', async (_browser, message) => {
+    const reload = vi.fn();
+    const first = renderBoundary(<LazyMissingModule message={message} />, { reload });
+    expect(await screen.findByRole('alert')).toHaveTextContent('A page file did not load.');
+    expect(reload).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    renderBoundary(<LazyMissingModule message={message} />, { reload });
+    expect(await screen.findByRole('alert')).toHaveTextContent('A page file did not load.');
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reload for the Firefox default-property wording outside a lazy module', () => {
+    const reload = vi.fn();
+    renderBoundary(<Suspense fallback={null}><Boom error={new TypeError(firefoxMissingLazyModuleMessage)} /></Suspense>, { reload });
     expect(reload).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('Reload the page to try again.');
   });

@@ -18,23 +18,42 @@ const CHUNK_ERROR_RE =
   /(dynamically imported module|importing a module script failed|loading chunk|failed to fetch dynamically)/i;
 const MISSING_LAZY_MODULE_RE =
   /^undefined is not an object \(evaluating ['"][\w$]+\._result\.default['"]\)$/i;
+// V8 and Firefox word a lazy module with no default like any read of
+// `default` from undefined (issue 1024). They count only when the boundary's
+// component stack starts at React.lazy under Suspense.
+const LAZY_DEFAULT_READ_RES = [
+  /^Cannot read properties of undefined \(reading ['"]default['"]\)$/,
+  /^can't access property ["']default["'], [\w$.]+ is undefined$/,
+];
+const LAZY_FRAME_RE = /^\s*(?:at\s+)?Lazy\b/;
+const SUSPENSE_FRAME_RE = /^\s*(?:at\s+)?Suspense\b/m;
+
+function thrownByLazyUnderSuspense(componentStack) {
+  if (typeof componentStack !== 'string') return false;
+  const [first, ...rest] = componentStack.split('\n').filter((line) => line.trim());
+  return LAZY_FRAME_RE.test(first ?? '') && SUSPENSE_FRAME_RE.test(rest.join('\n'));
+}
 
 /**
  * Is this a missing module or React.lazy reading an absent module's default?
  *
  * The message differs per engine (Chrome, Firefox, and Safari each word it
  * their own way), so this matches on the shared fragments rather than one
- * exact string.
+ * exact string. The Chrome and Firefox lazy-module wordings also need the
+ * boundary's component stack.
  *
  * @param {unknown} error
+ * @param {string} [componentStack] React's component stack for a caught error
  * @returns {boolean}
  */
-export function isChunkLoadError(error) {
+export function isChunkLoadError(error, componentStack) {
   if (!error) return false;
   if (error.name === 'ChunkLoadError') return true;
   const message = String(error.message || error);
-  return CHUNK_ERROR_RE.test(message) ||
-    (error.name === 'TypeError' && MISSING_LAZY_MODULE_RE.test(message));
+  if (CHUNK_ERROR_RE.test(message)) return true;
+  if (error.name !== 'TypeError') return false;
+  return MISSING_LAZY_MODULE_RE.test(message) ||
+    (LAZY_DEFAULT_READ_RES.some((re) => re.test(message)) && thrownByLazyUnderSuspense(componentStack));
 }
 
 /**
