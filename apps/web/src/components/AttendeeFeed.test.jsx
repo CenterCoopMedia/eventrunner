@@ -12,6 +12,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getDoc, getDocFromServer, getDocs, getDocsFromServer, onSnapshot } from 'firebase/firestore';
 import { auth } from '../firebase.js';
+import { reloadPage } from '../lib/pageReload.js';
 
 // The build snapshot turns the feed ON, so every "no request" case below
 // also proves that a generated snapshot cannot open an unresolved feed.
@@ -105,6 +106,22 @@ function publishAuth(nextUser) {
 
 // --- Render -----------------------------------------------------------------
 
+/**
+ * Another account in this tab ends the page (issue 1017): only the switching
+ * status shows, and the page reloads.
+ */
+function expectSwitching() {
+  expect(screen.getByText('Switching accounts…')).toBeInTheDocument();
+  expect(reloadPage).toHaveBeenCalledTimes(1);
+}
+
+/** Close this page and open a new one, as the next account in a new tab. */
+function freshTab(view, open = renderFeed) {
+  view.unmount();
+  auth.currentUser = null;
+  return open();
+}
+
 /** Every render's verdicts, to prove no render pairs a uid with another account's verdict. */
 let renders;
 
@@ -155,6 +172,7 @@ async function openFeedAs(user, account = APPROVED, features = FEED_ON) {
 }
 
 beforeEach(() => {
+  vi.mocked(reloadPage).mockClear();
   vi.stubEnv('VITE_FUNCTIONS_ORIGIN', 'https://functions.example.test');
   vi.stubGlobal('fetch', vi.fn());
   listeners = [];
@@ -266,13 +284,15 @@ describe('when the feed asks for posts', () => {
   });
 
   it('opens for a speaker and for an independent current staff grant with no account document', async () => {
-    renderFeed();
+    const view = renderFeed();
     await openFeedAs(makeUser('spk'), { registrationStatus: 'pending', speakerId: 'speaker-1' });
     expect(activeFeedListeners()).toHaveLength(1);
 
+    freshTab(view);
     admins.add('staffer');
     publishAuth(makeUser('staffer'));
     pushDoc('users/staffer', null);
+    pushDoc('config/features', FEED_ON);
     await act(async () => {});
     expect(activeFeedListeners()).toHaveLength(1);
     expect(activeFeedListeners()[0]).not.toBe(listenersFor('social_posts')[0]);
@@ -291,20 +311,19 @@ describe('account transitions', () => {
     publishAuth(makeUser('bo'));
     expect(screen.queryByText('Ada’s post')).not.toBeInTheDocument();
     expect(feedA.active).toBe(false);
-    // Not one render paired B with A's account document or A's verdict.
-    for (const entry of renders.filter((item) => item.uid === 'bo')) {
-      expect(entry.profileUid).toBeNull();
-      expect(entry.adminStatus).not.toBe('admin');
-    }
+    expectSwitching();
+    // No render carried B: the page ends before B is published.
+    expect(renders).toEqual([]);
 
     pushPosts(feedA, [post('p1', 'ada', 'Ada’s post')]);
-    pushDoc('users/bo', { uid: 'bo', ...PENDING });
+    expect(listenersFor('users/bo')).toHaveLength(0);
     await act(async () => {});
     expect(screen.queryByText('Ada’s post')).not.toBeInTheDocument();
     expect(activeFeedListeners()).toHaveLength(0);
+    expect(listenersFor('users/bo')).toHaveLength(0);
   });
 
-  it('approved A to approved B: a new listener for B, A’s late callback and late report completion dropped', async () => {
+  it('approved A to approved B: no listener for B, A’s late callback and late report completion dropped', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
     const feedA = activeFeedListeners()[0];
@@ -317,38 +336,36 @@ describe('account transitions', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 
     publishAuth(makeUser('bo'));
-    pushDoc('users/bo', { uid: 'bo', ...APPROVED });
+    expect(listenersFor('users/bo')).toHaveLength(0);
     await act(async () => {});
-    const feeds = activeFeedListeners();
-    expect(feeds).toHaveLength(1);
-    expect(feeds[0]).not.toBe(feedA);
+    expectSwitching();
+    expect(feedA.active).toBe(false);
+    expect(activeFeedListeners()).toHaveLength(0);
     expect(screen.queryByText('Shared post')).not.toBeInTheDocument();
 
     pushPosts(feedA, [post('p9', 'ada', 'Late for A')]);
-    pushPosts(feeds[0], [post('p1', 'cy', 'Shared post')]);
     await act(async () => pendingReport.resolve({ ok: true, status: 201, json: async () => ({ postId: 'p1', reported: true }) }));
-
     expect(screen.queryByText('Late for A')).not.toBeInTheDocument();
-    expect(screen.getByText('Shared post')).toBeInTheDocument();
     expect(screen.queryByText(/Reported\./)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Report post' })).toBeInTheDocument();
   });
 
-  it('offline switch: a cached admin probe for B opens nothing, and B never sees A’s posts', async () => {
+  it('offline switch: B gets no admin probe and never sees A’s posts', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
     pushPosts(activeFeedListeners()[0], [post('p1', 'ada', 'Only for Ada')]);
     expect(screen.getByText('Only for Ada')).toBeInTheDocument();
 
-    // Offline, an empty cached probe reads as "admin" for B.
+    // Offline, an empty cached probe would read as "admin" for B.
     admins.add('bo');
     cachedProbes.add('bo');
+    const probes = vi.mocked(getDocs).mock.calls.length;
     publishAuth(makeUser('bo'));
-    pushDoc('users/bo', { uid: 'bo', ...PENDING });
+    expect(listenersFor('users/bo')).toHaveLength(0);
     await act(async () => {});
+    expectSwitching();
+    expect(vi.mocked(getDocs).mock.calls.length).toBe(probes);
     expect(activeFeedListeners()).toHaveLength(0);
     expect(screen.queryByText('Only for Ada')).not.toBeInTheDocument();
-    expect(screen.getByRole('status', { name: /Loading the attendee feed/ })).toBeInTheDocument();
   });
 
   it('a staff reader whose probe answered from the cache opens the feed once the browser reconnects', async () => {
@@ -392,7 +409,7 @@ describe('account transitions', () => {
     expect(screen.getByText('Same post')).toBeInTheDocument();
   });
 
-  it('a staff verdict for A cannot authorize B while B’s probe is in flight', async () => {
+  it('a staff verdict for A cannot authorize B', async () => {
     admins.add('staffer');
     renderFeed();
     publishAuth(makeUser('staffer'));
@@ -405,15 +422,14 @@ describe('account transitions', () => {
     probeGates.set('bo', gate);
     renders = [];
     publishAuth(makeUser('bo'));
-    pushDoc('users/bo', { uid: 'bo', ...PENDING });
+    expect(listenersFor('users/bo')).toHaveLength(0);
     await act(async () => {});
-    expect(renders.filter((entry) => entry.uid === 'bo').every((entry) => entry.adminStatus === 'unknown')).toBe(true);
+    expectSwitching();
+    expect(renders).toEqual([]);
     expect(activeFeedListeners()).toHaveLength(0);
-    expect(screen.getByRole('status', { name: /Loading the attendee feed/ })).toBeInTheDocument();
 
     await act(async () => gate.resolve());
     expect(activeFeedListeners()).toHaveLength(0);
-    expect(screen.getByText(/opens for you once your registration is approved/)).toBeInTheDocument();
   });
 
   it.each([
@@ -528,8 +544,8 @@ describe('what the feed shows', () => {
     expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('Private draft');
   });
 
-  it('never shows a kept draft to another account in the same tab', async () => {
-    renderFeed();
+  it('never shows a kept draft to another account after the tab reloads', async () => {
+    let view = renderFeed();
     await openFeedAs(makeUser('ada'));
     const feed = activeFeedListeners()[0];
     pushPosts(feed, []);
@@ -537,11 +553,13 @@ describe('what the feed shows', () => {
     act(() => feed.error(Object.assign(new Error('refused'), { code: 'permission-denied' })));
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 
+    view = freshTab(view);
     await openFeedAs(makeUser('bo'));
     pushPosts(activeFeedListeners().at(-1), []);
     expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('');
     expect(screen.queryByDisplayValue('Ada only')).not.toBeInTheDocument();
 
+    freshTab(view);
     await openFeedAs(makeUser('ada'));
     pushPosts(activeFeedListeners().at(-1), []);
     expect(await screen.findByRole('textbox', { name: 'Write a post' })).toHaveValue('');
@@ -746,21 +764,23 @@ function type(field, value) {
 
 describe('the post composer', () => {
   it('opens for an approved attendee and a speaker, never for a staff grant alone or a pending account', async () => {
-    renderFeed();
+    let view = renderFeed();
     await openFeedAs(makeUser('ada'));
     expect(await screen.findByRole('textbox', { name: 'Write a post' })).toBeInTheDocument();
 
+    view = freshTab(view);
     await openFeedAs(makeUser('spk'), { registrationStatus: 'pending', speakerId: 'speaker-1' });
     expect(await screen.findByRole('textbox', { name: 'Write a post' })).toBeInTheDocument();
 
-    publishAuth(makeUser('bo'));
-    pushDoc('users/bo', { uid: 'bo', ...PENDING });
-    await act(async () => {});
+    view = freshTab(view);
+    await openFeedAs(makeUser('bo'), PENDING);
     expect(screen.queryByRole('textbox', { name: 'Write a post' })).not.toBeInTheDocument();
 
+    freshTab(view);
     admins.add('staffer');
     publishAuth(makeUser('staffer'));
     pushDoc('users/staffer', null);
+    pushDoc('config/features', FEED_ON);
     await act(async () => {});
     pushPosts(activeFeedListeners()[0], [post('p1', 'cy', 'Staff can read this')]);
     await act(async () => {});
@@ -897,7 +917,7 @@ describe('the post composer', () => {
     expect(screen.getByText('Draft discarded.')).toBeInTheDocument();
   });
 
-  it('approved A to approved B: A’s draft is gone in the switch render and A’s late answer is ignored', async () => {
+  it('approved A to approved B: A’s draft is gone at the switch and A’s late answer is ignored', async () => {
     renderFeed();
     await openFeedAs(makeUser('ada'));
     const field = await screen.findByRole('textbox', { name: 'Write a post' });
@@ -908,13 +928,13 @@ describe('the post composer', () => {
 
     publishAuth(makeUser('cy'));
     expect(screen.queryByDisplayValue('Ada draft')).not.toBeInTheDocument();
-    pushDoc('users/cy', { uid: 'cy', ...APPROVED });
+    expectSwitching();
+    expect(listenersFor('users/cy')).toHaveLength(0);
     await act(async () => {});
-    const fieldB = await screen.findByRole('textbox', { name: 'Write a post' });
     await act(async () => pending.resolve(answer(201, { postId: 'n', state: 'active' })));
-    expect(fieldB).toHaveValue('');
     expect(screen.queryByText(/Posted\./)).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue('Ada draft')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Write a post' })).not.toBeInTheDocument();
   });
 });
 
@@ -1159,7 +1179,7 @@ describe('the thread page', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('approved A to approved B: A’s thread is gone in the switch render and A’s late callbacks are dropped', async () => {
+  it('approved A to approved B: A’s thread is gone at the switch and A’s late callbacks are dropped', async () => {
     renderThread();
     await openFeedAs(makeUser('ada'));
     const rootA = listenersFor('social_posts/root1').at(-1);
@@ -1175,15 +1195,13 @@ describe('the thread page', () => {
     expect(screen.queryByDisplayValue('Ada reply draft')).not.toBeInTheDocument();
     expect(rootA.active).toBe(false);
     expect(repliesA.active).toBe(false);
+    expectSwitching();
 
     act(() => rootA.next(docSnap('root1', post('root1', 'cy', 'Root text'))));
     pushPosts(repliesA, [post('r1', 'cy', 'A reply', { parentPostId: 'root1' })]);
-    pushDoc('users/bo', { uid: 'bo', ...APPROVED });
+    expect(listenersFor('users/bo')).toHaveLength(0);
     await act(async () => {});
     expect(screen.queryByText('Root text')).not.toBeInTheDocument();
-    expect(screen.getByRole('status', { name: /Loading the thread/ })).toBeInTheDocument();
-    pushDoc('social_posts/root1', post('root1', 'cy', 'Root text'));
-    pushPosts(replyListener(), []);
-    expect(await screen.findByRole('textbox', { name: 'Your reply' })).toHaveValue('');
+    expect(listenersFor('social_posts/root1').filter((entry) => entry.active)).toHaveLength(0);
   });
 });
