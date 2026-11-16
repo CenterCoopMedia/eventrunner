@@ -15,6 +15,14 @@ on:
         description: Additional pre-console client environments, comma-separated.
         type: string
         default: ''
+      allow_older_sha:
+        description: Intentionally roll back to an older SHA; requires rollback_reason.
+        type: boolean
+        default: false
+      rollback_reason:
+        description: Required explanation for an intentional rollback; recorded in the run summary.
+        type: string
+        default: ''
   push:
     branches: [main]
     paths: [.github/security-rollout-2026-11-06.json]
@@ -39,16 +47,26 @@ jobs:
     timeout-minutes: 150
     permissions:
       contents: read
+      deployments: read
       id-token: write
       actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
+
+      - name: Refuse to overwrite a newer live deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT_DEPLOY_ENVIRONMENT: console
+          EVENT_ALLOW_OLDER_SHA: ${{ inputs.allow_older_sha }}
+          EVENT_ROLLBACK_REASON: ${{ inputs.rollback_reason }}
+        run: node scripts/guard-deploy.cjs
 
       - name: Prepare the functions package
         run: npm run prepare:functions

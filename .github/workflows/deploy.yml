@@ -31,11 +31,21 @@ on:
         required: false
         type: boolean
         default: false
+      allow_older_sha:
+        description: Intentionally roll back to an older SHA; requires rollback_reason.
+        type: boolean
+        default: false
+      rollback_reason:
+        description: Required explanation for an intentional rollback; recorded in the run summary.
+        type: string
+        default: ''
   push:
     branches: [main]
 
 permissions:
   contents: read
+  actions: read
+  deployments: read
   # Reusable-workflow permissions are an intersection of caller and callee:
   # deploy-client.yml cannot get more than the caller grants, no matter what
   # its own `permissions:` block says. Without id-token here,
@@ -87,4 +97,6 @@ jobs:
       client: ${{ matrix.client }}
       provision: ${{ github.event_name == 'workflow_dispatch' && inputs.provision || false }}
       bootstrap: ${{ github.event_name == 'workflow_dispatch' && inputs.bootstrap || false }}
+      allow_older_sha: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_older_sha || false }}
+      rollback_reason: ${{ inputs.rollback_reason || '' }}
     secrets: inherit
