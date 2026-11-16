@@ -44,8 +44,18 @@ describe('subscribeOwnScheduleShare', () => {
     });
   });
 
-  it('uses the same reader for a shared schedule link', () => {
-    expect(subscribeScheduleShare).toBe(subscribeOwnScheduleShare);
+  it('shows the owner a cached share without waiting for the server', () => {
+    const onNext = vi.fn();
+    onSnapshotMock.mockImplementation((_ref, onSuccess) => {
+      onSuccess({
+        exists: () => true,
+        data: () => ({ scheduleVisibility: 'public', sessionIds: ['s1'] }),
+        metadata: { fromCache: true },
+      });
+      return vi.fn();
+    });
+    subscribeOwnScheduleShare('owner-1', onNext);
+    expect(onNext).toHaveBeenCalledWith({ scheduleVisibility: 'public', sessionIds: ['s1'], displayName: null });
   });
 
   it('drops a blank or non-text display name', () => {
@@ -62,6 +72,22 @@ describe('subscribeOwnScheduleShare', () => {
     });
     subscribeOwnScheduleShare('owner-1', onNext);
     expect(onNext).toHaveBeenCalledWith(null);
+  });
+
+  it('waits for the server before showing a cached share (issue 1004)', () => {
+    const onNext = vi.fn();
+    let onSuccess;
+    onSnapshotMock.mockImplementation((_ref, options, next) => {
+      expect(options).toEqual({ includeMetadataChanges: true });
+      onSuccess = next;
+      return vi.fn();
+    });
+    subscribeScheduleShare('owner-1', onNext);
+    const data = () => ({ scheduleVisibility: 'attendees_only', sessionIds: ['s1'] });
+    onSuccess({ exists: () => true, data, metadata: { fromCache: true } });
+    expect(onNext).not.toHaveBeenCalled();
+    onSuccess({ exists: () => true, data, metadata: { fromCache: false } });
+    expect(onNext).toHaveBeenCalledTimes(1);
   });
 
   it('answers null and does not listen when there is no uid', () => {

@@ -1,7 +1,7 @@
 // One attendee's public profile: the feature gate, the badge labels, and the
 // deliberate ambiguity between "private" and "does not exist" (issue #17).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 
 let features;
@@ -184,5 +184,37 @@ describe('AttendeeProfile', () => {
     ).toBeInTheDocument();
     // No hint about which of the two it was.
     expect(screen.queryByText(/permission/i)).toBeNull();
+  });
+
+  it('reads an unavailable profile again for an attendee, so a finished grant sweep shows it (issue 1004)', async () => {
+    vi.useFakeTimers();
+    try {
+      profileValue = { ...profileValue, status: 'ready', attendeeAccess: true };
+      fetchPublicProfileMock.mockResolvedValueOnce(null);
+      fetchPublicProfileMock.mockResolvedValueOnce({ id: 'u1', displayName: 'Amara Diallo', badges: [] });
+      renderPage();
+      await act(async () => {});
+      expect(screen.getByRole('heading', { name: 'This profile isn’t available' })).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Amara Diallo' })).toBeInTheDocument();
+      expect(fetchPublicProfileMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not read again for a signed-out viewer', async () => {
+    vi.useFakeTimers();
+    try {
+      renderPage();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(fetchPublicProfileMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

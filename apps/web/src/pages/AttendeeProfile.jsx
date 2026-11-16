@@ -15,6 +15,7 @@ import { validateCustomBadges } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { fetchPublicProfile } from '../lib/profileSource.js';
+import { RETRY_DELAY_MS } from '../lib/retrySubscription.js';
 import { badgeLabel, visibleBadgeIds } from '../lib/badgeDisplay.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
@@ -44,13 +45,20 @@ export default function AttendeeProfile() {
 
   useEffect(() => {
     let cancelled = false;
+    let retry = null;
     setState({ status: 'loading', profile: null });
-    fetchPublicProfile(uid).then((profile) => {
+    const read = () => fetchPublicProfile(uid).then((profile) => {
       if (cancelled) return;
       setState({ status: profile ? 'found' : 'unavailable', profile });
+      // A ticket resource grant can refuse an attendees-only profile while a
+      // grant sweep runs, and its end changes nothing this page watches, so
+      // an attendee's unavailable read is tried again (issue 1004).
+      if (!profile && attendeeAccess) retry = setTimeout(read, RETRY_DELAY_MS);
     });
+    read();
     return () => {
       cancelled = true;
+      clearTimeout(retry);
     };
   }, [uid, attendeeAccess, accountStatus]);
 

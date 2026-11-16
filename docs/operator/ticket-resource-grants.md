@@ -20,6 +20,8 @@ The first sweep activates granular mode when it finishes. There is no separate s
 
 The attendee feed follows the same modes and exemptions ([#1006](https://github.com/CenterCoopMedia/eventrunner/issues/1006)). In granular mode, reading posts and reply notifications, posting, replying, reporting a post and marking a notification read need the grant's `interactions` resource. Staff can still read, report and remove posts. During a later sweep the feed says access is updating, and an unsent post or reply comes back for the same reader when the feed reopens.
 
+In granular mode the same grant and exemptions also decide two read surfaces. Attendees-only directory profiles and attendees-only shared schedules need `directory`. Live updates for attendees need `attendeeUpdates`. Public profiles, public schedules and live updates for everyone stay readable. In legacy mode the attendee check alone decides both.
+
 ## Before you start
 
 Run the commands from a checkout of `main` after `npm run prepare:functions` and `npm ci`. Use the client project's operator service account. Set the client values in the shell:
@@ -100,6 +102,7 @@ For a later revision, publish at a quiet time. Accounts that need a grant get **
 2. Run a backfill dry run (section 5). Check that `grantWrites` and `accountWrites` are 0.
 3. Sign in with a limited test pass and confirm that a covered session accepts a bookmark and an uncovered session says the ticket does not include it.
 4. With a pass that has no `interactions`, confirm that the attendee feed says the ticket does not include it. With a pass that has `interactions`, confirm that the post form appears.
+5. With a pass that has no `directory` or `attendeeUpdates`, confirm that the attendee directory shows only public profiles and the live updates card shows only updates for everyone.
 
 ## 5. Backfill grants
 

@@ -20,7 +20,12 @@
 // the requester's own access — the rules, not this filter, are the boundary.
 import { SELF_EDITABLE_PROFILE_FIELDS, validateProfileBounds } from 'shared/profile';
 import { loadFirebase, subscribeToFirebase } from './firebaseLoader.js';
-import { subscribeWithRetry } from './retrySubscription.js';
+import {
+  afterServerConfirms,
+  SERVER_CONFIRMATION,
+  subscribeWithFallback,
+  subscribeWithRetry,
+} from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
 import { demoAttendees } from './demoCommunity.js';
 
@@ -111,27 +116,40 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
     onNext(demoAttendees);
     return () => {};
   }
-  return subscribeToFirebase(({ db, collection, onSnapshot, query, where }) => {
-    const target = includeAttendeesOnly
-      ? query(
-          collection(db, USERS_PUBLIC),
-          where('profileVisibility', 'in', ['public', 'attendees_only']),
-        )
-      : query(collection(db, USERS_PUBLIC), where('profileVisibility', '==', 'public'));
-    return subscribeWithRetry(
-      (onError) =>
-        onSnapshot(
-          target,
-          (snapshot) => {
-            onNext(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-          },
-          onError,
-        ),
+  return subscribeToFirebase(({ db, collection, limit, onSnapshot, query, where }) => {
+    const fullDirectory = (...constraints) => query(
+      collection(db, USERS_PUBLIC),
+      where('profileVisibility', 'in', ['public', 'attendees_only']),
+      ...constraints,
+    );
+    const publicDirectory = query(collection(db, USERS_PUBLIC), where('profileVisibility', '==', 'public'));
+    const emit = (snapshot) => {
+      onNext(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    };
+    // The full directory waits for the server (afterServerConfirms).
+    const listen = (target, onRefused = null) => subscribeWithRetry(
+      (onError) => onRefused
+        ? onSnapshot(target, SERVER_CONFIRMATION, afterServerConfirms(emit), onError)
+        : onSnapshot(target, emit, onError),
       (error) => {
+        if (onRefused && error?.code === 'permission-denied') {
+          onRefused();
+          return;
+        }
         console.warn('attendee directory subscription failed; retrying.', error);
         onFail?.(error);
       },
     );
+    if (!includeAttendeesOnly) return listen(publicDirectory);
+    // After a ticket resource policy is published, an approved attendee whose
+    // grant lacks `directory` may read only public profiles (issue 1004). The
+    // grant is server-private, so a refused full directory shows the public
+    // profiles until the full query is allowed again.
+    return subscribeWithFallback({
+      wide: (onRefused) => listen(fullDirectory(), onRefused),
+      narrow: () => listen(publicDirectory),
+      probe: (onAllowed, onError) => onSnapshot(fullDirectory(limit(1)), SERVER_CONFIRMATION, onAllowed, onError),
+    });
   }, onFail);
 }
 
@@ -146,8 +164,10 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
 export async function fetchPublicProfile(uid) {
   if (IS_DEMO) return demoAttendees.find((profile) => profile.id === uid) ?? null;
   try {
-    const { db, doc, getDoc } = await loadFirebase();
-    const snapshot = await getDoc(doc(db, USERS_PUBLIC, uid));
+    // From the server only: a profile cached for an earlier account in this
+    // tab must not reach a reader the rules refuse (issue 1004).
+    const { db, doc, getDocFromServer } = await loadFirebase();
+    const snapshot = await getDocFromServer(doc(db, USERS_PUBLIC, uid));
     return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
   } catch (error) {
     console.warn('public profile read failed.', error);
