@@ -14,46 +14,29 @@ import { afterServerConfirms, SERVER_CONFIRMATION, subscribeWithRetry } from './
 /** The closed list the rules read. One definition, mirrored server-side. */
 export const SCHEDULE_VISIBILITIES = Object.freeze(['private', 'attendees_only', 'public']);
 
-/**
- * Subscribe to the caller's own projection. onNext(share|null) — null
- * where the owner has never saved or shared anything, which is the state
- * the panel opens on.
- *
- * @param {string} uid
- * @param {(share: { scheduleVisibility: string, sessionIds: string[], displayName: string | null } | null) => void} onNext
- * @param {(error: unknown) => void} [onError]
- */
-export function subscribeOwnScheduleShare(uid, onNext, onError) {
+function readShare(snapshot) {
+  if (!snapshot.exists()) return null;
+  const data = snapshot.data() ?? {};
+  const storedName = data.displayName;
+  // The projection stores the owner's name. A blank value is not a name.
+  const displayName =
+    typeof storedName === 'string' && storedName.trim() ? storedName.trim() : null;
+  return {
+    scheduleVisibility:
+      typeof data.scheduleVisibility === 'string' ? data.scheduleVisibility : 'private',
+    sessionIds: Array.isArray(data.sessionIds) ? data.sessionIds : [],
+    displayName,
+  };
+}
+
+function subscribeShare(uid, onNext, onError, listen) {
   if (!uid) {
     onNext(null);
     return () => {};
   }
   return subscribeWithRetry(
     (onListenerError) =>
-      // A share cached for an earlier account in this tab waits for the
-      // server, which applies the directory grant (issue 1004).
-      onSnapshot(
-        doc(db, `schedule_shares/${uid}`),
-        SERVER_CONFIRMATION,
-        afterServerConfirms((snapshot) => {
-          if (!snapshot.exists()) {
-            onNext(null);
-            return;
-          }
-          const data = snapshot.data() ?? {};
-          const storedName = data.displayName;
-          // The projection stores the owner's name. A blank value is not a name.
-          const displayName =
-            typeof storedName === 'string' && storedName.trim() ? storedName.trim() : null;
-          onNext({
-            scheduleVisibility:
-              typeof data.scheduleVisibility === 'string' ? data.scheduleVisibility : 'private',
-            sessionIds: Array.isArray(data.sessionIds) ? data.sessionIds : [],
-            displayName,
-          });
-        }),
-        onListenerError,
-      ),
+      listen(doc(db, `schedule_shares/${uid}`), (snapshot) => onNext(readShare(snapshot)), onListenerError),
     (error) => {
       console.warn('schedule share subscription failed; keeping last-known state.', error);
       onError?.(error);
@@ -62,12 +45,31 @@ export function subscribeOwnScheduleShare(uid, onNext, onError) {
 }
 
 /**
- * Any viewer the projection permits reads it exactly the way its owner
- * does — one subscription shape for both directions of the share (issue
- * #173). The rules decide what this listener actually receives; a refusal
- * arrives at onError and the page answers it as privacy.
+ * Subscribe to the caller's own projection. onNext(share|null) — null
+ * where the owner has never saved or shared anything, which is the state
+ * the panel opens on. The owner always reads its own projection, so a
+ * cached copy is shown at once, offline included.
+ *
+ * @param {string} uid
+ * @param {(share: { scheduleVisibility: string, sessionIds: string[], displayName: string | null } | null) => void} onNext
+ * @param {(error: unknown) => void} [onError]
  */
-export { subscribeOwnScheduleShare as subscribeScheduleShare };
+export function subscribeOwnScheduleShare(uid, onNext, onError) {
+  return subscribeShare(uid, onNext, onError, (ref, next, fail) => onSnapshot(ref, next, fail));
+}
+
+/**
+ * Any viewer the projection permits reads it the same way its owner does
+ * (issue #173). The rules decide what this listener actually receives; a
+ * refusal arrives at onError and the page answers it as privacy. A share
+ * cached for an earlier account in this tab waits for the server, which
+ * applies the directory grant (issue 1004).
+ */
+export function subscribeScheduleShare(uid, onNext, onError) {
+  return subscribeShare(uid, onNext, onError, (ref, next, fail) =>
+    onSnapshot(ref, SERVER_CONFIRMATION, afterServerConfirms(next), fail),
+  );
+}
 
 /** Thrown by {@link setScheduleVisibility} on any non-2xx response. */
 export class ScheduleShareError extends Error {

@@ -15,7 +15,7 @@ const { subscribeOwnScheduleShare, subscribeScheduleShare } = await import('./sc
 
 function emit(data) {
   const onNext = vi.fn();
-  onSnapshotMock.mockImplementation((_ref, _options, onSuccess) => {
+  onSnapshotMock.mockImplementation((_ref, onSuccess) => {
     onSuccess({
       exists: () => true,
       data: () => data,
@@ -44,8 +44,18 @@ describe('subscribeOwnScheduleShare', () => {
     });
   });
 
-  it('uses the same reader for a shared schedule link', () => {
-    expect(subscribeScheduleShare).toBe(subscribeOwnScheduleShare);
+  it('shows the owner a cached share without waiting for the server', () => {
+    const onNext = vi.fn();
+    onSnapshotMock.mockImplementation((_ref, onSuccess) => {
+      onSuccess({
+        exists: () => true,
+        data: () => ({ scheduleVisibility: 'public', sessionIds: ['s1'] }),
+        metadata: { fromCache: true },
+      });
+      return vi.fn();
+    });
+    subscribeOwnScheduleShare('owner-1', onNext);
+    expect(onNext).toHaveBeenCalledWith({ scheduleVisibility: 'public', sessionIds: ['s1'], displayName: null });
   });
 
   it('drops a blank or non-text display name', () => {
@@ -56,7 +66,7 @@ describe('subscribeOwnScheduleShare', () => {
 
   it('answers null when the owner has no projection', () => {
     const onNext = vi.fn();
-    onSnapshotMock.mockImplementation((_ref, _options, onSuccess) => {
+    onSnapshotMock.mockImplementation((_ref, onSuccess) => {
       onSuccess({ exists: () => false, data: () => undefined });
       return vi.fn();
     });
