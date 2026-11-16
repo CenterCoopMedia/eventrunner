@@ -31,9 +31,19 @@ on:
         required: false
         type: boolean
         default: false
+      allow_older_sha:
+        description: Allow an intentional rollback on workflow_dispatch with a reason.
+        type: boolean
+        default: false
+      rollback_reason:
+        description: Required explanation when allow_older_sha is true.
+        type: string
+        default: ''
 
 permissions:
   contents: read
+  actions: read
+  deployments: read
   id-token: write # required for google-github-actions/auth (WIF)
 
 concurrency:
@@ -45,7 +55,7 @@ env:
 
 jobs:
   guard:
-    name: Guard fork execution
+    name: Guard deploy execution
     runs-on: ubuntu-latest
     steps:
       - name: Refuse to run on a forked repository
@@ -77,6 +87,20 @@ jobs:
             exit 1
           fi
           echo "guard: ref is refs/heads/main — continuing"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Refuse to overwrite a newer live deployment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT_DEPLOY_ENVIRONMENT: ${{ inputs.client }}
+          EVENT_ALLOW_OLDER_SHA: ${{ inputs.allow_older_sha }}
+          EVENT_ROLLBACK_REASON: ${{ inputs.rollback_reason }}
+        run: node scripts/guard-deploy.cjs
 
   changes:
     name: Detect functions-affecting changes
