@@ -202,7 +202,8 @@ test('persistent 500s time out naming only endpoints never ready', { timeout: 50
   t.mock.method(console, 'log', () => {});
   t.mock.method(console, 'error', () => {});
   // This checks readiness diagnostics, without a final HTTP request racing its
-  // own deadline. The HTTP rollout and probe-abort cases cover real transport.
+  // own deadline. The HTTP rollout covers transport; the probe-abort case
+  // separately checks a request that never responds.
   t.mock.method(globalThis, 'fetch', async (url, { method }) => {
     const pathname = new URL(url).pathname;
     requests.push(`${method} ${pathname}`);

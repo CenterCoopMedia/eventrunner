@@ -52,7 +52,8 @@
 
 
 /* Title bands and work share one bounded grid; prose keeps its own measure. */
-.admin-stone { --font-heading: var(--admin-font-ui); max-inline-size: var(--admin-canvas-max); }
+.admin-stone { --font-heading: var(--admin-font-ui); }
+.admin-stone, .admin-pending-notice { max-inline-size: var(--admin-canvas-max); }
 /* The resizable client preview needs the available workspace beside its editor. */
 .admin-stone:has(.admin-branding-workspace) { max-inline-size: none; }
 :where(.admin-prose, .admin-stone p,
