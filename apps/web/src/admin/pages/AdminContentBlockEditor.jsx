@@ -587,7 +587,7 @@ export default function AdminContentBlockEditor({ mode }) {
         </div>
       ) : null}
       <div id="admin-content-block-settings" hidden={isExisting && !settingsOpen}>
-        <div className="mt-sm grid items-end gap-sm sm:grid-cols-2">
+        <div className="mt-sm grid items-end gap-sm">
           <SelectField help="Choose the kind of content to add, such as text, an image or a link."
             label="Block type"
             value={content.blockType}

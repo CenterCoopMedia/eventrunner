@@ -254,16 +254,14 @@ export default function AdminContentSection() {
     <div ref={frameRef} className="flex flex-col gap-md">
       <AdminPageHeader help="Add, edit and reorder the content blocks in this page section."
         title={section?.label || sectionId}
-        identifiers={`${page?.current?.label || pageId} · ${section?.label || sectionId} · ${blocks.length} block${
-          blocks.length === 1 ? '' : 's'
-        }`}
+        identifiers={<>
+          {`${page?.current?.label || pageId} · ${section?.label || sectionId} · ${blocks.length} block${blocks.length === 1 ? '' : 's'}`}
+          {allowed.length > 0 && blockedReason ? (
+            <span id={blockedReasonId} className="admin-prose mt-2xs block font-admin-ui text-admin-sm text-admin-ink-secondary">{blockedReason}</span>
+          ) : null}
+        </>}
         description={allowed.length === BLOCK_TYPE_IDS.length ? 'Add and edit content in this section.' : `Available content: ${allowed.map(blockTypeLabel).join(', ')}.`}
-        feedback={notice?.message || (allowed.length > 0 && blockedReason) ? (
-          <>
-            {allowed.length > 0 && blockedReason ? <p id={blockedReasonId} className="text-admin-sm text-admin-ink-secondary">{blockedReason}</p> : null}
-            <ActionFeedback message={notice?.message} tone={notice?.tone} className="admin-editor-action-feedback" />
-          </>
-        ) : null}
+        feedback={notice?.message ? <ActionFeedback message={notice.message} tone={notice.tone} className="admin-editor-action-feedback" /> : null}
         actions={
           <>
             <OrderDraftButtons
