@@ -175,7 +175,6 @@ export default function AdminOrganizationsList() {
               onSave={saveOrder}
               onCancel={cancelOrder}
             />
-      <PlannerFeatureControls choices={[{ key: 'sponsors', label: 'Sponsor list' }]} />
             {resume && !draft.dirty ? (
               <button
                 type="button"
@@ -203,6 +202,7 @@ export default function AdminOrganizationsList() {
         }
       />
 
+      <PlannerFeatureControls choices={[{ key: 'sponsors', label: 'Sponsor list' }]} />
       <DeletedRecordResult />
       <OrderAnnouncement message={spoken} />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}

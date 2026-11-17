@@ -359,8 +359,8 @@ export default function AdminAttendees() {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-sm">
-        <div className="min-w-0 flex-1">
+      <div className="grid gap-sm sm:grid-cols-[minmax(0,32rem)_minmax(12rem,20rem)] sm:items-end">
+        <div className="min-w-0">
           <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
             label="Search"
             value={search}
@@ -369,7 +369,7 @@ export default function AdminAttendees() {
             placeholder="Name, email, or organization"
           />
         </div>
-        <div className="w-full max-w-xs sm:w-auto">
+        <div className="min-w-0">
           <SelectField help="Choose which records to show in this list." label="Status" value={filter} onChange={setFilter} options={STATUS_FILTERS} />
         </div>
       </div>

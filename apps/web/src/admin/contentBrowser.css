@@ -43,7 +43,7 @@
 .admin-content-no-sections { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3xs) var(--space-xs); }
 .admin-content-no-sections p { font-size: var(--admin-text-sm); color: rgb(var(--admin-ink-secondary-rgb)); }
 .admin-content-section {
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm);
   padding: var(--space-md); border-top: 1px solid rgb(var(--admin-rule-hairline-rgb));
 }
 .admin-content-section:first-child { border-top: 0; }
@@ -51,9 +51,9 @@
 .admin-content-section__description > p { margin-top: var(--space-xs); font-size: var(--admin-text-base); line-height: 1.5; color: rgb(var(--admin-ink-secondary-rgb)); overflow-wrap: anywhere; }
 .admin-content-section__description .admin-content-section__types { font-size: var(--admin-text-sm); }
 .admin-content-section__types > span { font-weight: 600; }
-.admin-content-section__count { font-family: var(--admin-font-data); font-size: var(--admin-text-base); font-variant-numeric: tabular-nums; color: rgb(var(--admin-ink-rgb)); }
+.admin-content-section__count { grid-column: 1; font-family: var(--admin-font-data); font-size: var(--admin-text-base); font-variant-numeric: tabular-nums; color: rgb(var(--admin-ink-rgb)); }
 .admin-content-section__count .admin-content-section__limit { margin-top: var(--space-3xs); font-family: var(--admin-font-ui); font-size: var(--admin-text-sm); color: rgb(var(--admin-ink-secondary-rgb)); }
-.admin-content-section__action { justify-self: start; gap: var(--space-xs); min-height: var(--admin-control-height); }
+.admin-content-section__action { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; gap: var(--space-xs); min-height: var(--admin-control-height); }
 @media (hover: hover) and (pointer: fine) {
   .admin-content-section-link:hover { color: rgb(var(--admin-action-rgb)); text-decoration-thickness: 2px; }
 }
@@ -74,5 +74,7 @@
   .admin-content-index thead th:last-child { width: 24%; }
   .admin-content-index__mobile-label, .admin-content-index__state .admin-content-index__mobile-label { display: none; }
   .admin-content-section { grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.25fr) auto; align-items: center; gap: var(--space-lg); }
+  .admin-content-section__count { grid-column: 2; }
+  .admin-content-section__action { grid-column: 3; align-self: center; }
   .admin-content-section__action { justify-self: end; }
 }

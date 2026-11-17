@@ -400,9 +400,9 @@ export default function AdminEmailLog() {
             role="search"
             aria-label="Search the email log"
             onSubmit={submit}
-            className="flex flex-wrap items-end gap-sm"
+            className="flex flex-col items-start gap-sm"
           >
-            <div className="min-w-0 grow basis-64">
+            <div className="min-w-0 w-full max-w-lg">
               <TextField help="Find delivery records by recipient email address or message subject."
                 label="Search recipient or subject"
                 type="search"
@@ -413,7 +413,7 @@ export default function AdminEmailLog() {
                 maxLength={200}
               />
             </div>
-            <fieldset aria-label={[" ", (activeFilters ? `Filters, ${activeFilters} active` : 'Filters'), " "].join('').trim()} className="min-w-0 grow basis-80">
+            <fieldset aria-label={[" ", (activeFilters ? `Filters, ${activeFilters} active` : 'Filters'), " "].join('').trim()} className="min-w-0 w-full max-w-3xl">
               <legend className={`${fieldLabelClass} mb-3xs`}>
                 {activeFilters ? `Filters, ${activeFilters} active` : 'Filters'}
                <HelpTooltip label="Email log filters">Narrow the delivery records by message source and delivery status.</HelpTooltip></legend>
