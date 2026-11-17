@@ -59,6 +59,7 @@
 :where(.admin-prose, .admin-stone p,
 .admin-editor-disclosure__description) { max-inline-size: var(--admin-measure-text); }
 .admin-version-records-table :is(th, time) { white-space: nowrap; }
+.speaker-photo-field--admin fieldset > .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
 .admin-panel { overflow-wrap: anywhere; }
 .admin-panel__heading { align-items: center; }
 .admin-editor-layout, .admin-editor-stack, .admin-page-basics, .admin-page-section-list,
