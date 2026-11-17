@@ -8,14 +8,14 @@ test('Auth persistence remains writable when hidden and after pagehide', async (
   const results = await page.evaluate(async (url) => {
     const { clearEmulatorAuthPersistence, signedInUid } = await import(url);
     await signedInUid();
-    const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    const visibility = Object.getOwnPropertyDescriptor(globalThis.document, 'visibilityState');
     const outcomes = [];
     try {
       // The upstream regression closed Auth's IndexedDB on this event.
-      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
-      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(globalThis.document, 'visibilityState', { configurable: true, value: 'hidden' });
+      globalThis.document.dispatchEvent(new globalThis.Event('visibilitychange'));
       for (const event of ['hidden', 'pagehide']) {
-        if (event === 'pagehide') window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+        if (event === 'pagehide') globalThis.dispatchEvent(new globalThis.PageTransitionEvent('pagehide', { persisted: true }));
         try {
           await clearEmulatorAuthPersistence();
           outcomes.push({ event, error: null });
@@ -24,10 +24,10 @@ test('Auth persistence remains writable when hidden and after pagehide', async (
         }
       }
     } finally {
-      if (visibility) Object.defineProperty(document, 'visibilityState', visibility);
-      else delete document.visibilityState;
-      window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-      document.dispatchEvent(new Event('visibilitychange'));
+      if (visibility) Object.defineProperty(globalThis.document, 'visibilityState', visibility);
+      else delete globalThis.document.visibilityState;
+      globalThis.dispatchEvent(new globalThis.PageTransitionEvent('pageshow', { persisted: true }));
+      globalThis.document.dispatchEvent(new globalThis.Event('visibilitychange'));
     }
     await clearEmulatorAuthPersistence();
     return outcomes;
