@@ -16,6 +16,7 @@ test('only the short post-build enrollment job serializes the shared client-list
   assert.match(enrollment, /needs: provision/);
   assert.ok(enrollment.includes("needs.provision.result == 'success'"));
   assert.ok(enrollment.includes('!inputs.test_mode'));
+  assert.ok(enrollment.includes('!inputs.sync_access'));
   assert.match(enrollment, /uses: \.\/\.github\/workflows\/auto-deploy-enrollment.yml/);
   assert.match(enrollment, /operation: enroll/);
   assert.match(writer, /concurrency:\s+group: auto-deploy-environments\s+cancel-in-progress: false\s+queue: max/);
@@ -23,6 +24,15 @@ test('only the short post-build enrollment job serializes the shared client-list
   assert.ok(workflowSettings.includes('group: provision-${{ inputs.application_id }}'));
   assert.match(writer, /--application "\$APPLICATION_ID" --enroll-auto-deploy/);
   assert.match(writer, /--application "\$APPLICATION_ID" --remove-auto-deploy/);
+});
+
+test('existing-site access sync uses the provisioner identity without build finalization or enrollment', () => {
+  assert.match(workflow, /sync_access:\s+description: Repair configured support signer access on one completed client\.\s+required: false\s+type: boolean\s+default: false/);
+  assert.match(workflow, /if \[ "\$SYNC_ACCESS" = "true" \]; then\s+node scripts\/provision-client\.cjs --application "\$APPLICATION_ID" --sync-access/);
+  const stopped = workflow.match(/- name: Record a run that stopped([\s\S]*?)(?=\n\n {2}enroll-auto-deploy:)/)?.[1] || '';
+  assert.ok(stopped.includes('!inputs.sync_access'));
+  assert.ok(enrollment.includes('!inputs.sync_access'));
+  assert.match(workflow, /Sync access \{0\}/);
 });
 
 test('enrollment uses the existing trusted identity and exposes only its App key', () => {

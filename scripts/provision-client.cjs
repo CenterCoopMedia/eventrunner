@@ -11,6 +11,7 @@
  *   node scripts/provision-client.cjs --application <id> --enroll-auto-deploy
  *   node scripts/provision-client.cjs --application <id> --remove-auto-deploy [--confirm-site <name> | --if-purge-due]
  *   node scripts/provision-client.cjs --application <id> --restore-auto-deploy
+ *   node scripts/provision-client.cjs --application <id> --sync-access
  *   node scripts/provision-client.cjs --sync-teams
  *
  * Each step reads the current state and does nothing when it is already right,
@@ -34,7 +35,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { toMillis } = require('../console/functions/src/access.cjs');
-const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('../console/functions/src/consoleSettings.cjs');
+const { APPROVAL_FIELDS, approvalDefaults, checkSettings, normalizeProjectId, readConsoleSettings } = require('../console/functions/src/consoleSettings.cjs');
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
 const { stripeErrorDetails } = require('../functions/src/ticketing/stripeErrors.cjs');
@@ -277,16 +278,12 @@ async function finish(ctx, label, origin, operation) {
  *
  * @returns {Promise<number>} how many bindings it added or removed
  */
-async function grant(ctx, label, resource, wanted, { readVia = 'POST', readJson = {}, agents = {}, revoke = [] } = {}) {
+async function grant(ctx, label, resource, wanted, { readVia = 'POST', readJson = {}, readQuery = '', agents = {}, revoke = [] } = {}) {
   for (let attempt = 1; ; attempt += 1) {
-    const policy = await google(ctx, `${label}: read`, `${resource}:getIamPolicy`, readVia === 'GET' ? {} : { method: 'POST', json: readJson });
+    const policy = await google(ctx, `${label}: read`, `${resource}:getIamPolicy${readQuery}`, readVia === 'GET' ? {} : { method: 'POST', json: readJson });
     let bindings = (policy.bindings || []).map((binding) => ({ ...binding, members: [...(binding.members || [])] }));
-    const missing = wanted.filter(({ role, member }) => !bindings.some((binding) => (
-      binding.role === role && !binding.condition && binding.members.includes(member)
-    )));
-    const held = revoke.filter(({ role, member }) => bindings.some((binding) => (
-      binding.role === role && !binding.condition && binding.members.includes(member)
-    )));
+    const missing = wanted.filter((entry) => !policyHolds(bindings, entry));
+    const held = revoke.filter((entry) => policyHolds(bindings, entry));
     if (missing.length === 0 && held.length === 0) return 0;
     for (const { role, member } of held) {
       for (const binding of bindings) {
@@ -319,6 +316,20 @@ const serviceAccount = (email) => `serviceAccount:${email}`;
 const computeAccount = (ctx) => `${ctx.projectNumber}-compute@developer.gserviceaccount.com`;
 const summary = (notes) => (notes.length > 0 ? notes.join('; ') : 'already right');
 const functionUrl = (ctx, name) => `https://${ctx.region}-${ctx.projectId}.cloudfunctions.net/${name}`;
+
+const policyHolds = (bindings, { role, member }) => bindings.some((binding) => (
+  binding.role === role && !binding.condition && binding.members?.includes(member)
+));
+
+async function readPolicy(ctx, label, resource, { readJson = {}, readQuery = '' } = {}) {
+  return google(ctx, `${label}: read`, `${resource}:getIamPolicy${readQuery}`, { method: 'POST', json: readJson });
+}
+
+async function requirePolicyGrants(ctx, label, resource, wanted, options = {}) {
+  const policy = await readPolicy(ctx, label, resource, options);
+  const missing = wanted.filter((grant) => !policyHolds(policy.bindings || [], grant));
+  if (missing.length > 0) throw new Error(`${label}: readback is missing ${missing.length} required binding${missing.length === 1 ? '' : 's'}`);
+}
 
 /** One support identity list for project IAM and site operator access. */
 function supportAdminEmails(ctx) {
@@ -1815,6 +1826,75 @@ async function markStopped({ appId, runId, deps }) {
 }
 
 /**
+ * Repair the configured support users' signing grant on one completed client.
+ * The application, build record and project owner label must name the same
+ * request before this writes the existing compute account's policy.
+ * @returns {Promise<number>} the exit code
+ */
+async function syncAccess({ appId, deps }) {
+  const { db, log } = deps;
+  const [appSnap, recordSnap] = await Promise.all([
+    db.collection('applications').doc(appId).get(),
+    db.collection(BUILD_COLLECTION).doc(appId).get(),
+  ]);
+  if (!appSnap.exists) {
+    log.error(`access sync: request ${appId} does not exist`);
+    return 2;
+  }
+  if (!CONSOLE_REQUEST_GROUPS.built.includes(appSnap.data().status)) {
+    log.error(`access sync: request ${appId} is not ready or launched`);
+    return 2;
+  }
+  if (!recordSnap.exists) {
+    log.error(`access sync: request ${appId} has no build record`);
+    return 2;
+  }
+  const record = recordSnap.data();
+  if (record.appId !== appId || record.state !== 'done') {
+    log.error(`access sync: request ${appId} has no matching completed build`);
+    return 2;
+  }
+  const savedProjectId = record.resources?.projectId;
+  const projectId = normalizeProjectId(savedProjectId);
+  if (!projectId || projectId !== savedProjectId) {
+    log.error(`access sync: request ${appId} has no valid saved project`);
+    return 2;
+  }
+
+  const ctx = { appId, projectId, deps };
+  try {
+    const project = await google(ctx, 'access sync: read the project', projectResource(ctx));
+    const number = typeof project.name === 'string' ? project.name.match(/^projects\/(\d+)$/)?.[1] : null;
+    if (project.projectId !== projectId || project.labels?.[OWNER_LABEL] !== ownerLabel(appId)) {
+      throw new Error(`project ${projectId} was not made for this request`);
+    }
+    if (project.state !== 'ACTIVE') throw new Error(`project ${projectId} is ${project.state || 'unknown'}`);
+    if (!number) throw new Error(`project ${projectId} has no valid project number`);
+    ctx.projectNumber = number;
+
+    const compute = computeAccount(ctx);
+    const resource = accountResource(ctx, compute);
+    const account = await google(ctx, 'access sync: read the compute account', resource, { allow: [404] });
+    if (!account || account.projectId !== projectId || account.email !== compute) {
+      throw new Error(`project ${projectId} has no matching compute account`);
+    }
+    const emails = supportAdminEmails(ctx);
+    if (emails.length === 0) throw new Error('EVENT_SUPPORT_ADMIN_EMAILS has no support identities');
+    const wanted = emails.map((email) => ({
+      role: 'roles/iam.serviceAccountTokenCreator', member: `user:${email}`,
+    }));
+    const readOptions = { readQuery: '?options.requestedPolicyVersion=3' };
+    const changed = await grant(ctx, 'support token signing', resource, wanted, readOptions);
+    await requirePolicyGrants(ctx, 'support token signing readback', resource, wanted, readOptions);
+    log.log(`access sync: request ${appId} verified ${wanted.length} support signer binding${wanted.length === 1 ? '' : 's'}${changed ? `; added ${changed}` : ''}`);
+    return 0;
+  } catch (err) {
+    log.error(`access sync: request ${appId} failed:`, err.message);
+    return 1;
+  }
+}
+
+/**
  * The scheduled team sync (#839): each built site gets its console team's
  * changes since the build, without a rebuild. A site with no project or no
  * config/bootstrap is skipped with a warning. Any other failure does not
@@ -1866,6 +1946,7 @@ function parseArgs(argv) {
     else if (argv[i] === '--enroll-auto-deploy') args.enrollAutoDeploy = true;
     else if (argv[i] === '--remove-auto-deploy') args.removeAutoDeploy = true;
     else if (argv[i] === '--restore-auto-deploy') args.restoreAutoDeploy = true;
+    else if (argv[i] === '--sync-access') args.syncAccess = true;
     else if (argv[i] === '--if-purge-due') args.removeDue = true;
     else if (argv[i] === '--confirm-site') args.confirmSite = argv[++i] || '';
     else return null;
@@ -1874,6 +1955,7 @@ function parseArgs(argv) {
   const enrollment = modes > 0;
   return APP_ID_RE.test(args.appId) && !(enrollment && (args.testMode || args.markStopped))
     && modes <= 1
+    && !(args.syncAccess && (args.testMode || args.markStopped || enrollment || args.removeDue || args.confirmSite !== undefined))
     && (!args.removeDue || args.removeAutoDeploy)
     && (args.confirmSite === undefined || (args.removeAutoDeploy && Boolean(args.confirmSite))) ? args : null;
 }
@@ -1927,13 +2009,14 @@ function realDeps(env) {
 async function main(argv = process.argv.slice(2), env = process.env, makeDeps = realDeps) {
   const args = parseArgs(argv);
   if (!args) {
-    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped | --enroll-auto-deploy | --remove-auto-deploy [--confirm-site <name>] | --restore-auto-deploy] | --sync-teams');
+    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped | --enroll-auto-deploy | --remove-auto-deploy [--confirm-site <name>] | --restore-auto-deploy | --sync-access] | --sync-teams');
     return 2;
   }
   const deps = makeDeps(env);
   if (args.syncTeams) return syncTeams({ deps });
   if (args.markStopped) return markStopped({ appId: args.appId, runId: env.GITHUB_RUN_ID, deps });
   if (args.enrollAutoDeploy || args.removeAutoDeploy || args.restoreAutoDeploy) return enrollAutoDeploy({ appId: args.appId, remove: args.removeAutoDeploy, removeDue: args.removeDue, restore: args.restoreAutoDeploy, confirmSite: args.confirmSite, deps });
+  if (args.syncAccess) return syncAccess({ appId: args.appId, deps });
   return provision({ appId: args.appId, testMode: args.testMode, deps });
 }
 
@@ -1947,4 +2030,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { COMPUTE_ROLES, INVOKER_PERMISSIONS, SERVICES, STEPS, brandingProblem, deployVariables, main, markStopped, parseArgs, provision, requiredRecords, syncTeams };
+module.exports = { COMPUTE_ROLES, INVOKER_PERMISSIONS, SERVICES, STEPS, brandingProblem, deployVariables, main, markStopped, parseArgs, provision, requiredRecords, syncAccess, syncTeams };

@@ -1511,6 +1511,16 @@ Newly seeded sites route runtime platform alerts to the monitored agent inbox, `
 
 The `deploy-identity` step grants each `user:<support address>` in `EVENT_SUPPORT_ADMIN_EMAILS` two permanent, unconditional IAM roles: `roles/editor` on the client project and `roles/iam.serviceAccountTokenCreator` on its existing compute runtime account. Editor permits changes to project resources and access to project data. Token Creator permits signing Firebase custom tokens for any site uid and minting access tokens as the runtime account. The signing role stays on that service account, rather than the whole project. Provisioning preserves existing bindings and restores missing support grants on retry. Site Access controls do not change either IAM role, and removing the Editor binding does not remove the signing binding. Review all three access grants separately during offboarding. Disclose these capabilities during client handoff.
 
+To repair only the support signer grant on a completed client, run:
+
+```sh
+gh workflow run provision-client.yml --repo CenterCoopMedia/eventrunner --ref main -f application_id=<application-id> -f sync_access=true
+```
+
+The access sync requires a `ready` or `launched` application, its matching completed build record and the saved client project. It reads the project and refuses a project whose id, active state or `eventrunner-request` owner label does not match the application. These checks prevent a stale or edited build record from changing another client's policy. They use the same owner label as provisioning and remain required while the existing-site maintenance path exists.
+
+After those checks, the sync reads the existing compute account and its IAM policy. It adds only missing configured support users to the account's unconditional `roles/iam.serviceAccountTokenCreator` binding, preserves every other member and binding, and reads the policy again. A missing readback fails the run. An already-correct policy gets no write. This mode does not build or deploy the client, enroll automatic deployments, sync the Console team, change project roles, site access, content or providers, or send mail.
+
 10. **Check the organization's policies on the client folder.** `iam.allowedPolicyMemberDomains` can refuse the `allUsers` binding public functions need. Allow public invocation on the client folder where required, or the deploy fails. Provisioning grants the compute account its required roles explicitly; it does not depend on automatic Editor grants.
 
 ### 12.2 When a build fails

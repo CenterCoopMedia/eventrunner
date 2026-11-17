@@ -8,7 +8,7 @@
  */
 
 const assert = require('node:assert/strict');
-const { generateKeyPairSync } = require('node:crypto');
+const { createHash, generateKeyPairSync } = require('node:crypto');
 const test = require('node:test');
 const { makeFakeDb, makeFakeSecrets } = require('../console/functions/src/fakes.cjs');
 const { fakeMailer, quietLog } = require('../console/functions/src/testData.cjs');
@@ -17,7 +17,7 @@ const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs'
 const { resolveAdminTier } = require('../functions/src/core/auth.cjs');
 const { acceptInvite, inviteMember } = require('../console/functions/src/invites.cjs');
 const { changeMemberRole, removeMember } = require('../console/functions/src/members.cjs');
-const { SERVICES, STEPS, brandingProblem, main, markStopped, parseArgs, provision, syncTeams } = require('./provision-client.cjs');
+const { SERVICES, STEPS, brandingProblem, main, markStopped, parseArgs, provision, syncAccess, syncTeams } = require('./provision-client.cjs');
 const { STEPS: DECOMMISSION_STEPS } = require('./decommission-client.cjs');
 
 const { privateKey } = generateKeyPairSync('rsa', {
@@ -135,6 +135,9 @@ function fakeCloud(options = {}) {
   function googleRoute(url, method, body) {
     const { pathname: p } = url;
     if (p.endsWith(':getIamPolicy')) {
+      if (url.host === 'iam.googleapis.com' && body?.options) {
+        return answer({ error: { message: 'options belongs in the query' } }, 400);
+      }
       return answer({ version: 3, etag: 'e', bindings: state.policies[`${url.host}${p.replace(':getIamPolicy', '')}`] || [] });
     }
     if (p.endsWith(':setIamPolicy')) {
@@ -251,7 +254,8 @@ function fakeCloud(options = {}) {
         state.accounts.add(`${body.accountId}@${PROJECT}.iam.gserviceaccount.com`);
         return answer({});
       }
-      return state.accounts.has(p.split('/').at(-1)) ? answer({}) : answer({}, 404);
+      const email = p.split('/').at(-1);
+      return state.accounts.has(email) ? answer({ name: p, projectId: PROJECT, email }) : answer({}, 404);
     }
     if (url.host === 'artifactregistry.googleapis.com') {
       if (method === 'GET') return state.repository ? answer(state.repository) : answer({}, 404);
@@ -527,6 +531,25 @@ const holds = (bindings, role, member) => bindings.some((b) => b.role === role &
 const statusMail = (mailer) => mailer.sent.filter((m) => m.kind === 'status').map((m) => m.status);
 const notices = (mailer) => mailer.sent.filter((m) => m.kind === 'operator');
 const remainingConnectionTokens = (fake) => [...fake.consoleSecrets.store.keys()].filter((id) => id.startsWith('connection-'));
+const SIGNER_KEY = `iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/${COMPUTE}`;
+const policyCall = (call, action) => new URL(call.url).pathname.endsWith(`:${action}IamPolicy`);
+
+async function existingSite(fake, { status = 'ready', record = {}, project = {} } = {}) {
+  await fake.db.doc('applications/a1').update({ status });
+  const built = { appId: 'a1', state: 'done', resources: { projectId: PROJECT } };
+  await fake.db.doc('console_builds/a1').set({
+    ...built,
+    ...record,
+    resources: { ...built.resources, ...(record.resources || {}) },
+  });
+  fake.state.project = {
+    name: `projects/${NUMBER}`,
+    projectId: PROJECT,
+    labels: { 'eventrunner-request': createHash('sha256').update('a1', 'utf8').digest('hex').slice(0, 32) },
+    state: 'ACTIVE',
+    ...project,
+  };
+}
 
 test('one approved request becomes a built site, and the record and the status say so', async () => {
   const fake = setup();
@@ -1250,6 +1273,82 @@ test('a provisioning retry preserves client operators and configured support acc
     assert.ok(holds(afterSigner, 'roles/iam.serviceAccountTokenCreator', `user:${email}`), email);
   }
   assert.ok(holds(afterSigner, 'roles/iam.serviceAccountTokenCreator', `serviceAccount:${COMPUTE}`));
+});
+
+test('existing-site access sync repairs only support signer members, preserves the policy and reads it back', async () => {
+  const fake = setup();
+  await existingSite(fake);
+  const originalViewer = { role: 'roles/viewer', members: ['user:viewer@example.org'] };
+  const conditional = {
+    role: 'roles/iam.serviceAccountTokenCreator',
+    members: ['user:jamditis@gmail.com'],
+    condition: { title: 'limited', expression: 'request.time < timestamp("2030-01-01T00:00:00Z")' },
+  };
+  fake.state.policies[SIGNER_KEY] = [
+    { role: 'roles/iam.serviceAccountTokenCreator', members: [`serviceAccount:${COMPUTE}`, 'user:existing-helper@example.org'] },
+    originalViewer,
+    conditional,
+  ];
+  const appBefore = fake.db.read('applications/a1');
+  const buildBefore = fake.db.read('console_builds/a1');
+
+  assert.equal(await syncAccess({ appId: 'a1', deps: fake.deps }), 0);
+  const policy = bindingsOf(fake, SIGNER_KEY);
+  const signer = policy.find((binding) => binding.role === 'roles/iam.serviceAccountTokenCreator' && !binding.condition);
+  for (const member of [`serviceAccount:${COMPUTE}`, 'user:existing-helper@example.org', 'user:jamditis@gmail.com', 'user:amditisjunk@gmail.com']) {
+    assert.ok(signer.members.includes(member), member);
+  }
+  assert.deepEqual(policy.find((binding) => binding.role === 'roles/viewer'), originalViewer);
+  assert.deepEqual(policy.find((binding) => binding.condition), conditional);
+  assert.deepEqual(fake.db.read('applications/a1'), appBefore);
+  assert.deepEqual(fake.db.read('console_builds/a1'), buildBefore);
+  const writes = fake.calls.filter((call) => policyCall(call, 'set'));
+  assert.equal(writes.length, 1);
+  assert.ok(writes[0].url.includes(`/serviceAccounts/${COMPUTE}:setIamPolicy`));
+  const reads = fake.calls.filter((call) => policyCall(call, 'get'));
+  assert.equal(reads.length, 2, 'read, then readback');
+  assert.ok(reads.every((call) => Object.keys(call.body).length === 0
+    && new URL(call.url).searchParams.get('options.requestedPolicyVersion') === '3'));
+
+  const beforeRetry = fake.calls.length;
+  assert.equal(await syncAccess({ appId: 'a1', deps: fake.deps }), 0);
+  const retry = fake.calls.slice(beforeRetry);
+  assert.equal(retry.filter((call) => policyCall(call, 'set')).length, 0);
+  assert.equal(retry.filter((call) => policyCall(call, 'get')).length, 2, 'an already-correct policy is still read back');
+});
+
+test('existing-site access sync fails when the provider readback does not contain the requested grants', async () => {
+  const fake = setup();
+  await existingSite(fake);
+  const original = [{ role: 'roles/iam.serviceAccountTokenCreator', members: [`serviceAccount:${COMPUTE}`] }];
+  fake.state.policies[SIGNER_KEY] = original;
+  const fetch = fake.deps.fetch;
+  fake.deps.fetch = async (address, init) => {
+    const response = await fetch(address, init);
+    if (address.endsWith(':setIamPolicy')) fake.state.policies[SIGNER_KEY] = original;
+    return response;
+  };
+
+  assert.equal(await syncAccess({ appId: 'a1', deps: fake.deps }), 1);
+  assert.equal(fake.calls.filter((call) => policyCall(call, 'set')).length, 1);
+  assert.equal(fake.calls.filter((call) => policyCall(call, 'get')).length, 2);
+});
+
+test('existing-site access sync refuses mismatched application, build and project identity before IAM', async () => {
+  const cases = [
+    ['unfinished application', 2, { status: 'building' }],
+    ['other build', 2, { record: { appId: 'other' } }],
+    ['unfinished build', 2, { record: { state: 'running' } }],
+    ['other project owner', 1, { project: { labels: { 'eventrunner-request': 'other' } } }],
+    ['other project id', 1, { project: { projectId: 'er-other-project' } }],
+    ['inactive project', 1, { project: { state: 'DELETE_REQUESTED' } }],
+  ];
+  for (const [label, code, setupOptions] of cases) {
+    const fake = setup();
+    await existingSite(fake, setupOptions);
+    assert.equal(await syncAccess({ appId: 'a1', deps: fake.deps }), code, label);
+    assert.equal(fake.calls.some((call) => call.url.includes(':getIamPolicy') || call.url.includes(':setIamPolicy')), false, label);
+  }
 });
 
 const ANA = { uid: 'ana', email: 'ana@example.org' };
@@ -2164,11 +2263,15 @@ test('--mark-stopped leaves a finished request alone', async () => {
 test('the id is checked before anything reads it', async () => {
   assert.deepEqual(parseArgs(['--application', 'app_1-A', '--test-mode']), { appId: 'app_1-A', testMode: true, markStopped: false });
   assert.deepEqual(parseArgs(['--sync-teams']), { syncTeams: true });
+  assert.deepEqual(parseArgs(['--application', 'a1', '--sync-access']), { appId: 'a1', testMode: false, markStopped: false, syncAccess: true });
   assert.deepEqual(parseArgs(['--application', 'a1', '--enroll-auto-deploy']), { appId: 'a1', testMode: false, markStopped: false, enrollAutoDeploy: true });
   assert.equal(parseArgs(['--application', 'a1', '--enroll-auto-deploy', '--test-mode']), null);
   assert.equal(parseArgs(['--application', 'a1', '--enroll-auto-deploy', '--mark-stopped']), null);
   assert.equal(parseArgs(['--application', 'a1', '--enroll-auto-deploy', '--remove-auto-deploy']), null);
   assert.equal(parseArgs(['--application', 'a1', '--restore-auto-deploy', '--test-mode']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--sync-access', '--test-mode']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--sync-access', '--mark-stopped']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--sync-access', '--enroll-auto-deploy']), null);
   assert.equal(parseArgs(['--application', 'a1', '--remove-auto-deploy', '--confirm-site']), null);
   assert.equal(parseArgs(['--application', 'a1', '--confirm-site', 'nclocal']), null);
   assert.equal(parseArgs(['--application', 'a1', '--if-purge-due']), null);
