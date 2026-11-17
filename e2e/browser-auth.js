@@ -1,4 +1,4 @@
-import { signInWithCustomToken } from 'firebase/auth';
+import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { auth } from '../apps/web/src/firebase.js';
 import { useEmulators } from '../apps/web/src/lib/firebaseSettings.js';
 
@@ -13,4 +13,11 @@ export function signInWithEmulatorToken(token) {
 export async function signedInUid() {
   await auth.authStateReady();
   return auth.currentUser?.uid ?? null;
+}
+
+// Exercise the SDK's actual IndexedDB write path without a real account.
+export async function clearEmulatorAuthPersistence() {
+  if (!useEmulators) throw new Error('This fixture requires the Auth emulator.');
+  await auth.authStateReady();
+  return signOut(auth);
 }
