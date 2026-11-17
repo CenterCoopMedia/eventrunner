@@ -5,7 +5,7 @@ export const UNPUBLISHED_PATH = '/admin/unpublished';
 /** The shell's notice, without the live count or own-page suppression. */
 export default function PendingChangesNotice({ failed, total, sentence }) {
   return (
-    <div className="mx-auto w-full max-w-admin-canvas">
+    <div className="w-full max-w-admin-canvas">
       <aside
         aria-label="Unpublished changes"
         data-pending-total={failed ? undefined : total}
