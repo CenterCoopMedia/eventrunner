@@ -156,7 +156,10 @@ test('a production caught error reaches the emulator and the real System errors 
   await page.goto('/admin/system-errors');
   const payload = await (await listed).json();
   expect(payload.rows.some((row) => row.id === record.id)).toBe(true);
-  await expect(page.getByRole('heading', { name: 'A visitor had a problem', exact: true })).toHaveCount(payload.rows.filter((row) => row.kind === 'client-error').length);
+  // The synthetic route has no known activity. Locate its card by the safe
+  // fallback, rather than assuming every browser error gets the same title.
+  await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toHaveCount(payload.rows.filter((row) => !row.resolved).length);
+  await expect(page.getByRole('heading', { name: 'A browser error occurred', exact: true }).first()).toBeVisible();
 });
 
 test('production missing chunk reloads once and stays out of telemetry', async ({ page }) => {

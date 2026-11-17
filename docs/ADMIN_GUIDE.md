@@ -986,7 +986,11 @@ Every publish keeps a version of the record. A version holds the record's conten
 
 ## System errors
 
-Unresolved system-error rows — the operational surface for things like an invalid email-template override falling back to its code default. Each row has a resolve action. If you are chasing down why a template edit "is not working", check here before assuming it is a bug: A rejected override logs here and silently keeps serving the last-good copy rather than breaking the send.
+Operators review unresolved site problems here. Browser-error cards identify the activity when the recorded page is known, such as managing tickets or creating a page. A page error gives a reload step. A browser error on the ticket settings page does not confirm that a registration or payment failed. The cards omit personal details, raw addresses and technical error text. An unrecognized report says what is known without guessing the activity.
+
+An invalid email-template override appears as **Email wording needs attention**. Sign-in emails keep using the default wording, so check the saved wording with the Event Runner team.
+
+Each row has a **Resolve** action. Review the problem with the Event Runner team before resolving it. The row returns if the same problem happens again.
 
 ## Data export
 

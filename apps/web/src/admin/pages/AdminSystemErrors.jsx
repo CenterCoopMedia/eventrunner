@@ -40,26 +40,12 @@ import AdminPageHeader, {
   AdminLoadingState,
 } from '../components/adminChrome.jsx';
 import OperationIcon from '../components/OperationIcon.jsx';
+import { systemErrorDetails } from '../systemErrorDetails.js';
 
 const PAGE_SIZE = 100;
 function formatWhen(ms) {
   if (!Number.isFinite(ms)) return 'Time not recorded';
   return new Date(ms).toLocaleString();
-}
-
-function errorDetails(kind) {
-  if (kind === 'template-override-invalid') return {
-    title: 'Email wording needs attention',
-    message: 'Sign-in emails are using the default wording. Ask the Event Runner team to check your saved wording.',
-  };
-  if (kind === 'client-error') return {
-    title: 'A visitor had a problem',
-    message: 'A visitor could not complete an action on the site. Ask the Event Runner team to check it.',
-  };
-  return {
-    title: 'Site error',
-    message: 'An action on the site failed. Ask the Event Runner team to check it.',
-  };
 }
 
 export default function AdminSystemErrors() {
@@ -231,39 +217,42 @@ export default function AdminSystemErrors() {
                 — the hairline already does that work, and striping is the
                 tell of a default table. */}
             <ul>
-              {visibleRows.map((row) => (
-                <li
-                  key={row.id}
-                  className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
-                >
-                  <div className="flex flex-col gap-2xs px-md py-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-sm">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-x-sm gap-y-3xs">
-                          <h2 className="text-admin-base font-semibold text-admin-ink">{errorDetails(row.kind).title}</h2>
+              {visibleRows.map((row) => {
+                const details = systemErrorDetails(row);
+                return (
+                  <li
+                    key={row.id}
+                    className="border-admin-rule-hairline border-b-admin-hairline last:border-b-0"
+                  >
+                    <div className="flex flex-col gap-2xs px-md py-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-sm">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-sm gap-y-3xs">
+                            <h2 className="text-admin-base font-semibold text-admin-ink">{details.title}</h2>
+                          </div>
+                          <p className="mt-3xs text-admin-sm text-admin-ink-secondary">{details.message}</p>
+                          <p className="mt-3xs font-admin-data text-admin-xs text-admin-ink-secondary">
+                            Last seen {formatWhen(row.lastSeenAt ?? row.createdAt)}
+                          </p>
                         </div>
-                        <p className="mt-3xs text-admin-sm text-admin-ink-secondary">{errorDetails(row.kind).message}</p>
-                        <p className="mt-3xs font-admin-data text-admin-xs text-admin-ink-secondary">
-                          Last seen {formatWhen(row.lastSeenAt ?? row.createdAt)}
-                        </p>
+                        <button
+                          ref={(node) => { if (node) rowRefs.current.set(row.id, node); else rowRefs.current.delete(row.id); }}
+                          type="button"
+                          className={secondaryButtonClass}
+                          onClick={() => resolveRow(row)}
+                          disabled={Boolean(resolvingId) || refreshing || loadingMore}
+                          aria-busy={resolvingId === row.id || undefined}
+                        >
+                          {resolvingId === row.id ? 'Resolving…' : 'Resolve'}
+                        </button>
                       </div>
-                      <button
-                        ref={(node) => { if (node) rowRefs.current.set(row.id, node); else rowRefs.current.delete(row.id); }}
-                        type="button"
-                        className={secondaryButtonClass}
-                        onClick={() => resolveRow(row)}
-                        disabled={Boolean(resolvingId) || refreshing || loadingMore}
-                        aria-busy={resolvingId === row.id || undefined}
-                      >
-                        {resolvingId === row.id ? 'Resolving…' : 'Resolve'}
-                      </button>
+                      {rowNotices[row.id] ? (
+                        <Notice tone="error" message={rowNotices[row.id]} />
+                      ) : null}
                     </div>
-                    {rowNotices[row.id] ? (
-                      <Notice tone="error" message={rowNotices[row.id]} />
-                    ) : null}
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           </Panel>
           {nextCursor ? (

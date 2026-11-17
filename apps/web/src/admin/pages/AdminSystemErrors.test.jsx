@@ -114,7 +114,7 @@ describe('system errors list', () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN, ROW_ALERTED], nextCursor: null }));
     await renderPage();
 
-    expect(await screen.findByText('A visitor had a problem')).toBeInTheDocument();
+    expect(await screen.findByText('A browser error occurred')).toBeInTheDocument();
     expect(urlOf(0)).toMatch(/\/listSystemErrors$/);
     expect(screen.getByText('Email wording needs attention')).toBeInTheDocument();
     expect(screen.queryByText('client-error')).not.toBeInTheDocument();
@@ -149,9 +149,53 @@ describe('system errors list', () => {
     const longMessage = 'TypeError: internalFunction failed at private/document/path';
     fetch.mockResolvedValueOnce(okResponse({ rows: [{ ...ROW_OPEN, message: longMessage }], nextCursor: null }));
     await renderPage();
-    expect(await screen.findByText('A visitor had a problem')).toBeInTheDocument();
+    expect(await screen.findByText('A browser error occurred')).toBeInTheDocument();
     expect(screen.queryByText(longMessage)).toBeNull();
     expect(screen.getByText(/Ask the Event Runner team to check it/)).toBeInTheDocument();
+  });
+
+  it('explains the five reported page failures without treating ticket settings as a failed payment', async () => {
+    // The incident records identify these activities and two browser wordings.
+    // Use synthetic origins and IDs; no operator or visitor details are needed.
+    const safari = "undefined is not an object (evaluating 'e._result.default')";
+    const chrome = "Cannot read properties of undefined (reading 'default')";
+    const examples = [
+      ['/admin/overview', chrome, 'Page error while viewing the event overview'],
+      ['/admin/ticketing', safari, 'Page error while managing tickets'],
+      ['/updates', chrome, 'Page error while reading live updates'],
+      ['/admin/pages/new', safari, 'Page error while creating a page'],
+      ['/admin/versions', safari, 'Page error while viewing version history'],
+    ];
+    fetch.mockResolvedValueOnce(okResponse({
+      rows: examples.map(([path, message], index) => ({
+        ...ROW_OPEN, id: `page-error-${index}`, message,
+        url: `https://event.example.test${path}/?email=visitor%40example.test#private-detail`,
+      })),
+      nextCursor: null,
+    }));
+    const { container } = await renderPage();
+    for (const [, , title] of examples) {
+      expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument();
+    }
+    expect(screen.getAllByText(/^A required page file could not be loaded/)).toHaveLength(3);
+    expect(screen.getAllByText(/^Part of the page failed in the browser/)).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Resolve' })).toHaveLength(5);
+    expect(container).not.toHaveTextContent(/example\.test|private-detail|payment|registration|_result|TypeError/);
+  });
+
+  it('does not expose unknown URLs or raw messages, or guess an activity from them', async () => {
+    fetch.mockResolvedValueOnce(okResponse({
+      rows: [{
+        ...ROW_OPEN,
+        url: 'https://event.example.test/people/private-name?email=visitor%40example.test',
+        message: 'Payment failed for visitor@example.test at private/document/path',
+      }],
+      nextCursor: null,
+    }));
+    const { container } = await renderPage();
+    expect(await screen.findByRole('heading', { name: 'A browser error occurred' })).toBeInTheDocument();
+    expect(screen.getByText(/The report does not confirm whether an action finished/)).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/private-name|visitor@|example\.test|Payment failed|private\/document/);
   });
 });
 
@@ -159,17 +203,17 @@ describe('manual refresh', () => {
   it('preserves the last rows when refresh fails', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('A visitor had a problem');
+    await screen.findByText('A browser error occurred');
     fetch.mockRejectedValueOnce(new Error('offline'));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText(/showing the last values/)).toBeInTheDocument();
-    expect(screen.getByText('A visitor had a problem')).toBeInTheDocument();
+    expect(screen.getByText('A browser error occurred')).toBeInTheDocument();
     expect(screen.queryByText('No unresolved errors')).not.toBeInTheDocument();
   });
   it('refetches the list on demand', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('A visitor had a problem');
+    await screen.findByText('A browser error occurred');
 
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_ALERTED], nextCursor: null }));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
@@ -177,7 +221,7 @@ describe('manual refresh', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(urlOf(1)).toMatch(/\/listSystemErrors$/);
     expect(await screen.findByText('Email wording needs attention')).toBeInTheDocument();
-    expect(screen.queryByText('A visitor had a problem')).toBeNull();
+    expect(screen.queryByText('A browser error occurred')).toBeNull();
   });
 });
 
@@ -191,14 +235,14 @@ describe('load more', () => {
     const notice = await screen.findByRole('alert');
     expect(notice).toHaveTextContent('The next page could not be loaded. Try again.');
     expect(notice.parentElement).toContainElement(more);
-    expect(screen.getByText('A visitor had a problem')).toBeInTheDocument();
+    expect(screen.getByText('A browser error occurred')).toBeInTheDocument();
     expect(more).toBeEnabled();
   });
   it('fetches the next page with the server cursor and appends it', async () => {
     const cursor = { createdAt: 1700000000000, id: 'e-open-1' };
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: cursor }));
     await renderPage();
-    await screen.findByText('A visitor had a problem');
+    await screen.findByText('A browser error occurred');
     expect(screen.getByRole('button', { name: 'Load more' })).toBeInTheDocument();
 
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_ALERTED], nextCursor: null }));
@@ -209,7 +253,7 @@ describe('load more', () => {
     expect(bodyOf(1)).toEqual({ limit: 100, cursor });
     // Both pages' rows are visible, and the exhausted cursor removes the button.
     expect(await screen.findByText('Email wording needs attention')).toBeInTheDocument();
-    expect(screen.getByText('A visitor had a problem')).toBeInTheDocument();
+    expect(screen.getByText('A browser error occurred')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
   });
 });
@@ -218,7 +262,7 @@ describe('resolving a row', () => {
   it('reloads from the server after a successful resolve, rather than only patching local state', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('A visitor had a problem');
+    await screen.findByText('A browser error occurred');
 
     fetch.mockResolvedValueOnce(okResponse({ id: 'e-open-1', resolved: true }));
     // The reload can surface a row that was past this page's limit — assert
@@ -232,14 +276,14 @@ describe('resolving a row', () => {
     expect(bodyOf(1)).toEqual({ id: 'e-open-1', expectedLastSeenAt: ROW_OPEN.lastSeenAt });
     expect(urlOf(2)).toMatch(/\/listSystemErrors$/);
 
-    await waitFor(() => expect(screen.queryByText('A visitor had a problem')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('A browser error occurred')).toBeNull());
     expect(await screen.findByText('Email wording needs attention')).toBeInTheDocument();
   });
 
   it('reloads to an empty state when the server confirms nothing unresolved remains', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('A visitor had a problem');
+    await screen.findByText('A browser error occurred');
 
     fetch.mockResolvedValueOnce(okResponse({ id: 'e-open-1', resolved: true }));
     fetch.mockResolvedValueOnce(okResponse({ rows: [], nextCursor: null }));
@@ -251,14 +295,14 @@ describe('resolving a row', () => {
   it('reports a reopen race instead of pretending the resolve worked, and does not reload', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('A visitor had a problem');
+    await screen.findByText('A browser error occurred');
 
     fetch.mockResolvedValueOnce(okResponse({ id: 'e-open-1', resolved: false, reopened: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Resolve' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/recurred since the list loaded/i);
     // The row stays visible — it was NOT actually resolved.
-    expect(screen.getByText('A visitor had a problem')).toBeInTheDocument();
+    expect(screen.getByText('A browser error occurred')).toBeInTheDocument();
     // Not a "successful" resolve, so no reload — only the initial list call.
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -266,7 +310,7 @@ describe('resolving a row', () => {
   it('surfaces a server rejection against the row it came from', async () => {
     fetch.mockResolvedValueOnce(okResponse({ rows: [ROW_OPEN], nextCursor: null }));
     await renderPage();
-    await screen.findByText('A visitor had a problem');
+    await screen.findByText('A browser error occurred');
 
     fetch.mockResolvedValueOnce(errorResponse(404, 'not-found', 'system_errors/e-open-1 does not exist.'));
     fireEvent.click(screen.getByRole('button', { name: 'Resolve' }));
