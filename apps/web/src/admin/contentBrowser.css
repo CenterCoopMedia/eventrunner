@@ -76,5 +76,4 @@
   .admin-content-section { grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.25fr) auto; align-items: center; gap: var(--space-lg); }
   .admin-content-section__count { grid-column: 2; }
   .admin-content-section__action { grid-column: 3; align-self: center; }
-  .admin-content-section__action { justify-self: end; }
 }
