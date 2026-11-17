@@ -558,13 +558,13 @@ function TicketList({ call, refreshToken }) {
           search(false);
         }}
       >
-          <TextField data-help-skip="Search field; its label names the email search."
-            label="Email"
-            type="email"
-            value={email}
-            onChange={setEmail}
-            placeholder="attendee@example.com"
-          />
+        <TextField data-help-skip="Search field; its label names the email search."
+          label="Email"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          placeholder="attendee@example.com"
+        />
         <SelectField help="Choose which records to show in this list."
           label="Status"
           value={status}

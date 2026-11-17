@@ -72,6 +72,7 @@ export default function AdminContentPages() {
     <div className="admin-content-browser flex flex-col gap-md">
       <AdminPageHeader help="Choose a page to edit the text, images and other content in its sections."
         title="Content"
+        identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
         actions={<Link to="/admin/pages" className={linkButtonClass}>Manage page structure</Link>}
       />
 
@@ -115,7 +116,7 @@ export default function AdminContentPages() {
                 {query ? <AdminIconControl label="Clear search" icon="close" onClick={clearSearch} /> : null}
               </div>
             </div>
-            <p id={resultId} role="status" aria-atomic="true" className="admin-content-browser__result">
+            <p id={resultId} role="status" aria-atomic="true" className={hasQuery ? 'admin-content-browser__result' : 'sr-only'}>
               {hasQuery ? `${filtered.length} of ${rows.length} page${rows.length === 1 ? '' : 's'}` : `${rows.length} page${rows.length === 1 ? '' : 's'}`}
             </p>
           </div>

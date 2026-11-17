@@ -416,7 +416,8 @@ export default function AdminEmailLog() {
             <fieldset aria-label={[" ", (activeFilters ? `Filters, ${activeFilters} active` : 'Filters'), " "].join('').trim()} className="min-w-0 w-full max-w-3xl">
               <legend className={`${fieldLabelClass} mb-3xs`}>
                 {activeFilters ? `Filters, ${activeFilters} active` : 'Filters'}
-               <HelpTooltip label="Email log filters">Narrow the delivery records by message source and delivery status.</HelpTooltip></legend>
+                {' '}<HelpTooltip label="Email log filters">Narrow the delivery records by message source and delivery status.</HelpTooltip>
+              </legend>
               <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
                 <SelectField help="Show messages sent by a particular event feature."
                   label="Source"

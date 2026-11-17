@@ -2,7 +2,7 @@
    tokens supply both modes; no page editor or public theme is restyled. */
 .admin-content-browser { container: admin-content-browser / inline-size; min-width: 0; }
 .admin-content-browser__toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-sm) var(--space-lg); }
-.admin-content-search { flex: 1 1 28rem; min-width: 0; }
+.admin-content-search { flex: 1 1 28rem; min-width: 0; max-inline-size: 28rem; }
 .admin-content-search > label { display: block; margin-bottom: var(--space-xs); }
 .admin-content-search__controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
 .admin-content-search__field { position: relative; flex: 1 1 18rem; min-width: 0; }
