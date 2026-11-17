@@ -182,19 +182,18 @@ describe('speakers list', () => {
 });
 
 describe('speaker editor', () => {
-  it('keeps identity, public profile, and contact cards in reading order with the account link read-only', async () => {
+  it('groups identity and contact before the public profile with the account link read-only', async () => {
     speakerDocs = [{ ...RAE, uid: 'linked-attendee' }];
     await renderAt('/admin/speakers/rae-okonkwo');
     const form = screen.getByLabelText('First name').closest('form');
     const layout = form.querySelector('.admin-editor-layout--speaker');
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
-      .toEqual(['Name', 'Profile', 'Contact and status', 'Logistics', 'Sessions']);
+      .toEqual(['Name', 'Contact and status', 'Logistics', 'Profile', 'Sessions']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
-      'First name', 'Last name', 'Pronouns', 'Job title', 'Organization',
+      'First name', 'Last name', 'Email', 'Status', 'Pronouns', 'Job title', 'Organization',
       'Bio', 'Replace photo', 'None',
       'Default avatar 01', 'Default avatar 02', 'Default avatar 03',
       'Default avatar 04', 'Default avatar 05', 'Default avatar 06',
-      'Email', 'Status',
     ]);
     expect(screen.queryByLabelText('Headshot path')).toBeNull();
     expect(screen.getByRole('group', { name: 'Headshot' })).toBeInTheDocument();
