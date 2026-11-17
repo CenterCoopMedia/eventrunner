@@ -1031,6 +1031,21 @@ test('validateFeatures: booleans only, unknown keys rejected', () => {
 });
 
 // Issue #188: the change request flag is a known key, and a boolean only.
+test('validateFeatures: calendar sync requires the schedule, bookmarks and file fallback', () => {
+  const enabled = { schedule: true, sessionBookmarks: true, icsExport: true, calendarSync: true };
+  assert.equal(validateFeatures(enabled).ok, true);
+  for (const key of ['schedule', 'sessionBookmarks', 'icsExport']) {
+    for (const value of [false, undefined]) {
+      const features = { ...enabled, [key]: value };
+      if (value === undefined) delete features[key];
+      const result = validateFeatures(features);
+      assert.equal(result.ok, false, `${key}=${value}`);
+      assert.match(result.errors.join('\n'), /features.calendarSync: enable/);
+    }
+  }
+  assert.equal(validateFeatures({ calendarSync: false }).ok, true);
+});
+
 test('validateFeatures: changeRequests is a known boolean flag', () => {
   assert.equal(validateFeatures({ changeRequests: true }).ok, true);
   assert.equal(validateFeatures({ changeRequests: false }).ok, true);

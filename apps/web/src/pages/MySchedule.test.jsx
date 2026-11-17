@@ -2,7 +2,7 @@
 // Firebase, no network (spec §8.1); useMyBookmarks is mocked directly so
 // tests drive the bookmarked-id set without a Firestore listener.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
@@ -187,11 +187,28 @@ describe('MySchedule', () => {
 
   it('offers the calendar sync when the operator turned the flag on', () => {
     renderMySchedule({
-      features: { schedule: true, sessionBookmarks: true, calendarSync: true },
+      features: { schedule: true, sessionBookmarks: true, icsExport: true, calendarSync: true },
       bookmarkedIds: new Set(['fx-late']),
     });
     expect(screen.getByRole('heading', { name: 'Google Calendar' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sync my sessions/i })).toBeInTheDocument();
+  });
+
+  it('keeps stored inconsistent flags from offering sync without the file fallback', () => {
+    renderMySchedule({ features: { schedule: true, sessionBookmarks: true, calendarSync: true, icsExport: false } });
+    expect(screen.queryByRole('heading', { name: 'Google Calendar' })).toBeNull();
+  });
+
+  it('keeps the file fallback and sync available after the final bookmark is removed', () => {
+    renderMySchedule({ features: { schedule: true, sessionBookmarks: true, calendarSync: true, icsExport: true } });
+    expect(screen.getByRole('heading', { name: 'No bookmarked sessions yet' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download my schedule (.ics)' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /sync my sessions/i })).toBeEnabled();
+  });
+
+  it('waits for bookmarks before allowing a file download', () => {
+    renderMySchedule({ bookmarksLoading: true, features: { schedule: true, sessionBookmarks: true, icsExport: true } });
+    expect(screen.getByRole('button', { name: 'Download my schedule (.ics)' })).toBeDisabled();
   });
 
   it('shows a signed-out reader’s browser saves without private account controls', () => {
@@ -288,14 +305,34 @@ describe('MySchedule', () => {
       expect(screen.getByRole('heading', { level: 2, name: /Day one/ })).toBeInTheDocument();
     });
 
-    it('does not count toward the bulk "download my schedule" export', () => {
+    it('exports an empty fallback file without the orphaned session (ADR 0003)', async () => {
       renderMySchedule({
         bookmarkedIds: new Set(['fx-orphan']),
         features: { schedule: true, sessionBookmarks: true, icsExport: true },
       });
-      // Only the orphaned bookmark exists, so mySessions is empty — the
-      // download button (gated on mySessions.length > 0) must not render.
-      expect(screen.queryByRole('button', { name: /download my schedule/i })).toBeNull();
+      const create = vi.fn(() => 'blob:synthetic-calendar');
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      const oldCreate = URL.createObjectURL;
+      const oldRevoke = URL.revokeObjectURL;
+      URL.createObjectURL = create;
+      URL.revokeObjectURL = () => {};
+      try {
+        fireEvent.click(screen.getByRole('button', { name: /download my schedule/i }));
+        const blob = create.mock.calls[0][0];
+        const text = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsText(blob);
+        });
+        expect(blob.type).toBe('text/calendar;charset=utf-8');
+        expect(text).toContain('BEGIN:VCALENDAR\r\n');
+        expect(text).toContain('END:VCALENDAR\r\n');
+        expect(text).not.toContain('BEGIN:VEVENT');
+      } finally {
+        URL.createObjectURL = oldCreate;
+        URL.revokeObjectURL = oldRevoke;
+        click.mockRestore();
+      }
     });
   });
 

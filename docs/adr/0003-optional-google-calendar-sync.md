@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. The owner accepts or amends this record before any calendar code is reviewed as done (issue #177).
+Accepted, November 16, 2026. The owner accepted all six recommendations without amendments ([decision receipt](https://github.com/CenterCoopMedia/eventrunner/issues/548#issuecomment-6931415263)).
 
 A disabled implementation and `docs/CLIENT_ONBOARDING.md` §6 reached `main` in the M8 wave before this record was reviewed. Both sit behind a flag that is off. The branch that follows acceptance reconciles both with this record. Where the code and this record differ, this record wins.
 
@@ -93,7 +93,7 @@ Failure and fallback:
 
 ### 5. Provisioning steps for `docs/CLIENT_ONBOARDING.md`
 
-These steps replace the current §6 after acceptance. Until then nothing in that file changes.
+The operator follows [CLIENT_ONBOARDING §6](../CLIENT_ONBOARDING.md#6-optional-google-calendar-sync-configfeaturescalendarsync), including the dated test receipt, before enabling a client.
 
 - [ ] Opt-in recorded. The client's project owner asks for the feature in writing and accepts that their event name and support address appear on Google's consent screen, and that Google contacts them about it.
 - [ ] Onboarding §3 items 1 and 2 are complete and attested with `init-event.cjs --attest-auth`: Google sign-in is enabled and the authorized domains are set.

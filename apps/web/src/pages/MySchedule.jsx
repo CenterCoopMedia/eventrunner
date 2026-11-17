@@ -178,9 +178,10 @@ export default function MySchedule() {
           <Link to="/schedule" className={quietActionClass}>
             Full schedule
           </Link>
-          {features.icsExport && mySessions.length > 0 ? (
+          {features.icsExport ? (
             <button
               type="button"
+              disabled={loading || (!deviceOnly && bookmarksLoading)}
               onClick={() => downloadIcs(icsFileName('my-schedule'), buildIcsCalendar(eventConfig, mySessions))}
               className={quietActionClass}
             >
@@ -298,7 +299,7 @@ export default function MySchedule() {
       {/* Optional Google Calendar sync (issue #177, ADR 0003): the flag
           gates the whole card, and the .ics download above it stays the
           answer whenever the grant is refused or the flag is off. */}
-      {features.calendarSync && !deviceOnly && !loading && !bookmarksLoading ? (
+      {features.calendarSync === true && features.icsExport === true && !deviceOnly && !loading && !bookmarksLoading ? (
         <CalendarSyncCard key={user.uid} sessions={accountSessions} eventConfig={eventConfig} />
       ) : null}
     </article>

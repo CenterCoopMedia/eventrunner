@@ -1063,7 +1063,7 @@ function validateBadgesConfig(badges) {
 
 /**
  * Validate a config/features document: booleans only, unknown keys
- * rejected.
+ * rejected. Calendar sync also requires its schedule and export fallback.
  *
  * @param {object} features
  * @returns {{ ok: boolean, errors: string[] }}
@@ -1080,6 +1080,14 @@ function validateFeatures(features) {
     }
     if (typeof value !== 'boolean') {
       errors.push(`features.${key}: must be a boolean, got ${JSON.stringify(value)}`);
+    }
+  }
+  if (features.calendarSync === true) {
+    const missing = [
+      ['schedule', 'Public schedule'], ['sessionBookmarks', 'Session bookmarks'], ['icsExport', 'Calendar export'],
+    ].filter(([key]) => features[key] !== true).map(([, label]) => label);
+    if (missing.length) {
+      errors.push(`features.calendarSync: enable ${missing.join(', ')} or turn off Calendar sync`);
     }
   }
   return { ok: errors.length === 0, errors };

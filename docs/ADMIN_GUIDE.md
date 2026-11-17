@@ -1150,6 +1150,8 @@ The questions are stored in `config/registration_form`, which anyone can read, b
 
 Feature flags, wired to a **whole-document replace** — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form's key list comes from the same shared schema the server validates against.
 
+Google Calendar sync requires Public schedule, Session bookmarks and Calendar export (.ics); keep it off until the operator signs the [Calendar onboarding checklist](CLIENT_ONBOARDING.md#6-optional-google-calendar-sync-configfeaturescalendarsync).
+
 New sites start with attendee badges, custom badges, live updates, and change requests on. These features need no provider setup. Explicit setup choices and stored settings on existing sites stay unchanged. Written updates keep their existing default.
 
 **Field performance monitoring.** New and existing sites start with this feature off. Before an operator turns it on, the client's counsel reviews the performance notice and retention text on the Privacy policy page. When it is on, the site samples 10% of browser documents after the first paint. It sends Core Web Vitals and counts of waits that show the site's taking-longer message to the site's own Event Runner function. The application payload and daily aggregate store use categorical route patterns and mobile or desktop viewport classes. They do not contain full page URLs, page-element selectors, account identifiers, cookie identifiers, session identifiers, IP addresses, or IP address hashes. Standard platform HTTP request logs are separate and unchanged. The measurements use no third-party analytics endpoint.
