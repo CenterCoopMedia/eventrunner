@@ -570,10 +570,11 @@ async function stepDeployIdentity(ctx) {
   } else {
     notes.push('no appspot account yet');
   }
-  // createCustomToken may sign as the runtime account (unconfirmed, granted to be safe).
-  if (await grant(ctx, 'compute signs as itself', accountResource(ctx, compute), [
+  // The runtime and CCM support use this existing signer for Firebase tokens.
+  if (await grant(ctx, 'compute token signing', accountResource(ctx, compute), [
     { role: 'roles/iam.serviceAccountTokenCreator', member: serviceAccount(compute) },
-  ])) notes.push('let compute sign as itself');
+    ...supportAdminEmails(ctx).map((email) => ({ role: 'roles/iam.serviceAccountTokenCreator', member: `user:${email}` })),
+  ])) notes.push('let compute and CCM support sign tokens');
 
   await identityPool(ctx, notes);
 
