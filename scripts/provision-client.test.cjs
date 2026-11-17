@@ -1194,7 +1194,7 @@ test('the token is tested, moved, and deleted from the console, and the leftover
   assert.equal(fake.state.endpoints.length, 0);
 });
 
-test('fresh provisioning grants CCM support site operator and project Editor access alongside client Owners', async () => {
+test('fresh provisioning grants CCM support operator, Editor and compute signer access alongside client Owners', async () => {
   const fake = setup();
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   const bootstrap = fake.clientFirestore.read('config/bootstrap');
@@ -1203,9 +1203,14 @@ test('fresh provisioning grants CCM support site operator and project Editor acc
   }
   assert.deepEqual(bootstrap.supportAdminEmails, ['jamditis@gmail.com', 'amditisjunk@gmail.com']);
   const project = bindingsOf(fake, `cloudresourcemanager.googleapis.com/v3/projects/${PROJECT}`);
+  const signer = bindingsOf(fake, `iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/${COMPUTE}`);
   for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com']) {
     assert.ok(holds(project, 'roles/editor', `user:${email}`), email);
+    assert.ok(holds(signer, 'roles/iam.serviceAccountTokenCreator', `user:${email}`), email);
+    assert.equal(holds(project, 'roles/iam.serviceAccountTokenCreator', `user:${email}`), false, 'signer grant stays scoped to the compute account');
   }
+  assert.ok(holds(signer, 'roles/iam.serviceAccountTokenCreator', `serviceAccount:${COMPUTE}`));
+  assert.equal(holds(signer, 'roles/iam.serviceAccountTokenCreator', 'user:ana@example.org'), false);
   assert.equal(holds(project, 'roles/editor', 'user:ana@example.org'), false);
 });
 
@@ -1223,6 +1228,10 @@ test('a provisioning retry preserves client operators and configured support acc
   const editor = project.find((binding) => binding.role === 'roles/editor');
   editor.members = editor.members.filter((member) => member !== 'user:amditisjunk@gmail.com');
   editor.members.push('user:existing-operator@example.org');
+  const signerKey = `iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/${COMPUTE}`;
+  const signer = bindingsOf(fake, signerKey).find((binding) => binding.role === 'roles/iam.serviceAccountTokenCreator');
+  signer.members = signer.members.filter((member) => member !== 'user:amditisjunk@gmail.com');
+  signer.members.push('user:existing-helper@example.org');
   await fake.db.doc('applications/a1').update({ status: 'building' });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   const after = (await ref.get()).data();
@@ -1236,6 +1245,11 @@ test('a provisioning retry preserves client operators and configured support acc
   for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com', 'existing-operator@example.org']) {
     assert.ok(holds(afterPolicy, 'roles/editor', `user:${email}`), email);
   }
+  const afterSigner = bindingsOf(fake, signerKey);
+  for (const email of ['jamditis@gmail.com', 'amditisjunk@gmail.com', 'existing-helper@example.org']) {
+    assert.ok(holds(afterSigner, 'roles/iam.serviceAccountTokenCreator', `user:${email}`), email);
+  }
+  assert.ok(holds(afterSigner, 'roles/iam.serviceAccountTokenCreator', `serviceAccount:${COMPUTE}`));
 });
 
 const ANA = { uid: 'ana', email: 'ana@example.org' };
