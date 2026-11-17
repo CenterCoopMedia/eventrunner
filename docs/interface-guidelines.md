@@ -396,7 +396,7 @@ Preserve a server message's useful facts and recovery steps, including a result 
 
 ### Event hero and demo preview
 
-Home owns its h1 and configured hero actions in EventHero. From 640px up, its copy has a separate column and the artwork fills the rest; no live text sits on the photograph. The column reads `--hero-copy-min-inline-size`, the title reads `--hero-title-fit`, and copy keeps `--hero-inset-inline` at every width. A surface-color veil is allowed over the leading edge of the artwork. Below 640px, artwork and caption precede Home's title, details and actions in visual and reading order.
+Home owns its h1 and configured hero actions in EventHero. From 640px up, its copy has a separate column and the artwork fills the rest; no live text sits on the photograph. The column reads `--hero-copy-min-inline-size`, the title reads `--hero-title-fit`, and copy keeps `--hero-inset-inline` at every width. A surface-color veil is allowed only over the leading edge of the artwork. Below 640px, artwork and caption precede Home's title, details and actions in visual and reading order.
 
 Schedule uses a compact image-only band when artwork is available. It preserves the safe image URL, required alt text, focal point and caption without repeating the event name. Its page h1 and event dateline sit below the band with the shared xl spacing step. Without artwork there is no empty band. Public main content uses xl top padding for both navigation placements. Dense session controls retain their tighter spacing. See the [binding design brief](plans/2026-08-27-design-system-overhaul.md) for the component contracts.
 
