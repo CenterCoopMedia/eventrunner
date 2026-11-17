@@ -44,7 +44,7 @@ export default function AdminSpecimen() {
 
   return (
     <main className="admin-room min-h-screen bg-admin-ground font-admin-ui text-admin-ink" onClickCapture={holdExampleNavigation}>
-      <div className="admin-stone mx-auto flex max-w-admin-canvas flex-col gap-md px-md py-lg lg:px-lg">
+      <div className="admin-stone mx-auto flex flex-col gap-md px-md py-lg lg:px-lg">
         <AdminPageHeader title="Admin devices" description={longDescription ? LONG_DESCRIPTION : SHORT_DESCRIPTION}
           state={<div className="flex flex-wrap gap-xs"><RecordState state={{ id: 'live', label: 'Live' }} /><RecordState state={{ id: 'draft', label: 'Draft' }} /><RecordState state={{ id: 'dirty', label: 'Live with unpublished changes' }} /></div>}
           actions={<div className="flex flex-wrap gap-xs">{['light', 'dark'].map((value) => (

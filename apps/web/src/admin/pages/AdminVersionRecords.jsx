@@ -161,7 +161,7 @@ export default function AdminVersionRecords() {
         caption="Records"
         hideCaption
         className="max-h-[40rem] bg-admin-ground-raised"
-        tableClassName="min-w-[40rem]"
+        tableClassName="admin-version-records-table min-w-[40rem]"
         sort={sort === 'name' ? { column: 'record', direction: 'ascending' } : { column: 'published', direction: 'descending' }}
         columns={[
           { id: 'record', label: 'Record' },

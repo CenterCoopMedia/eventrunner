@@ -51,9 +51,15 @@
 }
 
 
-/* A fluid canvas with fields that fill their panels. Wide screens gain
-   useful parallel groups; compact controls keep their own size limits. */
-.admin-stone { max-inline-size: none; }
+/* Title bands and work share one bounded grid; prose keeps its own measure. */
+.admin-stone { --font-heading: var(--admin-font-ui); }
+.admin-stone, .admin-pending-notice { max-inline-size: var(--admin-canvas-max); }
+/* The resizable client preview needs the available workspace beside its editor. */
+.admin-stone:has(.admin-branding-workspace) { max-inline-size: none; }
+:where(.admin-prose, .admin-stone p,
+.admin-editor-disclosure__description) { max-inline-size: var(--admin-measure-text); }
+.admin-version-records-table :is(th, time) { white-space: nowrap; }
+.speaker-photo-field--admin fieldset > .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
 .admin-panel { overflow-wrap: anywhere; }
 .admin-panel__heading { align-items: center; }
 .admin-editor-layout, .admin-editor-stack, .admin-page-basics, .admin-page-section-list,
@@ -164,7 +170,7 @@
 @media (min-width: 1280px) {
   .admin-editor-layout { grid-template-columns: minmax(0, min(42rem, 40%)) minmax(0, 1fr); }
   .admin-editor-stack { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
-  .admin-editor-layout--speaker { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr); }
+  .admin-editor-layout--speaker { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
   .admin-page-basics { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
   .admin-page-section-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); }
   .admin-page-block-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); }
@@ -174,13 +180,6 @@
   .admin-settings-grid, .admin-feature-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-settings-grid--essentials > :last-child:nth-child(3) { grid-column: 1 / -1; }
   .admin-settings-row-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
-}
-@media (min-width: 1800px) {
-  .admin-settings-grid--essentials { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .admin-settings-grid--essentials > :last-child:nth-child(3) { grid-column: auto; }
-  .admin-branding-workspace { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
-  .admin-page-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .admin-section-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @container (min-width: 54rem) {

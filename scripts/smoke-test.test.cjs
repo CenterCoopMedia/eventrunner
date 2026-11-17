@@ -190,11 +190,25 @@ test('HTTP: a rollout 500 then 204 becomes ready within the bound', { timeout: 5
   assert.equal(requests.indexOf('GET /public'), 3);
 });
 
-test('HTTP: persistent 500s time out naming only endpoints never ready', { timeout: 5000 }, async (t) => {
-  const { checks, requests, counts, base } = await smokeServer(t, {
-    '/getSentEmail': [500],
-    '/getSiteContent': [503],
-    '/emailDeliveryWebhook': [405],
+test('persistent 500s time out naming only endpoints never ready', { timeout: 5000 }, async (t) => {
+  const base = 'https://smoke.example.test';
+  const statuses = new Map([['/getSentEmail', 500], ['/getSiteContent', 503], ['/emailDeliveryWebhook', 405]]);
+  const requests = [];
+  const counts = new Map();
+  const checks = [
+    { url: `${base}/public`, method: 'GET' },
+    ...[...statuses.keys()].map((pathname) => ({ url: `${base}${pathname}`, method: 'OPTIONS' })),
+  ];
+  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'error', () => {});
+  // This checks readiness diagnostics, without a final HTTP request racing its
+  // own deadline. The HTTP rollout covers transport; the probe-abort case
+  // separately checks a request that never responds.
+  t.mock.method(globalThis, 'fetch', async (url, { method }) => {
+    const pathname = new URL(url).pathname;
+    requests.push(`${method} ${pathname}`);
+    counts.set(pathname, (counts.get(pathname) || 0) + 1);
+    return new Response(null, { status: statuses.get(pathname) ?? 200 });
   });
   const started = performance.now();
   assert.equal(await runChecks(checks, { timeoutMs: 250, intervalMs: 20 }), 1);

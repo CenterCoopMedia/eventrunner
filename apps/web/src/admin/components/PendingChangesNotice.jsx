@@ -5,16 +5,16 @@ export const UNPUBLISHED_PATH = '/admin/unpublished';
 /** The shell's notice, without the live count or own-page suppression. */
 export default function PendingChangesNotice({ failed, total, sentence }) {
   return (
-    <div className="mx-auto w-full max-w-admin-canvas">
+    <div className="admin-pending-notice w-full">
       <aside
         aria-label="Unpublished changes"
         data-pending-total={failed ? undefined : total}
         className="border-admin-rule-hairline border-b-admin-hairline bg-admin-ground-proof px-md py-xs text-admin-sm text-admin-ink lg:px-lg"
       >
         {failed ? (
-          <p>We could not count the unpublished changes. We will try again.</p>
+          <p className="admin-prose">We could not count the unpublished changes. We will try again.</p>
         ) : (
-          <p>
+          <p className="admin-prose">
             {sentence}{' '}
             {/* The ink, not the link ink: the ink on the proof ground is a
                 measured pair, and the underline and weight say "link". It
