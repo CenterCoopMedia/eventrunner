@@ -3,10 +3,8 @@ import { focalPosition, useSizedImageSources } from './LeadImage.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 
 // One live content contract; each preset composes its own artwork and marks.
-// Home owns the h1; the schedule uses a paragraph before its own heading.
-// `compact` is the Schedule-only interior-page treatment at every width.
-// It keeps the event name and dateline, drops the repeated tagline, and uses
-// a shorter art crop while preserving meaningful alt text and captions.
+// Home owns the h1. Schedule's compact treatment supplies artwork only;
+// its page introduction owns the event dateline.
 export default function EventHero({
   name,
   dates,
@@ -42,17 +40,18 @@ export default function EventHero({
     </div>
     {caption ? <figcaption className="event-hero__caption">{caption}</figcaption> : null}
   </figure> : null;
+  if (compact) return figure ? (
+    <div className="event-hero event-hero--illustrated event-hero--compact">{figure}</div>
+  ) : null;
   return (
     <div
       className={[
         'event-hero',
         src ? 'event-hero--illustrated' : '',
-        compact ? 'event-hero--compact' : '',
       ].filter(Boolean).join(' ')}
     >
       {src ? <div className="event-hero__veil" aria-hidden="true" /> : null}
-      {/* Phone reading order follows the artwork on Home; Schedule keeps its compact lead. */}
-      {compact ? null : figure}
+      {figure}
       <div className="event-hero__copy">
         {name ? <Name id={nameId} className="event-hero__title font-heading">{name}</Name> : null}
         {dates || place ? (
@@ -65,7 +64,6 @@ export default function EventHero({
         {typeof tagline === 'string' && tagline.trim() ? <p className="event-hero__tagline font-body">{tagline}</p> : null}
         {children}
       </div>
-      {compact ? figure : null}
     </div>
   );
 }

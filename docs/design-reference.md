@@ -1,6 +1,6 @@
 # Site design reference
 
-> September 11, 2026 update: the approved hero mockups supersede the full-size shell masthead and image-free lead descriptions below. Header now uses a compact identity beside navigation; Home and Schedule own EventHero with style-specific artwork and component tokens. The hero alone permits a surface-color opacity veil for text readability. See the dated update in [the binding design brief](plans/2026-08-27-design-system-overhaul.md).
+The header uses compact event identity beside navigation. Home owns the full EventHero with style-specific artwork and component tokens. Schedule uses an image-only band with meaningful alt text and any caption; its page title and event dateline sit below the band. Public page introductions use the same top spacing for top and side navigation. The full hero permits a surface-color opacity veil for text readability. See the [binding design brief](plans/2026-08-27-design-system-overhaul.md) for the component contracts.
 
 
 Everything the look of a client site is made of: The six site styles, the type, the illustrations, the headers, the page templates, the colour, the tokens under all of it, what prints, and where a developer extends it.

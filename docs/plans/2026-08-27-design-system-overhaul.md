@@ -174,7 +174,7 @@ Never use a device as decoration.
 
 | Device | What it is | Where to use it | The rule |
 |---|---|---|---|
-| **Masthead nameplate** | A rule-bounded title block. It holds the event name, the dates, and the edition line. | The header of a deployment whose theme names the `masthead` or `compact` treatment (§2.5.1). | Never a hero banner with a background image. Never a photo behind the name. The nameplate is type and rules only. Never mandatory: A theme chooses it. |
+| **Masthead nameplate** | A rule-bounded title block. It holds the event name, the dates, and the edition line. | The shared header of a deployment whose theme names the `masthead` or `compact` treatment (§2.5.1). | The shared header uses type and rules on a solid surface. Home and Schedule place their artwork in main content. A theme chooses the nameplate treatment. |
 | **Lead image** | One picture beside the opening copy, or below it at narrow viewports. | The opening section of a page whose subject has a face, a place, or a room. | See §2.5.2. Text never sits over it. Alt text, a token-fixed crop, and a stated focal point are all required. One per page. |
 | **Hairline rules** | Low-contrast 1px rules that separate content. | Section boundaries, table rows, folios, column gutters. | A rule replaces a card border. A rule never carries brand color. Rules use the `--rule-*` tokens only. |
 | **Folios** | A small-caps plain-text label beside a rule. It states the section, the day, or the page role. | A section boundary, a schedule day head, an archive label, a margin, or a running header. | Never a chip. Never a pill. Never a colored badge. Text plus rule only. A folio never sits directly above a heading. See §2.4. |
@@ -398,7 +398,7 @@ Bind these:
   page's own headline is that same name, the page keeps its `<h1>` for structure and does not print
   it a second time. The other three treatments set the identity at running-header size, so a page
   headline that repeats it is not a repetition a reader sees.
-- No treatment puts text over an image, and none of them is a hero banner.
+- All four shared-header treatments use a solid surface for event identity. Home's full EventHero and Schedule's artwork band live in main content.
 - A theme may name any of the four. Never make one of them mandatory across every deployment.
 
 #### 2.5.2 The lead image
@@ -939,8 +939,7 @@ Restyle the public site in full. Move it onto the new base system and the preset
 
 Bind these:
 
-- Every public page gets one of the four headers in §2.5.1. The active theme names which. Remove
-  the hero-banner pattern.
+- Every public page gets one of the four shared headers in §2.5.1. The active theme names which. Home owns its full EventHero; Schedule owns an image-only artwork band when an image is available.
 - A page may open with one lead image beside its opening copy (§2.5.2). Text never sits over it.
 - Every section boundary uses rules and folios. Remove decorative card chrome.
 - `SessionCard` loses the colored left edge. `TypeBadge` loses the pill radius. This closes #113.
@@ -1277,10 +1276,10 @@ in PR2. Nothing here blocks PR1.
 
 ## September 11, 2026: approved hero and header update
 
-The approved Harborlight mockups supersede the earlier home lead and full-size masthead restrictions for this scope. The shared header keeps a compact event identity beside navigation. The home page owns its visible heading in EventHero. The public schedule may repeat the event identity as a paragraph in the same hero before its own Schedule heading. Other inner routes retain their compact header without a hero.
+The shared header keeps compact event identity beside navigation. Home owns its visible heading in EventHero. Schedule uses an image-only compact band when artwork is available, followed by its page heading and event dateline at the shared xl spacing step. It draws no empty band when artwork is absent. Other inner routes retain their compact header without a hero.
 
 Each style has its own artwork and composition: newsroom editorial collage, civic architecture, broadsheet engraving, field-guide natural history, zine print collage, and Atlas waterfront transit in day and night versions. Atlas carries a yellow route through the hero and restrained stops along the schedule. Real client logos remain supported; an absent logo does not gain a decorative square.
 
-A surface-color opacity veil is permitted only within the illustrated EventHero to keep live text readable over artwork. It is not permitted as decoration elsewhere. Below 640px, Home places the image and its caption before the event title, details, and actions in both visual and reading order, in every style. A meaningful caption or credit stays inside the image's figure on phones, including before the Home h1, as specified in the eyebrow rule above. Schedule keeps its compact copy before the image. Safe image URLs, required alt text, focal points, captions, live text, editor-authored actions, keyboard access, and one h1 per page remain required. Theme variations use declared component tokens.
+A surface-color opacity veil is permitted only within the full illustrated EventHero to keep live text readable over artwork. Below 640px, Home places the image and caption before the event title, details and actions in visual and reading order. A meaningful caption or credit stays inside the image's figure. Schedule preserves its artwork and caption without hero copy; the event date and place remain in its page introduction. Safe image URLs, required alt text, focal points, captions, live text, editor-authored actions, keyboard access and one h1 per page remain required. Theme variations use declared component tokens.
 
 The static demo has a full-screen preview control. It hides demo controls while exploring, has an always-available exit, supports Escape, and preserves the selected style and route. A client build includes no demo controls. Fictional content keeps its clear demo disclosure outside preview without repeated bracketed prefixes in every label.

@@ -101,7 +101,7 @@ export default function HeadersSection({ folio }) {
       <Figure name="Event hero" file="components/EventHero.jsx" contract="event-hero" note="The page owns its hero; each style supplies the composition and artwork.">
         <EventHero name={identity.name} dates={identity.dates} place={identity.edition} tagline={eventConfig.tagline} image={demoHero(theme)} />
       </Figure>
-      <Figure name="Compact interior event hero" file="components/EventHero.jsx" contract="event-hero--compact" note="Schedule keeps event identity while reducing repeated material on phones.">
+      <Figure name="Compact interior artwork" file="components/EventHero.jsx" contract="event-hero--compact" note="Schedule uses an artwork band. Its page introduction carries the event dateline.">
         <EventHero compact name={identity.name} dates={identity.dates} place={identity.edition} tagline={eventConfig.tagline} image={demoHero(theme)} />
       </Figure>
     </SpecimenSection>

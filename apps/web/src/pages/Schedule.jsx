@@ -358,6 +358,8 @@ export default function Schedule() {
   const archived = eventIsArchived(eventConfig);
   const backIssue = activeDay ? isBackIssue(activeDay, eventConfig) : false;
   const hasAnySession = sessionsByDay.size > 0;
+  const nameplate = buildNameplate(eventConfig);
+  const dateline = [nameplate.dates, nameplate.edition].filter(Boolean).join(' · ');
   const eventZoneLabel = activeDay
     ? zoneLabel(
         eventConfig.timezone,
@@ -369,15 +371,12 @@ export default function Schedule() {
     <SystemPage pageId="schedule">
       <EventHero
         compact
-        name={eventConfig.name}
-        dates={buildNameplate(eventConfig).dates}
-        place={buildNameplate(eventConfig).edition}
-        tagline={eventConfig.tagline}
         image={demoHero(theme, { compact: true }) ?? getSectionBlocks?.('hero')?.find((block) => block.blockType === 'image')}
       />
       <header className="schedule-page-header">
         <div>
           <h1 className="font-heading text-h1 font-semibold text-text-primary">{pageHeading(page) || 'Schedule'}</h1>
+          {dateline ? <p className="schedule-dateline mt-xs font-data text-caption text-text-secondary">{dateline}</p> : null}
           {IS_DEMO ? (
             <p className="mt-2xs max-w-prose text-body text-text-secondary">
               Selected historical program. Tracks and format chips are demo groupings.

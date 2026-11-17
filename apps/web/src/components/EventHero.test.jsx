@@ -22,8 +22,8 @@ describe('EventHero artwork', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('resolves a picked path to the bucket and offers the sizes', async () => {
-    render(<EventHero name="Summit" image={IMAGE} />);
+  it.each([false, true])('preserves picked artwork and its caption with compact=%s', async (compact) => {
+    render(<EventHero name="Summit" compact={compact} image={{ ...IMAGE, caption: 'The registration hall.' }} />);
     const img = screen.getByAltText(IMAGE.alt);
     await waitFor(() => expect(img).toHaveAttribute('srcset'));
     expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
@@ -34,6 +34,7 @@ describe('EventHero artwork', () => {
     expect(img).toHaveAttribute('sizes', '100vw');
     expect(img).toHaveAttribute('fetchpriority', 'high');
     expect(img).toHaveStyle({ objectPosition: '10% 90%' });
+    expect(screen.getByText('The registration hall.')).toHaveClass('event-hero__caption');
   });
 
   it('falls back to the original when a size fails to load', async () => {

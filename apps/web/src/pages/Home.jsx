@@ -207,6 +207,7 @@ export default function Home() {
       // otherwise print its heading over nothing.
       const cards = groupIntoCards(
         infoBlocks
+          .filter((block) => !(days.length > 0 && block.blockType === 'fact' && block.seeded === true && block.field === 'when'))
           .map((block) => withLiveDates(block, eventConfig))
           .filter((block) => !isStarterContent(block)),
       );
