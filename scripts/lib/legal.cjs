@@ -137,7 +137,7 @@ function buildPrivacyBlocks(ctx) {
       value: clause(
         `We share personal information with the service providers that run this site: ${processors.join(', ')}. ` +
         'If the Center for Cooperative Media (CCM) hosts this site, authorized CCM staff and its support account have full operator access to site content, attendee records and settings to provide support and diagnose problems. ' +
-        'For CCM-hosted sites, CCM support also keeps permanent Editor access to the Google Cloud/Firebase project to manage resources and inspect project data; removing site access does not remove this project access. Contact CCM to review project access separately. ' +
+        'For CCM-hosted sites, CCM support also keeps permanent Editor access to the Google Cloud/Firebase project and signing access through the runtime service account. This permits resource changes, project data access, sign-in as any site user and use of the runtime service identity. Removing site access removes neither IAM grant, and removing Editor alone leaves signing access. Contact CCM to review and remove each grant separately when support ends. ' +
         'We do not sell personal information.',
       ),
     },

@@ -1188,7 +1188,7 @@ Operators only. One ruled table of every admin account with its tier word, and a
 
 CCM support does not count toward the second-organizer setup check or receive alerts meant for your operators. The configured CCM platform contact still gets a copy of each client alert.
 
-CCM also keeps permanent Editor access to the site's Google Cloud/Firebase project for hosting, support and diagnosis. This permits changes to project resources and access to project data. Removing a support account in **Settings → Access** changes its site access only; it does not remove project access. Ask CCM to review project access separately.
+CCM also keeps permanent Editor access to the site's Google Cloud/Firebase project for hosting, support and diagnosis. Its support accounts can sign in as any site user and use the site's runtime service identity. Removing a support account in **Settings → Access** removes neither project access nor signing access; removing Editor alone also leaves signing access. Ask CCM to review and remove each grant separately when support ends.
 
 **Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. A new account grant sends one transactional email naming the event, role, event admin address and any staff end time. It tells the person to use the exact granted email address and request an emailed sign-in code. Google sign-in is not required. The admin address is a regular sign-in page, not a one-time invitation.
 

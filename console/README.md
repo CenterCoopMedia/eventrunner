@@ -103,7 +103,7 @@ A member record repeats its own uid. Firestore cannot query a collection group b
 - **Owner**: runs the event site and manages the team. In the event admin, an Owner is an operator.
 - **CCM support**: the builder merges `EVENT_SUPPORT_ADMIN_EMAILS` into the site's operator list. These accounts are labeled in Access, have full operator permissions, and use the same change/removal rules as other operators. A build retry adds the configured support accounts again and preserves client operators.
 
-  The same setting gives those Google users permanent Editor access to the client Firebase/GCP project. The provisioner preserves existing IAM bindings and restores missing support grants on retry. Removing site access does not remove project access; CCM reviews that separately.
+  The same setting gives those Google users permanent Editor access to the client Firebase/GCP project and Token Creator on its existing compute runtime account. Support can sign in as any site user and mint runtime access tokens. The provisioner preserves other bindings and restores missing support grants on retry. Removing site access removes neither IAM grant, and removing Editor alone leaves signing access. CCM reviews each grant separately during offboarding.
 - **Editor**: edits the event content. In the event admin, an Editor is staff.
 - **Operator**: a CCM person named in `console_config/operators`. An operator can read every organization and team, and reviews requests. An operator does not change a client's team.
 
