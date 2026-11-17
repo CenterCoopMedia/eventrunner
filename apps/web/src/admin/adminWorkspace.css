@@ -51,9 +51,11 @@
 }
 
 
-/* A fluid canvas with fields that fill their panels. Wide screens gain
-   useful parallel groups; compact controls keep their own size limits. */
-.admin-stone { max-inline-size: none; }
+/* Title bands and work share one bounded grid; prose keeps its own measure. */
+.admin-stone { max-inline-size: 64rem; }
+.admin-stone :is(h1, h2, h3, h4, h5, h6) { font-family: var(--admin-font-ui); }
+.admin-prose, .admin-field__hint, .admin-section-intro p,
+.admin-object-row__description, .admin-editor-disclosure__description { max-inline-size: 68ch; }
 .admin-panel { overflow-wrap: anywhere; }
 .admin-panel__heading { align-items: center; }
 .admin-editor-layout, .admin-editor-stack, .admin-page-basics, .admin-page-section-list,

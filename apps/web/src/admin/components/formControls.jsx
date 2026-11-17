@@ -32,7 +32,7 @@ import './adminControls.css';
  * stops matching its neighbours.
  */
 export const fieldLabelClass = 'text-admin-base font-semibold text-admin-ink';
-export const fieldHintClass = 'text-admin-sm text-admin-ink-secondary';
+export const fieldHintClass = 'admin-prose text-admin-sm text-admin-ink-secondary';
 
 // Neither a field nor a button carries `admin-target`: that class is the
 // 24px floor under a quiet in-row link, and Tailwind emits it after the
@@ -656,7 +656,7 @@ export function Panel({
           <div className="min-w-0 flex-auto">
             <div className="flex items-center gap-2xs"><h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2><HelpTooltip label={title} descriptionId={help === description ? descriptionId : undefined}>{help}</HelpTooltip></div>
             {description ? (
-              <p id={descriptionId} className="mt-3xs text-admin-sm text-admin-ink-secondary">
+              <p id={descriptionId} className="admin-prose mt-3xs text-admin-sm text-admin-ink-secondary">
                 {description}
               </p>
             ) : null}

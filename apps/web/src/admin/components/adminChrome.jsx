@@ -114,7 +114,7 @@ export function AdminEmptyState({ title, description, action = null }) {
     <div className="grid place-items-center gap-xs rounded-admin-panel border-admin-hairline border-dashed border-admin-rule-strong bg-admin-ground-raised px-md py-xl text-center">
       <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2>
       {description ? (
-        <p className="w-full text-admin-sm text-admin-ink-secondary">{description}</p>
+        <p className="admin-prose w-full text-admin-sm text-admin-ink-secondary">{description}</p>
       ) : null}
       {action ? <div className="mt-2xs">{action}</div> : null}
     </div>
@@ -168,20 +168,25 @@ export default function AdminPageHeader({
     <>
       <header ref={headerRef} className="admin-job-line flex flex-col gap-2xs border-admin-rule-header border-b-admin-header bg-admin-ground-raised">
         <div className={`admin-job-line__heading ${feedback !== undefined ? 'admin-job-line__heading--editor' : ''}`}>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-sm gap-y-2xs">
-            <div className="flex min-w-0 items-center gap-2xs">
-              {/* The ink dot a compositor puts on the chase: a small solid mark
-                  beside the name. The one place the client accent appears. */}
-              <span
-                aria-hidden="true"
-                className="mr-xs h-2.5 w-2.5 shrink-0 rounded-admin-small bg-admin-page-header-mark"
-              />
-              <Heading className="min-w-0 break-words font-admin-ui text-admin-title font-bold text-admin-ink">
-                {title}
-              </Heading>
-              <HelpTooltip label={title} descriptionId={help === description ? descriptionId : undefined}>{help}</HelpTooltip>
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-sm gap-y-2xs">
+              <div className="flex min-w-0 items-center gap-2xs">
+                {/* The ink dot a compositor puts on the chase: a small solid mark
+                    beside the name. The one place the client accent appears. */}
+                <span
+                  aria-hidden="true"
+                  className="mr-xs h-2.5 w-2.5 shrink-0 rounded-admin-small bg-admin-page-header-mark"
+                />
+                <Heading className="min-w-0 break-words font-admin-ui text-admin-title font-bold text-admin-ink">
+                  {title}
+                </Heading>
+                <HelpTooltip label={title} descriptionId={help === description ? descriptionId : undefined}>{help}</HelpTooltip>
+              </div>
+              {state}
             </div>
-            {state}
+            {identifiers ? (
+              <p className="mt-2xs font-admin-data text-admin-xs text-admin-ink-data">{identifiers}</p>
+            ) : null}
           </div>
           {actions ? (
             <div className="admin-job-line__actions flex flex-wrap items-center gap-xs">
@@ -189,9 +194,6 @@ export default function AdminPageHeader({
             </div>
           ) : null}
         </div>
-        {identifiers ? (
-          <p className="font-admin-data text-admin-xs text-admin-ink-data">{identifiers}</p>
-        ) : null}
         {feedback ? (
           <div className="admin-job-feedback" role="region" aria-label="Editor action status">
             {feedback}
@@ -199,7 +201,7 @@ export default function AdminPageHeader({
         ) : null}
       </header>
       {description ? (
-        <p id={descriptionId} className="w-full text-pretty text-admin-sm text-admin-ink-secondary">{description}</p>
+        <p id={descriptionId} className="admin-prose w-full text-pretty text-admin-sm text-admin-ink-secondary">{description}</p>
       ) : null}
     </>
   );
