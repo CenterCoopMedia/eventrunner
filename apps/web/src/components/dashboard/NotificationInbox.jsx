@@ -82,7 +82,7 @@ function OwnerInbox({ user }) {
           pageEpoch.current += 1;
           pageFlight.current = null;
           setPaging(false);
-          setNotice('New replies arrived. Load older notifications to continue.');
+          setNotice('New replies arrived. Select “Show older notifications” to continue.');
         }
         headIds.current = new Set(next.items.map((item) => item.id));
         const retainHistory = paged.current;
