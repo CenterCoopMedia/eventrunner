@@ -51,7 +51,7 @@
         "section-mark": "section-mark.svg",
         "divider": "divider.svg",
         "nameplate-mark": "nameplate-mark.svg",
-        "empty-state": "empty-state.svg"
+        "empty-state": null
       }
     }
   }

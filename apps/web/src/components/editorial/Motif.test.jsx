@@ -58,14 +58,18 @@ describe('Motif', () => {
     expect(indexCss).toMatch(/\[data-motif-set='none'\] \.motif \{\s*display: none;\s*\}/);
   });
 
-  it('has an asset for every slot of every set it can switch to', () => {
-    // The `none` gate above covers the set being off. A set that declared an
-    // EMPTY slot would need its own gate, because an unmasked box paints as
-    // a solid rectangle of ink — so no set declares one, and this is where
-    // that invariant is held.
+  it('has an asset or an explicit display gate for every supported slot', () => {
+    // An absent mask must leave no painted box. Cartographic empty states
+    // deliberately use only their rule and message; all other active slots
+    // still require their declared asset.
     for (const [id, set] of Object.entries(motifs.sets)) {
       if (id === 'none') continue;
       for (const slot of motifs.slots) {
+        if (id === 'cartographic' && slot === 'empty-state') {
+          expect(set.slots[slot]).toBeNull();
+          expect(indexCss).toMatch(/\[data-motif-set='cartographic'\] \.motif--empty-state \{\s*display: none;\s*\}/);
+          continue;
+        }
         expect(set.slots[slot], `${id} declares the ${slot} slot`).toBeTruthy();
         expect(
           fs.existsSync(

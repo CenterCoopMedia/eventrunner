@@ -48,8 +48,8 @@
   --er-space-xl: 2.5rem;
   --er-space-2xl: 4rem;
   --er-space-3xl: 6rem;
-  --er-stage-frame: 95%;
-  --er-stage-measure: 100%;
+  --er-stage-frame: min(95%, 72rem);
+  --er-stage-measure: min(100%, 48ch);
   --er-width-hairline: 1px;
   --er-width-strong: 2px;
   --er-width-nameplate: 3px;
@@ -1966,7 +1966,7 @@
   --motif-section-mark: url('/motifs/cartographic/section-mark.svg');
   --motif-divider: url('/motifs/cartographic/divider.svg');
   --motif-nameplate-mark: url('/motifs/cartographic/nameplate-mark.svg');
-  --motif-empty-state: url('/motifs/cartographic/empty-state.svg');
+  --motif-empty-state: none;
 }
 
 /* Self-hosted font faces (spec §7.4): woff2 only, no font CDN at runtime.

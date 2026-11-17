@@ -150,7 +150,7 @@ A set of small drawings that carry a style's vocabulary, in four slots: A sectio
 - **None** — no drawings. What Institutional, Newsroom, Zine, and Broadsheet ship.
 - **Botanical** — leaves, seed heads, specimen sprigs. Built for Field Guide, off by default.
 - **Fauna** — the same idea in animals.
-- **Cartographic** — compass points, contour fragments, route marks. On for Atlas.
+- **Cartographic** — compass points, contour fragments, route marks. On for Atlas. Empty states use a rule and text without a separate drawing.
 
 They take the site's own ink and never carry a colour of their own, so a set cannot fight a client's palette.
 
@@ -160,15 +160,15 @@ They take the site's own ink and never carry a colour of their own, so a set can
 
 ### The stage and the measure
 
-The frame and running text each have a width token. The frame defaults to `95%` and centers. The measure defaults to `100%` of that content box.
+The frame and running text each have a width token. The public frame uses `min(95%, 72rem)` and centers. The running-text measure uses `min(100%, 48ch)` so it fits narrow columns and remains readable on a wide page.
 
 **The stage** is the frame. The header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer, and every section heading run to it. It leaves a small margin on both sides.
 
-**The measure** is running text. Paragraphs, lists, rich text, descriptions and answers fill the stage's content box, matching the section rule.
+**The measure** is running text. Paragraphs, lists, rich text, descriptions and answers use at most 48ch. The value is tuned from measured body lines: `ch` is the width of the font's zero, not a character count. Headings, section rules, schedule grids and directories keep the wider stage. The `max-w-prose` utility uses this same token.
 
-The stage retains its `--space-lg` inline gutter for the Atlas coordinate mark. At viewports of 1024px and wider, its content box uses at least 90 percent of the viewport. The specimen split uses one full-width track, and folios stay inside the stage at the end of the rule.
+The stage retains its `--space-lg` inline gutter for the Atlas coordinate mark. Header, navigation, main content and footer share the same cap at wide viewports. At narrow widths the frame keeps its responsive margin and gutter. The specimen split uses one full-width track, and folios stay inside the stage at the end of the rule.
 
-**Engine.** Both widths are tokens: `--stage-max` and `--measure-text`, declared in the page contract over a tier 2 stage family. Their source is `design/tokens/primitives.json`; regenerate the committed CSS with `node scripts/generate-content.cjs --demo`. The `arrangement` variant maps onto them: `grid` uses the stage's columns and `list` uses the measure. Admin introductions, panel descriptions, helper paragraphs, notices and confirmations fill their available content box. Narrative fields and public multi-step forms fill their workspace. Console management pages use a fluid frame with responsive gutters. Narrower sizes serve specific tasks: long-form agreement reading, focused identity flows, short-value controls, compact table columns, tooltips, email previews and modal shells; their contextual text fills the space inside them.
+**Engine.** Both widths are tokens: `--stage-max` and `--measure-text`, declared in the page contract over a tier 2 stage family. Their source is `design/tokens/primitives.json`; regenerate the committed CSS with `node scripts/generate-content.cjs --demo`. The `arrangement` variant maps onto them: `grid` uses the stage's columns and `list` uses the measure. Admin uses its own canvas token; introductions, helper paragraphs and notices fill the space within it. Public multi-step forms fill their workspace. Console management pages use a fluid frame with responsive gutters. Narrower sizes serve specific tasks: long-form agreement reading, focused identity flows, short-value controls, compact table columns, tooltips, email previews and modal shells; their contextual text fills the space inside them.
 
 ### Pages are chosen by task
 
@@ -367,7 +367,7 @@ What a developer can add, and what the system will refuse.
 
 **A new font set.** Add the woff2 to the bundle, declare the family, and register the set. It becomes selectable everywhere at once, because the type map is live.
 
-**A new illustration set.** Add it to the motif JSON with all four slots filled. A set with a hole in it renders nothing in that slot, which reads as a bug.
+**A new illustration set.** Add it to the motif JSON with its supported slots. A slot without an illustration is `null` and must be hidden by its display rule, including in the specimen book.
 
 **A new page template.** A template is a named, validated bundle of layout values plus the record of which task the operator meant. Add both, and state every axis: A template that left one unanswered would leave the page following the style for that one value while stating the others, which is the half-configured state templates exist to prevent.
 

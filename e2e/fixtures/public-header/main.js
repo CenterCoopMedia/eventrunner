@@ -2,10 +2,10 @@ import { createElement as h } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
 import { quietActionClass } from '../../../apps/web/src/components/controlClasses.js';
-import '../../../apps/web/src/generated/theme.css';
 
 const params = new URLSearchParams(globalThis.location.search);
 const before = params.get('source') === 'before' ? '?header-before' : '';
+await import(/* @vite-ignore */ `/@fs${globalThis.HEADER_SOURCE}/generated/theme.css${before}`);
 await import(/* @vite-ignore */ `/@fs${globalThis.HEADER_SOURCE}/index.css${before}`);
 const { default: Header } = await import(/* @vite-ignore */ `/@fs${globalThis.HEADER_SOURCE}/components/Header.jsx${before}`);
 const variant = params.get('variant');
