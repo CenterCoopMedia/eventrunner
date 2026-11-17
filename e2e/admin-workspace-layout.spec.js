@@ -11,7 +11,7 @@ async function firstId(collection) {
   return snapshot.docs[0].id;
 }
 
-test('admin workspaces fill desktop width and group readable cards without narrow overflow', async ({ page }) => {
+test('admin workspaces bound their reading width and group readable cards without narrow overflow', async ({ page }) => {
   test.setTimeout(180_000);
   const [sessionId, organizationId, speakerId, event] = await Promise.all([
     firstId('cmsSchedule'), firstId('cmsOrganizations'), firstId('speakers'),
@@ -69,11 +69,15 @@ test('admin workspaces fill desktop width and group readable cards without narro
       });
       const geometry = await page.evaluate(() => {
         const main = document.getElementById('admin-content').getBoundingClientRect();
-        const canvas = document.querySelector('.admin-stone').getBoundingClientRect();
+        const canvasElement = document.querySelector('.admin-stone');
+        const canvas = canvasElement.getBoundingClientRect();
+        const canvasToken = getComputedStyle(canvasElement).getPropertyValue('--admin-canvas-max').trim();
         const controls = [...document.querySelectorAll('#admin-content input, #admin-content select, #admin-content textarea, #admin-content button')]
           .filter((control) => control.getClientRects().length > 0);
         return {
           canvasWidth: canvas.width, mainWidth: main.width,
+          canvasLeft: canvas.left, mainLeft: main.left, canvasToken,
+          canvasLimit: Number.parseFloat(canvasToken) * Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
           viewportWidth: document.documentElement.clientWidth, pageWidth: document.documentElement.scrollWidth,
           cardsFit: [...document.querySelectorAll('#admin-content .admin-panel')]
             .filter((card) => card.getClientRects().length > 0)
@@ -95,7 +99,10 @@ test('admin workspaces fill desktop width and group readable cards without narro
           }),
         };
       });
-      expect(Math.abs(geometry.canvasWidth - geometry.mainWidth), `${task.name} uses its whole workspace`).toBeLessThanOrEqual(1);
+      expect(geometry.canvasToken, 'the organizer canvas uses the approved width token').toBe('64rem');
+      const expectedWidth = task.name === 'branding' ? geometry.mainWidth : Math.min(geometry.mainWidth, geometry.canvasLimit);
+      expect(Math.abs(geometry.canvasWidth - expectedWidth), `${task.name} uses its bounded workspace or wide preview`).toBeLessThanOrEqual(1);
+      expect(Math.abs(geometry.canvasLeft - geometry.mainLeft), `${task.name} keeps its leading grid edge`).toBeLessThanOrEqual(1);
       expect(geometry.pageWidth, `${task.name} page overflow at ${viewport.width}`).toBeLessThanOrEqual(geometry.viewportWidth + 1);
       expect(geometry.cardsFit, `${task.name} cards contain their content at ${viewport.width}`).toBe(true);
       expect(geometry.controlsFitCards, `${task.name} controls fit their cards at ${viewport.width}`).toBe(true);
