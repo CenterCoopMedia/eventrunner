@@ -220,7 +220,7 @@ Explain that CCM support can access site content, attendee records and settings 
 
 CCM support does not satisfy the second-operator setup check and is excluded from the Owner-alert recipients. The configured platform contact still gets a copy of client alerts.
 
-The same support setting gives each listed identity permanent `roles/editor` access as a Google user on the client's Google Cloud/Firebase project. Provisioning adds these IAM bindings without removing existing bindings and restores a missing support grant on retry. This project access permits changes to resources and access to data, and is separate from site access: removing an account in **Settings → Access** does not remove its project IAM grant. Explain both levels during handoff; CCM reviews project access separately.
+The same support setting gives each listed identity permanent `roles/editor` access on the client's Google Cloud/Firebase project and `roles/iam.serviceAccountTokenCreator` on its existing compute runtime account. Editor permits resource changes and project data access. Token Creator lets support sign Firebase custom tokens for any site uid and mint access tokens as the runtime account. Provisioning preserves existing bindings and restores missing support grants on retry. Removing an account in **Settings → Access** removes neither IAM grant; removing Editor alone also leaves signing access. Explain all three grants during handoff and review each one during offboarding.
 
 The first operator (from `--admin` above, or `config/bootstrap.adminEmails`) signs in and confirms
 the admin panel loads. Point them at **Set up your event** on the rail: it shows every row of
