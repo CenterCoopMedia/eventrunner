@@ -551,30 +551,34 @@ function TicketList({ call, refreshToken }) {
   return (
     <Panel help="Find tickets by email address and status." title="Tickets" description="Find tickets by email address and status.">
       <form
-        className="mb-md grid items-end gap-sm sm:grid-cols-[minmax(0,24rem)_minmax(10rem,14rem)_auto]"
+        className="mb-md flex flex-wrap items-end gap-sm"
         onSubmit={(event) => {
           event.preventDefault();
           setCursor(null);
           search(false);
         }}
       >
-        <TextField data-help-skip="Search field; its label names the email search."
-          label="Email"
-          type="email"
-          value={email}
-          onChange={setEmail}
-          placeholder="attendee@example.com"
-        />
-        <SelectField help="Choose which records to show in this list."
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          options={[
-            { value: '', label: 'Any' },
-            ...TICKET_STATUSES.map((value) => ({ value, label: ticketStatusLabel(value) })),
-          ]}
-        />
-        <button type="submit" className={`${secondaryButtonClass} self-end justify-self-start`} disabled={loading}>
+        <div className="min-w-0 grow basis-64 max-w-sm">
+          <TextField data-help-skip="Search field; its label names the email search."
+            label="Email"
+            type="email"
+            value={email}
+            onChange={setEmail}
+            placeholder="attendee@example.com"
+          />
+        </div>
+        <div className="min-w-0 grow basis-40 sm:max-w-xs">
+          <SelectField help="Choose which records to show in this list."
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: '', label: 'Any' },
+              ...TICKET_STATUSES.map((value) => ({ value, label: ticketStatusLabel(value) })),
+            ]}
+          />
+        </div>
+        <button type="submit" className={`${secondaryButtonClass} w-full sm:w-auto`} disabled={loading}>
           Search
         </button>
       </form>
