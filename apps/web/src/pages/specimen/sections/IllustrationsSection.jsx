@@ -10,6 +10,7 @@
 // so the page puts the original value back when the reader leaves.
 import { useEffect, useRef, useState } from 'react';
 import { THEME_MOTIF_SET_IDS } from 'shared/theme';
+import motifs from '../../../../../../design/tokens/motifs.json';
 import Motif, { MOTIF_SLOTS } from '../../../components/editorial/Motif.jsx';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
@@ -34,7 +35,7 @@ function SetRow({ setId }) {
       <ul className="flex flex-wrap gap-lg">
         {MOTIF_SLOTS.map((slot) => (
           <li key={slot} className="flex items-center gap-2xs">
-            <Motif slot={slot} className="h-8 w-8" />
+            {motifs.sets[setId].slots[slot] ? <Motif slot={slot} className="h-8 w-8" /> : null}
             <span className="font-data text-caption text-text-secondary">{slot}</span>
           </li>
         ))}

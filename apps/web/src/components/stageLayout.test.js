@@ -157,8 +157,8 @@ describe('the stage and the measure', () => {
     expect(themeCss).toMatch(/--measure-text:\s*var\(--stage-measure\);/);
     // The requested public frame stays responsive and stops growing at 72rem.
     expect(primitives.scalar.stage.frame).toBe('min(95%, 72rem)');
-    expect(primitives.scalar.stage.measure).toBe('min(100%, 68ch)');
+    expect(primitives.scalar.stage.measure).toBe('min(100%, 48ch)');
     expect(themeCss).toMatch(/--er-stage-frame:\s*min\(95%, 72rem\);/);
-    expect(themeCss).toMatch(/--er-stage-measure:\s*min\(100%, 68ch\);/);
+    expect(themeCss).toMatch(/--er-stage-measure:\s*min\(100%, 48ch\);/);
   });
 });

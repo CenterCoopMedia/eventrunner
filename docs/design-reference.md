@@ -160,11 +160,11 @@ They take the site's own ink and never carry a colour of their own, so a set can
 
 ### The stage and the measure
 
-The frame and running text each have a width token. The public frame uses `min(95%, 72rem)` and centers. The running-text measure uses `min(100%, 68ch)` so it fits narrow columns and remains readable on a wide page.
+The frame and running text each have a width token. The public frame uses `min(95%, 72rem)` and centers. The running-text measure uses `min(100%, 48ch)` so it fits narrow columns and remains readable on a wide page.
 
 **The stage** is the frame. The header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer, and every section heading run to it. It leaves a small margin on both sides.
 
-**The measure** is running text. Paragraphs, lists, rich text, descriptions and answers use at most 68ch. Headings, section rules, schedule grids and directories keep the wider stage. The `max-w-prose` utility uses this same token.
+**The measure** is running text. Paragraphs, lists, rich text, descriptions and answers use at most 48ch. The value is tuned from measured body lines: `ch` is the width of the font's zero, not a character count. Headings, section rules, schedule grids and directories keep the wider stage. The `max-w-prose` utility uses this same token.
 
 The stage retains its `--space-lg` inline gutter for the Atlas coordinate mark. Header, navigation, main content and footer share the same cap at wide viewports. At narrow widths the frame keeps its responsive margin and gutter. The specimen split uses one full-width track, and folios stay inside the stage at the end of the rule.
 

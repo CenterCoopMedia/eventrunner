@@ -2263,8 +2263,7 @@
      every motif on the page, nested attribute or not. This re-states the
      display for a row that names a set of its own, at a specificity that
      wins, and nowhere else. */
-  .specimen-motif-row:not([data-motif-set='none']) .motif:not(.motif--empty-state),
-  .specimen-motif-row:not([data-motif-set='none']):not([data-motif-set='cartographic']) .motif--empty-state {
+  .specimen-motif-row:not([data-motif-set='none']) .motif {
     display: inline-block;
   }
   .specimen-motif-row:not([data-motif-set='none']) .motif--divider {
