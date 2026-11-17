@@ -58,6 +58,7 @@ describe('Attendees', () => {
   it('gates the route behind config/features.attendeeDirectory, not just the nav link', () => {
     features.attendeeDirectory = false;
     renderPage();
+    expect(screen.getByRole('heading', { level: 1, name: 'Attendees' })).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'This event doesn’t have an attendee directory' }),
     ).toBeInTheDocument();
@@ -74,6 +75,7 @@ describe('Attendees', () => {
   it('sends a signed-out visitor to sign-in when the event has no public profiles', () => {
     profileValue = { status: 'signed-out', attendeeAccess: false, profile: null, needsProfileSetup: false };
     renderPage();
+    expect(screen.getByRole('heading', { level: 1, name: 'Attendees' })).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Sign in to see who’s attending' }),
     ).toBeInTheDocument();

@@ -195,9 +195,11 @@ describe('SchedulePage', () => {
     expect(screen.getByRole('heading', { level: 1, name: expected })).toBeInTheDocument();
   });
 
-  it('marks the repeated event identity as the compact interior-page hero', () => {
+  it('keeps the event dateline in the introduction without an empty artwork band', () => {
     const { container } = renderSchedule();
-    expect(container.querySelector('.event-hero')).toHaveClass('event-hero--compact');
+    expect(container.querySelector('.event-hero')).toBeNull();
+    expect(container.querySelector('.schedule-dateline')).toHaveTextContent('October 15–16, 2026');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
   it('groups sessions by day and sorts the active day by start time', () => {

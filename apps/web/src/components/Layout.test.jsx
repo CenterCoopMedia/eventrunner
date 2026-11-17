@@ -725,6 +725,7 @@ describe('Layout footer', () => {
 
   it('lists the same pages the navigation lists, in the same order', () => {
     const { container } = renderShell({});
+    expect(within(footer(container).querySelector(PAGE_NAV)).getByText('Site pages')).toBeInTheDocument();
     expect(footerLinks(container)).toEqual([
       { label: 'Home', href: '/' },
       { label: 'Schedule', href: '/schedule' },

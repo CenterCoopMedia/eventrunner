@@ -1,7 +1,7 @@
 // Event hero geometry in every site style, mode and width (#345, #478).
 //
 // The hero sets its copy beside a photograph from 640px up. On phones,
-// Home puts the photograph first (#753); compact Schedule keeps copy first.
+// Home puts the photograph first; Schedule uses an image-only band.
 // Two defects reached the public page because no check measured
 // what a reader sees: the copy column ran onto the photograph (#345), and
 // the copy started at the hero's coloured left edge with no inner inset
@@ -19,7 +19,7 @@ import { adminDb } from './helpers.mjs';
 const THEMES = ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'];
 const MODES = ['light', 'dark'];
 const WIDTHS = [320, 360, 375, 640, 768, 1024, 1280, 1440, 1920];
-// Below this width Home stacks artwork first and compact Schedule copy first.
+// Below this width Home stacks artwork before its copy.
 const SIDE_BY_SIDE_MIN = 640;
 // The smallest inner inset the copy may have from the hero's edge.
 const MIN_INSET = 12;
@@ -68,7 +68,6 @@ async function measureHero(page) {
     const figureRect = figure ? figure.getBoundingClientRect() : null;
     return {
       illustrated: hero.classList.contains('event-hero--illustrated'),
-      compact: hero.classList.contains('event-hero--compact'),
       artBeforeCopy: art ? Boolean(art.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING) : false,
       hero: { left: heroRect.left, right: heroRect.right },
       copy: { right: copyRect.right, top: copyRect.top },
@@ -85,6 +84,32 @@ async function measureHero(page) {
 
 function round(value) {
   return Math.round(value * 10) / 10;
+}
+
+async function compactHeroFaults(page, illustrated) {
+  const metrics = await page.evaluate(() => {
+    const hero = document.querySelector('.event-hero');
+    const art = hero?.querySelector('img');
+    const box = art?.getBoundingClientRect();
+    const frame = hero?.getBoundingClientRect();
+    return {
+      hero: Boolean(hero), copy: Boolean(hero?.querySelector('.event-hero__copy')),
+      alt: art?.getAttribute('alt'), dateline: document.querySelector('.schedule-dateline')?.textContent,
+      art: box ? { left: box.left, right: box.right, height: box.height } : null,
+      frame: frame ? { left: frame.left, right: frame.right } : null,
+      clientWidth: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth,
+    };
+  });
+  const faults = [];
+  if (metrics.copy) faults.push('compact artwork repeats event copy');
+  if (!metrics.dateline) faults.push('Schedule is missing its event dateline');
+  if (metrics.scrollWidth > metrics.clientWidth) faults.push('Schedule scrolls sideways');
+  if (illustrated) {
+    if (metrics.alt !== 'A wide photograph for the event hero.') faults.push('compact artwork loses its meaningful alt');
+    if (!metrics.art || metrics.art.height <= 0) faults.push('compact artwork is not visible');
+    else if (Math.abs(metrics.art.left - metrics.frame.left) > 1 || Math.abs(metrics.art.right - metrics.frame.right) > 1) faults.push('compact artwork does not fill its frame');
+  } else if (metrics.hero) faults.push('Schedule draws an empty artwork band');
+  return faults;
 }
 
 /** Every way the copy breaks the contract at one width, as readable lines. */
@@ -129,12 +154,10 @@ function heroFaults(width, metrics, copy) {
       faults.push(`the copy column ends ${round(metrics.art.left - metrics.copy.right)}px before the photograph`);
     }
   } else if (metrics.illustrated) {
-    if (metrics.artBeforeCopy === metrics.compact) {
+    if (!metrics.artBeforeCopy) {
       faults.push('the phone artwork reading order disagrees with the page treatment');
     }
-    if (metrics.compact && metrics.art.top < textBottom) {
-      faults.push(`the phone photograph starts ${round(textBottom - metrics.art.top)}px above the end of the copy`);
-    } else if (!metrics.compact && metrics.figure.bottom > metrics.copy.top + 0.5) {
+    if (metrics.figure.bottom > metrics.copy.top + 0.5) {
       faults.push(`the phone artwork ends ${round(metrics.figure.bottom - metrics.copy.top)}px below the start of the copy`);
     }
   }
@@ -170,20 +193,20 @@ test('hero copy keeps its inset and stays off the photograph in every style, mod
           } else {
             await titleRef.delete();
           }
-          for (const route of ['/', '/schedule']) {
+          for (const route of copy === 'long' ? ['/'] : ['/', '/schedule']) {
             await page.setViewportSize({ width: 1280, height: 900 });
             await page.goto(route);
             await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
             await expect(page.locator('html')).toHaveAttribute('data-mode', mode);
-            await expect(page.locator('.event-hero__title')).toBeVisible();
             if (route === '/') {
+              await expect(page.locator('.event-hero__title')).toBeVisible();
               await expect(page.locator('.event-hero--illustrated .event-hero__art')).toBeVisible();
               if (copy === 'long') await expect(page.locator('.event-hero__title')).toHaveText(LONG_TITLE);
             }
             await page.evaluate(() => document.fonts.ready);
             for (const width of WIDTHS) {
               await page.setViewportSize({ width, height: 900 });
-              const found = heroFaults(width, await measureHero(page), copy);
+              const found = route === '/' ? heroFaults(width, await measureHero(page), copy) : await compactHeroFaults(page, true);
               report.push({ route, theme, mode, copy, width, faults: found });
               for (const fault of found) faults.push(`${route} ${theme} ${mode} ${copy} ${width}px: ${fault}`);
             }
@@ -205,10 +228,11 @@ test('hero copy keeps its inset and stays off the photograph in every style, mod
           await page.goto(route);
           await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
           await expect(page.locator('html')).toHaveAttribute('data-mode', mode);
-          await expect(page.locator('.event-hero:not(.event-hero--illustrated) .event-hero__title')).toBeVisible();
+          if (route === '/') await expect(page.locator('.event-hero:not(.event-hero--illustrated) .event-hero__title')).toBeVisible();
+          else await expect(page.locator('main h1')).toBeVisible();
           for (const width of WIDTHS) {
             await page.setViewportSize({ width, height: 900 });
-            const found = heroFaults(width, await measureHero(page), 'normal');
+            const found = route === '/' ? heroFaults(width, await measureHero(page), 'normal') : await compactHeroFaults(page, false);
             report.push({ route, theme, mode, copy: 'no photograph', width, faults: found });
             for (const fault of found) faults.push(`${route} ${theme} ${mode} no photograph ${width}px: ${fault}`);
           }

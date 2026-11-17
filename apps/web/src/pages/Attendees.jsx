@@ -203,16 +203,21 @@ export default function Attendees() {
 
   if (!directoryEnabled) {
     return (
+      <>
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Attendees</h1>
       <EmptyState
         title="This event doesn’t have an attendee directory"
         description="Everything else about the event is on the home page."
         action={homeLink}
       />
+      </>
     );
   }
 
   if (signedOutWithNothingToSee) {
     return (
+      <>
+      <h1 className="font-heading text-h1 font-semibold text-text-primary">Attendees</h1>
       <EmptyState
         title="Sign in to see who’s attending"
         description="The attendee directory is open to registered attendees and speakers."
@@ -222,6 +227,7 @@ export default function Attendees() {
           </Link>
         }
       />
+      </>
     );
   }
 

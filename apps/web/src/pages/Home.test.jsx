@@ -351,11 +351,7 @@ describe('Home key facts', () => {
     expect(screen.getByText('Venue: The hall')).toBeInTheDocument();
   });
 
-  // The seeded When fact and the live Dates list beside it read the same
-  // configuration (adversarial review of the 2026-09-10 wave): while the
-  // fact is still the seed's, its value is the range config/event states
-  // now, not the range init copied in.
-  it('reads the seeded When fact’s dates from the event settings, so a moved day never goes stale', async () => {
+  it('uses the live Dates list without repeating a seeded When fact', async () => {
     eventConfig = {
       name: 'Demo Event',
       timezone: 'UTC',
@@ -365,9 +361,11 @@ describe('Home key facts', () => {
       ],
     };
     infoBlocks = [await whenFactFromTheCms()];
-    render(<Home />);
-    // The hero states the range too; the card is the <dd>.
-    expect(screen.getByText('October 21–22, 2026', { selector: 'dd' })).toBeInTheDocument();
+    const { container } = render(<Home />);
+    expect(screen.getByRole('heading', { level: 2, name: 'Dates' })).toBeInTheDocument();
+    expect(container.querySelector('time[datetime="2026-10-21"]')).not.toBeNull();
+    expect(container.querySelector('time[datetime="2026-10-22"]')).not.toBeNull();
+    expect(screen.queryByText('When', { selector: 'dt' })).toBeNull();
     expect(screen.queryByText('October 14–16, 2026')).toBeNull();
   });
 

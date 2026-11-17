@@ -524,7 +524,7 @@ export default function Layout() {
       className={
         navPlacement === 'side'
           ? 'min-w-0 flex-1 pb-2xl pt-xl'
-          : 'stage flex-1 pb-2xl pt-md'
+          : 'stage flex-1 pb-2xl pt-xl'
       }
     >
       <ErrorBoundary>
@@ -646,8 +646,10 @@ export default function Layout() {
                 is off cannot leave the header and stay in the footer.
                 <Link>, not <a>: the demo runs under HashRouter, where a raw
                 href reloads a path the static host does not serve. */}
+            <div className="grid gap-lg lg:grid-cols-2">
             {navItems.length === 0 ? null : (
               <nav aria-label="Site pages" className="mt-md">
+                <p className="font-semibold text-text-primary">Site pages</p>
                 <ul className="footer-links">
                   {navItems.map((item) => (
                     <li key={item.to}>
@@ -664,6 +666,7 @@ export default function Layout() {
               groups={footerGroups}
               linkClass={FOOTER_LINK_CLASS}
             />
+            </div>
             {operatorName || supportEmail ? (
               <p className="mt-md">
                 {operatorName ? `Operated by ${operatorName}` : null}
