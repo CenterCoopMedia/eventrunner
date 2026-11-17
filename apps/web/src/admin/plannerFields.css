@@ -4,14 +4,13 @@
 .planner-fields > div:not(.admin-field):has(> :is(input, select, textarea)) {
   display: grid;
   grid-template-rows: subgrid;
-  grid-row: span 4;
   align-content: start;
 }
 .planner-fields > div:not(.admin-field) > label { grid-row: 1; }
 .planner-fields > div:not(.admin-field) > :is(input, select, textarea) { grid-row: 2; }
 .planner-fields > div:not(.admin-field) > [id$="-hint"] { grid-row: 3; }
 .planner-fields > div:not(.admin-field) > [id$="-error"] { grid-row: 4; }
-.planner-fields > :is(button, .admin-icon-control) { grid-row: span 4; align-self: center; }
+.planner-fields > :is(button, .admin-icon-control) { align-self: center; }
 
 .planner-fields > div:not(:has(> .admin-field)):has(> div > input) {
   display: grid;

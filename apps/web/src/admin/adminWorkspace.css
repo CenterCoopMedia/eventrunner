@@ -52,10 +52,9 @@
 
 
 /* Title bands and work share one bounded grid; prose keeps its own measure. */
-.admin-stone { max-inline-size: var(--admin-canvas-max); }
+.admin-stone { --font-heading: var(--admin-font-ui); max-inline-size: var(--admin-canvas-max); }
 /* The resizable client preview needs the available workspace beside its editor. */
 .admin-stone:has(.admin-branding-workspace) { max-inline-size: none; }
-.admin-stone :is(h1, h2, h3, h4, h5, h6):not([class*='font-admin-']) { font-family: var(--admin-font-ui); }
 :where(.admin-prose, .admin-stone p,
 .admin-editor-disclosure__description) { max-inline-size: var(--admin-measure-text); }
 .admin-version-records-table :is(th, time) { white-space: nowrap; }
@@ -171,7 +170,6 @@
   .admin-editor-layout { grid-template-columns: minmax(0, min(42rem, 40%)) minmax(0, 1fr); }
   .admin-editor-stack { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
   .admin-editor-layout--speaker { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
-  .admin-editor-layout--speaker > .admin-editor-stack { grid-template-columns: minmax(0, 1fr); }
   .admin-page-basics { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
   .admin-page-section-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); }
   .admin-page-block-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); }

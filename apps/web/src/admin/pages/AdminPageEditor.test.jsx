@@ -273,7 +273,8 @@ describe('page list', () => {
     expect(up).toBeDisabled();
     expect(up.className).toContain('min-h-11');
     expect(up.className).toContain('min-w-11');
-    expect(up.parentElement.className).toContain('flex-wrap');
+    expect(within(up.parentElement).getAllByRole('button').map((button) => button.getAttribute('aria-label')))
+      .toEqual(['Drag FAQ', 'Move FAQ up', 'Move FAQ down']);
     expect(screen.getByRole('button', { name: 'Drag Scholarships' })).toHaveAttribute('draggable', 'true');
     const row = screen.getByRole('link', { name: 'Scholarships' }).closest('li');
     expect(row).toHaveAttribute('draggable', 'true');
