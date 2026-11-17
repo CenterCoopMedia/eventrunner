@@ -72,7 +72,7 @@ export default function CalendarSyncCard({ sessions, eventConfig }) {
         },
       });
       if (controller.signal.aborted) return;
-      previousRef.current = { calendarId: result.calendarId };
+      previousRef.current = { calendarId: result.calendarId, ownershipMigrated: result.ownershipMigrated };
       completedKeyRef.current = input.key;
       setSummary(
         `${result.created + result.updated} events written, ${result.deleted} removed${
@@ -83,9 +83,18 @@ export default function CalendarSyncCard({ sessions, eventConfig }) {
     } catch (err) {
       if (controller.signal.aborted) return;
       if (err instanceof CalendarScopeRefusedError) {
+        tokenRef.current = null;
         setState('refused');
+      } else if (err.kind === 'setup') {
+        tokenRef.current = null;
+        setState('setup');
+      } else if (err.kind === 'scope') {
+        tokenRef.current = null;
+        setState('refused');
+      } else if (err.status === 401) {
+        tokenRef.current = null;
+        setState('expired');
       } else {
-        if (err.status === 401) tokenRef.current = null;
         setState('error');
       }
     } finally {
@@ -109,9 +118,18 @@ export default function CalendarSyncCard({ sessions, eventConfig }) {
       <h2 id="calendar-sync-heading" className="font-heading text-h3 font-semibold text-text-primary">
         Google Calendar
       </h2>
-      {state === 'refused' ? (
+      {state === 'setup' ? (
         <p role="status" className="mt-xs max-w-prose text-body text-text-secondary">
-          Calendar access wasn’t granted, so nothing was written. You can still download the
+          This event has not finished its calendar setup. Use the .ics download from your schedule.
+        </p>
+      ) : state === 'expired' ? (
+        <p role="status" className="mt-xs max-w-prose text-body text-text-secondary">
+          Calendar access expired or was revoked. The calendar could not be updated.
+          Select sync to grant access again, or use the .ics download from your schedule.
+        </p>
+      ) : state === 'refused' ? (
+        <p role="status" className="mt-xs max-w-prose text-body text-text-secondary">
+          Calendar access wasn’t granted. You can still download the
           .ics file from your schedule — it never needs a Google account.
         </p>
       ) : state === 'error' ? (
@@ -120,24 +138,26 @@ export default function CalendarSyncCard({ sessions, eventConfig }) {
         </p>
       ) : state === 'partial' ? (
         <p role="status" className="mt-xs max-w-prose text-body text-text-secondary">
-          Some events could not be updated. {summary} Try syncing again.
+          Some events could not be updated. {summary} Try syncing again, or use the .ics download.
         </p>
       ) : state === 'synced' ? (
         <p role="status" className="mt-xs max-w-prose text-body text-text-secondary">
           Your calendar is up to date. {summary} It re-syncs when you change your bookmarks.
+          The .ics download is also available.
         </p>
       ) : state === 'syncing' ? (
         <p role="status" className="mt-xs max-w-prose text-body text-text-secondary">
-          Writing your sessions to your calendar…
+          Writing your sessions to your calendar… The .ics download is still available.
         </p>
       ) : (
         <p className="mt-xs max-w-prose text-body text-text-secondary">
           Keep your saved sessions on your own Google Calendar. You choose the account, and you
           can revoke the access at any time from your Google account. If you signed in by email,
           this connects the chosen Google account to your event sign-in. Sync runs while this page is open.
+          You can also use the .ics download without granting access.
         </p>
       )}
-      <div className="mt-sm">
+      {state !== 'setup' ? <div className="mt-sm">
         {state === 'syncing' ? (
           <button type="button" className={primaryActionClass} disabled>
             Syncing…
@@ -147,7 +167,7 @@ export default function CalendarSyncCard({ sessions, eventConfig }) {
             {state === 'synced' ? 'Sync now' : 'Sync my sessions to Google Calendar'}
           </button>
         )}
-      </div>
+      </div> : null}
     </section>
   );
 }

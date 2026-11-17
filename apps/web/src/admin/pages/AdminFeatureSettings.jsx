@@ -8,7 +8,7 @@
 // no switch here, so no client admin can turn on the unfinished feed; its
 // stored value is still sent back unchanged.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { KNOWN_FEATURE_KEYS } from 'shared/config';
+import { KNOWN_FEATURE_KEYS, validateFeatures } from 'shared/config';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -151,6 +151,18 @@ export default function AdminFeatureSettings() {
   async function submit(event) {
     event.preventDefault();
     if (saving) return;
+    const validation = validateFeatures(form);
+    if (!validation.ok) {
+      setError({
+        clientValidation: true,
+        message: 'Check the feature settings before saving.',
+        fieldErrors: validation.errors.map((message) => {
+          const separator = message.indexOf(':');
+          return { field: message.slice(0, separator), message: message.slice(separator + 2) };
+        }),
+      });
+      return;
+    }
     setSaving(true);
     setError(null);
     setStatus('');

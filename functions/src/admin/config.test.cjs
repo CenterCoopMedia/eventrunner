@@ -333,6 +333,11 @@ test('invalid payloads are rejected with the shared validator errors', async () 
       body: { features: { notAFeature: true } },
       expect: /features\.notAFeature: unknown feature key/,
     },
+    {
+      handler: createUpdateFeaturesHandler,
+      body: { features: { schedule: true, sessionBookmarks: true, icsExport: false, calendarSync: true } },
+      expect: /features\.calendarSync: enable Calendar export or turn off Calendar sync/,
+    },
   ];
   for (const { handler, body, expect } of cases) {
     const deps = makeDeps();

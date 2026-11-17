@@ -281,31 +281,66 @@ run repeatedly, not once.
 ## 6. Optional: Google Calendar sync (`config/features.calendarSync`)
 
 This feature is **off by default**. [ADR 0003](adr/0003-optional-google-calendar-sync.md)
-is proposed and still needs owner acceptance. Keep the flag off until that acceptance and
-client-specific verification are recorded. Existing file exports continue to work.
+was accepted on November 16, 2026. Source acceptance does not authorize client setup or
+activation. Keep every client's flag off until its authorized onboarding operator completes
+this checklist and signs the dated test receipt. There is no new attestation flag or secret.
 
-After acceptance, the operator and the client's authorized project owner must:
-
-1. Enable the Google Calendar API in the client's existing Firebase/GCP project.
-2. Enable Google as a Firebase Authentication provider. Check the OAuth web client and its
-   redirect URI, including `https://<auth-domain>/__/auth/handler`. Add the deployed site domain
-   to Firebase's authorized domains. Follow [Firebase's Google provider setup](https://firebase.google.com/docs/auth/web/google-signin).
-3. Configure the consent screen with the client's approved name, support contact, privacy
-   policy, domains, and `https://www.googleapis.com/auth/calendar.app.created` scope. This
-   scope permits the dedicated calendar's creation; `calendar.events` alone does not.
-4. Configure the intended audience and synthetic test users. Follow Google's current
-   [verification requirements](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification)
-   for the scope and audience. Record the result; do not assume a fixed review time.
-5. Test the grant with an existing Google sign-in and an email sign-in. The latter links the
-   chosen Google account to the event account, as the control states. A refused grant must
-   leave file exports available.
-6. In a test deployment, verify creation, reload and reuse, changed session details, removal
-   of the final bookmark, retry after a failed write, account changes, and preservation of
-   events added by the attendee. Tokens must stay in memory. Only the calendar ID is saved
-   locally; clearing browser storage can create a new calendar.
-7. Enable `config/features.calendarSync` in the admin Features editor only after these checks
-   pass. Sync runs while the personal schedule page is open. Confirm the production audience
-   can grant access. Leave or set the flag off if setup or verification is incomplete.
+- [ ] Record the client's written opt-in, Firebase/Google Cloud project ID, project owner,
+  and the operator authorized to configure it. The client owns the OAuth web client and
+  consent-screen brand, answers Google's questions, and carries any verification review.
+- [ ] Complete §3 items 1 and 2, including `init-event.cjs --attest-auth`: Google sign-in
+  enabled and authorized domains configured. Follow [Firebase's Google provider setup](https://firebase.google.com/docs/auth/web/google-signin).
+- [ ] Update the client's privacy page: at an attendee's request, the app creates a secondary
+  Google calendar and sends the event name plus bookmarked session titles, descriptions,
+  locations, start/end times and opaque session IDs. An email sign-in links the chosen Google
+  account. Explain revocation through Google's third-party access page. Record the client's
+  legal/privacy approval after this edit.
+- [ ] In the client's project, enable the Google Calendar API. Use the Firebase Google
+  sign-in web client; its redirect URI includes `https://<auth-domain>/__/auth/handler`,
+  including any custom auth domain, and JavaScript origins include the deployed site domains.
+  No operator-owned OAuth client, browser client secret, or stored refresh token is used.
+- [ ] Configure consent-screen branding: the event's public name, the client's support email,
+  `EVENT_PUBLIC_URL`, the approved privacy page, and the client's authorized domain. The
+  project owner verifies the domain in Search Console. Record any brand-verification
+  submission date; complete verification if required by the console or the test shows a warning.
+- [ ] Add only `https://www.googleapis.com/auth/calendar.app.created`. Read the current
+  [Calendar scopes reference](https://developers.google.com/workspace/calendar/api/auth)
+  and the project's Data access page; record the classification and date actually observed.
+  If sensitive or restricted, stop activation until the client completes Google's applicable
+  [verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification).
+  Do not promise a review date or assume the classification from this document.
+- [ ] Set the audience to External and list the synthetic test users while testing. Record
+  the test deployment URL, tested source commit, audience and publishing status. Use an
+  authorized synthetic deployment for the following checks; the target client flag stays off.
+- [ ] Test the deployed My schedule control with signed-in synthetic Google and email
+  attendees. Check a refused grant, missing client setup, expired/revoked access and a new
+  grant, two simultaneous tabs on the same remembered calendar, session edits, all bookmark
+  removals including the final one, and a partial failure followed by retry. Verify account
+  changes and leaving the page cancel pending work. Verify calendar reuse after reload.
+- [ ] Verify a manually added event is untouched, including on a calendar with multiple list
+  pages. A remembered calendar's first sync in a page migrates session-only ownership tags
+  before filtered reconciliation; a failed migration must remain retryable without replacement
+  copies. Remove that discovery migration only after onboarding receipts establish that every
+  supported remembered calendar has the fixed marker. Subsequent passes use the provider's
+  ownership filter and retain every owned copy for duplicate removal.
+- [ ] Download and open the `.ics` fallback in idle, refused, setup, expired, partial, syncing
+  and successful states, including an empty bookmark set. An empty file contains a calendar
+  without session events; importing it does not remove earlier manual imports. Traverse the
+  control and download with the keyboard and confirm visible focus and announced status.
+- [ ] Confirm tokens remain in page memory only and local storage contains only the calendar
+  ID, scoped by project, attendee and Google account. No sync runs with the browser closed.
+  Clearing browser storage or using another browser can create another calendar.
+- [ ] The operator who ran the checks records **name, date, project owner, scope classification,
+  publishing status, source commit, test URL, synthetic audience, results and evidence links**
+  in the client's onboarding notes. Record the signed-in attendee pass before activation.
+- [ ] Set the target audience to In production and confirm it can grant access under the
+  approved scope/brand configuration. In [Settings → Features](ADMIN_GUIDE.md#settings-features),
+  confirm `schedule`, `sessionBookmarks` and `icsExport` are on. The named operator turns
+  `calendarSync` on **last**, only under that client's activation authorization, and records
+  the date and readback. Leave it off while any required check or approval is incomplete.
+- [ ] Tell staff that turning the flag off hides the control at once and leaves attendee
+  calendars in place. Attendees revoke access from their own Google account. The `.ics`
+  download remains available without a Google grant.
 
 ## Reuse a past event as a template
 

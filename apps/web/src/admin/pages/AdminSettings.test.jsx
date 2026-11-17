@@ -1184,6 +1184,20 @@ describe('feature flags', () => {
     expect(bodyOf(0).features.speakers).toBe(true);
   });
 
+  it('names missing calendar prerequisites before saving and allows correction', async () => {
+    await renderAt('/admin/features');
+    await pushConfig('features', { schedule: true, sessionBookmarks: true, calendarSync: true, icsExport: false });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('enable Calendar export or turn off Calendar sync');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(screen.getByRole('switch', { name: 'Calendar sync' })).toHaveAttribute('aria-invalid', 'true');
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/features' }));
+    fireEvent.click(document.querySelector('input[name="icsExport"]'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).features).toMatchObject({ calendarSync: true, schedule: true, sessionBookmarks: true, icsExport: true });
+  });
+
   it('names the offending flag when the server rejects one', async () => {
     await renderAt('/admin/features');
     await pushConfig('features', { schedule: true });
