@@ -106,9 +106,14 @@ describe('Home', () => {
     // section a second time further down the page.
     const infoSection = home.sections.find((s) => s.id === 'info');
     expect(screen.getAllByRole('heading', { name: infoSection.label })).toHaveLength(1);
-    // The cards are facts (#234): a term and a description, no evidence.
-    // The hero states the range too, so the card is found as its <dd>.
-    expect(screen.getByText(siteContent.info__when.value, { selector: 'dd' })).toBeInTheDocument();
+    // Dates stay in their list without a duplicate seeded When fact.
+    // Other authored facts remain term/description pairs (#234).
+    const dates = screen.getByRole('region', { name: 'Dates' });
+    expect(within(dates).getAllByRole('listitem')).toHaveLength(eventConfig.days.length);
+    for (const day of eventConfig.days) {
+      expect(dates.querySelector(`time[datetime="${day.date}"]`)).not.toBeEmptyDOMElement();
+    }
+    expect(screen.queryByText(siteContent.info__when.value, { selector: 'dd' })).toBeNull();
     expect(screen.getByText(siteContent.info__where.value)).toBeInTheDocument();
     // The sponsor strip (M7 issue 10) draws the demo's own published
     // organizations on the home page, in the section's own place: it comes

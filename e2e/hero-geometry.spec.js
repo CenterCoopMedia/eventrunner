@@ -125,7 +125,6 @@ function heroFaults(width, metrics, copy) {
   expect(metrics.boxes.length, 'the hero copy has text').toBeGreaterThan(0);
   const textLeft = Math.min(...metrics.boxes.map((box) => box.left));
   const textRight = Math.max(...metrics.boxes.map((box) => box.right));
-  const textBottom = Math.max(...metrics.boxes.map((box) => box.bottom));
   // #478: the copy keeps a visible inset from the hero's edge.
   if (textLeft - metrics.hero.left < MIN_INSET) {
     faults.push(`copy starts ${round(textLeft - metrics.hero.left)}px from the hero's left edge`);
