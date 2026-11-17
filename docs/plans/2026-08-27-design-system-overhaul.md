@@ -939,7 +939,7 @@ Restyle the public site in full. Move it onto the new base system and the preset
 
 Bind these:
 
-- Every public page gets one of the four compact headers in §2.5.1. The active theme names which. Home owns its full EventHero; Schedule owns an image-only artwork band when an image is available.
+- Every public page gets one of the four shared headers in §2.5.1. The active theme names which. Home owns its full EventHero; Schedule owns an image-only artwork band when an image is available.
 - A page may open with one lead image beside its opening copy (§2.5.2). Text never sits over it.
 - Every section boundary uses rules and folios. Remove decorative card chrome.
 - `SessionCard` loses the colored left edge. `TypeBadge` loses the pill radius. This closes #113.
