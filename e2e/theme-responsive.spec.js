@@ -164,9 +164,12 @@ test('phone proof uses its own viewport and public inheritance for every theme a
       const stressedSchedule = page.frameLocator(
         `iframe[title="Schedule preview, ${mode} mode, 390px wide"]`,
       );
-      await expect(stressedSchedule.locator('.event-hero__title')).toContainText(
+      await expect(stressedSchedule.locator('header').first()).toContainText(
         'The Fifteenth Annual Regional Convening',
       );
+      await expect(stressedSchedule.locator('main h1')).toBeVisible();
+      await expect(stressedSchedule.locator('.schedule-dateline')).toBeVisible();
+      await expect(stressedSchedule.locator('.event-hero__copy')).toHaveCount(0);
       await expect(stressedSchedule.locator('.session-block')).toHaveCount(28);
       const filters = stressedSchedule.getByRole('button', { name: 'Filters', exact: true });
       await expect(stressedSchedule.getByRole('searchbox', { name: 'Search this day', exact: true })).toBeVisible();
@@ -272,7 +275,9 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
   );
   await expect(scheduleFrame.locator('.schedule-screen')).toBeVisible();
   await expect(scheduleFrame.locator('.schedule-grid')).toHaveCount(0);
-  await expect(scheduleFrame.locator('.event-hero')).toHaveClass(/event-hero--compact/);
+  await expect(scheduleFrame.locator('main h1')).toBeVisible();
+  await expect(scheduleFrame.locator('.schedule-dateline')).toBeVisible();
+  await expect(scheduleFrame.locator('.event-hero')).toHaveCount(0);
   await expect(scheduleFrame.getByRole('searchbox', { name: 'Search this day', exact: true })).toBeVisible();
   await expect(scheduleFrame.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await expect(scheduleFrame.locator('.schedule-facets')).toBeHidden();

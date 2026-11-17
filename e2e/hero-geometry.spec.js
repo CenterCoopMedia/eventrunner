@@ -202,7 +202,7 @@ test('hero copy keeps its inset and stays off the photograph in every style, mod
               await expect(page.locator('.event-hero__title')).toBeVisible();
               await expect(page.locator('.event-hero--illustrated .event-hero__art')).toBeVisible();
               if (copy === 'long') await expect(page.locator('.event-hero__title')).toHaveText(LONG_TITLE);
-            }
+            } else await expect(page.locator('.event-hero--compact .event-hero__art')).toBeVisible();
             await page.evaluate(() => document.fonts.ready);
             for (const width of WIDTHS) {
               await page.setViewportSize({ width, height: 900 });
