@@ -12,9 +12,9 @@ export default function PendingChangesNotice({ failed, total, sentence }) {
         className="border-admin-rule-hairline border-b-admin-hairline bg-admin-ground-proof px-md py-xs text-admin-sm text-admin-ink lg:px-lg"
       >
         {failed ? (
-          <p>We could not count the unpublished changes. We will try again.</p>
+          <p className="admin-prose">We could not count the unpublished changes. We will try again.</p>
         ) : (
-          <p>
+          <p className="admin-prose">
             {sentence}{' '}
             {/* The ink, not the link ink: the ink on the proof ground is a
                 measured pair, and the underline and weight say "link". It

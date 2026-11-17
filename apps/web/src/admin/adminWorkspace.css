@@ -56,8 +56,8 @@
 /* The resizable client preview needs the available workspace beside its editor. */
 .admin-stone:has(.admin-branding-workspace) { max-inline-size: none; }
 .admin-stone :is(h1, h2, h3, h4, h5, h6):not([class*='font-admin-']) { font-family: var(--admin-font-ui); }
-.admin-prose, .admin-field__hint, .admin-section-intro p,
-.admin-object-row__description, .admin-editor-disclosure__description { max-inline-size: var(--measure-text); }
+.admin-prose, .admin-stone p,
+.admin-editor-disclosure__description { max-inline-size: var(--measure-text); }
 .admin-version-records-table :is(th, time) { white-space: nowrap; }
 .admin-panel { overflow-wrap: anywhere; }
 .admin-panel__heading { align-items: center; }
