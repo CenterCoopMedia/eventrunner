@@ -146,7 +146,7 @@ export default function AdminRegistrationForm() {
       <ServerErrorSummary error={error} errorRef={errorRef} title="The form could not be saved" />
       {result ? <SaveStatus message={result} /> : null}
 
-      <div className="planner-fields grid items-start gap-md xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div className="grid items-start gap-md xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <form id={FORM_ID} onSubmit={save} noValidate className="min-w-0">
         <fieldset disabled={busy} className="flex min-w-0 flex-col gap-md">
           <Panel title="Standard questions" description="Choose which questions to ask and which answers are required.">

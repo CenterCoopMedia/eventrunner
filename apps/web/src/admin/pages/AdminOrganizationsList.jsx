@@ -175,7 +175,6 @@ export default function AdminOrganizationsList() {
               onSave={saveOrder}
               onCancel={cancelOrder}
             />
-      <PlannerFeatureControls choices={[{ key: 'sponsors', label: 'Sponsor list' }]} />
             {resume && !draft.dirty ? (
               <button
                 type="button"
@@ -203,6 +202,7 @@ export default function AdminOrganizationsList() {
         }
       />
 
+      <PlannerFeatureControls choices={[{ key: 'sponsors', label: 'Sponsor list' }]} />
       <DeletedRecordResult />
       <OrderAnnouncement message={spoken} />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
@@ -237,7 +237,7 @@ export default function AdminOrganizationsList() {
               <tr>
                 <th scope="col" className={`${HEAD_CLASS} text-start`}>Organization</th>
                 <th scope="col" className={`${HEAD_CLASS} text-start`}>Tier</th>
-                <th scope="col" aria-sort={draft.dirty ? undefined : 'ascending'} className={`${HEAD_CLASS} text-end`}>Order</th>
+                <th scope="col" aria-sort={draft.dirty ? undefined : 'ascending'} className={`${HEAD_CLASS} text-start`}>Order</th>
                 <th scope="col" className={`${HEAD_CLASS} text-start`}>State</th>
               </tr>
             </thead>
@@ -252,16 +252,16 @@ export default function AdminOrganizationsList() {
                     className={`border-b-admin-hairline border-admin-rule-hairline last:border-b-0 ${proofRowClass(row.state.id)}`}
                     {...bindReorderDrop('organization:', index, moveRow)}
                   >
-                    <td className="px-sm py-xs align-top">
+                    <td className="px-sm py-xs align-middle">
                       <Link to={encodeURIComponent(row.id)} className={rowTitleLinkClass}>
                         {label}
                       </Link>
                     </td>
-                    <td className={`px-sm py-xs align-top ${tier ? 'text-admin-ink' : 'text-admin-ink-secondary'}`}>
+                    <td className={`px-sm py-xs align-middle ${tier ? 'text-admin-ink' : 'text-admin-ink-secondary'}`}>
                       {tier ?? 'None'}
                     </td>
-                    <td className="px-sm py-xs text-end align-top">
-                      <div className="flex flex-wrap items-center justify-end gap-2xs">
+                    <td className="px-sm py-xs align-middle">
+                      <div className="flex items-center gap-2xs">
                         <span className="font-admin-data tabular-nums text-admin-ink">
                           {Number.isFinite(organization.order) ? organization.order : 'None'}
                         </span>
@@ -275,7 +275,7 @@ export default function AdminOrganizationsList() {
                         />
                       </div>
                     </td>
-                    <td className="px-sm py-xs align-top">
+                    <td className="px-sm py-xs align-middle">
                       <span className="flex flex-wrap items-center gap-2xs">
                         <RecordState state={row.state} />
                         {organization.visible === false ? <StatusBadge tone="neutral">Hidden</StatusBadge> : null}

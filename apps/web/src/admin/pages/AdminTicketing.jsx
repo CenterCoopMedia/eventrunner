@@ -32,6 +32,7 @@ import {
   Notice,
   Panel,
   SelectField,
+  TextField,
   fieldLabelClass,
   inputClass,
   primaryButtonClass,
@@ -557,29 +558,27 @@ function TicketList({ call, refreshToken }) {
           search(false);
         }}
       >
-        <div className="flex flex-col gap-3xs">
-          <label htmlFor="ticketing-search-email" className={fieldLabelClass}>
-            Email
-          </label>
-          <input data-help-skip="Search field; its label names the email search."
-            id="ticketing-search-email"
+        <div className="min-w-0 grow basis-64 max-w-sm">
+          <TextField data-help-skip="Search field; its label names the email search."
+            label="Email"
             type="email"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className={inputClass}
+            onChange={setEmail}
             placeholder="attendee@example.com"
           />
         </div>
-        <SelectField help="Choose which records to show in this list."
-          label="Status"
-          value={status}
-          onChange={setStatus}
-          options={[
-            { value: '', label: 'Any' },
-            ...TICKET_STATUSES.map((value) => ({ value, label: ticketStatusLabel(value) })),
-          ]}
-        />
-        <button type="submit" className={secondaryButtonClass} disabled={loading}>
+        <div className="min-w-0 grow basis-40 sm:max-w-xs">
+          <SelectField help="Choose which records to show in this list."
+            label="Status"
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: '', label: 'Any' },
+              ...TICKET_STATUSES.map((value) => ({ value, label: ticketStatusLabel(value) })),
+            ]}
+          />
+        </div>
+        <button type="submit" className={`${secondaryButtonClass} w-full sm:w-auto`} disabled={loading}>
           Search
         </button>
       </form>
@@ -672,7 +671,7 @@ export default function AdminTicketing() {
         description="Manage ticket sales, registration records, and attendee admission."
       />
 
-      <p className={rowMetaClass}>For Stripe tickets, attendees answer the Registration form questions at checkout after you publish tickets; other attendees answer on Complete your registration.</p>
+      <p className="admin-prose text-admin-sm text-admin-ink-secondary">For Stripe tickets, attendees answer the Registration form questions at checkout after you publish tickets; other attendees answer on Complete your registration.</p>
       <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} call={call} />
       {confirmedProvider === 'stripe' ? <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
         <StripeTicketingWorkspace call={call} />

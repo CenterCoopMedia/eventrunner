@@ -360,7 +360,7 @@ export default function AdminAttendees() {
       ) : null}
 
       <div className="flex flex-wrap items-end gap-sm">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 grow basis-64 max-w-lg">
           <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
             label="Search"
             value={search}
