@@ -20,7 +20,7 @@ test.beforeAll(async () => {
   base = event?.pull_request?.base?.sha;
   const baseline = new Map();
   if (base) {
-    for (const name of ['components/Header.jsx', 'index.css']) {
+    for (const name of ['components/Header.jsx', 'index.css', 'generated/theme.css']) {
       baseline.set(`${SOURCE}/${name}?header-before`, execFileSync('git', ['show', `${base}:apps/web/src/${name}`], { encoding: 'utf8' }));
     }
   }
@@ -89,8 +89,13 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
             }
             const logo = header.querySelector('img');
             const logoBox = logo?.getBoundingClientRect();
+            const stage = header.querySelector('.stage').getBoundingClientRect();
             return {
               width: globalThis.innerWidth,
+              clientWidth: globalThis.document.documentElement.clientWidth,
+              rootFontSize: parseFloat(globalThis.getComputedStyle(globalThis.document.documentElement).fontSize),
+              stageWidth: stage.width,
+              stageX: stage.x,
               scrollWidth: globalThis.document.documentElement.scrollWidth,
               linkRight: link.getBoundingClientRect().right,
               linkFragments: [...link.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0).length,
@@ -107,6 +112,8 @@ for (const variant of ['standard', 'masthead', 'compact', 'minimal']) {
           metrics.push({ source, width, ...measured });
           await page.screenshot({ path: path.join(EVIDENCE, `public-header--${source}--${variant}--${logo}--${width}.png`), animations: 'disabled' });
           if (source === 'before') continue;
+          expect(measured.stageWidth).toBeCloseTo(Math.min(measured.clientWidth * 0.95, measured.rootFontSize * 72), 0);
+          expect(measured.stageX).toBeCloseTo((measured.clientWidth - measured.stageWidth) / 2, 0);
           expect(measured.scrollWidth).toBeLessThanOrEqual(width);
           expect(measured.linkRight).toBeLessThanOrEqual(width);
           expect(measured.linkFragments).toBeGreaterThan(0);

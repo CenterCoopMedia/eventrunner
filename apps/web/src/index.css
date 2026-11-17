@@ -420,34 +420,12 @@
     background-size: 24px 24px;
   }
 
-  /* THE STAGE AND THE MEASURE (2026-09-10 vocabulary expansion).
-     ------------------------------------------------------------------
-     Every page used to sit in one column the width of a text measure. At
-     1440px the event name wrapped at display size, the schedule grid, the
-     portrait shelf, the logo wall and the footer were all squeezed into
-     that measure, and half the canvas stayed empty. Every style shared the
-     shape, so every style read as the same narrow template.
-
-     Both widths are tokens the page contract declares. The frame uses
-     95 percent of the available width and centers. Running text fills
-     the frame's content box:
-
-       .stage     the frame. The header, the navigation, the schedule grid,
-                  the directories, the logo wall, the footer, and every
-                  section head run to it.
-       .measure   running text. A paragraph, a list, a rich text block, a
-                  stat description, or an FAQ answer never exceeds it.
-
-     Nothing here states a fixed width. Both are read as a MAXIMUM inline
-     size, the gutter is a spacing step, and every grid track is a
-     `minmax(0, …)` so a long word narrows the column instead of widening
-     the page.
-
-     The gutter stays at --space-lg to hold the coordinate mark. The
-     Atlas coordinate mark is drawn 20px outside the title block, so a 16px
-     gutter pushed it 4px past the viewport and every style scrolled
-     sideways by 4px on a phone. The stage gives the mark the room its
-     device needs rather than clipping it. */
+  /* The public stage centers the header, navigation, main and footer.
+     Its responsive maximum and the running-text measure come from the
+     page contract. Headings, rules, directories and schedule grids keep
+     the stage; paragraphs and descriptions use the narrower measure.
+     The --space-lg gutter holds Atlas's 20px coordinate-mark outset.
+     Grid tracks use minmax(0, ...) so long content does not widen the page. */
   .stage {
     inline-size: 100%;
     max-inline-size: var(--stage-max);
@@ -1503,6 +1481,9 @@
   [data-motif-set='none'] .motif {
     display: none;
   }
+  [data-motif-set='cartographic'] .motif--empty-state {
+    display: none;
+  }
   .motif--section-mark {
     block-size: 1.25em;
     inline-size: 1.25em;
@@ -2282,7 +2263,8 @@
      every motif on the page, nested attribute or not. This re-states the
      display for a row that names a set of its own, at a specificity that
      wins, and nowhere else. */
-  .specimen-motif-row:not([data-motif-set='none']) .motif {
+  .specimen-motif-row:not([data-motif-set='none']) .motif:not(.motif--empty-state),
+  .specimen-motif-row:not([data-motif-set='none']):not([data-motif-set='cartographic']) .motif--empty-state {
     display: inline-block;
   }
   .specimen-motif-row:not([data-motif-set='none']) .motif--divider {

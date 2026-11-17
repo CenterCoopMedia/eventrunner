@@ -10,7 +10,7 @@
 // `none` set — four of the six presets — it renders nothing at all, so this
 // is the same block it was before. Under `botanical` it is Field Guide's
 // unlabeled plate (visual story, Field Guide, moment 3); under
-// `cartographic` it is an empty sheet.
+// `cartographic` the message uses the rule and text without an illustration.
 //
 // The admin has no motif layer at all (admin identity story): the room is
 // not a preset, so nothing here is shared with it.
@@ -25,7 +25,7 @@ import Rule from './editorial/Rule.jsx';
 
 export default function EmptyState({ title, description, action = null }) {
   return (
-    <div className="py-2xl">
+    <div className="py-lg">
       <Rule />
       <Plate className="mt-lg">
         <Motif slot="empty-state" />

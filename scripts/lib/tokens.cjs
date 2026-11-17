@@ -380,7 +380,7 @@ function modePolicy(theme) {
 
 /**
  * One motif set's slot values (brief §3.8). A slot the set leaves empty
- * resolves to `none`, so a component's mask-image simply paints nothing.
+ * resolves to `none`; its display rule removes the decorative element.
  *
  * @param {object} motifs motifs.json
  * @param {string} setId

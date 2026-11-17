@@ -328,8 +328,8 @@ test('the stage and the measure are declared once and read by name', () => {
   // wider stage moves --stage-max and never mints a width of its own.
   const css = buildTokenCss(THEME);
   for (const [name, value] of [
-    ['--er-stage-frame', '95%'],
-    ['--er-stage-measure', '100%'],
+    ['--er-stage-frame', 'min(95%, 72rem)'],
+    ['--er-stage-measure', 'min(100%, 68ch)'],
     ['--stage-frame', 'var(--er-stage-frame)'],
     ['--stage-measure', 'var(--er-stage-measure)'],
     ['--stage-max', 'var(--stage-frame)'],
@@ -343,10 +343,10 @@ test('the stage and the measure are declared once and read by name', () => {
     const declared = css.match(new RegExp(`${name}:`, 'g')) || [];
     assert.equal(declared.length, 1, `${name} is declared once`);
   }
-  // The frame keeps a 5 percent margin. Running text fills its content box.
+  // The public frame retains its responsive margin and has a readable cap.
   const { primitives } = loadTokens();
-  assert.equal(primitives.scalar.stage.frame, '95%');
-  assert.equal(primitives.scalar.stage.measure, '100%');
+  assert.equal(primitives.scalar.stage.frame, 'min(95%, 72rem)');
+  assert.equal(primitives.scalar.stage.measure, 'min(100%, 68ch)');
 });
 
 test('a style may retune the stage and the measure from its own preset file', () => {
