@@ -18,7 +18,7 @@ name: Provision client
 # after a build reach each built site's operator and staff lists. It lives in
 # this workflow because the provisioner's Workload Identity condition names it.
 
-run-name: ${{ inputs.application_id && format('Provision {0}', inputs.application_id) || 'Sync client teams' }}
+run-name: ${{ inputs.sync_access && format('Sync access {0}', inputs.application_id) || inputs.application_id && format('Provision {0}', inputs.application_id) || 'Sync client teams' }}
 
 on:
   workflow_dispatch:
@@ -29,6 +29,11 @@ on:
         type: string
       test_mode:
         description: Allow a test-mode ticket connection. Only for a rehearsal.
+        required: false
+        type: boolean
+        default: false
+      sync_access:
+        description: Repair configured support signer access on one completed client.
         required: false
         type: boolean
         default: false
@@ -73,9 +78,15 @@ jobs:
         # The script checks it again before it reads anything.
         env:
           APPLICATION_ID: ${{ inputs.application_id }}
+          SYNC_ACCESS: ${{ inputs.sync_access }}
+          TEST_MODE: ${{ inputs.test_mode }}
         run: |
           if ! printf '%s' "$APPLICATION_ID" | grep -Eq '^[A-Za-z0-9_-]{1,200}$'; then
             echo "::error::The application id is not valid." >&2
+            exit 1
+          fi
+          if [ "$SYNC_ACCESS" = "true" ] && [ "$TEST_MODE" = "true" ]; then
+            echo "::error::Access sync cannot run in test mode." >&2
             exit 1
           fi
 
@@ -115,6 +126,7 @@ jobs:
         env:
           EVENT_SUPPORT_ADMIN_EMAILS: ${{ vars.EVENT_SUPPORT_ADMIN_EMAILS || 'jamditis@gmail.com,amditisjunk@gmail.com' }}
           APPLICATION_ID: ${{ inputs.application_id }}
+          SYNC_ACCESS: ${{ inputs.sync_access }}
           TEST_MODE: ${{ inputs.test_mode }}
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
           CONSOLE_PUBLIC_URL: ${{ vars.CONSOLE_PUBLIC_URL }}
@@ -128,7 +140,9 @@ jobs:
           PROVISIONER_APP_PRIVATE_KEY: ${{ secrets.PROVISIONER_APP_PRIVATE_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          if [ "$TEST_MODE" = "true" ]; then
+          if [ "$SYNC_ACCESS" = "true" ]; then
+            node scripts/provision-client.cjs --application "$APPLICATION_ID" --sync-access
+          elif [ "$TEST_MODE" = "true" ]; then
             node scripts/provision-client.cjs --application "$APPLICATION_ID" --test-mode
           else
             node scripts/provision-client.cjs --application "$APPLICATION_ID"
@@ -136,7 +150,7 @@ jobs:
       - name: Record a run that stopped
         # A timeout or a cancel never reaches the script's own failure record.
         # This also runs after a failure the script recorded, and then does nothing.
-        if: ${{ (failure() || cancelled()) && steps.auth.outcome == 'success' }}
+        if: ${{ (failure() || cancelled()) && steps.auth.outcome == 'success' && !inputs.sync_access }}
         env:
           APPLICATION_ID: ${{ inputs.application_id }}
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
@@ -148,7 +162,7 @@ jobs:
   enroll-auto-deploy:
     name: Enroll automatic deployments
     needs: provision
-    if: ${{ github.event_name == 'workflow_dispatch' && needs.provision.result == 'success' && !inputs.test_mode }}
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.provision.result == 'success' && !inputs.test_mode && !inputs.sync_access }}
     permissions:
       contents: read
       id-token: write
