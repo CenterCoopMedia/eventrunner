@@ -4,7 +4,7 @@ import { webcrypto } from 'node:crypto';
 import AuthContext from '../../contexts/AuthContext.jsx';
 import CalendarSyncCard from './CalendarSyncCard.jsx';
 import { readCalendarId, saveCalendarId } from '../../lib/calendarSync.js';
-import { calendarEvent, calendarSession, calendarUser, calendarProvider, calendarResponse } from '../../test/calendarProvider.js';
+import { calendarEvent, calendarSession, calendarUser, calendarProvider, calendarResponse } from '../../test/calendarProvider.mjs';
 
 // Only the Firebase popup and Calendar HTTP boundary are substituted. The
 // card, sync, time conversion and account-scoped browser storage are real.

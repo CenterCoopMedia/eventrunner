@@ -3,7 +3,7 @@
 // summary it returns.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
-import { calendarProvider, calendarResponse } from '../test/calendarProvider.js';
+import { calendarProvider, calendarResponse } from '../test/calendarProvider.mjs';
 
 const authMocks = vi.hoisted(() => ({ link: vi.fn(), reauth: vi.fn(), scope: vi.fn(), credential: vi.fn() }));
 vi.mock('firebase/auth', () => ({
@@ -361,7 +361,7 @@ it('continues without persisted calendar ids when browser storage is unavailable
   removeItem.mockRestore();
 });
 
-describe('Calendar v3 reconciliation contract (#547, #548)', () => {
+describe('Calendar v3 reconciliation contract (issues 547 and 548)', () => {
   const marked = (id, sessionId = 's1', migrated = true) => ({
     id, extendedProperties: { private: {
       'eventrunner/sessionId': sessionId, ...(migrated ? { 'eventrunner/owner': 'saved-session' } : {}),
