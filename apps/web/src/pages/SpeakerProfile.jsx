@@ -414,9 +414,9 @@ export default function SpeakerProfile() {
 
   return (
     <article className="w-full space-y-lg">
-      <header className="max-w-prose space-y-xs">
+      <header className="space-y-xs">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Your speaker profile</h1>
-        <p className="text-body text-text-secondary">
+        <p className="max-w-prose text-body text-text-secondary">
           This is what appears on the public programme once an organizer approves it. Each step saves when you move on.
         </p>
         {statusNote ? (
