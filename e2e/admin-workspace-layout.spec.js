@@ -71,13 +71,13 @@ test('admin workspaces bound their reading width and group readable cards withou
         const main = document.getElementById('admin-content').getBoundingClientRect();
         const canvasElement = document.querySelector('.admin-stone');
         const canvas = canvasElement.getBoundingClientRect();
-        const canvasToken = getComputedStyle(canvasElement).getPropertyValue('--admin-canvas-max').trim();
+        const canvasToken = document.defaultView.getComputedStyle(canvasElement).getPropertyValue('--admin-canvas-max').trim();
         const controls = [...document.querySelectorAll('#admin-content input, #admin-content select, #admin-content textarea, #admin-content button')]
           .filter((control) => control.getClientRects().length > 0);
         return {
           canvasWidth: canvas.width, mainWidth: main.width,
           canvasLeft: canvas.left, mainLeft: main.left, canvasToken,
-          canvasLimit: Number.parseFloat(canvasToken) * Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+          canvasLimit: Number.parseFloat(canvasToken) * Number.parseFloat(document.defaultView.getComputedStyle(document.documentElement).fontSize),
           viewportWidth: document.documentElement.clientWidth, pageWidth: document.documentElement.scrollWidth,
           cardsFit: [...document.querySelectorAll('#admin-content .admin-panel')]
             .filter((card) => card.getClientRects().length > 0)
