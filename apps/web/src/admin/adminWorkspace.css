@@ -57,7 +57,7 @@
 .admin-stone:has(.admin-branding-workspace) { max-inline-size: none; }
 .admin-stone :is(h1, h2, h3, h4, h5, h6):not([class*='font-admin-']) { font-family: var(--admin-font-ui); }
 :where(.admin-prose, .admin-stone p,
-.admin-editor-disclosure__description) { max-inline-size: var(--measure-text); }
+.admin-editor-disclosure__description) { max-inline-size: var(--admin-measure-text); }
 .admin-version-records-table :is(th, time) { white-space: nowrap; }
 .admin-panel { overflow-wrap: anywhere; }
 .admin-panel__heading { align-items: center; }
@@ -169,10 +169,8 @@
 @media (min-width: 1280px) {
   .admin-editor-layout { grid-template-columns: minmax(0, min(42rem, 40%)) minmax(0, 1fr); }
   .admin-editor-stack { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
-  .admin-editor-layout--speaker { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); grid-template-areas: 'identity profile' 'contact profile'; }
-  .admin-editor-layout--speaker > .admin-editor-card--identity { grid-area: identity; }
-  .admin-editor-layout--speaker > .admin-editor-card--primary { grid-area: profile; }
-  .admin-editor-layout--speaker > .admin-editor-card--contact { grid-area: contact; }
+  .admin-editor-layout--speaker { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+  .admin-editor-layout--speaker > .admin-editor-stack { grid-template-columns: minmax(0, 1fr); }
   .admin-page-basics { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
   .admin-page-section-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); }
   .admin-page-block-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); }

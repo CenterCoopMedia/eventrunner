@@ -311,158 +311,162 @@ export default function AdminSpeakerEditor({ mode }) {
       ) : null}
 
       <div className="admin-editor-layout admin-editor-layout--speaker">
-        <Panel help="Identify this speaker and their directory address."
-          title="Name"
-          description="Identify this speaker and their directory address."
-          className="admin-editor-card--identity"
-        >
-          <div className="flex flex-col gap-sm">
-            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
-              label="First name"
-              value={form.firstName}
-              onChange={(value) => set({ firstName: value })}
-              error={errorFor('firstName')}
-              required
-            />
-            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
-              label="Last name"
-              value={form.lastName}
-              onChange={(value) => set({ lastName: value })}
-              error={errorFor('lastName')}
-              required
-            />
-          </div>
-          {mode === 'create' ? <div className="mt-sm">
-            <TextField help="Set this speaker’s public page address when creating the profile. The address stays fixed after it is saved."
-              label="Page link"
-              hint={
-                mode === 'edit'
-                  ? 'This address stays the same when the name changes.'
-                  : 'Leave this blank and the address follows the name. Enter one when that address is already used.'
-              }
-              value={form.slug}
-              onChange={mode === 'edit' ? () => {} : (value) => set({ slug: value })}
-              error={errorFor('slug')}
-            />
-          </div> : null}
-        </Panel>
+        <div className="admin-editor-stack">
+          <Panel help="Identify this speaker and their directory address."
+            title="Name"
+            description="Identify this speaker and their directory address."
+            className="admin-editor-card--identity"
+          >
+            <div className="flex flex-col gap-sm">
+              <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
+                label="First name"
+                value={form.firstName}
+                onChange={(value) => set({ firstName: value })}
+                error={errorFor('firstName')}
+                required
+              />
+              <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
+                label="Last name"
+                value={form.lastName}
+                onChange={(value) => set({ lastName: value })}
+                error={errorFor('lastName')}
+                required
+              />
+            </div>
+            {mode === 'create' ? <div className="mt-sm">
+              <TextField help="Set this speaker’s public page address when creating the profile. The address stays fixed after it is saved."
+                label="Page link"
+                hint={
+                  mode === 'edit'
+                    ? 'This address stays the same when the name changes.'
+                    : 'Leave this blank and the address follows the name. Enter one when that address is already used.'
+                }
+                value={form.slug}
+                onChange={mode === 'edit' ? () => {} : (value) => set({ slug: value })}
+                error={errorFor('slug')}
+              />
+            </div> : null}
+          </Panel>
 
-        <Panel help="Everything here appears on the public speaker directory."
-          title="Profile"
-          description="Everything here appears on the public speaker directory."
-          className="admin-editor-card--primary"
-        >
-          <div className="mb-sm">
-            <TextField help="Optional. Shown with the name, for example she/her."
-              label="Pronouns"
-              
-              value={form.pronouns}
-              onChange={(value) => set({ pronouns: value })}
-              maxLength={80}
-              error={errorFor('pronouns')}
-            />
-          </div>
-          <div className="planner-fields grid gap-sm sm:grid-cols-2">
-            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
-              label="Job title"
-              value={form.jobTitle}
-              onChange={(value) => set({ jobTitle: value })}
-              error={errorFor('jobTitle')}
-            />
-            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
-              label="Organization"
-              value={form.organization}
-              onChange={(value) => set({ organization: value })}
-              error={errorFor('organization')}
-            />
-          </div>
-          <div className="mt-sm flex flex-col gap-sm">
-            <TextAreaField help="Write the introduction attendees see in the speaker directory."
-              label="Bio"
-              rows={5}
-              value={form.bio}
-              onChange={(value) => set({ bio: value })}
-              error={errorFor('bio')}
-            />
-            {mode === 'edit' ? (
-              <div className="flex flex-col gap-3xs">
-                <SpeakerPhotoField data-help-skip="Headshot names the expected picture; existing format, size and save guidance remains."
-                  user={user}
-                  speakerId={speakerId}
-                  value={form.headshotPath}
-                  onChange={(path) => set({ headshotPath: path })}
-                  label="Headshot"
-                  saveNote="Save to use this photo."
-                  appearance="admin"
-                  onBusyChange={setPhotoBusy}
+          <Panel help="The email address is used for invitations and is never published."
+            title="Contact and status"
+            description="The email address is used for invitations and is never published."
+            className="admin-editor-card--contact"
+          >
+            <div className="flex flex-col gap-sm">
+              <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
+                label="Email"
+                type="email"
+                value={form.email}
+                onChange={(value) => set({ email: value })}
+                error={errorFor('email')}
+              />
+              {ADMIN_SETTABLE_STATUSES.includes(form.status) ? (
+                <SelectField help="Set the speaker’s invitation and approval stage. Publishing is a separate step."
+                  label="Status"
+                  value={form.status}
+                  onChange={(value) => {
+                    setStatusPicked(true);
+                    set({ status: value });
+                  }}
+                  options={mode === 'edit' && speaker ? speakerStatusOptions(STATUS_OPTIONS, speaker.status ?? null) : STATUS_OPTIONS}
+                  error={errorFor('status')}
                 />
-                <FieldError message={errorFor('headshotPath')} />
+              ) : (
+                // A speaker mid-invite is shown, not offered. The pipeline
+                // states belong to the invitation flow — they mean nothing
+                // without the token it issues — so the editor reports where
+                // this speaker stands and leaves the state alone. Editing any
+                // other field on this page no longer disturbs it.
+                <div className="flex flex-col gap-3xs">
+                  <span className={fieldLabelClass}>Status</span>
+                  <p className="text-admin-sm text-admin-ink-secondary">
+                    {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
+                  </p>
+                </div>
+              )}
+            </div>
+            {speaker?.uid ? (
+              <div className="admin-object-row mt-sm">
+                <span className="admin-object-row__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <circle cx="12" cy="8" r="3" />
+                    <path d="M5 20v-2a7 7 0 0 1 14 0v2" />
+                  </svg>
+                </span>
+                <div className="admin-object-row__body">
+                  <div className="flex items-center gap-2xs"><h3 className="admin-object-row__title">Linked attendee account</h3><HelpTooltip label="Linked attendee account">Check which signed-in attendee account is connected to this speaker.</HelpTooltip></div>
+                  <p className="admin-object-row__description">
+                    This speaker has an attendee account.
+                  </p>
+                </div>
               </div>
             ) : null}
-          </div>
-        </Panel>
-
-        <Panel help="The email address is used for invitations and is never published."
-          title="Contact and status"
-          description="The email address is used for invitations and is never published."
-          className="admin-editor-card--contact"
-        >
-          <div className="flex flex-col gap-sm">
-            <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={(value) => set({ email: value })}
-              error={errorFor('email')}
-            />
-            {ADMIN_SETTABLE_STATUSES.includes(form.status) ? (
-              <SelectField help="Set the speaker’s invitation and approval stage. Publishing is a separate step."
-                label="Status"
-                value={form.status}
-                onChange={(value) => {
-                  setStatusPicked(true);
-                  set({ status: value });
-                }}
-                options={mode === 'edit' && speaker ? speakerStatusOptions(STATUS_OPTIONS, speaker.status ?? null) : STATUS_OPTIONS}
-                error={errorFor('status')}
-              />
-            ) : (
-              // A speaker mid-invite is shown, not offered. The pipeline
-              // states belong to the invitation flow — they mean nothing
-              // without the token it issues — so the editor reports where
-              // this speaker stands and leaves the state alone. Editing any
-              // other field on this page no longer disturbs it.
-              <div className="flex flex-col gap-3xs">
-                <span className={fieldLabelClass}>Status</span>
-                <p className="text-admin-sm text-admin-ink-secondary">
-                  {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
-                </p>
-              </div>
-            )}
-          </div>
-          {speaker?.uid ? (
-            <div className="admin-object-row mt-sm">
-              <span className="admin-object-row__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="12" cy="8" r="3" />
-                  <path d="M5 20v-2a7 7 0 0 1 14 0v2" />
-                </svg>
-              </span>
-              <div className="admin-object-row__body">
-                <div className="flex items-center gap-2xs"><h3 className="admin-object-row__title">Linked attendee account</h3><HelpTooltip label="Linked attendee account">Check which signed-in attendee account is connected to this speaker.</HelpTooltip></div>
-                <p className="admin-object-row__description">
-                  This speaker has an attendee account.
-                </p>
-              </div>
-            </div>
+          </Panel>
+          {mode === 'edit' && speaker ? (
+            <SpeakerLogisticsPanel speakerId={speaker.id} submittedAt={toIsoOrNull(speaker.profileSubmittedAt)} timeZone={eventTimeZone} />
           ) : null}
-        </Panel>
-        {mode === 'edit' && speaker ? (
-          <SpeakerLogisticsPanel speakerId={speaker.id} submittedAt={toIsoOrNull(speaker.profileSubmittedAt)} timeZone={eventTimeZone} />
-        ) : null}
-        {mode === 'edit' && speaker ? (
-          <SpeakerSessionConfirmations speakerId={speaker.id} call={call} disabled={saving} />
-        ) : null}
+        </div>
+        <div className="admin-editor-stack">
+          <Panel help="Everything here appears on the public speaker directory."
+            title="Profile"
+            description="Everything here appears on the public speaker directory."
+            className="admin-editor-card--primary"
+          >
+            <div className="mb-sm">
+              <TextField help="Optional. Shown with the name, for example she/her."
+                label="Pronouns"
+
+                value={form.pronouns}
+                onChange={(value) => set({ pronouns: value })}
+                maxLength={80}
+                error={errorFor('pronouns')}
+              />
+            </div>
+            <div className="planner-fields grid gap-sm sm:grid-cols-2">
+              <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
+                label="Job title"
+                value={form.jobTitle}
+                onChange={(value) => set({ jobTitle: value })}
+                error={errorFor('jobTitle')}
+              />
+              <TextField data-help-skip="The label directly names the requested detail; no further explanation needed."
+                label="Organization"
+                value={form.organization}
+                onChange={(value) => set({ organization: value })}
+                error={errorFor('organization')}
+              />
+            </div>
+            <div className="mt-sm flex flex-col gap-sm">
+              <TextAreaField help="Write the introduction attendees see in the speaker directory."
+                label="Bio"
+                rows={5}
+                value={form.bio}
+                onChange={(value) => set({ bio: value })}
+                error={errorFor('bio')}
+              />
+              {mode === 'edit' ? (
+                <div className="flex flex-col gap-3xs">
+                  <SpeakerPhotoField data-help-skip="Headshot names the expected picture; existing format, size and save guidance remains."
+                    user={user}
+                    speakerId={speakerId}
+                    value={form.headshotPath}
+                    onChange={(path) => set({ headshotPath: path })}
+                    label="Headshot"
+                    saveNote="Save to use this photo."
+                    appearance="admin"
+                    onBusyChange={setPhotoBusy}
+                  />
+                  <FieldError message={errorFor('headshotPath')} />
+                </div>
+              ) : null}
+            </div>
+          </Panel>
+
+          {mode === 'edit' && speaker ? (
+            <SpeakerSessionConfirmations speakerId={speaker.id} call={call} disabled={saving} />
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-xs">

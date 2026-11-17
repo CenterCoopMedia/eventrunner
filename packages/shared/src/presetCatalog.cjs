@@ -1303,6 +1303,7 @@ const ADMIN_TOKENS = Object.freeze({
     '--admin-control-height': '2.75rem',
     '--admin-rail-width': '14.5rem',
     '--admin-canvas-max': '64rem',
+    '--admin-measure-text': '64ch',
     '--admin-text-xs': '0.8125rem',
     '--admin-text-sm': '0.875rem',
     '--admin-text-base': '0.9375rem',
