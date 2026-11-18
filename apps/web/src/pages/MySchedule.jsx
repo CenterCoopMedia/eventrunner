@@ -27,7 +27,6 @@ import { isBackIssue } from '../lib/backIssue.js';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from '../lib/scheduleView.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
-import { downloadMySchedulePdf } from '../lib/schedulePdf.js';
 import { sessionMovement } from 'shared/venue';
 import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
@@ -71,6 +70,7 @@ export default function MySchedule() {
   async function onDownloadPdf() {
     setPdfState({ status: 'loading', message: '' });
     try {
+      const { downloadMySchedulePdf } = await import('../lib/schedulePdf.js');
       await downloadMySchedulePdf({ origin: functionsOrigin(), user, language });
       setPdfState({ status: 'idle', message: '' });
     } catch (err) {

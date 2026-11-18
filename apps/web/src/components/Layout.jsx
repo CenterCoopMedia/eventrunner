@@ -63,7 +63,6 @@ import { useDeviceBookmarks } from '../hooks/useDeviceBookmarks.js';
 import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { PublicLink as Link, PublicNavLink as NavLink } from './PublicLink.jsx';
-import LanguageChoice from './LanguageChoice.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
@@ -115,6 +114,7 @@ export function optionalOnDemand(importer, label) {
 }
 // Only multi-role accounts need this menu; keep it out of public first paint.
 const AccountMenu = optionalOnDemand(() => import('./AccountMenu.jsx'), 'account menu');
+const LanguageChoice = optionalOnDemand(() => import('./LanguageChoice.jsx'), 'language controls');
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
 // Import account code only when this signed-in reader has browser saves.
@@ -281,7 +281,7 @@ const FOOTER_LINK_CLASS =
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage, getSectionBlocks } = usePublicContent();
-  const { language, text } = usePublicLanguage();
+  const { available, language, text } = usePublicLanguage();
   const { user, loading: authLoading } = useAuth();
   const { pathname, key: locationKey } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -616,7 +616,7 @@ export default function Layout() {
             {navPlacement === 'side' ? null : nav}
             {navPlacement === 'side' ? null : <RegistrationAction placement="header" />}
           </Header>
-          <LanguageChoice />
+          {available.length > 1 ? <Suspense fallback={null}><LanguageChoice /></Suspense> : null}
         </div>
       </header>
       <AnnouncementBanners />

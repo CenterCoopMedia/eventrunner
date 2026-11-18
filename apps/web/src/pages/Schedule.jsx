@@ -56,7 +56,6 @@ import { formatDayDate, zonedDateTime, zoneLabel } from '../lib/eventTime.js';
 import { schedulePlainText } from '../lib/scheduleText.js';
 import { copyTextToClipboard } from '../lib/clipboard.js';
 import { SUPPRESS_STYLE_ID } from '../lib/modeRuntime.js';
-import { downloadSchedulePdf } from '../lib/schedulePdf.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
@@ -248,6 +247,7 @@ export default function Schedule() {
   async function onDownloadPdf() {
     setPdfState({ status: 'loading', message: '' });
     try {
+      const { downloadSchedulePdf } = await import('../lib/schedulePdf.js');
       await downloadSchedulePdf({ origin: functionsOrigin(), language });
       setPdfState({ status: 'idle', message: '' });
     } catch (err) {
