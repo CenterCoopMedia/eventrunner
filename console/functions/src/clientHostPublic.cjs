@@ -1,5 +1,7 @@
 'use strict';
 
+const { composeClientRobots } = require('./clientHostRobots.cjs');
+
 const MAP_STATUS_PATH = '/.well-known/eventrunner-route-map';
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
@@ -24,15 +26,24 @@ function eventIndex(routes) {
 </html>`;
 }
 
-function createPublicHostHandler({ fallback = () => null } = {}) {
-  return (request, url, host) => {
+function createPublicHostHandler({ fallback = () => null, fetchUpstream = fetch, log = console } = {}) {
+  return async (request, url, host) => {
     const { pathname } = url;
-    if (pathname !== '/' && pathname !== MAP_STATUS_PATH) return fallback(request, url);
+    if (pathname !== '/' && pathname !== MAP_STATUS_PATH && pathname !== '/robots.txt') return fallback(request, url);
     const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       return new Response(null, { status: 405, headers: { ...headers, allow: 'GET, HEAD' } });
     }
     const read = request.method === 'GET';
+    if (pathname === '/robots.txt') {
+      headers['content-type'] = 'text/plain; charset=utf-8';
+      try {
+        const robots = await composeClientRobots({ routes: host.routes, url, fallback, fetchUpstream, log });
+        return new Response(read ? robots : null, { headers });
+      } catch {
+        return new Response(read ? 'Crawler policy is temporarily unavailable. Try again shortly.\n' : null, { status: 503, headers });
+      }
+    }
     if (pathname === MAP_STATUS_PATH) {
       headers['content-type'] = 'application/json; charset=utf-8';
       const { version, exportedAt } = host;
