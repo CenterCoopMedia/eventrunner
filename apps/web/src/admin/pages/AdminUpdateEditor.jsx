@@ -292,15 +292,15 @@ export default function AdminUpdateEditor({ mode }) {
         actions={
           <>
             {mode === 'edit' && features?.updates ? (
-              <a
-                href={`/updates/${encodeURIComponent(updateId)}?preview=1`}
+              <Link
+                to={`/updates/${encodeURIComponent(updateId)}?preview=1`}
                 target="_blank"
                 rel="noreferrer"
                 className={linkButtonClass}
               >
                 Preview draft
                 <NewTabNote />
-              </a>
+              </Link>
             ) : null}
             <button
               type="submit"

@@ -333,9 +333,7 @@ export function imageBlockSources(url) {
 export function brandingSrc(value) {
   const path = storagePath(value);
   if (!path) return null;
-  // BASE_URL is '/' for every Hosting deploy (Vite's default base), so this
-  // is the same `/branding/…` path it has always been; it only differs for a
-  // build deployed under a subpath, such as the static demo.
+  // Flat placeholders ship in the bundle at Vite's asset base.
   return path.split('/').length > 2
     ? assetUrl(path)
     : `${import.meta.env.BASE_URL}${path}`;

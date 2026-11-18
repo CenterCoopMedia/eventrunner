@@ -189,6 +189,20 @@ describe('storagePath', () => {
 });
 
 describe('brandingSrc', () => {
+  it('mounts bundled paths while keeping stored assets in their event bucket', () => {
+    vi.stubEnv('BASE_URL', '/events/conference/');
+    try {
+      expect(brandingSrc('branding/logo.svg')).toBe('/events/conference/branding/logo.svg');
+      expect(assetUrl('branding/demo-venue-plan.svg')).toBe('/events/conference/branding/demo-venue-plan.svg');
+      const object = 'branding/abc123/logo.png';
+      expect(brandingSrc(object)).toBe(
+        `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(object)}?alt=media`,
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('serves a seeded flat path from the bundle', () => {
     // branding/logo.svg ships in apps/web/public/branding/ AND is uploaded by
     // init; the bundled copy renders before Storage is even provisioned.

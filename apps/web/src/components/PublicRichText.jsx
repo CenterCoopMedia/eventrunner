@@ -1,4 +1,5 @@
 import { internalRoutePath } from 'shared/languageUrls';
+import { joinEventPath } from 'shared/config/publicPath';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { sanitizeHtml } from '../lib/sanitizeHtml.js';
 
@@ -7,7 +8,7 @@ export default function PublicRichText({ value, ...props }) {
   const html = sanitizeHtml(value, rootHref && ((href) => {
     if (!internalRoutePath(href)) return null;
     const to = localize(href);
-    return { to, href: rootHref + to.slice(1) };
+    return { to, href: joinEventPath(rootHref, to) };
   }));
   if (!html) return null;
 

@@ -21,7 +21,7 @@
 // device SignInPanel and the speaker-invite page use — never a shadowed,
 // rounded card.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useHref, useSearchParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
@@ -40,6 +40,7 @@ const Panel = ({ children }) => (
 // Keep listening through the existing ProfileContext retry path. A bounded
 // wait also gives the attendee a recovery action without losing the reference.
 function PreparingAccount({ retryPath }) {
+  const retryHref = useHref(retryPath);
   const [takingLonger, setTakingLonger] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -55,7 +56,7 @@ function PreparingAccount({ retryPath }) {
           ? 'Your account is taking longer to load. Check your connection and reload this page, or contact the organizers if this continues.'
           : 'Setting up your account. The claim form will appear when your account is ready.'}
       </p>
-      {takingLonger ? <a href={retryPath} className={primaryActionClass}>Reload claim page</a> : null}
+      {takingLonger ? <a href={retryHref} className={primaryActionClass}>Reload claim page</a> : null}
     </Panel>
   );
 }

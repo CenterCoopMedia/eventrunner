@@ -34,6 +34,17 @@ function renderEditor(unsaved, props = {}) {
 }
 
 describe('inAppPath', () => {
+  it('passes an app-relative target to the mounted router and leaves a sibling alone', () => {
+    vi.stubEnv('BASE_URL', '/events/conference/');
+    try {
+      const current = 'https://events.example.org/events/conference/admin/edit';
+      expect(inAppPath('/events/conference/admin/content?tab=one', current)).toBe('/admin/content?tab=one');
+      expect(inAppPath('/events/conference-old/admin/content', current)).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('returns a same-origin path and ignores a new page or the current one', () => {
     expect(inAppPath('/admin/content', 'https://demo.example/admin/edit')).toBe('/admin/content');
     expect(inAppPath('https://demo.example/admin/edit', 'https://demo.example/admin/edit')).toBe(null);

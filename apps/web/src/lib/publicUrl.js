@@ -1,5 +1,6 @@
 import { IS_DEMO } from './demoMode.js';
 import { withContentLanguage } from 'shared/languageUrls';
+import { joinEventPath } from 'shared/config/publicPath';
 
 /** Public route URL, independent of query state and stale canonical markup. */
 export function publicUrl(path, {
@@ -15,7 +16,7 @@ export function publicUrl(path, {
   if (demo) url.hash = target;
   else {
     const [pathname, query] = target.split('?');
-    url.pathname += pathname.replace(/^\//, '');
+    url.pathname = joinEventPath(appPath, pathname);
     if (query) url.search = query;
   }
   return url.href;

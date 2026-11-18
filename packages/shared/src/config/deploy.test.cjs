@@ -77,11 +77,22 @@ test('EVENT_SLUG must be lowercase [a-z0-9-]', () => {
   assert.ok(result.errors.some((e) => e.startsWith('EVENT_SLUG:')));
 });
 
-test('EVENT_PUBLIC_URL must be a parseable https URL', () => {
+test('EVENT_PUBLIC_URL must satisfy the HTTPS public-base contract', () => {
   for (const url of ['not a url', 'http://summit.example.org', 'ftp://x.example']) {
     const result = validateDeployEnv({ ...VALID_ENV, EVENT_PUBLIC_URL: url });
     assert.equal(result.ok, false, url);
     assert.ok(result.errors.some((e) => e.startsWith('EVENT_PUBLIC_URL:')));
+  }
+});
+
+test('the server and web build must name the same validated public base', () => {
+  const publicUrl = 'https://summit.example.org/events/conference';
+  const configured = { ...VALID_ENV, EVENT_PUBLIC_URL: publicUrl, VITE_EVENT_PUBLIC_URL: `${publicUrl}/` };
+  assert.equal(validateDeployEnv(configured).ok, true);
+  for (const url of [`${publicUrl}-old`, `${publicUrl}/%2f`]) {
+    const result = validateDeployEnv({ ...configured, VITE_EVENT_PUBLIC_URL: url });
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some((error) => error.startsWith('VITE_EVENT_PUBLIC_URL:')));
   }
 });
 
