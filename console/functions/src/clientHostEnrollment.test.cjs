@@ -10,6 +10,7 @@ const { recordAppliedPublicBase } = require('./clientHostRecords.cjs');
 const { saveApplicationStep } = require('./applicationSave.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
 const { ana, application, deps, ops, seeded } = require('./fakeReview.cjs');
+const { fakeRouteMap } = require('./fakeRouteMap.cjs');
 
 const otherOwner = { uid: 'cy', email: 'cy@example.org' };
 const editor = { uid: 'ben', email: 'ben@example.org' };
@@ -19,7 +20,7 @@ const siblingBase = `https://${host}/events/workshops/`;
 const verified = { authorityReference: 'fixture/host-approval-1', confirmAuthority: true };
 
 function setup(extra = {}) {
-  return deps(seeded({
+  return Object.assign(deps(seeded({
     'organizations/o2': { name: 'NC Local' },
     'organizations/o2/members/cy': { role: 'owner', email: otherOwner.email },
     'applications/a1': application({ status: 'launched', agreementAcceptance: { id: 'aa1' } }),
@@ -32,7 +33,7 @@ function setup(extra = {}) {
     'signup_links/l1': { appId: 'a1', status: 'used' },
     'signup_links/l2': { appId: 'a2', status: 'used' },
     ...extra,
-  }));
+  })), fakeRouteMap());
 }
 
 function consent(d, { appId = 'a1', orgId = 'o1', url = publicBase, user = ana, confirm = true } = {}) {
@@ -40,7 +41,9 @@ function consent(d, { appId = 'a1', orgId = 'o1', url = publicBase, user = ana, 
 }
 
 function manage(d, action, fields = {}, user = ops) {
-  return manageEventMount(d, { body: { action, appId: 'a1', publicBase, ...fields }, user });
+  return manageEventMount(d, { body: {
+    action, appId: 'a1', publicBase, ...(action === 'publish' && { publicTitle: 'Conference' }), ...fields,
+  }, user });
 }
 
 test('consent requires the application’s own authenticated Owner and enrollment requires a host receipt', async () => {
@@ -132,6 +135,40 @@ test('reserved paths, overlapping mounts and incompatible hosts are refused', as
   const similar = `https://${host}/summit-2027-old/`;
   await consent(d, { appId: 'a2', orgId: 'o2', url: similar, user: otherOwner });
   await manage(d, 'enroll', { appId: 'a2', publicBase: similar });
+});
+
+test('publication returns only after the versioned public map is read back, including on retry or a sibling write', async () => {
+  const d = setup();
+  const sibling = { appId: 'a2', publicBase: siblingBase, publicTitle: 'Workshops', confirm: true };
+  await consent(d);
+  await consent(d, { appId: 'a2', orgId: 'o2', url: siblingBase, user: otherOwner });
+  await manage(d, 'enroll', verified);
+  await manage(d, 'enroll', sibling);
+  assert.deepEqual((await d.routeMaps.read(host)).routes, []);
+  await assert.rejects(manage(d, 'publish', { confirm: true, publicTitle: undefined }), { code: 'public-title-required' });
+  assert.equal(d.db.read('console_event_mounts/a1').state, 'enrolled');
+
+  d.controls.beforeWrite = () => manage(d, 'publish', sibling);
+  const first = (await manage(d, 'publish', { confirm: true })).body.routeMap;
+  const map = await d.routeMaps.read(host);
+  assert.deepEqual(first, { version: map.version, exportedAt: map.exportedAt });
+  assert.deepEqual(map.routes, [
+    { mount: '/events/workshops', hostingOrigin: 'https://workshops-host.web.app', publicTitle: 'Workshops' },
+    { mount: '/summit-2027', hostingOrigin: 'https://summit-host.web.app', publicTitle: 'Conference' },
+  ]);
+  assert.deepEqual(Object.keys(map), ['host', 'version', 'exportedAt', 'routes']);
+
+  const rename = { confirm: true, publicTitle: 'Conference archive' };
+  d.controls.readFailure = true;
+  await assert.rejects(manage(d, 'publish', rename), {
+    code: 'route-map-unavailable', cause: 'Reading the public route map failed (code 503).',
+  });
+  d.controls.readFailure = false;
+  const confirmed = (await manage(d, 'publish', rename)).body.routeMap;
+  assert.equal(confirmed.version, first.version + 1);
+  const removed = (await manage(d, 'remove', { confirm: true })).body.routeMap;
+  assert.equal(removed.version, confirmed.version + 1);
+  assert.deepEqual((await d.routeMaps.read(host)).routes, [map.routes[0]]);
 });
 
 test('an approved new managed host stays separate from event web-address reservations', async () => {

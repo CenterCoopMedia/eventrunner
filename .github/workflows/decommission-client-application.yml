@@ -67,6 +67,7 @@ jobs:
           CONFIRM_SITE: ${{ inputs.confirm_site }}
           EVENT_NAME: ${{ inputs.event_name }}
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+          CONSOLE_CLIENT_ROUTE_MAP_BUCKET: ${{ vars.CONSOLE_CLIENT_ROUTE_MAP_BUCKET }}
           CONSOLE_PUBLIC_URL: ${{ vars.CONSOLE_PUBLIC_URL }}
           CONSOLE_MAIL_FROM: ${{ vars.CONSOLE_MAIL_FROM }}
           CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
