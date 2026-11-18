@@ -10,7 +10,6 @@ const { buildWebManifest } = require('../lib/site-manifest.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const origin = 'https://events.example.org';
-const schedule = 'src/pages/Schedule.jsx';
 
 function verifyBuild(dist, base, manifest) {
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
@@ -27,8 +26,10 @@ function verifyBuild(dist, base, manifest) {
     assert.ok(fs.existsSync(path.join(dist, url.slice(base.length))), `missing file: ${url}`);
   }
 
-  const lazy = chunks[schedule];
-  assert.ok(lazy?.isDynamicEntry, 'the schedule must remain a lazy entry');
+  // The Vite config groups Schedule into a named chunk. Rolldown's manifest
+  // can key the group by its output file instead of by Schedule.jsx.
+  const [schedule, lazy] = Object.entries(chunks).find(([, chunk]) => /^assets\/schedule-[^/]+\.js$/.test(chunk.file)) ?? [];
+  assert.ok(lazy, 'missing schedule chunk in the Vite manifest');
   assert.ok(fs.existsSync(path.join(dist, lazy.file)), 'missing lazy schedule chunk');
   const importers = Object.values(chunks).filter((chunk) => chunk.dynamicImports?.includes(schedule));
   assert.ok(importers.some(({ file }) => {

@@ -87,7 +87,6 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       'shared/richText',
       'shared/config',
       'shared/config/lifecycle',
-      'shared/config/publicBase',
       'shared/config/socialAccounts',
       'shared/routing',
       'shared/page',
