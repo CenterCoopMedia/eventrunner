@@ -2,7 +2,7 @@
 // (lib/launchSource.js). It states what is already true from setup — the
 // event's name, its dates, its place — and the one action a visitor can
 // take, so a client's link is never a page of starter text.
-import { Link } from 'react-router';
+import { PublicLink as Link } from './PublicLink.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { usePitchCallOpen } from '../lib/usePitchCallOpen.js';

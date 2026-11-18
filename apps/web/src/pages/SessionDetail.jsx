@@ -3,8 +3,10 @@
 // navigation bypasses the nav, so the route itself must gate too, matching
 // the Speakers.jsx pattern). A session id that does not resolve to a
 // visible cmsSchedule doc 404s here rather than rendering a blank page.
-import { Link, useLocation, useParams } from 'react-router';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { useLocation, useParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
+import { usePublicContent as useContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useEventClock } from '../hooks/useEventClock.js';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
@@ -21,16 +23,17 @@ import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 function NotFoundState({ search }) {
+  const { text } = usePublicLanguage();
   return (
     <EmptyState
-      title="This session is not available"
-      description="It may not be published yet, or the link may be out of date."
+      title={text('This session is not available', 'Esta sesión no está disponible')}
+      description={text('It may not be published yet, or the link may be out of date.', 'Es posible que aún no se haya publicado o que el enlace ya no esté vigente.')}
       action={
         <Link
           to={{ pathname: '/schedule', search }}
           className={primaryActionClass}
         >
-          Back to the schedule
+          {text('Back to the schedule', 'Volver al programa')}
         </Link>
       }
     />
@@ -38,6 +41,7 @@ function NotFoundState({ search }) {
 }
 
 export default function SessionDetail() {
+  const { language, text } = usePublicLanguage();
   const { sessionId } = useParams();
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
@@ -79,14 +83,14 @@ export default function SessionDetail() {
   if (loading) {
     return (
       <div className="mt-lg">
-        <LoadingState label="Loading the session…" />
+        <LoadingState label={text('Loading the session…', 'Cargando la sesión…')} />
       </div>
     );
   }
 
   if (!session) return <NotFoundState search={search} />;
 
-  const range = formatSessionTimeRange(eventConfig, session);
+  const range = formatSessionTimeRange(eventConfig, session, language);
   const day = Array.isArray(eventConfig.days)
     ? eventConfig.days.find((d) => d?.id === session.dayId)
     : null;
@@ -101,12 +105,12 @@ export default function SessionDetail() {
           to={{ pathname: '/schedule', search }}
           className="font-data text-caption font-semibold text-text-secondary hover:text-text-primary hover:underline"
         >
-          ← Back to the schedule
+          {text('← Back to the schedule', '← Volver al programa')}
         </Link>
       </p>
       <header>
         <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">{session.title}</h1>
+          <h1 lang={session.publicLanguage} className="font-heading text-h1 font-semibold text-text-primary">{session.title}</h1>
           <SessionFormat format={session.type} />
         </div>
         <p className="mt-2xs font-data text-caption text-text-secondary">
@@ -123,18 +127,19 @@ export default function SessionDetail() {
               {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
             </span>
           ) : !day ? (
-            'Time to be announced'
+            text('Time to be announced', 'Hora por confirmar')
           ) : null}
         </p>
         {session.location ? (
           <p className="mt-2xs font-data text-caption text-text-secondary">{session.location}</p>
         ) : null}
         <SpeakerNames speakers={speakerNames} features={features} />
-        <ShareLink className="mt-sm" path={`/schedule/${encodeURIComponent(session.id)}`} title={session.title} shareLabel="Share session" copyLabel="Copy session link" />
+        <ShareLink className="mt-sm" path={`/schedule/${encodeURIComponent(session.id)}`} title={session.title}
+          shareLabel={text('Share session', 'Compartir sesión')} copyLabel={text('Copy session link', 'Copiar enlace de la sesión')} />
       </header>
 
       {session.description ? (
-        <p className="mt-md max-w-prose whitespace-pre-line text-body text-text-secondary text-pretty">
+        <p lang={session.publicLanguage} className="mt-md max-w-prose whitespace-pre-line text-body text-text-secondary text-pretty">
           {session.description}
         </p>
       ) : null}

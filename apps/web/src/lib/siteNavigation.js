@@ -88,7 +88,7 @@ function navItemFor(page, features) {
     // A systemPage doc with an id no route answers to has nothing to link
     // to. That is hand-written data, not something the editor can produce.
     if (!system) return null;
-    return { to: system.to, label: page.label, end: !system.children };
+    return { to: system.to, label: page.label, end: !system.children, ...(page.publicLanguage && { language: page.publicLanguage }) };
   }
 
   // A generic page IS its stored path, so the path has to hold up on its
@@ -105,7 +105,7 @@ function navItemFor(page, features) {
   // matching would mark /about as current while the reader is on
   // /about/team — two items claiming aria-current at once, which is worse
   // than none: it tells a screen reader the reader is in two places.
-  return { to: page.path, label: page.label, end: true };
+  return { to: page.path, label: page.label, end: true, ...(page.publicLanguage && { language: page.publicLanguage }) };
 }
 
 /**

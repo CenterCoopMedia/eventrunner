@@ -4,7 +4,8 @@
 // visitor acts on — signing in, pitching a session, tickets and
 // registration, a speaker's invitation, an account — stay open, because a
 // link the organizers sent must work before the site is announced.
-import { Link, Outlet, useLocation } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
+import { PublicLink as Link } from './PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useComingSoon } from '../lib/launchSource.js';
 import ComingSoon from './ComingSoon.jsx';

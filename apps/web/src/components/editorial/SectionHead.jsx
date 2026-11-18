@@ -34,6 +34,7 @@ import Rule from './Rule.jsx';
  *   className?: string,
  *   tabIndex?: -1,                      // a jump target a section index can focus (issue #14)
  *   action?: import('react').ReactNode, // one control after the heading (issue #198)
+ *   lang?: string,
  * }} props
  */
 export default function SectionHead({
@@ -46,6 +47,7 @@ export default function SectionHead({
   className = '',
   tabIndex,
   action = null,
+  lang,
 }) {
   const Tag = `h${level >= 2 && level <= 6 ? level : 2}`;
   const isFolioHead = variant === 'folio';
@@ -64,6 +66,7 @@ export default function SectionHead({
       >
         <Tag
           id={id}
+          lang={lang}
           tabIndex={tabIndex}
           className={
             isFolioHead

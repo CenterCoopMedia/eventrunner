@@ -7,7 +7,8 @@
 // sent to the attendee dashboard; a failed request stays visible and retryable
 // because a network error is not evidence that the account is not a speaker.
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useLocation, useOutletContext } from 'react-router';
+import { Navigate, useLocation, useOutletContext } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import AdminEntryLink from '../components/AdminEntryLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';

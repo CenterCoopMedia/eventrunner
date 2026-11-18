@@ -29,11 +29,13 @@ import {
 } from '../../utils/calendar.js';
 import { rowActionClass } from './sessionActionClass.js';
 import ExternalLink from '../ExternalLink.jsx';
+import { usePublicLanguage } from '../../contexts/PublicLanguageContext.jsx';
 
 /**
  * @param {{ eventConfig: object, session: object }} props
  */
 export default function CalendarMenu({ eventConfig, session }) {
+  const { text } = usePublicLanguage();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
   const googleUrl = buildGoogleCalendarUrl(eventConfig, session);
@@ -73,17 +75,17 @@ export default function CalendarMenu({ eventConfig, session }) {
         onClick={() => setOpen((was) => !was)}
         className={rowActionClass}
       >
-        Add to calendar
+        {text('Add to calendar', 'Agregar al calendario')}
       </button>
       {open ? (
         <ul
           id={listId}
-          aria-label={`Add ${session.title} to a calendar`}
+          aria-label={text(`Add ${session.title} to a calendar`, `Agregar ${session.title} al calendario`)}
           className="motion-enter mt-2xs flex flex-col items-start gap-2xs ps-sm"
         >
           <li>
             <button type="button" className={rowActionClass} onClick={onDownload}>
-              Calendar file (.ics)
+              {text('Calendar file (.ics)', 'Archivo de calendario (.ics)')}
             </button>
           </li>
           {googleUrl ? (

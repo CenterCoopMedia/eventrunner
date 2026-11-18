@@ -21,7 +21,8 @@
 // stays a control label above its own input — the eyebrow ban's one named
 // exception (§2.4).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Navigate, useNavigate, useParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { SELF_EDITABLE_SPEAKER_FIELDS } from 'shared/speaker';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';

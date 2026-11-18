@@ -21,7 +21,8 @@
 // device SignInPanel and the speaker-invite page use — never a shadowed,
 // rounded card.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';

@@ -21,11 +21,14 @@
 // to find.
 
 /** The one sentence. Exported so a call site that must inline it agrees. */
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+
 export const NEW_TAB_NOTE = 'opens in a new tab';
 
 /** The hidden half of the link's name, for a call site with its own <a>. */
 export function NewTabNote() {
-  return <span className="sr-only">{` (${NEW_TAB_NOTE})`}</span>;
+  const { language, text } = usePublicLanguage();
+  return <span className="sr-only" lang={language}>{` (${text(NEW_TAB_NOTE, 'se abre en una pestaña nueva')})`}</span>;
 }
 
 /**

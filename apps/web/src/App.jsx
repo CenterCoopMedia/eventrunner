@@ -5,6 +5,7 @@ import { useLocation, useRoutes, useSearchParams } from 'react-router';
 import { EventConfigProvider, useEventConfig } from './contexts/EventConfigContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ContentProvider } from './contexts/ContentContext.jsx';
+import { mayHaveSpanish, PublicLanguageProvider } from './contexts/PublicLanguageProvider.jsx';
 import { ProfileProvider } from './contexts/ProfileContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
@@ -52,12 +53,13 @@ function ContentGate({ children }) {
   const { pathname, search } = useLocation();
   const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
-  const { features } = useEventConfig();
+  const { eventConfig, features } = useEventConfig();
   const readSource =
     searchParams.get('preview') === '1' && isAdmin ? 'draft' : 'published';
 
   return (
-    <ContentProvider readSource={readSource} pathname={pathname} search={search} publicTools={IS_DEMO || features.webmcpPublic === true}>
+    <ContentProvider readSource={readSource} pathname={pathname} search={search} publicTools={IS_DEMO || features.webmcpPublic === true}
+      languageNeedsSchedule={features.schedule && mayHaveSpanish(eventConfig)}>
       {children}
     </ContentProvider>
   );
@@ -71,12 +73,14 @@ export default function App() {
       <AuthProvider>
         <ProfileProvider>
           <ContentGate>
-            <ToastProvider>
-              <ScrollReset />
-              <ProfileSetupRedirect />
-              <RouteTitle />
-              <AppRoutes />
-            </ToastProvider>
+            <PublicLanguageProvider>
+              <ToastProvider>
+                <ScrollReset />
+                <ProfileSetupRedirect />
+                <RouteTitle />
+                <AppRoutes />
+              </ToastProvider>
+            </PublicLanguageProvider>
           </ContentGate>
         </ProfileProvider>
       </AuthProvider>

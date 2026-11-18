@@ -112,6 +112,7 @@ export default function SectionIndexNav({ sections }) {
             <li key={section.id}>
               <a
                 href={`#${section.id}`}
+                lang={section.language}
                 // aria-current="location" is the token WAI-ARIA names for a
                 // link to the reader's own place within a page's sections —
                 // not "page", which names a different document.

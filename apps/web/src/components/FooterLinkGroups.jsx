@@ -17,8 +17,8 @@
 // Each group's name labels its own list. It is a label, not a heading, so
 // the footer adds nothing to the page's heading outline.
 import { useId } from 'react';
-import { Link } from 'react-router';
-import { isCanonicalPagePath } from 'shared/routing';
+import { PublicLink as Link } from './PublicLink.jsx';
+import { internalRoutePath } from 'shared/languageUrls';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 
@@ -58,8 +58,8 @@ function FooterGroup({ name, links, linkClass }) {
       ) : null}
       <ul {...(name ? { 'aria-labelledby': labelId } : null)}>
         {links.map((block) => (
-          <li key={block.id ?? `${block.section}__${block.field}`}>
-            {isCanonicalPagePath(block.url) ? (
+          <li key={block.id ?? `${block.section}__${block.field}`} lang={block.publicLanguage}>
+            {internalRoutePath(block.url) ? (
               <Link to={block.url} className={linkClass}>
                 {block.label}
               </Link>

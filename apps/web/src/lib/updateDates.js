@@ -23,16 +23,17 @@ export function toPublishDate(publishAt) {
  * event's clock (design record §3.1): a post published late in the evening
  * at the venue is dated that day, not the reader's next morning.
  */
-function formatterIn(timeZone, options) {
+function formatterIn(timeZone, options, language) {
+  const locale = language === 'es' ? 'es' : DISPLAY_LOCALE;
   if (typeof timeZone === 'string' && timeZone) {
     try {
-      return new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone, ...options });
+      return new Intl.DateTimeFormat(locale, { timeZone, ...options });
     } catch {
       // An unknown zone: fall through to the reader's clock rather than
       // failing the page over a date.
     }
   }
-  return new Intl.DateTimeFormat(DISPLAY_LOCALE, options);
+  return new Intl.DateTimeFormat(locale, options);
 }
 
 /**
@@ -41,10 +42,10 @@ function formatterIn(timeZone, options) {
  * @param {*} publishAt
  * @param {string} [timeZone] the event's zone (config/event.timezone)
  */
-export function publishDateLabel(publishAt, timeZone) {
+export function publishDateLabel(publishAt, timeZone, language) {
   const date = toPublishDate(publishAt);
   if (!date) return null;
-  return formatterIn(timeZone, { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
+  return formatterIn(timeZone, { month: 'long', day: 'numeric', year: 'numeric' }, language).format(date);
 }
 
 /**
@@ -86,10 +87,10 @@ export function sortUpdates(updates) {
  * @param {*} publishAt
  * @param {string} [timeZone]
  */
-export function publishMonthLabel(publishAt, timeZone) {
+export function publishMonthLabel(publishAt, timeZone, language) {
   const date = toPublishDate(publishAt);
   if (!date) return null;
-  return formatterIn(timeZone, { month: 'long', year: 'numeric' }).format(date);
+  return formatterIn(timeZone, { month: 'long', year: 'numeric' }, language).format(date);
 }
 
 /**
@@ -122,7 +123,7 @@ export function publishMonthLabel(publishAt, timeZone) {
  * @param {string} [timeZone] the event's zone, so a month head is the event's month
  * @returns {Array<{ kind: 'lead'|'pinned'|'month'|'undated', label: string, members: object[] }>}
  */
-export function groupUpdates(sorted, timeZone) {
+export function groupUpdates(sorted, timeZone, language) {
   const runs = [];
   // Only a real `true` features a post, the value cmsSaveUpdate stores.
   const lead = sorted.find((update) => update?.featured === true) ?? null;
@@ -138,7 +139,7 @@ export function groupUpdates(sorted, timeZone) {
       push('pinned', 'Pinned', update);
       continue;
     }
-    const month = publishMonthLabel(update?.publishAt, timeZone);
+    const month = publishMonthLabel(update?.publishAt, timeZone, language);
     if (month) push('month', month, update);
     else push('undated', 'Undated', update);
   }

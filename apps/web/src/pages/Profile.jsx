@@ -23,7 +23,7 @@
 // their edge, so this page held the two controls on the site that no preset
 // could reach (expansion record §3.3).
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { PROFILE_VISIBILITIES, PROFILE_TEXT_LIMITS, validateProfileBounds } from 'shared/profile';
 import {
   MAX_CUSTOM_BADGE_LENGTH,

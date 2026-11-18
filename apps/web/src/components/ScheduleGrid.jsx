@@ -35,7 +35,9 @@
 // choice. The traced line is the same interaction with Atlas's tokens on
 // (--schedule-trace-width): the column's cells connect down the sheet.
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { PublicLink as Link } from './PublicLink.jsx';
 import RouteMark from './editorial/RouteMark.jsx';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
 import CallingPoints from './CallingPoints.jsx';
@@ -62,13 +64,14 @@ import { sessionStateOf } from '../lib/scheduleState.js';
  * existed at all.
  */
 function GridEntry({ entry, eventConfig, countsById, now }) {
+  const { language, text } = usePublicLanguage();
   const recordingUrl = sessionRecordingUrl(entry.session);
   const { search } = useLocation();
-  const range = formatSessionTimeRange(eventConfig, entry.session);
+  const range = formatSessionTimeRange(eventConfig, entry.session, language);
   return (
     <div className="schedule-grid__entry">
       <div className="flex flex-wrap items-baseline gap-x-sm gap-y-3xs">
-        <h3 className="font-heading text-h3 font-semibold text-text-primary">
+        <h3 lang={entry.session.publicLanguage} className="font-heading text-h3 font-semibold text-text-primary">
           <Link
             to={{ pathname: `/schedule/${entry.session.id}`, search }}
             className="hover:underline"
@@ -82,13 +85,13 @@ function GridEntry({ entry, eventConfig, countsById, now }) {
       </div>
       {range?.endLabel ? (
         <p className="mt-3xs font-mono text-caption text-text-secondary">
-          {'Ends '}
+          {text('Ends ', 'Termina a las ')}
           <time dateTime={range.endIso}>{range.endLabel}</time>
         </p>
       ) : null}
       <SpecimenLabel
         className="mt-2xs"
-        fields={[{ key: 'Place', value: entry.session.location }]}
+        fields={[{ key: text('Place', 'Lugar'), value: entry.session.location }]}
       />
       <CallingPoints
         className="mt-xs"
@@ -120,6 +123,7 @@ function GridEntry({ entry, eventConfig, countsById, now }) {
  * }} props
  */
 export default function ScheduleGrid({ day, entries, columns, eventConfig, countsById, now = null }) {
+  const { language } = usePublicLanguage();
   // Two states, because the reader is doing two things. `focused` is the
   // preview that follows the keyboard; `pinned` is the choice a press
   // keeps. Focus wins while it lasts, which is what makes tabbing across
@@ -166,7 +170,7 @@ export default function ScheduleGrid({ day, entries, columns, eventConfig, count
           const first = (row.span ?? row.cells.flatMap((cell) => cell.entries))[0];
           // The row header is a time standing on its own, so it carries its
           // own AM/PM rather than borrowing the range's (lib/eventTime.js).
-          const range = first ? formatSessionStart(eventConfig, first.session) : null;
+          const range = first ? formatSessionStart(eventConfig, first.session, language) : null;
           return (
             <tr key={row.key}>
               <th scope="row" className="schedule-grid__time font-mono text-caption">

@@ -15,17 +15,17 @@
 // The shape is the site's one filled action, so it reads that class string
 // from controlClasses.js rather than restating it. Restating it is exactly
 // how the drift that module's header describes got started.
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
-import { isCanonicalPagePath } from 'shared/routing';
+import { internalRoutePath } from 'shared/languageUrls';
 import { primaryActionClass } from '../controlClasses.js';
 import ExternalLink from '../ExternalLink.jsx';
 
 export default function CtaBlock({ block }) {
   if (!block?.url || !block?.label || !isSafeHref(block.url)) return null;
-  if (isCanonicalPagePath(block.url)) {
+  if (internalRoutePath(block.url)) {
     return (
-      <Link to={block.url} className={primaryActionClass}>
+      <Link to={block.url} className={primaryActionClass} lang={block.publicLanguage}>
         {block.label}
       </Link>
     );
@@ -35,13 +35,13 @@ export default function CtaBlock({ block }) {
   // string nobody can see (components/ExternalLink.jsx).
   if (block.external) {
     return (
-      <ExternalLink href={block.url} className={primaryActionClass}>
+      <ExternalLink href={block.url} className={primaryActionClass} lang={block.publicLanguage}>
         {block.label}
       </ExternalLink>
     );
   }
   return (
-    <a href={block.url} rel="noreferrer" className={primaryActionClass}>
+    <a href={block.url} rel="noreferrer" className={primaryActionClass} lang={block.publicLanguage}>
       {block.label}
     </a>
   );

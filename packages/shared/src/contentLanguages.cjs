@@ -1,8 +1,8 @@
 'use strict';
 
 const { hasRichTextContent } = require('./richText.cjs');
+const { LANGUAGES } = require('./languageUrls.cjs');
 
-const LANGUAGES = Object.freeze(['en', 'es']);
 const ENGLISH_ONLY = Object.freeze({ default: 'en', available: Object.freeze(['en']) });
 // Identifiers, URLs, prices, figures, attributions and proper names are shared.
 const BLOCK_FIELDS = Object.freeze({

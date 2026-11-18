@@ -10,8 +10,9 @@
 // event's own data, the card names itself, and an event with the
 // bookmarking feature off draws nothing at all — there is nothing to list.
 import { useMemo } from 'react';
-import { Link } from 'react-router';
-import { useContent } from '../../contexts/ContentContext.jsx';
+import { PublicLink as Link } from '../PublicLink.jsx';
+import { usePublicContent as useContent } from '../../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../../hooks/useMyBookmarks.js';
 import { formatSessionTimeRange } from '../../lib/eventTime.js';
@@ -22,6 +23,7 @@ const cardClass =
   'rounded-brand-lg border-hairline border-rule-hairline bg-surface-alt p-md';
 
 export default function MySessionsCard() {
+  const { language } = usePublicLanguage();
   const { eventConfig, features } = useEventConfig();
   const { scheduleData } = useContent();
   const { bookmarkedIds } = useMyBookmarks();
@@ -78,7 +80,7 @@ export default function MySessionsCard() {
         <>
           <ul className="mt-sm">
             {upcoming.map((session) => {
-              const range = formatSessionTimeRange(eventConfig, session);
+              const range = formatSessionTimeRange(eventConfig, session, language);
               return (
                 <li
                   key={session.id}
@@ -86,6 +88,7 @@ export default function MySessionsCard() {
                 >
                   <Link
                     to={`/schedule/${session.id}`}
+                    lang={session.publicLanguage}
                     className="font-medium text-text-primary hover:underline"
                   >
                     {session.title}

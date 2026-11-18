@@ -6,7 +6,7 @@
 // A choice field shows only when staff set its list on the call
 // (config/pitch_call.formOptions). With no format list, Format stays the
 // free-text field the one-page form had.
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 import { AUDIENCE_LEVELS } from 'shared/pitchForm';
 import { SelectField, TextAreaField, TextField } from '../forms/publicForm.jsx';
 import { Checkbox } from '../forms/Choice.jsx';

@@ -25,7 +25,7 @@
 // A custom page has no core component, so it ignores `slot` entirely and
 // keeps full block composition (ContentPage.jsx). Nothing here reaches it.
 import { Fragment } from 'react';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
@@ -95,7 +95,7 @@ function SlotSections({ pageId, sections, getSectionBlocks, renderSection, arran
           <section aria-labelledby={`section-${section.id}`} className="page-section">
             {/* The head runs to the stage whatever the arrangement: a
                 section boundary is the width of the page it opens. */}
-            <SectionHead level={2} id={`section-${section.id}`} title={section.label} action={editLink} />
+            <SectionHead level={2} id={`section-${section.id}`} title={section.label} lang={section.publicLanguage} action={editLink} />
             {/* THE ARRANGEMENT ON THE STAGE (2026-09-10 vocabulary
                 expansion): `grid` gives the section the stage's own
                 columns, `list` sets it on the text measure — which is what
@@ -134,7 +134,7 @@ export default function SystemPage({
   children,
   ...articleProps
 }) {
-  const { pages, getPage, getSectionBlocks: storedSectionBlocks } = useContent();
+  const { pages, getPage, getSectionBlocks: storedSectionBlocks } = usePublicContent();
   const { features } = useEventConfig();
   // A cta or link_group that leads to a section that is off, or to a page
   // that is not public, is not drawn (lib/linkTargets.js). Filtered here, before any section decides whether

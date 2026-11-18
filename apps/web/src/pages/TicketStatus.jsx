@@ -1,6 +1,7 @@
 import { ORDER_COMPLETE_STATUSES } from 'shared/ticketCommerce';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';

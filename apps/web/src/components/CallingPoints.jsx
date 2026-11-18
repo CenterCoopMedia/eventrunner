@@ -27,7 +27,9 @@
 // a reader who asked for less motion gets a marker that does not move. The
 // schedule's one EXPRESSIVE moment is the grid's column, never this.
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { PublicLink as Link } from './PublicLink.jsx';
 import { sessionMovement } from 'shared/venue';
 import TransferLine from './TransferLine.jsx';
 import { formatSessionStart } from '../lib/eventTime.js';
@@ -41,6 +43,7 @@ import { formatSessionStart } from '../lib/eventTime.js';
  * }} props
  */
 export default function CallingPoints({ parent, points, eventConfig, className = '' }) {
+  const { language, text } = usePublicLanguage();
   const [open, setOpen] = useState(true);
   // The initially visible programme is still; only a reader's reopening enters.
   const [openedByReader, setOpenedByReader] = useState(false);
@@ -71,11 +74,11 @@ export default function CallingPoints({ parent, points, eventConfig, className =
       <ul
         id={listId}
         hidden={!open}
-        aria-label={`Calling points of ${parent.title}`}
+        aria-label={text(`Calling points of ${parent.title}`, `Partes de ${parent.title}`)}
         className={`mt-2xs${open && openedByReader ? ' motion-enter' : ''}`}
       >
         {points.map((child) => {
-          const range = formatSessionStart(eventConfig, child);
+          const range = formatSessionStart(eventConfig, child, language);
           // The move from the parent's place to this child's, if anyone
           // recorded it. Null when either states no place, when both are
           // in the same one, and when the pair has no record — which is
@@ -94,13 +97,18 @@ export default function CallingPoints({ parent, points, eventConfig, className =
                 <Link
                   to={{ pathname: `/schedule/${child.id}`, search }}
                   className="hover:underline"
+                  lang={child.publicLanguage}
                 >
                   {child.title}
                 </Link>
                 {/* The relationship, in words. The indent says it to a
                     reader who can see it; this says it to everyone
                     else. */}
-                <span className="sr-only">{` — part of ${parent.title}`}</span>
+                <span className="sr-only">
+                  {parent.publicLanguage === 'en'
+                    ? <> — parte de <span lang="en">{parent.title}</span></>
+                    : text(` — part of ${parent.title}`, ` — parte de ${parent.title}`)}
+                </span>
               </p>
               <TransferLine movement={movement} />
             </li>

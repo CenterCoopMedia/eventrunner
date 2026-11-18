@@ -5,10 +5,11 @@
 // folio-on-a-rule SectionHead device Schedule.jsx uses, and the page actions
 // are ruled rectangles rather than filled pill buttons.
 import { Fragment, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { functionsOrigin } from '../lib/firebaseSettings.js';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent as useContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useEventClock } from '../hooks/useEventClock.js';
@@ -47,6 +48,7 @@ import { primaryActionClass, quietActionClass } from '../components/controlClass
 // unrecorded route honestly looks like.
 
 export default function MySchedule() {
+  const { language, text } = usePublicLanguage();
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
   const { user, loading: authLoading } = useAuth();
@@ -157,7 +159,7 @@ export default function MySchedule() {
     <article>
       <header className="flex flex-wrap items-baseline justify-between gap-md">
         <div>
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">My schedule</h1>
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">{text('My schedule', 'Mi programa')}</h1>
           <p className="mt-2xs font-data text-caption text-text-secondary">
             {deviceOnly ? 'These sessions are saved only in this browser. Browser settings may clear them.'
               : 'Sessions you’ve bookmarked, across every day.'}
@@ -241,8 +243,8 @@ export default function MySchedule() {
                 id={`my-day-${day.id}`}
                 title={day.label}
                 folio={
-                  formatDayDate(day, eventConfig.timezone) ? (
-                    <time dateTime={day.date}>{formatDayDate(day, eventConfig.timezone)}</time>
+                  formatDayDate(day, eventConfig.timezone, language) ? (
+                    <time dateTime={day.date}>{formatDayDate(day, eventConfig.timezone, language)}</time>
                   ) : null
                 }
               />

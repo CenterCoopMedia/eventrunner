@@ -31,6 +31,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { OtpRequestError, useAuth } from '../contexts/AuthContext.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { adminReturnPath } from '../lib/adminReturnPath.js';
@@ -98,6 +99,7 @@ export function FormError({ id, message, errorRef }) {
  *   hosting setup, with the historical demo's admin exception.
  */
 function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allowGoogle = false }) {
+  const { text } = usePublicLanguage();
   const { signInWithGoogle, sendOtpCode, verifyOtpCode } = useAuth();
   const { showToast } = useToast();
 
@@ -131,6 +133,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
         err instanceof OtpRequestError
           ? err.message
           : 'Sign-in could not be confirmed. Try again.',
+      spanish: field === 'code' ? 'No se pudo verificar el código. Revisa el código o solicita otro.' : 'No se pudo completar el inicio de sesión. Inténtalo de nuevo.',
     });
   }, []);
 
@@ -143,6 +146,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
       setError({
         field: 'email',
         message: 'Enter a valid email address, like you@example.org.',
+        spanish: 'Escribe una dirección de correo válida, como tu@example.org.',
       });
       return;
     }
@@ -157,7 +161,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
       setRateLimitMessage(null);
       setCode('');
       if (step === 'code') {
-        showToast('New code sent. Check your inbox.');
+        showToast(text('New code sent. Check your inbox.', 'Te enviamos un código nuevo. Revisa tu correo.'));
         codeInputRef.current?.focus();
       } else {
         setStep('code');
@@ -192,13 +196,13 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
     setError(null);
     const digits = code.trim();
     if (!/^\d{6}$/.test(digits)) {
-      setError({ field: 'code', message: 'Enter the six-digit code from the email.' });
+      setError({ field: 'code', message: 'Enter the six-digit code from the email.', spanish: 'Escribe el código de seis dígitos que recibiste por correo.' });
       return;
     }
     setBusy('verify');
     try {
       await verifyOtpCode({ challengeId, email, code: digits });
-      showToast('Signed in.');
+      showToast(text('Signed in.', 'Sesión iniciada.'));
       onSignedIn?.();
     } catch (err) {
       failWith('code', err);
@@ -212,7 +216,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
     setBusy('google');
     try {
       await signInWithGoogle();
-      showToast('Signed in.');
+      showToast(text('Signed in.', 'Sesión iniciada.'));
       onSignedIn?.();
     } catch (err) {
       // Closing the popup is a choice, not an error.
@@ -223,6 +227,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
         setError({
           field: null,
           message: 'Google sign-in did not complete. Try again or use an emailed code.',
+          spanish: 'No se pudo iniciar sesión con Google. Inténtalo de nuevo o usa un código por correo.',
         });
       }
     } finally {
@@ -238,7 +243,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
   return (
     <div className="space-y-lg border-hairline border-rule-hairline bg-surface-alt p-lg">
       {error?.field === null && (
-        <FormError id="signin-error" message={error.message} errorRef={errorRef} />
+        <FormError id="signin-error" message={text(error.message, error.spanish)} errorRef={errorRef} />
       )}
 
       {allowGoogle && (
@@ -248,7 +253,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
           disabled={busy === 'google'}
           className={secondaryButtonClass}
         >
-          {busy === 'google' ? 'Waiting for Google…' : 'Continue with Google'}
+          {busy === 'google' ? text('Waiting for Google…', 'Esperando a Google…') : text('Continue with Google', 'Continuar con Google')}
         </button>
       )}
 
@@ -257,7 +262,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
       {allowGoogle && (
         <div className="flex items-center gap-sm" aria-hidden="true">
           <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
-          <span className="font-data text-caption text-text-secondary">or</span>
+          <span className="font-data text-caption text-text-secondary">{text('or', 'o')}</span>
           <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
         </div>
       )}
@@ -266,7 +271,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
         <form onSubmit={requestCode} noValidate className="space-y-sm">
           <div className="space-y-3xs">
             <label htmlFor="signin-email" className="block font-semibold text-text-primary">
-              Email address
+              {text('Email address', 'Correo electrónico')}
             </label>
             <input
               id="signin-email"
@@ -285,12 +290,12 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
           {error?.field === 'email' && (
             <FormError
               id="signin-email-error"
-              message={error.message}
+              message={text(error.message, error.spanish)}
               errorRef={errorRef}
             />
           )}
           <button type="submit" disabled={busy === 'send'} className={primaryButtonClass}>
-            {busy === 'send' ? 'Sending code…' : 'Email me a code'}
+            {busy === 'send' ? text('Sending code…', 'Enviando el código…') : text('Email me a code', 'Enviarme un código por correo')}
           </button>
           <p role="status" className="font-data text-caption text-text-secondary">
             {retrySeconds > 0 ? (
@@ -320,7 +325,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
           </p>
           <div className="space-y-3xs">
             <label htmlFor="signin-code" className="block font-semibold text-text-primary">
-              Six-digit code
+              {text('Six-digit code', 'Código de seis dígitos')}
             </label>
             <input
               id="signin-code"
@@ -349,7 +354,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
           {error?.field === 'code' && (
             <FormError
               id="signin-code-error"
-              message={error.message}
+              message={text(error.message, error.spanish)}
               errorRef={errorRef}
             />
           )}
@@ -358,7 +363,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
             disabled={busy === 'verify'}
             className={primaryButtonClass}
           >
-            {busy === 'verify' ? 'Signing in…' : 'Sign in'}
+            {busy === 'verify' ? text('Signing in…', 'Iniciando sesión…') : text('Sign in', 'Iniciar sesión')}
           </button>
           <p role="status" className="font-data text-caption text-text-secondary">
             {retrySeconds > 0 ? (
@@ -391,7 +396,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
                 .
               </>
             ) : (
-              'Your code has expired. Email yourself a new one below.'
+              text('Your code has expired. Email yourself a new one below.', 'Tu código venció. Solicita otro abajo.')
             )}
           </p>
           <div className="flex flex-wrap items-center justify-between gap-xs">
@@ -401,7 +406,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
               disabled={busy === 'send'}
               className={linkButtonClass}
             >
-              {busy === 'send' ? 'Sending code…' : 'Email me a new code'}
+              {busy === 'send' ? text('Sending code…', 'Enviando el código…') : text('Email me a new code', 'Enviarme un código nuevo')}
             </button>
             <button
               type="button"
@@ -416,7 +421,7 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
               }}
               className={linkButtonClass}
             >
-              Use a different email
+              {text('Use a different email', 'Usar otro correo electrónico')}
             </button>
           </div>
         </form>
@@ -433,10 +438,11 @@ function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true, allo
  * Google sign-in, because the public tour stays closed.
  */
 function DemoSignInNotice() {
+  const { text } = usePublicLanguage();
   return (
     <div className="space-y-sm border-hairline border-rule-hairline bg-surface-alt p-lg">
       <p className="font-heading text-h3 font-semibold text-text-primary">
-        Sign-in is disabled in this demo
+        {text('Sign-in is disabled in this demo', 'El inicio de sesión está desactivado en esta demostración')}
       </p>
       <p className="text-text-secondary text-pretty">
         This is a read-only event tour. Accounts, bookmarks,

@@ -2,7 +2,7 @@
 // §5). It shows only when the form asks something and a ticket (or the
 // account) has no saved answers; while loading, or on a failed read, it
 // draws nothing, so the dashboard never shows a card that may be wrong.
-import { Link } from 'react-router';
+import { PublicLink as Link } from './PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useRegistrationTargets } from '../lib/useRegistrationTargets.js';
 

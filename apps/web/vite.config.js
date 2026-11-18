@@ -100,6 +100,7 @@ export default defineConfig(({ isSsrBuild }) => ({
       'shared/ticketAccess',
       'shared/webVitals',
       'shared/contentLanguages',
+      'shared/languageUrls',
     ],
   },
   build: isSsrBuild ? {} : {

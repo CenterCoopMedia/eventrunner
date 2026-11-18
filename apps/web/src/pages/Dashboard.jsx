@@ -2,7 +2,8 @@
 //
 // The cards own their account, schedule, reply-notification and event data.
 // The shell arranges them and carries no data or subscriptions itself.
-import { Link, useOutletContext } from 'react-router';
+import { useOutletContext } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import AdminEntryLink from '../components/AdminEntryLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';

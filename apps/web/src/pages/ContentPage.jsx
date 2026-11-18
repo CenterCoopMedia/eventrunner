@@ -17,11 +17,13 @@
 // itself, on both the requested URL and the matched doc's stored path, and
 // 404s rather than trusting stored data to already be clean.
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
 import { pageHeading } from 'shared/page';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import EmptyState from '../components/EmptyState.jsx';
@@ -133,7 +135,8 @@ function filterSections(sections, query) {
 
 export default function ContentPage() {
   const { pathname } = useLocation();
-  const { pages, getPublicPage, getSectionBlocks } = useContent();
+  const { pages, getPublicPage, getSectionBlocks } = usePublicContent();
+  const { text } = usePublicLanguage();
   const { eventConfig, features } = useEventConfig();
   // Declared before the early return below so hook order stays fixed across
   // renders regardless of which page (or no page) this URL resolves to
@@ -293,15 +296,15 @@ export default function ContentPage() {
   const resultsSummary = !settledTrimmedQuery
     ? ''
     : settledMatchedItems === 0
-      ? `No items match “${settledTrimmedQuery}”.`
-      : `${settledMatchedItems} of ${totalItems} items match “${settledTrimmedQuery}”.`;
+      ? text(`No items match “${settledTrimmedQuery}”.`, `No hay resultados para «${settledTrimmedQuery}».`)
+      : text(`${settledMatchedItems} of ${totalItems} items match “${settledTrimmedQuery}”.`, `${settledMatchedItems} de ${totalItems} resultados para «${settledTrimmedQuery}».`);
 
   // The invisible heading's own section is left out of the index: a sighted
   // keyboard user who activates it would land on a heading with nothing to
   // see, which reads as a bug, not a jump.
   const indexSections = filteredSections
     .filter(({ section }) => !isTitleRepeatingSection(section, page))
-    .map(({ section }) => ({ id: `section-${section.id}`, label: section.label }));
+    .map(({ section }) => ({ id: `section-${section.id}`, label: section.label, language: section.publicLanguage }));
 
   const clearFilter = () => {
     setQuery('');
@@ -318,7 +321,7 @@ export default function ContentPage() {
     // quote block in the page's section order; any later one is set plain.
     <PullQuoteBudget sections={page.sections ?? []} getSectionBlocks={getSectionBlocks}>
     <article>
-      <h1 className="pb-lg font-heading text-h1 font-semibold text-text-primary">
+      <h1 lang={page.publicLanguage} className="pb-lg font-heading text-h1 font-semibold text-text-primary">
         {pageHeading(page)}
       </h1>
       {showLegalNotice ? (
@@ -336,7 +339,7 @@ export default function ContentPage() {
             htmlFor="content-page-filter"
             className="mb-2xs block font-data text-caption font-semibold text-text-primary"
           >
-            Filter by keyword
+            {text('Filter by keyword', 'Filtrar por palabra clave')}
           </label>
           <input
             id="content-page-filter"
@@ -344,7 +347,7 @@ export default function ContentPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filter this page"
+            placeholder={text('Filter this page', 'Filtrar esta página')}
             className={inputClass}
           />
           {/* Always mounted — even idle and empty — so the region itself
@@ -408,7 +411,7 @@ export default function ContentPage() {
                   (interface guidelines: Accessibility — only tabindex 0 and
                   -1). */}
               {isTitleRepeatingSection(section, page) ? (
-                <h2 id={`section-${section.id}`} tabIndex={-1} className="sr-only">
+                <h2 id={`section-${section.id}`} lang={section.publicLanguage} tabIndex={-1} className="sr-only">
                   {section.label}
                 </h2>
               ) : (
@@ -416,6 +419,7 @@ export default function ContentPage() {
                   level={2}
                   id={`section-${section.id}`}
                   title={section.label}
+                  lang={section.publicLanguage}
                   tabIndex={-1}
                   action={<SectionEditLink pageId={page.id} sectionId={section.id} label={section.label} />}
                 />

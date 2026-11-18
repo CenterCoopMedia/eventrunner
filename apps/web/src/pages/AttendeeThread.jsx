@@ -21,7 +21,8 @@
 // replies stay readable and reportable, and the reply composer is gone. A
 // removed reply is a placeholder with no text and no author.
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SocialPostEntry, { RemovedEntry } from '../components/SocialPostEntry.jsx';

@@ -10,8 +10,10 @@
 // Feature-gated by config/features.speakers — the nav link already hides
 // when the feature is off, but the route itself must gate too, since direct
 // navigation bypasses the nav (matches the Schedule.jsx pattern).
-import { Link } from 'react-router';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
+import { pageHeading } from 'shared/page';
+import { usePublicContent as useContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
@@ -26,8 +28,10 @@ const LIST_PORTRAIT_SIZES = '(min-width: 40rem) 14rem, 100vw';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Speakers() {
+  const { language, text } = usePublicLanguage();
   const { features } = useEventConfig();
-  const { speakers } = useContent();
+  const { speakers, getPage } = useContent();
+  const page = getPage?.('speakers');
 
   if (!features.speakers) {
     return (
@@ -47,7 +51,9 @@ export default function Speakers() {
     <SystemPage pageId="speakers">
       {({ arrangement }) => (
         <>
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">Speakers</h1>
+          <h1 lang={page?.publicLanguage} className="font-heading text-h1 font-semibold text-text-primary">
+            {language === 'es' && pageHeading(page) ? pageHeading(page) : text('Speakers', 'Ponentes')}
+          </h1>
           {speakers.length === 0 ? (
             <div className="mt-lg">
               <EmptyState

@@ -9,7 +9,9 @@
 // Everything below the title reads at the same weight, so the eye keeps
 // running down the time column instead of stopping at a shelf of boxes.
 import { useMemo } from 'react';
-import { Link, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
+import { PublicLink as Link } from './PublicLink.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
@@ -146,8 +148,9 @@ export default function SessionCard({
   state = null,
   noteSlot = null,
 }) {
+  const { language, text } = usePublicLanguage();
   const speakerNames = useSessionSpeakerNames(session.speakerIds);
-  const range = formatSessionTimeRange(eventConfig, session);
+  const range = formatSessionTimeRange(eventConfig, session, language);
   // Carries the current query string (notably ?preview=1) into the detail
   // link — react-router resets the URL's search to nothing on a bare
   // pathname `to`, so without this an admin previewing drafts would flip
@@ -184,7 +187,7 @@ export default function SessionCard({
           been. */}
       <article className="session-block__face grid sm:grid-cols-[9.5rem,1fr]">
         <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs sm:col-start-2 sm:row-start-1">
-          <h3 className="session-block__title font-heading font-semibold text-text-primary">
+          <h3 lang={session.publicLanguage} className="session-block__title font-heading font-semibold text-text-primary">
             {linkToDetail ? (
               <Link to={{ pathname: `/schedule/${session.id}`, search }} className="hover:underline">
                 {session.title}
@@ -210,7 +213,7 @@ export default function SessionCard({
               {range.zone ? <span className="ms-2xs">{range.zone}</span> : null}
             </>
           ) : (
-            <span>Time to be announced</span>
+            <span>{text('Time to be announced', 'Hora por confirmar')}</span>
           )}
         </p>
         <div className="sm:col-start-2 sm:row-start-2">
@@ -220,10 +223,10 @@ export default function SessionCard({
               markup is the collection tag the story asks for. */}
           <SpecimenLabel
             className="mt-2xs"
-            fields={[{ key: 'Place', value: session.location }]}
+            fields={[{ key: text('Place', 'Lugar'), value: session.location }]}
           />
           {session.description ? (
-            <p className="session-block__text mt-xs line-clamp-3 max-w-prose text-text-secondary text-pretty">
+            <p lang={session.publicLanguage} className="session-block__text mt-xs line-clamp-3 max-w-prose text-text-secondary text-pretty">
               {session.description}
             </p>
           ) : null}

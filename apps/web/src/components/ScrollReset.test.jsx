@@ -150,6 +150,7 @@ describe('ScrollReset, at a fragment that has not rendered yet', () => {
       <MemoryRouter initialEntries={['/faq']}>
         <ScrollReset />
         <Link to="/travel#section-rooms">Travel, at a section</Link>
+        <Link to="/travel?lang=es#section-rooms" state={{ languageSwitch: true }} replace>Keep the travel language</Link>
         <Link to="/faq">Back to the FAQ</Link>
         <Routes>
           <Route path="/faq" element={<p>FAQ</p>} />
@@ -200,6 +201,16 @@ describe('ScrollReset, at a fragment that has not rendered yet', () => {
       vi.advanceTimersByTime(FRAGMENT_WINDOW_MS);
     });
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' });
+  });
+
+  it('finds a late fragment after the URL is replaced with the selected language', async () => {
+    const { arrive } = renderLazyApp();
+    fireEvent.click(screen.getByText('Travel, at a section'));
+    fireEvent.click(screen.getByText('Keep the travel language'));
+    await act(async () => { arrive(); });
+    const heading = await screen.findByRole('heading', { name: 'Rooms' });
+    expect(heading).toHaveFocus();
+    expect(scrollIntoView.mock.instances).toContain(heading);
   });
 
   it('stops waiting when the reader navigates again', () => {

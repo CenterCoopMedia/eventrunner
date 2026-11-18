@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 import { useSocialAccess } from '../../hooks/useSocialFeed.js';
 import {
   loadSocialNotificationPage,

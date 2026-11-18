@@ -48,7 +48,7 @@ export default function StatBlock({ block }) {
   if (!full) {
     if (!value || !label) return null;
     return (
-      <div className="flex flex-col border-t-hairline border-t-rule-hairline pt-sm">
+      <div lang={block.publicLanguage} className="flex flex-col border-t-hairline border-t-rule-hairline pt-sm">
         <dt className="order-last mt-2xs font-data text-caption text-text-secondary">
           {label}
         </dt>
@@ -60,7 +60,7 @@ export default function StatBlock({ block }) {
   }
 
   return (
-    <div className="border-t-hairline border-t-rule-hairline pt-sm">
+    <div lang={block.publicLanguage} className="border-t-hairline border-t-rule-hairline pt-sm">
       <dt className="font-heading text-h3 font-semibold text-text-primary">
         {takeaway ?? label}
       </dt>

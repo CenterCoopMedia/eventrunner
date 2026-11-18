@@ -8,9 +8,10 @@
 // composition, the tier rules, and why the operator's own order sets the
 // mark size are all documented there. This page is now what it always was
 // around it: the route, the feature gate, the heading, and the empty state.
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { pageHeading } from 'shared/page';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent as useContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
@@ -18,9 +19,11 @@ import SponsorWall, { visibleOrganizations } from '../components/SponsorWall.jsx
 import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Sponsors() {
+  const { text } = usePublicLanguage();
   const { features } = useEventConfig();
   const { organizationsData, getPage } = useContent();
-  const pageTitle = pageHeading(getPage?.('sponsors')) || 'Sponsors';
+  const page = getPage?.('sponsors');
+  const pageTitle = pageHeading(page) || text('Sponsors', 'Patrocinadores');
   const visible = visibleOrganizations(organizationsData);
 
   if (!features.sponsors) {
@@ -41,7 +44,7 @@ export default function Sponsors() {
     <SystemPage pageId="sponsors">
       {({ arrangement }) => (
         <>
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">{pageTitle}</h1>
+          <h1 lang={page?.publicLanguage} className="font-heading text-h1 font-semibold text-text-primary">{pageTitle}</h1>
           {visible.length === 0 ? (
             <div className="mt-lg">
               <EmptyState

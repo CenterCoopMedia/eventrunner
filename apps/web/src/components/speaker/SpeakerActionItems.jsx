@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 import Progress from '../Progress.jsx';
 import { secondaryActionClass } from '../controlClasses.js';
 import { speakerCompletion } from '../../lib/speakerCompletion.js';

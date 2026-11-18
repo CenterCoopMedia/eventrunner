@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
+import { PublicLink as Link } from './PublicLink.jsx';
 import { validUpdateBlock, validUpdateImage } from 'shared/update';
 import ImageBlock from './blocks/ImageBlock.jsx';
 import RichTextBlock from './blocks/RichTextBlock.jsx';

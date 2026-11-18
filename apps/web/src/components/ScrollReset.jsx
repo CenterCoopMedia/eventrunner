@@ -129,7 +129,7 @@ function focusFragmentTarget(element) {
 }
 
 export default function ScrollReset() {
-  const { pathname, hash, key } = useLocation();
+  const { pathname, hash, key, state } = useLocation();
   const navigationType = useNavigationType();
   // The navigation this effect last ran for, and whether it was a move
   // within one page. Keyed on the location key rather than recomputed every
@@ -143,6 +143,7 @@ export default function ScrollReset() {
       lastRun.current = { key, pathname, samePage: lastRun.current.pathname === pathname };
     }
     const { samePage } = lastRun.current;
+    if (samePage && state?.languageSwitch && navigationType === 'PUSH') return undefined;
     const id = fragmentId(hash);
 
     /**
@@ -204,7 +205,7 @@ export default function ScrollReset() {
     // waiting for the previous page's fragment — and the key changes on
     // every navigation, so "the next one" includes a move within one page.
     return close;
-  }, [key, pathname, hash, navigationType]);
+  }, [key, pathname, hash, state, navigationType]);
 
   return null;
 }
