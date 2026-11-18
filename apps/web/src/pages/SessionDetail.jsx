@@ -20,6 +20,7 @@ import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
 import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { useDocumentDescription } from '../lib/useDocumentDescription.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 function NotFoundState({ search }) {
@@ -64,7 +65,8 @@ export default function SessionDetail() {
   // switched off this route renders "not available", and a tab naming a
   // session over that page would advertise what the event has turned off.
   // The server refuses the same route for the same reason.
-  useDocumentTitle(features.schedule ? session?.title : null, session?.description);
+  useDocumentTitle(features.schedule ? session?.title : null);
+  useDocumentDescription(eventConfig, features.schedule ? session?.description : null);
 
   if (!features.schedule) {
     return (

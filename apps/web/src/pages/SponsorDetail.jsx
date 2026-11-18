@@ -19,6 +19,7 @@ import Standfirst from '../components/editorial/Standfirst.jsx';
 import { DefinitionPair } from '../components/editorial/DefinitionList.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { useDocumentDescription } from '../lib/useDocumentDescription.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { pageHeading } from 'shared/page';
@@ -30,14 +31,15 @@ function paragraphs(value) {
 export default function SponsorDetail() {
   const { slug } = useParams();
   const { search } = useLocation();
-  const { features } = useEventConfig();
+  const { eventConfig, features } = useEventConfig();
   const { organizationsData, scheduleData = [], getPage } = useContent();
   const directoryLabel = pageHeading(getPage?.('sponsors')) || 'Sponsors';
   const backLabel = `Back to ${directoryLabel.toLowerCase()}`;
   const roleLabel = IS_DEMO && directoryLabel === 'Partners' ? 'Historical role' : 'Tier';
   const org = features.sponsors && visibleOrganizations(organizationsData).find((item) => item.id === slug);
   const description = typeof org?.description === 'string' && org.description.trim() ? org.description : org?.bio;
-  useDocumentTitle(org?.name, description);
+  useDocumentTitle(org?.name);
+  useDocumentDescription(eventConfig, org?.name ? description : null);
   if (!org) return (
     <EmptyState title="This sponsor is not available" description="It may not be published yet, or the link may be out of date."
       action={<Link to={{ pathname: "/sponsors", search }} className={primaryActionClass}>{backLabel}</Link>} />

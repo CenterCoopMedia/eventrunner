@@ -28,8 +28,7 @@ import { IS_DEMO } from '../lib/demoMode.js';
 import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime.js';
 import { loadPresetRemaps, presetRemapsLoaded } from '../lib/presetRemaps.js';
 import { startModeSync } from '../lib/modeRuntime.js';
-import { getRouteDescription, getRouteTitlePart, subscribeRouteTitle } from '../lib/useDocumentTitle.js';
-import { eventMetaDescription } from 'shared/page';
+import { getRouteTitlePart, subscribeRouteTitle } from '../lib/useDocumentTitle.js';
 import { resolveShape, themePresetId } from 'shared/theme';
 import { publicSubscriptionsForRoute } from '../lib/publicSubscriptions.js';
 
@@ -289,28 +288,15 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO, pathname, se
   // (functions/src/public/og.cjs) — otherwise the tab would visibly change
   // from the page's own title to the bare event name the moment the app
   // finished booting.
-  const fallbackDescription = eventMetaDescription(value.eventConfig);
   useEffect(() => {
-    const apply = (part, description) => {
+    const apply = (part) => {
       document.title = part
         ? `${part} · ${value.eventConfig.name}`
         : value.eventConfig.name;
-      const content = description || fallbackDescription;
-      let meta = document.head.querySelector('meta[name="description"]');
-      if (!content) {
-        meta?.remove();
-        return;
-      }
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.name = 'description';
-        document.head.append(meta);
-      }
-      meta.content = content;
     };
-    apply(getRouteTitlePart(), getRouteDescription());
+    apply(getRouteTitlePart());
     return subscribeRouteTitle(apply);
-  }, [value.eventConfig.name, fallbackDescription]);
+  }, [value.eventConfig.name]);
 
   // Mirror the RESOLVED texture onto the document element so the
   // .page-surface rule in index.css can gate on it — CSS custom properties

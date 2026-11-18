@@ -1,7 +1,7 @@
 'use strict';
 
 const { hasRichTextContent } = require('./richText.cjs');
-const { LANGUAGES, withContentLanguage } = require('./languageUrls.cjs');
+const { LANGUAGES } = require('./languageUrls.cjs');
 
 const ENGLISH_ONLY = Object.freeze({ default: 'en', available: Object.freeze(['en']) });
 // Identifiers, URLs, prices, figures, attributions and proper names are shared.
@@ -112,24 +112,7 @@ function resolveContentVariant(record, kind, requestedLanguage, event = {}) {
   return { value, language: spanish ? 'es' : 'en', requestedLanguage: requested, fallback: requested !== (spanish ? 'es' : 'en') };
 }
 
-/** Canonical route paths for the approved page or session versions. */
-function publicRouteUrls(path, record, kind, event) {
-  // Hosting uses static HTML at the root and attendee directory.
-  if (path === '/' || path === '/attendees') return { en: path };
-  const config = contentLanguages(event);
-  if (!config.available.includes('es')) return { en: path };
-  const approvedSpanish = (unit, unitKind) => resolveContentVariant(unit, unitKind, 'es', event).language === 'es';
-  const hasSpanish = approvedSpanish(record, kind)
-    || (kind === 'page' && Array.isArray(record?.sections)
-      && record.sections.some((section) => typeof section?.label === 'string' && section.label.trim()
-        && approvedSpanish(section, 'section')));
-  if (hasSpanish) {
-    return { en: withContentLanguage(path, 'en'), es: withContentLanguage(path, 'es') };
-  }
-  return { en: config.default === 'es' ? withContentLanguage(path, 'en') : path };
-}
-
 module.exports = {
   LANGUAGES, contentLanguages, languageConfigErrors, variantFields, richVariantFields,
-  variantErrors, collectionVariantErrors, resolveContentVariant, selectContentLanguage, publicRouteUrls,
+  variantErrors, collectionVariantErrors, resolveContentVariant, selectContentLanguage,
 };

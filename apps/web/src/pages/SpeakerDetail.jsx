@@ -34,6 +34,7 @@ import Rule from '../components/editorial/Rule.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { useDocumentDescription } from '../lib/useDocumentDescription.js';
 import { sortSessions } from '../lib/scheduleView.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
@@ -71,7 +72,8 @@ export default function SpeakerDetail() {
   // The server refuses the same route for the same reason.
   const speaker = speakers.find((candidate) => candidate.slug === slug);
   const affiliation = [text(speaker?.jobTitle), text(speaker?.organization)].filter(Boolean).join(', ');
-  useDocumentTitle(features.speakers && speaker ? text(speaker.displayName) : null, text(speaker?.bio).trim() || affiliation);
+  useDocumentTitle(features.speakers && speaker ? text(speaker.displayName) : null);
+  useDocumentDescription(eventConfig, features.speakers ? text(speaker?.bio).trim() || affiliation : null);
 
   if (!features.speakers) {
     return (

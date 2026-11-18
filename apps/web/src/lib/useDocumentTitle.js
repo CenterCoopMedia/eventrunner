@@ -16,7 +16,7 @@
 
 import { useEffect } from 'react';
 import { SYSTEM_PAGE_ROUTES, isCanonicalPagePath, systemPageIdForPath } from 'shared/routing';
-import { metaExcerpt, pageHeading } from 'shared/page';
+import { pageHeading } from 'shared/page';
 
 // TWO LAYERS, AND THE MORE SPECIFIC ONE WINS.
 //
@@ -36,18 +36,14 @@ const subscribers = new Set();
 
 /** The part in force: what a page claimed, else what the route derives. */
 export function getRouteTitlePart() {
-  return claimedPart?.title ?? derivedPart;
-}
-
-export function getRouteDescription() {
-  return claimedPart?.description ?? '';
+  return claimedPart ?? derivedPart;
 }
 
 /**
  * Watch the route part. Returns the unsubscribe function, so an effect can
  * return it directly.
  *
- * @param {(part: string|null, description: string) => void} listener
+ * @param {(part: string|null) => void} listener
  * @returns {() => void}
  */
 export function subscribeRouteTitle(listener) {
@@ -62,25 +58,25 @@ function normalize(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function publish(previous, previousDescription) {
+function publish(previous) {
   const next = getRouteTitlePart();
-  const description = getRouteDescription();
-  if (next !== previous || description !== previousDescription) {
-    subscribers.forEach((listener) => listener(next, description));
-  }
+  if (next === previous) return next;
+  subscribers.forEach((listener) => listener(next));
+  return next;
 }
 
 function setClaimedPart(value) {
   const before = getRouteTitlePart();
-  const previousDescription = getRouteDescription();
-  claimedPart = value;
-  publish(before, previousDescription);
+  claimedPart = normalize(value);
+  publish(before);
+  return claimedPart;
 }
 
 function setDerivedPart(value) {
   const before = getRouteTitlePart();
   derivedPart = normalize(value);
-  publish(before, getRouteDescription());
+  publish(before);
+  return derivedPart;
 }
 
 /** Test hook: forget both parts and every listener between tests. */
@@ -104,17 +100,14 @@ export function resetRouteTitleForTest() {
  * must not wipe the arriving one's name.
  *
  * @param {string|null|undefined} part
- * @param {string|null} [description]
  */
-export function useDocumentTitle(part, description) {
+export function useDocumentTitle(part) {
   useEffect(() => {
-    const title = normalize(part);
-    const applied = title ? { title, description: metaExcerpt(description) } : null;
-    setClaimedPart(applied);
+    const applied = setClaimedPart(part);
     return () => {
       if (claimedPart === applied) setClaimedPart(null);
     };
-  }, [part, description]);
+  }, [part]);
 }
 
 /**

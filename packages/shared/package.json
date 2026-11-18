@@ -34,6 +34,7 @@
     "./urlSafety": { "require": "./src/urlSafety.cjs", "import": "./src/urlSafety.mjs" },
     "./routing": { "require": "./src/routing.cjs", "import": "./src/routing.mjs" },
     "./page": { "require": "./src/page.cjs", "import": "./src/page.mjs" },
+    "./pageMetadata": { "require": "./src/pageMetadata.cjs", "import": "./src/pageMetadata.mjs" },
     "./venue": { "require": "./src/venue.cjs", "import": "./src/venue.mjs" },
     "./update": { "require": "./src/update.cjs", "import": "./src/update.mjs" },
     "./answers": { "require": "./src/answers.cjs", "import": "./src/answers.mjs" },

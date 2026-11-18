@@ -9,7 +9,6 @@
 // them needs.
 
 const { SYSTEM_PAGE_ROUTES } = require('./routing.cjs');
-const { isStarterText } = require('./seed.cjs');
 
 // These sections have dedicated renderers in Home, InfoCards, and
 // FooterLinkGroups. Other sections use SectionBlocks and accept every type.
@@ -35,21 +34,6 @@ function sectionBlockTypes(page, section, allTypes) {
 /** @param {unknown} v @returns {boolean} */
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
-}
-
-/** Plain text for an HTML description, cut at a word boundary. */
-function metaExcerpt(text, maxLen = 200) {
-  if (!isNonEmptyString(text)) return '';
-  const trimmed = text.trim();
-  if (trimmed.length <= maxLen) return trimmed;
-  const cut = trimmed.slice(0, maxLen);
-  const lastSpace = cut.lastIndexOf(' ');
-  return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trim()}…`;
-}
-
-function eventMetaDescription(event) {
-  if (!isStarterText(event?.seo?.description)) return event.seo.description.trim();
-  return isNonEmptyString(event?.tagline) ? event.tagline.trim() : '';
 }
 
 /**
@@ -151,6 +135,4 @@ module.exports = {
   pageHeading,
   pageFeatureGate,
   isPublicPage,
-  metaExcerpt,
-  eventMetaDescription,
 };

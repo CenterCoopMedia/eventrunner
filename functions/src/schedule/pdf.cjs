@@ -306,7 +306,7 @@ async function buildSchedulePdf({
 
     for (const session of daySessions) {
       if (y < MARGIN + ROW_MIN_HEIGHT) {
-        ({ page, y } = newPage(`${dayLabelOf(day)} (cont.)`));
+        ({ page, y } = newPage(`${dayLabelOf(day)} (${spanish ? 'continuación' : 'cont.'})`));
       }
 
       const timeText = formatSessionTime(session); // digits/AM/PM/en-dash only — always WinAnsi-safe
