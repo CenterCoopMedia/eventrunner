@@ -4,6 +4,10 @@ Use this runbook after an event ends. It covers four things: the files the clien
 
 The client owns the event data. Each client deployment uses a separate Firebase project, so the data never shares a database with another client.
 
+Public pages, the schedule and the archive stay online after the event at no extra hosting cost.
+There is no automatic shutdown at 30 days. The [onboarding agreement/adoption recipe](../CLIENT_ONBOARDING.md#agreement-version-and-existing-site-adoption)
+records the new agreement version and how the default applies to an existing site.
+
 ## Three kinds of access
 
 These are different things. State which ones the client gets.
@@ -102,15 +106,17 @@ gcloud storage cp --recursive gs://<storage-bucket>/* gs://<archive-bucket>/stor
 
 ## 5. Keep the past site online, read-only
 
-The public site can stay online after the event:
+Keep the public site online after the event:
 
-1. Settle ticketing first. Pause sales, finish refunds and reconciliation, and wait until the ticket sync queue is empty. The [deploy runbook](../DEPLOY_RUNBOOK.md) section "Archiving an event with ticket sales" gives the order.
+1. Settle ticketing first. New native paid/free checkout closes when the event ends or is archived, including a catalog with no sales deadline. Existing orders remain available for reconciliation. Check that external ticketing is closed too, finish refunds and reconciliation, and wait until the ticket sync queue is empty. The [deploy runbook](../DEPLOY_RUNBOOK.md) section "Archiving an event with ticket sales" gives the order.
 2. Close the pitch call in **Session pitches**.
 3. In **Event settings → Announce and archive**, an operator sets **Archived**. Every day becomes a back issue: the content stays, and bookmarking, reactions and calendar links go away.
 4. Download the event data package and the spreadsheets first. Then set `config/event.historicalDemo` to `true`. Account, feedback and email actions then refuse writes, and so does sign-in with an email code. An admin who signs in with Google can still open the admin panel and run both exports. An admin who signs in only with an email code cannot get back in until an operator sets `historicalDemo` to `false` again.
 5. Remove staff access the client no longer needs on **Access**.
 
-To take the site offline instead, export first, then disable Hosting (`firebase hosting:disable --project <project-id>`).
+The event date does not authorize taking the site offline. If the client requests closure or the
+service ends under a separately authorized decision, export first and use the decommission
+workflow in the deploy runbook.
 
 ## 6. Retention and deletion
 
@@ -118,7 +124,10 @@ To take the site offline instead, export first, then disable Hosting (`firebase 
 - Store the package, the managed export and the Storage copy with access control. Do not send any of them as an open link.
 - When a person asks to be deleted after the export, delete the account in **Attendees**, and remove the person from every copy of the package and the backup, or delete those copies.
 - Registration answers (`ticket_answers`) and speaker logistics (`speaker_logistics`) hold diet, access and travel needs. They are not in the package. They are deleted with each account, and with the Firebase project. Answers given at Stripe checkout for a seat nobody has claimed yet wait on the order (`ticket_orders`) and are deleted with the project. If the client needs catering or access counts after the event, export them from **Attendees** before the handoff.
-- When the retention period ends, delete the archive bucket, every downloaded package, and, when the contract ends, the Firebase project.
+- When the agreed personal-data retention period ends, remove the corresponding backups and
+  downloaded packages. Keeping public event pages online does not extend the retention of
+  private attendee, order or logistics data. Deleting a hosted project is a separate authorized
+  decommission, not a date-driven retention action.
 
 ## Handoff record
 
@@ -128,4 +137,6 @@ Record these items for each handoff:
 - The parts included, and whether staff notes were included.
 - The location of the managed export and the Storage copy.
 - Who received each one, and the retention period.
-- Whether the site stays online, and the archive date.
+- The public site URL, its no-cost past-event hosting, the archive date and the closed-form checks.
+- For an existing site, the accepted agreement version/checksum and the current agreement version
+  recorded in the operator's private adoption receipt.

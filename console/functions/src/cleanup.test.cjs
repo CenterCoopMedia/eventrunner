@@ -67,6 +67,25 @@ test('isExpired is true only for withdrawn or declined requests 90 days after th
   assert.equal(isExpired({ status: 'declined' }, at), false);
 });
 
+test('past-event hosting keeps built sites and their reserved names after 30 days and a year', async () => {
+  for (const daysAfter of [31, 366]) {
+    for (const status of ['ready', 'launched']) {
+      const ended = new Date(NOW - daysAfter * DAY);
+      const frozen = answers();
+      frozen.event.days = [{ date: ended.toISOString().slice(0, 10), startTime: '09:00', endTime: '17:00', label: 'Event day' }];
+      const app = application({ status, frozen, updatedAt: ended });
+      const build = { state: 'complete', projectId: 'example-past-event' };
+      const db = seeded({ 'applications/a1': app, 'console_builds/a1': build });
+      const result = await runRetention({ db, secrets: makeFakeSecrets(), now: () => NOW, log: QUIET });
+      assert.deepEqual(result, { deleted: [], failed: [] });
+      assert.deepEqual(db.read('applications/a1'), app);
+      assert.deepEqual(db.read('console_builds/a1'), build);
+      assert.equal(db.read('site_names/nclocal').appId, 'a1');
+      assert.deepEqual(auditRows(db), []);
+    }
+  }
+});
+
 test('the retention job deletes old withdrawn and declined requests, frees their names, and keeps the rest', async () => {
   const old = new Date(NOW - 95 * DAY);
   const db = seeded({

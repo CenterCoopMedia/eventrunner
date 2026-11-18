@@ -17,5 +17,8 @@ it('shows the accepted version', async () => {
   });
   expect(await screen.findByRole('heading', { name: 'Hosting terms' })).toBeInTheDocument();
   expect(screen.getByText('Second.')).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'After your event' })).toHaveTextContent('stay online after the event at no extra cost');
+  expect(screen.getByText('Version 3')).toBeInTheDocument();
   expect(callApi).toHaveBeenCalledWith('getAgreement', { orgId: 'o1', appId: 'a1' });
+  expect(callApi.mock.calls.every(([name]) => name === 'getAgreement')).toBe(true);
 });
