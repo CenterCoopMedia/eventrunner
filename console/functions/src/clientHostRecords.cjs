@@ -4,9 +4,15 @@ const { parseEventPublicBase } = require('shared/config/publicBase');
 
 const HOSTS = 'console_client_hosts';
 const MOUNTS = 'console_event_mounts';
+const RESERVED_ROOTS = new Set(['__', 'admin', 'api', 'assets', 'auth', 'unsubscribe']);
 
 const clientHostRef = (db, host) => db.collection(HOSTS).doc(host);
 const eventMountRef = (db, appId) => db.collection(MOUNTS).doc(appId);
+
+function reservedClientPath(pathname) {
+  const first = pathname.split('/')[1];
+  return !first || first.includes('.') || RESERVED_ROOTS.has(first);
+}
 
 function hostingOrigin(site) {
   if (typeof site !== 'string' || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(site)) {
@@ -79,5 +85,5 @@ async function changeMountForApplication(tx, db, appId, change) {
 
 module.exports = {
   MOUNTS, changeMountForApplication, clientHostRef, eventMountRef, hostingOrigin, purgeEventMount,
-  recordAppliedPublicBase, recordStandalonePublicBase, resolveEventPublicBase,
+  recordAppliedPublicBase, recordStandalonePublicBase, reservedClientPath, resolveEventPublicBase,
 };

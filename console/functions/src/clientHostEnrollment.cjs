@@ -7,14 +7,13 @@ const { requireOwner } = require('./access.cjs');
 const { NOT_FOUND, applicationRef, requireAppId, requireOperator } = require('./reviewAccess.cjs');
 const { readBuild, canRetryBuild } = require('./buildState.cjs');
 const { normalizeProjectId } = require('./consoleSettings.cjs');
-const { MOUNTS, clientHostRef, eventMountRef, hostingOrigin, resolveEventPublicBase } = require('./clientHostRecords.cjs');
+const {
+  MOUNTS, clientHostRef, eventMountRef, hostingOrigin, reservedClientPath, resolveEventPublicBase,
+} = require('./clientHostRecords.cjs');
 const { COLLECTION: SITE_NAMES, SITE_DOMAIN, RESERVED } = require('./siteNames.cjs');
 
 const DNS_LABEL = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
 const HOSTNAME = new RegExp(`^(?:${DNS_LABEL}\\.)+${DNS_LABEL}$`);
-// The router owns these paths. The shared parser already refuses /__/,
-// /.well-known and file names such as /robots.txt and /sitemap.xml.
-const RESERVED_ROOTS = new Set(['admin', 'api', 'assets', 'auth', 'unsubscribe']);
 const AUTHORITY_REFERENCE = /^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,127}$/;
 
 function conflict(message) {
@@ -36,7 +35,7 @@ function parseEnrollmentBase(value) {
         if (!port && host.length <= 253 && HOSTNAME.test(host) && /[a-z]/.test(host.split('.').at(-1))
             && host !== SITE_DOMAIN && !RESERVED.has(managedName(host))
             && !/(^|\.)(web\.app|firebaseapp\.com)$/.test(host)
-            && !RESERVED_ROOTS.has(mount.split('/')[1])) {
+            && !reservedClientPath(mount)) {
           return { publicBase, host, mount };
         }
       }
