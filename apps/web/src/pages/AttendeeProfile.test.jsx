@@ -186,12 +186,14 @@ describe('AttendeeProfile', () => {
     expect(screen.queryByText(/permission/i)).toBeNull();
   });
 
-  it('reads an unavailable profile again for an attendee, so a finished grant sweep shows it (issue 1004)', async () => {
+  it('rechecks a protected profile, keeping it through a network failure and clearing it on denial', async () => {
     vi.useFakeTimers();
     try {
       profileValue = { ...profileValue, status: 'ready', attendeeAccess: true };
       fetchPublicProfileMock.mockResolvedValueOnce(null);
-      fetchPublicProfileMock.mockResolvedValueOnce({ id: 'u1', displayName: 'Amara Diallo', badges: [] });
+      fetchPublicProfileMock.mockResolvedValueOnce({ id: 'u1', displayName: 'Amara Diallo', profileVisibility: 'attendees_only' });
+      fetchPublicProfileMock.mockRejectedValueOnce(new Error('offline'));
+      fetchPublicProfileMock.mockResolvedValueOnce(null);
       renderPage();
       await act(async () => {});
       expect(screen.getByRole('heading', { name: 'This profile isn’t available' })).toBeInTheDocument();
@@ -199,7 +201,15 @@ describe('AttendeeProfile', () => {
         await vi.advanceTimersByTimeAsync(15_000);
       });
       expect(screen.getByRole('heading', { level: 1, name: 'Amara Diallo' })).toBeInTheDocument();
-      expect(fetchPublicProfileMock).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+      expect(screen.getByRole('heading', { level: 1, name: 'Amara Diallo' })).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+      expect(screen.getByRole('heading', { name: 'This profile isn’t available' })).toBeInTheDocument();
+      expect(fetchPublicProfileMock).toHaveBeenCalledTimes(4);
     } finally {
       vi.useRealTimers();
     }

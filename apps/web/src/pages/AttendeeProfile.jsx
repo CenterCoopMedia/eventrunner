@@ -48,14 +48,21 @@ export default function AttendeeProfile() {
     let cancelled = false;
     let retry = null;
     setState({ status: 'loading', profile: null });
-    const read = () => fetchPublicProfile(uid).then((profile) => {
-      if (cancelled) return;
-      setState({ status: profile ? 'found' : 'unavailable', profile });
-      // A ticket resource grant can refuse an attendees-only profile while a
-      // grant sweep runs, and its end changes nothing this page watches, so
-      // an attendee's unavailable read is tried again (issue 1004).
-      if (!profile && attendeeAccess) retry = setTimeout(read, RETRY_DELAY_MS);
-    });
+    const read = async () => {
+      let checkAgain = attendeeAccess;
+      try {
+        const profile = await fetchPublicProfile(uid);
+        if (cancelled) return;
+        setState({ status: profile ? 'found' : 'unavailable', profile });
+        // A grant-only change can revoke or restore a protected profile
+        // while the viewer's account stays approved.
+        checkAgain &&= !profile || profile.profileVisibility === 'attendees_only';
+      } catch {
+        if (cancelled) return;
+        setState((current) => current.status === 'loading' ? { status: 'unavailable', profile: null } : current);
+      }
+      if (checkAgain) retry = setTimeout(read, RETRY_DELAY_MS);
+    };
     read();
     return () => {
       cancelled = true;

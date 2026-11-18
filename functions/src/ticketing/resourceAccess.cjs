@@ -81,26 +81,24 @@ class SessionGrantError extends Error {
   }
 }
 
-/**
- * Read the account, control and grant inside the caller's write transaction,
- * so a concurrent refund, revocation or publication conflicts with the write
- * and the retry decides again. `decide` receives { control, account, grant }.
- * `bootstrapEmail` is the verified address of a caller the attendee gate
- * admitted from its cached bootstrap copy; the exemption is confirmed here
- * from the live document, as the rules do. Throws SessionGrantError on denial.
- */
-async function assertGrant({ db, tx, uid, bootstrapEmail, decide }) {
+/** Read the grant once in the caller's transaction, with live bootstrap confirmation. */
+async function readGrantContext({ db, tx, uid, bootstrapEmail }) {
   const control = (await tx.get(db.collection(POLICIES).doc('current'))).data() ?? null;
-  if (!control || control.effectiveRevision === 0) return;
+  if (!control || control.effectiveRevision === 0) return { control };
   if (bootstrapEmail) {
     const bootstrap = (await tx.get(db.collection('config').doc('bootstrap'))).data() ?? null;
-    if (resolveAdminTier(bootstrap, bootstrapEmail.trim().toLowerCase()) !== null) return;
+    if (resolveAdminTier(bootstrap, bootstrapEmail.trim().toLowerCase()) !== null) return { control: null };
   }
   const [accountSnap, grantSnap] = await Promise.all([
     tx.get(db.collection('users').doc(uid)),
     tx.get(db.collection(GRANTS).doc(uid)),
   ]);
-  const decision = decide({ control, account: accountSnap.data() ?? null, grant: grantSnap.data() ?? null });
+  return { control, account: accountSnap.data() ?? null, grant: grantSnap.data() ?? null };
+}
+
+/** Run inside the write transaction so a concurrent access change forces a retry. */
+async function assertGrant({ db, tx, uid, bootstrapEmail, decide }) {
+  const decision = decide(await readGrantContext({ db, tx, uid, bootstrapEmail }));
   if (!decision.ok) throw new SessionGrantError(decision);
 }
 
@@ -116,5 +114,5 @@ function assertResourceGrant({ db, tx, uid, resource, bootstrapEmail = null }) {
 }
 
 module.exports = {
-  decideSessionGrant, decideResourceGrant, assertSessionGrant, assertResourceGrant, SessionGrantError,
+  decideSessionGrant, decideResourceGrant, readGrantContext, assertSessionGrant, assertResourceGrant, SessionGrantError,
 };

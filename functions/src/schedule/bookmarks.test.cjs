@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   createBookmarkSessionHandler,
+  createCheckSessionAccessHandler,
   internals: { toggleSessionBookmark, SessionNotFoundError, ScheduleVisibilityChangedError },
 } = require('./bookmarks.cjs');
 
@@ -178,6 +179,33 @@ const ATTENDEE_TOKEN = { uid: 'u1', email: 'attendee@example.org', email_verifie
 function fakeGetConfig(featureOverrides = {}, bootstrap = null) {
   return async () => ({ features: { sessionBookmarks: true, ...featureOverrides }, bootstrap });
 }
+
+test('session access checks the caller and session without writing', async () => {
+  const control = { effectiveRevision: 2, candidateRevision: null };
+  const db = fakeDb({
+    ...seedSession('s1', { dayId: 'day-1' }),
+    ...seedSession('hidden', { visible: false }),
+    'users/u1': { registrationStatus: 'approved', approvalSource: 'ticket' },
+    'ticket_access_policies/current': control,
+    'ticket_access_grants/u1': { policyRevision: 2, resources: { sessions: { dayIds: ['day-1'] }, interactions: false } },
+  });
+  const handler = createCheckSessionAccessHandler({ db, auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+    getConfig: fakeGetConfig({ sessionReactions: true }) });
+  const request = async (sessionId, interactions, authorization = 'Bearer good') => {
+    const res = fakeRes();
+    await handler({ method: 'POST', headers: { authorization }, body: { sessionId, interactions, uid: 'other' } }, res);
+    assert.equal(res.headers['Cache-Control'], 'no-store');
+    return res;
+  };
+  assert.equal((await request('s1', false, '')).statusCode, 401);
+  assert.equal((await request('s1/hidden', false)).statusCode, 400);
+  assert.equal((await request('hidden', false)).statusCode, 404);
+  assert.deepEqual((await request('s1', false)).body, { ok: true });
+  assert.equal((await request('s1', true)).body.error.code, 'ticket-resource');
+  control.candidateRevision = 3;
+  assert.equal((await request('s1', false)).body.error.code, 'access-updating');
+  assert.equal(db.docs.size, 5);
+});
 
 test('handler: rejects non-POST', async () => {
   const db = fakeDb(seedSession('s1'));

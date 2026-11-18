@@ -21,7 +21,7 @@
  */
 
 const { requireAttendeeAccess } = require('../core/auth.cjs');
-const { assertSessionGrant, SessionGrantError } = require('../ticketing/resourceAccess.cjs');
+const { assertSessionGrant, decideSessionGrant, readGrantContext, SessionGrantError } = require('../ticketing/resourceAccess.cjs');
 const {
   sendError,
   badRequest,
@@ -154,8 +154,39 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
   };
 }
 
+/** Recheck a displayed refusal without retrying the action that raised it. */
+function createCheckSessionAccessHandler({ db, auth, getConfig, log = console }) {
+  return async function handler(req, res) {
+    res.set('Cache-Control', 'no-store');
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const { sessionId, interactions } = req.body ?? {};
+    if (typeof sessionId !== 'string' || !sessionId || sessionId.includes('/') || typeof interactions !== 'boolean') {
+      return badRequest(res, 'A session ID and interactions flag are required.');
+    }
+
+    try {
+      const feature = interactions ? 'sessionReactions' : 'sessionBookmarks';
+      if ((await getConfig())?.features?.[feature] !== true) return notFound(res, 'This session action is disabled.');
+      const gate = await requireAttendeeAccess({ auth, db, getConfig }, req);
+      if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+      const decision = await db.runTransaction(async (tx) => {
+        const session = (await tx.get(db.collection('cmsSchedule').doc(sessionId))).data();
+        if (session?.visible !== true) return null;
+        const access = await readGrantContext({ db, tx, uid: gate.uid, bootstrapEmail: gate.viaAccount ? null : gate.email });
+        return decideSessionGrant({ ...access, session, sessionId, interactions });
+      }, { readOnly: true });
+      if (!decision) return notFound(res, 'Session not found.');
+      if (!decision.ok) return sendError(res, decision.status, decision.code, decision.message);
+      return res.status(200).json({ ok: true });
+    } catch (err) {
+      log.error('checkSessionAccess failed', err);
+      return internal(res, 'Session access could not be checked.');
+    }
+  };
+}
+
 /**
- * Deployable export: bookmarkSession. firebase-functions and firebase-admin
+ * Deployable exports: bookmarkSession and checkSessionAccess. firebase-functions and firebase-admin
  * are required lazily HERE ONLY (house rule, spec §1.3).
  */
 function buildHandlers() {
@@ -180,6 +211,12 @@ function buildHandlers() {
   };
 
   return {
+    checkSessionAccess: onRequest(
+      { region },
+      withCors(async (req, res) => {
+        await createCheckSessionAccessHandler(buildDeps())(req, res);
+      }),
+    ),
     bookmarkSession: onRequest(
       { region },
       withCors(async (req, res) => {
@@ -191,6 +228,7 @@ function buildHandlers() {
 
 module.exports = {
   createBookmarkSessionHandler,
+  createCheckSessionAccessHandler,
   get handlers() {
     return buildHandlers();
   },
