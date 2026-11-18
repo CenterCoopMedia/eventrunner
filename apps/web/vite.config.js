@@ -10,7 +10,7 @@
 // so the override applies to the whole app, theme.css included.
 import { defineConfig, loadEnv, normalizePath } from 'vite';
 import react from '@vitejs/plugin-react';
-import publicBase from 'shared/config/publicBase';
+import { parseEventPublicBase } from 'shared/config/publicBase';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +20,6 @@ import { snapshotHtml } from './snapshotHtml.js';
 import { specimenBoundary } from './specimenBoundary.js';
 import { isDemoModeFlag } from './src/lib/demoModeFlag.js';
 
-const { parseEventPublicBase } = publicBase;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const generatedDir = resolveGeneratedDir(process.env, path.resolve(here, 'src/generated'));
 const entryModule = normalizePath(path.resolve(here, 'src/main.jsx'));
