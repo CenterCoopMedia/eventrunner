@@ -140,6 +140,7 @@ jobs:
           SYNC_EVENT_MOUNT: ${{ inputs.sync_event_mount }}
           TEST_MODE: ${{ inputs.test_mode }}
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+          CONSOLE_CLIENT_ROUTE_MAP_BUCKET: ${{ vars.CONSOLE_CLIENT_ROUTE_MAP_BUCKET }}
           CONSOLE_PUBLIC_URL: ${{ vars.CONSOLE_PUBLIC_URL }}
           CONSOLE_MAIL_FROM: ${{ vars.CONSOLE_MAIL_FROM }}
           CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}

@@ -39,6 +39,7 @@ const { saveApplicationStep } = require('./applicationSave.cjs');
 const { withdrawApplication } = require('./applicationStatus.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
 const { consentEventMount, manageEventMount } = require('./clientHostEnrollment.cjs');
+const { createRouteMapStore } = require('./clientHostMapStore.cjs');
 const { getApplicationForReview, listApplicationsForReview } = require('./reviewQueue.cjs');
 const { closeApplication, declineApplication, launchApplication } = require('./reviewDecisions.cjs');
 const { deleteSpamApplication, runRetention } = require('./cleanup.cjs');
@@ -228,6 +229,12 @@ function buildHandlers({ startBuild } = {}) {
       if (spec.mail) deps.mailer = lazyMailer();
       if (spec.build) deps.startBuild = buildStarter();
       if (spec.deployments) deps.deployments = createDeploymentRuns({ env: process.env, privateKey: githubAppKey.value(), fetch: globalThis.fetch });
+      if (spec.action === manageEventMount) {
+        deps.routeMaps = createRouteMapStore({
+          bucket: process.env.CONSOLE_CLIENT_ROUTE_MAP_BUCKET,
+          getStorage: () => require('firebase-admin/storage').getStorage(),
+        });
+      }
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
     });
   }

@@ -37,8 +37,10 @@ const path = require('node:path');
 
 const { toMillis } = require('../console/functions/src/access.cjs');
 const {
-  eventMountRef, recordAppliedPublicBase, recordStandalonePublicBase, resolveEventPublicBase,
+  eventMountRef, recordStandalonePublicBase, resolveEventPublicBase,
 } = require('../console/functions/src/clientHostRecords.cjs');
+const { createRouteMapStore } = require('../console/functions/src/clientHostMapStore.cjs');
+const { recordAppliedPublicBase } = require('../console/functions/src/clientHostPublish.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, normalizeProjectId, readConsoleSettings } = require('../console/functions/src/consoleSettings.cjs');
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
@@ -1227,8 +1229,8 @@ async function syncEventMount({ appId, deps }) {
   const written = await writeEnvironmentVariables(ctx, target, variables);
   if (written || route.appliedPublicBase !== base.publicBase) {
     await deploy(ctx, { bootstrap: false, after: deps.now(), fresh: true });
-    await recordAppliedPublicBase(db, ctx, base.publicBase);
   }
+  await recordAppliedPublicBase(deps, ctx, base.publicBase);
   log.log('provision-client: event public URL applied');
   return 0;
 }
@@ -1650,7 +1652,7 @@ async function stepReady(ctx) {
 async function stepFullDeploy(ctx) {
   const result = await deploy(ctx, { bootstrap: false, after: toMillis(ctx.ticketsChangedAt) });
   if (ctx.eventMount?.publishedAt) {
-    await recordAppliedPublicBase(ctx.deps.db, ctx, ctx.publicConfig.publicBase);
+    await recordAppliedPublicBase(ctx.deps, ctx, ctx.publicConfig.publicBase);
   }
   return result;
 }
@@ -2060,10 +2062,8 @@ function realDeps(env) {
   const { spawn } = require('node:child_process');
 
   const credential = applicationDefault();
-  const firestoreFor = (projectId) => {
-    const app = getApps().find((item) => item.name === projectId) || initializeApp({ credential, projectId }, projectId);
-    return getFirestore(app);
-  };
+  const appFor = (projectId) => getApps().find((item) => item.name === projectId) || initializeApp({ credential, projectId }, projectId);
+  const firestoreFor = (projectId) => getFirestore(appFor(projectId));
   const storeFor = (projectId) => createSecretStore({
     projectId, getAccessToken: () => credential.getAccessToken(), fetch: globalThis.fetch, log: console,
   });
@@ -2075,6 +2075,10 @@ function realDeps(env) {
     now: Date.now,
     log: console,
     db: firestoreFor(env.CONSOLE_PROJECT_ID),
+    routeMaps: createRouteMapStore({
+      bucket: env.CONSOLE_CLIENT_ROUTE_MAP_BUCKET,
+      getStorage: () => require('firebase-admin/storage').getStorage(appFor(env.CONSOLE_PROJECT_ID)),
+    }),
     clientDb: firestoreFor,
     consoleSecrets: storeFor(env.CONSOLE_PROJECT_ID),
     clientSecrets: storeFor,

@@ -52,16 +52,8 @@ async function recordStandalonePublicBase(db, appId, base) {
   });
 }
 
-/** Record the effective address only after the ordinary deployment succeeds. */
-async function recordAppliedPublicBase(db, identity, publicBase) {
-  await db.runTransaction(async (tx) => {
-    const ref = eventMountRef(db, identity.appId);
-    const route = (await tx.get(ref)).data();
-    if (!route || resolveEventPublicBase(route, identity).publicBase !== publicBase) {
-      throw new Error('the event address changed during deployment');
-    }
-    tx.update(ref, { appliedPublicBase: publicBase });
-  });
+function eventListingTitle(route) {
+  return route.appliedPublicBase === route.publicBase ? route.publicTitle ?? null : null;
 }
 
 /** Keep the path reservation when its application and consent are purged. */
@@ -73,17 +65,31 @@ async function purgeEventMount(tx, db, appId) {
   tx.set(ref, { host, mount, publicBase, projectId, hostingOrigin: origin, appId, state: 'removed' });
 }
 
+/** Serialize changes in the public projection with the host's existing revision. */
+async function updateEventMount(tx, db, appId, route, update) {
+  const next = { ...route, ...update };
+  const published = route.state === 'published';
+  const willPublish = next.state === 'published';
+  if (published !== willPublish || (willPublish && eventListingTitle(route) !== eventListingTitle(next))) {
+    const ref = clientHostRef(db, route.host);
+    const { revision } = (await tx.get(ref)).data() || {};
+    if (!Number.isSafeInteger(revision) || revision < 1) throw new Error('The client host has no route revision.');
+    tx.update(ref, { revision: revision + 1 });
+  }
+  tx.update(eventMountRef(db, appId), update);
+}
+
 /** Change only this route inside the application lifecycle transaction. */
 async function changeMountForApplication(tx, db, appId, change) {
   const ref = eventMountRef(db, appId);
   const route = (await tx.get(ref)).data();
   if (!route || route.state === 'removed') return;
-  if (change === 'remove') tx.update(ref, { state: 'removed' });
-  if (change === 'retire' && route.state === 'published') tx.update(ref, { state: 'retired' });
-  if (change === 'restore' && route.state === 'retired') tx.update(ref, { state: 'published' });
+  if (change === 'remove') return updateEventMount(tx, db, appId, route, { state: 'removed' });
+  if (change === 'retire' && route.state === 'published') return updateEventMount(tx, db, appId, route, { state: 'retired' });
+  if (change === 'restore' && route.state === 'retired') return updateEventMount(tx, db, appId, route, { state: 'published' });
 }
 
 module.exports = {
   MOUNTS, changeMountForApplication, clientHostRef, eventMountRef, hostingOrigin, purgeEventMount,
-  recordAppliedPublicBase, recordStandalonePublicBase, reservedClientPath, resolveEventPublicBase,
+  eventListingTitle, recordStandalonePublicBase, reservedClientPath, resolveEventPublicBase, updateEventMount,
 };

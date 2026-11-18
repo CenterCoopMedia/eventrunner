@@ -8,8 +8,11 @@ const { NOT_FOUND, applicationRef, requireAppId, requireOperator } = require('./
 const { readBuild, canRetryBuild } = require('./buildState.cjs');
 const { normalizeProjectId } = require('./consoleSettings.cjs');
 const {
-  MOUNTS, clientHostRef, eventMountRef, hostingOrigin, reservedClientPath, resolveEventPublicBase,
+  MOUNTS, clientHostRef, eventMountRef, hostingOrigin, reservedClientPath, resolveEventPublicBase, updateEventMount,
 } = require('./clientHostRecords.cjs');
+const { publicEventTitle } = require('./clientHostMap.cjs');
+const { routeMapError } = require('./clientHostMapStore.cjs');
+const { publishClientHostMap } = require('./clientHostPublish.cjs');
 const { COLLECTION: SITE_NAMES, SITE_DOMAIN, RESERVED } = require('./siteNames.cjs');
 
 const DNS_LABEL = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
@@ -151,7 +154,8 @@ async function enroll(tx, db, { appId, app, ref, route, body, user, at }) {
   return record;
 }
 
-async function manageEventMount({ db, now = Date.now }, { body, user }) {
+async function manageEventMount(deps, { body, user }) {
+  const { db, routeMaps, now = Date.now } = deps;
   const appId = requireAppId(body.appId);
   const ref = eventMountRef(db, appId);
   const at = new Date(now());
@@ -169,6 +173,7 @@ async function manageEventMount({ db, now = Date.now }, { body, user }) {
     }
     if (!route) throw new ConsoleError(404, 'not-found', 'No event route was enrolled.');
     const state = body.action === 'publish' ? 'published' : 'removed';
+    let publicTitle;
     if (state === 'published') {
       const app = requireApplication(await get(applicationRef(db, appId)));
       const build = await readBuild(get, db, appId);
@@ -177,16 +182,33 @@ async function manageEventMount({ db, now = Date.now }, { body, user }) {
         throw conflict('Confirm the approved public address for a completed event.');
       }
       resolveEventPublicBase({ ...route, state }, { ...build?.resources, appId });
+      publicTitle = publicEventTitle(body.publicTitle ?? route.publicTitle);
+      if (!publicTitle) throw new ConsoleError(400, 'public-title-required', 'Enter the event title to list on the client host.');
     }
-    if (route.state === state) return route;
+    if ((publicTitle || route.publishedAt) && !routeMaps) {
+      throw new ConsoleError(503, 'route-map-unavailable', 'The client route map store is unavailable.');
+    }
+    if (route.state === state && (state !== 'published' || route.publicTitle === publicTitle)) return route;
     const updated = {
       state, changedBy: user.uid, changedAt: at,
-      ...(state === 'published' ? { publishedAt: route.publishedAt || at } : {}),
+      ...(state === 'published' ? { publicTitle, publishedAt: route.publishedAt || at } : {}),
     };
-    tx.update(ref, updated);
+    await updateEventMount(tx, db, appId, route, updated);
     return { ...route, ...updated };
   });
-  return { body: { route: result } };
+  let routeMap;
+  const enrolledHost = body.action === 'enroll' && routeMaps;
+  const changedPublicRoute = ['publish', 'remove'].includes(body.action) && result?.publishedAt;
+  if (enrolledHost || changedPublicRoute) {
+    try {
+      routeMap = await publishClientHostMap(deps, result);
+    } catch (error) {
+      const refusal = new ConsoleError(503, 'route-map-unavailable', 'The public route map could not be verified.');
+      refusal.cause = routeMapError('Verifying the public route map', error).message;
+      throw refusal;
+    }
+  }
+  return { body: { route: result, ...(routeMap && { routeMap }) } };
 }
 
 module.exports = { consentEventMount, manageEventMount };
