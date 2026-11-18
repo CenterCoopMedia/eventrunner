@@ -5,7 +5,9 @@
 // link. The mark is per account and per browser, holds no request data, and
 // is a convenience only. A reader on another device still reaches the page
 // through the link in every change request email.
-const PREFIX = 'changeRequests.sent.';
+import { eventStorageKey } from './eventBrowserState.js';
+
+const PREFIX = eventStorageKey('changeRequests.sent.');
 
 /** @param {string|null|undefined} uid */
 export function hasSentChangeRequest(uid) {

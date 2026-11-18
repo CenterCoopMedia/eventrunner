@@ -10,11 +10,13 @@
 // Nothing here reaches Firestore. The admin shell reads it on every admin
 // load, so it stays this small.
 
+import { eventStorageKey } from '../lib/eventBrowserState.js';
+
 /** Accounts that ended the tour in this tab while the store refused the write. */
 const endedInThisTab = new Set();
 
 /** @param {string} uid */
-export const tourStorageKey = (uid) => `eventrunner.adminTour.v1:${uid}`;
+export const tourStorageKey = (uid) => eventStorageKey(`eventrunner.adminTour.v1:${uid}`);
 
 /**
  * @param {string} uid

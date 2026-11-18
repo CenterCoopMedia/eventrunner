@@ -10,10 +10,12 @@
 // held in memory for the life of the tab, so the layout still holds until a
 // reload; a read that fails or finds nothing usable gives the default.
 
+import { eventStorageKey } from '../lib/eventBrowserState.js';
+
 /** The values this tab wrote, so a refused store still holds them. */
 const memory = new Map();
 
-const KEY_PREFIX = 'eventrunner.adminLayout.v1:';
+const KEY_PREFIX = eventStorageKey('eventrunner.adminLayout.v1:');
 
 export const RAIL_COLLAPSED_KEY = `${KEY_PREFIX}railCollapsed`;
 export const DOCKET_GROUPS_KEY = `${KEY_PREFIX}docketGroups`;

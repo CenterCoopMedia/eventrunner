@@ -1,3 +1,5 @@
+import { eventStorageKey } from './eventBrowserState.js';
+
 const VIEWS = Object.freeze([
   { id: 'attendee', label: 'Attendee', to: '/dashboard' },
   { id: 'speaker', label: 'Speaker', to: '/speaker/dashboard' },
@@ -23,7 +25,7 @@ export function viewForPath(pathname) {
   return null;
 }
 
-const sessionKey = (uid) => `eventrunner.accountView:${uid}`;
+const sessionKey = (uid) => eventStorageKey(`eventrunner.accountView:${uid}`);
 
 export function readSessionView(uid) {
   if (!uid) return null;

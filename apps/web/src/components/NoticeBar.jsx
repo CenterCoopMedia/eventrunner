@@ -36,8 +36,9 @@
 import { useState } from 'react';
 import { quietActionClass } from './controlClasses.js';
 import { focusAsDestination } from '../lib/scrollToTop.js';
+import { eventStorageKey } from '../lib/eventBrowserState.js';
 
-const STORAGE_PREFIX = 'notice-dismissed:';
+const STORAGE_PREFIX = eventStorageKey('notice-dismissed:');
 
 /** The two levels, each a word and a role. */
 export const NOTICE_LEVELS = Object.freeze({

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect } from 'react';
+import { eventStorageKey } from '../lib/eventBrowserState.js';
 
 // Only the six publishable collections' existing editors belong in recents.
 // Account records, list pages and unsaved new records never do.
@@ -12,7 +13,7 @@ function valid(record) {
     && typeof record.label === 'string' && record.label.trim().length > 0;
 }
 
-const keyFor = (uid) => `eventrunner.adminCommands:${encodeURIComponent(uid)}`;
+const keyFor = (uid) => eventStorageKey(`eventrunner.adminCommands:${encodeURIComponent(uid)}`);
 
 export function readCommandRecents(uid) {
   if (!uid) return [];

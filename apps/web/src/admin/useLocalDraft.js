@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { openLocalDraft } from '../lib/localDraft.js';
+import { LOCAL_DRAFTS_CLEARED, openLocalDraft } from '../lib/localDraft.js';
 
 export function useLocalDraft({ accountId, docPath, version, baseline, value, dirty, enabled }) {
   const sessionRef = useRef(null);
@@ -31,13 +31,13 @@ export function useLocalDraft({ accountId, docPath, version, baseline, value, di
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', hidden);
     window.addEventListener('storage', cleared);
-    window.addEventListener('admin-drafts-cleared', cleared);
+    window.addEventListener(LOCAL_DRAFTS_CLEARED, cleared);
     return () => {
       flush(); // A lost sign-in unmounts the editor without a leave dialog.
       window.removeEventListener('pagehide', flush);
       document.removeEventListener('visibilitychange', hidden);
       window.removeEventListener('storage', cleared);
-      window.removeEventListener('admin-drafts-cleared', cleared);
+      window.removeEventListener(LOCAL_DRAFTS_CLEARED, cleared);
       sessionRef.current = null;
     };
     // Version belongs to the revision first loaded, not later listener echoes.

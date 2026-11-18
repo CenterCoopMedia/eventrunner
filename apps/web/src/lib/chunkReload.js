@@ -12,7 +12,9 @@
 // loop forever, so the attempt is recorded in sessionStorage and the second
 // failure is left for ErrorBoundary to show as a retry panel instead.
 
-export const RELOAD_FLAG = 'eventrunner:chunk-reload';
+import { eventStorageKey } from './eventBrowserState.js';
+
+export const RELOAD_FLAG = eventStorageKey('eventrunner:chunk-reload');
 
 const CHUNK_ERROR_RE =
   /(dynamically imported module|importing a module script failed|loading chunk|failed to fetch dynamically)/i;

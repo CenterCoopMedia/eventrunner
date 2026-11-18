@@ -10,6 +10,7 @@ import {
   disableNetwork,
 } from 'firebase/firestore';
 import { IS_DEMO } from './lib/demoMode.js';
+import { mountedProjectId } from './lib/eventBrowserState.js';
 import { useEmulators, appCheckSiteKey } from './lib/firebaseSettings.js';
 
 export { GoogleAuthProvider, onAuthStateChanged, signInWithCustomToken, signInWithPopup, signOut } from 'firebase/auth';
@@ -24,7 +25,9 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-export const app = initializeApp(firebaseConfig);
+// Auth persists by app name and API key. Give mounted events an SDK identity
+// as well as scoped application keys, while preserving root sign-in state.
+export const app = initializeApp(firebaseConfig, mountedProjectId || undefined);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
