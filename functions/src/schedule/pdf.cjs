@@ -36,6 +36,7 @@
 const { speakerDisplayName, isPubliclyVisibleSpeaker } = require('shared/speaker');
 const { contentLanguages, resolveContentVariant, selectContentLanguage } = require('shared/contentLanguages');
 const { requestedContentLanguage } = require('../core/http.cjs');
+const { decideSessionGrant, readGrantContext } = require('../ticketing/resourceAccess.cjs');
 // The theme, branding, fitText and font-safety helpers are shared with the
 // invoice PDF (#209), so they live in one module both documents import.
 const {
@@ -174,7 +175,8 @@ function formatSessionTime(session) {
  *
  * @param {{ event: object | null, theme: object | null,
  *           sessions: Array<object>, speakerNamesById?: Record<string, string>,
- *           ownerName?: string | null, onlySessionIds?: string[] | null, language?: 'en'|'es' }} args
+ *           ownerName?: string | null, onlySessionIds?: string[] | null,
+ *           excludedSessionIds?: Set<string>, language?: 'en'|'es' }} args
  * @returns {Promise<Uint8Array>}
  */
 async function buildSchedulePdf({
@@ -184,6 +186,7 @@ async function buildSchedulePdf({
   speakerNamesById = {},
   ownerName = null,
   onlySessionIds = null,
+  excludedSessionIds = new Set(),
   language = selectContentLanguage(event),
 }) {
   const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
@@ -305,10 +308,6 @@ async function buildSchedulePdf({
     }
 
     for (const session of daySessions) {
-      if (y < MARGIN + ROW_MIN_HEIGHT) {
-        ({ page, y } = newPage(`${dayLabelOf(day)} (${spanish ? 'continuación' : 'cont.'})`));
-      }
-
       const timeText = formatSessionTime(session); // digits/AM/PM/en-dash only — always WinAnsi-safe
       const locationText = safeBody(
         isNonEmptyString(session?.location) ? session.location : '',
@@ -318,6 +317,11 @@ async function buildSchedulePdf({
         isNonEmptyString(localized?.title) ? localized.title : (spanish ? 'Sesión sin título' : 'Untitled session'),
       );
       const speakerText = safeBody(resolveSpeakerLine(session?.speakerIds, speakerNamesById));
+      const excluded = Array.isArray(onlySessionIds) && excludedSessionIds.has(session.id);
+      const rowHeight = ROW_MIN_HEIGHT + (speakerText ? 13 : 0) + (excluded ? 13 : 0);
+      if (y < MARGIN + (excluded ? rowHeight : ROW_MIN_HEIGHT)) {
+        ({ page, y } = newPage(`${dayLabelOf(day)} (${spanish ? 'continuación' : 'cont.'})`));
+      }
 
       const timeColWidth = 90;
       const locationColWidth = 110;
@@ -356,7 +360,6 @@ async function buildSchedulePdf({
         color: toColor(colors.ink),
       });
 
-      let rowHeight = ROW_MIN_HEIGHT;
       if (speakerText) {
         page.drawText(speakerText, {
           x: titleColX,
@@ -365,7 +368,15 @@ async function buildSchedulePdf({
           font: bodyFont,
           color: toColor(colors.inkMuted),
         });
-        rowHeight += 13;
+      }
+      if (excluded) {
+        page.drawText(spanish ? 'No incluida con tu entrada' : 'Not included with your ticket', {
+          x: titleColX,
+          y: y - (speakerText ? 26 : 13),
+          size: 9,
+          font: bodyFont,
+          color: toColor(colors.inkMuted),
+        });
       }
 
       y -= rowHeight + ROW_GAP;
@@ -529,8 +540,15 @@ function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console })
       // Only the bookmarked sessions are drawn, so only their speakers are
       // read. A failed speaker read still gives a PDF without names.
       const wanted = new Set(onlySessionIds);
-      const speakerNamesById = await publicSpeakerNames(db, sessions.filter((s) => wanted.has(s.id)))
-        .catch(() => ({}));
+      const bookmarkedSessions = sessions.filter((session) => wanted.has(session.id));
+      const [speakerNamesById, access] = await Promise.all([
+        publicSpeakerNames(db, bookmarkedSessions).catch(() => ({})),
+        db.runTransaction((tx) => readGrantContext({ db, tx, uid: gate.uid,
+          bootstrapEmail: gate.viaAccount ? null : gate.email }), { readOnly: true }),
+      ]);
+      const excludedSessionIds = new Set(bookmarkedSessions.filter((session) =>
+        decideSessionGrant({ ...access, session, sessionId: session.id }).code === 'ticket-resource',
+      ).map((session) => session.id));
 
       const bytes = await buildSchedulePdf({
         event: config.event,
@@ -539,6 +557,7 @@ function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console })
         speakerNamesById,
         ownerName,
         onlySessionIds,
+        excludedSessionIds,
         language,
       });
 

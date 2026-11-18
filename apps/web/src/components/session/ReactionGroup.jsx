@@ -29,6 +29,7 @@ import { useProfile } from '../../contexts/ProfileContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { REACTION_KINDS, setSessionReaction } from '../../lib/reactionsSource.js';
 import { useSessionReactions } from '../../hooks/useSessionReactions.js';
+import { useSessionAccessRefusal } from '../../hooks/useSessionAccessRefusal.js';
 import { ticketAccessState, ticketAccessText } from '../../lib/ticketAccess.js';
 import { chipActionClass } from './sessionActionClass.js';
 import TicketAccessNote from './TicketAccessNote.jsx';
@@ -60,17 +61,11 @@ export default function ReactionGroup({ session }) {
   const [optimistic, setOptimistic] = useState(undefined);
   const hasOverride = optimistic !== undefined;
   const myActiveReaction = hasOverride ? optimistic : myReaction;
-  // A ticket refusal (#1007), stated under the group as BookmarkAction does.
-  const [ticketDenial, setTicketDenial] = useState(null);
-  const ticketState = ticketDenial && ticketDenial.uid === user?.uid && ticketDenial.sessionId === session.id
-    ? ticketDenial.state : null;
+  const [ticketState, setTicketDenial] = useSessionAccessRefusal(user, session.id, attendeeAccess, true);
 
   useEffect(() => {
     setOptimistic(undefined);
   }, [myReaction, session.id, user?.uid]);
-  useEffect(() => {
-    setTicketDenial(null);
-  }, [session.id, user?.uid, attendeeAccess]);
 
   const onPick = useCallback(
     async (emoji) => {
@@ -90,7 +85,7 @@ export default function ReactionGroup({ session }) {
         setPending(false);
       }
     },
-    [user, myActiveReaction, session.id, showToast],
+    [user, myActiveReaction, session.id, showToast, setTicketDenial],
   );
 
   // Optimistically nudge the displayed counts so a click feels immediate

@@ -9,6 +9,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { setSessionBookmarked } from '../../lib/bookmarksSource.js';
 import { setDeviceBookmarked } from '../../lib/deviceBookmarks.js';
 import { useDeviceBookmarks } from '../../hooks/useDeviceBookmarks.js';
+import { useSessionAccessRefusal } from '../../hooks/useSessionAccessRefusal.js';
 import { ticketAccessState, ticketAccessText } from '../../lib/ticketAccess.js';
 import { rowActionClass } from './sessionActionClass.js';
 import TicketAccessNote from './TicketAccessNote.jsx';
@@ -37,11 +38,7 @@ export default function BookmarkAction({ session, bookmarked = false }) {
   // instead of the server's real state, sending the inverse of what the
   // user actually sees on screen.
   const [optimistic, setOptimistic] = useState(null);
-  // A ticket refusal (#1007) stays stated beside the control for this reader
-  // and session. The control stays usable: a later try asks the server again.
-  const [ticketDenial, setTicketDenial] = useState(null);
-  const ticketState = ticketDenial && ticketDenial.uid === user?.uid && ticketDenial.sessionId === session.id
-    ? ticketDenial.state : null;
+  const [ticketState, setTicketDenial] = useSessionAccessRefusal(user, session.id, attendeeAccess);
   const isBookmarked = optimistic && optimistic.uid === user?.uid && optimistic.deviceSaved === deviceSaved
     ? optimistic.value : deviceOnly ? deviceSaved : bookmarked || deviceSaved;
 
@@ -51,9 +48,6 @@ export default function BookmarkAction({ session, bookmarked = false }) {
   useEffect(() => {
     setOptimistic(null);
   }, [bookmarked, session.id, user?.uid, attendeeAccess]);
-  useEffect(() => {
-    setTicketDenial(null);
-  }, [session.id, user?.uid, attendeeAccess]);
   useEffect(() => {
     setOptimistic((previous) => previous && previous.deviceSaved !== deviceSaved ? null : previous);
   }, [deviceSaved]);
@@ -89,7 +83,7 @@ export default function BookmarkAction({ session, bookmarked = false }) {
     } finally {
       setPending(false);
     }
-  }, [user, isBookmarked, session.id, showToast, pending, importing, profileLoading, deviceOnly, deviceSaved]);
+  }, [user, isBookmarked, session.id, showToast, pending, importing, profileLoading, deviceOnly, deviceSaved, setTicketDenial]);
 
   if (!profileLoading && deviceOnly && !device.available && !user) {
     return (

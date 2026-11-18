@@ -630,6 +630,36 @@ test('schedule PDFs draw approved Spanish or whole English fallback and keep per
   assert.doesNotMatch(personalText, /Open data|Sesión privada/);
 });
 
+test('only uncovered saved sessions receive the localized ticket label in the personal PDF', async () => {
+  const event = { ...EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const db = makeFakeDb({
+    'users/u1': { displayName: 'Alex Rivera', registrationStatus: 'approved', approvalSource: 'ticket' },
+    'cmsSchedule/covered': session({ title: 'Covered session', dayId: 'day-1' }),
+    'cmsSchedule/excluded': session({ title: 'Uncovered session', dayId: 'day-2' }),
+    'ticket_access_policies/current': { effectiveRevision: 2, candidateRevision: null },
+    'ticket_access_grants/u1': { policyRevision: 2, resources: { sessions: { dayIds: ['day-1'] } } },
+  });
+  for (const id of ['covered', 'excluded']) {
+    await db.collection('users/u1/bookmarks').doc(id).set({ bookmarkedAt: new Date() });
+  }
+  const getConfig = async () => ({ features: { schedulePdf: true }, event, theme: THEME });
+  const personal = createBuildMySchedulePdfHandler({ db, getConfig, auth: fakeAuth('u1') });
+  for (const [lang, label] of [['en', 'Not included with your ticket'], ['es', 'No incluida con tu entrada']]) {
+    const res = fakeRes();
+    await personal({ method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: { lang } }, res);
+    assert.equal(res.statusCode, 200);
+    const text = pdfDrawnText(res.sent);
+    assert.match(text, /Covered session/);
+    assert.ok(text.includes(`Uncovered session\n${label}`));
+    assert.equal(text.split(label).length, 2);
+  }
+
+  const publicPdf = fakeRes();
+  await createBuildSchedulePdfHandler({ db, getConfig })({ method: 'GET' }, publicPdf);
+  assert.equal(publicPdf.statusCode, 200);
+  assert.doesNotMatch(pdfDrawnText(publicPdf.sent), /Not included with your ticket/);
+});
+
 test('createBuildMySchedulePdfHandler: a bookmark matches the document id when the body has none', async () => {
   const kept = session({ title: 'Kept session title' });
   delete kept.id;

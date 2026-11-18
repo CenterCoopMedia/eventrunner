@@ -155,7 +155,8 @@ export function subscribeDirectory({ includeAttendeesOnly }, onNext, onFail) {
 /**
  * Read one public profile. Resolves null both for a profile that does not
  * exist and for one the rules refuse — the page must not distinguish them,
- * or it becomes an oracle for "this person has a private profile".
+ * or it becomes an oracle for "this person has a private profile". Other
+ * failures reject so a recheck can keep the last server-confirmed profile.
  *
  * @param {string} uid
  * @returns {Promise<object | null>}
@@ -169,7 +170,8 @@ export async function fetchPublicProfile(uid) {
     const snapshot = await getDocFromServer(doc(db, USERS_PUBLIC, uid));
     return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
   } catch (error) {
+    if (error?.code === 'permission-denied' || error?.code === 'unauthenticated') return null;
     console.warn('public profile read failed.', error);
-    return null;
+    throw error;
   }
 }

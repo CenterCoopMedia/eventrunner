@@ -240,11 +240,17 @@ describe('fetchPublicProfile', () => {
   });
 
   it('returns null for a denied read, exactly as for a missing profile', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    getDocMock.mockRejectedValue(new Error('permission denied'));
+    getDocMock.mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'permission-denied' }));
     await expect(fetchPublicProfile('u1')).resolves.toBeNull();
 
     getDocMock.mockResolvedValue({ exists: () => false });
     await expect(fetchPublicProfile('u2')).resolves.toBeNull();
+  });
+
+  it('distinguishes a transient read failure from a refusal', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = Object.assign(new Error('offline'), { code: 'unavailable' });
+    getDocMock.mockRejectedValue(error);
+    await expect(fetchPublicProfile('u1')).rejects.toBe(error);
   });
 });
