@@ -17,7 +17,7 @@ const {
   CATALOG, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
   CommerceError, orderIdFor, attemptIdFor, requestFingerprint, providerScope, assertOrderScope,
   normalizeInventory, reserveInventory, priceSelections, makeSeats, ticketsForFreeOrder,
-  configuredPublicUrl, checkoutRequestFor, millis, iso,
+  configuredPublicBase, checkoutRequestFor, millis, iso,
 } = require('./stripeCommerce.cjs');
 
 // Written when Stripe refuses the site's key. Functions only, like the catalog.
@@ -272,7 +272,7 @@ async function reserveCommerceOrder({
     const priced = priceSelections({ catalog, request, at, comp, promo });
     const paid = priced.totalAmount > 0;
     if (paid) requirePaymentCredentials(provider, connectionSnap.data()?.ended === true);
-    const publicUrl = paid ? configuredPublicUrl(config, env) : null;
+    const publicBase = paid ? configuredPublicBase(config, env) : null;
     // makeSeats copies each attendee as given; keep only the checked answers.
     const seats = makeSeats(id, priced.lines, request).map(({ answers: _given, ...seat }) => {
       const answers = seatAnswers?.[seat.lineIndex]?.[seat.seatIndex];
@@ -338,7 +338,7 @@ async function reserveCommerceOrder({
     const attempt = {
       id: attemptId, orderId: id, purchaserUid: actor.uid, ...scope,
       state: paid ? 'prepared' : 'succeeded', idempotencyKey: `eventrunner:${attemptId}`,
-      stripeRequest: paid ? checkoutRequestFor(order, publicUrl) : null,
+      stripeRequest: paid ? checkoutRequestFor(order, publicBase) : null,
       stripeSessionId: null, requestFingerprint: fingerprint,
       createdAt: at, updatedAt: at, lastTriedAt: null, leaseUntil: null, retryNotBefore: null,
     };

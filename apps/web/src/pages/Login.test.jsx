@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import App from '../App.jsx';
+import EventRouter from '../EventRouter.jsx';
 import { functionsOrigin } from '../lib/firebaseSettings.js';
 import { appCheckHeaders } from '../firebase.js';
 
@@ -74,6 +75,29 @@ describe('functions origin convention', () => {
 });
 
 describe('emailed-code sign-in', () => {
+  it('opens the mounted signin route and sends the code request to the event API', async () => {
+    const base = '/events/conference/';
+    const api = 'https://api.example.test';
+    const previousUrl = location.href;
+    vi.stubEnv('BASE_URL', base);
+    vi.stubEnv('VITE_FUNCTIONS_ORIGIN', api);
+    history.replaceState(null, '', `${base}signin`);
+    fetch.mockImplementation(async (url) => url === `${api}/sendOtpCode`
+      ? jsonResponse(200, { challengeId: 'mounted-challenge', expiresInMinutes: 10 })
+      : jsonResponse(200, { provider: 'none', salesEnabled: false }));
+    const view = render(<EventRouter><App /></EventRouter>);
+    try {
+      expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+      await requestCode();
+      expect(fetch).toHaveBeenCalledWith(`${api}/sendOtpCode`, expect.objectContaining({ method: 'POST' }));
+      expect(location.pathname).toBe(`${base}signin`);
+    } finally {
+      view.unmount();
+      history.replaceState(null, '', previousUrl);
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('states an SDK startup failure and offers an explicit page reload', async () => {
     vi.mocked(onAuthStateChanged).mockImplementationOnce(() => { throw new Error('SDK unavailable'); });
     renderSignIn();

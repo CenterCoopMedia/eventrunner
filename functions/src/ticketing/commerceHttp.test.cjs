@@ -78,10 +78,15 @@ test('dependency failures do not expose private exception details from any nativ
 });
 
 test('native CORS preflight does not need runtime provider configuration', async () => {
-  const { handlers, res, providerCalls } = fixture({});
-  await handlers.ticketingCheckout({ method: 'OPTIONS', headers: {} }, res);
-  assert.equal(res.statusCode, 204);
-  assert.deepEqual(providerCalls, []);
+  const origin = 'https://event.example.org';
+  const publicBase = `${origin}/events/conference/`;
+  for (const requestOrigin of [origin, publicBase]) {
+    const { handlers, res, providerCalls } = fixture({ EVENT_PUBLIC_URL: publicBase, EVENT_ALLOWED_ORIGINS: origin });
+    await handlers.ticketingCheckout({ method: 'OPTIONS', headers: { origin: requestOrigin } }, res);
+    assert.equal(res.statusCode, 204);
+    assert.equal(res.headers['Access-Control-Allow-Origin'], requestOrigin === origin ? origin : undefined);
+    assert.deepEqual(providerCalls, []);
+  }
 });
 
 test('the shared invocation guard redacts an uncaught failure after dependency setup', async () => {

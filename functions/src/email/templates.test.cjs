@@ -300,16 +300,18 @@ test('auth.otp renders the code into both html and text', () => {
 });
 
 test('account.welcome renders login_url in both bodies and next_steps_html from config', () => {
-  const out = render({
-    template: getDefaultTemplate('account.welcome'),
-    tokenValues: { first_name: 'Ada', profile_url: 'https://summit.example.org/profile' },
-    config: CONFIG,
-  });
-  assert.equal(linkHref(out.html, 'Sign in'), 'https://summit.example.org/signin');
-  assert.match(out.text, /^Sign in: https:\/\/summit\.example\.org\/signin$/m);
-  assert.ok(out.html.includes('<ul>')); // next_steps_html raw in html
-  assert.ok(!out.text.includes('<ul>')); // stripped in text
-  assert.deepEqual(out.warnings, []);
+  for (const base of ['https://summit.example.org/', 'https://summit.example.org/events/conference/']) {
+    const out = render({
+      template: getDefaultTemplate('account.welcome'),
+      tokenValues: { first_name: 'Ada', profile_url: `${base}profile` },
+      config: { ...CONFIG, tierA: { ...CONFIG.tierA, publicUrl: base } },
+    });
+    assert.equal(linkHref(out.html, 'Sign in'), `${base}signin`);
+    assert.ok(out.text.split('\n').includes(`Sign in: ${base}signin`));
+    assert.ok(out.html.includes('<ul>')); // next_steps_html raw in html
+    assert.ok(!out.text.includes('<ul>')); // stripped in text
+    assert.deepEqual(out.warnings, []);
+  }
 });
 
 // --- the event's social accounts in the footer (#231) ----------------------

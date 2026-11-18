@@ -113,13 +113,13 @@ test('getRegistrationPrompt suppresses for a speaker or an already-claimed ticke
 test('getRegistrationPrompt: unclaimed ticket → claim prompt pointed at /ticket/claim (§3.5, issue #33)', async () => {
   const provider = createManualProvider({
     db: makeFakeDb(),
-    getConfig: async () => ({ tierA: { publicUrl: 'https://summit.example.org' } }),
+    getConfig: async () => ({ tierA: { publicUrl: 'https://summit.example.org/events/conference/' } }),
   });
   const prompt = await provider.getRegistrationPrompt({ trigger: 'ticket_unclaimed' });
   assert.equal(prompt.send, true);
   assert.equal(prompt.action, 'claim');
   assert.equal(prompt.templateId, 'ticket.claim_prompt');
-  assert.equal(prompt.ctaUrl, 'https://summit.example.org/ticket/claim');
+  assert.equal(prompt.ctaUrl, 'https://summit.example.org/events/conference/ticket/claim');
 });
 
 test('getRegistrationPrompt: unclaimed ticket with no configured public URL degrades to no CTA', async () => {

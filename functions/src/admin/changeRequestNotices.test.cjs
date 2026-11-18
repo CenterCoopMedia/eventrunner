@@ -237,6 +237,15 @@ test('wording: a stored email_templates override is never used', async () => {
   assert.doesNotMatch(mailer.sent[0].text, /LIVE/);
 });
 
+test('a localized change request notice links to the mounted requester page', () => {
+  const publicUrl = `${SITE}/events/conference/`;
+  const config = { ...CONFIG, tierA: { publicUrl } };
+  const rendered = renderNotice({ config, slot: 'done', language: 'es' });
+  const target = `${publicUrl}profile/change-requests?lang=es`;
+  assert.ok(rendered.html.includes(`href="${target}"`));
+  assert.ok(rendered.text.includes(target));
+});
+
 test('wording: with no public site address the email still goes, and names no link', () => {
   const rendered = renderNotice({ config: { ...CONFIG, tierA: {} }, slot: 'done' });
   const hrefs = [...rendered.html.matchAll(/<a href="([^"]*)"/g)].map((match) => match[1]);

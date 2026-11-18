@@ -557,6 +557,9 @@ test('every admin endpoint is admin-gated and POST-only', async () => {
 test('sendSpeakerInvite mails a tokenized invite that carries the accept URL and is never stored', async () => {
   const db = makeSpeakersDb(world());
   const { sent, deps: d } = deps(db);
+  const publicUrl = 'https://summit.example.org/events/conference/';
+  const config = await d.getConfig();
+  d.getConfig = async () => ({ ...config, tierA: { publicUrl } });
   const res = fakeRes();
   await createSendSpeakerInviteHandler(d)(adminReq({ speakerId: 'rae' }), res);
 
@@ -570,7 +573,9 @@ test('sendSpeakerInvite mails a tokenized invite that carries the accept URL and
   assert.equal(sent[0].storeRendered, false);
   const match = sent[0].text.match(/\/speaker\/accept\?token=([0-9a-f]{64})/);
   assert.notEqual(match, null, 'the mail must carry the accept URL');
-  assert.equal(sent[0].html.includes(match[0]), true);
+  const acceptUrl = `${publicUrl}speaker/accept?token=${match[1]}`;
+  assert.ok(sent[0].text.includes(acceptUrl));
+  assert.ok(sent[0].html.includes(`href="${acceptUrl}"`));
   assert.equal(sent[0].subject.includes('Example Summit'), true);
   // The mailed token is the one the store hashed.
   assert.equal(db.read('speakers', 'rae').inviteToken, hashInviteToken(match[1]));

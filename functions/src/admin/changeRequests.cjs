@@ -40,9 +40,8 @@
  * THE OUTCOME is recorded by staff, never by a deploy or any other process:
  * marking a request done or declined stores `outcome`, and
  * saveChangeRequestOutcome adds an optional reply and an optional result
- * link. A result link must be on this site's own origin
- * (`config.tierA.publicUrl`, compared exactly after parsing) and needs the
- * staff member to confirm that they opened it and saw the change. The
+ * link. A result link must be inside this event's configured public base.
+ * The staff member confirms that they opened it and saw the change. The
  * request text is never an instruction to anything: no handler reads it to
  * decide what to do.
  *
@@ -90,6 +89,8 @@
  */
 
 const crypto = require('node:crypto');
+const { parseEventPublicBase } = require('shared/config/publicBase');
+const { stripEventMount } = require('shared/config/publicPath');
 const { requireAdmin, resolveAdminTier, internals: { extractBearerToken } } = require('../core/auth.cjs');
 const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
@@ -322,10 +323,8 @@ function requesterView(id, data) {
 }
 
 /**
- * A result link staff checked, or a refusal. Only an http(s) address on
- * this site's own origin passes: both are parsed, and the origins are
- * compared exactly, so a look-alike host, a credential, another port or a
- * relative address is refused.
+ * A full result URL within the event's origin and mount, with its query
+ * and fragment preserved.
  *
  * @param {unknown} value
  * @param {string} publicUrl config.tierA.publicUrl
@@ -337,9 +336,10 @@ function readResultUrl(value, publicUrl) {
   if (raw.length > MAX_RESULT_URL_LENGTH) {
     return { ok: false, message: `resultUrl: at most ${MAX_RESULT_URL_LENGTH} characters.` };
   }
-  let site;
+  let address;
   try {
-    site = new URL(String(publicUrl ?? '').trim());
+    address = parseEventPublicBase(publicUrl ?? undefined, { allowHttpLoopback: process.env.FUNCTIONS_EMULATOR === 'true' });
+    if (!address.publicBase) throw new Error('A public URL is required');
   } catch {
     return { ok: false, message: 'resultUrl: this site has no public address set, so a result link cannot be checked.' };
   }
@@ -349,9 +349,12 @@ function readResultUrl(value, publicUrl) {
   } catch {
     return { ok: false, message: 'resultUrl: must be a full address on this site, such as a page link copied from the browser.' };
   }
-  if ((site.protocol !== 'https:' && site.protocol !== 'http:') || url.username || url.password || url.origin !== site.origin) {
-    return { ok: false, message: `resultUrl: must be an address on this site (${site.origin}).` };
+  const { publicBase, origin, mount, assetBase } = address;
+  if ((url.protocol !== 'https:' && url.protocol !== 'http:') || url.username || url.password || url.origin !== origin
+      || stripEventMount(url.pathname, mount) === null) {
+    return { ok: false, message: `resultUrl: must be an address on this site (${mount ? publicBase : origin}).` };
   }
+  if (mount && url.pathname === mount) url.pathname = assetBase;
   return { ok: true, href: url.href };
 }
 

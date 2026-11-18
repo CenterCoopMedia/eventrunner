@@ -211,9 +211,11 @@ test('days until reads as words', () => {
 // --- one run -----------------------------------------------------------------
 
 test('two runs in one window send one email to each registered attendee, on the announcement contract', async () => {
-  const db = seed();
+  const publicUrl = `${SITE}/events/conference`;
+  const config = withEvent({}, { publicUrl: `${publicUrl}/` });
+  const db = seed({ [`${SCHEDULES}/${SCHEDULE_ID}`]: approvedSchedule({}, config) });
   const box = mailbox();
-  const first = await run(db, IN_7D, { box });
+  const first = await run(db, IN_7D, { box, config });
   assert.equal(first.outcome, 'completed');
   assert.equal(first.sendId, 'reminder-attendees-2026-12-01-7d');
   assert.equal(sendIdFor('2026-12-01-7d'), first.sendId);
@@ -225,12 +227,16 @@ test('two runs in one window send one email to each registered attendee, on the 
   assert.match(message.text, /The event is 7 days away\./);
   assert.match(message.text, /When: Tuesday, December 1, 2026 at 9:00\sAM EST/);
   assert.match(message.text, /Where: Example Hall, 1 Main St, Example City/);
-  assert.match(message.text, new RegExp(`Open your dashboard: ${SITE}/dashboard`));
+  assert.ok(message.text.includes(`Open your dashboard: ${publicUrl}/dashboard`));
   // The announcement stream and the per-recipient unsubscribe link.
   assert.equal(message.messageStream, 'announcements');
-  assert.match(message.headers['List-Unsubscribe'], new RegExp(`^<${SITE}/unsubscribe\\?s=reminder-attendees-2026-12-01-7d&r=[0-9a-f]{64}&t=`));
+  const unsubscribe = new URL(message.headers['List-Unsubscribe'].slice(1, -1));
+  assert.equal(`${unsubscribe.origin}${unsubscribe.pathname}`, `${publicUrl}/unsubscribe`);
+  assert.equal(unsubscribe.searchParams.get('s'), 'reminder-attendees-2026-12-01-7d');
+  assert.match(unsubscribe.searchParams.get('r'), /^[0-9a-f]{64}$/);
+  assert.ok(unsubscribe.searchParams.has('t'));
   assert.equal(message.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
-  assert.match(message.text, /Unsubscribe from announcements: https:\/\/site\.example\.test\/unsubscribe\?s=/);
+  assert.ok(message.text.includes(`Unsubscribe from announcements: ${unsubscribe.href}`));
 
   const record = db.read('announcement_sends', first.sendId);
   assert.equal(record.status, 'sent');
@@ -242,7 +248,7 @@ test('two runs in one window send one email to each registered attendee, on the 
   assert.equal(ledger.sendId, first.sendId);
   assert.equal(claims(db), 2);
 
-  const second = await run(db, IN_7D + HOUR, { box });
+  const second = await run(db, IN_7D + HOUR, { box, config });
   assert.equal(second.outcome, 'completed');
   assert.equal(second.counts.sent, 0);
   assert.equal(box.mail.length, 2, 'the second run sends nothing');

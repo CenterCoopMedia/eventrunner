@@ -62,7 +62,7 @@ function baseConfig(overrides = {}) {
       ...overrides.event,
     },
     theme: { colors: {} },
-    tierA: { publicUrl: 'https://summit.example.org' },
+    tierA: { publicUrl: 'https://summit.example.org', ...overrides.tierA },
   };
 }
 
@@ -103,12 +103,12 @@ function none() {
   return createNoneProvider({});
 }
 
-function stripe(db, getConfig) {
+function stripe(db, getConfig, publicUrl = 'https://summit.example.org') {
   return createStripeProvider({
     db, getConfig,
     env: {
       EVENT_TICKETING_EVENT_ID: 'conference-1', EVENT_STRIPE_ACCOUNT_ID: 'acct_fixture',
-      EVENT_STRIPE_MODE: 'test', EVENT_PUBLIC_URL: 'https://summit.example.org',
+      EVENT_STRIPE_MODE: 'test', EVENT_PUBLIC_URL: publicUrl,
     },
   });
 }
@@ -143,7 +143,10 @@ test('hasClaimedTicket is true only when a ticket names this uid as claimedByUid
 
 test('eventbrite: a brand-new signup gets ticket.get_ticket pointed at the configured checkout URL', async () => {
   const db = makeFakeDb({ 'users/uid-ada': user() });
-  const getConfig = async () => baseConfig({ event: { registration: { externalUrl: 'https://eventbrite.example/e/1' } } });
+  const getConfig = async () => baseConfig({
+    event: { registration: { externalUrl: 'https://eventbrite.example/e/1' } },
+    tierA: { publicUrl: 'https://summit.example.org/conference' },
+  });
   const calls = [];
   const result = await sendRegistrationPrompt({
     db, provider: eventbrite(getConfig), sendEmail: makeSendEmail(calls), getConfig,
@@ -160,7 +163,10 @@ test('eventbrite: a brand-new signup gets ticket.get_ticket pointed at the confi
 
 test('manual: a brand-new signup with a client external URL gets ticket.get_ticket, action purchase', async () => {
   const db = makeFakeDb({ 'users/uid-ada': user() });
-  const getConfig = async () => baseConfig({ event: { registration: { externalUrl: 'https://client.example/register' } } });
+  const getConfig = async () => baseConfig({
+    event: { registration: { externalUrl: 'https://client.example/register' } },
+    tierA: { publicUrl: 'https://summit.example.org/conference' },
+  });
   const calls = [];
   const result = await sendRegistrationPrompt({
     db, provider: manual(db, getConfig), sendEmail: makeSendEmail(calls), getConfig,
@@ -200,20 +206,22 @@ test('none: a brand-new signup gets nothing at all — send: false suppresses th
 });
 
 test('stripe: a signup without admission gets the catalog prompt without payment credentials', async () => {
-  const db = makeFakeDb({ 'users/uid-ada': user() });
-  const getConfig = async () => baseConfig();
-  const calls = [];
-  const result = await sendRegistrationPrompt({
-    db, provider: stripe(db, getConfig), sendEmail: makeSendEmail(calls), getConfig,
-    uid: 'uid-ada', now: () => T0, log: QUIET,
-  });
-  assert.equal(result.sent, true);
-  assert.equal(result.templateId, 'ticket.get_ticket');
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].onceKey, 'get-ticket:uid-ada');
-  const catalogAnchor = calls[0].html.match(/<a href="([^"]+)"[^>]*>Choose tickets<\/a>/);
-  assert.ok(catalogAnchor, 'the catalog CTA is rendered');
-  assert.equal(catalogAnchor[1], 'https://summit.example.org/tickets');
+  for (const publicUrl of ['https://summit.example.org', 'https://summit.example.org/events/conference']) {
+    const db = makeFakeDb({ 'users/uid-ada': user() });
+    const getConfig = async () => baseConfig({ tierA: { publicUrl } });
+    const calls = [];
+    const result = await sendRegistrationPrompt({
+      db, provider: stripe(db, getConfig, publicUrl), sendEmail: makeSendEmail(calls), getConfig,
+      uid: 'uid-ada', now: () => T0, log: QUIET,
+    });
+    assert.equal(result.sent, true);
+    assert.equal(result.templateId, 'ticket.get_ticket');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].onceKey, 'get-ticket:uid-ada');
+    const catalogAnchor = calls[0].html.match(/<a href="([^"]+)"[^>]*>Choose tickets<\/a>/);
+    assert.ok(catalogAnchor, 'the catalog CTA is rendered');
+    assert.equal(catalogAnchor[1], `${publicUrl}/tickets`);
+  }
 });
 
 for (const [label, makeProvider] of [

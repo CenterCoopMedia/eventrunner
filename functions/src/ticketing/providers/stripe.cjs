@@ -2,6 +2,8 @@
 
 /** Organizer-owned Stripe account, hosted Checkout, and authoritative reconciliation. */
 const { createHash } = require('node:crypto');
+const { parseEventPublicBase } = require('shared/config/publicBase');
+const { joinEventPath } = require('shared/config/publicPath');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../../core/demoWrites.cjs');
 
 const WEBHOOK_EVENTS = [
@@ -367,12 +369,11 @@ function createStripeProvider({ env = process.env, db, stripeClient, now = () =>
       if (ctx?.isSpeaker === true || ctx?.hasClaimedTicket === true) {
         return { send: false, templateId: null, ctaLabel: null, ctaUrl: null, action: null, bodyNote: null };
       }
-      const publicUrl = env.EVENT_PUBLIC_URL?.trim();
-      let origin;
-      try { origin = new URL(publicUrl); } catch { return { send: false }; }
-      if (origin.protocol !== 'https:') return { send: false };
+      let publicBase;
+      try { ({ publicBase } = parseEventPublicBase(env.EVENT_PUBLIC_URL)); } catch { return { send: false }; }
+      if (!publicBase) return { send: false };
       return { send: true, templateId: 'ticket.get_ticket', ctaLabel: 'Choose tickets',
-        ctaUrl: new URL('/tickets', origin).href, action: 'purchase', bodyNote: null };
+        ctaUrl: joinEventPath(publicBase, '/tickets'), action: 'purchase', bodyNote: null };
     },
 
     async registerWebhook({ callbackUrl }) {

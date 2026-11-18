@@ -169,7 +169,7 @@ function cardPaymentsStatus(getPayments) {
 const NOT_SET_UP = 'Card payment links need Stripe, and Stripe is not fully set up on this site. Ask an operator to check the Stripe settings.';
 
 /** The Checkout Session request for one invoice, from the frozen record only. */
-function invoiceCheckoutRequest({ id, stored, linkId, publicUrl, eventId, at }) {
+function invoiceCheckoutRequest({ id, stored, linkId, publicBase, eventId, at }) {
   const number = sanitizeInvoiceText(stored.number);
   const issuerName = sanitizeInvoiceText(stored.issuer?.name);
   const metadata = { eventRunnerInvoiceId: id, eventRunnerEventId: eventId, eventRunnerPayLinkId: linkId };
@@ -194,8 +194,8 @@ function invoiceCheckoutRequest({ id, stored, linkId, publicUrl, eventId, at }) 
       description: issuerName ? `Invoice ${number} from ${issuerName}` : `Invoice ${number}`,
     },
     expires_at: Math.floor((at.getTime() + LINK_LIFETIME_MS) / 1000),
-    success_url: `${publicUrl}/`,
-    cancel_url: `${publicUrl}/`,
+    success_url: publicBase,
+    cancel_url: publicBase,
   };
 }
 
@@ -310,7 +310,7 @@ async function createPayLink({ db, actor, body, now, getPayments, log }) {
   if (payments?.available !== true || !payments.provider) {
     fail(409, 'pay-links-unavailable', payments?.reason || NOT_SET_UP);
   }
-  const { provider, publicUrl } = payments;
+  const { provider, publicBase } = payments;
   const ref = db.collection(INVOICES).doc(id);
 
   const plan = await db.runTransaction(async (tx) => {
@@ -356,7 +356,7 @@ async function createPayLink({ db, actor, body, now, getPayments, log }) {
       fail(429, 'rate-limited', `This invoice already had ${links.length} card payment links. Use the payment instructions instead.`);
     }
     const linkId = `pl_${randomBytes(12).toString('hex')}`;
-    const request = invoiceCheckoutRequest({ id, stored, linkId, publicUrl, eventId: provider.externalEventId, at });
+    const request = invoiceCheckoutRequest({ id, stored, linkId, publicBase, eventId: provider.externalEventId, at });
     const attempt = {
       linkId, status: 'creating', idempotencyKey: `invoice-pay-link:${id}:${linkId}`, request,
       amount: stored.totals.total, currency: stored.currency, livemode: provider.livemode === true,

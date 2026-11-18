@@ -858,10 +858,10 @@ function stripePayments({ db, getConfig, env }) {
   const notReady = { available: false, reason: 'Card payment links need Stripe, and Stripe is not fully set up on this site. Ask an operator to check the Stripe settings.' };
   try {
     const { getTicketingProvider } = require('../ticketing/providers/index.cjs');
-    const { configuredPublicUrl } = require('../ticketing/stripeCommerce.cjs');
+    const { configuredPublicBase } = require('../ticketing/stripeCommerce.cjs');
     const provider = getTicketingProvider({ env, db, getConfig });
     if (provider.hasPaymentCredentials !== true || typeof provider.createInvoiceCheckoutSession !== 'function') return notReady;
-    return { available: true, provider, publicUrl: configuredPublicUrl(null, env), testMode: provider.livemode !== true };
+    return { available: true, provider, publicBase: configuredPublicBase(null, env), testMode: provider.livemode !== true };
   } catch {
     return notReady;
   }
