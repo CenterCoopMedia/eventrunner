@@ -221,6 +221,8 @@ test('stripe: a signup without admission gets the catalog prompt without payment
     const catalogAnchor = calls[0].html.match(/<a href="([^"]+)"[^>]*>Choose tickets<\/a>/);
     assert.ok(catalogAnchor, 'the catalog CTA is rendered');
     assert.equal(catalogAnchor[1], `${publicUrl}/tickets`);
+    assert.ok(calls[0].html.includes(`href="${publicUrl}/travel"`));
+    assert.ok(calls[0].text.includes(`Travel and venue details: ${publicUrl}/travel`));
   }
 });
 

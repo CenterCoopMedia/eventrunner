@@ -4,7 +4,7 @@ export function stripEventMount(pathname, mount) {
   return pathname.startsWith(`${mount}/`) ? pathname.slice(mount.length) : null;
 }
 
-/** Join a validated asset base and an app-relative pathname. */
-export function joinEventPath(assetBase, pathname) {
-  return `${assetBase}${pathname.slice(1)}`;
+/** Join a validated public or asset base and an app-relative path. */
+export function joinEventPath(base, path) {
+  return `${base}${path.slice(1)}`;
 }

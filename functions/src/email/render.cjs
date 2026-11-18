@@ -211,7 +211,7 @@ function emailLogoUrl(theme, bucket) {
 function buildGlobalTokens(config, { now = () => new Date() } = {}) {
   const event = config?.event || {};
   const theme = config?.theme || {};
-  const { publicBase, origin, mount } = eventPublicAddress(config?.tierA?.publicUrl);
+  const { publicBase } = eventPublicAddress(config?.tierA?.publicUrl);
   return {
     event_name: event.name || '',
     event_short_name: event.shortName || '',
@@ -222,7 +222,8 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
     venue_name: event.venue?.name || '',
     venue_address: formatVenueAddress(event.venue),
     venue_map_url: event.venue?.mapUrl || '',
-    site_url: (mount ? publicBase : origin) ?? '',
+    // Saved templates can append an app path to this token.
+    site_url: publicBase?.slice(0, -1) ?? '',
     login_url: publicBase ? joinEventPath(publicBase, '/signin') : '',
     schedule_url: publicBase ? joinEventPath(publicBase, '/schedule') : '',
     support_email: event.legal?.supportEmail || '',
