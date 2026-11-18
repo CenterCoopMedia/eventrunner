@@ -14,6 +14,7 @@ import { Navigate, useNavigate, useParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { activeQuestions, answerText, answeredQuestions, checkAnswers, readRegistrationForm } from 'shared/registrationForm';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
@@ -75,6 +76,7 @@ function Shell({ children }) {
 
 export default function CompleteRegistration() {
   useDocumentTitle('Complete your registration');
+  const { language } = usePublicLanguage();
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { stepSlug } = useParams();
@@ -207,7 +209,7 @@ export default function CompleteRegistration() {
     try {
       const formRevision = readRegistrationForm(form).revision;
       const result = await saveRegistrationAnswers({
-        user, ticketId: target.ticketId, account: target.account, formRevision, answers: checked.answers,
+        user, ticketId: target.ticketId, account: target.account, formRevision, answers: checked.answers, language,
       });
       const answers = result?.answers ?? checked.answers;
       // Keep the questions as answered, as the stored record does, so Review

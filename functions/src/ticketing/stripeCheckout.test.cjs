@@ -35,6 +35,17 @@ const PAST_EVENT = {
   days: [{ id: 'day-one', date: '2026-10-12', startTime: '09:00', endTime: '18:00' }],
 };
 
+test('checkout persists the registration language through a repeat request', async () => {
+  const { db, deps } = setup();
+  await db.collection('config').doc('event').set({ contentLanguages: { default: 'en', available: ['en', 'es'] } }, { merge: true });
+  const first = await checkout(deps, request({ lang: 'es' }));
+  assert.equal(first.statusCode, 200);
+  const replay = await checkout(deps, request({ lang: 'en' }));
+  assert.equal(replay.statusCode, 200);
+  assert.equal(replay.body.orderId, first.body.orderId);
+  assert.equal(db.read('ticket_orders', first.body.orderId).registrationLanguage, 'es');
+});
+
 test('past events close paid and free checkout even when the catalog has no deadline', async () => {
   for (const daysAfter of [31, 366]) {
     for (const archived of [false, true]) {

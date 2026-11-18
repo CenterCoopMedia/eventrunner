@@ -152,6 +152,9 @@ test('preview: one sample per reminder day, with the days, the facts, the ticket
   assert.match(seven.text, new RegExp(`Open your dashboard: ${SITE}/dashboard`));
   assert.match(seven.text, new RegExp(`${SITE}/unsubscribe\\?test=1`));
   assert.match(seven.html, /We open the doors in 7 days\./);
+  assert.equal(seven.spanish.subject, 'See you in 7 days');
+  assert.match(seven.spanish.html, /<div lang="en"><p[^>]*>We open the doors in 7 days\.<\/p><\/div>/);
+  assert.match(seven.spanish.text, /Dejar de recibir avisos: https:\/\/site.example.test\/unsubscribe\?test=1/);
   assert.equal(res.body.recipientCount, 2);
   assert.equal(res.body.suppressedCount, 1);
   assert.equal(res.body.from, 'Example Event <events@example.test>');

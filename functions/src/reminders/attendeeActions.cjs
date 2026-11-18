@@ -30,7 +30,6 @@ const { AudienceError, resolveAudience } = require('../announcements/audience.cj
 const { SENDS } = require('../announcements/sendRunner.cjs');
 const {
   previewBodies,
-  renderAnnouncement,
   resolveChannel,
   senderOf,
   unsubscribeNote,
@@ -52,7 +51,7 @@ const {
   settingsVersion,
   attendeeWordingVersion,
   eventFacts,
-  composeReminder,
+  renderReminder,
   planFor,
   sendIdFor,
   loadSchedule,
@@ -235,16 +234,17 @@ async function previewAction({ db, getConfig, provider, now, actor }) {
   if (!plan.ok) fail(409, 'not-ready', plan.error);
   const channel = await channelState({ db, provider, config });
   const { count, suppressed, unusable, problem } = await reachNow(db);
-  const draft = schedule.draft ?? DEFAULT_DRAFT;
   const samples = plan.windows.map((window) => {
     // The days a run would render when the window opens, which is after
     // quiet hours when the send time falls in them.
     const daysUntil = core.calendarDaysUntil(facts.facts.start.date, timeZone, window.opensAt.getTime());
-    const composed = composeReminder({ draft, facts: facts.facts, daysUntil });
-    if (!composed.ok) fail(409, 'not-ready', `The reminder could not be prepared: ${composed.errors.join('; ')}`);
-    const rendered = renderAnnouncement({ config, draft: composed.value, mode: channel.mode ?? 'app' });
-    const shown = previewBodies({ rendered, config });
-    return { ...core.windowOut(window), daysUntil, subject: rendered.subject, html: shown.html, text: shown.text };
+    const args = { schedule, facts: facts.facts, daysUntil, config, mode: channel.mode ?? 'app' };
+    const sample = (language) => {
+      const composed = renderReminder({ ...args, language });
+      if (!composed.ok) fail(409, 'not-ready', `The reminder could not be prepared: ${composed.errors.join('; ')}`);
+      return { subject: composed.rendered.subject, ...previewBodies({ rendered: composed.rendered, config }) };
+    };
+    return { ...core.windowOut(window), daysUntil, ...sample('en'), spanish: sample('es') };
   });
   const sender = senderOf(config);
   let blocker = channel.blocker;

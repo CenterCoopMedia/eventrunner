@@ -29,6 +29,7 @@ const { sendError, badRequest, methodNotAllowed, internal } = require('../core/e
 const { isValidDocId, logAdminAction } = require('../cms/store.cjs');
 const { answeredQuestions, checkAnswers, readRegistrationForm } = require('shared/registrationForm');
 const { getEventPhase } = require('shared/config');
+const { registrationLanguage } = require('../email/attendeeLanguage.cjs');
 
 const ANSWERS = 'ticket_answers';
 // Answers from the registration import wait here, server-only, until the
@@ -94,31 +95,32 @@ function accountTarget(caller) {
 }
 
 /** Check the answers against the current form and store them for `target`. One body for both kinds of record. */
-function saveAnswers({ db, config, caller, at, target, answers, formRevision }) {
+function saveAnswers({ db, config, caller, at, target, answers, formRevision, language }) {
   return db.runTransaction(async (tx) => {
     const [owner, formSnap] = await Promise.all([target.load(tx), tx.get(db.collection('config').doc('registration_form'))]);
     const form = readRegistrationForm(formSnap.exists ? formSnap.data() : null);
     if (form.revision !== formRevision) refuse(409, 'form-changed', 'The registration questions changed. Reload the page to see the current questions; your answers are still on the page.');
     const checked = checkAnswers(answers, form);
     if (!checked.ok) refuse(400, 'bad-request', Object.entries(checked.errors).map(([id, message]) => `answers.${id}: ${message}`).join('; '));
-    let userRef = null;
-    if (checked.answers.directoryListing) {
-      userRef = db.collection('users').doc(owner.uid);
-      const userSnap = await tx.get(userRef);
-      if (!userSnap.exists) userRef = null;
-    }
+    const locale = owner.uid === caller.uid ? registrationLanguage(config?.event, language) : null;
+    const userRef = db.collection('users').doc(owner.uid);
+    const user = (await tx.get(userRef)).data();
+    const recordedLocale = user?.registrationLanguage ?? (user ? locale : null);
     tx.set(db.collection(ANSWERS).doc(target.recordId), {
       ...owner.fields, uid: owner.uid, answers: checked.answers, formRevision,
       // The questions as the attendee saw them, so a later change to the
       // form never misreads these answers.
       questions: answeredQuestions(form, checked.answers),
+      ...(recordedLocale ? { registrationLanguage: recordedLocale } : {}),
       updatedAt: at, updatedBy: caller.email || caller.uid,
     });
-    if (userRef) {
+    const profile = {};
+    if (user && checked.answers.directoryListing) {
       const allowPublic = config?.features?.publicAttendeeProfiles === true;
-      const visibility = checked.answers.directoryListing === 'public' && !allowPublic ? 'attendees_only' : checked.answers.directoryListing;
-      tx.set(userRef, { profileVisibility: visibility, updatedAt: at }, { merge: true });
+      profile.profileVisibility = checked.answers.directoryListing === 'public' && !allowPublic ? 'attendees_only' : checked.answers.directoryListing;
     }
+    if (user && locale && !user.registrationLanguage) profile.registrationLanguage = locale;
+    if (Object.keys(profile).length > 0) tx.set(userRef, { ...profile, updatedAt: at }, { merge: true });
     return { answers: checked.answers };
   });
 }
@@ -127,7 +129,7 @@ function createSaveTicketAnswersHandler({ db, auth, getConfig, providerName = nu
   return async function saveTicketAnswers(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     if (Buffer.byteLength(JSON.stringify(req.body ?? {})) > MAX_BODY_BYTES) return sendError(res, 413, 'payload-too-large', 'The answers are too long.');
-    const { ticketId, answers, formRevision, account } = req.body || {};
+    const { ticketId, answers, formRevision, account, lang } = req.body || {};
     const forAccount = account === true;
     if (forAccount && ticketId !== undefined) return badRequest(res, 'Send either ticketId or account, not both.');
     if (!forAccount && !isValidDocId(ticketId)) return badRequest(res, 'ticketId: required');
@@ -150,7 +152,7 @@ function createSaveTicketAnswersHandler({ db, auth, getConfig, providerName = nu
     const target = forAccount ? accountTarget(caller) : ticketTarget(db, caller, ticketId);
     let saved;
     try {
-      saved = await saveAnswers({ db, config, caller, at, target, answers, formRevision });
+      saved = await saveAnswers({ db, config, caller, at, target, answers, formRevision, language: lang });
     } catch (err) {
       if (err?.conflict) return sendError(res, err.conflict.status, err.conflict.code, err.conflict.message);
       log.error('saveTicketAnswers failed', err);

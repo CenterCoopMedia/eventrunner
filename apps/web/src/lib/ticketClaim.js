@@ -27,10 +27,10 @@ export class TicketClaimError extends Error {
 }
 
 /**
- * @param {{ orderNumber: string, idToken: string }} args
+ * @param {{ orderNumber: string, idToken: string, language?: 'en'|'es' }} args
  * @returns {Promise<{ ok: true, claimed: number, registrationStatus: string|null }>}
  */
-export async function verifyTicketOrder({ orderNumber, idToken }) {
+export async function verifyTicketOrder({ orderNumber, idToken, language }) {
   const attestation = await appCheckHeaders();
   let response;
   try {
@@ -41,7 +41,7 @@ export async function verifyTicketOrder({ orderNumber, idToken }) {
         Authorization: `Bearer ${idToken}`,
         ...attestation,
       },
-      body: JSON.stringify({ orderNumber }),
+      body: JSON.stringify({ orderNumber, lang: language }),
     });
   } catch {
     throw new TicketClaimError({

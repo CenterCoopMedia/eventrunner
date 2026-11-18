@@ -273,6 +273,24 @@ test('the next window sends again, with the next number of days', async () => {
   assert.equal(box.mail.at(-1).subject, 'Your event is 1 day away');
 });
 
+test('one reminder window sends each language through its original send-once and unsubscribe path', async () => {
+  const db = seed({ 'users/b': { ...PEOPLE['users/b'], registrationLanguage: 'es' } });
+  const box = mailbox();
+  const result = await run(db, IN_7D, { box });
+  assert.equal(result.counts.sent, 2);
+  const [english, spanish] = box.mail;
+  assert.equal(english.subject, 'Your event is 7 days away');
+  assert.equal(spanish.subject, 'Faltan 7 días para el evento');
+  assert.match(spanish.html, /<html lang="es">/);
+  assert.match(spanish.text, /Dónde: Example Hall, 1 Main St, Example City/);
+  assert.match(spanish.text, /Abrir tu panel: https:\/\/site.example.test\/dashboard\?lang=es/);
+  assert.match(spanish.text, /Dejar de recibir avisos: https:\/\/site.example.test\/unsubscribe\?s=/);
+  assert.equal(spanish.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
+  assert.equal(claims(db), 2);
+  await run(db, IN_7D + HOUR, { box });
+  assert.equal(box.mail.length, 2);
+});
+
 test('a ticket sold through Stripe links to the ticket page', async () => {
   const config = withEvent({}, { ticketingProvider: 'stripe' });
   const db = seed({}, { scheduleOverrides: { approvedFactsVersion: eventFacts(config).version } });

@@ -57,6 +57,7 @@
 const crypto = require('node:crypto');
 const { DEFAULT_OFFSETS, isQuietAt, resolveLocalInstant } = require('shared/reminderSchedule');
 const { internals: renderInternals } = require('../email/render.cjs');
+const { attendeeUrl, spanishTemplateVariant } = require('../email/attendeeTemplates.cjs');
 const announcementLayout = require('../email/templates/announcement.email.cjs');
 const { AudienceError, resolveAudience } = require('../announcements/audience.cjs');
 const {
@@ -99,6 +100,11 @@ const DEFAULT_DRAFT = Object.freeze({
   subject: `Your event is ${PLACEHOLDER} away`,
   message: `The event is ${PLACEHOLDER} away. The details are below. We look forward to seeing you.`,
 });
+const SPANISH_DRAFT = Object.freeze({
+  subject: `Faltan ${PLACEHOLDER} para el evento`,
+  message: `Faltan ${PLACEHOLDER} para el evento. Aquí tienes los detalles. Esperamos verte pronto.`,
+});
+const SPANISH_FACTS = Object.freeze({ when: 'Cuándo', where: 'Dónde', tickets: 'Ver tus entradas', dashboard: 'Abrir tu panel' });
 
 /** Why the schedule is paused, in staff words. */
 const PAUSE_REASONS = Object.freeze({
@@ -203,9 +209,10 @@ function settingsVersion(schedule) {
  * @param {{ subject: string, message: string }|null} draft
  */
 function attendeeWordingVersion(draft) {
-  const layout = [announcementLayout.subject, announcementLayout.html, announcementLayout.text];
+  const layout = [announcementLayout.subject, announcementLayout.html, announcementLayout.text,
+    spanishTemplateVariant('announcement.email'), SPANISH_FACTS];
   if (draft) return digest([draft.subject, draft.message, ...layout]);
-  return `shipped:${digest([DEFAULT_DRAFT.subject, DEFAULT_DRAFT.message, ...layout])}`;
+  return `shipped:${digest([DEFAULT_DRAFT, SPANISH_DRAFT, ...layout])}`;
 }
 
 function siteUrl(config) {
@@ -222,8 +229,8 @@ function firstDay(event) {
   return [...days].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))[0];
 }
 
-function formatWhen(instant, timeZone) {
-  return new Intl.DateTimeFormat('en-US', {
+function formatWhen(instant, timeZone, language = 'en-US') {
+  return new Intl.DateTimeFormat(language, {
     timeZone,
     weekday: 'long',
     year: 'numeric',
@@ -260,25 +267,34 @@ function eventFacts(config) {
   const facts = {
     start: { date: day.date, time: day.startTime, timeZone },
     when: formatWhen(instant, timeZone),
+    whenEs: formatWhen(instant, timeZone, 'es'),
     where,
     ticketUrl: `${site}${stripe ? '/tickets/mine' : '/dashboard'}`,
     ticketLabel: stripe ? 'View your tickets' : 'Open your dashboard',
   };
   return {
     ok: true,
-    version: digest([facts.start.date, facts.start.time, timeZone, facts.where, facts.ticketUrl, facts.ticketLabel]),
+    version: digest([facts.start.date, facts.start.time, timeZone, facts.where, facts.ticketUrl, facts.ticketLabel, facts.whenEs]),
     facts,
   };
 }
 
 /** "7 days", "1 day", or "less than a day" on the event's first day. */
-function daysUntilWords(days) {
+function daysUntilWords(days, language = 'en') {
+  if (language === 'es') {
+    if (days <= 0) return 'menos de un día';
+    return days === 1 ? 'un día' : `${days} días`;
+  }
   if (days <= 0) return 'less than a day';
   return `${days} ${days === 1 ? 'day' : 'days'}`;
 }
 
 /** The facts block the server adds after the staff message. */
-function factsBlock(facts) {
+function factsBlock(facts, language) {
+  if (language === 'es') {
+    return [`${SPANISH_FACTS.when}: ${facts.whenEs}`, facts.where ? `${SPANISH_FACTS.where}: ${facts.where}` : null]
+      .filter(Boolean).join('\n');
+  }
   return [`When: ${facts.when}`, facts.where ? `Where: ${facts.where}` : null].filter(Boolean).join('\n');
 }
 
@@ -288,15 +304,26 @@ function factsBlock(facts) {
  *
  * @returns {{ ok: boolean, errors: string[], value: object }} validateDraft's answer
  */
-function composeReminder({ draft, facts, daysUntil }) {
-  const words = daysUntilWords(daysUntil);
+function composeReminder({ draft, facts, daysUntil, language = 'en', draftLanguage = language }) {
+  const words = daysUntilWords(daysUntil, draftLanguage);
   const fill = (text) => text.split(PLACEHOLDER).join(words);
+  const spanish = language === 'es';
   return validateDraft({
     subject: fill(draft.subject),
-    message: `${fill(draft.message)}\n\n${factsBlock(facts)}`,
-    linkUrl: facts.ticketUrl,
-    linkLabel: facts.ticketLabel,
+    message: `${fill(draft.message)}\n\n${factsBlock(facts, language)}`,
+    linkUrl: attendeeUrl(facts.ticketUrl, language),
+    linkLabel: spanish ? (facts.ticketUrl.endsWith('/tickets/mine') ? SPANISH_FACTS.tickets : SPANISH_FACTS.dashboard) : facts.ticketLabel,
   });
+}
+
+function renderReminder({ schedule, facts, daysUntil, config, mode, language = 'en' }) {
+  const customDraft = schedule.draft;
+  const draft = customDraft ?? (language === 'es' ? SPANISH_DRAFT : DEFAULT_DRAFT);
+  const composed = composeReminder({ draft, facts, daysUntil, language, draftLanguage: customDraft ? 'en' : language });
+  if (!composed.ok) return composed;
+  const englishLead = language === 'es' && customDraft
+    ? draft.message.split(PLACEHOLDER).join(daysUntilWords(daysUntil)) : '';
+  return { ...composed, rendered: renderAnnouncement({ config, draft: composed.value, mode, language, englishLead }) };
 }
 
 /** The planner's view of the schedule at `nowMs`. */
@@ -368,7 +395,7 @@ async function stopClosedWindows({ db, plan, nowMs }) {
 async function startWindow({ db, config, channel, schedule, facts, window, version, guard, nowMs }) {
   let recipients;
   try {
-    ({ recipients } = await resolveAudience({ db, audience: AUDIENCE }));
+    ({ recipients } = await resolveAudience({ db, audience: AUDIENCE, event: config.event, withLanguage: true }));
   } catch (err) {
     if (err instanceof AudienceError) return { error: { code: err.code, message: err.message } };
     throw err;
@@ -376,14 +403,18 @@ async function startWindow({ db, config, channel, schedule, facts, window, versi
   if (recipients.length === 0) return { nobody: true };
   const timeZone = eventTimeZone(config);
   const daysUntil = core.calendarDaysUntil(facts.facts.start.date, timeZone, nowMs);
-  const draft = composeReminder({ draft: schedule.draft ?? DEFAULT_DRAFT, facts: facts.facts, daysUntil });
-  if (!draft.ok) {
-    return { error: { code: 'not-ready', message: `The reminder could not be prepared: ${draft.errors.join('; ')}` } };
+  const args = { schedule, facts: facts.facts, daysUntil, config, mode: channel.mode };
+  const draft = renderReminder(args);
+  const spanishDraft = recipients.some((recipient) => recipient.language === 'es') ? renderReminder({ ...args, language: 'es' }) : null;
+  if (!draft.ok || spanishDraft?.ok === false) {
+    const errors = [...draft.errors, ...(spanishDraft?.errors ?? [])];
+    return { error: { code: 'not-ready', message: `The reminder could not be prepared: ${errors.join('; ')}` } };
   }
-  const rendered = renderAnnouncement({ config, draft: draft.value, mode: channel.mode });
+  const { rendered } = draft;
+  const spanish = spanishDraft?.rendered;
   const sendId = sendIdFor(window.windowKey);
   const receipt = receiptFor({
-    audience: `${AUDIENCE}:reminder:${window.windowKey}`, recipients, rendered, sender: senderOf(config), channel,
+    audience: `${AUDIENCE}:reminder:${window.windowKey}`, recipients, rendered, spanish, sender: senderOf(config), channel,
   });
   const started = await startSendRecord({
     db,
@@ -404,6 +435,7 @@ async function startWindow({ db, config, channel, schedule, facts, window, versi
         wordingVersion: version,
         factsVersion: facts.version,
         settingsVersion: settingsVersion(schedule),
+        ...(spanish ? { spanish } : {}),
       },
     },
     guard,
@@ -673,6 +705,7 @@ module.exports = {
   eventFacts,
   daysUntilWords,
   composeReminder,
+  renderReminder,
   planFor,
   sendIdFor,
   ledgerIdFor,

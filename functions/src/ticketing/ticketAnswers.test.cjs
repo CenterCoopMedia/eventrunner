@@ -60,6 +60,18 @@ test('a public directory answer needs the public profiles feature, as the profil
   assert.equal(db.read('users', 'ada').profileVisibility, 'public');
 });
 
+test('registration answers keep the first valid attendee locale across later edits', async () => {
+  const db = world();
+  const event = { ...OPEN_EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const body = { ticketId: 't-1', formRevision: 4, answers: ANSWERS };
+  assert.equal((await save(db, 'ada', { ...body, lang: 'es' }, { event })).statusCode, 200);
+  assert.equal((await save(db, 'ada', { ...body, lang: 'en' }, { event })).statusCode, 200);
+  assert.equal((await save(db, 'staff', body, { event })).statusCode, 200);
+  assert.equal(db.read('users', 'ada').registrationLanguage, 'es');
+  assert.equal(db.read('ticket_answers', 't-1').registrationLanguage, 'es');
+  assert.equal(db.read('users_public', 'ada'), undefined);
+});
+
 test('phone is normalized in private answers and never copied into account or public profile records', async () => {
   const originalUser = { uid: 'ada', profileVisibility: 'public', displayName: 'Ada' };
   const publicUser = { displayName: 'Ada', profileVisibility: 'public' };

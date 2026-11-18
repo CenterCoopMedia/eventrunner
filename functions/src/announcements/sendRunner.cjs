@@ -242,14 +242,15 @@ async function runChunk({ db, sendId, lease, getConfig, provider, emailCore, now
       const url = data.mode === 'app'
         ? unsubscribeUrlFor({ config, sendId, key: data.unsubscribeKey, email: recipient.email })
         : null;
-      const bodies = personalize({ html: data.html, text: data.text }, url);
+      const spanish = recipient.language === 'es' ? data.reminder?.spanish : null;
+      const bodies = personalize(spanish ?? data, url);
       return {
         to: recipient.email,
-        subject: data.renderedSubject,
+        subject: spanish?.subject ?? data.renderedSubject,
         html: bodies.html,
         text: bodies.text,
-        hasLegalFooterHtml: data.hasLegalFooterHtml,
-        hasLegalFooterText: data.hasLegalFooterText,
+        hasLegalFooterHtml: spanish?.hasLegalFooterHtml ?? data.hasLegalFooterHtml,
+        hasLegalFooterText: spanish?.hasLegalFooterText ?? data.hasLegalFooterText,
         ...(url ? { headers: unsubscribeHeaders(url) } : {}),
         // The email log keeps the inert link: the live one would let anyone
         // who reads the log unsubscribe this recipient.

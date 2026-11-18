@@ -33,6 +33,8 @@ import {
 } from 'shared/badges';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { completesRegistration, saveRegistrationProfile } from '../lib/profileRegistration.js';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -106,7 +108,8 @@ function totalSelectable(categories) {
 
 export default function Profile() {
   const { user } = useAuth();
-  const { features, badges: badgesConfig } = useEventConfig();
+  const { eventConfig, features, badges: badgesConfig } = useEventConfig();
+  const { language } = usePublicLanguage();
   const { profile, status, needsProfileSetup, saveProfile } = useProfile();
   const { showToast } = useToast();
 
@@ -286,7 +289,7 @@ export default function Profile() {
         }
         photoPath = uploadedPath;
       }
-      await saveProfile({
+      const fields = {
         ...profileText,
         profileVisibility: form.profileVisibility,
         badges: form.badges,
@@ -295,7 +298,12 @@ export default function Profile() {
         // for photoPath (firestore.rules validSelfProfileTypes), and the
         // projection coerces either to nothing rendered.
         photoPath,
-      });
+      };
+      if (needsProfileSetup && !profile?.registrationLanguage && await completesRegistration(eventConfig?.id)) {
+        await saveRegistrationProfile(user.uid, fields, language);
+      } else {
+        await saveProfile(fields);
+      }
       photoRef.current?.release();
       if (features.customBadges === true && customBadgesChanged) savedCustomBadgesRef.current = customBadges;
       // The old photo object stays until syncUserPublic has published the

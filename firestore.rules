@@ -208,8 +208,8 @@ service cloud.firestore {
     // invite/approval transactions and the users/ triggers (§3.4, §4.3). The
     // update rule therefore enumerates what the owner MAY change and denies
     // the write when any other key is touched; the list mirrors
-    // SELF_EDITABLE_PROFILE_FIELDS in packages/shared/src/profile.cjs, which
-    // rules cannot import.
+    // SELF_EDITABLE_PROFILE_FIELDS in packages/shared/src/profile.cjs and
+    // includes the one-time registration language field.
     function isSelf(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
@@ -224,7 +224,7 @@ service cloud.firestore {
     function editsOnlySelfProfileFields() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'displayName', 'pronouns', 'bio', 'organization', 'jobTitle',
-        'photoPath', 'socialHandles', 'badges', 'customBadges', 'profileVisibility', 'updatedAt'
+        'photoPath', 'socialHandles', 'badges', 'customBadges', 'profileVisibility', 'updatedAt', 'registrationLanguage'
       ]);
     }
 
@@ -399,6 +399,17 @@ service cloud.firestore {
             || publicProfilesEnabled());
     }
 
+    function validInitialRegistrationLanguage() {
+      let d = request.resource.data;
+      let selection = d.get('registrationLanguage', '');
+      return !d.diff(resource.data).affectedKeys().hasAny(['registrationLanguage'])
+        || (!resource.data.keys().hasAny(['registrationLanguage'])
+            && d.get('displayName', '').size() > 0
+            && (selection == 'en' || (selection == 'es'
+                && get(/databases/$(database)/documents/config/event)
+                    .data.get('contentLanguages', {}).get('available', []).hasAny(['es']))));
+    }
+
     match /users/{userId} {
       allow read: if isSelf(userId);
       allow read: if isAdmin();
@@ -408,6 +419,7 @@ service cloud.firestore {
       allow create, delete: if false;
       allow update: if isSelf(userId)
         && editsOnlySelfProfileFields()
+        && validInitialRegistrationLanguage()
         && validSelfProfileValues(userId);
 
       // Private per-session bookmark membership (spec §4.1, §9). Every WRITE

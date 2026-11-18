@@ -13,7 +13,7 @@ import { IS_DEMO } from './lib/demoMode.js';
 import { useEmulators, appCheckSiteKey } from './lib/firebaseSettings.js';
 
 export { GoogleAuthProvider, onAuthStateChanged, signInWithCustomToken, signInWithPopup, signOut } from 'firebase/auth';
-export { collection, doc, getDoc, getDocFromServer, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+export { collection, doc, getDoc, getDocFromServer, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,

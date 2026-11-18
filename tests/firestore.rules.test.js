@@ -1430,6 +1430,21 @@ describe("users account documents (spec §3.4)", () => {
     );
   });
 
+  it("allows the first profile language selection for its owner only", async () => {
+    const uid = "registration-language-owner";
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, "users", uid), { displayName: "", profileVisibility: "private" });
+      await setDoc(doc(db, "config/event"), { contentLanguages: { default: "en", available: ["en", "es"] } }, { merge: true });
+    });
+    const ref = doc(attendee(uid), "users", uid);
+    await assertFails(updateDoc(doc(attendee("pending-1"), "users", uid), { displayName: "Visitor", registrationLanguage: "es" }));
+    await assertFails(updateDoc(ref, { displayName: "Visitor", registrationLanguage: "fr" }));
+    await assertSucceeds(updateDoc(ref, { displayName: "Visitor", registrationLanguage: "es" }));
+    await assertFails(updateDoc(ref, { registrationLanguage: "en" }));
+    await assertSucceeds(updateDoc(ref, { bio: "Profile edit" }));
+  });
+
   it("denies a self-update that touches the server-owned speakerId", async () => {
     await assertFails(
       updateDoc(doc(attendee("pending-1"), "users/pending-1"), {

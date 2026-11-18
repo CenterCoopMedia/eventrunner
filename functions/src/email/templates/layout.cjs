@@ -42,18 +42,23 @@ const TEXT_FOOTER = [
   '',
   '{{social_links_text}}{{/if}}',
 ].join('\n');
+const TEXT_FOOTER_ES = TEXT_FOOTER.replace('Hosted by', 'Organiza');
 
 /**
  * Wrap inner body HTML in the shared header/footer chrome.
  *
  * @param {string} innerHtml template-specific content; tokens unrendered
- * @param {{ preheader?: string }} [options] optional inbox preview; tokens unrendered
+ * @param {{ preheader?: string, language?: 'en'|'es' }} [options]
  * @returns {string} full HTML document with tokens unrendered
  */
-function wrap(innerHtml, { preheader = '' } = {}) {
+function wrap(innerHtml, { preheader = '', language = 'en' } = {}) {
+  const spanish = language === 'es';
+  const host = spanish
+    ? '{{#if operator_name}}<p style="margin:0 0 6px 0;">Organiza {{operator_name}}</p>{{/if}}'
+    : '{{#if host_label}}<p style="margin:0 0 6px 0;">{{host_label}}</p>{{/if}}';
   return [
     '<!doctype html>',
-    '<html lang="en">',
+    spanish ? '<html lang="es">' : '<html lang="en">',
     '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width,initial-scale=1">',
@@ -74,13 +79,15 @@ function wrap(innerHtml, { preheader = '' } = {}) {
     '</td></tr>',
     // Keep the host's uploaded raster logo on a white cell in mail clients.
     '<tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:20px 32px 28px 32px;border-top:1px solid #e6e6e6;font-family:Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#676767;">',
-    '{{#if host_label}}<p style="margin:0 0 6px 0;">{{host_label}}</p>{{/if}}{{#if logo_url}}<img src="{{logo_url}}" alt="{{operator_name}}" width="120" style="display:block;width:120px;height:auto;border:0;margin:0 0 14px 0;">{{/if}}',
+    host + '{{#if logo_url}}<img src="{{logo_url}}" alt="{{operator_name}}" width="120" style="display:block;width:120px;height:auto;border:0;margin:0 0 14px 0;">{{/if}}',
     '<p style="margin:0 0 8px 0;">{{postal_address_html}}</p>',
     // The event's social accounts (#231). Guarded on the TEXT token because
     // `{{#if}}` reads plain values only; both are empty together, so an
     // event with no account gets no row at all rather than an empty one.
     '{{#if social_links_text}}<p style="margin:0 0 8px 0;">{{social_links_html}}</p>{{/if}}',
-    '<p style="margin:0;">Questions? Write to <a href="mailto:{{support_email}}" style="color:#676767;">{{support_email}}</a>.</p>',
+    spanish
+      ? '<p style="margin:0;">¿Tienes preguntas? Escribe a <a href="mailto:{{support_email}}" style="color:#676767;">{{support_email}}</a>.</p>'
+      : '<p style="margin:0;">Questions? Write to <a href="mailto:{{support_email}}" style="color:#676767;">{{support_email}}</a>.</p>',
     '</td></tr>',
     '</table>',
     '</td></tr>',
@@ -90,4 +97,4 @@ function wrap(innerHtml, { preheader = '' } = {}) {
   ].join('\n');
 }
 
-module.exports = { wrap, LAYOUT_TOKENS, TEXT_FOOTER };
+module.exports = { wrap, LAYOUT_TOKENS, TEXT_FOOTER, TEXT_FOOTER_ES };

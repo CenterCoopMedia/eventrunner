@@ -23,6 +23,7 @@
  */
 
 const { normalizeEmail, suppressionIdFor, readSuppressedIds, internals: suppressionInternals } = require('./suppression.cjs');
+const { attendeeLanguage } = require('../email/attendeeLanguage.cjs');
 
 const { EMAIL_RE } = suppressionInternals;
 
@@ -67,19 +68,21 @@ class AudienceError extends Error {
 /**
  * Resolve an audience to its recipients.
  *
- * @param {{ db: FirebaseFirestore.Firestore, audience: string }} args
+ * @param {{ db: FirebaseFirestore.Firestore, audience: string, event?: object, withLanguage?: boolean }} args
  * @returns {Promise<{ recipients: Array<{ uid: string, email: string }>,
  *   suppressed: number, unusable: number }>} recipients sorted by address
  * @throws {AudienceError} unknown audience, or more than MAX_AUDIENCE
  */
-async function resolveAudience({ db, audience }) {
+async function resolveAudience({ db, audience, event, withLanguage = false }) {
   if (!isAudience(audience)) throw new AudienceError('unknown-audience', 'audience: must be one of the listed audiences');
   const rule = AUDIENCES[audience];
   let query = db.collection('users');
   query = rule.speakers
     ? query.where('speakerId', '!=', null)
     : query.where('registrationStatus', 'in', [...rule.statuses]);
-  const snap = await query.select('email', 'registrationStatus', 'speakerId').get();
+  const fields = ['email', 'registrationStatus', 'speakerId'];
+  if (withLanguage) fields.push('registrationLanguage');
+  const snap = await query.select(...fields).get();
 
   const byEmail = new Map();
   let unusable = 0;
@@ -92,7 +95,10 @@ async function resolveAudience({ db, audience }) {
       unusable += 1;
       continue;
     }
-    if (!byEmail.has(email)) byEmail.set(email, { uid: doc.id, email });
+    if (!byEmail.has(email)) {
+      const spanish = withLanguage && attendeeLanguage(data, event) === 'es';
+      byEmail.set(email, { uid: doc.id, email, ...(spanish ? { language: 'es' } : {}) });
+    }
   }
 
   const candidates = [...byEmail.values()].sort((a, b) => a.email.localeCompare(b.email));

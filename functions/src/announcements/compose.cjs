@@ -32,7 +32,8 @@
  */
 
 const crypto = require('node:crypto');
-const { render, internals: renderInternals } = require('../email/render.cjs');
+const { internals: renderInternals } = require('../email/render.cjs');
+const { renderAttendeeTemplate } = require('../email/attendeeTemplates.cjs');
 const announcementTemplate = require('../email/templates/announcement.email.cjs');
 const { safeUrlHref } = require('shared/urlSafety');
 const { hasMailingAddress } = require('shared/email');
@@ -104,10 +105,11 @@ function messageHtml(message) {
  * Render the draft once for a whole send. In app mode the bodies keep the
  * unsubscribe placeholder; personalize() puts each recipient's link in.
  *
- * @param {{ config: object, draft: object, mode: 'app'|'provider', now?: () => Date }} args
+ * @param {{ config: object, draft: object, mode: 'app'|'provider', now?: () => Date,
+ *           language?: 'en'|'es', englishLead?: string }} args
  */
-function renderAnnouncement({ config, draft, mode, now }) {
-  const rendered = render({
+function renderAnnouncement({ config, draft, mode, now, language = 'en', englishLead = '' }) {
+  const rendered = renderAttendeeTemplate({
     template: announcementTemplate,
     tokenValues: {
       announcement_subject: draft.subject,
@@ -118,10 +120,14 @@ function renderAnnouncement({ config, draft, mode, now }) {
     },
     config,
     now,
+    language,
   });
+  const body = englishLead && draft.message.startsWith(englishLead)
+    ? `<div lang="en">${messageHtml(englishLead)}</div>${messageHtml(draft.message.slice(englishLead.length))}`
+    : messageHtml(draft.message);
   return {
     subject: rendered.subject,
-    html: rendered.html.split(BODY_SLOT).join(messageHtml(draft.message)),
+    html: rendered.html.split(BODY_SLOT).join(body),
     text: rendered.text.split(BODY_SLOT).join(draft.message).replace(/\n{3,}/g, '\n\n'),
     hasLegalFooterHtml: rendered.hasLegalFooterHtml,
     hasLegalFooterText: rendered.hasLegalFooterText,
@@ -229,7 +235,7 @@ function unsubscribeNote(mode) {
 }
 
 /** The opaque digest a confirmation must match. */
-function receiptFor({ audience, recipients, rendered, sender, channel }) {
+function receiptFor({ audience, recipients, rendered, spanish, sender, channel }) {
   const canonical = JSON.stringify({
     v: 1,
     audience,
@@ -237,6 +243,7 @@ function receiptFor({ audience, recipients, rendered, sender, channel }) {
     subject: rendered.subject,
     html: rendered.html,
     text: rendered.text,
+    ...(spanish ? { spanish, recipientLanguages: recipients.map((r) => r.language) } : {}),
     from: sender.from,
     replyTo: sender.replyTo,
     stream: channel.stream,
