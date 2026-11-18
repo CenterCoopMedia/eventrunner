@@ -7,3 +7,11 @@ The router refuses repeated separators, dot segments, backslashes, malformed esc
 Hosting handles app-relative paths, rewrites and static files. The router forwards GET and HEAD, and forwards POST only for the exact event `/unsubscribe` path. It sends the query unchanged and streams the POST body with its content type. It sends no client cookies, authorization or forwarding headers to Firebase. It requests identity encoding for streamed bodies, keeps event security and cache headers and bypasses shared caching. The host owns HSTS. The router strips cookie, refresh and data-clearing headers and limits a service worker's explicit scope to that event. Failures log a class, hostname, known mount and available upstream status.
 
 The router checks GET and HEAD redirects on the fixed Hosting origin before returning a public `Location`. Redirects can target app-relative paths on the same Hosting origin or already-mounted paths on the same public host. The router blocks reserved Firebase helper paths, sibling destinations, external origins, repeated targets and chains longer than four hops. POST redirects are refused to avoid replaying an unsubscribe. Keep the fixed Hosting address available for rollback.
+
+## Cutover windows
+
+The route-map projection takes the enrollment's `published` state so the mounted deployment can run its public smoke check before recording `appliedPublicBase`. A map entry can omit its listing title by supplying `null` until the event is ready for the public index.
+
+From route publication until the mounted build reaches Hosting, the standalone address works and the mount may fail to render because its origin still serves the root-based build. Once the mounted build replaces that build on Hosting, the mount becomes the visitor address. The old standalone origin serves the mounted bundle from that point, including the window before smoke and the applied receipt finish.
+
+The shared-host rehearsal in #1063 covers the order that keeps both windows short, the redirect or notice at the old visitor address, and recovery after a failed deployment or smoke step. Recovery restores the affected event’s standalone build and its matching route and URL settings together.

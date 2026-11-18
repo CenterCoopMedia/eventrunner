@@ -13,8 +13,9 @@ function enrollment(mount, site, state, publicTitle) {
   const identity = { appId: `application-${site}`, projectId: `er-${site}`, site, domain: host };
   return {
     identity,
+    publicTitle,
     record: {
-      appId: identity.appId, projectId: identity.projectId, host, mount, state, publicTitle,
+      appId: identity.appId, projectId: identity.projectId, host, mount, state,
       publicBase: `https://${host}${mount}/`, hostingOrigin: `https://${site}.web.app`,
       consent: { by: 'fixture-owner', orgId: 'fixture-organization' },
     },
@@ -25,11 +26,11 @@ const conference = enrollment('/conference', 'conference-fixture', 'published', 
 const workshops = enrollment('/events/workshops', 'workshops-fixture', 'published', 'Workshops archive');
 
 test('the public projection keeps only published titles and validated route bindings', () => {
-  const map = projectRouteMap({ host, revision: 9, authority: 'fixture-approval' }, [
+  const map = projectRouteMap({ host, version: 9, exportedAt }, [
     workshops, enrollment('/draft', 'draft-fixture', 'enrolled', 'Unpublished title'), conference,
     enrollment('/retired', 'retired-fixture', 'retired', 'Retired title'),
     enrollment('/removed', 'removed-fixture', 'removed', 'Removed title'),
-  ], exportedAt);
+  ]);
   assert.deepEqual(map, {
     host, version: 9, exportedAt,
     routes: [
@@ -38,17 +39,19 @@ test('the public projection keeps only published titles and validated route bind
     ],
   });
   assert.equal(validateRouteMap(map, host).routes[1].assetBase, '/events/workshops/');
+  const staged = projectRouteMap({ host, version: 9, exportedAt }, [{ ...conference, publicTitle: null }]);
+  assert.deepEqual(staged.routes, [{ ...map.routes[0], publicTitle: null }]);
   assert.throws(() => validateRouteMap(map, 'different.example.test'));
-  assert.throws(() => projectRouteMap({ host, revision: 9 }, [{ ...conference, identity: workshops.identity }], exportedAt));
-  assert.throws(() => projectRouteMap({ host, revision: 9 }, [conference, enrollment('/conference/extra', 'nested-fixture', 'published', 'Nested')], exportedAt));
+  assert.throws(() => projectRouteMap({ host, version: 9, exportedAt }, [{ ...conference, identity: workshops.identity }]));
+  assert.throws(() => projectRouteMap({ host, version: 9, exportedAt }, [conference, enrollment('/conference/extra', 'nested-fixture', 'published', 'Nested')]));
   assert.throws(() => createRouteMapReader({}), /bucket is missing or invalid/);
 });
 
 test('a generation conflict preserves the newer verified map and a readback failure withholds success', async () => {
   const { routeMaps, controls } = fakeRouteMap();
-  const first = projectRouteMap({ host, revision: 1 }, [conference], exportedAt);
-  const second = projectRouteMap({ host, revision: 2 }, [conference, workshops], exportedAt);
-  const third = projectRouteMap({ host, revision: 3 }, [workshops], exportedAt);
+  const first = projectRouteMap({ host, version: 1, exportedAt }, [conference]);
+  const second = projectRouteMap({ host, version: 2, exportedAt }, [conference, workshops]);
+  const third = projectRouteMap({ host, version: 3, exportedAt }, [workshops]);
 
   controls.beforeWrite = async () => {
     assert.deepEqual(await writeVerifiedRouteMap(routeMaps, second), { version: 2, exportedAt });

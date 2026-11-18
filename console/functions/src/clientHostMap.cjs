@@ -26,8 +26,10 @@ function validateRouteMap(map, host) {
     const { mount, publicTitle, hostingOrigin: origin } = entry;
     const base = parseEventPublicBase(`https://${host}${mount}/`);
     const site = HOSTING_ORIGIN.exec(origin)?.[1];
+    const validTitle = publicTitle === null || (typeof publicTitle === 'string'
+      && publicEventTitle(publicTitle) === publicTitle);
     if (base.mount !== mount || reservedClientPath(mount) || hostingOrigin(site) !== origin
-        || Object.keys(entry).length !== 3 || publicEventTitle(publicTitle) !== publicTitle || !publicTitle
+        || Object.keys(entry).length !== 3 || !validTitle
         || routes.some((route) => stripEventMount(mount, route.mount) !== null
           || stripEventMount(route.mount, mount) !== null || route.hostingOrigin === origin)) {
       throw new Error('The client route map contains an invalid or conflicting event.');
@@ -37,15 +39,20 @@ function validateRouteMap(map, host) {
   return { version: map.version, exportedAt: map.exportedAt, routes };
 }
 
-/** Build the public projection from one approved host and its enrolled records. */
-function projectRouteMap({ host, revision }, enrollments, exportedAt) {
-  const routes = enrollments.filter(({ record }) => record.state === 'published').map(({ record, identity }) => {
+/**
+ * Build the projection from enrollment records in the published state.
+ * The publisher supplies a version that advances with every public route
+ * change. An explicitly approved listing title is optional while the event
+ * builds and the published route handles the deployment smoke check.
+ */
+function projectRouteMap({ host, version, exportedAt }, enrollments) {
+  const routes = enrollments.filter(({ record }) => record.state === 'published').map(({ record, identity, publicTitle }) => {
     const base = resolveEventPublicBase(record, identity);
     if (record.host !== host || base.publicBase !== record.publicBase) throw new Error('The published event address is invalid.');
-    return { mount: base.mount, publicTitle: record.publicTitle, hostingOrigin: record.hostingOrigin };
+    return { mount: base.mount, publicTitle, hostingOrigin: record.hostingOrigin };
   });
   routes.sort((left, right) => left.mount.localeCompare(right.mount, 'en'));
-  const map = { host, version: revision, exportedAt, routes };
+  const map = { host, version, exportedAt, routes };
   validateRouteMap(map, host);
   return map;
 }
