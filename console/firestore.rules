@@ -94,6 +94,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // The Console service owns host verification and per-event routing.
+    match /console_client_hosts/{host} {
+      allow read, write: if false;
+    }
+
+    match /console_event_mounts/{appId} {
+      allow read, write: if false;
+    }
+
     match /invites/{inviteId} {
       allow read, write: if false;
     }

@@ -205,6 +205,18 @@ A decline sends `revision`, the length of `history` that `getApplicationForRevie
 
 **Retention.** The scheduled function `runApplicationRetention` runs each day at 04:17 Eastern time. It deletes `withdrawn` and `declined` requests 90 days after `updatedAt`, and frees their names unless a build began for them. A `draft` stays, because it belongs to a client whose invoice was paid. The records in `agreement_acceptances` are never deleted. It checks each request again inside its own transaction, so a request that changed after the query stays. A second run is safe. Each delete writes an audit record. A request with a connection change running stays. After the request is gone it deletes the stored account tokens and ends each connection at the provider, unless another request uses the account. A token that cannot be deleted keeps its `console_token_deletions` row, and the next run tries again. The same run sweeps expired `console_connection_states`.
 
+## Shared client hosts
+
+[ADR 0010](../docs/adr/0010-events-under-one-client-host.md) gives an event a public path on an approved client host. Its web-address reservation keeps identifying its own project, deployment environment and original address.
+
+The Console exposes two authenticated POST actions. `consentEventMount` takes `appId`, `orgId`, `publicBase` and `confirm: true`. An Owner of that application’s organization confirms the exact HTTPS base. The application records the canonical base, the Owner’s UID and the time. Decline and withdrawal clear pending consent.
+
+`manageEventMount` requires a Console operator. The `enroll` action takes the application ID and the same `publicBase` and checks the recorded consent against the current Owner membership. For the first event on a host, the operator supplies `confirmAuthority: true` and an `authorityReference` for evidence of verified host control. Use an internal reference ID. A managed host already assigned as an event web address requires that event to enroll first. Later events each require their own Owner’s consent. The `get` action returns the event’s private route record to the operator.
+
+`console_client_hosts/{host}` stores the operator’s authority verification reference, UID and time. `console_event_mounts/{appId}` stores the host, complete mount, public base, application ID, Firebase project ID, fixed Firebase Hosting origin and lifecycle state, along with the recorded consent and operator enrollment. The Console service owns both private collections.
+
+The host transaction rejects duplicate and ancestor/descendant paths. The root, Firebase infrastructure paths, host-level files, and the first path segments `admin`, `api`, `assets`, `auth` and `unsubscribe` are reserved. An enrolled address stays tied to its original event. Closing an enrolled failed build marks that enrollment removed alongside the request status. Purge keeps its path reservation and removes the consent and operator details. This phase stores enrollments for the later publication work.
+
 ## Account connections
 
 ADR 0007 §4 is the decision. In the tickets step, and on the status page while the request is a draft or its build has failed, an Owner connects the client's own Stripe or Eventbrite account with a button, and picks an Eventbrite event from a list. `functions/src/connections.cjs` holds the flow, `connectors.cjs` the provider calls, and `secretStore.cjs` the Secret Manager calls. All three are injected, and the tests use fakes.

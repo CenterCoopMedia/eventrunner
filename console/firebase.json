@@ -24,6 +24,8 @@
       { "source": "/api/listApplications", "function": { "functionId": "listApplications", "region": "us-central1" } },
       { "source": "/api/saveApplicationStep", "function": { "functionId": "saveApplicationStep", "region": "us-central1" } },
       { "source": "/api/checkWebAddress", "function": { "functionId": "checkWebAddress", "region": "us-central1" } },
+      { "source": "/api/consentEventMount", "function": { "functionId": "consentEventMount", "region": "us-central1" } },
+      { "source": "/api/manageEventMount", "function": { "functionId": "manageEventMount", "region": "us-central1" } },
       { "source": "/api/withdrawApplication", "function": { "functionId": "withdrawApplication", "region": "us-central1" } },
       { "source": "/api/listApplicationsForReview", "function": { "functionId": "listApplicationsForReview", "region": "us-central1" } },
       { "source": "/api/getApplicationForReview", "function": { "functionId": "getApplicationForReview", "region": "us-central1" } },
