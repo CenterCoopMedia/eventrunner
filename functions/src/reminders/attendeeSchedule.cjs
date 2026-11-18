@@ -101,8 +101,8 @@ const DEFAULT_DRAFT = Object.freeze({
   message: `The event is ${PLACEHOLDER} away. The details are below. We look forward to seeing you.`,
 });
 const SPANISH_DRAFT = Object.freeze({
-  subject: `Faltan ${PLACEHOLDER} para el evento`,
-  message: `Faltan ${PLACEHOLDER} para el evento. Aquí tienes los detalles. Esperamos verte pronto.`,
+  subject: `El evento empieza en ${PLACEHOLDER}`,
+  message: `El evento empieza en ${PLACEHOLDER}. Aquí tienes los detalles. Esperamos verte pronto.`,
 });
 const SPANISH_FACTS = Object.freeze({ when: 'Cuándo', where: 'Dónde', tickets: 'Ver tus entradas', dashboard: 'Abrir tu panel' });
 

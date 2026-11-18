@@ -189,7 +189,7 @@ function approvedValues({ config, account, asksQuestions }) {
   const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
   const name = typeof account.displayName === 'string' ? account.displayName.trim() : '';
   return {
-    attendee_name: name || 'there',
+    attendee_name: name,
     dashboard_url: site ? `${site}/dashboard` : '',
     registration_url: site && asksQuestions ? `${site}/registration` : '',
   };

@@ -40,14 +40,14 @@ const SPANISH = {
   'attendee.approved': spanish({
     subject: 'Ya tienes tu registro para {{event_name}}',
     html: [
-      '<p>Hola, {{attendee_name}}:</p>',
+      '<p>Hola{{#if attendee_name}}, {{attendee_name}}{{/if}}:</p>',
       '<p>El equipo del evento aprobó tu registro para {{event_name}}.</p>',
       '<p><a href="{{dashboard_url}}">Abre tu panel</a></p>',
       '{{#if registration_url}}<p>Si todavía no has respondido las preguntas de registro, <a href="{{registration_url}}">respóndelas aquí</a>.</p>{{/if}}',
       '<p>¿Tienes preguntas? Responde a este mensaje.</p>',
     ],
     text: [
-      'Hola, {{attendee_name}}:', '', 'El equipo del evento aprobó tu registro para {{event_name}}.', '',
+      'Hola{{#if attendee_name}}, {{attendee_name}}{{/if}}:', '', 'El equipo del evento aprobó tu registro para {{event_name}}.', '',
       'Abre tu panel: {{dashboard_url}}', '',
       '{{#if registration_url}}Si todavía no has respondido las preguntas de registro, respóndelas aquí:\n{{registration_url}}\n\n{{/if}}¿Tienes preguntas? Responde a este mensaje.',
     ],
@@ -69,14 +69,14 @@ const SPANISH = {
   'ticket.attendee_confirmation': spanish({
     subject: 'Tienes una entrada para {{event_name}}',
     html: [
-      '<p>Hola, {{first_name}}:</p>',
+      '<p>Hola{{#if first_name}}, {{first_name}}{{/if}}:</p>',
       '<p>Entradas para {{event_name}} asignadas a este correo: {{ticket_count}}.</p>',
       '<p><a href="{{cta_url}}">Inicia sesión y reclama tu entrada</a></p>',
       '<p>Referencia del pedido: {{order_reference}}. Usa este correo para iniciar sesión. La referencia por sí sola no da acceso a tu entrada.</p>',
       '<p>Después de reclamarla, abre Mis entradas para ver o imprimir tu entrada.</p>',
     ],
     text: [
-      'Hola, {{first_name}}:', '', 'Entradas para {{event_name}} asignadas a este correo: {{ticket_count}}.', '',
+      'Hola{{#if first_name}}, {{first_name}}{{/if}}:', '', 'Entradas para {{event_name}} asignadas a este correo: {{ticket_count}}.', '',
       'Inicia sesión y reclama tu entrada: {{cta_url}}', '', 'Referencia del pedido: {{order_reference}}.',
       'Usa este correo para iniciar sesión. La referencia por sí sola no da acceso a tu entrada.',
       'Después de reclamarla, abre Mis entradas para ver o imprimir tu entrada.',
@@ -91,16 +91,16 @@ function spanishTemplateVariant(id) {
   return Object.hasOwn(SPANISH, id) ? SPANISH[id] : undefined;
 }
 
-function renderAttendeeTemplate({ template, override, language, ...context }) {
+function renderAttendeeTemplate({ template, override, language, tokenValues = {}, ...context }) {
   const variant = language === 'es' ? spanishTemplateVariant(template.id) : null;
-  if (!variant) return render({ template, override, ...context });
   // A saved English override keeps its unit. Treat HTML and text as a pair.
-  const localized = { ...template, subject: variant.subject };
-  if (typeof override?.html !== 'string' && typeof override?.text !== 'string') {
-    localized.html = variant.html;
-    localized.text = variant.text;
+  const spanishBody = variant && typeof override?.html !== 'string' && typeof override?.text !== 'string';
+  const localized = spanishBody ? { ...template, ...variant } : { ...template, subject: variant?.subject ?? template.subject };
+  if (!spanishBody) {
+    const nameToken = { 'attendee.approved': 'attendee_name', 'ticket.attendee_confirmation': 'first_name' }[template.id];
+    if (nameToken && !tokenValues[nameToken]) tokenValues = { ...tokenValues, [nameToken]: 'there' };
   }
-  return render({ template: localized, override, ...context });
+  return render({ template: localized, override, tokenValues, ...context });
 }
 
 function attendeeUrl(url, language) {

@@ -69,7 +69,7 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
     if (ticket.claimedByUid) continue;
     const email = ticket.email?.trim().toLowerCase();
     if (!email) continue;
-    const existing = attendees.get(email) || { firstName: ticket.firstName || 'there', count: 0 };
+    const existing = attendees.get(email) || { firstName: ticket.firstName || '', count: 0 };
     existing.count += 1;
     attendees.set(email, existing);
   }

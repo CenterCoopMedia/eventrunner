@@ -36,4 +36,10 @@ test('Spanish attendee variants preserve required tokens in each body and Englis
   const fallback = renderAttendeeTemplate({ template, override: { html: template.html }, config, tokenValues, language: 'es' });
   assert.match(fallback.html, /<html lang="en">/);
   assert.match(fallback.text, /Open your dashboard/);
+  const unnamed = { ...tokenValues, attendee_name: '' };
+  const spanish = renderAttendeeTemplate({ template, config, tokenValues: unnamed, language: 'es' });
+  assert.match(spanish.text, /^Hola:/);
+  assert.match(spanish.html, /<p>Hola:<\/p>/);
+  const english = renderAttendeeTemplate({ template, override: { html: template.html }, config, tokenValues: unnamed, language: 'es' });
+  assert.match(english.text, /there/);
 });

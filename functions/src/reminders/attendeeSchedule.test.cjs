@@ -280,7 +280,7 @@ test('one reminder window sends each language through its original send-once and
   assert.equal(result.counts.sent, 2);
   const [english, spanish] = box.mail;
   assert.equal(english.subject, 'Your event is 7 days away');
-  assert.equal(spanish.subject, 'Faltan 7 días para el evento');
+  assert.equal(spanish.subject, 'El evento empieza en 7 días');
   assert.match(spanish.html, /<html lang="es">/);
   assert.match(spanish.text, /Dónde: Example Hall, 1 Main St, Example City/);
   assert.match(spanish.text, /Abrir tu panel: https:\/\/site.example.test\/dashboard\?lang=es/);
@@ -289,6 +289,8 @@ test('one reminder window sends each language through its original send-once and
   assert.equal(claims(db), 2);
   await run(db, IN_7D + HOUR, { box });
   assert.equal(box.mail.length, 2);
+  await run(db, IN_1D, { box });
+  assert.equal(box.mail.at(-1).subject, 'El evento empieza en un día');
 });
 
 test('a ticket sold through Stripe links to the ticket page', async () => {
