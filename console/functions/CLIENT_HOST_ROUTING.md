@@ -15,3 +15,11 @@ The route-map projection takes the enrollment's `published` state so the mounted
 From route publication until the mounted build reaches Hosting, the standalone address works and the mount may fail to render because its origin still serves the root-based build. Once the mounted build replaces that build on Hosting, the mount becomes the visitor address. The old standalone origin serves the mounted bundle from that point, including the window before smoke and the applied receipt finish.
 
 The shared-host rehearsal in #1063 covers the order that keeps both windows short, the redirect or notice at the old visitor address, and recovery after a failed deployment or smoke step. Recovery restores the affected event’s standalone build and its matching route and URL settings together.
+
+## Worker runtime
+
+The Worker entry point is `client-host-worker.mjs`. Its `CLIENT_ROUTE_MAP_BUCKET` binding identifies the dedicated bucket holding the Console’s public projection. The exact request hostname selects `<host>.json`. The Worker reads that object without caching. The Console retains the writer identity.
+
+The Worker lists public event titles and links at `/` once the mounted deployment is confirmed. A map with zero confirmed listings serves the empty index. `/.well-known/eventrunner-route-map` reports the `version` and `exportedAt` of the map currently in use. Unmatched mounts return 404. An optional `CLIENT_HOST_FALLBACK` service preserves existing responses on reserved host paths, including root Firebase helper paths.
+
+The hosted fixtures use synthetic maps and upstreams. Raw ingress normalization, cache rules, bucket permissions, supported browsers and provider setup are part of the shared-host rehearsal.
