@@ -52,16 +52,8 @@ async function recordStandalonePublicBase(db, appId, base) {
   });
 }
 
-/** Record the effective address only after the ordinary deployment succeeds. */
-async function recordAppliedPublicBase(db, identity, publicBase) {
-  await db.runTransaction(async (tx) => {
-    const ref = eventMountRef(db, identity.appId);
-    const route = (await tx.get(ref)).data();
-    if (!route || resolveEventPublicBase(route, identity).publicBase !== publicBase) {
-      throw new Error('the event address changed during deployment');
-    }
-    tx.update(ref, { appliedPublicBase: publicBase });
-  });
+function eventListingTitle(route) {
+  return route.appliedPublicBase === route.publicBase ? route.publicTitle ?? null : null;
 }
 
 /** Keep the path reservation when its application and consent are purged. */
@@ -75,9 +67,10 @@ async function purgeEventMount(tx, db, appId) {
 
 /** Serialize changes in the public projection with the host's existing revision. */
 async function updateEventMount(tx, db, appId, route, update) {
+  const next = { ...route, ...update };
   const published = route.state === 'published';
-  const willPublish = update.state === 'published';
-  if (published !== willPublish || (willPublish && route.publicTitle !== update.publicTitle)) {
+  const willPublish = next.state === 'published';
+  if (published !== willPublish || (willPublish && eventListingTitle(route) !== eventListingTitle(next))) {
     const ref = clientHostRef(db, route.host);
     const { revision } = (await tx.get(ref)).data() || {};
     if (!Number.isSafeInteger(revision) || revision < 1) throw new Error('The client host has no route revision.');
@@ -98,5 +91,5 @@ async function changeMountForApplication(tx, db, appId, change) {
 
 module.exports = {
   MOUNTS, changeMountForApplication, clientHostRef, eventMountRef, hostingOrigin, purgeEventMount,
-  recordAppliedPublicBase, recordStandalonePublicBase, reservedClientPath, resolveEventPublicBase, updateEventMount,
+  eventListingTitle, recordStandalonePublicBase, reservedClientPath, resolveEventPublicBase, updateEventMount,
 };

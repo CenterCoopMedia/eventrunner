@@ -6,7 +6,7 @@ const { consentEventMount, manageEventMount } = require('./clientHostEnrollment.
 const { closeApplication, declineApplication } = require('./reviewDecisions.cjs');
 const { withdrawApplication } = require('./applicationStatus.cjs');
 const { getApplication } = require('./applications.cjs');
-const { recordAppliedPublicBase } = require('./clientHostRecords.cjs');
+const { recordAppliedPublicBase } = require('./clientHostPublish.cjs');
 const { saveApplicationStep } = require('./applicationSave.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
 const { ana, application, deps, ops, seeded } = require('./fakeReview.cjs');
@@ -100,13 +100,14 @@ test('publication and removal change only the selected event’s public address'
   await manage(d, 'publish', { confirm: true });
   await manage(d, 'publish', { appId: 'a2', publicBase: siblingBase, confirm: true });
   assert.equal((await ownerView()).publicBase, undefined);
+  assert.ok((await d.routeMaps.read(host)).routes.every(({ publicTitle }) => publicTitle === null));
   const identity = { appId: 'a1', projectId: 'er-summit', site: 'summit-host', domain: host };
-  await recordAppliedPublicBase(d.db, identity, publicBase);
+  await recordAppliedPublicBase(d, identity, publicBase);
   assert.equal((await ownerView()).publicBase, publicBase);
   const sibling = d.db.read('console_event_mounts/a2');
   await manage(d, 'remove', { confirm: true });
   assert.equal((await ownerView()).publicBase, publicBase);
-  await recordAppliedPublicBase(d.db, identity, 'https://summit-host.web.app');
+  await recordAppliedPublicBase(d, identity, 'https://summit-host.web.app');
   assert.equal((await ownerView()).publicBase, 'https://summit-host.web.app');
   assert.equal(d.db.read('console_event_mounts/a1').publicBase, publicBase);
   assert.deepEqual(d.db.read('console_event_mounts/a2'), sibling);
@@ -150,11 +151,17 @@ test('publication returns only after the versioned public map is read back, incl
 
   d.controls.beforeWrite = () => manage(d, 'publish', sibling);
   const first = (await manage(d, 'publish', { confirm: true })).body.routeMap;
+  const staged = await d.routeMaps.read(host);
+  assert.deepEqual(first, { version: staged.version, exportedAt: staged.exportedAt });
+  assert.ok(staged.routes.every(({ publicTitle }) => publicTitle === null));
+  await recordAppliedPublicBase(d, { appId: 'a1', projectId: 'er-summit', site: 'summit-host', domain: host }, publicBase);
+  const listed = await recordAppliedPublicBase(d, {
+    appId: 'a2', projectId: 'er-workshops', site: 'workshops-host', domain: host,
+  }, siblingBase);
   const map = await d.routeMaps.read(host);
-  assert.deepEqual(first, { version: map.version, exportedAt: map.exportedAt });
   assert.deepEqual(map.routes, [
-    { mount: '/events/workshops', hostingOrigin: 'https://workshops-host.web.app', publicTitle: 'Workshops' },
-    { mount: '/summit-2027', hostingOrigin: 'https://summit-host.web.app', publicTitle: 'Conference' },
+    { mount: '/events/workshops', publicTitle: 'Workshops', hostingOrigin: 'https://workshops-host.web.app' },
+    { mount: '/summit-2027', publicTitle: 'Conference', hostingOrigin: 'https://summit-host.web.app' },
   ]);
   assert.deepEqual(Object.keys(map), ['host', 'version', 'exportedAt', 'routes']);
 
@@ -165,7 +172,7 @@ test('publication returns only after the versioned public map is read back, incl
   });
   d.controls.readFailure = false;
   const confirmed = (await manage(d, 'publish', rename)).body.routeMap;
-  assert.equal(confirmed.version, first.version + 1);
+  assert.equal(confirmed.version, listed.version + 1);
   const removed = (await manage(d, 'remove', { confirm: true })).body.routeMap;
   assert.equal(removed.version, confirmed.version + 1);
   assert.deepEqual((await d.routeMaps.read(host)).routes, [map.routes[0]]);
