@@ -7,8 +7,8 @@
 // destination. No copy lives in this component, so an operator who renames
 // their FAQ renames the card; a page that is hidden or was never seeded
 // draws no card.
-import { Link } from 'react-router';
-import { useContent } from '../../contexts/ContentContext.jsx';
+import { PublicLink as Link } from '../PublicLink.jsx';
+import { usePublicContent as useContent } from '../../contexts/PublicLanguageContext.jsx';
 
 // The seeded page ids an attendee is sent to. A page id the event does not
 // carry — a seed that never ran, a page an operator hid — resolves to

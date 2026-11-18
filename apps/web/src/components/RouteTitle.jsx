@@ -15,14 +15,15 @@
 // components and would otherwise show the server's title for a moment and
 // then drop to the bare event name.
 import { useLocation } from 'react-router';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { routeTitlePartFor, useDerivedDocumentTitle } from '../lib/useDocumentTitle.js';
 
 export default function RouteTitle() {
   const { pathname } = useLocation();
-  const { pages } = useContent();
+  const { pages } = usePublicContent();
+  const { text } = usePublicLanguage();
   const { features } = useEventConfig();
-  useDerivedDocumentTitle(routeTitlePartFor({ pathname, pages, features }));
+  useDerivedDocumentTitle(routeTitlePartFor({ pathname, pages, features, pitchTitle: text('Pitch a session', 'Proponer una sesión') }));
   return null;
 }

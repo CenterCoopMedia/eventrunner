@@ -2,7 +2,7 @@
 // its running identity; the masthead Header now has a compact navigation bar.
 // A real client mark is optional. Only the closing divider uses a motif.
 // The page owns its h1; the repeated site identity is a paragraph.
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 import { formatEventDateRange } from '../../lib/eventTime.js';
 import Motif from './Motif.jsx';
 
@@ -14,10 +14,10 @@ import Motif from './Motif.jsx';
  * checked and a line that cannot be resolved is simply not rendered.
  *
  * @param {object} eventConfig
- * @param {{ compact?: boolean }} [options] compact prefers the short name.
+ * @param {{ compact?: boolean, language?: string }} [options] compact prefers the short name.
  * @returns {{ name: string, dates: string | null, edition: string | null }}
  */
-export function buildNameplate(eventConfig, { compact = false } = {}) {
+export function buildNameplate(eventConfig, { compact = false, language } = {}) {
   const str = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
   const full = str(eventConfig?.name);
   const short = str(eventConfig?.shortName);
@@ -25,7 +25,7 @@ export function buildNameplate(eventConfig, { compact = false } = {}) {
   const place = [str(venue.city), str(venue.region)].filter(Boolean).join(', ');
   return {
     name: (compact ? short || full : full || short) ?? '',
-    dates: formatEventDateRange(eventConfig?.days, eventConfig?.timezone),
+    dates: formatEventDateRange(eventConfig?.days, eventConfig?.timezone, language),
     edition: place || str(venue.name),
   };
 }

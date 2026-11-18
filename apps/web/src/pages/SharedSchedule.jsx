@@ -17,9 +17,10 @@
 // lands on the same denial path as a private schedule: the reason, never
 // the sessions.
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useEventClock } from '../hooks/useEventClock.js';
@@ -35,6 +36,7 @@ import { sortSessions } from '../lib/scheduleView.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function SharedSchedule() {
+  const { language } = usePublicLanguage();
   const { uid } = useParams();
   const { user } = useAuth();
   const { eventConfig, features } = useEventConfig();
@@ -191,8 +193,8 @@ export default function SharedSchedule() {
               id={`shared-day-${day.id}`}
               title={day.label}
               folio={
-                formatDayDate(day, eventConfig.timezone) ? (
-                  <time dateTime={day.date}>{formatDayDate(day, eventConfig.timezone)}</time>
+                formatDayDate(day, eventConfig.timezone, language) ? (
+                  <time dateTime={day.date}>{formatDayDate(day, eventConfig.timezone, language)}</time>
                 ) : null
               }
             />

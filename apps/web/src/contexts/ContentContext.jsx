@@ -155,7 +155,7 @@ function prepareTimelineDocs(docs) {
     );
 }
 
-export function ContentProvider({ readSource = 'published', pathname, search = '', publicTools = IS_DEMO, children }) {
+export function ContentProvider({ readSource = 'published', pathname, search = '', publicTools = IS_DEMO, languageNeedsSchedule = false, children }) {
   // One overlay slot per collection; null = no runtime result yet, so the
   // committed snapshot stands (spec §2.4 fail-soft first paint).
   const [storedOverlay, setOverlay] = useState({ readSource, ...EMPTY_OVERLAY });
@@ -163,9 +163,12 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
   const sessionRef = useRef(null);
   const requestedRef = useRef(new Set());
   const neededCollections = useMemo(
-    () => publicSubscriptionsForRoute(pathname, search, publicTools)
-      .filter((name) => RUNTIME_COLLECTIONS.includes(name)),
-    [pathname, search, publicTools],
+    () => {
+      const streams = publicSubscriptionsForRoute(pathname, search, publicTools);
+      if (languageNeedsSchedule && !streams.includes('cmsSchedule')) streams.push('cmsSchedule');
+      return streams.filter((name) => RUNTIME_COLLECTIONS.includes(name));
+    },
+    [pathname, search, publicTools, languageNeedsSchedule],
   );
 
   useEffect(() => {
@@ -298,6 +301,8 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
       readSource,
       source: live ? 'live' : 'snapshot',
       contentSource: overlay.cmsContent != null ? 'live' : 'snapshot',
+      languageRecordsReady: overlay.cmsPages != null && overlay.cmsContent != null
+        && (!languageNeedsSchedule || overlay.cmsSchedule != null),
       siteContent,
       pages,
       updates,
@@ -313,7 +318,7 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
       getPage,
       getPublicPage,
     };
-  }, [readSource, overlay]);
+  }, [readSource, overlay, languageNeedsSchedule]);
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }

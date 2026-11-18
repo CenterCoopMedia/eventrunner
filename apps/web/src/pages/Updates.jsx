@@ -31,9 +31,10 @@
 // it draws only when it passes the rule the server stored it under
 // (shared/update validUpdateCategory), so a stray stored value draws
 // nothing.
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { validUpdateCategory } from 'shared/update';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { pageHeading } from 'shared/page';
+import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { UpdateImage } from '../components/UpdateContent.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -68,7 +69,8 @@ function EntryTags({ update }) {
 
 /** The featured post at the head of the page (issue #191). */
 function LeadEntry({ update, timeZone }) {
-  const dateLabel = publishDateLabel(update.publishAt, timeZone);
+  const { language } = usePublicLanguage();
+  const dateLabel = publishDateLabel(update.publishAt, timeZone, language);
   const body = excerpt(update.body, 320);
   return (
     <li className="update-feed__entry">
@@ -96,8 +98,10 @@ function LeadEntry({ update, timeZone }) {
 }
 
 export default function Updates() {
+  const { language, text } = usePublicLanguage();
   const { features, eventConfig } = useEventConfig();
-  const { updates } = useContent();
+  const { updates, getPage } = useContent();
+  const page = getPage?.('updates');
 
   if (!features.updates) {
     return (
@@ -120,17 +124,19 @@ export default function Updates() {
 
   return (
     <SystemPage pageId="updates">
-      <h1 className="font-heading text-h1 font-semibold text-text-primary">Updates</h1>
+      <h1 lang={page?.publicLanguage} className="font-heading text-h1 font-semibold text-text-primary">
+        {language === 'es' && pageHeading(page) ? pageHeading(page) : text('Updates', 'Novedades')}
+      </h1>
       {visible.length === 0 ? (
         <div className="mt-lg">
           <EmptyState
-            title="No updates yet"
-            description="Announcements appear here once they are published."
+            title={text('No updates yet', 'Aún no hay novedades')}
+            description={text('Announcements appear here once they are published.', 'Los anuncios aparecerán aquí cuando se publiquen.')}
           />
         </div>
       ) : (
         <div className="update-feed mt-lg">
-          {groupUpdates(visible, eventConfig?.timezone).map((run, index) => (
+          {groupUpdates(visible, eventConfig?.timezone, language).map((run, index) => (
             <section
               key={`${run.kind}-${run.label}`}
               aria-labelledby={`update-run-${index}`}
@@ -147,7 +153,7 @@ export default function Updates() {
                 {run.kind === 'lead' ? (
                   <LeadEntry key={run.members[0].id} update={run.members[0]} timeZone={eventConfig?.timezone} />
                 ) : run.members.map((update) => {
-                  const dateLabel = publishDateLabel(update.publishAt, eventConfig?.timezone);
+                  const dateLabel = publishDateLabel(update.publishAt, eventConfig?.timezone, language);
                   const publishDate = toPublishDate(update.publishAt);
                   const body = excerpt(update.body);
                   return (

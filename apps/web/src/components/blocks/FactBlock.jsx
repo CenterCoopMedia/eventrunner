@@ -27,7 +27,7 @@ export function factDraws(block) {
 export default function FactBlock({ block }) {
   if (!factDraws(block)) return null;
   return (
-    <DefinitionPair term={text(block.label)} note={text(block.note)}>
+    <DefinitionPair term={text(block.label)} note={text(block.note)} lang={block.publicLanguage}>
       {text(block.value)}
     </DefinitionPair>
   );

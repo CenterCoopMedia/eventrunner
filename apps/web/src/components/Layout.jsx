@@ -55,12 +55,14 @@
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { hasSentChangeRequest } from '../lib/changeRequestMarker.js';
-import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router';
+import { Outlet, matchPath, useLocation } from 'react-router';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config/socialAccounts';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useDeviceBookmarks } from '../hooks/useDeviceBookmarks.js';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { PublicLink as Link, PublicNavLink as NavLink } from './PublicLink.jsx';
+import LanguageChoice from './LanguageChoice.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
@@ -277,7 +279,8 @@ const FOOTER_LINK_CLASS =
 
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { pages, getPage, getSectionBlocks } = useContent();
+  const { pages, getPage, getSectionBlocks } = usePublicContent();
+  const { language, text } = usePublicLanguage();
   const { user, loading: authLoading } = useAuth();
   const { pathname, key: locationKey } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -378,7 +381,7 @@ export default function Layout() {
   const headerVariant = resolveHeader(theme?.header, pageHeaderTreatment(layout.header));
   const navPlacement = layout.navPlacement ?? resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
   // Only the event bar prefers the short name.
-  const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact' });
+  const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact', language });
   const markSize = headerVariant === 'masthead' ? MARK_SIZE.masthead : MARK_SIZE.running;
   const readOnlyDemo = isReadOnlyDemo(eventConfig);
   const historicalDemo = readOnlyDemo && eventConfig.shortName === 'NC Local';
@@ -436,7 +439,7 @@ export default function Layout() {
       ) : null}
       <li className={compactHeader ? 'grid w-full' : undefined}>
         <NavLink to={account.to} end={account.end} className={accountClass}>
-          {account.label}
+          {user && !authLoading ? text(account.label, 'Panel personal') : text(account.label, 'Iniciar sesión')}
         </NavLink>
       </li>
     </ul>
@@ -446,7 +449,7 @@ export default function Layout() {
   // placement keeps accounts in Header. Compact menus put accounts last.
   const nav = navPlacement !== 'side' || navItems.length || compactHeader ? (
     <nav
-      aria-label="Main"
+      aria-label={text('Main', 'Principal')}
       id={navId}
       ref={navRef}
       data-mobile-open={menuOpen}
@@ -472,7 +475,7 @@ export default function Layout() {
       >
         {primaryNavItems.map((item) => (
           <li key={item.to} className={compactHeader ? 'grid' : undefined}>
-            <NavLink to={item.to} end={item.end} className={navClass}>
+            <NavLink to={item.to} end={item.end} className={navClass} lang={item.language}>
               {item.label}
             </NavLink>
           </li>
@@ -487,11 +490,11 @@ export default function Layout() {
             }}>
               <summary className={`touch-target font-data text-caption border-b-strong ${moreIsActive
                 ? 'border-b-rule-strong font-semibold text-text-primary'
-                : 'border-b-transparent text-text-secondary'}`}>More</summary>
+                : 'border-b-transparent text-text-secondary'}`}>{text('More', 'Más')}</summary>
               <ul className="site-nav-more__links">
                 {moreNavItems.map((item) => (
                   <li key={item.to}>
-                    <NavLink to={item.to} end={item.end} className={navClass} onClick={(event) => {
+                    <NavLink to={item.to} end={item.end} className={navClass} lang={item.language} onClick={(event) => {
                       event.currentTarget.closest('details').open = false;
                     }}>{item.label}</NavLink>
                   </li>
@@ -548,7 +551,7 @@ export default function Layout() {
         </Suspense>
       ) : null}
       <a href="#main-content" className="skip-link">
-        Skip to main content
+        {text('Skip to main content', 'Saltar al contenido principal')}
       </a>
       <DemoBanner />
       {/* The top of the page, by name: the back-to-top control moves focus
@@ -568,7 +571,7 @@ export default function Layout() {
                 onClick={() => setMenuOpen((open) => !open)}
                 onKeyDown={closeMenuOnEscape}
               >
-                Menu
+                {text('Menu', 'Menú')}
                 <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" className="disclosure-chevron">
                   <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
                 </svg>
@@ -612,6 +615,7 @@ export default function Layout() {
             {navPlacement === 'side' ? null : nav}
             {navPlacement === 'side' ? null : <RegistrationAction placement="header" />}
           </Header>
+          <LanguageChoice />
         </div>
       </header>
       <AnnouncementBanners />
@@ -648,12 +652,12 @@ export default function Layout() {
                 href reloads a path the static host does not serve. */}
             <div className="grid gap-lg lg:grid-cols-2">
             {navItems.length === 0 ? null : (
-              <nav aria-label="Site pages" className="mt-md">
+              <nav aria-label={text('Site pages', 'Páginas del sitio')} className="mt-md">
                 <p className="font-semibold text-text-primary">Site pages</p>
                 <ul className="footer-links">
                   {navItems.map((item) => (
                     <li key={item.to}>
-                      <Link to={item.to} className={FOOTER_LINK_CLASS}>
+                      <Link to={item.to} className={FOOTER_LINK_CLASS} lang={item.language}>
                         {item.label}
                       </Link>
                     </li>

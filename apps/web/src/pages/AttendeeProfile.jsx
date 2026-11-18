@@ -10,7 +10,8 @@
 // the small ruled-rectangle tag Attendees.jsx and SessionCard.jsx already
 // use — never a pill, never a colored chip.
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { validateCustomBadges } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';

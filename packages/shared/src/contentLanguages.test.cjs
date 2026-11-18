@@ -3,9 +3,25 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   contentLanguages, languageConfigErrors, variantErrors, collectionVariantErrors, resolveContentVariant,
+  languageFromSearch, internalRoutePath, withContentLanguage,
 } = require('./contentLanguages.cjs');
 
 const BILINGUAL = { contentLanguages: { default: 'en', available: ['en', 'es'] } };
+
+test('public locale URLs use one canonical language and retain the query and anchor', () => {
+  assert.equal(languageFromSearch('?day=two&lang=es'), 'es');
+  for (const search of ['?lang=es-MX', '?lang=ES', '?lang=es&lang=es', '?lang=en&lang=es']) {
+    assert.equal(languageFromSearch(search), null);
+  }
+  assert.equal(languageFromSearch('?lang=es', ['en']), null);
+  assert.equal(internalRoutePath('/schedule?day=two#morning'), '/schedule');
+  assert.equal(withContentLanguage('/schedule?day=two&tag=a&tag=b&lang=en#morning', 'es'),
+    '/schedule?day=two&tag=a&tag=b&lang=es#morning');
+  for (const href of ['https://example.org/schedule?lang=en#morning', '//example.org/away', 'mailto:team@example.org', 'javascript:void(0)']) {
+    assert.equal(internalRoutePath(href), null);
+    assert.equal(withContentLanguage(href, 'es'), href);
+  }
+});
 
 test('event languages are canonical, English remains available, and absent config needs no migration', () => {
   assert.deepEqual(contentLanguages({}), { default: 'en', available: ['en'] });

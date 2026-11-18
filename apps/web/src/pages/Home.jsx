@@ -1,7 +1,7 @@
 // Home owns the visible hero heading, CMS actions, and optional artwork.
 // Other CMS sections stay in their authored order through SystemPage.
-import { Link } from 'react-router';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
+import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
@@ -54,6 +54,7 @@ import { SEED_WHEN_PLACEHOLDER, isStarterContent } from 'shared/seed';
  * }} props
  */
 export function SummaryRow({ days, timezone, eventConfig, facts, action = null, className = '' }) {
+  const { language, text } = usePublicLanguage();
   const clock = countdownDraws(eventConfig);
   if (days.length === 0 && !facts && !clock) return null;
   const row = (
@@ -63,7 +64,7 @@ export function SummaryRow({ days, timezone, eventConfig, facts, action = null, 
           figures line up as a column (brief §2.1, §3.2). */}
       {days.length === 0 ? null : (
         <section aria-labelledby="event-days">
-          <SectionHead level={2} id="event-days" title="Dates" />
+          <SectionHead level={2} id="event-days" title={text('Dates', 'Fechas')} />
           <ul className="mt-sm">
             {days.map((day) => (
               <li
@@ -74,9 +75,9 @@ export function SummaryRow({ days, timezone, eventConfig, facts, action = null, 
                   {day.label}
                 </h3>
                 <p className="font-mono text-caption text-text-secondary">
-                  <time dateTime={day.date}>{formatDayDate(day, timezone) ?? day.date}</time>
+                  <time dateTime={day.date}>{formatDayDate(day, timezone, language) ?? day.date}</time>
                   {day.startTime && day.endTime
-                    ? ` · ${formatDayHours(day.startTime, day.endTime) ?? `${day.startTime}–${day.endTime}`}`
+                    ? ` · ${formatDayHours(day.startTime, day.endTime, language) ?? `${day.startTime}–${day.endTime}`}`
                     : null}
                 </p>
               </li>
@@ -86,7 +87,7 @@ export function SummaryRow({ days, timezone, eventConfig, facts, action = null, 
       )}
       {facts ? (
         <section aria-labelledby={facts.id}>
-          <SectionHead level={2} id={facts.id} title={facts.title} action={facts.action} />
+          <SectionHead level={2} id={facts.id} title={facts.title} lang={facts.language} action={facts.action} />
           <div className="mt-sm">
             {/* One cell wide, so the cards run down it rather than across
                 a track that cannot hold three of them. */}
@@ -122,9 +123,9 @@ export function SummaryRow({ days, timezone, eventConfig, facts, action = null, 
  * @param {object} eventConfig
  * @returns {object}
  */
-export function withLiveDates(block, eventConfig) {
+export function withLiveDates(block, eventConfig, language) {
   if (block?.blockType !== 'fact' || block.seeded !== true || block.field !== 'when') return block;
-  const live = eventDateRangeLabel(eventConfig);
+  const live = eventDateRangeLabel(eventConfig, language);
   if (live) return { ...block, value: live };
   // The settings state a day list that holds no date: the dates are not
   // set, so the card says what the seed would write now, never the range
@@ -134,6 +135,7 @@ export function withLiveDates(block, eventConfig) {
 }
 
 export default function Home() {
+  const { language, text } = usePublicLanguage();
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
   const registrationAction = useRegistrationLink();
@@ -208,7 +210,7 @@ export default function Home() {
       const cards = groupIntoCards(
         infoBlocks
           .filter((block) => !(days.length > 0 && block.blockType === 'fact' && block.seeded === true && block.field === 'when'))
-          .map((block) => withLiveDates(block, eventConfig))
+          .map((block) => withLiveDates(block, eventConfig, language))
           .filter((block) => !isStarterContent(block)),
       );
       // THE KEY FACTS ARE ONE CELL OF THE SUMMARY ROW, and the row is drawn
@@ -223,7 +225,7 @@ export default function Home() {
           days={days}
           timezone={eventConfig.timezone}
           eventConfig={eventConfig}
-          facts={cards.length ? { id: `section-${section.id}`, title: section.label, cards, action: editLink } : null}
+          facts={cards.length ? { id: `section-${section.id}`, title: section.label, language: section.publicLanguage, cards, action: editLink } : null}
           action={
             <SectionEditLink pageId={page.id} sectionId={section.id} label={section.label} className="mt-sm" />
           }
@@ -272,7 +274,7 @@ export default function Home() {
   // The lead is the core, so its section's edit link is drawn here, last in
   // the lead, and only where the page states a hero section to open.
   const heroSection = (page?.sections ?? []).find((section) => section?.id === 'hero');
-  const plate = buildNameplate(eventConfig);
+  const plate = buildNameplate(eventConfig, { language });
 
   return (
     // The content-specific signal distinguishes the cmsContent listener
@@ -298,7 +300,7 @@ export default function Home() {
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}
       >
         <EventHero
-          name={leadTitle}
+          name={title?.publicLanguage && title.value === leadTitle ? <span lang={title.publicLanguage}>{leadTitle}</span> : leadTitle}
           nameAs="h1"
           nameId="hero-title"
           dates={plate.dates}
@@ -306,12 +308,12 @@ export default function Home() {
           tagline={tagline}
           image={demoHero(theme) ?? lead}
         >
-          {subtitle?.value ? <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">{subtitle.value}</p> : null}
+          {subtitle?.value ? <p lang={subtitle.publicLanguage} className="mt-sm max-w-prose text-body text-text-secondary text-pretty">{subtitle.value}</p> : null}
           {registrationAction || heroCtas.length || pitchOpen ? (
             <div className="no-print mt-lg flex flex-wrap gap-sm">
               <RegistrationLink action={registrationAction} placement="lead" />
               {heroCtas.map((block) => <CtaBlock key={`${block.section}__${block.field}`} block={block} />)}
-              {pitchOpen ? <Link to="/pitch" className={secondaryActionClass}>Pitch a session</Link> : null}
+              {pitchOpen ? <Link to="/pitch" className={secondaryActionClass}>{text('Pitch a session', 'Proponer una sesión')}</Link> : null}
             </div>
           ) : null}
           {heroSection ? (

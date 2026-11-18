@@ -31,11 +31,12 @@ function text(value) {
  *   children: import('react').ReactNode,   // the description
  *   note?: import('react').ReactNode,      // one line under it, in the data face
  *   className?: string,
+ *   lang?: string,
  * }} props
  */
-export function DefinitionPair({ term, children, note = null, className = '' }) {
+export function DefinitionPair({ term, children, note = null, className = '', lang }) {
   return (
-    <div className={['definition-list__pair', className].filter(Boolean).join(' ')}>
+    <div lang={lang} className={['definition-list__pair', className].filter(Boolean).join(' ')}>
       <dt className="definition-list__term font-semibold text-text-primary">{term}</dt>
       <dd className="text-body text-text-primary text-pretty">{children}</dd>
       {note ? <dd className="font-data text-caption text-text-secondary text-pretty">{note}</dd> : null}

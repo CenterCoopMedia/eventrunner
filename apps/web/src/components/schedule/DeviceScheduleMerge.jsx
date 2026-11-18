@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useProfile } from '../../contexts/ProfileContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';

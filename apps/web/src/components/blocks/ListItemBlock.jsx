@@ -4,5 +4,5 @@
 // inheriting the browser default (design brief §3.7).
 export default function ListItemBlock({ block }) {
   if (!block?.text) return null;
-  return <li className="max-w-prose text-body text-text-primary">{block.text}</li>;
+  return <li lang={block.publicLanguage} className="max-w-prose text-body text-text-primary">{block.text}</li>;
 }

@@ -11,7 +11,7 @@
 // reads `Date.now()` and never formats in the browser's zone.
 //
 // Neither is an eyebrow: both sit below or beside the title they credit.
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 
 /** A string with something in it, or null. */
 function text(value) {

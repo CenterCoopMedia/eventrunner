@@ -14,6 +14,7 @@ export default function ImageBlock({ block }) {
   if (!block?.url || !isSafeHref(block.url)) return null;
   const image = (
     <img
+      lang={block.publicLanguage}
       src={bundledDemoAssetUrl(block.url) ?? block.url}
       alt={block.alt ?? ''}
       loading="lazy"
@@ -22,7 +23,7 @@ export default function ImageBlock({ block }) {
   );
   if (!block.caption) return image;
   return (
-    <figure>
+    <figure lang={block.publicLanguage}>
       {image}
       <figcaption className="mt-2xs font-data text-caption text-text-secondary">
         {block.caption}

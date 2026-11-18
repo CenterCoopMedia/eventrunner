@@ -8,23 +8,16 @@
 // §3.1, §3.7) — the same vocabulary SessionCard and the restyled pages use.
 // The boundary is the hairline rule token at the hairline width, so the
 // disclosure is bounded by a rule rather than an ink-derived border.
-import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
+import PublicRichText from '../PublicRichText.jsx';
 
 export default function FaqItemBlock({ block }) {
   if (!block?.question) return null;
-  const answer = sanitizeHtml(block.answer);
   return (
-    <details className="motion-disclosure rounded-brand-lg border-hairline border-rule-hairline bg-surface-alt">
+    <details lang={block.publicLanguage} className="motion-disclosure rounded-brand-lg border-hairline border-rule-hairline bg-surface-alt">
       <summary className="touch-target flex cursor-pointer items-center px-md py-sm font-heading text-lead text-text-primary">
         {block.question}
       </summary>
-      {answer ? (
-        <div
-          className="rich-text max-w-prose px-md pb-md"
-          // Sanitized above — allowlisted tags and attributes only.
-          dangerouslySetInnerHTML={{ __html: answer }}
-        />
-      ) : null}
+      <PublicRichText value={block.answer} className="rich-text max-w-prose px-md pb-md" />
     </details>
   );
 }

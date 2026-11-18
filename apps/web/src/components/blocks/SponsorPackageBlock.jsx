@@ -8,7 +8,7 @@
 // shadow: SectionBlocks sets a run of packages in a grid of entries ruled
 // on top, the way every list in the system is ruled.
 import { DefinitionPair } from '../editorial/DefinitionList.jsx';
-import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
+import PublicRichText from '../PublicRichText.jsx';
 
 /** A string field with something in it, or null. */
 function text(value) {
@@ -30,7 +30,6 @@ export default function SponsorPackageBlock({ block }) {
   if (!sponsorPackageDraws(block)) return null;
   const price = text(block.price);
   const openTo = sponsorLimitLabel(block.limit);
-  const benefits = sanitizeHtml(block.benefits);
   return (
     <article>
       <h3 className="font-heading text-h3 font-semibold text-text-primary">{text(block.name)}</h3>
@@ -42,13 +41,7 @@ export default function SponsorPackageBlock({ block }) {
           {openTo ? <DefinitionPair term="Open to">{openTo}</DefinitionPair> : null}
         </dl>
       ) : null}
-      {benefits ? (
-        <div
-          className="rich-text mt-sm"
-          // Sanitized above — allowlisted tags and attributes only.
-          dangerouslySetInnerHTML={{ __html: benefits }}
-        />
-      ) : null}
+      <PublicRichText value={block.benefits} lang={block.publicLanguage} className="rich-text mt-sm" />
     </article>
   );
 }

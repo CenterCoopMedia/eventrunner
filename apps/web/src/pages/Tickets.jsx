@@ -17,7 +17,8 @@
 // page takes the newer live form, keeps every answer whose question is still
 // asked, and returns the buyer to the Questions step.
 import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
+import { Navigate, useNavigate, useSearchParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { resolveRegistrationAction } from 'shared/registration';
 import { DEFAULT_REGISTRATION_LABEL } from '../lib/useRegistrationLink.js';
 import { activeQuestions, answerText, checkAnswers, readRegistrationForm } from 'shared/registrationForm';

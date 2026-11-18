@@ -22,9 +22,10 @@
 // SessionCard.jsx already carry. No avatar card: the headshot, where present,
 // sits inline with the name at directory scale (Speakers.jsx), never boxed
 // or shadowed on its own.
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import ShareLink from '../components/ShareLink.jsx';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
@@ -54,6 +55,7 @@ function NotFoundState() {
 }
 
 export default function SpeakerDetail() {
+  const { language } = usePublicLanguage();
   const { slug } = useParams();
   const { eventConfig, features } = useEventConfig();
   const { speakers, scheduleData } = useContent();
@@ -176,7 +178,7 @@ export default function SpeakerDetail() {
               idiom Schedule.jsx and SessionCard.jsx use. */}
           <ul className="mt-sm">
             {sessions.map((session) => {
-              const range = formatSessionTimeRange(eventConfig, session);
+              const range = formatSessionTimeRange(eventConfig, session, language);
               return (
                 <li key={session.id} className="border-t-hairline border-t-rule-hairline">
                   {/* Title first in the source, time second — the same order
@@ -188,7 +190,7 @@ export default function SpeakerDetail() {
                       own left-hand column. */}
                   <div className="grid py-sm sm:grid-cols-[9.5rem,1fr] sm:gap-x-md">
                     <h3 className="font-heading text-h3 font-semibold text-text-primary sm:col-start-2 sm:row-start-1">
-                      <Link to={`/schedule/${session.id}`} className="hover:underline">
+                      <Link to={`/schedule/${session.id}`} lang={session.publicLanguage} className="hover:underline">
                         {session.title}
                       </Link>
                     </h3>

@@ -22,7 +22,7 @@ export default function EventHero({
   // the full width at any size, so the slot is stated as the viewport.
   const art = useSizedImageSources(src);
   const caption = typeof image?.caption === 'string' ? image.caption.trim() : '';
-  const figure = src ? <figure className="event-hero__figure">
+  const figure = src ? <figure lang={image.publicLanguage} className="event-hero__figure">
     <div className="event-hero__media">
       <img className="event-hero__art" src={art.src} srcSet={art.srcSet} sizes={art.srcSet ? '100vw' : undefined} onError={art.onError} alt={alt} style={{ objectPosition: focalPosition(image), ...(art.pending ? { visibility: 'hidden' } : null) }} fetchpriority="high" />
       {image.demoTransitSign ? (

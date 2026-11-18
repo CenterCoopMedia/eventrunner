@@ -15,7 +15,7 @@
 // Every outcome email links here, so the page works while the flag is off:
 // a reader can still see what they sent.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';

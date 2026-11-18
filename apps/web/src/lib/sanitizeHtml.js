@@ -52,7 +52,7 @@ const MAX_NODES_WALKED = 20000;
 // element or a text node, so every appendChild is O(1) — nothing we ever
 // move carries an unprocessed subtree with it. Iterative (explicit stack)
 // rather than recursive so pathological depth can't blow the JS call stack.
-function cleanTree(sourceRoot, doc) {
+function cleanTree(sourceRoot, doc, routeLink) {
   const rootFragment = doc.createDocumentFragment();
   const stack = [
     { children: Array.from(sourceRoot.childNodes), index: 0, target: rootFragment },
@@ -92,7 +92,9 @@ function cleanTree(sourceRoot, doc) {
     if (tag === 'a') {
       const href = child.getAttribute('href');
       if (href !== null && isSafeHref(href)) {
-        clean.setAttribute('href', href);
+        const route = routeLink?.(href);
+        clean.setAttribute('href', route?.href ?? href);
+        if (route) clean.setAttribute('data-public-route', route.to);
         // Links in body copy may point anywhere the CMS allows; sever the
         // opener relationship either way.
         clean.setAttribute('rel', 'noopener noreferrer');
@@ -108,13 +110,13 @@ function cleanTree(sourceRoot, doc) {
  * Sanitize a CMS richtext value to the allowlisted subset. Always returns a
  * string; non-strings and parse failures come back as ''.
  */
-export function sanitizeHtml(html) {
+export function sanitizeHtml(html, routeLink) {
   if (typeof html !== 'string' || html === '') return '';
   try {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     if (!doc?.body) return '';
     const container = doc.createElement('div');
-    container.appendChild(cleanTree(doc.body, doc));
+    container.appendChild(cleanTree(doc.body, doc, routeLink));
     return container.innerHTML;
   } catch {
     // Never let a pathological document take the renderer down with it.

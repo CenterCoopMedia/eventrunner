@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { copyTextToClipboard } from '../lib/clipboard.js';
 import { publicUrl } from '../lib/publicUrl.js';
 import { inputClass, quietActionClass } from './controlClasses.js';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 
 function ShareAction({ url, title, shareLabel, copyLabel, className }) {
+  const { text } = usePublicLanguage();
   const [busy, setBusy] = useState(false);
   const [copyOnly, setCopyOnly] = useState(false);
   const [message, setMessage] = useState('');
@@ -21,13 +23,13 @@ function ShareAction({ url, title, shareLabel, copyLabel, className }) {
         await navigator.share({ title, url });
       } else {
         const copied = await copyTextToClipboard(url);
-        setMessage(copied ? 'Link copied.' : 'Copy did not work. Select and copy the link below.');
+        setMessage(copied ? text('Link copied.', 'Enlace copiado.') : text('Copy did not work. Select and copy the link below.', 'No se pudo copiar. Selecciona y copia el enlace de abajo.'));
         setManualCopy(!copied);
       }
     } catch (error) {
       if (error?.name !== 'AbortError') {
         setCopyOnly(true);
-        setMessage('Sharing is unavailable. Copy the link instead.');
+        setMessage(text('Sharing is unavailable. Copy the link instead.', 'No se pudo compartir. Puedes copiar el enlace.'));
       }
     } finally {
       setBusy(false);
@@ -37,12 +39,12 @@ function ShareAction({ url, title, shareLabel, copyLabel, className }) {
   return (
     <div className={`flex flex-wrap items-center gap-xs ${className}`}>
       <button type="button" className={quietActionClass} aria-disabled={busy || undefined} aria-busy={busy || undefined} onClick={activate}>
-        {busy ? (native ? 'Opening share options…' : 'Copying link…') : (native ? shareLabel : copyLabel)}
+        {busy ? (native ? text('Opening share options…', 'Abriendo opciones para compartir…') : text('Copying link…', 'Copiando enlace…')) : (native ? shareLabel : copyLabel)}
       </button>
       <p role="status" className="font-data text-caption text-text-secondary">{message}</p>
       {manualCopy ? (
         <label className="w-full font-data text-caption text-text-secondary">
-          Link to copy
+          {text('Link to copy', 'Enlace para copiar')}
           <input className={inputClass} type="text" readOnly value={url} onFocus={(event) => event.target.select()} />
         </label>
       ) : null}
@@ -51,7 +53,8 @@ function ShareAction({ url, title, shareLabel, copyLabel, className }) {
 }
 
 export default function ShareLink({ path, title, shareLabel = 'Share link', copyLabel = 'Copy link', className = '' }) {
-  const url = publicUrl(path);
+  const { urlLanguage } = usePublicLanguage();
+  const url = publicUrl(path, { language: urlLanguage });
   // A different public target owns fresh feedback, including late answers.
   return <ShareAction key={url} url={url} title={title} shareLabel={shareLabel} copyLabel={copyLabel} className={className} />;
 }

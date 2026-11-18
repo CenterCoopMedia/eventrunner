@@ -21,7 +21,7 @@
 // the server belongs to the request and stays one urgent line at the head
 // of the form (issue 219).
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from './PublicLink.jsx';
 import { submitChangeRequest } from '../lib/changeRequestApi.js';
 import { createSubmissionKey } from '../lib/submissionKey.js';
 import { markChangeRequestSent } from '../lib/changeRequestMarker.js';

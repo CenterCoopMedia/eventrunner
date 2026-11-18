@@ -25,7 +25,8 @@
 // hairline-ruled block tinted by --color-surface-alt — the same device
 // SignInPanel uses — rather than a shadowed, rounded card.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import EmptyState from '../components/EmptyState.jsx';

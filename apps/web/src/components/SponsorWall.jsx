@@ -28,7 +28,8 @@
 //
 // A mark is contained, never cropped: a sponsor's logo is their property
 // and `object-fit: cover` would cut it. Transparent marks sit directly on the page ground.
-import { Link, useLocation } from 'react-router';
+import { useLocation } from 'react-router';
+import { PublicLink as Link } from './PublicLink.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
 import AssetImage from './media/AssetImage.jsx';

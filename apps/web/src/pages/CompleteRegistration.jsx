@@ -10,7 +10,8 @@
 // someone types. When the server says they changed, the page takes the new
 // form and keeps every answer whose question is still asked.
 import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Navigate, useNavigate, useParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { activeQuestions, answerText, answeredQuestions, checkAnswers, readRegistrationForm } from 'shared/registrationForm';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';

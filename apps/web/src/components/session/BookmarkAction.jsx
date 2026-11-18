@@ -2,7 +2,7 @@
 // browser. SessionActions owns the feature flag. Storage refusal preserves
 // the signed-out reader's sign-in path.
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useProfile } from '../../contexts/ProfileContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';

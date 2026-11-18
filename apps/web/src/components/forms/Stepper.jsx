@@ -22,7 +22,7 @@
 // maps the stepper's custom properties onto the admin set. The public
 // default maps them onto the tier-2 theme roles in stepper.css.
 import { useEffect, useRef } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../PublicLink.jsx';
 import { controlStateClass } from '../controlClasses.js';
 import './stepper.css';
 

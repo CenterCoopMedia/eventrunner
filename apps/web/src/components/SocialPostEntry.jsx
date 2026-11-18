@@ -13,7 +13,7 @@
 // read (hooks/useSocialFeed.js useAuthorNames). Without one the entry shows
 // a neutral, unlinked "An attendee".
 import { useEffect, useId, useRef } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from './PublicLink.jsx';
 import { safeUrlHref } from 'shared/urlSafety';
 import ExternalLink from './ExternalLink.jsx';
 import { primaryActionClass, secondaryActionClass, textControlStateClass } from './controlClasses.js';

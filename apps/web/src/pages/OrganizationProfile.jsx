@@ -12,7 +12,7 @@
 // logo, the tier and the order are the event team's, and the page shows
 // the name and the logo for orientation only.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';

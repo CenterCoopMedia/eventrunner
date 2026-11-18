@@ -4,16 +4,8 @@
 // sanitizeHtml's allowlist (no script/style/iframe/event handlers — see
 // src/lib/sanitizeHtml.js). Typography for the subset lives in the
 // .rich-text component class (index.css).
-import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
+import PublicRichText from '../PublicRichText.jsx';
 
 export default function RichTextBlock({ block }) {
-  const html = sanitizeHtml(block?.value);
-  if (!html) return null;
-  return (
-    <div
-      className="rich-text max-w-prose"
-      // Sanitized above — allowlisted tags and attributes only.
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
+  return <PublicRichText value={block?.value} lang={block?.publicLanguage} className="rich-text max-w-prose" />;
 }

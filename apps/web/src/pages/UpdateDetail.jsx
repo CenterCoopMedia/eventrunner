@@ -9,7 +9,8 @@
 //
 // Editorial base restyle (design brief §2.1): the same back-link, header,
 // and body treatment SessionDetail.jsx gives its own detail page.
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import ShareLink from '../components/ShareLink.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -17,6 +18,7 @@ import UpdateContent, { UpdateImage } from '../components/UpdateContent.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { Dateline } from '../components/editorial/Byline.jsx';
 import { publishDateLabel, toPublishDate } from '../lib/updateDates.js';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 
@@ -35,6 +37,7 @@ function NotFoundState() {
 }
 
 export default function UpdateDetail() {
+  const { language } = usePublicLanguage();
   const { id } = useParams();
   const { features, eventConfig } = useEventConfig();
   const { updates } = useContent();
@@ -62,7 +65,7 @@ export default function UpdateDetail() {
   if (!update) return <NotFoundState />;
 
   // On the event's clock (design record §3.1), never the reader's.
-  const dateLabel = publishDateLabel(update.publishAt, eventConfig?.timezone);
+  const dateLabel = publishDateLabel(update.publishAt, eventConfig?.timezone, language);
   const dateInstant = toPublishDate(update.publishAt);
 
   return (

@@ -13,8 +13,7 @@ import { getDay } from 'shared/time';
 const DATE_RE = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/;
 const TIME_24H_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
-// Deterministic display locale for v1 (matches the "9:30 AM" register used
-// across the platform's emails); localization is a later, separate concern.
+// The default keeps the existing English display and wall-clock arithmetic.
 const DISPLAY_LOCALE = 'en-US';
 
 function partsIn(timeZone, instant, options) {
@@ -161,10 +160,21 @@ export function resolveSessionInstants(eventConfig, session) {
  * day or start time cannot be resolved; endIso/endLabel are null when only
  * the end is missing or malformed.
  */
-export function formatSessionTimeRange(eventConfig, session) {
+export function formatSessionTimeRange(eventConfig, session, language) {
   const timeZone = eventConfig?.timezone;
   const { start, end, startDate, endDate } = resolveSessionInstants(eventConfig, session);
   if (!start) return null;
+
+  if (language === 'es') {
+    const clock = new Intl.DateTimeFormat('es', { timeZone, hour: 'numeric', minute: '2-digit' });
+    return {
+      startIso: `${startDate}T${session.startTime}`,
+      startLabel: clock.format(start),
+      endIso: end ? `${endDate}T${session.endTime}` : null,
+      endLabel: end ? clock.format(end) : null,
+      zone: zoneLabel(timeZone, start),
+    };
+  }
 
   const s = clockParts(start, timeZone);
   const e = end ? clockParts(end, timeZone) : null;
@@ -195,8 +205,8 @@ export function formatSessionTimeRange(eventConfig, session) {
  * @param {object} session
  * @returns {{ startIso: string, startLabel: string }|null}
  */
-export function formatSessionStart(eventConfig, session) {
-  const range = formatSessionTimeRange(eventConfig, { ...session, endTime: null });
+export function formatSessionStart(eventConfig, session, language) {
+  const range = formatSessionTimeRange(eventConfig, { ...session, endTime: null }, language);
   return range ? { startIso: range.startIso, startLabel: range.startLabel } : null;
 }
 
@@ -236,7 +246,8 @@ export function isCalendarDate(date) {
  * @param {object} eventConfig
  * @returns {string|null}
  */
-export function eventDateRangeLabel(eventConfig) {
+export function eventDateRangeLabel(eventConfig, language) {
+  if (language === 'es') return formatEventDateRange(eventConfig?.days, eventConfig?.timezone, language);
   const dates = (Array.isArray(eventConfig?.days) ? eventConfig.days : [])
     .map((day) => day?.date)
     .filter(isCalendarDate)
@@ -259,10 +270,10 @@ export function eventDateRangeLabel(eventConfig) {
  * A configured day's date as display copy ("Thursday, October 15"),
  * evaluated on the event's wall clock. Null when unresolvable.
  */
-export function formatDayDate(day, timeZone) {
+export function formatDayDate(day, timeZone, language) {
   const instant = zonedDateTime(day?.date, '12:00', timeZone);
   if (!instant) return null;
-  return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+  return new Intl.DateTimeFormat(language === 'es' ? 'es' : DISPLAY_LOCALE, {
     timeZone,
     weekday: 'long',
     month: 'long',
@@ -291,10 +302,14 @@ function apClock(time) {
  * @param {string} startTime @param {string} endTime
  * @returns {string|null}
  */
-export function formatDayHours(startTime, endTime) {
+export function formatDayHours(startTime, endTime, language) {
   const start = apClock(startTime);
   const end = apClock(endTime);
   if (!start || !end) return null;
+  if (language === 'es') {
+    const clock = (time) => String(time).trim().padStart(5, '0');
+    return `${clock(startTime)} a ${clock(endTime)}`;
+  }
   const startText = start.period && start.period === end.period ? start.clock : `${start.clock} ${start.period}`.trim();
   return `${startText} to ${`${end.clock} ${end.period}`.trim()}`;
 }
@@ -374,7 +389,7 @@ export function countdownParts(msRemaining) {
  * spaced form is used where either side already carries a space, which is
  * the ordinary typographic rule for a range of multi-word endpoints.
  */
-export function formatEventDateRange(days, timeZone) {
+export function formatEventDateRange(days, timeZone, language) {
   const instants = (Array.isArray(days) ? days : [])
     .map((day) => zonedDateTime(day?.date, '12:00', timeZone))
     .filter(Boolean)
@@ -383,6 +398,10 @@ export function formatEventDateRange(days, timeZone) {
 
   const first = instants[0];
   const last = instants[instants.length - 1];
+  if (language === 'es') {
+    const date = new Intl.DateTimeFormat('es', { timeZone, dateStyle: 'long' });
+    return date.formatRange(first, last);
+  }
   const parts = (instant, options) => partsIn(timeZone, instant, options);
   const startParts = parts(first, { year: 'numeric', month: 'long', day: 'numeric' });
   const endParts = parts(last, { year: 'numeric', month: 'long', day: 'numeric' });

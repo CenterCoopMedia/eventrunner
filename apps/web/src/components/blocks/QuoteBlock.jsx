@@ -20,7 +20,7 @@ function text(value) {
 /** The plain quotation: body copy with a rule, for a page's second quote. */
 function PlainQuote({ line, attribution }) {
   return (
-    <figure className="quote-plain max-w-prose">
+    <figure lang={block.publicLanguage} className="quote-plain max-w-prose">
       <blockquote>
         <p className="text-body text-text-primary text-pretty">“{line}”</p>
       </blockquote>

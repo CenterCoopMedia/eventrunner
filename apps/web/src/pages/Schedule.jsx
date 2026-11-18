@@ -9,10 +9,11 @@
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router';
+import { useLocation, useNavigationType, useSearchParams } from 'react-router';
+import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { pageHeading } from 'shared/page';
 import { functionsOrigin } from '../lib/firebaseSettings.js';
-import { useContent } from '../contexts/ContentContext.jsx';
+import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import { useBookmarkCounts } from '../hooks/useBookmarkCounts.js';
@@ -76,6 +77,7 @@ function dayClass(isActive) {
 }
 
 export default function Schedule() {
+  const { language, text } = usePublicLanguage();
   const { eventConfig, features, theme } = useEventConfig();
   const { scheduleData, speakers, loading, getSectionBlocks, getPage } = useContent();
   const page = getPage?.('schedule');
@@ -211,8 +213,8 @@ export default function Schedule() {
   // stale URL cannot select an order the page never offered.
   const sort = view.sort === 'saved' && features.sessionBookmarks ? 'saved' : 'time';
   const sortOptions = [
-    { value: 'time', label: 'By time' },
-    ...(features.sessionBookmarks ? [{ value: 'saved', label: 'Most saved' }] : []),
+    { value: 'time', label: text('By time', 'Por hora') },
+    ...(features.sessionBookmarks ? [{ value: 'saved', label: text('Most saved', 'Más guardadas') }] : []),
   ];
   // The take-it-with-you controls (issue #166): the PDF request's state and
   // the copy action's answer are the only local state on the page.
@@ -358,7 +360,7 @@ export default function Schedule() {
   const archived = eventIsArchived(eventConfig);
   const backIssue = activeDay ? isBackIssue(activeDay, eventConfig) : false;
   const hasAnySession = sessionsByDay.size > 0;
-  const nameplate = buildNameplate(eventConfig);
+  const nameplate = buildNameplate(eventConfig, { language });
   const dateline = [nameplate.dates, nameplate.edition].filter(Boolean).join(' · ');
   const eventZoneLabel = activeDay
     ? zoneLabel(
@@ -375,7 +377,7 @@ export default function Schedule() {
       />
       <header className="schedule-page-header">
         <div>
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">{pageHeading(page) || 'Schedule'}</h1>
+          <h1 lang={page?.publicLanguage} className="font-heading text-h1 font-semibold text-text-primary">{pageHeading(page) || text('Schedule', 'Programa')}</h1>
           {dateline ? <p className="schedule-dateline mt-xs font-data text-caption text-text-secondary">{dateline}</p> : null}
           {IS_DEMO ? (
             <p className="mt-2xs max-w-prose text-body text-text-secondary">
@@ -384,7 +386,7 @@ export default function Schedule() {
           ) : null}
           {eventZoneLabel ? (
             <p className="mt-2xs font-data text-caption text-text-secondary">
-              All times are shown in {eventZoneLabel}.
+              {text(`All times are shown in ${eventZoneLabel}.`, `El programa usa la zona horaria ${eventZoneLabel}.`)}
             </p>
           ) : null}
           {/* The legend for the saved figure (issue #165). It sits on the
@@ -401,13 +403,13 @@ export default function Schedule() {
 
       {loading ? (
         <div className="mt-lg">
-          <LoadingState shape="schedule" label="Loading the schedule…" />
+          <LoadingState shape="schedule" label={text('Loading the schedule…', 'Cargando el programa…')} />
         </div>
       ) : !hasAnySession || !activeDay ? (
         <div className="mt-lg">
           <EmptyState
-            title="The schedule isn’t published yet"
-            description="Sessions appear here as soon as they’re announced — check back closer to the event."
+            title={text('The schedule isn’t published yet', 'El programa aún no se ha publicado')}
+            description={text('Sessions appear here as soon as they’re announced — check back closer to the event.', 'Aquí aparecerán las sesiones cuando se anuncien. Vuelve a consultar el programa cuando se acerque el evento.')}
           />
         </div>
       ) : (
@@ -419,7 +421,7 @@ export default function Schedule() {
             {days.length > 1 ? (
               <div
                 role="group"
-                aria-label="Event days"
+                aria-label={text('Event days', 'Días del evento')}
                 className="schedule-days mt-sm flex flex-wrap"
               >
                 {days.map((day) => {
@@ -446,23 +448,23 @@ export default function Schedule() {
             <div className="schedule-toolbar">
               <div ref={searchRef} className="schedule-search">
                 <SearchField
-                  label="Search this day"
+                  label={text('Search this day', 'Buscar en este día')}
                   value={query}
                   onChange={(next) => updateView({ q: next }, { replace: true })}
                   status={
                     query.trim()
-                      ? `${matchedCount} sessions match “${query.trim()}”`
+                      ? text(`${matchedCount} sessions match “${query.trim()}”`, `${matchedCount} sesiones coinciden con «${query.trim()}»`)
                       : activeFilterCount > 0
-                        ? `${matchedCount} sessions match the selected filters`
+                        ? text(`${matchedCount} sessions match the selected filters`, `${matchedCount} sesiones coinciden con los filtros seleccionados`)
                         : undefined
                   }
-                  placeholder="Title, room, speaker…"
+                  placeholder={text('Title, room, speaker…', 'Título, sala, ponente…')}
                 />
               </div>
               <div className="schedule-toolbar__actions">
                 {sortOptions.length > 1 ? (
                   <SortControl
-                    label="Sort sessions"
+                    label={text('Sort sessions', 'Ordenar sesiones')}
                     options={sortOptions}
                     value={sort}
                     onChange={(next) => updateView({ sort: next })}
@@ -477,9 +479,9 @@ export default function Schedule() {
                     aria-controls={filtersId}
                     onClick={() => setFiltersExpanded((expanded) => !expanded)}
                   >
-                    Filters
+                    {text('Filters', 'Filtros')}
                     {activeFilterCount > 0 ? (
-                      <span className="font-normal">{activeFilterCount} active</span>
+                      <span className="font-normal">{text(`${activeFilterCount} active`, `${activeFilterCount} en uso`)}</span>
                     ) : null}
                     <svg
                       className="schedule-filters-toggle__chevron"
@@ -498,7 +500,7 @@ export default function Schedule() {
                   programme behind its feature flag. */}
                 {features.sessionBookmarks ? (
                   <Link to="/schedule/mine" className={quietActionClass}>
-                    My schedule
+                    {text('My schedule', 'Mi programa')}
                   </Link>
                 ) : null}
                 {features.icsExport && !archived && visibleSessions.length > 0 ? (
@@ -509,12 +511,12 @@ export default function Schedule() {
                     }}
                     className={quietActionClass}
                   >
-                    Download schedule (.ics)
+                    {text('Download schedule (.ics)', 'Descargar el programa (.ics)')}
                   </button>
                 ) : null}
                 {visibleSessions.length > 0 ? (
                   <button type="button" onClick={() => window.print()} className={quietActionClass}>
-                    Print the schedule
+                    {text('Print the schedule', 'Imprimir el programa')}
                   </button>
                 ) : null}
                 {features.schedulePdf && visibleSessions.length > 0 ? (
@@ -524,7 +526,7 @@ export default function Schedule() {
                     disabled={pdfState.status === 'loading'}
                     className={quietActionClass}
                   >
-                    Download schedule (PDF)
+                    {text('Download schedule (PDF)', 'Descargar el programa (PDF)')}
                   </button>
                 ) : null}
                 {pdfState.status === 'error' ? (
@@ -551,22 +553,22 @@ export default function Schedule() {
                 {formatOptions.length > 0 ? (
                   <div className="schedule-facet">
                     <FilterGroup
-                      legend="Format"
+                      legend={text('Format', 'Formato')}
                       options={formatOptions}
                       selected={formats}
                       onChange={(next) => updateView({ formats: next })}
-                      clearLabel="Clear format filter"
+                      clearLabel={text('Clear format filter', 'Quitar el filtro de formato')}
                     />
                   </div>
                 ) : null}
                 {trackOptions.length > 0 ? (
                   <div className="schedule-facet">
                     <FilterGroup
-                      legend="Track"
+                      legend={text('Track', 'Tema')}
                       options={trackOptions}
                       selected={tracks}
                       onChange={(next) => updateView({ tracks: next })}
-                      clearLabel="Clear track filter"
+                      clearLabel={text('Clear track filter', 'Quitar el filtro de tema')}
                     />
                   </div>
                 ) : null}
@@ -605,9 +607,9 @@ export default function Schedule() {
                         only where the page is a plate book: the token, not a
                         theme test in here, decides that. */}
                     <PlateNumber position={days.indexOf(activeDay) + 1} />
-                    {formatDayDate(activeDay, eventConfig.timezone) ? (
+                    {formatDayDate(activeDay, eventConfig.timezone, language) ? (
                       <time dateTime={activeDay.date}>
-                        {formatDayDate(activeDay, eventConfig.timezone)}
+                        {formatDayDate(activeDay, eventConfig.timezone, language)}
                       </time>
                     ) : null}
                     {/* The "Back issue" folio the device asks for, beside the
@@ -615,8 +617,8 @@ export default function Schedule() {
                         (brief §2.4). */}
                     {backIssue ? (
                       <>
-                        {formatDayDate(activeDay, eventConfig.timezone) ? ' · ' : null}
-                        Back issue
+                        {formatDayDate(activeDay, eventConfig.timezone, language) ? ' · ' : null}
+                        {text('Back issue', 'Archivo')}
                       </>
                     ) : null}
                   </>
@@ -630,15 +632,15 @@ export default function Schedule() {
               <Marginalia mark="squiggle" className="mt-3xs" />
               {activeSessions.length === 0 ? (
                 <p data-schedule-results="" className="mt-md max-w-prose text-body text-text-secondary">
-                  No sessions are announced for {activeDay.label} yet.
+                  {text(`No sessions are announced for ${activeDay.label} yet.`, `Todavía no se han anunciado sesiones para ${activeDay.label}.`)}
                 </p>
               ) : entries.length === 0 ? (
                 // An empty result states what was searched (issue #162), so
                 // an empty page is never mistaken for an empty day.
                 <p data-schedule-results="" className="mt-md max-w-prose text-body text-text-secondary">
                   {query.trim()
-                    ? `No sessions on ${activeDay.label} match “${query.trim()}”. Clear the search or a filter to see more sessions.`
-                    : `No sessions on ${activeDay.label} match the selected filters. Clear a filter to see more sessions.`}
+                    ? text(`No sessions on ${activeDay.label} match “${query.trim()}”. Clear the search or a filter to see more sessions.`, `Ninguna sesión de ${activeDay.label} coincide con «${query.trim()}». Borra la búsqueda o quita un filtro para ver más sesiones.`)
+                    : text(`No sessions on ${activeDay.label} match the selected filters. Clear a filter to see more sessions.`, `Ninguna sesión de ${activeDay.label} coincide con los filtros seleccionados. Quita un filtro para ver más sesiones.`)}
                 </p>
               ) : showGrid ? (
                 // The programme page: time down, lettered lines across (brief

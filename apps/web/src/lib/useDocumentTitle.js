@@ -125,7 +125,7 @@ export function useDocumentTitle(part) {
  * @param {{ pathname: string, pages?: Array<object>|null, features?: object|null }} args
  * @returns {string|null}
  */
-export function routeTitlePartFor({ pathname, pages, features }) {
+export function routeTitlePartFor({ pathname, pages, features, pitchTitle = 'Pitch a session' }) {
   const path = typeof pathname === 'string' && pathname.length > 1
     ? pathname.replace(/\/+$/, '')
     : '/';
@@ -136,7 +136,7 @@ export function routeTitlePartFor({ pathname, pages, features }) {
   // event name alone: "Home" names the document for an editor, not the
   // site for a reader.
   if (path === '/') return null;
-  if (path === '/pitch' || path.startsWith('/pitch/')) return 'Pitch a session';
+  if (path === '/pitch' || path.startsWith('/pitch/')) return pitchTitle;
 
   const systemId = systemPageIdForPath(path);
   if (systemId) {
