@@ -140,6 +140,7 @@ async function withdrawApplication(deps, { body, user }) {
     releaseNames(tx, db, held);
     tx.update(ref, {
       status: 'withdrawn',
+      ...(data.eventMountConsent ? { eventMountConsent: null } : {}),
       updatedAt: at,
       updatedBy: user.uid,
       history: [...(Array.isArray(data.history) ? data.history : []), historyEntry('withdrawn', at, user.uid)],

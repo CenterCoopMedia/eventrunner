@@ -12,9 +12,10 @@
  */
 
 const { ConsoleError } = require('./http.cjs');
+const { clientHostRef } = require('./clientHostRecords.cjs');
 const { ANSWER_STEPS, MAX_DAYS, cleanStep, withDefaults } = require('./answers.cjs');
 const { checkAnswers, stepErrors } = require('./checks.cjs');
-const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames, siteNameProblem } = require('./siteNames.cjs');
+const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames, siteAddress, siteNameProblem } = require('./siteNames.cjs');
 const { readApplication, requireMember } = require('./applications.cjs');
 
 const LOCKED = 'You accepted the agreement or closed this request, so you cannot change it now.';
@@ -44,7 +45,10 @@ async function reserveSiteName(tx, db, { appId, orgId, name, at }) {
   const ref = db.collection(SITE_NAMES).doc(name);
   const snap = await tx.get(ref);
   if (snap.exists && snap.data().appId !== appId) return { 'webAddress.name': TAKEN.message };
-  if (!snap.exists) tx.create(ref, { appId, orgId, reservedAt: at });
+  if (!snap.exists) {
+    if ((await tx.get(clientHostRef(db, siteAddress(name)))).exists) return { 'webAddress.name': TAKEN.message };
+    tx.create(ref, { appId, orgId, reservedAt: at });
+  }
   releaseNames(tx, db, held.filter((other) => other !== name));
   return null;
 }

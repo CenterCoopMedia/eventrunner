@@ -20,6 +20,7 @@
  */
 
 const { ConsoleError } = require('./http.cjs');
+const { removeEventMount } = require('./clientHostRecords.cjs');
 const {
   NOT_FOUND, applicationRef, ownerEmails, requireAppId, requireOperator, reviewedAnswers,
 } = require('./reviewAccess.cjs');
@@ -65,6 +66,7 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, revis
     const at = new Date(now());
     tx.update(ref, {
       status: to,
+      ...(to === 'declined' && app.eventMountConsent ? { eventMountConsent: null } : {}),
       updatedAt: at,
       updatedBy: user.uid,
       history: [...history, { status: to, at, by: user.uid, note }],
@@ -162,8 +164,10 @@ async function closeApplication(deps, { body, user }) {
     }
     const held = await heldNames(tx, db, appId);
     const accounts = await readConnectedAccounts(tx, db, appId);
+    await removeEventMount(tx, db, appId);
     tx.update(ref, {
       status: 'declined',
+      ...(current.eventMountConsent ? { eventMountConsent: null } : {}),
       connections: {},
       updatedAt: at,
       updatedBy: user.uid,

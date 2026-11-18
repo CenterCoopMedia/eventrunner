@@ -6,11 +6,14 @@
 // rate limits from the browser. The suite runs under its own demo project
 // id, so the client rules suites on the same emulator are not affected.
 import { readFileSync } from 'node:fs';
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
+import { deleteApp, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where,
 } from 'firebase/firestore';
+import enrollment from '../functions/src/clientHostEnrollment.cjs';
 
 const PROJECT_ID = 'demo-eventrunner-console';
 
@@ -84,6 +87,53 @@ describe('connected accounts', () => {
       await assertFails(getDoc(doc(db, 'console_token_deletions/a1')));
       await assertFails(getDocs(collection(db, 'console_connection_states')));
       await assertFails(setDoc(doc(db, 'console_connection_states/h2'), { uid: 'zed' }));
+    }
+  });
+});
+
+describe('event mount reservations', () => {
+  it('keeps host approvals and routes private even for browser operators', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'console_client_hosts/client.example.test'), { revision: 1 });
+      await setDoc(doc(db, 'console_event_mounts/a1'), { state: 'enrolled' });
+    });
+    for (const db of [ana(), operator()]) {
+      for (const path of ['console_client_hosts/client.example.test', 'console_event_mounts/a1']) {
+        await assertFails(getDoc(doc(db, path)));
+        await assertFails(setDoc(doc(db, path), { state: 'published' }));
+      }
+    }
+  });
+
+  it('lets just one concurrent reservation claim overlapping routes on an approved host', async () => {
+    const admin = initializeApp({ projectId: PROJECT_ID }, 'mount-reservation-test');
+    try {
+      const db = getFirestore(admin);
+      const host = 'client.example.test';
+      const fixtures = [
+        { appId: 'a1', orgId: 'o1', user: { uid: 'ana' }, path: 'events' },
+        { appId: 'a2', orgId: 'o2', user: { uid: 'cy' }, path: 'events/summit' },
+      ];
+      const batch = db.batch();
+      batch.set(db.doc(`console_client_hosts/${host}`), { host, revision: 1, authority: { reference: 'fixture' } });
+      for (const { appId, orgId } of fixtures) {
+        batch.set(db.doc(`applications/${appId}`), { orgId, status: 'ready' });
+        batch.set(db.doc(`console_builds/${appId}`), { resources: { projectId: `event-project-${appId}`, site: `event-site-${appId}` } });
+      }
+      await batch.commit();
+      await Promise.all(fixtures.map(({ appId, orgId, user, path }) => enrollment.consentEventMount({ db }, {
+        body: { orgId, appId, publicBase: `https://${host}/${path}/`, confirm: true }, user,
+      })));
+      const results = await Promise.allSettled(fixtures.map(({ appId, path }) => enrollment.manageEventMount({ db }, {
+        body: { appId, action: 'enroll', publicBase: `https://${host}/${path}/` },
+        user: { uid: 'ops', email: 'ops@ccm.example' },
+      })));
+      expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
+      expect(results.find(({ status }) => status === 'rejected')?.reason).toMatchObject({ code: 'mount-conflict' });
+      expect((await db.collection('console_event_mounts').where('host', '==', host).get()).size).toBe(1);
+    } finally {
+      await deleteApp(admin);
     }
   });
 });

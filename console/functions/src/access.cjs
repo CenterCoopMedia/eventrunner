@@ -41,22 +41,22 @@ function validOrgId(value) {
 }
 
 /** @returns {Promise<boolean>} */
-async function isOperator(db, email) {
-  const snap = await db.collection('console_config').doc('operators').get();
+async function isOperator(db, email, get = (ref) => ref.get()) {
+  const snap = await get(db.collection('console_config').doc('operators'));
   const list = snap.exists ? snap.data().emails : null;
   if (!Array.isArray(list)) return false;
   return list.some((entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email);
 }
 
 /** @returns {Promise<object|null>} */
-async function readMember(db, orgId, uid) {
-  const snap = await db.collection('organizations').doc(orgId).collection('members').doc(uid).get();
+async function readMember(db, orgId, uid, get = (ref) => ref.get()) {
+  const snap = await get(db.collection('organizations').doc(orgId).collection('members').doc(uid));
   return snap.exists ? snap.data() : null;
 }
 
-async function requireOrganization(db, orgId) {
+async function requireOrganization(db, orgId, get = (ref) => ref.get()) {
   if (!validOrgId(orgId)) throw new ConsoleError(400, 'bad-request', 'Choose an organization.');
-  const snap = await db.collection('organizations').doc(orgId).get();
+  const snap = await get(db.collection('organizations').doc(orgId));
   if (!snap.exists) throw new ConsoleError(404, 'not-found', 'We could not find that organization.');
   return snap.data();
 }
@@ -66,9 +66,9 @@ async function requireOrganization(db, orgId) {
  * Editor is told, so each action can say what only an Owner can do.
  * @returns {Promise<object>} the caller's member record
  */
-async function requireOwner(db, orgId, user, refusal = 'Only an Owner can change the team.') {
-  await requireOrganization(db, orgId);
-  const member = await readMember(db, orgId, user.uid);
+async function requireOwner(db, orgId, user, refusal = 'Only an Owner can change the team.', get) {
+  await requireOrganization(db, orgId, get);
+  const member = await readMember(db, orgId, user.uid, get);
   if (!member) throw new ConsoleError(404, 'not-found', 'We could not find that organization.');
   if (member.role !== 'owner') {
     throw new ConsoleError(403, 'forbidden', refusal);

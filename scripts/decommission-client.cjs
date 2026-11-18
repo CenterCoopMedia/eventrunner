@@ -4,6 +4,7 @@
 /** The site builder's inverse. All I/O is injected. See runbook §12.6. */
 const { createHash } = require('node:crypto');
 const { toMillis } = require('../console/functions/src/access.cjs');
+const { eventMountRef, purgeEventMount } = require('../console/functions/src/clientHostRecords.cjs');
 const { historyEntry } = require('../console/functions/src/applications.cjs');
 const { BUILD_COLLECTION, canRetryBuild } = require('../console/functions/src/buildState.cjs');
 const { approvalDefaults, readConsoleSettings, normalizeProjectId } = require('../console/functions/src/consoleSettings.cjs');
@@ -710,6 +711,7 @@ async function consoleRecords(ctx) {
     const refs = [appRef(ctx), buildRef(ctx), db.collection(ACCOUNT_COLLECTION).doc(ctx.appId), db.collection(DELETION_COLLECTION).doc(ctx.appId)];
     const snaps = await Promise.all(refs.map((r) => tx.get(r)));
     const held = await tx.get(db.collection('site_names').where('appId', '==', ctx.appId));
+    await purgeEventMount(tx, db, ctx.appId);
     for (let i = 0; i < refs.length; i += 1) if (snaps[i].exists) tx.delete(refs[i]);
     // Built names stay reserved: Google never reuses a project id. Remove the
     // orgId, which is not needed to keep that reservation.
@@ -782,6 +784,11 @@ async function inspect(ctx) {
   }
   for (const provider of PROVIDERS) await check(`console-secret:${provider}`, async () => ({ state: await secretExists(ctx, ctx.deps.env.CONSOLE_PROJECT_ID, connectionSecretId(ctx.appId, provider)) ? 'present' : 'absent' }));
   for (const collection of ['applications', BUILD_COLLECTION, ACCOUNT_COLLECTION, DELETION_COLLECTION]) await check(`console:${collection}`, async () => ({ state: (await ctx.deps.db.collection(collection).doc(ctx.appId).get()).exists ? 'present' : 'absent' }));
+  await check('console:event-mount-private', async () => {
+    const route = (await eventMountRef(ctx.deps.db, ctx.appId).get()).data();
+    const remaining = route && (route.state !== 'removed' || route.consent || route.enrolledBy || route.changedBy);
+    return { state: remaining ? 'present' : 'absent' };
+  });
   for (const collection of ['signup_links', STATE_COLLECTION]) await check(`console:${collection}`, async () => ({ state: (await ctx.deps.db.collection(collection).where('appId', '==', ctx.appId).limit(1).get()).docs.length ? 'present' : 'absent' }));
   const leftovers = Object.entries(checks).filter(([id, value]) => value.state === 'unknown' || (value.state === 'present' && !(id === 'project' && value.lifecycle === 'DELETE_REQUESTED'))).map(([id]) => id);
   return { appId: ctx.appId, checks, leftovers, ok: leftovers.length === 0 };

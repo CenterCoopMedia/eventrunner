@@ -287,6 +287,21 @@ test('restore re-releases the saved version and restores the previous status', a
   assert.equal(s.db.writes.length, writes);
 });
 
+test('purge scrubs one enrollment and retains its path reservation', async () => {
+  const route = {
+    appId: 'a1', host: 'client.example.test', mount: '/first', publicBase: 'https://client.example.test/first/',
+    projectId: PROJECT, hostingOrigin: `https://${SITE}.web.app`, state: 'enrolled',
+  };
+  const sibling = { ...route, appId: 'a2', mount: '/second', publicBase: 'https://client.example.test/second/' };
+  const s = archived({ seed: {
+    'console_event_mounts/a1': { ...route, consent: { orgId: 'o1', by: 'owner' }, enrolledBy: 'operator' },
+    'console_event_mounts/a2': sibling,
+  } });
+  assert.equal(await s.run('purge'), 0);
+  assert.deepEqual(s.db.read('console_event_mounts/a1'), { ...route, state: 'removed' });
+  assert.deepEqual(s.db.read('console_event_mounts/a2'), sibling);
+});
+
 test('archive accepts failed builds and closed requests whose build began, and refuses active builds', async () => {
   const failed = setup({ app: { status: 'building', buildStart: { state: 'failed', at: new Date(NOW) } }, build: { state: 'failed' } });
   assert.equal(await failed.run('archive'), 0);

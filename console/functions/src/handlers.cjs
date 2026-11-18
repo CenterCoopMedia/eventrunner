@@ -38,6 +38,7 @@ const { getApplication, listApplications } = require('./applications.cjs');
 const { saveApplicationStep } = require('./applicationSave.cjs');
 const { withdrawApplication } = require('./applicationStatus.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
+const { consentEventMount, manageEventMount } = require('./clientHostEnrollment.cjs');
 const { getApplicationForReview, listApplicationsForReview } = require('./reviewQueue.cjs');
 const { closeApplication, declineApplication, launchApplication } = require('./reviewDecisions.cjs');
 const { deleteSpamApplication, runRetention } = require('./cleanup.cjs');
@@ -78,6 +79,8 @@ const ENDPOINTS = Object.freeze({
   listApplications: { action: listApplications },
   saveApplicationStep: { action: saveApplicationStep },
   checkWebAddress: { action: checkWebAddress },
+  consentEventMount: { action: consentEventMount },
+  manageEventMount: { action: manageEventMount },
   withdrawApplication: { action: withdrawApplication, mail: true },
   // Signup links and the agreement (ADR 0007, amendment 2026-11-04).
   createSignupLink: { action: createSignupLink },

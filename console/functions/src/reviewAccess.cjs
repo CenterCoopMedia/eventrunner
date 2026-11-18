@@ -21,8 +21,8 @@ const NOT_FOUND = 'We could not find that request.';
  * The caller must be on the operator allowlist, read live on each call.
  * @throws {ConsoleError} 403 not-operator
  */
-async function requireOperator(db, user) {
-  if (!(await isOperator(db, user.email))) throw new ConsoleError(403, 'not-operator', NOT_OPERATOR);
+async function requireOperator(db, user, get) {
+  if (!(await isOperator(db, user.email, get))) throw new ConsoleError(403, 'not-operator', NOT_OPERATOR);
 }
 
 /** @throws {ConsoleError} 400 when the id is not one document id */

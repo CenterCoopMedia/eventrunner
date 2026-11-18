@@ -1,5 +1,7 @@
 'use strict';
 
+const { clientHostRef } = require('./clientHostRecords.cjs');
+
 /**
  * Web-address names (ADR 0007 §3, "Your web address").
  *
@@ -71,6 +73,9 @@ async function siteNameVerdict(db, name, appId) {
   if (problem) return { available: false, ...problem };
   const snap = await db.collection(COLLECTION).doc(name).get();
   if (snap.exists && snap.data().appId !== appId) return { available: false, ...TAKEN };
+  if (!snap.exists && (await clientHostRef(db, siteAddress(name)).get()).exists) {
+    return { available: false, ...TAKEN };
+  }
   return { available: true };
 }
 
