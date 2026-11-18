@@ -33,6 +33,7 @@
  */
 
 const crypto = require('node:crypto');
+const { eventPageUrl } = require('../core/config.cjs');
 
 const SPEAKER_INVITES = 'speaker_invites';
 
@@ -99,8 +100,8 @@ function timestampMs(value) {
  * @returns {string}
  */
 function buildInviteUrl(config, token) {
-  const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
-  return `${site}/speaker/accept?token=${encodeURIComponent(token)}`;
+  const path = `/speaker/accept?token=${encodeURIComponent(token)}`;
+  return eventPageUrl(config, path) ?? path;
 }
 
 /**

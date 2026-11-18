@@ -3,6 +3,7 @@
 // Access is committed before email preparation. Reuse the central send-once
 // claim and email log; there is no background retry or separate mail queue.
 const { resolveAdminTier, staffExpiryOf } = require('../core/auth.cjs');
+const { eventPageUrl } = require('../core/config.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { render } = require('../email/render.cjs');
 const { loadTemplate } = require('../email/templates.cjs');
@@ -40,16 +41,6 @@ async function activeAccount({ db, email, now = Date.now }) {
   return { tier, expiresAtMs: expiry?.expiresAtMs ?? null };
 }
 
-/** Configured event address, never an inferred host or one-time invitation. */
-function adminUrl(config) {
-  const raw = config?.tierA?.publicUrl;
-  const url = new URL(raw);
-  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
-    throw new Error('Invalid event address');
-  }
-  return `${raw.trim().replace(/\/+$/, '')}/admin`;
-}
-
 /** accepted means the provider accepted it, never that it was delivered. */
 async function sendAccessInstructions({ db, getConfig, sendEmail, email, onceKey, now = Date.now, env = process.env, log = console }) {
   let message;
@@ -70,7 +61,8 @@ async function sendAccessInstructions({ db, getConfig, sendEmail, email, onceKey
     const account = await activeAccount({ db, email, now });
     if (!account.tier) return { status: 'failed', reason: 'inactive-access' };
     reason = 'event-address';
-    const url = adminUrl(config);
+    const url = eventPageUrl(config, '/admin', env);
+    if (!url) throw new Error('Invalid event address');
     reason = 'email-render';
     const rendered = render({
       template, override, config, now: () => new Date(now()),

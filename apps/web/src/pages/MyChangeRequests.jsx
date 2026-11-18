@@ -24,6 +24,7 @@ import { secondaryActionClass } from '../components/controlClasses.js';
 import { listMyChangeRequests } from '../lib/changeRequestApi.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { eventAppPath } from '../lib/eventPath.js';
 
 const STATUS_WORDS = Object.freeze({
   new: 'Received',
@@ -37,13 +38,14 @@ export function statusWord(status) {
   return STATUS_WORDS[status] ?? STATUS_WORDS.new;
 }
 
-/** The address as a link target, or null when it is not on this site's origin. */
-function sameOriginHref(value) {
+/** Only stored results within this event can become a link. */
+function eventResultHref(value) {
   if (typeof value !== 'string' || typeof window === 'undefined') return null;
   try {
     const url = new URL(value);
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
-    return url.origin === window.location.origin ? url.href : null;
+    if (url.username || url.password || url.origin !== window.location.origin || eventAppPath(url.pathname) === null) return null;
+    return url.href;
   } catch {
     return null;
   }
@@ -62,7 +64,7 @@ function Time({ iso }) {
 /** One request, as its requester reads it. */
 function RequestItem({ request }) {
   const outcome = request.outcome;
-  const resultHref = sameOriginHref(outcome?.resultUrl);
+  const resultHref = eventResultHref(outcome?.resultUrl);
   // A "new" after the first entry is the request opened again.
   const history = (request.history || []).map((entry, index) => ({
     ...entry,

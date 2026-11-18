@@ -89,8 +89,8 @@
  */
 
 const crypto = require('node:crypto');
-const { parseEventPublicBase } = require('shared/config/publicBase');
 const { stripEventMount } = require('shared/config/publicPath');
+const { eventPublicAddress } = require('../core/config.cjs');
 const { requireAdmin, resolveAdminTier, internals: { extractBearerToken } } = require('../core/auth.cjs');
 const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
@@ -338,7 +338,7 @@ function readResultUrl(value, publicUrl) {
   }
   let address;
   try {
-    address = parseEventPublicBase(publicUrl ?? undefined, { allowHttpLoopback: process.env.FUNCTIONS_EMULATOR === 'true' });
+    address = eventPublicAddress(publicUrl);
     if (!address.publicBase) throw new Error('A public URL is required');
   } catch {
     return { ok: false, message: 'resultUrl: this site has no public address set, so a result link cannot be checked.' };

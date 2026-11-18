@@ -93,6 +93,7 @@
 
 const crypto = require('node:crypto');
 const { resolveRegistrationAction } = require('shared/registration');
+const { eventPageUrl } = require('../../core/config.cjs');
 
 const API_BASE = 'https://www.eventbriteapi.com/v3';
 const { normalizeTicketClassId } = require('shared/ticketAccess');
@@ -249,8 +250,7 @@ function safeEqual(a, b) {
  * @param {object|null} config @returns {string|null}
  */
 function claimUrl(config) {
-  const site = typeof config?.tierA?.publicUrl === 'string' ? config.tierA.publicUrl.replace(/\/+$/, '') : '';
-  return site ? `${site}/ticket/claim` : null;
+  return eventPageUrl(config, '/ticket/claim');
 }
 
 /**

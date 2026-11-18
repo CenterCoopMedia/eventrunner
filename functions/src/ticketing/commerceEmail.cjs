@@ -3,8 +3,8 @@
 // Firestore is a wake-up only. Re-read current financial and admission state,
 // then use the existing managed-email send-once contract. No email work queue.
 const { isOrderFulfilled } = require('shared/ticketCommerce');
-const { parseEventPublicBase } = require('shared/config/publicBase');
 const { joinEventPath } = require('shared/config/publicPath');
+const { eventPublicAddress } = require('../core/config.cjs');
 const { createHash } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { attendeeLanguage } = require('../email/attendeeLanguage.cjs');
@@ -20,7 +20,7 @@ function receiptAmount(order, language = 'en') {
 }
 
 function confirmationPublicBase(env) {
-  const { publicBase } = parseEventPublicBase(env.EVENT_PUBLIC_URL, { allowHttpLoopback: env.FUNCTIONS_EMULATOR === 'true' });
+  const { publicBase } = eventPublicAddress(env.EVENT_PUBLIC_URL, env);
   if (!publicBase) {
     throw new Error('Ticket confirmations require a configured public event URL.');
   }

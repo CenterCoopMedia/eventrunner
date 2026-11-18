@@ -36,6 +36,7 @@
  */
 
 const crypto = require('node:crypto');
+const { eventPageUrl } = require('../core/config.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
@@ -83,28 +84,21 @@ function newUnsubscribeKey() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-/** @param {object} config */
-function siteUrlOf(config) {
-  const url = config?.tierA?.publicUrl;
-  return typeof url === 'string' ? url.replace(/\/+$/, '') : '';
-}
-
 /**
  * The live link for one recipient of one send, or null when the site has
  * no public URL to put it on.
  */
 function unsubscribeUrlFor({ config, sendId, key, email }) {
-  const site = siteUrlOf(config);
-  if (!site) return null;
+  const url = eventPageUrl(config, UNSUBSCRIBE_PATH);
+  if (!url) return null;
   const rid = suppressionIdFor(email);
   const params = new URLSearchParams({ s: sendId, r: rid, t: signUnsubscribe(key, sendId, rid) });
-  return `${site}${UNSUBSCRIBE_PATH}?${params.toString()}`;
+  return `${url}?${params.toString()}`;
 }
 
 /** The inert link a test send and the preview carry. */
 function testUnsubscribeUrl(config) {
-  const site = siteUrlOf(config);
-  return site ? `${site}${UNSUBSCRIBE_PATH}?test=1` : null;
+  return eventPageUrl(config, `${UNSUBSCRIBE_PATH}?test=1`);
 }
 
 /**
@@ -391,7 +385,6 @@ module.exports = {
     RATE_LIMIT_MAX,
     UNSUBSCRIBE_PATH,
     EMAIL_RE,
-    siteUrlOf,
     page,
   },
 };

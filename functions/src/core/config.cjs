@@ -1,5 +1,8 @@
 'use strict';
 
+const { parseEventPublicBase } = require('shared/config/publicBase');
+const { joinEventPath } = require('shared/config/publicPath');
+
 /**
  * Config loader for the functions runtime (spec §2.4).
  *
@@ -15,6 +18,16 @@
 
 const CONFIG_DOC_IDS = ['event', 'features', 'theme', 'badges', 'providers', 'bootstrap'];
 const CACHE_TTL_MS = 5 * 60 * 1000;
+
+/** Local emulator mail links can use the existing HTTP loopback address. */
+function eventPublicAddress(value, env = process.env) {
+  return parseEventPublicBase(value ?? undefined, { allowHttpLoopback: env.FUNCTIONS_EMULATOR === 'true' });
+}
+
+function eventPageUrl(config, path, env) {
+  const { publicBase } = eventPublicAddress(config?.tierA?.publicUrl, env);
+  return publicBase ? joinEventPath(publicBase, path) : null;
+}
 
 /**
  * Structured view of the Tier A env the functions runtime consumes
@@ -91,6 +104,8 @@ function resetConfigCacheForTest() {
 }
 
 module.exports = {
+  eventPublicAddress,
+  eventPageUrl,
   getEventConfig,
   getTierA,
   internals: { resetConfigCacheForTest, CACHE_TTL_MS, CONFIG_DOC_IDS },

@@ -125,6 +125,27 @@ describe('MyChangeRequests', () => {
     expect(done.querySelector('a[href^="https://evil.example"]')).toBeNull();
   });
 
+  it('links only stored results within the mounted event', async () => {
+    vi.stubEnv('BASE_URL', '/events/conference/');
+    try {
+      const target = `${ORIGIN}/events/conference/travel?lang=es#hotel`;
+      listMock.mockResolvedValueOnce({
+        ok: true,
+        requests: [
+          { ...DONE, id: 'local', outcome: { ...DONE.outcome, resultUrl: target } },
+          { ...DONE, id: 'sibling', outcome: { ...DONE.outcome, resultUrl: `${ORIGIN}/events/conference-next/travel` } },
+          { ...DONE, id: 'root', outcome: { ...DONE.outcome, resultUrl: `${ORIGIN}/travel` } },
+        ],
+      });
+      renderPage();
+      await flush();
+      expect(screen.getAllByRole('link', { name: 'See the result' })).toHaveLength(1);
+      expect(screen.getByRole('link', { name: 'See the result' })).toHaveAttribute('href', target);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('states an empty list and how to send a request', async () => {
     listMock.mockResolvedValueOnce({ ok: true, requests: [] });
     renderPage();

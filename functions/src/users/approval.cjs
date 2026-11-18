@@ -39,6 +39,7 @@
 
 const { isValidTransition } = require('shared/registration');
 const { requireAdmin } = require('../core/auth.cjs');
+const { eventPageUrl } = require('../core/config.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { internals: { GRANTS } } = require('../ticketing/resourceGrants.cjs');
@@ -186,12 +187,11 @@ async function applyRevokeUser({ db, uid, now = () => new Date() }) {
 
 /** The values of attendee.approved; `registration_url` is empty when the form asks nothing. */
 function approvedValues({ config, account, asksQuestions }) {
-  const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
   const name = typeof account.displayName === 'string' ? account.displayName.trim() : '';
   return {
     attendee_name: name,
-    dashboard_url: site ? `${site}/dashboard` : '',
-    registration_url: site && asksQuestions ? `${site}/registration` : '',
+    dashboard_url: eventPageUrl(config, '/dashboard') ?? '',
+    registration_url: asksQuestions ? eventPageUrl(config, '/registration') ?? '' : '',
   };
 }
 
