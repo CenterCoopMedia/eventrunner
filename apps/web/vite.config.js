@@ -80,6 +80,7 @@ export default defineConfig(({ isSsrBuild }) => ({
       'shared/config/socialAccounts',
       'shared/routing',
       'shared/page',
+      'shared/pageMetadata',
       'shared/profile',
       'shared/badges',
       'shared/speaker',

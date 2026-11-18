@@ -63,6 +63,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
+const { contentLanguages } = require('shared/contentLanguages');
 const { buildSiteArtifacts, buildWebManifest } = require('./lib/site-manifest.cjs');
 const { writeAppIcons } = require('./lib/app-icons.cjs');
 
@@ -195,7 +196,7 @@ async function importGenerated(dir, file) {
  * @param {{ generatedDir: string, importModule?: typeof importGenerated }} args
  * @returns {Promise<{ event: object, features: object, theme: object,
  *                     pages: object[], sessions: object[], speakers: object[], organizations: object[],
- *                     updates: object[] }>}
+ *                     updates: object[], blocks: object[] }>}
  */
 async function readGeneratedSnapshot({ generatedDir, importModule = importGenerated }) {
   const [eventConfigMod, pagesMod, scheduleMod, organizationsMod] = await Promise.all([
@@ -204,14 +205,18 @@ async function readGeneratedSnapshot({ generatedDir, importModule = importGenera
     importModule(generatedDir, 'scheduleData.js'),
     importModule(generatedDir, 'organizationsData.js'),
   ]);
+  const event = eventConfigMod.eventConfig || {};
+  const siteContent = contentLanguages(event).available.includes('es')
+    ? (await importModule(generatedDir, 'siteContent.js')).siteContent : null;
   return {
-    event: eventConfigMod.eventConfig || {},
+    event,
     features: eventConfigMod.features || {},
     theme: eventConfigMod.theme || {},
     pages: pagesMod.pagesData || [],
     sessions: scheduleMod.scheduleData || [],
     speakers: scheduleMod.speakers || [],
     organizations: organizationsMod.organizationsData || [],
+    blocks: Object.values(siteContent ?? {}),
     // No build-time snapshot exists for cmsUpdates — see the module
     // docstring above.
     updates: [],

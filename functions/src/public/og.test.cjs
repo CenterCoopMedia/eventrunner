@@ -619,6 +619,24 @@ test('routeMeta: direct language URLs use approved page and session text and rec
   assert.doesNotMatch(hidden.sent, /Privado|canonical|hreflang=/);
 });
 
+test('routeMeta: translations in a public section body make a page eligible for language URLs', async () => {
+  const event = { ...SITE_EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const sections = Array.from({ length: 31 }, (_, index) => ({ id: `travel-${index}` }));
+  const block = { visible: true, blockType: 'text', value: 'Travel details', translations: { es: { value: 'Detalles del viaje' } } };
+  const docs = {
+    ...SITE_DOCS,
+    'cmsPages/travel': { ...SITE_DOCS['cmsPages/travel'], sections },
+    'cmsContent/hidden': { ...block, section: 'travel-0', visible: false },
+    'cmsContent/other-page': { ...block, section: 'other-page' },
+    'cmsContent_drafts/example': { ...block, section: 'travel-1' },
+  };
+  const handler = (records) => routeHandler({ event }, records);
+  const fallback = await getRoute(handler(docs), '/travel');
+  assert.doesNotMatch(fallback.sent, /hreflang=/);
+  const translated = await getRoute(handler({ ...docs, 'cmsContent/published': { ...block, section: 'travel-30' } }), '/travel');
+  assert.match(translated.sent, /hreflang="es" href="https:\/\/example.org\/travel\?lang=es"/);
+});
+
 // ------------------------------------------------------ requestedRoutePath
 
 test('requestedRoutePath: normalizes the trailing slash, the query, and repeated separators', () => {

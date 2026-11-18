@@ -2,7 +2,7 @@
 
 const { contentLanguages, resolveContentVariant } = require('./contentLanguages.cjs');
 const { withContentLanguage } = require('./languageUrls.cjs');
-const { isStarterText } = require('./seed.cjs');
+const { isStarterContent, isStarterText } = require('./seed.cjs');
 
 /** Plain text for an HTML description, cut at a word boundary. */
 function metaExcerpt(text, maxLen = 200) {
@@ -20,7 +20,7 @@ function eventMetaDescription(event) {
 }
 
 /** Canonical route paths for the approved page or session versions. */
-function publicRouteUrls(path, record, kind, event) {
+function publicRouteUrls(path, record, kind, event, spanishSections) {
   // Hosting uses static HTML at the root and attendee directory.
   if (path === '/' || path === '/attendees') return { en: path };
   const config = contentLanguages(event);
@@ -28,12 +28,24 @@ function publicRouteUrls(path, record, kind, event) {
   const approvedSpanish = (unit, unitKind) => resolveContentVariant(unit, unitKind, 'es', event).language === 'es';
   const hasSpanish = approvedSpanish(record, kind)
     || (kind === 'page' && Array.isArray(record?.sections)
-      && record.sections.some((section) => typeof section?.label === 'string' && section.label.trim()
-        && approvedSpanish(section, 'section')));
+      && record.sections.some((section) => spanishSections?.has(section?.id)
+        || (typeof section?.label === 'string' && section.label.trim() && approvedSpanish(section, 'section'))));
   if (hasSpanish) {
     return { en: withContentLanguage(path, 'en'), es: withContentLanguage(path, 'es') };
   }
   return { en: config.default === 'es' ? withContentLanguage(path, 'en') : path };
 }
 
-module.exports = { metaExcerpt, eventMetaDescription, publicRouteUrls };
+function publishedSpanishSections(blocks, event) {
+  const sections = new Set();
+  if (!contentLanguages(event).available.includes('es')) return sections;
+  for (const block of blocks) {
+    if (block?.visible === true && typeof block.section === 'string' && !isStarterContent(block)
+        && resolveContentVariant(block, 'block', 'es', event).language === 'es') {
+      sections.add(block.section);
+    }
+  }
+  return sections;
+}
+
+module.exports = { metaExcerpt, eventMetaDescription, publicRouteUrls, publishedSpanishSections };

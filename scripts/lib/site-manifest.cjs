@@ -27,7 +27,7 @@ const { configuredThemeColor } = require('./shared-theme.cjs');
 const { assertNoPitchPageCollisions } = require('./pitch-route-check.cjs');
 const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
 const { isPublicPage, pageFeatureGate } = require('shared/page');
-const { publicRouteUrls } = require('shared/pageMetadata');
+const { publicRouteUrls, publishedSpanishSections } = require('shared/pageMetadata');
 const { APP_ICON_SIZES, appIconPath } = require('./app-icons.cjs');
 
 /**
@@ -407,11 +407,11 @@ function escapeXml(value) {
 
 /**
  * @param {{ publicUrl: string, event?: object, pages: object[], features: object,
- *           sessions?: object[], speakers?: object[], organizations?: object[], updates?: object[] }} args
+ *           sessions?: object[], speakers?: object[], organizations?: object[], updates?: object[], blocks?: object[] }} args
  * @returns {string} sitemap.xml content
  */
 function buildSitemapXml({
-  publicUrl, event, pages, features, sessions = [], speakers = [], organizations = [], updates = [],
+  publicUrl, event, pages, features, sessions = [], speakers = [], organizations = [], updates = [], blocks = [],
 }) {
   assertNoPitchPageCollisions(pages);
   const base = normalizedBaseUrl(publicUrl);
@@ -419,9 +419,10 @@ function buildSitemapXml({
     pages, features, sessions, speakers, organizations, updates,
   });
   const sorted = [...publicRoutes].sort((a, b) => a.path.localeCompare(b.path));
+  const spanishSections = publishedSpanishSections(blocks, event);
   let hasAlternates = false;
   const urls = sorted.flatMap((route) => {
-    const versions = publicRouteUrls(encodeRoutePath(route.path), route.doc, route.kind, event);
+    const versions = publicRouteUrls(encodeRoutePath(route.path), route.doc, route.kind, event, spanishSections);
     const locations = Object.entries(versions).map(([language, path]) => [language, escapeXml(`${base}${path}`)]);
     const alternateLinks = [];
     if (versions.es) {
@@ -548,16 +549,16 @@ function buildWebManifest({ event = {}, theme = {}, maskable = true }) {
  *
  * @param {{ event: object, features: object, theme: object,
  *           pages: object[], sessions?: object[], speakers?: object[], organizations?: object[],
- *           updates?: object[], publicUrl: string, maskable?: boolean, hashRouter?: boolean }} args
+ *           updates?: object[], blocks?: object[], publicUrl: string, maskable?: boolean, hashRouter?: boolean }} args
  * @returns {{ sitemapXml: string, robotsTxt: string, manifest: object }}
  */
 function buildSiteArtifacts({
   event, features, theme, pages, sessions = [], speakers = [], organizations = [], updates = [], publicUrl,
-  maskable = true, hashRouter = false,
+  blocks = [], maskable = true, hashRouter = false,
 }) {
   return {
     sitemapXml: buildSitemapXml({
-      publicUrl, event: hashRouter ? undefined : event, pages, features, sessions, speakers, organizations, updates,
+      publicUrl, event: hashRouter ? undefined : event, pages, features, sessions, speakers, organizations, updates, blocks,
     }),
     robotsTxt: buildRobotsTxt({ publicUrl, pages, features }),
     manifest: buildWebManifest({ event, theme, maskable }),

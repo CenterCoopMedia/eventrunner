@@ -286,8 +286,8 @@ const {
   systemPageIdForPath,
 } = require('shared/routing');
 const { pageHeading, isPublicPage } = require('shared/page');
-const { metaExcerpt: excerpt, eventMetaDescription, publicRouteUrls } = require('shared/pageMetadata');
-const { resolveContentVariant, selectContentLanguage } = require('shared/contentLanguages');
+const { metaExcerpt: excerpt, eventMetaDescription, publicRouteUrls, publishedSpanishSections } = require('shared/pageMetadata');
+const { contentLanguages, resolveContentVariant, selectContentLanguage } = require('shared/contentLanguages');
 const { isValidDocId } = require('../cms/store.cjs');
 
 /**
@@ -547,6 +547,23 @@ async function resolveRouteSubject({ db, config, path }) {
   return page.systemPage === true ? null : { kind: 'page', doc: page };
 }
 
+async function readRouteSpanishSections({ db, event, path, subject }) {
+  if (subject?.kind !== 'page' || path === '/' || path === '/attendees'
+      || !contentLanguages(event).available.includes('es') || publicRouteUrls(path, subject.doc, 'page', event).es) {
+    return undefined;
+  }
+  const sections = Array.isArray(subject.doc.sections) ? subject.doc.sections : [];
+  const ids = [...new Set(sections.map((section) => section?.id).filter((id) => typeof id === 'string' && id))];
+  // Firestore allows 30 section IDs per in query. Stop after the first
+  // translated group because the caller only needs to establish an alternate.
+  for (let offset = 0; offset < ids.length; offset += 30) {
+    const snap = await db.collection('cmsContent').where('section', 'in', ids.slice(offset, offset + 30)).get();
+    const translated = publishedSpanishSections(snap.docs.map((doc) => doc.data()), event);
+    if (translated.size > 0) return translated;
+  }
+  return undefined;
+}
+
 /**
  * A displayable URL for a `config/theme.logos` slot, resolved server-side.
  *
@@ -799,9 +816,9 @@ function speakerName(speaker) {
  * noindex — a Firestore outage must not deindex a site.
  *
  * @param {{ config: object, subject: object|null, path: string, base: string,
- *           requestedLanguage?: unknown, degraded?: boolean }} args
+ *           requestedLanguage?: unknown, spanishSections?: Set<string>, degraded?: boolean }} args
  */
-function resolveRouteMeta({ config, subject, path, base, requestedLanguage, degraded = false }) {
+function resolveRouteMeta({ config, subject, path, base, requestedLanguage, spanishSections, degraded = false }) {
   const event = (config && config.event) || null;
   const language = selectContentLanguage(event, requestedLanguage);
   const siteName = isNonEmptyString(event?.name) ? event.name.trim() : 'Event site';
@@ -824,7 +841,7 @@ function resolveRouteMeta({ config, subject, path, base, requestedLanguage, degr
   const canonicalPath = subject.kind === 'sponsor'
     ? `/sponsors/${encodeURIComponent(path.slice('/sponsors/'.length))}`
     : path;
-  const urls = publicRouteUrls(canonicalPath, subject.doc, subject.kind, event);
+  const urls = publicRouteUrls(canonicalPath, subject.doc, subject.kind, event, spanishSections);
   const described = {
     ...shell,
     url: `${base}${urls[language] ?? urls.en}`,
@@ -1013,7 +1030,11 @@ function createRouteMetaHandler({
         }
       }
 
-      const meta = resolveRouteMeta({ config, subject, path, base, requestedLanguage: requestedContentLanguage(req), degraded });
+      const spanishSections = await readRouteSpanishSections({ db, event: config?.event, path, subject })
+        .catch((err) => { log.error('routeMeta could not resolve translated page blocks', err); });
+      const meta = resolveRouteMeta({
+        config, subject, path, base, requestedLanguage: requestedContentLanguage(req), spanishSections, degraded,
+      });
       res.status(200);
       res.set('Content-Type', 'text/html; charset=utf-8');
       res.set('Content-Language', meta.language);

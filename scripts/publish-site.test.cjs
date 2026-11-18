@@ -371,7 +371,7 @@ function asFakeDocs(records) {
  * `readSiteDocs` actually runs.
  */
 function fakeSiteDb({
-  event, features, theme, pages, sessions = [], speakers = [], organizations = [], updates = [],
+  event, features, theme, pages, sessions = [], speakers = [], organizations = [], updates = [], blocks = [],
 }) {
   const configDocs = { event, features, theme };
   const filterableCollection = (records) => ({
@@ -388,6 +388,7 @@ function fakeSiteDb({
       if (name === 'cmsSchedule') return filterableCollection(sessions);
       if (name === 'cmsOrganizations') return filterableCollection(organizations);
       if (name === 'cmsUpdates') return filterableCollection(updates);
+      if (name === 'cmsContent') return filterableCollection(blocks);
       if (name === 'speakers_public') return { async get() { return { docs: asFakeDocs(speakers) }; } };
       throw new Error(`fakeSiteDb: unexpected collection ${name}`);
     },
@@ -450,6 +451,29 @@ test('readSiteDocs filters cmsSchedule and cmsUpdates to visible === true, but n
 test('readSiteDocs refuses to run against a project with no config/event doc', async () => {
   const db = fakeSiteDb({ ...SITE_DOCS, event: null });
   await assert.rejects(readSiteDocs({ db }), /config\/event is missing/);
+});
+
+test('live publisher and generated snapshot use the same block-only language alternatives', async () => {
+  const { readGeneratedSnapshot } = require('./write-site-files.cjs');
+  const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
+  const event = { ...SITE_DOCS.event, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const pages = SITE_DOCS.pages.map((page) => page.id === 'travel' ? { ...page, sections: [{ id: 'travel-body' }] } : page);
+  const block = { id: 'travel-details', visible: true, section: 'travel-body', blockType: 'text',
+    value: 'Travel details', translations: { es: { value: 'Detalles del viaje' } } };
+  const db = fakeSiteDb({ ...SITE_DOCS, event, pages, updates: [], blocks: [block, { ...block, id: 'private', visible: false }] });
+  const live = await readSiteDocs({ db });
+  assert.deepEqual(live.blocks, [block]);
+  const modules = {
+    'eventConfig.js': { eventConfig: event, features: live.features, theme: live.theme },
+    'pagesData.js': { pagesData: pages },
+    'scheduleData.js': { scheduleData: live.sessions, speakers: live.speakers },
+    'organizationsData.js': { organizationsData: live.organizations },
+    'siteContent.js': { siteContent: { [block.id]: block } },
+  };
+  const snapshot = await readGeneratedSnapshot({ generatedDir: '/fixture', importModule: async (_dir, file) => modules[file] });
+  const sitemap = (docs) => buildSiteArtifacts({ ...docs, publicUrl: 'https://example.org' }).sitemapXml;
+  assert.equal(sitemap(live), sitemap(snapshot));
+  assert.match(sitemap(live), /<loc>https:\/\/example.org\/travel\?lang=es<\/loc>/);
 });
 
 test('generateSiteFiles writes all three files, and the sitemap and robots agree with each other', async () => {
