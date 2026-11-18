@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Link, Route, Routes } from 'react-router';
 import { afterEach, expect, it, vi } from 'vitest';
-import EventRouter from './EventRouter.jsx';
+import EventRouter, { canonicalizeEventHome } from './EventRouter.jsx';
 import CtaBlock from './components/blocks/CtaBlock.jsx';
 
 const sessionLink = Object.freeze({ url: '/schedule/one', label: 'Session' });
@@ -14,6 +14,7 @@ afterEach(() => {
 });
 
 function renderRoutes() {
+  canonicalizeEventHome();
   return render(
     <EventRouter>
       <Link to="/">Home</Link>

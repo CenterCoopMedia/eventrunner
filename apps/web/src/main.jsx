@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { useLocation } from 'react-router';
 import AppRoot from './AppRoot.jsx';
-import EventRouter from './EventRouter.jsx';
+import EventRouter, { canonicalizeEventHome } from './EventRouter.jsx';
 import { IS_DEMO } from './lib/demoMode.js';
 // Theme tokens first (the @generated alias honors GENERATED_DIR, spec §2.4),
 // then the Tailwind layers that consume them.
@@ -22,6 +22,8 @@ import { snapshotViewport } from './lib/snapshotViewport.js';
 import { publicRoutes } from './routes.jsx';
 import { preloadPublicTools } from './components/Layout.jsx';
 import { ADMIN_SPECIMEN_PATH, loadAdminSpecimenPage } from './pages/specimen/specimenRoute.js';
+
+canonicalizeEventHome();
 
 // Recent warnings and errors ride along with a "Report a problem" report.
 startRecentMessages();

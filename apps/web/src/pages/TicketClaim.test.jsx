@@ -74,9 +74,10 @@ function CurrentRoute() {
   return <output data-testid="current-route">{location.pathname}{location.search}</output>;
 }
 
-function renderClaim(entry = '/ticket/claim') {
+function renderClaim(entry = '/ticket/claim', basename = '/') {
   return render(
     <MemoryRouter
+      basename={basename}
       initialEntries={[entry]}
     >
       <App />
@@ -228,13 +229,13 @@ describe('signed in', () => {
     expect(claimRequests()).toHaveLength(2);
   });
 
-  it('requires the current account document and offers a bounded recovery that preserves the claim link', async () => {
+  it.each(['/', '/conference/'])('preserves the claim link at %s while waiting for the current account', async (base) => {
     profileAvailable = false;
     const timeout = vi.spyOn(globalThis, 'setTimeout');
     const heldUp = vi.fn();
     globalThis.addEventListener('eventrunner:held-up', heldUp);
-    const entry = '/ticket/claim?order=group-order-123&source=confirmation';
-    renderClaim(entry);
+    const entry = `${base}ticket/claim?order=group-order-123&source=confirmation`;
+    renderClaim(entry, base);
     await screen.findByText(/Setting up your account/);
     expect(screen.queryByRole('button', { name: 'Claim ticket' })).not.toBeInTheDocument();
 

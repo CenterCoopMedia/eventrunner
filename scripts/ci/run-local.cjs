@@ -21,8 +21,9 @@ const CHECKS = {
   unit: [['node', '--test', '--test-concurrency=2', 'packages/shared/src/**/*.test.cjs', 'functions/src/**/*.test.cjs', 'console/functions/src/**/*.test.cjs', 'scripts/**/*.test.cjs']],
   unitWeb: [['npm', 'run', 'test', '-w', 'apps/web', '--', '--maxWorkers=2'], ['npm', 'run', 'test:console']],
   build: [
-    ['npm', 'run', 'build'],
+    ['npm', 'run', 'build', '-w', 'apps/web', '--', '--manifest'],
     ['node', 'scripts/ci/bundle-budget.cjs', '--dist', 'apps/web/dist'],
+    ['node', 'scripts/ci/event-mount.cjs'],
     ['npm', 'run', 'build:console'],
     ['node', 'scripts/ci/bundle-budget.cjs', '--dist', 'console/web/dist', '--budget', 'scripts/ci/console-bundle-budget.json'],
   ],

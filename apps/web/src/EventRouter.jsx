@@ -1,19 +1,22 @@
-import React, { useLayoutEffect } from 'react';
+import React from 'react';
 import { BrowserRouter, HashRouter, useLocation } from 'react-router';
 import { IS_DEMO } from './lib/demoMode.js';
 import { eventAppPath, eventMount } from './lib/eventPath.js';
 
-function MountedEvent({ children }) {
-  const route = useLocation();
+// A trailing-slash basename would refuse a bare mount before routes render.
+export function canonicalizeEventHome() {
+  if (IS_DEMO) return;
   const { pathname, search, hash } = window.location;
   const mount = eventMount();
-  useLayoutEffect(() => {
-    if (mount && pathname === mount) {
-      window.history.replaceState(window.history.state, '', `${import.meta.env.BASE_URL}${search}${hash}`);
-    }
-  }, [route, pathname, mount, search, hash]);
+  if (mount && pathname === mount) {
+    window.history.replaceState(window.history.state, '', `${import.meta.env.BASE_URL}${search}${hash}`);
+  }
+}
+
+function MountedEvent({ children }) {
+  useLocation();
   // React Router matches basenames case-insensitively. Event mounts are exact.
-  return eventAppPath(pathname) === null ? null : children;
+  return eventAppPath(window.location.pathname) === null ? null : children;
 }
 
 export default function EventRouter({ children }) {
