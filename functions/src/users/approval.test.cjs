@@ -343,7 +343,7 @@ test('approval uses the stored locale and keeps its send-once key', async () => 
   assert.equal(sent[0].onceKey, 'attendee-approved:uid-ada');
   assert.match(sent[0].subject, /registro para Example Summit 2027/);
   assert.match(sent[0].html, /<html lang="es">/);
-  assert.match(sent[0].text, /https:\/\/summit.example.org\/registration\?lang=es/);
+  assert.match(sent[0].text, /https:\/\/summit\.example\.org\/registration\?lang=es/);
   assert.equal((await approveWithMail(db)).sent.length, 0);
 });
 
