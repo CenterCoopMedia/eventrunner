@@ -1,7 +1,7 @@
 # ADR 0010: Event paths under one client host
 
 **Date:** 2026-11-12  
-**Status:** Proposed. Owner acceptance and implementation remain open.  
+**Status:** Accepted on November 18, 2026 ([acceptance on #515](https://github.com/CenterCoopMedia/eventrunner/issues/515#issuecomment-6985898707)).  
 **Issue:** [#515](https://github.com/CenterCoopMedia/eventrunner/issues/515)  
 **Scope:** An optional shared web address for separately deployed events. This record changes no running site, account, DNS record or provider setting.
 
@@ -25,7 +25,7 @@ The October URL-prefix plan in [#335](https://github.com/CenterCoopMedia/eventru
 and children #558–#560 covers a mounted event. It does not supply a client host
 registry or a second-event enrollment path.
 
-## Proposed decisions
+## Decisions
 
 ### 1. Deploy each event separately behind a client router
 
@@ -167,10 +167,8 @@ page into another account, registration or administration surface.
 
 ## Staged delivery and acceptance
 
-1. **Design owner:** Accept or amend this ADR, including the shared-origin
-   limit, separate sign-ins and the new Console enrollment. Record acceptance
-   on #515 before treating the proposal as approved. A source PR merge alone
-   does not record that product decision.
+1. **Design owner:** Accepted this ADR on #515, including the shared-origin
+   limit, separate sign-ins and the new Console enrollment.
 2. **Mount implementation owner, [#558](https://github.com/CenterCoopMedia/eventrunner/issues/558):**
    Build the shared parser and joins, both build paths, router/assets and
    event-scoped browser state. Preserve root deployments and static demos.
@@ -217,5 +215,5 @@ page into another account, registration or administration surface.
   layer. The proposed edge router makes that selection explicit.
 
 The proposal adds routing and enrollment work; a basename alone does not deliver
-several events under one host. Implementation, fixture evidence, owner
-acceptance and live rollout remain separate work.
+several events under one host. Implementation, fixture evidence and live
+rollout remain separate work.
