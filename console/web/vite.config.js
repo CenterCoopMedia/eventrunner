@@ -8,7 +8,24 @@ export default defineConfig({
   // The dev server serves the CommonJS shared package without interop unless
   // it is prebundled. src/optimizeDeps.test.js keeps this list complete.
   optimizeDeps: { include: ['shared/consoleRequest'] },
-  build: { outDir: 'dist', emptyOutDir: true },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            // Keep the lazy Setup route within its per-chunk budget.
+            {
+              name: 'setup-steps',
+              test: /[\\/]src[\\/]setup[\\/]StepList\.jsx$/,
+              includeDependenciesRecursively: false,
+            },
+          ],
+        },
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
