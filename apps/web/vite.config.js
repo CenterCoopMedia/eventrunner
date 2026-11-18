@@ -8,8 +8,9 @@
 //
 // Every source import of snapshot data goes through the `@generated` alias
 // so the override applies to the whole app, theme.css included.
-import { defineConfig, normalizePath } from 'vite';
+import { defineConfig, loadEnv, normalizePath } from 'vite';
 import react from '@vitejs/plugin-react';
+import { parseEventPublicBase } from 'shared/config/publicBase';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +18,7 @@ import { resolveGeneratedDir } from './generatedDir.js';
 import { criticalFontTags } from './criticalFonts.js';
 import { snapshotHtml } from './snapshotHtml.js';
 import { specimenBoundary } from './specimenBoundary.js';
+import { isDemoModeFlag } from './src/lib/demoModeFlag.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const generatedDir = resolveGeneratedDir(process.env, path.resolve(here, 'src/generated'));
@@ -50,7 +52,15 @@ function staticImportGraph(context, entry = entryModule) {
   return seen;
 }
 
-export default defineConfig(({ isSsrBuild }) => ({
+function eventAssetBase(mode) {
+  const env = loadEnv(mode, here, ['VITE_EVENT_PUBLIC_URL', 'VITE_DEMO_MODE']);
+  return isDemoModeFlag(env.VITE_DEMO_MODE)
+    ? undefined
+    : parseEventPublicBase(env.VITE_EVENT_PUBLIC_URL).assetBase;
+}
+
+export default defineConfig(({ isSsrBuild, mode }) => ({
+  base: eventAssetBase(mode),
   plugins: [react(), {
     name: 'snapshot-font-preloads',
     transformIndexHtml: {
@@ -77,6 +87,7 @@ export default defineConfig(({ isSsrBuild }) => ({
       'shared/richText',
       'shared/config',
       'shared/config/lifecycle',
+      'shared/config/publicBase',
       'shared/config/socialAccounts',
       'shared/routing',
       'shared/page',

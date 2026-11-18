@@ -1,5 +1,6 @@
 import { startTransition } from 'react';
 import { appCheckEnabled } from './firebaseSettings.js';
+import { eventAppPath } from './eventPath.js';
 
 const SIGNED_IN_HINT = 'eventrunner:signed-in';
 let runtime;
@@ -14,7 +15,7 @@ export function rememberSignedIn(signedIn) {
 }
 
 function needsAuthNow() {
-  const path = location.hash.startsWith('#/') ? location.hash.slice(1) : location.pathname;
+  const path = location.hash.startsWith('#/') ? location.hash.slice(1) : eventAppPath(location.pathname);
   if (/^\/(?:admin|profile|dashboard|tickets\/mine|signin)(?:\/|$)/.test(path)) return true;
   try { return localStorage.getItem(SIGNED_IN_HINT) === '1'; } catch { return false; }
 }

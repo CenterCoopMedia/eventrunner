@@ -304,15 +304,15 @@ export default function AdminOrganizationEditor({ mode }) {
           actions={
             <>
               {!creating ? (
-                <a
-                  href={`/sponsors/${encodeURIComponent(docId)}?preview=1`}
+                <Link
+                  to={`/sponsors/${encodeURIComponent(docId)}?preview=1`}
                   target="_blank"
                   rel="noreferrer"
                   className={linkButtonClass}
                 >
                   Preview draft
                   <NewTabNote />
-                </a>
+                </Link>
               ) : null}
               <button
                 type="submit"

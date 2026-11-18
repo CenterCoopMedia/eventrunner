@@ -332,8 +332,8 @@ export default function AdminSessionEditor({ mode }) {
         actions={
           <>
             {mode === 'edit' ? (
-              <a
-                href={`/schedule/${encodeURIComponent(sessionId)}?preview=1`}
+              <Link
+                to={`/schedule/${encodeURIComponent(sessionId)}?preview=1`}
                 target="_blank"
                 rel="noreferrer"
                 className={linkButtonClass}
@@ -344,7 +344,7 @@ export default function AdminSessionEditor({ mode }) {
                     than through ExternalLink because this link is internal
                     and takes the admin's own control shape. */}
                 <NewTabNote />
-              </a>
+              </Link>
             ) : null}
             <button
               type="submit"

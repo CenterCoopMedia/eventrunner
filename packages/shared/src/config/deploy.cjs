@@ -1,5 +1,7 @@
 'use strict';
 
+const { parseEventPublicBase } = require('./publicBase.cjs');
+
 /**
  * Tier A deploy-time environment validation (spec §2.1, .env.example).
  *
@@ -98,16 +100,18 @@ function validateDeployEnv(env = process.env) {
     errors.push('EVENT_SLUG: must be lowercase [a-z0-9-]');
   }
 
-  if (present(source.EVENT_PUBLIC_URL)) {
-    let parsed = null;
+  const publicBases = {};
+  for (const key of ['EVENT_PUBLIC_URL', 'VITE_EVENT_PUBLIC_URL']) {
+    if (!present(source[key])) continue;
     try {
-      parsed = new URL(source.EVENT_PUBLIC_URL.trim());
-    } catch {
-      parsed = null;
+      publicBases[key] = parseEventPublicBase(source[key]).publicBase;
+    } catch (error) {
+      errors.push(`${key}: ${error.message}`);
     }
-    if (!parsed || parsed.protocol !== 'https:') {
-      errors.push('EVENT_PUBLIC_URL: must be a parseable https URL');
-    }
+  }
+  if (publicBases.EVENT_PUBLIC_URL && publicBases.VITE_EVENT_PUBLIC_URL &&
+      publicBases.EVENT_PUBLIC_URL !== publicBases.VITE_EVENT_PUBLIC_URL) {
+    errors.push('VITE_EVENT_PUBLIC_URL: must identify the same public base as EVENT_PUBLIC_URL');
   }
 
   if (present(source.EVENT_EMAIL_PROVIDER) &&

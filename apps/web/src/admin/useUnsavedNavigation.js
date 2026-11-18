@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { eventAppPath } from '../lib/eventPath.js';
 
 /**
  * Path the router should move to, or null when this click should not be
@@ -35,8 +36,10 @@ export function inAppPath(href, currentHref) {
     if (nextHash === currentHash && url.search === current.search) return null;
     return `${nextHash}${url.search}`;
   }
-  const next = `${url.pathname}${url.search}`;
-  const here = `${current.pathname}${current.search}`;
+  const nextPath = eventAppPath(url.pathname);
+  if (nextPath === null) return null;
+  const next = `${nextPath}${url.search}`;
+  const here = `${eventAppPath(current.pathname)}${current.search}`;
   if (next === here) return null;
   return next;
 }

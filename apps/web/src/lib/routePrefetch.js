@@ -1,4 +1,5 @@
 import { matchRoutes } from 'react-router';
+import { eventAppPath } from './eventPath.js';
 
 export const HOVER_DWELL_MS = 100;
 let timer;
@@ -11,8 +12,8 @@ function prefetch(link, routes, hashRouter) {
   if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
   if (link.origin !== location.origin) return;
   if (hashRouter && (link.pathname !== location.pathname || !link.hash.startsWith('#/'))) return;
-  const path = hashRouter ? link.hash.slice(1) : link.pathname;
-  matchRoutes(routes, path)?.at(-1)?.route.prefetch?.();
+  const path = hashRouter ? link.hash.slice(1) : eventAppPath(link.pathname);
+  if (path) matchRoutes(routes, path)?.at(-1)?.route.prefetch?.();
 }
 
 export function handleRouteIntent(event, routes, hashRouter = false) {
