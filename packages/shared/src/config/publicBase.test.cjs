@@ -2,7 +2,8 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { parseEventPublicBase, joinEventPath, stripEventMount } = require('./publicBase.mjs');
+const { parseEventPublicBase } = require('./publicBase.cjs');
+const { joinEventPath, stripEventMount } = require('./publicPath.mjs');
 
 const origin = 'https://events.example.org';
 

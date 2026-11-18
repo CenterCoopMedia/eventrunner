@@ -1,4 +1,5 @@
-import { stripEventMount } from 'shared/config/publicBase';
+import { stripEventMount } from 'shared/config/publicPath';
+import { IS_DEMO } from './demoMode.js';
 
 // Vite has already validated and normalized this base to one trailing slash.
 export function eventMount() {
@@ -6,5 +7,5 @@ export function eventMount() {
 }
 
 export function eventAppPath(pathname) {
-  return stripEventMount(pathname, eventMount());
+  return IS_DEMO ? pathname : stripEventMount(pathname, eventMount());
 }

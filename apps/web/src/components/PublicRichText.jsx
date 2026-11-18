@@ -1,5 +1,5 @@
 import { internalRoutePath } from 'shared/languageUrls';
-import { joinEventPath } from 'shared/config/publicBase';
+import { joinEventPath } from 'shared/config/publicPath';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { sanitizeHtml } from '../lib/sanitizeHtml.js';
 

@@ -1,6 +1,6 @@
 'use strict';
 
-const { parseEventPublicBase } = require('./publicBase.mjs');
+const { parseEventPublicBase } = require('./publicBase.cjs');
 
 /**
  * Tier A deploy-time environment validation (spec §2.1, .env.example).

@@ -1,6 +1,6 @@
 import { IS_DEMO } from './demoMode.js';
 import { withContentLanguage } from 'shared/languageUrls';
-import { joinEventPath } from 'shared/config/publicBase';
+import { joinEventPath } from 'shared/config/publicPath';
 
 /** Public route URL, independent of query state and stale canonical markup. */
 export function publicUrl(path, {
