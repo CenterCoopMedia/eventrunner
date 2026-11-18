@@ -56,6 +56,7 @@
 
 const crypto = require('node:crypto');
 const { DEFAULT_OFFSETS, isQuietAt, resolveLocalInstant } = require('shared/reminderSchedule');
+const { eventPageUrl } = require('../core/config.cjs');
 const { internals: renderInternals } = require('../email/render.cjs');
 const { attendeeUrl, spanishTemplateVariant } = require('../email/attendeeTemplates.cjs');
 const announcementLayout = require('../email/templates/announcement.email.cjs');
@@ -215,11 +216,6 @@ function attendeeWordingVersion(draft) {
   return `shipped:${digest([DEFAULT_DRAFT, SPANISH_DRAFT, ...layout])}`;
 }
 
-function siteUrl(config) {
-  const url = config?.tierA?.publicUrl;
-  return typeof url === 'string' ? url.trim().replace(/\/+$/, '') : '';
-}
-
 /** The start of the first event day, or null. */
 function firstDay(event) {
   const days = Array.isArray(event?.days)
@@ -257,9 +253,9 @@ function eventFacts(config) {
   if (!day) return { ok: false, error: 'The event has no day with a start time. Set the days in Event settings.' };
   const instant = resolveLocalInstant(day.date, day.startTime, timeZone);
   if (!instant) return { ok: false, error: 'The event start could not be read. Check the days in Event settings.' };
-  const site = siteUrl(config);
-  if (!site) return { ok: false, error: 'The site has no public address, so the reminder cannot link to the ticket page.' };
   const stripe = (config?.tierA?.ticketingProvider || '').trim() === 'stripe';
+  const ticketUrl = eventPageUrl(config, stripe ? '/tickets/mine' : '/dashboard');
+  if (!ticketUrl) return { ok: false, error: 'The site has no public address, so the reminder cannot link to the ticket page.' };
   const venue = plainObject(config?.event?.venue);
   const where = [typeof venue.name === 'string' ? venue.name.trim() : '', formatVenueAddress(venue)]
     .filter(Boolean)
@@ -269,7 +265,7 @@ function eventFacts(config) {
     when: formatWhen(instant, timeZone),
     whenEs: formatWhen(instant, timeZone, 'es'),
     where,
-    ticketUrl: `${site}${stripe ? '/tickets/mine' : '/dashboard'}`,
+    ticketUrl,
     ticketLabel: stripe ? 'View your tickets' : 'Open your dashboard',
   };
   return {

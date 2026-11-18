@@ -48,3 +48,12 @@ test('malformed public bases fail before URL normalization', () => {
     `${origin}/Conference`, `${origin}/__/auth`, `${origin}\n`, `${origin}\u0001`,
   ]) assert.throws(() => parseEventPublicBase(base), /must be an HTTPS URL/);
 });
+
+test('emulator callers can opt into HTTP on loopback only', () => {
+  const local = 'http://127.0.0.1:5173/events/conference';
+  assert.throws(() => parseEventPublicBase(local), /must be an HTTPS URL/);
+  const options = { allowHttpLoopback: true };
+  assert.equal(parseEventPublicBase(local, options).publicBase, `${local}/`);
+  assert.throws(() => parseEventPublicBase('http://events.example.org/conference', options), /must be an HTTPS URL/);
+  assert.throws(() => parseEventPublicBase(`${local}/../outside`, options), /must be an HTTPS URL/);
+});

@@ -841,6 +841,9 @@ const resend = async (deps, email = STAFF, sendId = 'resend_attempt_1', token = 
 
 test('new grant sends once with the configured admin link, exact address, role, expiry and standard footer, all logged', async () => {
   const { db, deps } = world();
+  const config = await deps.getConfig();
+  const publicUrl = 'https://summit.example.org/events/conference/';
+  deps.getConfig = async () => ({ ...config, tierA: { ...config.tierA, publicUrl } });
   const payloads = [];
   const { createPostmarkProvider } = require('../email/providers/postmark.cjs');
   const provider = createPostmarkProvider({
@@ -863,7 +866,7 @@ test('new grant sends once with the configured admin link, exact address, role, 
   assert.equal(mail.MessageStream, 'transactional');
   assert.equal(mail.From, 'Summit team <events@example.org>');
   assert.equal(mail.Tag, 'admin.access_granted');
-  assert.match(mail.HtmlBody, /href="https:\/\/summit.example.org\/admin"/);
+  assert.ok(mail.HtmlBody.includes(`href="${publicUrl}admin"`));
   for (const body of [mail.HtmlBody, mail.TextBody]) {
     for (const value of ['Community Summit', email, 'staff', 'Request an emailed sign-in code', '1 Main Street']) {
       assert.ok(body.includes(value), value);

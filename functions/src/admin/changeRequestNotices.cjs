@@ -54,6 +54,7 @@
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
+const { eventPageUrl } = require('../core/config.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
@@ -125,13 +126,6 @@ function queuedRecord({ id, slot, previous, mode, by, at }) {
   };
 }
 
-/** The address of the requester's own page, or '' with no public site address. */
-function requestsUrl(config) {
-  const raw = config?.tierA?.publicUrl;
-  if (typeof raw !== 'string' || !raw.trim()) return '';
-  return `${raw.trim().replace(/\/+$/, '')}${REQUESTS_PATH}`;
-}
-
 /** Render one notice with the shipped wording. Never reads an override. */
 function renderNotice({ config, slot, language }) {
   const { renderAttendeeTemplate, attendeeUrl } = require('../email/attendeeTemplates.cjs');
@@ -139,7 +133,7 @@ function renderNotice({ config, slot, language }) {
   const rendered = renderAttendeeTemplate({
     template: getDefaultTemplate(SLOT_TEMPLATES[slot]),
     override: null,
-    tokenValues: { requests_url: attendeeUrl(requestsUrl(config), language) },
+    tokenValues: { requests_url: attendeeUrl(eventPageUrl(config, REQUESTS_PATH), language) ?? '' },
     config,
     language,
   });
@@ -403,6 +397,5 @@ module.exports = {
     REQUESTS_PATH,
     onceKeyFor,
     readNoticeSettings,
-    requestsUrl,
   },
 };

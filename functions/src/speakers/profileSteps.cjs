@@ -16,6 +16,7 @@
  */
 
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { eventPageUrl } = require('../core/config.cjs');
 const { logAdminAction, isValidDocId } = require('../cms/store.cjs');
 const { checkLogistics } = require('shared/speakerLogistics');
 const { speakerDisplayName } = require('shared/speaker');
@@ -68,10 +69,9 @@ function createSaveOwnSpeakerLogisticsHandler({ db, auth, getConfig, now = Date.
 
 /** `{{profile_url}}` and the other values of speaker.profile_received. */
 function profileReceivedValues({ config, speaker }) {
-  const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
   return {
     speaker_name: speakerDisplayName(speaker),
-    profile_url: site ? `${site}/speaker/profile` : '',
+    profile_url: eventPageUrl(config, '/speaker/profile') ?? '',
     admin_contact_email: config?.event?.legal?.supportEmail || '',
   };
 }

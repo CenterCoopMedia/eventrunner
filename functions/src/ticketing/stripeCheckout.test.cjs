@@ -119,8 +119,21 @@ test('paid checkout reserves inventory before external creation and freezes exac
   assert.deepEqual(calls[0].params.payment_intent_data.metadata, calls[0].params.metadata);
   assert.equal(calls[0].params.line_items[0].price_data.product_data.metadata.eventRunnerTicketTypeId, 'general');
   assert.equal(calls[0].params.success_url, `https://event.example.com/tickets/status?orderId=${order.id}`);
+  assert.equal(calls[0].params.cancel_url, `${calls[0].params.success_url}&cancelled=1`);
   assert.equal(db.read('ticket_sync_queue', order.id).status, 'pending');
   assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('paid checkout sends mounted success and cancel URLs to the provider', async () => {
+  const { deps, calls } = setup();
+  deps.env.EVENT_PUBLIC_URL = 'https://event.example.com/events/conference/';
+  const res = await checkout(deps);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.checkoutUrl, 'https://checkout.stripe.com/c/pay/example');
+  assert.equal(calls.length, 1);
+  const { success_url: success, cancel_url: cancel } = calls[0].params;
+  assert.equal(success, `${deps.env.EVENT_PUBLIC_URL}tickets/status?orderId=${res.body.orderId}`);
+  assert.equal(cancel, `${success}&cancelled=1`);
 });
 
 test('missing or unverified authentication and client-supplied pricing cannot reserve or pay', async () => {

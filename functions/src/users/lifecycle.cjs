@@ -31,6 +31,7 @@ const {
 } = require('shared/profile');
 
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
+const { eventPageUrl } = require('../core/config.cjs');
 const { REPRESENTATIVES, EDIT_REQUESTS } = require('../cms/organizationRepresentatives.cjs');
 
 const USERS = 'users';
@@ -104,16 +105,16 @@ async function sendWelcomeEmail({ db, sendEmail, getConfig, uid, email, displayN
     const { isComingSoon } = require('../cms/launch.cjs');
     if (await isComingSoon({ db, log })) return { sent: false, reason: 'coming-soon' };
     const config = await getConfig();
-    const site = String(config?.tierA?.publicUrl || '').trim().replace(/\/+$/, '');
+    const profileUrl = eventPageUrl(config, '/profile');
     // login_url is the required token; without a site address it is empty.
-    if (!site) return { sent: false, reason: 'no-site-url' };
+    if (!profileUrl) return { sent: false, reason: 'no-site-url' };
     // Never on the announcement stream (issue #330).
     const channel = transactionalStream(config);
     if (!channel.ok) return { sent: false, reason: 'transactional-stream' };
     const { template, override } = await loadTemplate({ db, id: 'account.welcome', now: () => now().getTime() });
     const rendered = render({
       template, override, config, now,
-      tokenValues: { first_name: welcomeName(displayName), profile_url: `${site}/profile` },
+      tokenValues: { first_name: welcomeName(displayName), profile_url: profileUrl },
     });
     if (rendered.usedFallback) log.warn('account.welcome used the shipped wording', { reason: 'invalid-template-override' });
     const result = await sendEmail({

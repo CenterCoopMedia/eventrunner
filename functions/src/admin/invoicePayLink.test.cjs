@@ -11,6 +11,7 @@ const Stripe = require('stripe');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const { createInvoiceAdminHandler } = require('./invoices.cjs');
 const { createStripeProvider } = require('../ticketing/providers/stripe.cjs');
+const { configuredPublicBase } = require('../ticketing/stripeCommerce.cjs');
 const { createTicketingWebhookHandler } = require('../ticketing/webhook.cjs');
 const { currentPayLink, payLinkExpiryText, internals: { LINK_LIFETIME_MS } } = require('./invoicePayLink.cjs');
 
@@ -114,7 +115,7 @@ function resOf() {
   };
 }
 
-function setup({ invoice = issued(), stripe = true, extra = {} } = {}) {
+function setup({ invoice = issued(), stripe = true, extra = {}, publicUrl = ENV.EVENT_PUBLIC_URL } = {}) {
   const db = makeFakeDb({
     'config/bootstrap': { adminEmails: ['operator@example.org'], staffEmails: ['staff@example.org'] },
     'config/event': { historicalDemo: false, timezone: 'America/New_York' },
@@ -128,7 +129,7 @@ function setup({ invoice = issued(), stripe = true, extra = {} } = {}) {
   const log = { error: (...args) => logs.push(args), warn: (...args) => logs.push(args), info: (...args) => logs.push(args) };
   const provider = createStripeProvider({ env: ENV, db, stripeClient: fake.client, now });
   const getPayments = stripe
-    ? () => ({ available: true, provider, publicUrl: 'https://event.example', testMode: true })
+    ? () => ({ available: true, provider, publicBase: configuredPublicBase(null, { EVENT_PUBLIC_URL: publicUrl }), testMode: true })
     : () => ({ available: false, reason: 'Card payment links need Stripe. This site does not take card payments through Stripe.' });
   const admin = createInvoiceAdminHandler({ db, auth, getConfig, now, log, getPayments });
   const webhook = createTicketingWebhookHandler({ db, provider, now, log });
@@ -559,6 +560,17 @@ test('the current link and its end time are read on the event clock', () => {
   assert.equal(payLinkExpiryText('2026-10-21T15:30:00.000Z', 'Not/AZone'), 'October 21, 2026, 3:30 PM UTC');
 });
 
+test('invoice card checkout returns to the mounted event home', async () => {
+  const publicUrl = 'https://event.example/events/conference';
+  const env = setup({ publicUrl });
+  const res = await env.call({ action: 'createPayLink', invoiceId: ID });
+  assert.equal(res.statusCode, 200);
+  assert.equal(env.fake.calls.create.length, 1);
+  const { success_url: success, cancel_url: cancel } = env.fake.calls.create[0].params;
+  assert.equal(success, `${publicUrl}/`);
+  assert.equal(cancel, `${publicUrl}/`);
+});
+
 test('the deployed handler offers card links only with the Stripe provider and a key for its mode', () => {
   const { internals: { stripePayments } } = require('./invoices.cjs');
   const db = makeFakeDb({});
@@ -573,7 +585,10 @@ test('the deployed handler offers card links only with the Stripe provider and a
   const ready = stripePayments({ db, env: { ...ENV, TICKETING_API_TOKEN: 'sk_test_fixture' } });
   assert.equal(ready.available, true);
   assert.equal(ready.testMode, true);
-  assert.equal(ready.publicUrl, 'https://event.example');
+  assert.equal(ready.publicBase, 'https://event.example/');
+  const mountedEnv = { ...ENV, EVENT_PUBLIC_URL: 'https://event.example/events/conference/' };
+  const mounted = stripePayments({ db, env: { ...mountedEnv, TICKETING_API_TOKEN: 'sk_test_fixture' } });
+  assert.equal(mounted.publicBase, mountedEnv.EVENT_PUBLIC_URL);
 });
 
 test('two presses at once share one session, and neither closes the link the other opened', async () => {

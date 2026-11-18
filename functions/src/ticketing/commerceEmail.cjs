@@ -3,6 +3,8 @@
 // Firestore is a wake-up only. Re-read current financial and admission state,
 // then use the existing managed-email send-once contract. No email work queue.
 const { isOrderFulfilled } = require('shared/ticketCommerce');
+const { joinEventPath } = require('shared/config/publicPath');
+const { eventPublicAddress } = require('../core/config.cjs');
 const { createHash } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { attendeeLanguage } = require('../email/attendeeLanguage.cjs');
@@ -17,13 +19,12 @@ function receiptAmount(order, language = 'en') {
   return format.format(order.totalAmount / (10 ** exponent));
 }
 
-function eventOrigin(env) {
-  const url = new URL(env.EVENT_PUBLIC_URL || '');
-  const emulator = env.FUNCTIONS_EMULATOR === 'true' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if ((url.protocol !== 'https:' && !(emulator && url.protocol === 'http:')) || url.username || url.password) {
+function confirmationPublicBase(env) {
+  const { publicBase } = eventPublicAddress(env.EVENT_PUBLIC_URL, env);
+  if (!publicBase) {
     throw new Error('Ticket confirmations require a configured public event URL.');
   }
-  return url.origin;
+  return publicBase;
 }
 
 async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null, actorUid = null, sendEmail, env = process.env, now = () => new Date() }) {
@@ -45,7 +46,7 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   const tickets = snapshots.filter((ticket) => ticket.exists && ticket.data().orderId === orderId && ticket.data().status === 'valid')
     .map((ticket) => ticket.data());
   if (tickets.length === 0) return { sent: 0, alreadySent: false, skipped: 'no-valid-tickets' };
-  const origin = eventOrigin(env);
+  const publicBase = confirmationPublicBase(env);
   const config = await getConfig();
   const event = config?.event;
   const purchaserLanguage = attendeeLanguage(order, event);
@@ -59,7 +60,7 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   if (order.purchaserEmail) {
     recipients.push({
       to: order.purchaserEmail, templateId: 'ticket.order_confirmation', language: purchaserLanguage,
-      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order, purchaserLanguage), cta_url: `${origin}/tickets/status?orderId=${encodeURIComponent(orderId)}` },
+      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order, purchaserLanguage), cta_url: joinEventPath(publicBase, `/tickets/status?orderId=${encodeURIComponent(orderId)}`) },
     });
   }
   const attendees = new Map();
@@ -86,7 +87,7 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
     const language = email === purchaserEmail ? purchaserLanguage : attendeeLanguage(accountsByEmail.get(email), event);
     recipients.push({
       to: email, templateId: 'ticket.attendee_confirmation', language,
-      tokens: { first_name: attendee.firstName, order_reference: orderId, ticket_count: String(attendee.count), cta_url: `${origin}/ticket/claim?order=${encodeURIComponent(orderId)}` },
+      tokens: { first_name: attendee.firstName, order_reference: orderId, ticket_count: String(attendee.count), cta_url: joinEventPath(publicBase, `/ticket/claim?order=${encodeURIComponent(orderId)}`) },
     });
   }
   let sent = 0;
@@ -138,4 +139,4 @@ function buildHandlers() {
   };
 }
 
-module.exports = { sendOrderConfirmations, get handlers() { return buildHandlers(); }, internals: { eventOrigin, receiptAmount } };
+module.exports = { sendOrderConfirmations, get handlers() { return buildHandlers(); }, internals: { receiptAmount } };

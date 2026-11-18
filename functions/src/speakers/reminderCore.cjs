@@ -13,6 +13,7 @@
 
 const crypto = require('node:crypto');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
+const { eventPageUrl } = require('../core/config.cjs');
 const { speakerDisplayName } = require('shared/speaker');
 const {
   REMINDABLE_SPEAKER_STATUSES,
@@ -106,10 +107,6 @@ function wordingVersion(override, shipped = null) {
   return `${SHIPPED_WORDING_PREFIX}${wordingDigest(template)}`;
 }
 
-function siteUrl(config) {
-  return String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
-}
-
 /**
  * The stores the readiness rule reads, once per request.
  *
@@ -166,7 +163,6 @@ function remindableEntries(stores) {
  * the renderer escapes them in the html body.
  */
 function reminderTokenValues({ config, speaker, readiness, items, actor, due = null }) {
-  const site = siteUrl(config);
   const wants = (item) => items.includes(item);
   return {
     // Set only by the reminder schedule, which has a due date. Empty for a
@@ -174,8 +170,8 @@ function reminderTokenValues({ config, speaker, readiness, items, actor, due = n
     due_date: due?.dateLabel ?? '',
     days_left: due && Number.isInteger(due.daysLeft) ? String(due.daysLeft) : '',
     speaker_name: speakerDisplayName(speaker),
-    dashboard_url: site ? `${site}/speaker/dashboard` : '',
-    profile_url: site ? `${site}/speaker/profile` : '',
+    dashboard_url: eventPageUrl(config, '/speaker/dashboard') ?? '',
+    profile_url: eventPageUrl(config, '/speaker/profile') ?? '',
     admin_contact_email: actor.email || config?.event?.legal?.supportEmail || '',
     needs_bio: wants('bio') && readiness.bio ? 'yes' : '',
     needs_headshot: wants('headshot') && readiness.headshot ? 'yes' : '',

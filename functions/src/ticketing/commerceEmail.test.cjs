@@ -45,15 +45,18 @@ test('ticket confirmations use the purchaser and assigned attendee languages sep
     'users/recipient': { email: 'attendee@example.org', registrationLanguage: 'en' },
   });
   const sent = [];
-  await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail: async (message) => {
+  const mountedEnv = { ...env, EVENT_PUBLIC_URL: 'https://event.example.org/events/conference' };
+  await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env: mountedEnv, sendEmail: async (message) => {
     sent.push(message);
     return { status: 'sent' };
   } });
   assert.equal(sent.length, 2);
   assert.equal(sent[0].subject, 'Tu pedido de entradas para Synthetic conference');
-  assert.match(sent[0].html, /orderId=order-1&amp;lang=es/);
-  assert.match(sent[0].text, /orderId=order-1&lang=es/);
+  assert.ok(sent[0].html.includes(`href="${mountedEnv.EVENT_PUBLIC_URL}/tickets/status?orderId=order-1&amp;lang=es"`));
+  assert.ok(sent[0].text.includes(`${mountedEnv.EVENT_PUBLIC_URL}/tickets/status?orderId=order-1&lang=es`));
   assert.equal(sent[1].subject, 'A ticket is ready for you at Synthetic conference');
+  assert.ok(sent[1].html.includes(`href="${mountedEnv.EVENT_PUBLIC_URL}/ticket/claim?order=order-1"`));
+  assert.ok(sent[1].text.includes(`${mountedEnv.EVENT_PUBLIC_URL}/ticket/claim?order=order-1`));
   assert.doesNotMatch(sent[1].text, /lang=es/);
 });
 

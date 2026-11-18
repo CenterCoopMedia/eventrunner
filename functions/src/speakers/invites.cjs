@@ -63,6 +63,7 @@
  */
 
 const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
+const { eventPageUrl } = require('../core/config.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
 const { speakerDisplayName } = require('shared/speaker');
@@ -320,7 +321,6 @@ function inviteTokenValues({ config, speaker, token, inviteType, actor }) {
 
 /** The per-send values of speaker.accepted; shared with the preview too. */
 function acceptedTokenValues({ config, speaker }) {
-  const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
   const days = Array.isArray(config?.event?.days) ? config.event.days : [];
   return {
     speaker_name: speakerDisplayName(speaker),
@@ -330,7 +330,7 @@ function acceptedTokenValues({ config, speaker }) {
     // accepted speaker lands here to write their bio and upload a
     // headshot — see email/templates/speaker.accepted.cjs for the copy
     // this URL backs.
-    profile_wizard_url: site ? `${site}/speaker/profile` : '',
+    profile_wizard_url: eventPageUrl(config, '/speaker/profile') ?? '',
     // Declared but unreferenced in the shipped copy; a client override
     // that wants a deadline gets the event's first day rather than an
     // empty substitution and a warning.

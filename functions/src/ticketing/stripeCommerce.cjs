@@ -4,6 +4,8 @@
 const crypto = require('node:crypto');
 const { MAX_AMOUNT, CURRENCY_MINIMUMS, isSalesWindowOpen } = require('shared/ticketCommerce');
 const { applyPromoCode } = require('shared/promoCodes');
+const { parseEventPublicBase } = require('shared/config/publicBase');
+const { joinEventPath } = require('shared/config/publicPath');
 
 const CATALOG = 'ticket_catalog';
 const INVENTORY = 'ticket_inventory';
@@ -232,24 +234,24 @@ function ticketsForFreeOrder(order, at = new Date()) {
   }));
 }
 
-function configuredPublicUrl(config, env = process.env) {
+function configuredPublicBase(config, env = process.env) {
   const candidate = env.EVENT_PUBLIC_URL || config?.tierA?.publicUrl;
   try {
-    const url = new URL(candidate);
-    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Invalid public URL.');
-    return url.origin;
+    const { publicBase } = parseEventPublicBase(candidate);
+    if (!publicBase) throw new Error('A public URL is required');
+    return publicBase;
   } catch {
     throw new CommerceError('ticketing-unavailable', 'Ticket sales are not configured.', 503);
   }
 }
 
-function checkoutRequestFor(order, publicUrl) {
+function checkoutRequestFor(order, publicBase) {
   const metadata = {
     eventRunnerOrderId: order.id,
     eventRunnerEventId: order.eventId,
     eventRunnerAttemptId: order.attemptId,
   };
-  const returnUrl = `${publicUrl}/tickets/status?orderId=${encodeURIComponent(order.id)}`;
+  const returnUrl = joinEventPath(publicBase, `/tickets/status?orderId=${encodeURIComponent(order.id)}`);
   return {
     mode: 'payment',
     ui_mode: 'hosted_page',
@@ -291,5 +293,5 @@ module.exports = {
   CATALOG, INVENTORY, ORDERS, ATTEMPTS, CURRENT, HOLD_MS, SAFE_RETRY_MS,
   CommerceError, orderIdFor, attemptIdFor, requestFingerprint, providerScope, assertOrderScope,
   normalizeInventory, reserveInventory, inventoryTransitionPatch, transitionOrderInventory,
-  priceSelections, makeSeats, ticketsForFreeOrder, configuredPublicUrl, checkoutRequestFor, millis, iso,
+  priceSelections, makeSeats, ticketsForFreeOrder, configuredPublicBase, checkoutRequestFor, millis, iso,
 };

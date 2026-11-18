@@ -24,11 +24,11 @@ const CONFIG = {
     social: { handles: [] },
   },
   theme: { colors: { primary: 'BRAND_PRIMARY_SENTINEL', ink: 'BRAND_INK_SENTINEL' } },
-  tierA: { publicUrl: 'https://site.example.test/' },
+  tierA: { publicUrl: 'https://site.example.test/events/conference/' },
 };
 const ACTOR = { uid: 'staff-1', email: 'staff@example.test' };
 const HOSTILE = '<script>alert(1)</script> & "quotes"';
-const DASHBOARD = 'https://site.example.test/speaker/dashboard';
+const DASHBOARD = 'https://site.example.test/events/conference/speaker/dashboard';
 
 // Whole URLs in a message, so a check compares the full link, not a substring.
 function linksIn(text) {
@@ -134,7 +134,7 @@ test('saved wording is used, and wording with an unknown token or no dashboard l
   assert.deepEqual(validateOverridePayload('speaker.reminder', override), { ok: true, errors: [] });
   const out = renderShipped(hostileRecipient(), override);
   assert.equal(out.delivered.subject, 'Reminder from Example Event');
-  assert.ok(out.delivered.text.startsWith(`Dear ${HOSTILE}, open https://site.example.test/speaker/dashboard for Panel`));
+  assert.ok(out.delivered.text.startsWith(`Dear ${HOSTILE}, open ${DASHBOARD} for Panel`));
   assert.equal(out.usedFallback, false);
 
   const unknown = validateOverridePayload('speaker.reminder', { text: '{{dashboard_url}} {{deadline}}' });

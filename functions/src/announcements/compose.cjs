@@ -37,7 +37,7 @@ const { renderAttendeeTemplate } = require('../email/attendeeTemplates.cjs');
 const announcementTemplate = require('../email/templates/announcement.email.cjs');
 const { safeUrlHref } = require('shared/urlSafety');
 const { hasMailingAddress } = require('shared/email');
-const { testUnsubscribeUrl, internals: suppressionInternals } = require('./suppression.cjs');
+const { testUnsubscribeUrl } = require('./suppression.cjs');
 
 const { escapeHtml } = renderInternals;
 
@@ -198,7 +198,7 @@ async function resolveChannel({ provider, config }) {
   }
   const configured = config?.providers?.email?.announcementStream;
   const stream = typeof configured === 'string' && configured.trim() ? configured.trim() : null;
-  const needsSite = () => !suppressionInternals.siteUrlOf(config);
+  const needsSite = () => !testUnsubscribeUrl(config);
 
   if (provider?.name === 'console') {
     if (needsSite()) return refused('site-url-missing');

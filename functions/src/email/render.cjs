@@ -3,6 +3,8 @@
 const { configuredThemeColor } = require('shared/theme');
 const { listSocialAccounts } = require('shared/config');
 const { isCalendarDate } = require('shared/eventDateTime');
+const { joinEventPath } = require('shared/config/publicPath');
+const { eventPublicAddress } = require('../core/config.cjs');
 
 /**
  * Template renderer (spec §6.1–6.2).
@@ -140,20 +142,15 @@ const HTML_TOKEN_RESOLVERS = {
   postal_address_html: (config) => config?.event?.legal?.postalAddressHtml || '',
   social_links_html: (config) => buildSocialLinksHtml(config?.event?.social),
   next_steps_html: (config) => {
-    const site = siteUrl(config);
+    const { publicBase } = eventPublicAddress(config?.tierA?.publicUrl);
+    const base = publicBase ?? '/';
     const steps = [
-      `<li><a href="${escapeHtml(`${site}/schedule`)}">Browse the schedule</a></li>`,
-      `<li><a href="${escapeHtml(`${site}/profile`)}">Complete your profile</a></li>`,
+      `<li><a href="${escapeHtml(joinEventPath(base, '/schedule'))}">Browse the schedule</a></li>`,
+      `<li><a href="${escapeHtml(joinEventPath(base, '/profile'))}">Complete your profile</a></li>`,
     ];
     return `<ul>${steps.join('')}</ul>`;
   },
 };
-
-/** @param {object} config */
-function siteUrl(config) {
-  const url = config?.tierA?.publicUrl || '';
-  return url.replace(/\/+$/, '');
-}
 
 /** Format calendar days without shifting them into the server's timezone. */
 function formatEventDates(event) {
@@ -214,7 +211,7 @@ function emailLogoUrl(theme, bucket) {
 function buildGlobalTokens(config, { now = () => new Date() } = {}) {
   const event = config?.event || {};
   const theme = config?.theme || {};
-  const site = siteUrl(config);
+  const { publicBase } = eventPublicAddress(config?.tierA?.publicUrl);
   return {
     event_name: event.name || '',
     event_short_name: event.shortName || '',
@@ -225,9 +222,10 @@ function buildGlobalTokens(config, { now = () => new Date() } = {}) {
     venue_name: event.venue?.name || '',
     venue_address: formatVenueAddress(event.venue),
     venue_map_url: event.venue?.mapUrl || '',
-    site_url: site,
-    login_url: site ? `${site}/signin` : '',
-    schedule_url: site ? `${site}/schedule` : '',
+    // Saved templates can append an app path to this token.
+    site_url: publicBase?.slice(0, -1) ?? '',
+    login_url: publicBase ? joinEventPath(publicBase, '/signin') : '',
+    schedule_url: publicBase ? joinEventPath(publicBase, '/schedule') : '',
     support_email: event.legal?.supportEmail || '',
     social_links_text: buildSocialLinksText(event.social),
     sender_name: event.sender?.name || '',

@@ -44,6 +44,7 @@
  */
 
 const { resolveRegistrationAction } = require('shared/registration');
+const { eventPageUrl } = require('../../core/config.cjs');
 
 const TICKETS = 'tickets';
 const PROVIDER_NAME = 'manual';
@@ -54,14 +55,13 @@ const LIST_PAGE_SIZE = 200;
 /**
  * The self-service claim page (issue #33): `/ticket/claim`, reserved in
  * `shared/routing` alongside `/speaker/accept`. `config.tierA.publicUrl` is
- * the deploy-time origin (spec §2.1); a deployment with none configured has
+ * the deploy-time public base (spec §2.1); a deployment with none configured has
  * bigger problems than a missing CTA link, so this degrades to null rather
  * than emitting a bare path.
  * @param {object|null} config @returns {string|null}
  */
 function claimUrl(config) {
-  const site = typeof config?.tierA?.publicUrl === 'string' ? config.tierA.publicUrl.replace(/\/+$/, '') : '';
-  return site ? `${site}/ticket/claim` : null;
+  return eventPageUrl(config, '/ticket/claim');
 }
 
 /** @param {FirebaseFirestore.QueryDocumentSnapshot} doc @returns {object} TicketRecord (§3.3) */

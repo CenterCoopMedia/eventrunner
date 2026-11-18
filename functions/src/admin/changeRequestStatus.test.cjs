@@ -254,6 +254,28 @@ test('result link: only an address on this site’s own origin, compared exactly
   assert.equal(readResultUrl(`${SITE}/travel`, '').ok, false);
 });
 
+test('a checked result URL must stay inside the event mount', async () => {
+  const publicUrl = `${SITE}/events/conference`;
+  const config = { ...CONFIG, tierA: { publicUrl } };
+  assert.deepEqual(readResultUrl(`${publicUrl}?lang=es#arrival`, publicUrl), {
+    ok: true, href: `${publicUrl}/?lang=es#arrival`,
+  });
+  const db = makeFakeDb({ 'change_requests/cr1': doneRequest() });
+  for (const input of [
+    `${SITE}/travel`, `${publicUrl}-later/travel`, `${publicUrl}%2Ftravel`,
+    `${publicUrl}/%2e%2e/later/travel`, `${SITE}/events/Conference/travel`,
+    `blob:${publicUrl}/travel`,
+  ]) {
+    const refused = await saveOutcome(db, { id: 'cr1', resultUrl: input, resultChecked: true }, { config });
+    assert.equal(refused.statusCode, 400, input);
+    assert.equal(db.read('change_requests', 'cr1').outcome.resultUrl, null);
+  }
+  const resultUrl = `${publicUrl}/travel?lang=es#hotel`;
+  const saved = await saveOutcome(db, { id: 'cr1', resultUrl, resultChecked: true }, { config });
+  assert.equal(saved.statusCode, 200);
+  assert.equal(db.read('change_requests', 'cr1').outcome.resultUrl, resultUrl);
+});
+
 test('outcome details: a link on another site is 400 and is not stored', async () => {
   const db = makeFakeDb({ 'change_requests/cr1': doneRequest() });
   const res = await saveOutcome(db, { id: 'cr1', resultUrl: 'https://summit.example.org.evil.test/x', resultChecked: true });
