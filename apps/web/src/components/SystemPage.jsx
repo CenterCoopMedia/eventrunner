@@ -25,7 +25,7 @@
 // A custom page has no core component, so it ignores `slot` entirely and
 // keeps full block composition (ContentPage.jsx). Nothing here reaches it.
 import { Fragment } from 'react';
-import { usePublicContent } from '../contexts/PublicLanguageContext.jsx';
+import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import SectionBlocks from './blocks/SectionBlocks.jsx';

@@ -15,7 +15,8 @@
 // components and would otherwise show the server's title for a moment and
 // then drop to the bare event name.
 import { useLocation } from 'react-router';
-import { usePublicContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { routeTitlePartFor, useDerivedDocumentTitle } from '../lib/useDocumentTitle.js';
 

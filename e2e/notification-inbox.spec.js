@@ -165,12 +165,15 @@ test.describe.serial('reply notification inbox', () => {
     await ownerPage.goto('/signin');
     await ownerPage.getByRole('button', { name: 'Sign out' }).click();
     await expect(ownerPage.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    // The signed-in page shares this heading. The form marks completed sign-out.
+    await expect(ownerPage.getByLabel('Email address', { exact: true })).toBeVisible();
     await signIn(ownerPage, THIRD);
     await ownerPage.goto('/dashboard');
     await expect(panel(ownerPage)).toContainText('No reply notifications yet.');
     await ownerPage.goto('/signin');
     await ownerPage.getByRole('button', { name: 'Sign out' }).click();
     await expect(ownerPage.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(ownerPage.getByLabel('Email address', { exact: true })).toBeVisible();
     await signIn(ownerPage, OWNER);
     await ownerPage.goto('/dashboard');
     await expect(rowForRoot(ownerPage, rootId)).toContainText('Read');

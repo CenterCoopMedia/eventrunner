@@ -11,7 +11,8 @@
 // bookmarking feature off draws nothing at all — there is nothing to list.
 import { useMemo } from 'react';
 import { PublicLink as Link } from '../PublicLink.jsx';
-import { usePublicContent as useContent, usePublicLanguage } from '../../contexts/PublicLanguageContext.jsx';
+import { usePublicContent as useContent } from '../../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../../hooks/useMyBookmarks.js';
 import { formatSessionTimeRange } from '../../lib/eventTime.js';

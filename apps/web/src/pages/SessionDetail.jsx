@@ -5,7 +5,8 @@
 // visible cmsSchedule doc 404s here rather than rendering a blank page.
 import { useLocation, useParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
-import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { usePublicContent as useContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useEventClock } from '../hooks/useEventClock.js';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';

@@ -34,7 +34,8 @@
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { validUpdateCategory } from 'shared/update';
 import { pageHeading } from 'shared/page';
-import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { usePublicContent as useContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { UpdateImage } from '../components/UpdateContent.jsx';
 import EmptyState from '../components/EmptyState.jsx';

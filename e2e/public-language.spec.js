@@ -54,7 +54,7 @@ test.beforeAll(async () => {
   block('cta', 'cta', 0, { label: 'Read the guide', url: href, translations: { es: { label: 'Leer la guía' } } });
   block('group', 'link_group', 1, { label: 'Another guide', url: href });
   block('rich', 'richtext', 2, {
-    value: `<p><a href="${href}">Open the guide</a><a href="https://example.org/?lang=en#external">External source</a><a href="javascript:void(0)">Unsafe destination</a></p>`,
+    value: `<p><a href="${href}">Open the guide</a> <a href="https://example.org/?lang=en#external">External source</a> <a href="javascript:void(0)">Unsafe destination</a></p>`,
   });
   block('first', 'list_item', 3, { text: 'First note', translations: { es: { text: 'Primera nota' } } });
   block('second', 'list_item', 4, { text: 'Second note' });
@@ -133,7 +133,9 @@ test('the hosted phone and desktop reader marks mixed language and retains keybo
     await page.goto(`${route}?lang=en`);
     const spanish = page.getByRole('button', { name: 'Español', exact: true });
     await expect(spanish).toBeVisible();
-    await spanish.focus();
+    await page.getByRole('button', { name: 'English', exact: true }).focus();
+    await page.keyboard.press('Tab');
+    await expect(spanish).toBeFocused();
     await page.keyboard.press('Space');
     await expect(spanish).toBeFocused();
     await expect(spanish).toHaveAttribute('aria-pressed', 'true');

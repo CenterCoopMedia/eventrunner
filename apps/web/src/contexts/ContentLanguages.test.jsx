@@ -29,7 +29,7 @@ vi.mock('@generated/scheduleData.js', () => ({ default: [
 
 import { EventConfigProvider, useEventConfig } from './EventConfigContext.jsx';
 import { ContentProvider, useContent } from './ContentContext.jsx';
-import { PublicLanguageProvider, usePublicContent } from './PublicLanguageContext.jsx';
+import { PublicLanguageProvider, usePublicContent } from './PublicLanguageProvider.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 
 function Probe() {

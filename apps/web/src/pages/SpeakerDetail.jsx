@@ -25,7 +25,8 @@
 import { useParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import ShareLink from '../components/ShareLink.jsx';
-import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { usePublicContent as useContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';

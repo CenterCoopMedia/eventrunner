@@ -1,7 +1,8 @@
 // Home owns the visible hero heading, CMS actions, and optional artwork.
 // Other CMS sections stay in their authored order through SystemPage.
 import { PublicLink as Link } from '../components/PublicLink.jsx';
-import { usePublicContent as useContent, usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
+import { usePublicContent as useContent } from '../contexts/PublicLanguageProvider.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';

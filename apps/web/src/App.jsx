@@ -5,7 +5,7 @@ import { useLocation, useRoutes, useSearchParams } from 'react-router';
 import { EventConfigProvider, useEventConfig } from './contexts/EventConfigContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ContentProvider } from './contexts/ContentContext.jsx';
-import { mayHaveSpanish, PublicLanguageProvider } from './contexts/PublicLanguageContext.jsx';
+import { mayHaveSpanish, PublicLanguageProvider } from './contexts/PublicLanguageProvider.jsx';
 import { ProfileProvider } from './contexts/ProfileContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
