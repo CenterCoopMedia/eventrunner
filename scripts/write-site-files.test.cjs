@@ -305,6 +305,11 @@ test('a page whose path merely starts with the same letters is allowed', () => {
   assert.deepEqual(excludedRoutesFound(xml), []);
 });
 
+test('only the app path counts when checking a mounted sitemap for specimen routes', () => {
+  assert.deepEqual(excludedRoutesFound('<loc>https://example.org/specimen/schedule</loc>', '/specimen'), []);
+  assert.deepEqual(excludedRoutesFound('<loc>https://example.org/specimen/specimen?lang=en</loc>', '/specimen'), ['/specimen']);
+});
+
 test('a refused route no page holds says what to remove instead', () => {
   // The sitemap is built from pages, sessions, speakers and updates. A
   // route that reached it from one of the other three has no page path to

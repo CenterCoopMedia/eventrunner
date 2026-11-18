@@ -253,6 +253,11 @@ node scripts/write-site-files.cjs --dist apps/web/dist --generated /tmp/generate
 `generate-content.cjs` already wrote earlier in the same workflow run, right after `npm run build`
 produces `apps/web/dist` from that same snapshot.
 
+For a mounted event, the host owner merges the generated `Disallow` lines into
+the wildcard group in the shared host's root `/robots.txt` and adds the event's
+`Sitemap` line. The mounted file contains rules for that event's paths. The
+client router serves the sitemap at `<mount>/sitemap.xml`.
+
 The script also writes the two app icons, the same way `publish-site.cjs` does, from the snapshot's
 `theme.logos.mark`. `--storage-bucket` names the bucket an uploaded square PNG is read from, over
 its public download URL, so the workflow step needs no credentials; `deploy-client.yml` passes

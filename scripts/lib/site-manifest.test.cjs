@@ -15,7 +15,6 @@ const {
   buildRobotsTxt,
   buildWebManifest,
   buildSiteArtifacts,
-  internals: { normalizedBaseUrl },
 } = require('./site-manifest.cjs');
 const { isPublicPage } = require('shared/page');
 
@@ -274,32 +273,35 @@ test('a route segment with a non-ASCII character is percent-encoded', () => {
   assert.match(xml, /<loc>https:\/\/example\.org\/speakers\/jos%C3%A9-garc%C3%ADa<\/loc>/);
 });
 
-// --- normalizedBaseUrl: EVENT_PUBLIC_URL is trimmed for validation only ------
-
-test('surrounding whitespace on the configured public URL is stripped', () => {
-  assert.equal(normalizedBaseUrl('  https://example.org  '), 'https://example.org');
-  assert.equal(normalizedBaseUrl('\thttps://example.org/\n'), 'https://example.org');
+test('crawler files require the validated public base', () => {
+  for (const publicUrl of ['', undefined, null, '  https://example.org/  ', 'not a url', 'https://example.org/site/?x=1#y']) {
+    const args = { publicUrl, pages: PAGES, features: FEATURES };
+    assert.throws(() => buildSitemapXml(args), /public URL is required|must be an HTTPS URL/);
+    assert.throws(() => buildRobotsTxt(args), /public URL is required|must be an HTTPS URL/);
+  }
 });
 
-test('a padded public URL still produces a correct sitemap base', () => {
-  const xml = buildSitemapXml({ publicUrl: '  https://example.org/  ', pages: PAGES, features: FEATURES });
-  assert.match(xml, /<loc>https:\/\/example\.org\/<\/loc>/);
-  assert.doesNotMatch(xml, / +https/);
-});
+test('mounted crawler files cover the event and preserve robots match boundaries', () => {
+  const mount = '/events/conference';
+  const publicUrl = `${PUBLIC_URL}${mount}`;
+  const pages = PAGES.map((page) => page.id === 'home' ? { ...page, visible: false } : page);
+  const args = { publicUrl, pages, features: FEATURES };
+  const xml = buildSitemapXml(args);
+  const locations = Array.from(xml.matchAll(/<loc>([^<]+)<\/loc>/gu), ([, url]) => url);
+  assert.ok(locations.includes(`${publicUrl}/travel`));
+  assert.ok(locations.every((url) => url.startsWith(`${publicUrl}/`)));
 
-test('a public URL carrying a path is preserved, query and hash are dropped', () => {
-  assert.equal(normalizedBaseUrl('https://example.org/site/?x=1#y'), 'https://example.org/site');
-});
-
-test('a value that is not a parseable URL still gets trimmed and trailing-slash-stripped', () => {
-  assert.equal(normalizedBaseUrl('  not a url/  '), 'not a url');
-});
-
-test('an empty or non-string public URL normalizes to an empty base', () => {
-  assert.equal(normalizedBaseUrl(''), '');
-  assert.equal(normalizedBaseUrl('   '), '');
-  assert.equal(normalizedBaseUrl(undefined), '');
-  assert.equal(normalizedBaseUrl(null), '');
+  const lines = buildRobotsTxt(args).split('\n');
+  assert.ok(lines.includes('User-agent: *'));
+  assert.ok(lines.includes(`Sitemap: ${publicUrl}/sitemap.xml`));
+  const rules = lines.filter((line) => line.startsWith('Disallow: ')).map((line) => line.slice('Disallow: '.length));
+  assert.ok(rules.every((rule) => rule.startsWith(`${mount}/`)));
+  assert.ok(!lines.some((line) => line.startsWith('Allow: ')));
+  for (const path of ['/$', '/secret$', '/admin$', '/admin/*', '/speaker/accept', '/ticket/claim']) {
+    assert.ok(rules.includes(`${mount}${path}`), path);
+  }
+  assert.ok(rules.some((rule) => `${mount}/ticket/claim?token=fixture`.startsWith(rule)));
+  assert.ok(!rules.some((rule) => `${mount}-next/admin`.startsWith(rule)));
 });
 
 // --- buildRobotsTxt ----------------------------------------------------------
