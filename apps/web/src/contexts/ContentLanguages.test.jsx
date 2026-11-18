@@ -84,7 +84,7 @@ function ReaderProbe() {
 it.each([
   ['browser', BrowserRouter, '/visit?lang=es', '/schedule?day=one&lang=es#morning'],
   ['hash', HashRouter, '/#/visit?lang=es', '#/schedule?day=one&lang=es#morning'],
-])('keeps safe query-bearing CMS links in the %s router and leaves source copy intact', (_name, Router, entry, expected) => {
+])('keeps safe query-bearing CMS links in the %s router and leaves source copy intact', async (_name, Router, entry, expected) => {
   window.history.replaceState(null, '', entry);
   render(<Router><EventConfigProvider><ContentProvider pathname="/schedule">
     <PublicLanguageProvider><ReaderProbe /></PublicLanguageProvider>
@@ -100,7 +100,7 @@ it.each([
         value: '<p><a href="/schedule?day=one#morning">Read more</a></p>' },
     ]);
   });
-  expect(screen.getByRole('link', { name: 'Visitar' })).toHaveAttribute('href', expected);
+  expect(await screen.findByRole('link', { name: 'Visitar' })).toHaveAttribute('href', expected);
   expect(screen.getByRole('link', { name: 'Find the room' })).toHaveAttribute('href', expected);
   expect(screen.getByRole('link', { name: 'Read more' })).toHaveAttribute('href', expected);
   expect(screen.getByTestId('source-label')).toHaveTextContent('Visit');

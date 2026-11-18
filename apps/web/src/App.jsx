@@ -5,8 +5,7 @@ import { useLocation, useRoutes, useSearchParams } from 'react-router';
 import { EventConfigProvider, useEventConfig } from './contexts/EventConfigContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ContentProvider } from './contexts/ContentContext.jsx';
-import { PublicLanguageProvider } from './contexts/PublicLanguageContext.jsx';
-import { contentLanguages } from 'shared/contentLanguages';
+import { mayHaveSpanish, PublicLanguageProvider } from './contexts/PublicLanguageContext.jsx';
 import { ProfileProvider } from './contexts/ProfileContext.jsx';
 import { ToastProvider } from './contexts/ToastContext.jsx';
 import Layout from './components/Layout.jsx';
@@ -60,7 +59,7 @@ function ContentGate({ children }) {
 
   return (
     <ContentProvider readSource={readSource} pathname={pathname} search={search} publicTools={IS_DEMO || features.webmcpPublic === true}
-      languageNeedsSchedule={features.schedule && contentLanguages(eventConfig).available.includes('es')}>
+      languageNeedsSchedule={features.schedule && mayHaveSpanish(eventConfig)}>
       {children}
     </ContentProvider>
   );

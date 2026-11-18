@@ -1,4 +1,3 @@
 import api from './contentLanguages.cjs';
 export const { LANGUAGES, contentLanguages, languageConfigErrors, variantFields, richVariantFields,
-  variantErrors, collectionVariantErrors, resolveContentVariant,
-  languageFromSearch, internalRoutePath, withContentLanguage } = api;
+  variantErrors, collectionVariantErrors, resolveContentVariant } = api;

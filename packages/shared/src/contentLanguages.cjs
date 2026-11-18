@@ -1,9 +1,8 @@
 'use strict';
 
-const { hasRichTextContent, isSafeRichTextHref } = require('./richText.cjs');
-const { isCanonicalPagePath } = require('./routing.cjs');
+const { hasRichTextContent } = require('./richText.cjs');
+const { LANGUAGES } = require('./languageUrls.cjs');
 
-const LANGUAGES = Object.freeze(['en', 'es']);
 const ENGLISH_ONLY = Object.freeze({ default: 'en', available: Object.freeze(['en']) });
 // Identifiers, URLs, prices, figures, attributions and proper names are shared.
 const BLOCK_FIELDS = Object.freeze({
@@ -50,32 +49,6 @@ function languageConfigErrors(value) {
 function contentLanguages(event = {}) {
   const value = event?.contentLanguages;
   return value && languageConfigErrors(value).length === 0 ? value : ENGLISH_ONLY;
-}
-
-function languageFromSearch(search, available = LANGUAGES) {
-  const values = new URLSearchParams(search).getAll('lang');
-  return values.length === 1 && available.includes(values[0]) ? values[0] : null;
-}
-
-function internalRoutePath(href) {
-  if (!isSafeRichTextHref(href)) return null;
-  const pathname = href.split(/[?#]/, 1)[0].replace(/\/+$/, '') || (href.startsWith('/') ? '/' : '');
-  return href.startsWith('/') && !href.startsWith('//') && isCanonicalPagePath(pathname)
-    ? pathname : null;
-}
-
-function withContentLanguage(href, language) {
-  if (!LANGUAGES.includes(language) || !isSafeRichTextHref(href)
-      || !/^\/(?![\/\\])[^\s\\?#]*/.test(href)) return href;
-  const fragmentStart = href.indexOf('#');
-  const beforeFragment = fragmentStart === -1 ? href : href.slice(0, fragmentStart);
-  const fragment = fragmentStart === -1 ? '' : href.slice(fragmentStart);
-  const queryStart = beforeFragment.indexOf('?');
-  const path = queryStart === -1 ? beforeFragment : beforeFragment.slice(0, queryStart);
-  if (/[\s\\]/.test(path)) return href;
-  const query = new URLSearchParams(queryStart === -1 ? '' : beforeFragment.slice(queryStart + 1));
-  query.set('lang', language);
-  return `${path}?${query}${fragment}`;
 }
 
 function variantErrors(record, kind, prefix = 'translations') {
@@ -137,5 +110,4 @@ function resolveContentVariant(record, kind, requestedLanguage, event = {}) {
 module.exports = {
   LANGUAGES, contentLanguages, languageConfigErrors, variantFields, richVariantFields,
   variantErrors, collectionVariantErrors, resolveContentVariant,
-  languageFromSearch, internalRoutePath, withContentLanguage,
 };

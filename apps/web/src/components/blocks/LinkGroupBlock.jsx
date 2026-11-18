@@ -22,7 +22,7 @@
 // underline at 40%, accent-strong on hover.
 import { PublicLink as Link } from '../PublicLink.jsx';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
-import { internalRoutePath } from 'shared/contentLanguages';
+import { internalRoutePath } from 'shared/languageUrls';
 
 const LINK_CLASS =
   'touch-target inline-flex items-center text-body text-accent underline decoration-accent/40 underline-offset-2 hover:text-accent-strong';

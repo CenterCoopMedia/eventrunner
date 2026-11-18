@@ -17,7 +17,7 @@
 // how the drift that module's header describes got started.
 import { PublicLink as Link } from '../PublicLink.jsx';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
-import { internalRoutePath } from 'shared/contentLanguages';
+import { internalRoutePath } from 'shared/languageUrls';
 import { primaryActionClass } from '../controlClasses.js';
 import ExternalLink from '../ExternalLink.jsx';
 

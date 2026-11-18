@@ -3,8 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   contentLanguages, languageConfigErrors, variantErrors, collectionVariantErrors, resolveContentVariant,
-  languageFromSearch, internalRoutePath, withContentLanguage,
 } = require('./contentLanguages.cjs');
+const { languageFromSearch, internalRoutePath, withContentLanguage } = require('./languageUrls.cjs');
 
 const BILINGUAL = { contentLanguages: { default: 'en', available: ['en', 'es'] } };
 
@@ -17,7 +17,7 @@ test('public locale URLs use one canonical language and retain the query and anc
   assert.equal(internalRoutePath('/schedule?day=two#morning'), '/schedule');
   assert.equal(withContentLanguage('/schedule?day=two&tag=a&tag=b&lang=en#morning', 'es'),
     '/schedule?day=two&tag=a&tag=b&lang=es#morning');
-  for (const href of ['https://example.org/schedule?lang=en#morning', '//example.org/away', 'mailto:team@example.org', 'javascript:void(0)']) {
+  for (const href of ['https://example.org/schedule?lang=en#morning', '//example.org/away', 'mailto:team@example.org', 'javascript:void(0)', '/\\example.org/away']) {
     assert.equal(internalRoutePath(href), null);
     assert.equal(withContentLanguage(href, 'es'), href);
   }

@@ -1,4 +1,4 @@
-import { internalRoutePath } from 'shared/contentLanguages';
+import { internalRoutePath } from 'shared/languageUrls';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { sanitizeHtml } from '../lib/sanitizeHtml.js';
 

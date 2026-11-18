@@ -18,7 +18,7 @@
 // the footer adds nothing to the page's heading outline.
 import { useId } from 'react';
 import { PublicLink as Link } from './PublicLink.jsx';
-import { internalRoutePath } from 'shared/contentLanguages';
+import { internalRoutePath } from 'shared/languageUrls';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 

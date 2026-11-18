@@ -97,13 +97,18 @@ export default function CallingPoints({ parent, points, eventConfig, className =
                 <Link
                   to={{ pathname: `/schedule/${child.id}`, search }}
                   className="hover:underline"
+                  lang={child.publicLanguage}
                 >
-                  <span lang={child.publicLanguage}>{child.title}</span>
+                  {child.title}
                 </Link>
                 {/* The relationship, in words. The indent says it to a
                     reader who can see it; this says it to everyone
                     else. */}
-                <span className="sr-only">{text(' — part of ', ' — parte de ')}<span lang={parent.publicLanguage}>{parent.title}</span></span>
+                <span className="sr-only">
+                  {parent.publicLanguage === 'en'
+                    ? <> — parte de <span lang="en">{parent.title}</span></>
+                    : text(` — part of ${parent.title}`, ` — parte de ${parent.title}`)}
+                </span>
               </p>
               <TransferLine movement={movement} />
             </li>

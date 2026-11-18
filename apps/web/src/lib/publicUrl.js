@@ -1,5 +1,5 @@
 import { IS_DEMO } from './demoMode.js';
-import { withContentLanguage } from 'shared/contentLanguages';
+import { withContentLanguage } from 'shared/languageUrls';
 
 /** Public route URL, independent of query state and stale canonical markup. */
 export function publicUrl(path, {
