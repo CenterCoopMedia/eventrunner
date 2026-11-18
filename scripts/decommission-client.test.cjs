@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { createHash, generateKeyPairSync } = require('node:crypto');
 const test = require('node:test');
 const { makeFakeDb, makeFakeSecrets } = require('../console/functions/src/fakes.cjs');
+const { fakeRouteMap } = require('../console/functions/src/fakeRouteMap.cjs');
 const { RECOVERY_MS, STEPS, decommission, dueApplications, main, parseArgs, purgeDue } = require('./decommission-client.cjs');
 
 const NOW = Date.parse('2026-11-05T12:00:00Z');
@@ -79,6 +80,7 @@ function setup(options = {}) {
   const failures = new Map();
   const deps = {
     env: ENV, db, consoleSecrets: secrets, clientSecrets: () => clientSecrets,
+    routeMaps: options.routeMaps,
     now: () => state.clock, sleep: async () => {}, getAccessToken: async () => ({ access_token: 'google-fixture' }),
     log: { log: (line) => logs.push(line), error: (...args) => logs.push(args.join(' ')) },
     fetch: async (raw, init = {}) => {
@@ -307,21 +309,34 @@ test('archive, restore and purge change only the selected event’s route', asyn
     host: DOMAIN, mount: '/first', appId: 'a1', publicBase: `https://${DOMAIN}/first/`, projectId: PROJECT,
     hostingOrigin: `https://${SITE}.web.app`,
   };
-  const route = { ...reservation, state: 'published', publishedAt: new Date(NOW) };
-  const sibling = { ...route, mount: '/second', appId: 'a2', publicBase: `https://${DOMAIN}/second/` };
-  const s = setup({ seed: {
+  const route = { ...reservation, state: 'published', publicTitle: 'First event', publishedAt: new Date(NOW) };
+  const sibling = { ...route, mount: '/second', appId: 'a2', publicBase: `https://${DOMAIN}/second/`,
+    projectId: 'er-second-fixture', hostingOrigin: 'https://second-fixture.web.app', publicTitle: 'Second event' };
+  const { routeMaps, controls } = fakeRouteMap();
+  const s = setup({ routeMaps, seed: {
     'console_event_mounts/a1': route,
     'console_event_mounts/a2': sibling,
-    [`console_client_hosts/${DOMAIN}`]: { revision: 2 },
+    'console_builds/a2': { resources: { projectId: sibling.projectId, site: 'second-fixture', domain: DOMAIN } },
+    [`console_client_hosts/${DOMAIN}`]: { host: DOMAIN, revision: 2 },
   } });
+  controls.readFailure = true;
+  assert.equal(await s.run('archive'), 1);
+  assert.equal(s.state.release.type, 'DEPLOY');
+  controls.readFailure = false;
   assert.equal(await s.run('archive'), 0);
   assert.deepEqual(s.db.read('console_event_mounts/a1'), { ...route, state: 'retired' });
+  assert.deepEqual((await routeMaps.read(DOMAIN)).routes.map(({ mount }) => mount), ['/second']);
+  controls.readFailure = true;
+  assert.equal(await s.run('restore'), 1);
+  controls.readFailure = false;
   assert.equal(await s.run('restore'), 0);
   assert.deepEqual(s.db.read('console_event_mounts/a1'), route);
+  assert.deepEqual((await routeMaps.read(DOMAIN)).routes.map(({ mount }) => mount), ['/first', '/second']);
   assert.equal(await s.run('purge', true), 0);
   assert.deepEqual(s.db.read('console_event_mounts/a1'), { ...reservation, state: 'removed' });
   assert.deepEqual(s.db.read('console_event_mounts/a2'), sibling);
-  assert.deepEqual(s.db.read(`console_client_hosts/${DOMAIN}`), { revision: 2 });
+  assert.deepEqual(s.db.read(`console_client_hosts/${DOMAIN}`), { host: DOMAIN, revision: 5 });
+  assert.deepEqual((await routeMaps.read(DOMAIN)).routes.map(({ mount }) => mount), ['/second']);
   assert.ok(s.state.dns.some(({ name }) => name === DOMAIN), 'the original address now serves the shared host');
   assert.ok(s.state.dns.some(({ name }) => name === `_acme-challenge.${DOMAIN}`), 'the shared host retains its certificate records');
   assert.ok(!s.state.dns.some(({ name }) => name === `fixture._domainkey.${DOMAIN}`), 'the retired event’s mail record is removed');

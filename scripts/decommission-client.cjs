@@ -5,6 +5,8 @@
 const { createHash } = require('node:crypto');
 const { toMillis } = require('../console/functions/src/access.cjs');
 const { changeMountForApplication, clientHostRef, eventMountRef, purgeEventMount } = require('../console/functions/src/clientHostRecords.cjs');
+const { createRouteMapStore } = require('../console/functions/src/clientHostMapStore.cjs');
+const { refreshApplicationRouteMap } = require('../console/functions/src/clientHostPublish.cjs');
 const { historyEntry } = require('../console/functions/src/applications.cjs');
 const { BUILD_COLLECTION, canRetryBuild } = require('../console/functions/src/buildState.cjs');
 const { approvalDefaults, readConsoleSettings, normalizeProjectId } = require('../console/functions/src/consoleSettings.cjs');
@@ -316,7 +318,7 @@ function runRecord(ctx, mode, state, extra = {}) {
 async function archive(ctx) {
   if (!ctx.app) throw new Error('archive: the application was purged');
   if (ctx.tomb) throw new Error('archive: purge has started');
-  if (ctx.app.status === 'archived' && !ctx.app.archive?.pending) return;
+  if (ctx.app.status === 'archived' && !ctx.app.archive?.pending) return refreshApplicationRouteMap(ctx.deps, ctx.appId);
   if (ctx.resources.projectId) {
     const p = await project(ctx);
     if (!p || p.state !== 'ACTIVE') throw new Error('archive: the project is not active');
@@ -346,6 +348,7 @@ async function archive(ctx) {
       updatedAt: at, updatedBy: 'decommission', history: [...(app.history || []), historyEntry('archived', at, 'decommission')],
     });
   });
+  await refreshApplicationRouteMap(ctx.deps, ctx.appId);
   await saveResources(ctx);
   await writeRun(ctx, 'archive', 'running');
   if (ctx.resources.site && release?.type !== 'SITE_DISABLE') {
@@ -858,6 +861,7 @@ async function purge(ctx, now, confirmSite) {
       });
     });
   }
+  await refreshApplicationRouteMap(ctx.deps, ctx.appId);
   for (const step of STEPS) {
     if (ctx.completed.includes(step.id)) continue;
     if (!ctx.resources.projectId && ['ticket-webhooks', 'buckets', 'database', 'custom-domain', 'project'].includes(step.id)) continue;
@@ -903,13 +907,22 @@ async function decommission({ appId, mode, now = false, confirmSite = '', deps }
     else if (mode === 'cancel-restore') await cancelRestore(ctx);
     else if (mode === 'purge') await purge(ctx, now, confirmSite);
     else throw new Error('setup: invalid mode');
-    return 0;
   } catch (err) {
     deps.log.error(`decommission-client: ${err.message}`);
     // Do not recreate a console build after its final deletion.
     if (mode !== 'verify' && ctx && (await buildRef(ctx).get()).exists) await writeRun(ctx, mode, 'failed', { error: err.message });
     return 1;
   }
+  if (mode === 'restore') {
+    // Keep Hosting's completed restore record so a route-map retry can resume here.
+    try {
+      await refreshApplicationRouteMap(deps, appId);
+    } catch (err) {
+      deps.log.error(`decommission-client: ${err.message}`);
+      return 1;
+    }
+  }
+  return 0;
 }
 
 async function dueApplications(deps) {
@@ -955,6 +968,10 @@ function realDeps(env) {
   const store = (projectId) => createSecretStore({ projectId, getAccessToken: () => credential.getAccessToken(), fetch: globalThis.fetch });
   return {
     env, db: getFirestore(app), consoleSecrets: store(env.CONSOLE_PROJECT_ID), clientSecrets: store,
+    routeMaps: createRouteMapStore({
+      bucket: env.CONSOLE_CLIENT_ROUTE_MAP_BUCKET,
+      getStorage: () => require('firebase-admin/storage').getStorage(app),
+    }),
     fetch: globalThis.fetch, getAccessToken: () => credential.getAccessToken(), now: Date.now, log: console,
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
