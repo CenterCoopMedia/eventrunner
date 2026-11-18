@@ -1,5 +1,15 @@
 'use strict';
 
+const { languageFromSearch } = require('shared/languageUrls');
+
+/** Use the same query parsing as the reader, including repeated parameters. */
+function requestedContentLanguage(req) {
+  const url = req.originalUrl ?? req.url;
+  if (typeof url !== 'string') return req.query?.lang;
+  const queryStart = url.indexOf('?');
+  return queryStart < 0 ? null : languageFromSearch(url.slice(queryStart + 1));
+}
+
 /**
  * CORS handling for onRequest handlers (spec §1.3 core/).
  *
@@ -52,4 +62,4 @@ function applyCors(req, res, { allowedOrigins, methods = ['POST'] }) {
   return false;
 }
 
-module.exports = { applyCors, parseAllowedOrigins };
+module.exports = { applyCors, parseAllowedOrigins, requestedContentLanguage };

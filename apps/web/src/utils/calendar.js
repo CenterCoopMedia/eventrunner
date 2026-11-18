@@ -107,8 +107,11 @@ function buildIcsEventLines(eventConfig, session, now = new Date()) {
   // An unresolvable end time is dropped rather than defaulted — a fabricated
   // end would misrepresent a session the CMS never gave a real duration.
   if (end) lines.push(`DTEND:${toIcsUtc(end)}`);
-  lines.push(`SUMMARY:${escapeIcsText(session.title)}`);
-  if (session.description) lines.push(`DESCRIPTION:${escapeIcsText(session.description)}`);
+  // PublicLanguageRuntime supplies the resolved unit and its actual language.
+  const language = session.publicLanguage === 'es' || session.publicLanguage === 'en'
+    ? `;LANGUAGE=${session.publicLanguage}` : '';
+  lines.push(`SUMMARY${language}:${escapeIcsText(session.title)}`);
+  if (session.description) lines.push(`DESCRIPTION${language}:${escapeIcsText(session.description)}`);
   if (location) lines.push(`LOCATION:${escapeIcsText(location)}`);
   lines.push('END:VEVENT');
   return lines;

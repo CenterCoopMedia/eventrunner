@@ -221,10 +221,10 @@ async function readGeneratedSnapshot({ generatedDir, importModule = importGenera
 /**
  * @param {string[]} argv
  * @param {{ importModule?: typeof importGenerated, log?: Console,
- *           fetchImpl?: typeof fetch }} [deps]
+ *           fetchImpl?: typeof fetch, hashRouter?: boolean }} [deps]
  * @returns {Promise<number>} process exit code
  */
-async function main(argv, { importModule = importGenerated, log = console, fetchImpl } = {}) {
+async function main(argv, { importModule = importGenerated, log = console, fetchImpl, hashRouter = false } = {}) {
   const parsed = parseArgv(argv, { withValue: ['dist', 'generated', 'public-url', 'storage-bucket'] });
   const unknown = unknownFlags(parsed, FLAGS);
   if (parsed.help) {
@@ -261,7 +261,7 @@ async function main(argv, { importModule = importGenerated, log = console, fetch
 
   let artifacts;
   try {
-    artifacts = buildSiteArtifacts({ ...snapshot, publicUrl: parsed['public-url'] });
+    artifacts = buildSiteArtifacts({ ...snapshot, publicUrl: parsed['public-url'], hashRouter });
   } catch (err) {
     log.error(`write-site-files: ${err.message}`);
     return 4;

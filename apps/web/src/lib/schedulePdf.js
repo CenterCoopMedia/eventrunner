@@ -1,3 +1,5 @@
+import { withContentLanguage } from 'shared/languageUrls';
+
 // The public schedule PDF (issue #166, spec §9).
 //
 // The programme is public, so `buildSchedulePdf` is an unauthenticated GET
@@ -20,12 +22,13 @@ export class SchedulePdfError extends Error {
  *
  * @param {{
  *   origin: string,
+ *   language?: 'en'|'es',
  *   fetchImpl?: typeof fetch,
  *   documentRef?: Document,
  * }} args
  * @returns {Promise<void>}
  */
-export async function downloadSchedulePdf({ origin, fetchImpl, documentRef }) {
+export async function downloadSchedulePdf({ origin, language, fetchImpl, documentRef }) {
   const doFetch = fetchImpl ?? (typeof fetch === 'function' ? fetch : null);
   const doc = documentRef ?? (typeof document === 'undefined' ? null : document);
   if (!doFetch || !doc) {
@@ -33,7 +36,7 @@ export async function downloadSchedulePdf({ origin, fetchImpl, documentRef }) {
   }
   let response;
   try {
-    response = await doFetch(`${origin}/buildSchedulePdf`);
+    response = await doFetch(`${origin}${withContentLanguage('/buildSchedulePdf', language)}`);
   } catch {
     throw new SchedulePdfError('We could not reach the server. Check your connection and try again.');
   }
@@ -65,12 +68,13 @@ export async function downloadSchedulePdf({ origin, fetchImpl, documentRef }) {
  * @param {{
  *   origin: string,
  *   user: import('firebase/auth').User,
+ *   language?: 'en'|'es',
  *   fetchImpl?: typeof fetch,
  *   documentRef?: Document,
  * }} args
  * @returns {Promise<void>}
  */
-export async function downloadMySchedulePdf({ origin, user, fetchImpl, documentRef }) {
+export async function downloadMySchedulePdf({ origin, user, language, fetchImpl, documentRef }) {
   const doFetch = fetchImpl ?? (typeof fetch === 'function' ? fetch : null);
   const doc = documentRef ?? (typeof document === 'undefined' ? null : document);
   if (!doFetch || !doc) {
@@ -87,7 +91,7 @@ export async function downloadMySchedulePdf({ origin, user, fetchImpl, documentR
         'Content-Type': 'application/json',
         Authorization: `Bearer ${await user.getIdToken()}`,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ lang: language }),
     });
   } catch {
     throw new SchedulePdfError('We could not reach the server. Check your connection and try again.');

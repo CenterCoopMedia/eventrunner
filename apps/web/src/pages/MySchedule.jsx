@@ -71,7 +71,7 @@ export default function MySchedule() {
   async function onDownloadPdf() {
     setPdfState({ status: 'loading', message: '' });
     try {
-      await downloadMySchedulePdf({ origin: functionsOrigin(), user });
+      await downloadMySchedulePdf({ origin: functionsOrigin(), user, language });
       setPdfState({ status: 'idle', message: '' });
     } catch (err) {
       setPdfState({

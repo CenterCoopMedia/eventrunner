@@ -64,7 +64,7 @@ export default function SessionDetail() {
   // switched off this route renders "not available", and a tab naming a
   // session over that page would advertise what the event has turned off.
   // The server refuses the same route for the same reason.
-  useDocumentTitle(features.schedule ? session?.title : null);
+  useDocumentTitle(features.schedule ? session?.title : null, session?.description);
 
   if (!features.schedule) {
     return (

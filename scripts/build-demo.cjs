@@ -103,7 +103,7 @@ const DEMO_ORIGIN = pagesSite({}).origin;
  */
 async function writeDemoSiteFiles({ base, origin = DEMO_ORIGIN }) {
   const publicUrl = `${origin}${base.replace(/\/+$/, '')}`;
-  const code = await writeSiteFiles(['--dist', DIST_DIR, '--public-url', publicUrl]);
+  const code = await writeSiteFiles(['--dist', DIST_DIR, '--public-url', publicUrl], { hashRouter: true });
   if (code !== 0) {
     console.error(`write-site-files failed while building the demo (exit ${code}).`);
     process.exit(1);

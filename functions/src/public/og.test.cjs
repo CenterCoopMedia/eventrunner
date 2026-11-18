@@ -566,6 +566,59 @@ async function getRoute(handler, path) {
   return res;
 }
 
+test('routeMeta: direct language URLs use approved page and session text and reciprocal canonicals', async () => {
+  const event = { ...SITE_EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const session = { visible: true, title: 'Map clinic', description: 'Bring a map.' };
+  const docs = {
+    ...SITE_DOCS,
+    'cmsPages/travel': { ...SITE_DOCS['cmsPages/travel'], title: 'Travel information',
+      translations: { es: { label: 'Viaje', title: 'Información de viaje' } } },
+    'cmsSchedule/maps': { ...session, translations: { es: { title: 'Clínica de mapas', description: 'Trae un mapa.' } } },
+    'cmsSchedule/partial': { ...session, translations: { es: { title: 'Texto incompleto' } } },
+    'cmsSchedule/hidden': { ...session, visible: false, translations: { es: { title: 'Privado', description: 'Texto privado' } } },
+    'cmsSchedule_drafts/maps': { ...session, translations: { es: { title: 'Borrador', description: 'Sin publicar' } } },
+  };
+  const handler = routeHandler({ event }, docs);
+  const get = async (path, search, activeHandler = handler) => {
+    const res = fakeRes();
+    await activeHandler({ method: 'GET', path, originalUrl: `${path}${search}` }, res);
+    assert.equal(res.statusCode, 200);
+    return res;
+  };
+  const page = await get('/travel', '?lang=es');
+  assert.match(page.sent, /<title>Información de viaje ·/);
+  const english = await get('/schedule/maps', '?lang=en&campaign=example');
+  const spanish = await get('/schedule/maps', '?lang=es');
+  for (const [res, language, title, description] of [
+    [english, 'en', 'Map clinic', 'Bring a map.'],
+    [spanish, 'es', 'Clínica de mapas', 'Trae un mapa.'],
+  ]) {
+    assert.equal(res.headers['Content-Language'], language);
+    assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
+    assert.ok(res.sent.includes(`<html lang="${language}">`));
+    assert.ok(res.sent.includes(`<title>${title} ·`));
+    assert.ok(res.sent.includes(`<meta name="description" content="${description}">`));
+    assert.ok(res.sent.includes(`<link rel="canonical" href="https://example.org/schedule/maps?lang=${language}">`));
+    for (const alternate of ['en', 'es']) {
+      assert.ok(res.sent.includes(`<link rel="alternate" hreflang="${alternate}" href="https://example.org/schedule/maps?lang=${alternate}">`));
+    }
+    assert.doesNotMatch(res.sent, /Borrador|Sin publicar|campaign=example/);
+  }
+  const partial = await get('/schedule/partial', '?lang=es');
+  assert.equal(partial.headers['Content-Language'], 'es');
+  assert.match(partial.sent, /<title>Map clinic ·/);
+  assert.match(partial.sent, /Bring a map\./);
+  assert.ok(partial.sent.includes('<link rel="canonical" href="https://example.org/schedule/partial">'));
+  assert.doesNotMatch(partial.sent, /Texto incompleto|hreflang=/);
+  assert.equal((await get('/schedule/maps', '?lang=en&lang=es')).headers['Content-Language'], 'en');
+  const removed = await get('/schedule/maps', '?lang=es', routeHandler({ event: SITE_EVENT }, docs));
+  assert.equal(removed.headers['Content-Language'], 'en');
+  assert.doesNotMatch(removed.sent, /Clínica|hreflang=/);
+  const hidden = await get('/schedule/hidden', '?lang=es');
+  assert.match(hidden.sent, /content="noindex"/);
+  assert.doesNotMatch(hidden.sent, /Privado|canonical|hreflang=/);
+});
+
 // ------------------------------------------------------ requestedRoutePath
 
 test('requestedRoutePath: normalizes the trailing slash, the query, and repeated separators', () => {

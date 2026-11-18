@@ -46,7 +46,7 @@ export default function UpdateDetail() {
   // on every render. Gated on the feature too: with updates off this route
   // renders "not available", and the tab must not name a post over it.
   const update = updates.find((u) => u.id === id && u.visible !== false);
-  useDocumentTitle(features.updates ? update?.title : null);
+  useDocumentTitle(features.updates ? update?.title : null, update?.body);
 
   if (!features.updates) {
     return (

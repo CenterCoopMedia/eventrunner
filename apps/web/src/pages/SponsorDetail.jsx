@@ -36,7 +36,8 @@ export default function SponsorDetail() {
   const backLabel = `Back to ${directoryLabel.toLowerCase()}`;
   const roleLabel = IS_DEMO && directoryLabel === 'Partners' ? 'Historical role' : 'Tier';
   const org = features.sponsors && visibleOrganizations(organizationsData).find((item) => item.id === slug);
-  useDocumentTitle(org?.name);
+  const description = typeof org?.description === 'string' && org.description.trim() ? org.description : org?.bio;
+  useDocumentTitle(org?.name, description);
   if (!org) return (
     <EmptyState title="This sponsor is not available" description="It may not be published yet, or the link may be out of date."
       action={<Link to={{ pathname: "/sponsors", search }} className={primaryActionClass}>{backLabel}</Link>} />

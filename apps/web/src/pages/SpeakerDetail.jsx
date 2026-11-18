@@ -70,7 +70,8 @@ export default function SpeakerDetail() {
   // speaker over that page would advertise what the event has turned off.
   // The server refuses the same route for the same reason.
   const speaker = speakers.find((candidate) => candidate.slug === slug);
-  useDocumentTitle(features.speakers && speaker ? text(speaker.displayName) : null);
+  const affiliation = [text(speaker?.jobTitle), text(speaker?.organization)].filter(Boolean).join(', ');
+  useDocumentTitle(features.speakers && speaker ? text(speaker.displayName) : null, text(speaker?.bio).trim() || affiliation);
 
   if (!features.speakers) {
     return (
@@ -88,7 +89,6 @@ export default function SpeakerDetail() {
 
   if (!speaker) return <NotFoundState />;
 
-  const affiliation = [text(speaker.jobTitle), text(speaker.organization)].filter(Boolean).join(', ');
   // Gated on features.schedule (issue #22 review finding P2-6): the
   // schedule itself is a feature a deployment can turn off, and a session
   // list here would be a working cross-link into a part of the site that

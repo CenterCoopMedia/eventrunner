@@ -1,7 +1,7 @@
 // lib/schedulePdf.js — the control behind features.schedulePdf (issue #166).
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { downloadSchedulePdf, SchedulePdfError } = await import('./schedulePdf.js');
+const { downloadMySchedulePdf, downloadSchedulePdf, SchedulePdfError } = await import('./schedulePdf.js');
 
 function fakeDocument() {
   const anchor = { href: '', download: '', click: vi.fn(), remove: vi.fn() };
@@ -52,4 +52,21 @@ describe('downloadSchedulePdf', () => {
       downloadSchedulePdf({ origin: 'https://functions.example', fetchImpl, documentRef: fakeDocument() }),
     ).rejects.toBeInstanceOf(SchedulePdfError);
   });
+});
+
+it('transports the selected locale in the public URL and the owner POST body', async () => {
+  const origin = 'https://functions.example.org';
+  const fetchImpl = vi.fn().mockResolvedValue({ ok: false });
+  const options = { origin, language: 'es', fetchImpl, documentRef: {} };
+  await expect(downloadSchedulePdf(options)).rejects.toBeInstanceOf(SchedulePdfError);
+  const user = { getIdToken: async () => 'fixture-token' };
+  await expect(downloadMySchedulePdf({ ...options, user })).rejects.toBeInstanceOf(SchedulePdfError);
+  expect(fetchImpl.mock.calls).toEqual([
+    ['https://functions.example.org/buildSchedulePdf?lang=es'],
+    ['https://functions.example.org/buildMySchedulePdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer fixture-token' },
+      body: '{"lang":"es"}',
+    }],
+  ]);
 });

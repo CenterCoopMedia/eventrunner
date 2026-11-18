@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { adminDb } from './helpers.mjs';
@@ -15,6 +15,7 @@ let event;
 let features;
 let originalEvent;
 let originalFeatures;
+let bilingualEvent;
 let fixtureRefs = [];
 let completeRef;
 let completeSession;
@@ -30,7 +31,8 @@ test.beforeAll(async () => {
   event = db.doc('config/event');
   features = db.doc('config/features');
   [originalEvent, originalFeatures] = await Promise.all([event.get(), features.get()]);
-  const dayId = originalEvent.get('days')[0].id;
+  const days = originalEvent.get('days');
+  const dayId = days[0].id;
   const create = (collection, id, data) => {
     const ref = db.collection(collection).doc(id);
     fixtureRefs.push(ref);
@@ -38,8 +40,12 @@ test.beforeAll(async () => {
     return ref;
   };
   const batch = db.batch();
-  batch.set(event, { name: 'Example Language Event', historicalDemo: false, contentLanguages: setting }, { merge: true });
-  batch.set(features, { schedule: true }, { merge: true });
+  bilingualEvent = {
+    name: 'Example Language Event', historicalDemo: false, contentLanguages: setting, archivedAt: null,
+    timezone: 'America/New_York', days: [{ ...days[0], date: '2099-10-15' }, ...days.slice(1)],
+  };
+  batch.set(event, bilingualEvent, { merge: true });
+  batch.set(features, { schedule: true, icsExport: true }, { merge: true });
   create('cmsPages', 'language-test', {
     path: route, label: 'Language test', title: 'Event information',
     translations: { es: { label: 'Información', title: 'Información del evento' } },
@@ -200,7 +206,45 @@ test('session units fall back together and live removal takes effect while the p
     await expect(page.getByRole('heading', { name: 'Map clinic', level: 1 })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Español', exact: true })).toHaveCount(0);
   } finally {
-    await event.set({ name: 'Example Language Event', historicalDemo: false, contentLanguages: setting }, { merge: true });
+    await event.set(bilingualEvent, { merge: true });
     await completeRef.set(completeSession);
+  }
+});
+
+test('calendar exports and document descriptions use the language of each published session', async ({ page }) => {
+  for (const [id, actualLanguage, title, description] of [
+    ['language-complete', 'es', 'Clínica de mapas', 'Trae un mapa.'],
+    [session.id, 'en', session.title, session.description],
+  ]) {
+    await page.goto(`/schedule/${id}?lang=es`);
+    await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible();
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', description);
+    await page.getByRole('button', { name: 'Agregar al calendario', exact: true }).click();
+    const google = new URL(await page.getByRole('link', { name: /Google Calendar/ }).getAttribute('href'));
+    expect(google.searchParams.get('text')).toBe(title);
+    expect(google.searchParams.get('details')).toBe(description);
+    expect(google.searchParams.get('dates')).toBe('20991015T171500Z/20991015T174500Z');
+    expect(google.searchParams.get('location')).toContain('Cedar Room');
+
+    const outlook = new URL(await page.getByRole('link', { name: /Outlook/ }).getAttribute('href'));
+    expect(outlook.searchParams.get('subject')).toBe(title);
+    expect(outlook.searchParams.get('body')).toBe(description);
+    expect(outlook.searchParams.get('startdt')).toBe('2099-10-15T17:15:00.000Z');
+    expect(outlook.searchParams.get('location')).toContain('Cedar Room');
+
+    const downloaded = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Archivo de calendario (.ics)', exact: true }).click();
+    const file = await downloaded;
+    const ics = (await readFile(await file.path(), 'utf8')).replaceAll('\r\n ', '');
+    expect(ics).toContain(`SUMMARY;LANGUAGE=${actualLanguage}:${title}\r\n`);
+    expect(ics).toContain(`DESCRIPTION;LANGUAGE=${actualLanguage}:${description}\r\n`);
+    expect(ics).toContain('DTSTART:20991015T171500Z\r\n');
+    expect(ics).toContain('LOCATION:Cedar Room');
+
+    if (actualLanguage === 'es') {
+      await page.getByRole('button', { name: 'English', exact: true }).click();
+      await expect(page).toHaveTitle('Map clinic · Example Language Event');
+      await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', 'Bring a map.');
+    }
   }
 });

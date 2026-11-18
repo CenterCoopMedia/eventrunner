@@ -190,6 +190,35 @@ test('only routes with their own subtree of further pages carry hasChildren', ()
 
 // --- buildSitemapXml --------------------------------------------------------
 
+test('sitemap pairs approved canonical language URLs and preserves route exclusions', () => {
+  const event = { contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const args = {
+    event, publicUrl: PUBLIC_URL, features: FEATURES,
+    pages: PAGES.map((p) => ({ ...p, translations: { es: { label: 'Información' } } })),
+    sessions: [
+      { id: 'maps', title: 'Maps', visible: true, translations: { es: { title: 'Mapas' } } },
+      { id: 'partial', title: 'Maps', description: 'Bring a map.', visible: true, translations: { es: { title: 'Mapas' } } },
+      { id: 'hidden', title: 'Hidden', visible: false, translations: { es: { title: 'Oculto' } } },
+    ],
+  };
+  const xml = buildSitemapXml(args);
+  assert.match(xml, /xmlns:xhtml="http:\/\/www.w3.org\/1999\/xhtml"/);
+  for (const route of ['/travel', '/schedule/maps']) {
+    for (const language of ['en', 'es']) {
+      const href = `${PUBLIC_URL}${route}?lang=${language}`;
+      assert.ok(xml.includes(`<loc>${href}</loc>`));
+      assert.equal(xml.split(`<xhtml:link rel="alternate" hreflang="${language}" href="${href}"/>`).length - 1, 2);
+    }
+  }
+  assert.match(xml, /<loc>https:\/\/example.org\/schedule\/partial<\/loc>/);
+  assert.doesNotMatch(xml, /example.org\/\?lang|partial\?lang|\/schedule\/hidden|\/attendees|\/secret|\/updates/);
+  const removed = buildSitemapXml({ ...args, event: {} });
+  assert.match(removed, /<loc>https:\/\/example.org\/schedule\/maps<\/loc>/);
+  assert.doesNotMatch(removed, /lang=|xmlns:xhtml/);
+  const demo = buildSiteArtifacts({ ...args, hashRouter: true }).sitemapXml;
+  assert.doesNotMatch(demo, /lang=|xmlns:xhtml/);
+});
+
 test('the sitemap lists only public routes as absolute URLs', () => {
   const xml = buildSitemapXml({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
   assert.match(xml, /<loc>https:\/\/example\.org\/<\/loc>/);

@@ -589,6 +589,47 @@ function pdfDrawnText(bytes) {
   return drawn.join('\n');
 }
 
+test('schedule PDFs draw approved Spanish or whole English fallback and keep personal bookmarks private', async () => {
+  const event = { ...EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const config = { event, theme: THEME, features: { schedulePdf: true } };
+  const db = makeFakeDb({
+    'users/u1': { displayName: 'Alex Rivera', registrationStatus: 'approved' },
+    'cmsSchedule/maps': session({ title: 'Map clinic', description: 'Bring a map.',
+      location: 'Cedar Room', speakerIds: ['approved'],
+      translations: { es: { title: 'Clínica de mapas', description: 'Trae un mapa.' } } }),
+    'cmsSchedule/partial': session({ title: 'Open data', description: 'Bring a question.',
+      translations: { es: { title: 'Traducción incompleta' } } }),
+    'cmsSchedule/hidden': session({ title: 'Private session', visible: false,
+      translations: { es: { title: 'Sesión privada' } } }),
+    'speakers/approved': { firstName: 'Rae', lastName: 'Okonkwo', status: 'approved' },
+  });
+  await db.collection('users/u1/bookmarks').doc('maps').set({ bookmarkedAt: new Date() });
+  await db.collection('users/u1/bookmarks').doc('hidden').set({ bookmarkedAt: new Date() });
+
+  const getConfig = async () => config;
+  const publicPdf = fakeRes();
+  await createBuildSchedulePdfHandler({ db, getConfig })({ method: 'GET', url: '/buildSchedulePdf?lang=es' }, publicPdf);
+  assert.equal(publicPdf.statusCode, 200);
+  assert.equal(publicPdf.headers['Content-Language'], 'es');
+  const drawn = pdfDrawnText(publicPdf.sent);
+  for (const text of ['Clínica de mapas', 'Open data', 'Cedar Room', 'Rae Okonkwo', '9:30 AM']) {
+    assert.ok(drawn.includes(text), text);
+  }
+  assert.doesNotMatch(drawn, /Map clinic|Traducción incompleta|Sesión privada/);
+
+  const personalPdf = fakeRes();
+  await createBuildMySchedulePdfHandler({ db, getConfig, auth: fakeAuth('u1') })({
+    method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: { lang: 'es' },
+  }, personalPdf);
+  assert.equal(personalPdf.statusCode, 200);
+  assert.equal(personalPdf.headers['Content-Language'], 'es');
+  assert.equal(personalPdf.headers['Cache-Control'], 'no-store');
+  const personalText = pdfDrawnText(personalPdf.sent);
+  assert.match(personalText, /Programa personal de Alex Rivera/);
+  assert.match(personalText, /Clínica de mapas/);
+  assert.doesNotMatch(personalText, /Open data|Sesión privada/);
+});
+
 test('createBuildMySchedulePdfHandler: a bookmark matches the document id when the body has none', async () => {
   const kept = session({ title: 'Kept session title' });
   delete kept.id;
