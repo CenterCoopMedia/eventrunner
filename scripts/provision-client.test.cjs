@@ -1783,6 +1783,7 @@ async function enrollMountedEvent(db, publicBase = MOUNT) {
 test('provision retries keep the root while staged and preserve the published base for both builds', async () => {
   const fake = setup();
   const { routeMaps } = fakeRouteMap();
+  fake.deps.routeMaps = routeMaps;
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   await fake.db.doc('applications/a1').update({ status: 'building' });
   await fake.db.doc('console_builds/a1').update({ state: 'failed', ownersEmailedAt: null });
@@ -1821,7 +1822,8 @@ test('provision retries keep the root while staged and preserve the published ba
 
 test('sync preserves a custom standalone address through mounted publication and rollback', async () => {
   const fake = setup();
-  const { routeMaps } = fakeRouteMap();
+  const { routeMaps, controls } = fakeRouteMap();
+  fake.deps.routeMaps = routeMaps;
   await existingSite(fake, { record: { resources: { site: PROJECT, domain: DOMAIN, environment: 'nclocal' } } });
   const publicBase = `https://${DOMAIN}/events/summit/`;
   const standalone = 'https://annual-summit.example.test';
@@ -1846,7 +1848,11 @@ test('sync preserves a custom standalone address through mounted publication and
   await assert.rejects(sync(), /deployment environment does not match/);
   fake.state.variables.EVENTRUNNER_REQUEST_ID = 'a1';
   const old = { ...fake.state.variables };
+  controls.beforeWrite = () => { throw Object.assign(new Error('fixture write failure'), { code: 503 }); };
+  await assert.rejects(sync(), /Writing the route map object failed/);
+  assert.equal((await routeMaps.read(DOMAIN)).routes[0].publicTitle, null);
   assert.equal(await sync(), 0);
+  assert.equal((await routeMaps.read(DOMAIN)).routes[0].publicTitle, 'Summit');
   assert.deepEqual(fake.state.variables, {
     ...old,
     EVENT_ALLOWED_ORIGINS: `https://additional.example.test,https://${DOMAIN},https://${PROJECT}.web.app`,
@@ -1873,6 +1879,7 @@ test('sync preserves a custom standalone address through mounted publication and
 test('a failed full deploy keeps the previously applied address', async () => {
   const fake = setup({ cloud: { deployFailures: 3 } });
   const { routeMaps } = fakeRouteMap();
+  fake.deps.routeMaps = routeMaps;
   await existingSite(fake, { record: { resources: { site: PROJECT, domain: DOMAIN, environment: 'nclocal' } } });
   await enrollMountedEvent(fake.db);
   await manageEventMount({ db: fake.db, routeMaps }, { body: {
@@ -1885,6 +1892,7 @@ test('a failed full deploy keeps the previously applied address', async () => {
   };
   await assert.rejects(syncEventMount({ appId: 'a1', deps: fake.deps }), /the deploy failed/);
   assert.equal(fake.db.read('console_event_mounts/a1').appliedPublicBase, undefined);
+  assert.equal((await routeMaps.read('client.example.test')).routes[0].publicTitle, null);
   assert.equal(fake.db.read('console_event_mounts/a1').standalonePublicBase, `https://${DOMAIN}`);
 });
 

@@ -309,9 +309,11 @@ test('archive, restore and purge change only the selected event’s route', asyn
     host: DOMAIN, mount: '/first', appId: 'a1', publicBase: `https://${DOMAIN}/first/`, projectId: PROJECT,
     hostingOrigin: `https://${SITE}.web.app`,
   };
-  const route = { ...reservation, state: 'published', publicTitle: 'First event', publishedAt: new Date(NOW) };
+  const route = { ...reservation, state: 'published', publicTitle: 'First event', publishedAt: new Date(NOW),
+    appliedPublicBase: reservation.publicBase };
   const sibling = { ...route, mount: '/second', appId: 'a2', publicBase: `https://${DOMAIN}/second/`,
-    projectId: 'er-second-fixture', hostingOrigin: 'https://second-fixture.web.app', publicTitle: 'Second event' };
+    appliedPublicBase: `https://${DOMAIN}/second/`, projectId: 'er-second-fixture',
+    hostingOrigin: 'https://second-fixture.web.app', publicTitle: 'Second event' };
   const { routeMaps, controls } = fakeRouteMap();
   const s = setup({ routeMaps, seed: {
     'console_event_mounts/a1': route,

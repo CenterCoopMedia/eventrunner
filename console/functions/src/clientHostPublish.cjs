@@ -3,7 +3,9 @@
 const { readBuild } = require('./buildState.cjs');
 const { projectRouteMap } = require('./clientHostMap.cjs');
 const { RouteMapError, routeMapError, writeVerifiedRouteMap } = require('./clientHostMapStore.cjs');
-const { MOUNTS, clientHostRef, eventMountRef } = require('./clientHostRecords.cjs');
+const {
+  MOUNTS, clientHostRef, eventListingTitle, eventMountRef, resolveEventPublicBase, updateEventMount,
+} = require('./clientHostRecords.cjs');
 
 const PUBLISH_ATTEMPTS = 3;
 
@@ -17,9 +19,9 @@ async function readApprovedProjection(db, host, exportedAt) {
         const record = doc.data();
         if (record.state !== 'published') return { record };
         const build = await readBuild((ref) => tx.get(ref), db, doc.id);
-        return { record, identity: { ...build?.resources, appId: doc.id } };
+        return { record, identity: { ...build?.resources, appId: doc.id }, publicTitle: eventListingTitle(record) };
       }));
-      return projectRouteMap(approved, enrollments, exportedAt);
+      return projectRouteMap({ host, version: approved.revision, exportedAt }, enrollments);
     }, { readOnly: true });
   } catch (error) {
     throw routeMapError('Reading and validating the approved host records', error);
@@ -32,13 +34,30 @@ async function publishClientHostMap({ db, routeMaps, now = Date.now }, expected)
     const map = await readApprovedProjection(db, expected.host, new Date(now()).toISOString());
     const route = map.routes.find(({ mount }) => mount === expected.mount);
     const matches = expected.state === 'published'
-      ? route?.hostingOrigin === expected.hostingOrigin && route?.publicTitle === expected.publicTitle
+      ? route?.hostingOrigin === expected.hostingOrigin && route?.publicTitle === eventListingTitle(expected)
       : !route;
     if (!matches) throw new RouteMapError('The event route changed during publication.');
     const verified = await writeVerifiedRouteMap(routeMaps, map);
     if (verified) return verified;
   }
   throw new RouteMapError('The public route map changed during publication. Try again.');
+}
+
+/** The mounted deployment and its smoke check must succeed before listing its title. */
+async function recordAppliedPublicBase(deps, identity, publicBase) {
+  const { db } = deps;
+  const { appId } = identity;
+  const applied = await db.runTransaction(async (tx) => {
+    const route = (await tx.get(eventMountRef(db, appId))).data();
+    if (!route || resolveEventPublicBase(route, identity).publicBase !== publicBase) {
+      throw new RouteMapError('The event address changed during deployment.');
+    }
+    if (route.appliedPublicBase === publicBase) return route;
+    const update = { appliedPublicBase: publicBase };
+    await updateEventMount(tx, db, appId, route, update);
+    return { ...route, ...update };
+  });
+  if (applied.state === 'published') return publishClientHostMap(deps, applied);
 }
 
 async function refreshApplicationRouteMap(deps, appId) {
@@ -50,4 +69,4 @@ async function refreshApplicationRouteMap(deps, appId) {
   }
 }
 
-module.exports = { publishClientHostMap, refreshApplicationRouteMap };
+module.exports = { publishClientHostMap, recordAppliedPublicBase, refreshApplicationRouteMap };
