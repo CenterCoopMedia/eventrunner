@@ -369,7 +369,14 @@ async function exportTemplate({ db, projectId, pageIds = null, now = Date.now })
   const theme = pickTheme(config.theme || {});
   const features = pickFeatures(config.features || {});
   const badges = pickBadges(config.badges || {});
+  const leftOut = {
+    'config/event': event.dropped,
+    'config/theme': theme.dropped,
+  };
   assets.push(...event.assets, ...theme.assets);
+  if (config.event.contentLanguages !== undefined) {
+    warnings.push('config/event.contentLanguages: language settings are not exported; configure them for the new event');
+  }
   // A carried contact address may belong to someone who has left.
   for (const field of ['supportEmail', 'conductEmail']) {
     if (typeof event.value.legal?.[field] === 'string' && event.value.legal[field]) {
@@ -387,13 +394,20 @@ async function exportTemplate({ db, projectId, pageIds = null, now = Date.now })
   }
   const pages = [];
   for (const page of allPages.filter((p) => !wanted || wanted.has(p.id)).sort((a, b) => a.id.localeCompare(b.id))) {
-    const picked = pickPage(page).value;
-    const verdict = validatePageDoc(picked);
+    const picked = pickPage(page);
+    const verdict = validatePageDoc(picked.value);
     if (!verdict.ok) {
       warnings.push(`cmsPages/${page.id}: left out, it fails page validation (${verdict.errors.join('; ')})`);
       continue;
     }
-    pages.push(picked);
+    if (picked.dropped.includes('translations')) {
+      leftOut[`cmsPages/${page.id}`] = ['translations'];
+      warnings.push(`cmsPages/${page.id}: page translations are not exported; bilingual handoff is incomplete`);
+    }
+    if ((page.sections || []).some((section) => section.translations !== undefined)) {
+      warnings.push(`cmsPages/${page.id}: section translations are copied as text; review them for the new event`);
+    }
+    pages.push(picked.value);
   }
 
   const sectionOwner = new Map();
@@ -425,6 +439,10 @@ async function exportTemplate({ db, projectId, pageIds = null, now = Date.now })
       const named = strings(picked.value).find((t) => STORAGE_URL_RE.test(t) || STORAGE_PATH_RE.test(t.trim()));
       assets.push({ ref: `cmsContent/${doc.id}`, value: storageObjectPath(named) });
       continue;
+    }
+    if (picked.dropped.includes('translations')) {
+      leftOut[`cmsContent/${doc.id}`] = ['translations'];
+      warnings.push(`cmsContent/${doc.id}: block translations are not exported; bilingual handoff is incomplete`);
     }
     // Review lines name the block and the reason, never the value: the
     // inventory is printed and shared, and the value may be personal.
@@ -459,11 +477,6 @@ async function exportTemplate({ db, projectId, pageIds = null, now = Date.now })
     if (name === 'config' || name === 'cmsPages' || name === 'cmsContent') continue;
     excluded.push({ path: name, count, reason: EXCLUDED_REASONS[name] || 'not on the template allowlist' });
   }
-  const leftOut = {
-    'config/event': event.dropped,
-    'config/theme': theme.dropped,
-  };
-
   return {
     ok: errors.length === 0,
     errors,

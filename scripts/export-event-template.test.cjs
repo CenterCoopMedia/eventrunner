@@ -178,6 +178,54 @@ test('--page narrows the export to the named pages', async () => {
   assert.ok(template.content.every((c) => template.pages[0].sections.some((s) => s.id === c.section)));
 });
 
+test('a bilingual export reports omitted text and distinguishes copied section translations', async () => {
+  const db = await pastEvent();
+  await db.collection('config').doc('event').update({ contentLanguages: { default: 'en', available: ['en', 'es'] } });
+  const page = db.read('cmsPages', 'faq');
+  await db.collection('cmsPages').doc('faq').set({
+    ...page,
+    translations: { es: { label: 'Preguntas privadas de ejemplo' } },
+    sections: page.sections.map((section) => ({
+      ...section, translations: { es: { label: 'Sección de ejemplo' } },
+    })),
+  });
+  await db.collection('cmsContent').doc('faq_items__what_is_this').update({
+    translations: { es: { value: '<p>Texto traducido de ejemplo.</p>' } },
+  });
+  const before = db.writes.length;
+  const { value, output, template } = await exportFrom(db);
+  assert.equal(value, 0, output);
+  assert.equal(db.writes.length, before, 'an export never writes to the source project');
+  assert.equal(template.answers.event.contentLanguages, undefined);
+  const exportedPage = template.pages.find((p) => p.id === 'faq');
+  assert.equal(exportedPage.translations, undefined);
+  assert.deepEqual(exportedPage.sections[0].translations, { es: { label: 'Sección de ejemplo' } });
+  assert.equal(template.content.find((block) => block.id === 'faq_items__what_is_this').translations, undefined);
+  assert.deepEqual(template.inventory.leftOut['cmsPages/faq'], ['translations']);
+  assert.deepEqual(template.inventory.leftOut['cmsContent/faq_items__what_is_this'], ['translations']);
+  assert.match(output, /config\/event\.contentLanguages: language settings are not exported/);
+  assert.match(output, /cmsPages\/faq: page translations are not exported; bilingual handoff is incomplete/);
+  assert.match(output, /cmsPages\/faq: section translations are copied as text; review them for the new event/);
+  assert.match(output, /cmsContent\/faq_items__what_is_this: block translations are not exported; bilingual handoff is incomplete/);
+  for (const text of ['Preguntas privadas de ejemplo', 'Sección de ejemplo', 'Texto traducido de ejemplo']) {
+    assert.equal(output.includes(text), false, 'inventory messages do not print translated values');
+  }
+  assert.equal(parseTemplateFile(JSON.stringify(template)).ok, true);
+});
+
+test('translation notices respect the selected pages and included blocks', async () => {
+  const db = await pastEvent();
+  await db.collection('cmsPages').doc('faq').update({ translations: { es: { label: 'Preguntas' } } });
+  await db.collection('cmsContent').doc('faq_items__what_is_this').update({
+    translations: { es: { value: '<p>Texto de ejemplo.</p>' } },
+  });
+  const { value, output, template } = await exportFrom(db, { page: ['home'] });
+  assert.equal(value, 0, output);
+  assert.equal(template.inventory.leftOut['cmsPages/faq'], undefined);
+  assert.equal(template.inventory.leftOut['cmsContent/faq_items__what_is_this'], undefined);
+  assert.equal(output.includes('bilingual handoff is incomplete'), false);
+});
+
 test('an export refuses an existing output file', async () => {
   const db = await pastEvent();
   const out = tmpFile('taken.json', '{}');
