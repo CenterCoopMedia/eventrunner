@@ -248,7 +248,7 @@ export default function Schedule() {
   async function onDownloadPdf() {
     setPdfState({ status: 'loading', message: '' });
     try {
-      await downloadSchedulePdf({ origin: functionsOrigin() });
+      await downloadSchedulePdf({ origin: functionsOrigin(), language });
       setPdfState({ status: 'idle', message: '' });
     } catch (err) {
       setPdfState({ status: 'error', message: err.message || 'The schedule PDF could not be generated.' });

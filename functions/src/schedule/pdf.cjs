@@ -34,6 +34,8 @@
  */
 
 const { speakerDisplayName, isPubliclyVisibleSpeaker } = require('shared/speaker');
+const { contentLanguages, resolveContentVariant, selectContentLanguage } = require('shared/contentLanguages');
+const { requestedContentLanguage } = require('../core/http.cjs');
 // The theme, branding, fitText and font-safety helpers are shared with the
 // invoice PDF (#209), so they live in one module both documents import.
 const {
@@ -172,7 +174,7 @@ function formatSessionTime(session) {
  *
  * @param {{ event: object | null, theme: object | null,
  *           sessions: Array<object>, speakerNamesById?: Record<string, string>,
- *           ownerName?: string | null, onlySessionIds?: string[] | null }} args
+ *           ownerName?: string | null, onlySessionIds?: string[] | null, language?: 'en'|'es' }} args
  * @returns {Promise<Uint8Array>}
  */
 async function buildSchedulePdf({
@@ -182,6 +184,7 @@ async function buildSchedulePdf({
   speakerNamesById = {},
   ownerName = null,
   onlySessionIds = null,
+  language = selectContentLanguage(event),
 }) {
   const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 
@@ -191,6 +194,7 @@ async function buildSchedulePdf({
 
   const colors = resolveThemeColors(theme);
   const branding = resolveBranding(event);
+  const spanish = language === 'es';
   const days = Array.isArray(event?.days) ? event.days : [];
   // A filter, even an empty one, IS the filter: an attendee with zero
   // bookmarks gets an empty personal programme, never the public one.
@@ -206,8 +210,10 @@ async function buildSchedulePdf({
   const grouped = groupSessionsByDay(sourceSessions, days);
 
   const doc = await PDFDocument.create();
-  doc.setTitle(ownerName ? `${ownerName}'s schedule` : branding.name);
-  doc.setSubject(branding.tagline || 'Event schedule');
+  const personalTitle = spanish ? `Programa personal de ${ownerName}` : `${ownerName}'s schedule`;
+  doc.setTitle(ownerName ? personalTitle : branding.name);
+  doc.setSubject(branding.tagline || (spanish ? 'Programa del evento' : 'Event schedule'));
+  if (spanish) doc.setLanguage(language);
   doc.setProducer('EventRunner');
   doc.setCreator('EventRunner');
 
@@ -246,7 +252,7 @@ async function buildSchedulePdf({
     const sub = [
       branding.tagline,
       branding.venueLine,
-      isNonEmptyString(ownerName) ? `${ownerName} — personal schedule` : null,
+      isNonEmptyString(ownerName) ? (spanish ? personalTitle : `${ownerName} — personal schedule`) : null,
     ]
       .filter(isNonEmptyString)
       .join(' · ');
@@ -288,7 +294,7 @@ async function buildSchedulePdf({
     let { page, y } = newPage(dayLabelOf(day));
 
     if (daySessions.length === 0) {
-      page.drawText('No sessions scheduled.', {
+      page.drawText(spanish ? 'No hay sesiones programadas.' : 'No sessions scheduled.', {
         x: MARGIN,
         y: y - 14,
         size: 11,
@@ -300,15 +306,16 @@ async function buildSchedulePdf({
 
     for (const session of daySessions) {
       if (y < MARGIN + ROW_MIN_HEIGHT) {
-        ({ page, y } = newPage(`${dayLabelOf(day)} (cont.)`));
+        ({ page, y } = newPage(`${dayLabelOf(day)} (${spanish ? 'continuación' : 'cont.'})`));
       }
 
       const timeText = formatSessionTime(session); // digits/AM/PM/en-dash only — always WinAnsi-safe
       const locationText = safeBody(
         isNonEmptyString(session?.location) ? session.location : '',
       );
+      const { value: localized } = resolveContentVariant(session, 'session', language, event);
       const titleText = safeBold(
-        isNonEmptyString(session?.title) ? session.title : 'Untitled session',
+        isNonEmptyString(localized?.title) ? localized.title : (spanish ? 'Sesión sin título' : 'Untitled session'),
       );
       const speakerText = safeBody(resolveSpeakerLine(session?.speakerIds, speakerNamesById));
 
@@ -406,10 +413,9 @@ async function publicSpeakerNames(db, sessions) {
 }
 
 /**
- * Public artifact cache, independent of request headers/query parameters.
- * Config changes invalidate the single slot; schedule/speaker edits appear
- * within one minute of the next request. Failed builds also consume the
- * refresh budget, so an outage cannot turn every GET into a database scan.
+ * One refresh reads the schedule and speakers once, then builds the configured
+ * language variants in sequence. A request selects bytes from that refresh by
+ * validated language. Config edits and failed builds share the same cooldown.
  *
  * @param {{ db: FirebaseFirestore.Firestore, getConfig: () => Promise<object>,
  *           now?: () => number, log?: Pick<Console, 'error'> }} deps
@@ -428,6 +434,7 @@ function createBuildSchedulePdfHandler({ db, getConfig, now = Date.now, log = co
       if (config?.features?.schedulePdf !== true) {
         return notFound(res, 'The schedule PDF is not enabled for this event.');
       }
+      const language = selectContentLanguage(config.event, requestedContentLanguage(req));
       const key = JSON.stringify([config.event, config.theme]);
       let artifact = cached?.key === key && now() < cached.expiresAt ? cached : null;
       if (!artifact) {
@@ -443,10 +450,14 @@ function createBuildSchedulePdfHandler({ db, getConfig, now = Date.now, log = co
             if (snap.docs.length > MAX_PUBLIC_SESSIONS) throw new Error('Public PDF session budget exceeded.');
             const sessions = snap.docs.map((doc) => doc.data());
             const speakerNamesById = await publicSpeakerNames(db, sessions);
-            const bytes = await buildSchedulePdf({
-              event: config.event, theme: config.theme, sessions, speakerNamesById,
-            });
-            cached = { key, bytes: Buffer.from(bytes), expiresAt: now() + PUBLIC_PDF_TTL_MS };
+            const bytesByLanguage = new Map();
+            for (const variantLanguage of contentLanguages(config.event).available) {
+              const bytes = await buildSchedulePdf({
+                event: config.event, theme: config.theme, sessions, speakerNamesById, language: variantLanguage,
+              });
+              bytesByLanguage.set(variantLanguage, Buffer.from(bytes));
+            }
+            cached = { key, bytesByLanguage, expiresAt: now() + PUBLIC_PDF_TTL_MS };
             return cached;
           })().finally(() => { inFlight = null; });
           inFlight = { key, promise };
@@ -458,8 +469,9 @@ function createBuildSchedulePdfHandler({ db, getConfig, now = Date.now, log = co
       const seconds = Math.max(0, Math.floor((artifact.expiresAt - now()) / 1000));
       res.set('Cache-Control', `public, max-age=0, s-maxage=${seconds}, must-revalidate`);
       res.set('Content-Type', 'application/pdf');
+      res.set('Content-Language', language);
       res.set('Content-Disposition', 'inline; filename="schedule.pdf"');
-      res.send(artifact.bytes);
+      res.send(artifact.bytesByLanguage.get(language));
     } catch (err) {
       log.error('buildSchedulePdf failed', err);
       internal(res, 'The schedule PDF could not be generated.');
@@ -470,6 +482,7 @@ function createBuildSchedulePdfHandler({ db, getConfig, now = Date.now, log = co
 /** Deployable export: buildMySchedulePdf (owner POST, spec §9). */
 function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console }) {
   return async function handler(req, res) {
+    res.set('Cache-Control', 'no-store');
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
     // The same flag gates the personal document and the public one: a
@@ -494,6 +507,7 @@ function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console })
     }
 
     try {
+      const language = selectContentLanguage(config.event, req.body?.lang);
       const [membersSnap, userSnap, sessionsSnap] = await Promise.all([
         db.collection(`users/${gate.uid}/bookmarks`).get(),
         db
@@ -525,10 +539,12 @@ function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console })
         speakerNamesById,
         ownerName,
         onlySessionIds,
+        language,
       });
 
       res.status(200);
       res.set('Content-Type', 'application/pdf');
+      res.set('Content-Language', language);
       res.set('Content-Disposition', 'inline; filename="my-schedule.pdf"');
       res.send(Buffer.from(bytes));
     } catch (err) {

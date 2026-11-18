@@ -178,16 +178,6 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-/** First `maxLen` characters of a plain-text excerpt, word-boundary trimmed. */
-function excerpt(text, maxLen = 200) {
-  if (!isNonEmptyString(text)) return '';
-  const trimmed = text.trim();
-  if (trimmed.length <= maxLen) return trimmed;
-  const cut = trimmed.slice(0, maxLen);
-  const lastSpace = cut.lastIndexOf(' ');
-  return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trim()}…`;
-}
-
 /**
  * Resolve the meta values for one response: either a specific update's
  * meta (when the doc exists and is visible) or the event-level fallback
@@ -202,14 +192,14 @@ function resolveMeta({ event, update, canonicalUrl }) {
   if (update && isNonEmptyString(update.title)) {
     return {
       title: `${update.title.trim()} · ${siteName}`,
-      description: excerpt(update.body) || (isNonEmptyString(event?.tagline) ? event.tagline.trim() : ''),
+      description: excerpt(update.body) || eventMetaDescription(event),
       url: canonicalUrl,
       siteName,
     };
   }
   return {
     title: siteName,
-    description: isNonEmptyString(event?.tagline) ? event.tagline.trim() : '',
+    description: eventMetaDescription(event),
     url: canonicalUrl,
     siteName,
   };
@@ -217,6 +207,13 @@ function resolveMeta({ event, update, canonicalUrl }) {
 
 const TITLE_RE = /<title>[\s\S]*?<\/title>/i;
 const HEAD_CLOSE_RE = /<\/head>/i;
+
+function setDocumentLanguage(template, language) {
+  return template.replace(/<html\b([^>]*)>/i, (_, attributes) => {
+    const rest = attributes.replace(/\slang\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, '');
+    return `<html lang="${escapeHtml(language)}"${rest}>`;
+  });
+}
 
 /**
  * Inject per-post OG/Twitter meta tags (and replace `<title>`) into the
@@ -237,6 +234,8 @@ function buildOgHtml({ template, meta }) {
 
   const tags = [
     `<title>${title}</title>`,
+    ...(description ? [`<meta name="description" content="${description}">`] : []),
+    ...(meta.canonical ? [`<link rel="canonical" href="${url}">`] : []),
     `<meta property="og:title" content="${title}">`,
     `<meta property="og:description" content="${description}">`,
     `<meta property="og:url" content="${url}">`,
@@ -247,7 +246,7 @@ function buildOgHtml({ template, meta }) {
     `<meta name="twitter:description" content="${description}">`,
   ].join('\n    ');
 
-  let html = template;
+  let html = meta.language ? setDocumentLanguage(template, meta.language) : template;
   // Replace an existing <title> rather than doubling it — most SPA
   // templates ship a static one for first paint before hydration.
   // Replacer FUNCTIONS, not replacement strings: escapeHtml does not touch
@@ -280,13 +279,17 @@ function requestedUpdateId(req) {
 // -------------------------------------------------------------------- http
 
 const { methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
+const { requestedContentLanguage } = require('../core/http.cjs');
 const {
   SYSTEM_PAGE_ROUTES,
   isCanonicalPagePath,
   systemPageIdForPath,
 } = require('shared/routing');
 const { pageHeading, isPublicPage } = require('shared/page');
-const { isStarterText } = require('shared/seed');
+const { metaExcerpt: excerpt, eventMetaDescription } = require('shared/pageMetadata');
+const {
+  contentLanguages, resolveContentVariant, selectContentLanguage, publicRouteUrls, publishedSpanishSections,
+} = require('shared/contentLanguages');
 const { isValidDocId } = require('../cms/store.cjs');
 
 /**
@@ -331,14 +334,18 @@ function createUpdatesMetaHandler({
       }
 
       const base = publicUrl.replace(/\/+$/, '');
-      const canonicalUrl = id ? `${base}/updates/${encodeURIComponent(id)}` : base;
-      const meta = resolveMeta({ event: config.event, update, canonicalUrl });
+      const path = id ? `/updates/${encodeURIComponent(id)}` : '';
+      const urls = publicRouteUrls(path, update, 'update', config.event);
+      const meta = resolveMeta({ event: config.event, update, canonicalUrl: `${base}${urls.en}` });
+      meta.language = selectContentLanguage(config.event, requestedContentLanguage(req));
+      meta.canonical = Boolean(update);
 
       const template = await fetchTemplateFn({ publicUrl, now });
       const html = buildOgHtml({ template, meta });
 
       res.status(200);
       res.set('Content-Type', 'text/html; charset=utf-8');
+      res.set('Content-Language', meta.language);
       res.send(html);
     } catch (err) {
       log.error('updatesMeta failed', err);
@@ -482,6 +489,7 @@ async function resolveRouteSubject({ db, config, path }) {
   const segments = path === '/' ? [] : path.slice(1).split('/');
   const [first, second] = segments;
   const features = (config && config.features) || {};
+  if (path === '/schedule/mine' || (first === 'attendees' && features.publicAttendeeProfiles !== true)) return null;
 
   // The feature gate belongs to the ROUTE, so it is read off the system
   // map and applied before any lookup. A route whose flag is off describes
@@ -539,6 +547,23 @@ async function resolveRouteSubject({ db, config, path }) {
   // App.jsx mounts system pages at their own routes and the catch-all
   // refuses them — so describing it here would title a 404.
   return page.systemPage === true ? null : { kind: 'page', doc: page };
+}
+
+async function readRouteSpanishSections({ db, event, path, subject }) {
+  if (subject?.kind !== 'page' || path === '/' || path === '/attendees'
+      || !contentLanguages(event).available.includes('es') || publicRouteUrls(path, subject.doc, 'page', event).es) {
+    return undefined;
+  }
+  const sections = Array.isArray(subject.doc.sections) ? subject.doc.sections : [];
+  const ids = [...new Set(sections.map((section) => section?.id).filter((id) => typeof id === 'string' && id))];
+  // Firestore allows 30 section IDs per in query. Stop after the first
+  // translated group because the caller only needs to establish an alternate.
+  for (let offset = 0; offset < ids.length; offset += 30) {
+    const snap = await db.collection('cmsContent').where('section', 'in', ids.slice(offset, offset + 30)).get();
+    const translated = publishedSpanishSections(snap.docs.map((doc) => doc.data()), event);
+    if (translated.size > 0) return translated;
+  }
+  return undefined;
 }
 
 /**
@@ -724,9 +749,7 @@ function buildEventJsonLd({ event, url, imageUrl = null }) {
     '@type': 'Event',
     name: event.name.trim(),
   };
-  const description = !isStarterText(event?.seo?.description)
-    ? event.seo.description.trim()
-    : (isNonEmptyString(event?.tagline) ? event.tagline.trim() : '');
+  const description = eventMetaDescription(event);
   if (description) data.description = description;
   if (isNonEmptyString(url)) data.url = url;
 
@@ -795,16 +818,14 @@ function speakerName(speaker) {
  * noindex — a Firestore outage must not deindex a site.
  *
  * @param {{ config: object, subject: object|null, path: string, base: string,
- *           degraded?: boolean }} args
+ *           requestedLanguage?: unknown, spanishSections?: Set<string>, degraded?: boolean }} args
  */
-function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
+function resolveRouteMeta({ config, subject, path, base, requestedLanguage, spanishSections, degraded = false }) {
   const event = (config && config.event) || null;
+  const language = selectContentLanguage(event, requestedLanguage);
   const siteName = isNonEmptyString(event?.name) ? event.name.trim() : 'Event site';
-  const eventDescription = !isStarterText(event?.seo?.description)
-    ? event.seo.description.trim()
-    : (isNonEmptyString(event?.tagline) ? event.tagline.trim() : '');
+  const eventDescription = eventMetaDescription(event);
   const image = resolveCardImage({ config, base });
-  const url = `${base}${path}`;
   const shell = {
     title: siteName,
     description: eventDescription,
@@ -812,24 +833,33 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
     siteName,
     image,
     ogType: 'website',
+    language,
     noindex: !degraded,
     jsonLd: null,
   };
   if (!subject) return shell;
 
   const titled = (name) => (isNonEmptyString(name) ? `${name.trim()} · ${siteName}` : siteName);
+  const canonicalPath = subject.kind === 'sponsor'
+    ? `/sponsors/${encodeURIComponent(path.slice('/sponsors/'.length))}`
+    : path;
+  const urls = publicRouteUrls(canonicalPath, subject.doc, subject.kind, event, spanishSections);
   const described = {
     ...shell,
-    url,
+    url: `${base}${urls[language] ?? urls.en}`,
+    alternates: urls.es
+      ? Object.entries(urls).map(([locale, href]) => ({ locale, href: `${base}${href}` }))
+      : [],
     noindex: false,
     jsonLd: buildEventJsonLd({ event, url: base, imageUrl: image ? image.url : null }),
   };
 
   if (subject.kind === 'session') {
+    const { value: session } = resolveContentVariant(subject.doc, 'session', language, event);
     return {
       ...described,
-      title: titled(subject.doc.title),
-      description: excerpt(subject.doc.description) || eventDescription,
+      title: titled(session.title),
+      description: excerpt(session.description) || eventDescription,
       ogType: 'article',
     };
   }
@@ -838,7 +868,6 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
     return {
       ...described,
       title: titled(subject.doc.name),
-      url: `${base}/sponsors/${encodeURIComponent(path.slice('/sponsors/'.length))}`,
       description: excerpt(subject.doc.description) || excerpt(subject.doc.bio) || eventDescription,
     };
   }
@@ -862,7 +891,8 @@ function resolveRouteMeta({ config, subject, path, base, degraded = false }) {
   // one page. shared/page pageHeading is the same read the app's own tab
   // title makes (apps/web/src/lib/useDocumentTitle.js), which is what keeps
   // the served title from changing on the first in-app navigation.
-  return { ...described, title: path === '/' ? siteName : titled(pageHeading(subject.doc)) };
+  const { value: page } = resolveContentVariant(subject.doc, 'page', language, event);
+  return { ...described, title: path === '/' ? siteName : titled(pageHeading(page)) };
 }
 
 /**
@@ -887,6 +917,9 @@ function buildRouteHtml({ template, meta }) {
   if (description) tags.push(`<meta name="description" content="${description}">`);
   if (meta.noindex) tags.push('<meta name="robots" content="noindex">');
   if (url) tags.push(`<link rel="canonical" href="${url}">`);
+  for (const { locale, href } of meta.alternates ?? []) {
+    tags.push(`<link rel="alternate" hreflang="${escapeHtml(locale)}" href="${escapeHtml(href)}">`);
+  }
   tags.push(`<meta property="og:title" content="${title}">`);
   if (description) tags.push(`<meta property="og:description" content="${description}">`);
   if (url) tags.push(`<meta property="og:url" content="${url}">`);
@@ -911,9 +944,10 @@ function buildRouteHtml({ template, meta }) {
   if (meta.jsonLd) tags.push(`<script type="application/ld+json">${jsonLdPayload(meta.jsonLd)}</script>`);
   const block = tags.join('\n    ');
 
-  const html = TITLE_RE.test(template)
-    ? template.replace(TITLE_RE, () => `<title>${title}</title>`)
-    : template;
+  const localized = meta.language ? setDocumentLanguage(template, meta.language) : template;
+  const html = TITLE_RE.test(localized)
+    ? localized.replace(TITLE_RE, () => `<title>${title}</title>`)
+    : localized;
   return HEAD_CLOSE_RE.test(html)
     ? html.replace(HEAD_CLOSE_RE, () => `    ${block}\n  </head>`)
     : `${html}\n${block}`;
@@ -998,9 +1032,14 @@ function createRouteMetaHandler({
         }
       }
 
-      const meta = resolveRouteMeta({ config, subject, path, base, degraded });
+      const spanishSections = await readRouteSpanishSections({ db, event: config?.event, path, subject })
+        .catch((err) => { log.error('routeMeta could not resolve translated page blocks', err); });
+      const meta = resolveRouteMeta({
+        config, subject, path, base, requestedLanguage: requestedContentLanguage(req), spanishSections, degraded,
+      });
       res.status(200);
       res.set('Content-Type', 'text/html; charset=utf-8');
+      res.set('Content-Language', meta.language);
       res.set('Cache-Control', ROUTE_CACHE_CONTROL);
       res.send(buildRouteHtml({ template, meta }));
     } catch (err) {

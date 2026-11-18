@@ -1,7 +1,8 @@
 'use strict';
 
 const { hasRichTextContent } = require('./richText.cjs');
-const { LANGUAGES } = require('./languageUrls.cjs');
+const { LANGUAGES, withContentLanguage } = require('./languageUrls.cjs');
+const { isStarterContent, publicContentDoc } = require('./seed.cjs');
 
 const ENGLISH_ONLY = Object.freeze({ default: 'en', available: Object.freeze(['en']) });
 // Identifiers, URLs, prices, figures, attributions and proper names are shared.
@@ -49,6 +50,11 @@ function languageConfigErrors(value) {
 function contentLanguages(event = {}) {
   const value = event?.contentLanguages;
   return value && languageConfigErrors(value).length === 0 ? value : ENGLISH_ONLY;
+}
+
+function selectContentLanguage(event, requested) {
+  const config = contentLanguages(event);
+  return config.available.includes(requested) ? requested : config.default;
 }
 
 function variantErrors(record, kind, prefix = 'translations') {
@@ -107,7 +113,38 @@ function resolveContentVariant(record, kind, requestedLanguage, event = {}) {
   return { value, language: spanish ? 'es' : 'en', requestedLanguage: requested, fallback: requested !== (spanish ? 'es' : 'en') };
 }
 
+/** Canonical route paths for the approved page or session versions. */
+function publicRouteUrls(path, record, kind, event, spanishSections) {
+  // Hosting uses static HTML at the root and attendee directory.
+  if (path === '/' || path === '/attendees') return { en: path };
+  const config = contentLanguages(event);
+  if (!config.available.includes('es')) return { en: path };
+  const approvedSpanish = (unit, unitKind) => resolveContentVariant(unit, unitKind, 'es', event).language === 'es';
+  const hasSpanish = approvedSpanish(record, kind)
+    || (kind === 'page' && Array.isArray(record?.sections)
+      && record.sections.some((section) => spanishSections?.has(section?.id)
+        || (typeof section?.label === 'string' && section.label.trim() && approvedSpanish(section, 'section'))));
+  if (hasSpanish) {
+    return { en: withContentLanguage(path, 'en'), es: withContentLanguage(path, 'es') };
+  }
+  return { en: config.default === 'es' ? withContentLanguage(path, 'en') : path };
+}
+
+function publishedSpanishSections(blocks, event) {
+  const sections = new Set();
+  if (!contentLanguages(event).available.includes('es')) return sections;
+  for (const block of blocks) {
+    if (block?.visible !== true || typeof block.section !== 'string') continue;
+    const published = publicContentDoc(block);
+    if (!isStarterContent(published) && resolveContentVariant(published, 'block', 'es', event).language === 'es') {
+      sections.add(published.section);
+    }
+  }
+  return sections;
+}
+
 module.exports = {
   LANGUAGES, contentLanguages, languageConfigErrors, variantFields, richVariantFields,
-  variantErrors, collectionVariantErrors, resolveContentVariant,
+  variantErrors, collectionVariantErrors, resolveContentVariant, selectContentLanguage,
+  publicRouteUrls, publishedSpanishSections,
 };

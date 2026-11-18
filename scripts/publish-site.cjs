@@ -76,6 +76,7 @@ const { spawnSync } = require('node:child_process');
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs');
+const { contentLanguages } = require('shared/contentLanguages');
 const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
 const { writeAppIcons } = require('./lib/app-icons.cjs');
 
@@ -307,7 +308,7 @@ async function writeQueueStatus({ db, queueId, patch, log = console }) {
  * @param {{ db: object }} args
  * @returns {Promise<{ event: object, features: object, theme: object,
  *                     pages: object[], sessions: object[],
- *                     speakers: object[], organizations: object[], updates: object[] }>}
+ *                     speakers: object[], organizations: object[], updates: object[], blocks: object[] }>}
  */
 async function readSiteDocs({ db }) {
   const configIds = ['event', 'features', 'theme'];
@@ -318,12 +319,14 @@ async function readSiteDocs({ db }) {
   });
   if (!config.event) throw new Error('config/event is missing — run scripts/init-event.cjs first');
 
-  const [pagesSnap, sessionsSnap, speakersSnap, organizationsSnap, updatesSnap] = await Promise.all([
+  const [pagesSnap, sessionsSnap, speakersSnap, organizationsSnap, updatesSnap, blocksSnap] = await Promise.all([
     db.collection('cmsPages').get(),
     db.collection('cmsSchedule').where('visible', '==', true).get(),
     db.collection('speakers_public').get(),
     db.collection('cmsOrganizations').where('visible', '==', true).get(),
     db.collection('cmsUpdates').where('visible', '==', true).get(),
+    contentLanguages(config.event).available.includes('es')
+      ? db.collection('cmsContent').where('visible', '==', true).get() : null,
   ]);
   const asDocs = (snap) => snap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 
@@ -336,6 +339,7 @@ async function readSiteDocs({ db }) {
     speakers: asDocs(speakersSnap),
     organizations: asDocs(organizationsSnap),
     updates: asDocs(updatesSnap),
+    blocks: blocksSnap ? asDocs(blocksSnap) : [],
   };
 }
 
@@ -361,7 +365,7 @@ async function generateSiteFiles({
 }) {
   if (!db) throw new Error('generateSiteFiles: no Firestore handle available');
   const {
-    event, features, theme, pages, sessions, speakers, organizations, updates,
+    event, features, theme, pages, sessions, speakers, organizations, updates, blocks,
   } = await readSiteDocs({ db });
 
   fs.mkdirSync(distDir, { recursive: true });
@@ -369,7 +373,7 @@ async function generateSiteFiles({
     distDir, theme, bucket: storageBucket, fetchImpl, log,
   });
   const artifacts = buildSiteArtifacts({
-    event, features, theme, pages, sessions, speakers, organizations, updates, publicUrl,
+    event, features, theme, pages, sessions, speakers, organizations, updates, blocks, publicUrl,
     maskable: icons.maskable,
   });
 

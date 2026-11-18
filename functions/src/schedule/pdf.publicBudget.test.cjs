@@ -92,6 +92,34 @@ test('public PDF: cache expires and refreshes after schedule edits', async () =>
   assert.deepEqual(f.reads, ['sessions', 'sessions']);
 });
 
+test('public PDF: concurrent language requests share the read and use separate bounded artifacts', async () => {
+  const f = fixture({ 'cmsSchedule/one': session({ translations: { es: { title: 'Sesión de prueba' } } }) });
+  const event = { name: 'Fixture', days: [{ id: 'day' }], contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const config = { event, features: { schedulePdf: true } };
+  f.setConfig(config);
+  const [english, spanish, duplicate] = await Promise.all([
+    f.get({ url: '/buildSchedulePdf?lang=en' }),
+    f.get({ url: '/buildSchedulePdf?lang=es' }),
+    f.get({ url: '/buildSchedulePdf?lang=es&lang=en' }),
+  ]);
+  assert.deepEqual([english.statusCode, spanish.statusCode, duplicate.statusCode], [200, 200, 200]);
+  assert.equal(english.headers['Content-Language'], 'en');
+  assert.equal(spanish.headers['Content-Language'], 'es');
+  assert.notDeepEqual(english.body, spanish.body);
+  assert.strictEqual(duplicate.body, english.body);
+  assert.strictEqual((await f.get({ url: '/buildSchedulePdf?lang=es&nonce=2' })).body, spanish.body);
+  assert.deepEqual(f.reads, ['sessions']);
+
+  f.setConfig({ ...config, event: { ...event, contentLanguages: { default: 'en', available: ['en'] } } });
+  assert.equal((await f.get({ url: '/buildSchedulePdf?lang=es' })).statusCode, 429);
+  f.advance(PUBLIC_PDF_TTL_MS);
+  const removed = await f.get({ url: '/buildSchedulePdf?lang=es' });
+  assert.equal(removed.statusCode, 200);
+  assert.equal(removed.headers['Content-Language'], 'en');
+  assert.notDeepEqual(removed.body, spanish.body);
+  assert.deepEqual(f.reads, ['sessions', 'sessions']);
+});
+
 test('public PDF: disablement blocks cached output; config changes do not serve the old PDF', async () => {
   const f = fixture();
   await f.get();

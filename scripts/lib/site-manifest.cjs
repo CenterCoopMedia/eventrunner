@@ -27,6 +27,7 @@ const { configuredThemeColor } = require('./shared-theme.cjs');
 const { assertNoPitchPageCollisions } = require('./pitch-route-check.cjs');
 const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
 const { isPublicPage, pageFeatureGate } = require('shared/page');
+const { publicRouteUrls, publishedSpanishSections } = require('shared/contentLanguages');
 const { APP_ICON_SIZES, appIconPath } = require('./app-icons.cjs');
 
 /**
@@ -324,14 +325,17 @@ function buildUpdateRoutes({ updates = [], parentPublic }) {
  *
  * @param {{ pages: object[], features: object, sessions: object[],
  *           speakers: object[], organizations: object[], updates: object[] }} args
- * @returns {Array<{ id: string, path: string }>}
+ * @returns {Array<{ id: string, path: string, kind?: 'page'|'session', doc?: object }>}
  */
 function collectPublicRoutes({ pages, features, sessions, speakers, organizations, updates }) {
   const { public: pageRoutes } = classifyPages({ pages, features });
   const publicPageIds = new Set(pageRoutes.map((r) => r.id));
+  const pagesById = new Map((pages ?? []).map((page) => [page?.id, page]));
+  const sessionsById = new Map((sessions ?? []).map((session) => [session?.id, session]));
   return [
-    ...pageRoutes,
-    ...buildSessionRoutes({ sessions, parentPublic: publicPageIds.has('schedule') }),
+    ...pageRoutes.map((route) => ({ ...route, kind: 'page', doc: pagesById.get(route.id) })),
+    ...buildSessionRoutes({ sessions, parentPublic: publicPageIds.has('schedule') })
+      .map((route) => ({ ...route, kind: 'session', doc: sessionsById.get(route.id) })),
     ...buildSpeakerRoutes({ speakers, parentPublic: publicPageIds.has('speakers') }),
     ...buildSponsorRoutes({ organizations, parentPublic: publicPageIds.has('sponsors') }),
     ...buildUpdateRoutes({ updates, parentPublic: publicPageIds.has('updates') }),
@@ -402,12 +406,12 @@ function escapeXml(value) {
 }
 
 /**
- * @param {{ publicUrl: string, pages: object[], features: object,
- *           sessions?: object[], speakers?: object[], organizations?: object[], updates?: object[] }} args
+ * @param {{ publicUrl: string, event?: object, pages: object[], features: object,
+ *           sessions?: object[], speakers?: object[], organizations?: object[], updates?: object[], blocks?: object[] }} args
  * @returns {string} sitemap.xml content
  */
 function buildSitemapXml({
-  publicUrl, pages, features, sessions = [], speakers = [], organizations = [], updates = [],
+  publicUrl, event, pages, features, sessions = [], speakers = [], organizations = [], updates = [], blocks = [],
 }) {
   assertNoPitchPageCollisions(pages);
   const base = normalizedBaseUrl(publicUrl);
@@ -415,14 +419,24 @@ function buildSitemapXml({
     pages, features, sessions, speakers, organizations, updates,
   });
   const sorted = [...publicRoutes].sort((a, b) => a.path.localeCompare(b.path));
-  const urls = sorted.map((route) => {
-    const encoded = encodeRoutePath(route.path);
-    const loc = route.path === '/' ? `${base}/` : `${base}${encoded}`;
-    return `  <url>\n    <loc>${escapeXml(loc)}</loc>\n  </url>`;
+  const spanishSections = publishedSpanishSections(blocks, event);
+  let hasAlternates = false;
+  const urls = sorted.flatMap((route) => {
+    const versions = publicRouteUrls(encodeRoutePath(route.path), route.doc, route.kind, event, spanishSections);
+    const locations = Object.entries(versions).map(([language, path]) => [language, escapeXml(`${base}${path}`)]);
+    const alternateLinks = [];
+    if (versions.es) {
+      hasAlternates = true;
+      for (const [language, href] of locations) {
+        alternateLinks.push(`    <xhtml:link rel="alternate" hreflang="${language}" href="${href}"/>`);
+      }
+    }
+    return locations.map(([, href]) => ['  <url>', `    <loc>${href}</loc>`, ...alternateLinks, '  </url>'].join('\n'));
   });
+  const xhtml = hasAlternates ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : '';
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${xhtml}>`,
     ...urls,
     '</urlset>',
     '',
@@ -535,16 +549,16 @@ function buildWebManifest({ event = {}, theme = {}, maskable = true }) {
  *
  * @param {{ event: object, features: object, theme: object,
  *           pages: object[], sessions?: object[], speakers?: object[], organizations?: object[],
- *           updates?: object[], publicUrl: string, maskable?: boolean }} args
+ *           updates?: object[], blocks?: object[], publicUrl: string, maskable?: boolean, hashRouter?: boolean }} args
  * @returns {{ sitemapXml: string, robotsTxt: string, manifest: object }}
  */
 function buildSiteArtifacts({
   event, features, theme, pages, sessions = [], speakers = [], organizations = [], updates = [], publicUrl,
-  maskable = true,
+  blocks = [], maskable = true, hashRouter = false,
 }) {
   return {
     sitemapXml: buildSitemapXml({
-      publicUrl, pages, features, sessions, speakers, organizations, updates,
+      publicUrl, event: hashRouter ? undefined : event, pages, features, sessions, speakers, organizations, updates, blocks,
     }),
     robotsTxt: buildRobotsTxt({ publicUrl, pages, features }),
     manifest: buildWebManifest({ event, theme, maskable }),
