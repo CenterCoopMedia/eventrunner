@@ -286,12 +286,16 @@ test('mounted crawler files cover the event and preserve robots match boundaries
   const publicUrl = `${PUBLIC_URL}${mount}`;
   const pages = PAGES.map((page) => page.id === 'home' ? { ...page, visible: false } : page);
   const args = { publicUrl, pages, features: FEATURES };
-  const xml = buildSitemapXml(args);
-  const locations = Array.from(xml.matchAll(/<loc>([^<]+)<\/loc>/gu), ([, url]) => url);
+  const { sitemapXml, robotsTxt, manifest } = buildSiteArtifacts(args);
+  const locations = Array.from(sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/gu), ([, url]) => url);
   assert.ok(locations.includes(`${publicUrl}/travel`));
   assert.ok(locations.every((url) => url.startsWith(`${publicUrl}/`)));
 
-  const lines = buildRobotsTxt(args).split('\n');
+  assert.equal(manifest.start_url, './');
+  assert.equal(manifest.scope, './');
+  assert.ok(manifest.icons.every(({ src }) => src.startsWith('branding/')));
+
+  const lines = robotsTxt.split('\n');
   assert.ok(lines.includes('User-agent: *'));
   assert.ok(lines.includes(`Sitemap: ${publicUrl}/sitemap.xml`));
   const rules = lines.filter((line) => line.startsWith('Disallow: ')).map((line) => line.slice('Disallow: '.length));

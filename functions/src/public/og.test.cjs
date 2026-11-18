@@ -575,8 +575,13 @@ test('mounted Hosting routes resolve app paths and publish public URLs with one 
   const mount = '/schedule';
   const publicBase = `https://example.org${mount}/`;
   const tierA = { publicUrl: publicBase };
-  const config = siteConfig({ tierA, features: { schedule: true, updates: true } });
-  const db = makeFakeDb({ ...SITE_DOCS, 'cmsUpdates/news': { title: 'Mounted news', body: 'A public update.', visible: true } });
+  const event = { ...SITE_EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const config = siteConfig({ event, tierA, features: { schedule: true, updates: true } });
+  const db = makeFakeDb({
+    ...SITE_DOCS,
+    'cmsPages/travel': { ...SITE_DOCS['cmsPages/travel'], translations: { es: { label: 'Viaje y sede' } } },
+    'cmsUpdates/news': { title: 'Mounted news', body: 'A public update.', visible: true },
+  });
   const fetched = [];
   const deps = {
     db,
@@ -596,17 +601,21 @@ test('mounted Hosting routes resolve app paths and publish public URLs with one 
     const updatesMeta = createUpdatesMetaHandler(deps);
     const request = (handler, browserPath) => getRoute(handler, stripEventMount(browserPath, mount));
 
-    for (const [handler, path, title] of [
+    for (const [handler, path, title, query = ''] of [
+      [routeMeta, '/', SITE_EVENT.name],
       [routeMeta, '/schedule/s-101', 'Opening remarks'],
-      [routeMeta, '/travel', 'Travel and venue'],
+      [routeMeta, '/travel', 'Travel and venue', '?lang=en'],
       [updatesMeta, '/updates/news', 'Mounted news'],
     ]) {
       const res = await request(handler, `${mount}${path}`);
-      const canonical = `https://example.org${mount}${path}`;
+      const canonical = `https://example.org${mount}${path}${query}`;
       assert.equal(res.statusCode, 200);
       assert.ok(res.sent.includes(title));
       assert.ok(res.sent.includes(`<link rel="canonical" href="${canonical}">`));
       assert.ok(res.sent.includes(`<meta property="og:url" content="${canonical}">`));
+      if (query) {
+        assert.ok(res.sent.includes(`<link rel="alternate" hreflang="es" href="${publicBase}travel?lang=es">`));
+      }
       if (handler === routeMeta) {
         const json = res.sent.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)?.[1];
         assert.equal(JSON.parse(json).url, publicBase);
