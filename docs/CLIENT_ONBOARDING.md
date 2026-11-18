@@ -29,6 +29,10 @@ panel; the client does not fork the repository.
   address on the client's domain. Announcements use their own broadcast stream, apart from login
   codes and receipts, and suppress anyone who used the one-click unsubscribe link. The client adds
   SPF, DKIM, and a DMARC policy for the sender domain; without them, emailed codes get quarantined.
+- **Past-event hosting.** Public pages, the schedule and the archive stay online after the event at
+  no extra hosting cost. Event dates do not trigger a site shutdown. Ticket sales close when the
+  event ends; the [handoff](#after-the-event-data-export-and-archive) closes the remaining event
+  forms and makes the past site read-only.
 
 ## 0. Prerequisites
 
@@ -480,14 +484,40 @@ content here:
 
 ### After the event: data export and archive
 
-The client keeps its data. At the end of the engagement, hand over the event's records and agree how long they are kept. [Archive and hand off a past event](operator/archive-handoff.md) is the runbook:
+The public site stays online at no extra hosting cost, including after 30 days. The client keeps
+its data. Hand over the event's records and agree how long personal data and backups are kept;
+their retention period is separate from the public site's hosting. [Archive and hand off a past event](operator/archive-handoff.md) is the runbook:
 
 1. An operator downloads the event data package from **Data export** (or runs `scripts/export-event-package.cjs` for a large event) and checks it with `--verify`.
 2. The operator takes a Firebase managed export and copies the Storage bucket when the client wants a full backup.
-3. The operator sets the archive date and `config/event.historicalDemo` to keep the past site online and read-only, or disables Hosting. After `historicalDemo` is on, only Google sign-in opens the admin panel, so export first.
+3. Settle ticket orders and close the pitch call, then the operator sets the archive date and `config/event.historicalDemo` to keep the past site online and read-only. After `historicalDemo` is on, only Google sign-in opens the admin panel, so export first. Taking a site offline is a separate, explicitly authorized decommission; the event date is not that authorization.
 4. The handoff record names the package date, the parts included, who received each file, and the retention period.
 
 Explain the difference between access to the cloud project, the client's ownership of the data, and the portable export. The runbook's first table states it.
+
+#### Agreement version and existing-site adoption
+
+Joe approved the past-event hosting default on November 11, 2026 (#831). The agreement is operator
+data in the Console, not a source file. The coordinator owns these live steps after this change is
+deployed:
+
+1. In **Review → Settings → Agreement**, read the current version and retain its version and
+   checksum in the operator's private record. Replace the default hosting-period sentence with:
+   “If the invoice states no hosting period, the public pages, schedule and archive stay online
+   after the event at no extra cost.” Keep the other approved terms intact.
+2. Select **Save agreement**. `saveAgreement` creates a new immutable version and an audit row.
+   Read it back and record the new version and checksum. New clients accept that version through
+   the existing setup agreement step; a stale version is refused by the existing acceptance API.
+3. NC Local has one existing site. Record its application and existing accepted-version/checksum
+   in the private handoff record, alongside the approved no-cost hosting extension and the new
+   current agreement version. Keep its original acceptance, signer, date and text intact. This
+   does not create another application, site or acceptance on the client's behalf.
+4. Read NC Local's accepted-agreement page: the current hosting policy appears separately, and the
+   signed version still matches its original record. Confirm its public site and published
+   schedule remain reachable. Record these readbacks before the coordinator marks adoption done.
+
+The Console retention job keeps built applications and their project/name references. It deletes
+eligible withdrawn or declined requests, not a ready or launched site because its event is over.
 
 Do not send the client screenshots of another client's event data, and do not put their attendee
 list, admin emails, or any other client-specific detail in a public GitHub issue or discussion —

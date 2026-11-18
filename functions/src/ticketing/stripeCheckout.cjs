@@ -5,6 +5,7 @@ const {
   CURRENCY_EXPONENTS, validateTicketCatalog, validateCheckoutRequest, isCommerceRequestId, isCommerceOrderId, isSalesWindowOpen,
 } = require('shared/ticketCommerce');
 const { answeredQuestions, checkAnswers, readRegistrationForm } = require('shared/registrationForm');
+const { getEventPhase } = require('shared/config');
 const { verifyAuthToken } = require('../core/auth.cjs');
 const { promoRef, takePromoCheck } = require('./promoCodes.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
@@ -147,7 +148,8 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
   const inventory = normalizeInventory(inventorySnap.data(), scope.eventId);
   const eventRemaining = Math.max(0, catalog.capacity - inventory.held - inventory.sold);
   const at = now();
-  const windowOpen = isSalesWindowOpen(catalog, at);
+  const windowOpen = isSalesWindowOpen(catalog, at)
+    && !['ended', 'archived'].includes(getEventPhase(event, at));
   const salesEnabled = !catalog.salesPaused && catalog.commercialTermsConfirmed && windowOpen && eventRemaining > 0;
   const paidConfigured = provider.hasPaymentCredentials === true && connectionSnap.data()?.ended !== true;
   const ticketTypes = catalog.ticketTypes.filter((type) => type.visibility === 'public' && type.active).map((type) => {
@@ -260,6 +262,9 @@ async function reserveCommerceOrder({
       }
     }
     const at = now();
+    if (!comp && ['ended', 'archived'].includes(getEventPhase(eventSnap.data(), at))) {
+      throw new CommerceError('sales-closed', 'Ticket sales are currently closed.');
+    }
     const rate = comp ? null : purchaserWindow(purchaserSnap?.data(), at);
     const promo = promoSnap?.exists ? promoSnap.data() : null;
     const priced = priceSelections({ catalog, request, at, comp, promo });

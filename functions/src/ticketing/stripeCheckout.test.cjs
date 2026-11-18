@@ -29,6 +29,58 @@ test('Stripe refusing the key closes paid tickets for the next buyer, and a lost
   assert.equal(ended.db.read('ticket_inventory', 'current').held, held);
 });
 
+const PAST_EVENT = {
+  name: 'Example event', historicalDemo: false, timezone: 'UTC',
+  announcedAt: '2026-10-01T00:00', archivedAt: null,
+  days: [{ id: 'day-one', date: '2026-10-12', startTime: '09:00', endTime: '18:00' }],
+};
+
+test('past events close paid and free checkout even when the catalog has no deadline', async () => {
+  for (const daysAfter of [31, 366]) {
+    for (const archived of [false, true]) {
+      for (const unitAmount of [2500, 0]) {
+        const { deps, db, calls, advance } = setup({
+          seed: { 'config/event': { ...PAST_EVENT, archivedAt: archived ? '2026-10-13T00:00' : null } },
+          catalogPatch: { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount }] },
+        });
+        advance(daysAfter * 24 * 60 * 60 * 1000);
+        const shown = await readTicketingCatalog(deps);
+        assert.equal(shown.salesEnabled, false);
+        assert.equal(shown.ticketTypes[0].available, false);
+        const refused = await checkout(deps);
+        assert.equal(refused.statusCode, 409);
+        assert.equal(refused.body.error.code, 'sales-closed');
+        for (const collection of ['ticket_orders', 'ticket_payment_attempts', 'ticket_inventory', 'tickets', 'ticket_sync_queue', 'admin_logs']) {
+          assert.equal(db.ids(collection).length, 0, collection);
+        }
+        assert.equal(calls.length, 0);
+      }
+    }
+  }
+});
+
+test('an existing order and its tickets remain readable after the event closes new checkout', async () => {
+  const { deps, db, calls, advance } = setup({
+    seed: { 'config/event': PAST_EVENT },
+    catalogPatch: { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount: 0 }] },
+  });
+  const first = await checkout(deps);
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.body.ticketIds.length, 1);
+  advance(366 * 24 * 60 * 60 * 1000);
+  assert.equal((await readTicketingCatalog(deps)).salesEnabled, false);
+  const replay = await checkout(deps);
+  assert.equal(replay.statusCode, 200);
+  assert.equal(replay.body.orderId, first.body.orderId);
+  assert.deepEqual(replay.body.ticketIds, first.body.ticketIds);
+  const owned = await status(deps, { orderId: first.body.orderId });
+  assert.equal(owned.statusCode, 200);
+  assert.deepEqual(owned.body.ticketIds, first.body.ticketIds);
+  assert.equal(db.ids('ticket_orders').length, 1);
+  assert.equal(db.ids('tickets').length, 1);
+  assert.equal(calls.length, 0);
+});
+
 test('paid checkout reserves inventory before external creation and freezes exact card-only prices', async () => {
   const { deps, db, calls } = setup({ create({ db: current, params }) {
     assert.equal(current.read('ticket_inventory', 'current').held, 2);

@@ -21,6 +21,11 @@ export default function AcceptedAgreement() {
       <PageHeading tabIndex={-1}>Your agreement</PageHeading>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       {!data && !error ? <LoadingState>Loading the agreement.</LoadingState> : null}
+      {data?.accepted && data.agreement ? <section aria-labelledby="past-event-hosting-title" className="stack">
+        <h2 id="past-event-hosting-title">After your event</h2>
+        <p>Your public pages, schedule and archive stay online after the event at no extra cost. Ticket sales close when the event ends. The hosting team can make the past site read-only during handoff.</p>
+        <p className="muted">This hosting policy applies to existing sites. The agreement below records the version you accepted.</p>
+      </section> : null}
       {data?.accepted ? <p className="muted">{data.accepted.name}{data.accepted.title ? `, ${data.accepted.title},` : ''} accepted this version for {data.accepted.legalName || 'your organization'}.</p> : null}
       {data?.accepted && data.agreement ? <AgreementText agreement={data.agreement} /> : null}
       {data && !data.accepted ? <p>Open your request to read and accept the agreement.</p> : null}
