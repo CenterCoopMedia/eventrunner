@@ -16,6 +16,8 @@ export function createClientHostWorker({ bucket, fetchMap, fetchUpstream, hostFa
   };
   const handleHostRequest = createPublicHostHandler({
     fallback: (request, url) => reservedClientPath(url.pathname) ? hostFallback?.fetch(request) : null,
+    fetchUpstream,
+    log,
   });
   return createClientHostRouter({ loadHost, handleHostRequest, fetchUpstream, log });
 }

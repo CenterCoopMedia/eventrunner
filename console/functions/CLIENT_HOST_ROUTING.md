@@ -22,4 +22,6 @@ The Worker entry point is `client-host-worker.mjs`. Its `CLIENT_ROUTE_MAP_BUCKET
 
 The Worker lists public event titles and links at `/` once the mounted deployment is confirmed. A map with zero confirmed listings serves the empty index. `/.well-known/eventrunner-route-map` reports the `version` and `exportedAt` of the map currently in use. Unmatched mounts return 404. An optional `CLIENT_HOST_FALLBACK` service preserves existing responses on reserved host paths, including root Firebase helper paths.
 
+At `/robots.txt`, the Worker composes the readable host policy with the mounted exclusions and verified sitemap URLs of confirmed events. A missing crawler file contributes no rules. An unreadable host or event exclusion policy makes the response temporarily unavailable. An unavailable sitemap omits just its URL. A staged mount contributes scoped exclusions and joins sitemap discovery after the applied deployment receipt. The Worker requests only fixed-origin crawler files and leaves event metadata and sitemap responses to Hosting.
+
 The hosted fixtures use synthetic maps and upstreams. Raw ingress normalization, cache rules, bucket permissions, supported browsers and provider setup are part of the shared-host rehearsal.
