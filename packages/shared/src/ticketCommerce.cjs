@@ -3,6 +3,7 @@
 /** Ticket commerce values shared by the catalog editor and server pricing. */
 
 const { isEmailAddress } = require('./email.cjs');
+const { LANGUAGES } = require('./languageUrls.cjs');
 
 const MAX_TICKET_TYPES = 20;
 const MAX_ORDER_SEATS = 20;
@@ -156,9 +157,9 @@ function normalizeAttendee(input) {
 function validateCheckoutRequest(input) {
   const issue = (message) => ({ ok: false, value: null, issues: [{ path: 'checkout', message }] });
   if (!input || typeof input !== 'object' || Array.isArray(input)) return issue('A checkout request is required.');
-  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume', 'catalogRevision', 'formRevision', 'promoCode'].includes(key))) return issue('Checkout accepts catalog acceptance, ticket selections, and attendee assignments only.');
+  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume', 'catalogRevision', 'formRevision', 'promoCode', 'lang'].includes(key))) return issue('Checkout accepts catalog acceptance, ticket selections, and attendee assignments only.');
   if (input.resume === true) {
-    if (input.lines !== undefined || ['catalogRevision', 'formRevision', 'promoCode'].some((key) => Object.hasOwn(input, key))) return issue('Resume uses the saved ticket selections and accepted terms.');
+    if (input.lines !== undefined || ['catalogRevision', 'formRevision', 'promoCode', 'lang'].some((key) => Object.hasOwn(input, key))) return issue('Resume uses the saved ticket selections and accepted terms.');
     if (!Object.hasOwn(input, 'requestId') && isCommerceOrderId(input.orderId)) {
       return { ok: true, value: { orderId: input.orderId, resume: true }, issues: [] };
     }
@@ -170,6 +171,7 @@ function validateCheckoutRequest(input) {
   if (input.resume !== undefined && input.resume !== false) return issue('Invalid resume value.');
   if (Object.hasOwn(input, 'orderId')) return issue('An order ID can only resume a saved order.');
   if (!isCommerceRequestId(input.requestId)) return issue('A valid request ID is required.');
+  if (input.lang !== undefined && !LANGUAGES.includes(input.lang)) return issue('Choose a supported registration language.');
   // Trusted comp creation and old durable requests have no accepted revision.
   // The reservation transaction requires it only for a new public order.
   const hasRevision = Object.hasOwn(input, 'catalogRevision');
@@ -231,6 +233,7 @@ function validateCheckoutRequest(input) {
       ...(hasRevision ? { catalogRevision: input.catalogRevision } : {}),
       ...(hasFormRevision ? { formRevision: input.formRevision } : {}),
       ...(promoCode !== undefined ? { promoCode: normalizePromoCode(promoCode) } : {}),
+      ...(input.lang !== undefined ? { lang: input.lang } : {}),
     },
     issues: [],
   };

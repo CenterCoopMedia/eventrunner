@@ -1,5 +1,7 @@
 'use strict';
 
+const { registrationLanguage } = require('../email/attendeeLanguage.cjs');
+
 /**
  * Ticketing → registration orchestration (spec §1.3 `registration.cjs`,
  * §3.3 step 4, §3.4).
@@ -69,7 +71,7 @@ async function applyTicketClaimToUser({ db, uid, env = process.env, now = () => 
  *           now?: () => Date }} deps
  * @returns {Promise<{ claimed: boolean, reason?: string }>}
  */
-async function claimTicket({ db, externalId, uid, email = null, now = () => new Date() }) {
+async function claimTicket({ db, externalId, uid, email = null, language, now = () => new Date() }) {
   const id = safeDocId(externalId);
   if (!id) return { claimed: false, reason: 'invalid_id' };
   const ref = db.collection(TICKETS).doc(id);
@@ -92,17 +94,22 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
     // account ticketed and, when the flag is on, approved. Only a valid
     // ticket may do that (issues #358, #359, #360).
     if (data.status !== 'valid') return { claimed: false, reason: 'not_valid' };
-    const userSnap = await tx.get(db.collection(USERS).doc(uid));
+    const userRef = db.collection(USERS).doc(uid);
+    const userSnap = await tx.get(userRef);
     if (!userSnap.exists) return { claimed: false, reason: 'account_missing' };
     // ADR 0008 §5: answers given at checkout wait on the order's seat until
     // this attendee claims; they then belong to the account. Every read
     // comes before any write, as a Firestore transaction requires.
     let move = null;
+    let purchaserLanguage;
     if (isCommerceOrderId(data.orderId)) {
       const orderRef = db.collection(ORDERS).doc(data.orderId);
       const answersRef = db.collection(ANSWERS).doc(id);
       const [orderSnap, answersSnap] = await tx.getAll(orderRef, answersRef);
       const order = orderSnap.exists ? orderSnap.data() : null;
+      if (order?.purchaserUid === uid && ['en', 'es'].includes(order.registrationLanguage)) {
+        purchaserLanguage = order.registrationLanguage;
+      }
       const seats = Array.isArray(order?.seats) ? order.seats : [];
       const seat = seats.find((entry) => entry?.externalId === id);
       if (seat && seat.answers && typeof seat.answers === 'object') {
@@ -120,8 +127,12 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
         hold = { holdRef, answersRef, data: holdSnap.data() || {}, recordExists: answersSnap.exists };
       }
     }
+    const event = language === 'es' && !purchaserLanguage && !userSnap.data()?.registrationLanguage
+      ? (await tx.get(db.collection('config').doc('event'))).data() : null;
+    const selected = purchaserLanguage || (language !== undefined ? registrationLanguage(event, language) : null);
     const at = now();
     tx.set(ref, { claimedByUid: uid, claimedAt: at, updatedAt: at }, { merge: true });
+    if (selected && !userSnap.data()?.registrationLanguage) tx.update(userRef, { registrationLanguage: selected });
     if (move) {
       const { order, seat } = move;
       // An answer record already there is the attendee's own later answer; it wins.
@@ -170,11 +181,11 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
  * @param {{ db: object, uid: string, email?: string|null, externalIds: string[],
  *           now?: () => Date }} deps
  */
-async function claimTicketsForUser({ db, uid, email = null, externalIds, env = process.env, now = () => new Date() }) {
+async function claimTicketsForUser({ db, uid, email = null, externalIds, language, env = process.env, now = () => new Date() }) {
   const claimed = [];
   const refused = [];
   for (const externalId of Array.isArray(externalIds) ? externalIds : []) {
-    const result = await claimTicket({ db, externalId, uid, email, now });
+    const result = await claimTicket({ db, externalId, uid, email, language, now });
     if (result.claimed) claimed.push(externalId);
     else refused.push({ externalId, reason: result.reason });
   }
@@ -306,7 +317,7 @@ function createTicketingVerifyOrderHandler({ db, provider, auth, now = () => new
     }
 
     const result = await claimTicketsForUser({
-      db, uid: decoded.uid, email, externalIds: mine, now,
+      db, uid: decoded.uid, email, externalIds: mine, language: req.body?.lang, now,
     });
     if (result.claimed.length === 0) {
       // Already claimed (by this account or another): the same answer, for

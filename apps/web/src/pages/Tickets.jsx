@@ -33,6 +33,7 @@ import PromoCodeField from '../components/tickets/PromoCodeField.jsx';
 import RegistrationQuestionFields from '../components/registration/RegistrationQuestionFields.jsx';
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { subscribeRegistrationForm } from '../lib/registrationFormSource.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
@@ -92,6 +93,7 @@ const fullName = (attendee) => [attendee.firstName, attendee.lastName].map((part
 
 export default function Tickets() {
   useDocumentTitle('Get tickets');
+  const { language } = usePublicLanguage();
   const { user, loading: authLoading, signOut } = useAuth();
   const { eventConfig } = useEventConfig();
   const navigate = useNavigate();
@@ -456,6 +458,7 @@ export default function Tickets() {
       const answered = lines.some((line) => line.attendees.some((attendee) => Object.keys(answersOf(attendee)).length > 0));
       const body = {
         requestId: newTicketingRequestId(),
+        lang: language,
         catalogRevision: acceptedCatalogRevision,
         ...(answered ? { formRevision: readRegistrationForm(form).revision } : {}),
         ...(applied ? { promoCode: applied.code } : {}),

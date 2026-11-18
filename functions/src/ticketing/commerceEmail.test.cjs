@@ -39,6 +39,24 @@ test('confirmation replay sends one purchaser confirmation and one distinct atte
   assert.ok(logs.docs.every((snap) => snap.data().bodyStored === false));
 });
 
+test('ticket confirmations use the purchaser and assigned attendee languages separately', async () => {
+  const db = fixture({
+    'ticket_orders/order-1': { ...order, registrationLanguage: 'es' },
+    'users/recipient': { email: 'attendee@example.org', registrationLanguage: 'en' },
+  });
+  const sent = [];
+  await sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail: async (message) => {
+    sent.push(message);
+    return { status: 'sent' };
+  } });
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0].subject, 'Tu pedido de entradas para Synthetic conference');
+  assert.match(sent[0].html, /orderId=order-1&amp;lang=es/);
+  assert.match(sent[0].text, /orderId=order-1&lang=es/);
+  assert.equal(sent[1].subject, 'A ticket is ready for you at Synthetic conference');
+  assert.doesNotMatch(sent[1].text, /lang=es/);
+});
+
 test('an explicit resend keeps the purchaser receipt but excludes tickets already claimed by an attendee', async () => {
   const db = fixture();
   const sent = [];

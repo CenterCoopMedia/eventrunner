@@ -5,13 +5,14 @@
 const { isOrderFulfilled } = require('shared/ticketCommerce');
 const { createHash } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
-const { render } = require('../email/render.cjs');
+const { attendeeLanguage } = require('../email/attendeeLanguage.cjs');
+const { attendeeUrl, renderAttendeeTemplate } = require('../email/attendeeTemplates.cjs');
 const { loadTemplate } = require('../email/templates.cjs');
 const { createEmailCore, internals: { SEND_SECRETS_BY_PROVIDER } } = require('../email/send.cjs');
 const { stripeScope, internals: { scopeMatches } } = require('./providers/stripe.cjs');
 
-function receiptAmount(order) {
-  const format = new Intl.NumberFormat('en', { style: 'currency', currency: order.currency.toUpperCase() });
+function receiptAmount(order, language = 'en') {
+  const format = new Intl.NumberFormat(language, { style: 'currency', currency: order.currency.toUpperCase() });
   const exponent = format.resolvedOptions().maximumFractionDigits;
   return format.format(order.totalAmount / (10 ** exponent));
 }
@@ -46,6 +47,9 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   if (tickets.length === 0) return { sent: 0, alreadySent: false, skipped: 'no-valid-tickets' };
   const origin = eventOrigin(env);
   const config = await getConfig();
+  const event = config?.event;
+  const purchaserLanguage = attendeeLanguage(order, event);
+  const purchaserEmail = typeof order.purchaserEmail === 'string' ? order.purchaserEmail.trim().toLowerCase() : '';
   let send = sendEmail;
   if (!send) {
     const { getEmailProvider } = require('../email/providers/index.cjs');
@@ -54,8 +58,8 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   const recipients = [];
   if (order.purchaserEmail) {
     recipients.push({
-      to: order.purchaserEmail, templateId: 'ticket.order_confirmation',
-      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order), cta_url: `${origin}/tickets/status?orderId=${encodeURIComponent(orderId)}` },
+      to: order.purchaserEmail, templateId: 'ticket.order_confirmation', language: purchaserLanguage,
+      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order, purchaserLanguage), cta_url: `${origin}/tickets/status?orderId=${encodeURIComponent(orderId)}` },
     });
   }
   const attendees = new Map();
@@ -65,13 +69,23 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
     if (ticket.claimedByUid) continue;
     const email = ticket.email?.trim().toLowerCase();
     if (!email) continue;
-    const existing = attendees.get(email) || { firstName: ticket.firstName || 'there', count: 0 };
+    const existing = attendees.get(email) || { firstName: ticket.firstName || '', count: 0 };
     existing.count += 1;
     attendees.set(email, existing);
   }
+  const assigned = [...attendees.keys()].filter((email) => email !== purchaserEmail);
+  const accountsByEmail = new Map();
+  if (assigned.length > 0) {
+    const accounts = await db.collection('users').where('email', 'in', assigned).get();
+    for (const account of accounts.docs) {
+      const data = account.data();
+      accountsByEmail.set(data.email, accountsByEmail.has(data.email) ? null : { registrationLanguage: data.registrationLanguage });
+    }
+  }
   for (const [email, attendee] of attendees) {
+    const language = email === purchaserEmail ? purchaserLanguage : attendeeLanguage(accountsByEmail.get(email), event);
     recipients.push({
-      to: email, templateId: 'ticket.attendee_confirmation',
+      to: email, templateId: 'ticket.attendee_confirmation', language,
       tokens: { first_name: attendee.firstName, order_reference: orderId, ticket_count: String(attendee.count), cta_url: `${origin}/ticket/claim?order=${encodeURIComponent(orderId)}` },
     });
   }
@@ -80,7 +94,9 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   let skipped = 0;
   for (const recipient of recipients) {
     const { template, override } = await loadTemplate({ db, id: recipient.templateId, now: () => now().getTime() });
-    const rendered = render({ template, override, tokenValues: recipient.tokens, config, now });
+    const { language } = recipient;
+    const tokenValues = { ...recipient.tokens, cta_url: attendeeUrl(recipient.tokens.cta_url, language) };
+    const rendered = renderAttendeeTemplate({ template, override, tokenValues, config, now, language });
     const addressKey = createHash('sha256').update(recipient.to).digest('hex');
     const onceKey = `ticket-confirmation:${orderId}:${recipient.templateId}:${addressKey}:${resendKey || 'initial'}`;
     const outcome = await send({

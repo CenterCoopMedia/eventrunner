@@ -133,14 +133,15 @@ function requestsUrl(config) {
 }
 
 /** Render one notice with the shipped wording. Never reads an override. */
-function renderNotice({ config, slot }) {
-  const { render } = require('../email/render.cjs');
+function renderNotice({ config, slot, language }) {
+  const { renderAttendeeTemplate, attendeeUrl } = require('../email/attendeeTemplates.cjs');
   const { getDefaultTemplate } = require('../email/templates.cjs');
-  const rendered = render({
+  const rendered = renderAttendeeTemplate({
     template: getDefaultTemplate(SLOT_TEMPLATES[slot]),
     override: null,
-    tokenValues: { requests_url: requestsUrl(config) },
+    tokenValues: { requests_url: attendeeUrl(requestsUrl(config), language) },
     config,
+    language,
   });
   return { ...rendered, subject: rendered.subject.replace(/\s+/g, ' ').trim() };
 }
@@ -191,7 +192,7 @@ async function isSuppressed(db, email) {
  *
  * @returns {Promise<{ state: 'sent'|'failed'|'uncertain'|'suppressed', error: string|null }>}
  */
-async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = console, id, slot, record, to }) {
+async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = console, id, slot, record, to, recipientUid }) {
   let state;
   let error = null;
   try {
@@ -208,7 +209,9 @@ async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = c
       state = 'suppressed';
       error = 'This address unsubscribed from email from this site. Nothing was sent.';
     } else {
-      const rendered = renderNotice({ config, slot });
+      const recipient = recipientUid ? (await db.collection('users').doc(recipientUid).get()).data() : null;
+      const { attendeeLanguage } = require('../email/attendeeLanguage.cjs');
+      const rendered = renderNotice({ config, slot, language: attendeeLanguage(recipient, config?.event) });
       const outcome = await sendEmail({
         to,
         subject: rendered.subject,
@@ -366,7 +369,7 @@ function createRetryChangeRequestNoticeHandler({ db, auth, getConfig, sendEmail,
         const record = queuedRecord({ id: request.id, slot: request.slot, previous: verdict.previous, mode: 'retry', by: gate.email, at });
         tx.update(ref, { notices: { ...stored.notices, [request.slot]: record } });
         tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({ action: 'retryChangeRequestNotice', id: request.id, actor: gate, at }));
-        return { record, to: stored.email };
+        return { record, to: stored.email, recipientUid: stored.uid };
       });
     } catch (err) {
       log.error('retryChangeRequestNotice failed', err);
@@ -378,7 +381,8 @@ function createRetryChangeRequestNoticeHandler({ db, auth, getConfig, sendEmail,
       return sendError(res, status, code, message);
     }
     const result = await deliverNotice({
-      db, sendEmail, getConfig, now, log, id: request.id, slot: request.slot, record: claimed.record, to: claimed.to,
+      db, sendEmail, getConfig, now, log, id: request.id, slot: request.slot, record: claimed.record,
+      to: claimed.to, recipientUid: claimed.recipientUid,
     });
     return res.status(200).json({ id: request.id, slot: request.slot, state: result.state, attempt: claimed.record.attempt });
   };

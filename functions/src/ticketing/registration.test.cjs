@@ -54,6 +54,19 @@ const getConfig = async () => ({
   features: {},
 });
 
+test('the first self-service claim saves the attendee language for later mail', async () => {
+  const db = makeFakeDb({
+    'config/event': { contentLanguages: { default: 'en', available: ['en', 'es'] } },
+    'users/uid-ada': { email: 'attendee@example.com' },
+    'tickets/one': { status: 'valid', email: 'attendee@example.com' },
+    'tickets/two': { status: 'valid', email: 'attendee@example.com' },
+  });
+  const input = { db, uid: 'uid-ada', email: 'attendee@example.com', now: () => T0 };
+  assert.equal((await claimTicket({ ...input, externalId: 'one', language: 'es' })).claimed, true);
+  assert.equal((await claimTicket({ ...input, externalId: 'two', language: 'en' })).claimed, true);
+  assert.equal(db.read('users', 'uid-ada').registrationLanguage, 'es');
+});
+
 test('a new claim restores only a revocation caused by entitlement loss', async () => {
   for (const [reason, expected] of [['entitlement_lost', 'ticketed'], ['admin_revocation', 'revoked'], [null, 'revoked']]) {
     const db = makeFakeDb({

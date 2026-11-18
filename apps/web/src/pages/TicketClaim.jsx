@@ -25,6 +25,7 @@ import { useSearchParams } from 'react-router';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
+import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
@@ -107,6 +108,7 @@ export default function TicketClaim() {
 }
 
 function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
+  const { language } = usePublicLanguage();
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null); // the server's success payload
   const [error, setError] = useState(null); // { message } — one shape, every cause
@@ -136,7 +138,7 @@ function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
       try {
         const idToken = await user.getIdToken();
         if (!active.current) return;
-        const claimed = await verifyTicketOrder({ orderNumber: trimmed, idToken });
+        const claimed = await verifyTicketOrder({ orderNumber: trimmed, idToken, language });
         if (active.current) setResult(claimed);
       } catch (err) {
         if (!active.current) return;
@@ -160,7 +162,7 @@ function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
         if (active.current) setSubmitting(false);
       }
     },
-    [orderNumber, user, onRequireSignIn],
+    [orderNumber, user, onRequireSignIn, language],
   );
 
   if (result) {

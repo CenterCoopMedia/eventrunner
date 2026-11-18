@@ -90,6 +90,19 @@ function makeRes() {
 const req = (token, body) => ({ method: 'POST', headers: token ? { authorization: `Bearer ${token}` } : {}, body });
 const getConfig = async () => CONFIG;
 
+test('the request acknowledgement uses the requester registration language', async () => {
+  const db = makeFakeDb({ seed: { 'users/uid-ada': { uid: 'uid-ada', email: 'ada@example.com', registrationLanguage: 'es' } } });
+  const mailer = makeMailer();
+  const res = await submit(db, mailer);
+  assert.equal(res.statusCode, 201);
+  assert.equal(mailer.sent.length, 1);
+  const [mail] = mailer.sent;
+  assert.equal(mail.subject, 'Recibimos tu solicitud de cambio para Example Summit');
+  assert.match(mail.html, /<html lang="es">/);
+  assert.ok(mail.text.includes(`${REQUESTS_URL}?lang=es`));
+  assert.equal(mail.messageStream, 'outbound');
+});
+
 async function submit(db, mailer, { token = 'visitor', payload = {}, config = getConfig } = {}) {
   const res = makeRes();
   await createSubmitChangeRequestHandler({ db, auth, getConfig: config, sendEmail: mailer.sendEmail, now: () => T0, log: QUIET })(

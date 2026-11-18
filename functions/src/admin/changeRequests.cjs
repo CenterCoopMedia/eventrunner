@@ -480,7 +480,8 @@ function createSubmitChangeRequestHandler({ db, auth, getConfig, sendEmail, now 
     // record for staff to retry (deliverNotice never throws).
     if (result.outcome === 'stored' && result.acknowledgement) {
       await deliverNotice({
-        db, sendEmail, getConfig, now, log, id, slot: 'received', record: result.acknowledgement, to: email,
+        db, sendEmail, getConfig, now, log, id, slot: 'received', record: result.acknowledgement,
+        to: email, recipientUid: actor.uid,
       });
     }
     res.status(201).json({ id, ok: true });
@@ -544,7 +545,7 @@ function createUpdateChangeRequestStatusHandler({ db, auth, getConfig, sendEmail
           actor: gate,
           at,
         }));
-        return { queued, to: stored.email };
+        return { queued, to: stored.email, recipientUid: stored.uid };
       });
     } catch (err) {
       log.error('updateChangeRequestStatus failed', err);
@@ -556,7 +557,8 @@ function createUpdateChangeRequestStatusHandler({ db, auth, getConfig, sendEmail
     let notice = null;
     if (result.queued) {
       const delivered = await deliverNotice({
-        db, sendEmail, getConfig, now, log, id, slot: result.queued.slot, record: result.queued.record, to: result.to,
+        db, sendEmail, getConfig, now, log, id, slot: result.queued.slot, record: result.queued.record,
+        to: result.to, recipientUid: result.recipientUid,
       });
       notice = { slot: result.queued.slot, state: delivered.state };
     }

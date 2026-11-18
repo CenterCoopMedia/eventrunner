@@ -71,22 +71,16 @@ export function subscribeOwnProfile(uid, onNext, onConfirmed) {
 }
 
 /**
- * Write the account owner's editable profile fields.
+ * Prepare the account owner's editable profile fields.
  *
  * Only SELF_EDITABLE_PROFILE_FIELDS are sent: the rules reject a write that
  * touches anything else, so filtering here turns a caller mistake into a
  * dropped field instead of a rejected save.
  *
- * `updatedAt` is stamped here, with serverTimestamp() rather than the
- * browser clock, and this is its ONLY writer — the same single-writer rule
- * `profileComplete` follows in the trigger. The rules type-check it as a
- * timestamp, so a client cannot backdate its own profile.
- *
- * @param {string} uid
  * @param {object} fields
- * @returns {Promise<void>}
+ * @returns {object}
  */
-export function saveOwnProfile(uid, fields) {
+export function ownProfileFields(fields) {
   const payload = {};
   for (const key of SELF_EDITABLE_PROFILE_FIELDS) {
     if (key === 'updatedAt') continue;
@@ -95,6 +89,11 @@ export function saveOwnProfile(uid, fields) {
     }
   }
   validateProfileBounds(payload);
+  return payload;
+}
+
+export function saveOwnProfile(uid, fields) {
+  const payload = ownProfileFields(fields);
   return loadFirebase().then(({ db, serverTimestamp, updateDoc, doc }) => {
     payload.updatedAt = serverTimestamp();
     return updateDoc(doc(db, USERS, uid), payload);

@@ -60,17 +60,10 @@ function sameForm(form, data) {
     === JSON.stringify([settings.offsetsDays, settings.sendTime, settings.draft.subject, settings.draft.message]);
 }
 
-function SampleMessage({ sample, timeZone }) {
+function SampleBody({ sample, name, testId }) {
   const srcDoc = useMemo(() => (sample.html ? buildPreviewDoc(sample.html) : null), [sample.html]);
-  const name = `Attendee reminder, ${dayCount(sample.offsetDays)} before`;
   return (
-    <section aria-label={name} className="flex flex-col gap-xs border-admin-rule-hairline border-t-admin-hairline pt-sm">
-      <div className="flex items-center gap-2xs"><h4 className="text-admin-base font-bold text-admin-ink">{name}</h4><HelpTooltip label={name}>Review this reminder’s date and message before enabling the schedule.</HelpTooltip></div>
-      <p className="text-admin-sm text-admin-ink">
-        Sends from {eventTime(sample.opensAt, timeZone)}.
-        {sample.state === 'closed' ? ' This reminder date has passed, so it will not send.' : ''}
-        {sample.state === 'empty' ? ' Quiet hours cover this whole reminder, so it will not send.' : ''}
-      </p>
+    <div className="flex flex-col gap-xs">
       <dl className="grid grid-cols-[auto_1fr] gap-x-sm gap-y-3xs text-admin-sm">
         <dt className="font-semibold text-admin-ink">Subject</dt>
         <dd className="wrap-anywhere text-admin-ink">{sample.subject}</dd>
@@ -85,10 +78,30 @@ function SampleMessage({ sample, timeZone }) {
         />
       ) : null}
       <HelpDisclosure title="Text preview" help={"Read the email as plain text, without images or page styling."} defaultOpen={!srcDoc} className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
-        <pre data-testid={`attendee-preview-text-${sample.offsetDays}`} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
+        <pre data-testid={testId} className="mt-2xs max-h-[20rem] overflow-auto whitespace-pre-wrap break-words font-admin-ui text-admin-sm text-admin-ink">
           {sample.text}
         </pre>
       </HelpDisclosure>
+    </div>
+  );
+}
+
+function SampleMessage({ sample, timeZone }) {
+  const name = `Attendee reminder, ${dayCount(sample.offsetDays)} before`;
+  return (
+    <section aria-label={name} className="flex flex-col gap-xs border-admin-rule-hairline border-t-admin-hairline pt-sm">
+      <div className="flex items-center gap-2xs"><h4 className="text-admin-base font-bold text-admin-ink">{name}</h4><HelpTooltip label={name}>Review this reminder’s date and message before enabling the schedule.</HelpTooltip></div>
+      <p className="text-admin-sm text-admin-ink">
+        Sends from {eventTime(sample.opensAt, timeZone)}.
+        {sample.state === 'closed' ? ' This reminder date has passed, so it will not send.' : ''}
+        {sample.state === 'empty' ? ' Quiet hours cover this whole reminder, so it will not send.' : ''}
+      </p>
+      <SampleBody sample={sample} name={name} testId={`attendee-preview-text-${sample.offsetDays}`} />
+      {sample.spanish ? (
+        <HelpDisclosure title="Spanish version" help="Review the reminder for attendees who registered in Spanish." className="text-admin-sm" titleClassName="admin-target cursor-pointer font-semibold text-admin-ink">
+          <SampleBody sample={sample.spanish} name={`${name}, Spanish`} testId={`attendee-preview-es-${sample.offsetDays}`} />
+        </HelpDisclosure>
+      ) : null}
     </section>
   );
 }

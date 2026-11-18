@@ -1,5 +1,7 @@
 'use strict';
 
+const { registrationLanguage } = require('../email/attendeeLanguage.cjs');
+
 /** Server-authoritative catalog, reservations, Checkout, and purchaser recovery. */
 const {
   CURRENCY_EXPONENTS, validateTicketCatalog, validateCheckoutRequest, isCommerceRequestId, isCommerceOrderId, isSalesWindowOpen,
@@ -304,9 +306,13 @@ async function reserveCommerceOrder({
       }
       freeBudget = { allocated: allocated + freeSeats.length, updatedAt: at };
     }
+    const accountLanguage = accountSnap?.data()?.registrationLanguage;
+    const savedLanguage = accountLanguage === 'en' || accountLanguage === 'es'
+      ? accountLanguage : registrationLanguage(eventSnap.data(), request.lang);
     const order = {
       id, orderId: id, provider: 'stripe', ...scope,
       attemptId, source, purchaserUid: actor.uid, purchaserEmail: actor.email,
+      ...(!comp && savedLanguage ? { registrationLanguage: savedLanguage } : {}),
       requestFingerprint: fingerprint, catalogRevision: catalog.revision,
       currency: catalog.currency, currencyExponent: CURRENCY_EXPONENTS[catalog.currency],
       ...priced, taxAmount: 0, discountAmount: 0, feeAmount: 0,

@@ -118,7 +118,8 @@ async function applyApproveUser({ db, uid, now = () => new Date() }) {
       approvalSource: 'admin',
       previousStatus: current,
       // For the approval email, so it needs no second read.
-      account: { email: data.email ?? null, displayName: data.displayName ?? '' },
+      account: { email: data.email ?? null, displayName: data.displayName ?? '',
+        ...(data.registrationLanguage ? { registrationLanguage: data.registrationLanguage } : {}) },
     };
   });
 }
@@ -188,7 +189,7 @@ function approvedValues({ config, account, asksQuestions }) {
   const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
   const name = typeof account.displayName === 'string' ? account.displayName.trim() : '';
   return {
-    attendee_name: name || 'there',
+    attendee_name: name,
     dashboard_url: site ? `${site}/dashboard` : '',
     registration_url: site && asksQuestions ? `${site}/registration` : '',
   };
@@ -204,16 +205,20 @@ async function sendAttendeeApproved({ db, sendEmail, getConfig, uid, result, now
   if (!sendEmail || result.previousStatus === 'approved' || !result.account) return false;
   const to = typeof result.account.email === 'string' ? result.account.email.trim() : '';
   if (!to) return false;
-  const { render } = require('../email/render.cjs');
-  const { getDefaultTemplate, loadTemplate } = require('../email/templates.cjs');
+  const { attendeeLanguage } = require('../email/attendeeLanguage.cjs');
+  const { attendeeUrl, renderAttendeeTemplate } = require('../email/attendeeTemplates.cjs');
+  const { loadTemplate } = require('../email/templates.cjs');
   const { activeQuestions } = require('shared/registrationForm');
   const config = await getConfig();
+  const language = attendeeLanguage(result.account, config?.event);
   const formSnap = await db.collection('config').doc('registration_form').get();
   const asksQuestions = activeQuestions(formSnap.exists ? formSnap.data() : null).length > 0;
   const tokenValues = approvedValues({ config, account: result.account, asksQuestions });
   if (!tokenValues.dashboard_url) return false;
-  const { override } = await loadTemplate({ db, id: 'attendee.approved', now: () => now().getTime() });
-  const rendered = render({ template: getDefaultTemplate('attendee.approved'), override, tokenValues, config });
+  tokenValues.dashboard_url = attendeeUrl(tokenValues.dashboard_url, language);
+  tokenValues.registration_url = attendeeUrl(tokenValues.registration_url, language);
+  const { template, override } = await loadTemplate({ db, id: 'attendee.approved', now: () => now().getTime() });
+  const rendered = renderAttendeeTemplate({ template, override, tokenValues, config, language });
   const sent = await sendEmail({
     to,
     subject: rendered.subject,

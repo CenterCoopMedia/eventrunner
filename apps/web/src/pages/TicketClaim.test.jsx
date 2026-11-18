@@ -157,7 +157,7 @@ describe('signed out', () => {
     await screen.findByRole('heading', { name: 'Ticket claimed' });
     expect(claimRequests()).toHaveLength(1);
     const [, options] = claimRequests()[0];
-    expect(JSON.parse(options.body)).toEqual({ orderNumber: 'group-order-123' });
+    expect(JSON.parse(options.body)).toEqual({ orderNumber: 'group-order-123', lang: 'en' });
     expect(options.headers.Authorization).toBe('Bearer id-token');
   });
 
@@ -318,7 +318,7 @@ describe('signed in', () => {
     expect(screen.getByText('Your ticket is now linked to your account.')).toBeInTheDocument();
 
     const [, options] = globalThis.fetch.mock.calls[0];
-    expect(JSON.parse(options.body)).toEqual({ orderNumber: '1234' });
+    expect(JSON.parse(options.body)).toEqual({ orderNumber: '1234', lang: 'en' });
     expect(options.headers.Authorization).toBe('Bearer id-token');
   });
 

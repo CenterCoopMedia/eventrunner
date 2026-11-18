@@ -335,6 +335,18 @@ test('the registration line is left out when the form asks no questions', async 
   }
 });
 
+test('approval uses the stored locale and keeps its send-once key', async () => {
+  const db = withEmail(ONE_QUESTION, { registrationLanguage: 'es' });
+  const { res, sent } = await approveWithMail(db);
+  assert.equal(res.statusCode, 200);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].onceKey, 'attendee-approved:uid-ada');
+  assert.match(sent[0].subject, /registro para Example Summit 2027/);
+  assert.match(sent[0].html, /<html lang="es">/);
+  assert.match(sent[0].text, /https:\/\/summit\.example\.org\/registration\?lang=es/);
+  assert.equal((await approveWithMail(db)).sent.length, 0);
+});
+
 test('a failed email never fails the approval', async () => {
   const db = withEmail(ONE_QUESTION);
   const { res } = await approveWithMail(db, new Error('provider down'));

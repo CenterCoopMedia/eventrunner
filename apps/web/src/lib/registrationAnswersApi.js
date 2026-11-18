@@ -30,9 +30,11 @@ export function answerTargets({ provider, tickets, uid }) {
 }
 
 /** @returns {Promise<{ ticketId: string, answers: object, formRevision: number }>} */
-export function saveRegistrationAnswers({ user, ticketId, account, formRevision, answers }) {
+export function saveRegistrationAnswers({ user, ticketId, account, formRevision, answers, language }) {
   const target = account ? { account: true } : { ticketId };
-  return callAdminEndpoint('saveTicketAnswers', { ...target, formRevision, answers }, idTokenGetter(user));
+  return callAdminEndpoint('saveTicketAnswers', {
+    ...target, formRevision, answers, ...(language ? { lang: language } : {}),
+  }, idTokenGetter(user));
 }
 
 /**

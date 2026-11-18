@@ -276,7 +276,7 @@ describe('attendee ticket selection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $50.00' }));
     await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
     const body = ticketingRequest.mock.calls.find(([name]) => name === 'ticketingCheckout')[1].body;
-    expect(body).toEqual({ requestId: expect.any(String), catalogRevision: 1, lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
+    expect(body).toEqual({ requestId: expect.any(String), lang: 'en', catalogRevision: 1, lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
       { firstName: 'Synthetic', lastName: 'Attendee 1', email: 'attendee-1@example.test' },
       { firstName: 'Synthetic', lastName: 'Attendee 2', email: 'attendee-2@example.test' },
     ] }] });
@@ -547,7 +547,7 @@ describe('registration questions in the ticket stepper', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and accept the refund policy' }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $50.00' }));
     await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
-    expect(checkoutCalls()[0][1].body).toEqual({ requestId: expect.any(String), catalogRevision: 1, formRevision: 4, lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
+    expect(checkoutCalls()[0][1].body).toEqual({ requestId: expect.any(String), lang: 'en', catalogRevision: 1, formRevision: 4, lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
       { firstName: 'Synthetic', lastName: 'Attendee 1', email: 'attendee-1@example.test', answers: { organization: 'Synthetic Org', phone: { entered: '+1 (201) 555-0123', normalized: '+12015550123' } } },
       { firstName: 'Synthetic', lastName: 'Attendee 2', email: 'attendee-2@example.test', answers: { organization: 'Second Org', phone: { entered: '+44 20 7946 0958', normalized: '+442079460958' }, photoConsent: true } },
     ] }] });
