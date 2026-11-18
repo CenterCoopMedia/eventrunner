@@ -12,6 +12,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { stripEventMount } = require('shared/config/publicPath');
+const { hosting } = require('../../../firebase.json');
 
 const { createEmailCore, createDeliveryWebhookHandler } = require('../email/send.cjs');
 const { createConsoleProvider } = require('../email/providers/console.cjs');
@@ -215,7 +217,7 @@ async function seed(db, { people = PEOPLE, event = {} } = {}) {
   }
 }
 
-function makeConfig(db, providers = { email: { provider: 'console', messageStream: null } }) {
+function makeConfig(db, providers = { email: { provider: 'console', messageStream: null } }, publicUrl = SITE) {
   return async () => {
     const event = (await db.collection('config').doc('event').get()).data();
     return {
@@ -225,7 +227,7 @@ function makeConfig(db, providers = { email: { provider: 'console', messageStrea
         sender: { email: 'events@example.org', name: 'Example Event', replyTo: 'help@example.org' },
         legal: { postalAddressHtml: '1 Example Street', ...event.legal },
       },
-      tierA: { publicUrl: SITE },
+      tierA: { publicUrl },
       providers,
     };
   };
@@ -245,7 +247,7 @@ function consoleProvider() {
 
 const QUIET = { error() {}, warn() {}, info() {}, log() {} };
 
-async function harness({ backend, providerKind = 'console', postmarkStream, seedOptions, batchAnswer } = {}) {
+async function harness({ backend, providerKind = 'console', postmarkStream, seedOptions, batchAnswer, publicUrl } = {}) {
   const db = await backend.make();
   await seed(db, seedOptions);
   let provider;
@@ -277,7 +279,7 @@ async function harness({ backend, providerKind = 'console', postmarkStream, seed
     };
     provider = createPostmarkProvider({ env: { EMAIL_PROVIDER_API_KEY: 'token' }, fetchImpl });
   }
-  const getConfig = makeConfig(db, providers);
+  const getConfig = makeConfig(db, providers, publicUrl);
   const emailCore = createEmailCore({ db, provider, getConfig, sleep: async () => {}, log: QUIET });
   let ids = 0;
   const deps = { db, auth, getConfig, provider, emailCore, log: QUIET, newId: () => `send-${(ids += 1)}-abcdef` };
@@ -561,6 +563,48 @@ for (const backend of backends) {
   });
 
   // --- Unsubscribe -------------------------------------------------------------
+
+  t('mounted unsubscribe links and confirmation POSTs keep the event path', async () => {
+    const mount = '/events/conference';
+    const h = await harness({ backend, publicUrl: `${SITE}${mount}/` });
+    await previewAndSend(h);
+
+    const forward = (browserUrl, options) => {
+      const source = stripEventMount(browserUrl.pathname, mount);
+      assert.equal(source, '/unsubscribe');
+      assert.equal(hosting.rewrites.find((rewrite) => rewrite.source === source).function.functionId, 'emailUnsubscribe');
+      return call(h.unsubscribe, { ...options, token: null, query: Object.fromEntries(browserUrl.searchParams) });
+    };
+    const linkFor = (email) => {
+      const message = h.mail.find((mail) => mail.to === email);
+      const link = message.headers['List-Unsubscribe'].slice(1, -1);
+      assert.ok(message.html.includes(`${SITE}${mount}/unsubscribe?`));
+      assert.ok(link.startsWith(`${SITE}${mount}/unsubscribe?`));
+      return new URL(link);
+    };
+    const benLink = linkFor('ben@example.org');
+    const confirmation = await forward(benLink, { method: 'GET' });
+    assert.equal(confirmation.status, 200);
+    assert.equal(confirmation.headers['cache-control'], 'no-store');
+    assert.equal(confirmation.headers['x-robots-tag'], 'noindex');
+    assert.equal((await docsOf(h.db, 'email_suppressions')).length, 0);
+
+    const action = confirmation.body.match(/<form method="post" action="([^"]+)"/)?.[1];
+    assert.ok(action);
+    const formUrl = new URL(action.replace(/&amp;/g, '&'), benLink);
+    assert.equal(formUrl.href, benLink.href);
+    const done = await forward(formUrl, { method: 'POST' });
+    assert.equal(done.status, 200);
+    assert.equal(done.headers['cache-control'], 'no-store');
+    assert.equal(done.headers['x-robots-tag'], 'noindex');
+    const oneClick = await forward(linkFor('ada@example.org'), { method: 'POST', body: { 'List-Unsubscribe': 'One-Click' } });
+    assert.equal(oneClick.status, 200);
+    const suppressions = await docsOf(h.db, 'email_suppressions');
+    assert.deepEqual(new Map(suppressions.map(({ id, via }) => [id, via])), new Map([
+      [suppressionIdFor('ben@example.org'), 'link'],
+      [suppressionIdFor('ada@example.org'), 'one-click'],
+    ]));
+  });
 
   t('a one-click unsubscribe is recorded and every later send leaves the address out', async () => {
     const h = await harness({ backend });

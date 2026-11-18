@@ -20,6 +20,8 @@ const {
 } = require('./og.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const { isPublicPage } = require('shared/page');
+const { stripEventMount } = require('shared/config/publicPath');
+const { hosting } = require('../../../firebase.json');
 
 const TEMPLATE = [
   '<!doctype html>',
@@ -145,8 +147,8 @@ test('fetchTemplate: self-fetches index.html from the public URL and caches per 
     assert.equal(url, 'https://example.org/index.html');
     return { ok: true, text: async () => TEMPLATE };
   };
-  const first = await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 1000 });
-  const second = await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 1500 });
+  const first = await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 1000 });
+  const second = await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 1500 });
   assert.equal(first, TEMPLATE);
   assert.equal(second, TEMPLATE);
   assert.equal(calls, 1); // second call served from cache
@@ -157,11 +159,11 @@ test('fetchTemplate: past the floor it re-fetches; forceRefresh skips the floor 
   let calls = 0;
   const fetchImpl = async () => { calls += 1; return { ok: true, text: async () => `v${calls}` }; };
 
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 0 });
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 30 * 1000 }); // past the floor
+  await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 0 });
+  await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 30 * 1000 }); // past the floor
   assert.equal(calls, 2);
 
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 30 * 1000, forceRefresh: true });
+  await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 30 * 1000, forceRefresh: true });
   assert.equal(calls, 3);
 });
 
@@ -178,7 +180,7 @@ test('fetchTemplate: a burst inside the floor makes exactly one request', async 
   resetTemplateCacheForTest();
   let calls = 0;
   const fetchImpl = async () => { calls += 1; return etagRes('"v1"', 'FIRST'); };
-  const at = (t) => fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => t });
+  const at = (t) => fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => t });
 
   assert.equal(await at(0), 'FIRST');
   for (const t of [1, 100, 5000, TEMPLATE_REVALIDATE_FLOOR_MS - 1]) {
@@ -198,7 +200,7 @@ test('fetchTemplate: revalidates with If-None-Match, and a 304 keeps the body an
       ? etagRes('"v1"', 'FIRST')
       : { ok: false, status: 304, headers: { get: () => null }, text: async () => '' };
   };
-  const at = (t) => fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => t });
+  const at = (t) => fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => t });
 
   assert.equal(await at(0), 'FIRST');
   assert.equal(await at(TEMPLATE_REVALIDATE_FLOOR_MS + 1), 'FIRST'); // 304, body reused
@@ -217,14 +219,14 @@ test('fetchTemplate: a 200 replaces the held template — this is how a deploy i
     calls += 1;
     return calls === 1 ? etagRes('"v1"', 'OLD BUILD') : etagRes('"v2"', 'NEW BUILD');
   };
-  const at = (t) => fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => t });
+  const at = (t) => fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => t });
 
   assert.equal(await at(0), 'OLD BUILD');
   assert.equal(await at(TEMPLATE_REVALIDATE_FLOOR_MS + 1), 'NEW BUILD');
   // The new ETag is the one sent from here on.
   let lastSent = null;
   const capture = async (url, init) => { lastSent = init?.headers?.['If-None-Match'] ?? null; return etagRes('"v2"', 'NEW BUILD'); };
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl: capture, now: () => 60 * 1000 });
+  await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl: capture, now: () => 60 * 1000 });
   assert.equal(lastSent, '"v2"');
 });
 
@@ -235,8 +237,8 @@ test('fetchTemplate: a non-ok response serves the held template rather than fail
     calls += 1;
     return calls === 1 ? etagRes('"v1"', 'HELD') : { ok: false, status: 503, headers: { get: () => null }, text: async () => '' };
   };
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 0 });
-  const served = await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 60 * 1000 });
+  await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 0 });
+  const served = await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 60 * 1000 });
   assert.equal(served, 'HELD');
 });
 
@@ -248,19 +250,19 @@ test('fetchTemplate: a network failure serves the held template too', async () =
     if (calls === 1) return etagRes('"v1"', 'HELD');
     throw new Error('ECONNRESET');
   };
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 0 });
-  assert.equal(await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl, now: () => 60 * 1000 }), 'HELD');
+  await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 0 });
+  assert.equal(await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl, now: () => 60 * 1000 }), 'HELD');
 });
 
 test('fetchTemplate: with nothing ever fetched, a non-ok response and a network failure both throw', async () => {
   resetTemplateCacheForTest();
   await assert.rejects(() => fetchTemplate({
-    publicUrl: 'https://example.org',
+    publicBase: 'https://example.org/',
     fetchImpl: async () => ({ ok: false, status: 503, text: async () => '' }),
   }));
   resetTemplateCacheForTest();
   await assert.rejects(() => fetchTemplate({
-    publicUrl: 'https://example.org',
+    publicBase: 'https://example.org/',
     fetchImpl: async () => { throw new Error('ECONNRESET'); },
   }));
 });
@@ -268,7 +270,7 @@ test('fetchTemplate: with nothing ever fetched, a non-ok response and a network 
 test('lastKnownTemplate: reports what the container holds, and nothing after a reset', async () => {
   resetTemplateCacheForTest();
   assert.equal(lastKnownTemplate(), null);
-  await fetchTemplate({ publicUrl: 'https://example.org', fetchImpl: async () => etagRes('"v1"', 'HELD') });
+  await fetchTemplate({ publicBase: 'https://example.org/', fetchImpl: async () => etagRes('"v1"', 'HELD') });
   assert.equal(lastKnownTemplate(), 'HELD');
   resetTemplateCacheForTest();
   assert.equal(lastKnownTemplate(), null);
@@ -282,6 +284,7 @@ test('requestedUpdateId: reads /updates/:id from the path or ?id= from the query
   assert.equal(requestedUpdateId({ path: '/updates', query: { id: 'from-query' } }), 'from-query');
   assert.equal(requestedUpdateId({ path: '/updates' }), null);
   assert.equal(requestedUpdateId({ path: '/' }), null);
+  assert.equal(requestedUpdateId({ path: '/other/updates/post' }), null);
 });
 
 test('requestedUpdateId: an id that cannot be a document id reads as no id', () => {
@@ -565,6 +568,76 @@ async function getRoute(handler, path) {
   await handler({ method: 'GET', path, query: {} }, res);
   return res;
 }
+
+test('mounted Hosting routes resolve app paths and publish public URLs with one mount', async () => {
+  // A mount that also names an app route catches accidental stripping inside
+  // Hosting or the function, after the client router already did it.
+  const mount = '/schedule';
+  const publicBase = `https://example.org${mount}/`;
+  const tierA = { publicUrl: publicBase };
+  const event = { ...SITE_EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const config = siteConfig({ event, tierA, features: { schedule: true, updates: true } });
+  const db = makeFakeDb({
+    ...SITE_DOCS,
+    'cmsPages/travel': { ...SITE_DOCS['cmsPages/travel'], translations: { es: { label: 'Viaje y sede' } } },
+    'cmsUpdates/news': { title: 'Mounted news', body: 'A public update.', visible: true },
+  });
+  const fetched = [];
+  const deps = {
+    db,
+    getConfig: async () => config,
+    fetchTemplateFn: (args) => fetchTemplate({
+      ...args,
+      fetchImpl: async (url) => {
+        fetched.push(url);
+        assert.equal(stripEventMount(new URL(url).pathname, mount), '/index.html');
+        return etagRes('"mounted"', TEMPLATE);
+      },
+    }),
+  };
+  resetTemplateCacheForTest();
+  try {
+    const routeMeta = createRouteMetaHandler(deps);
+    const updatesMeta = createUpdatesMetaHandler(deps);
+    const request = (handler, browserPath) => getRoute(handler, stripEventMount(browserPath, mount));
+
+    for (const [handler, path, title, query = ''] of [
+      [routeMeta, '/', SITE_EVENT.name],
+      [routeMeta, '/schedule/s-101', 'Opening remarks'],
+      [routeMeta, '/travel', 'Travel and venue', '?lang=en'],
+      [updatesMeta, '/updates/news', 'Mounted news'],
+    ]) {
+      const res = await request(handler, `${mount}${path}`);
+      const canonical = `https://example.org${mount}${path}${query}`;
+      assert.equal(res.statusCode, 200);
+      assert.ok(res.sent.includes(title));
+      assert.ok(res.sent.includes(`<link rel="canonical" href="${canonical}">`));
+      assert.ok(res.sent.includes(`<meta property="og:url" content="${canonical}">`));
+      if (query) {
+        assert.ok(res.sent.includes(`<link rel="alternate" hreflang="es" href="${publicBase}travel?lang=es">`));
+      }
+      if (handler === routeMeta) {
+        const json = res.sent.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)?.[1];
+        assert.equal(JSON.parse(json).url, publicBase);
+        assert.ok(res.sent.includes(`content="${publicBase}branding/og-default.png"`));
+        assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
+      }
+    }
+
+    const privatePath = stripEventMount(`${mount}/admin`, mount);
+    assert.deepEqual(hosting.rewrites.find(({ source }) => source === privatePath), {
+      source: '/admin', destination: '/index.html',
+    });
+    assert.deepEqual(Object.fromEntries(hosting.headers.find(({ source }) => source === privatePath).headers
+      .map(({ key, value }) => [key, value])), { 'X-Robots-Tag': 'noindex', 'Cache-Control': ROUTE_CACHE_CONTROL });
+    const shell = await request(routeMeta, `${mount}/admin`);
+    assert.match(shell.sent, /<meta name="robots" content="noindex">/);
+    assert.doesNotMatch(shell.sent, /rel="canonical"/);
+    assert.deepEqual(fetched, [`${publicBase}index.html`]);
+  } finally {
+    resetTemplateCacheForTest();
+  }
+});
 
 test('routeMeta: direct language URLs use approved page and session text and reciprocal canonicals', async () => {
   const event = { ...SITE_EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
@@ -867,17 +940,17 @@ test('buildEventJsonLd: a day with no times at all stays a plain date', () => {
 
 test('brandingObjectUrl: a flat branding path resolves against the site, an uploaded one against the bucket', () => {
   assert.equal(
-    brandingObjectUrl('branding/og-default.svg', { base: 'https://example.org', bucket: 'b' }),
+    brandingObjectUrl('branding/og-default.svg', { publicBase: 'https://example.org/', bucket: 'b' }),
     'https://example.org/branding/og-default.svg',
   );
   assert.ok(
-    brandingObjectUrl('branding/abc123/card.png', { base: 'https://example.org', bucket: 'b' })
+    brandingObjectUrl('branding/abc123/card.png', { publicBase: 'https://example.org/', bucket: 'b' })
       .startsWith('https://firebasestorage.googleapis.com/v0/b/b/o/'),
   );
-  assert.equal(brandingObjectUrl('branding/abc123/card.png', { base: 'https://example.org', bucket: null }), null);
-  assert.equal(brandingObjectUrl('/branding/x.svg', { base: 'https://example.org', bucket: 'b' }), null);
-  assert.equal(brandingObjectUrl('', { base: 'https://example.org', bucket: 'b' }), null);
-  assert.equal(brandingObjectUrl(null, { base: 'https://example.org', bucket: 'b' }), null);
+  assert.equal(brandingObjectUrl('branding/abc123/card.png', { publicBase: 'https://example.org/', bucket: null }), null);
+  assert.equal(brandingObjectUrl('/branding/x.svg', { publicBase: 'https://example.org/', bucket: 'b' }), null);
+  assert.equal(brandingObjectUrl('', { publicBase: 'https://example.org/', bucket: 'b' }), null);
+  assert.equal(brandingObjectUrl(null, { publicBase: 'https://example.org/', bucket: 'b' }), null);
 });
 
 test('imageTypeFor: names the type a crawler will meet, and nothing for a shape it will not decode', () => {
@@ -893,7 +966,7 @@ test('imageTypeFor: names the type a crawler will meet, and nothing for a shape 
 });
 
 test('resolveCardImage: an operator PNG wins; an SVG anywhere falls through to the bundled raster', () => {
-  const base = 'https://example.org';
+  const publicBase = 'https://example.org/';
   const bucket = 'fixture-bucket.appspot.com';
 
   const uploaded = resolveCardImage({
@@ -901,7 +974,7 @@ test('resolveCardImage: an operator PNG wins; an SVG anywhere falls through to t
       theme: { logos: { ogDefault: 'branding/abc123/card.png' } },
       tierA: { storageBucket: bucket },
     },
-    base,
+    publicBase,
   });
   assert.ok(uploaded.url.startsWith('https://firebasestorage.googleapis.com/'));
   assert.equal(uploaded.type, 'image/png');
@@ -917,7 +990,7 @@ test('resolveCardImage: an operator PNG wins; an SVG anywhere falls through to t
       event: { seo: { defaultOgImagePath: 'branding/og-default.svg' } },
       tierA: { storageBucket: bucket },
     },
-    base,
+    publicBase,
   });
   assert.deepEqual(seeded, {
     url: 'https://example.org/branding/og-default.png',
@@ -927,7 +1000,7 @@ test('resolveCardImage: an operator PNG wins; an SVG anywhere falls through to t
   });
   assert.equal(seeded.url.endsWith(DEFAULT_CARD_IMAGE.path), true);
 
-  const bare = resolveCardImage({ config: {}, base });
+  const bare = resolveCardImage({ config: {}, publicBase });
   assert.equal(bare.url, 'https://example.org/branding/og-default.png');
 });
 
@@ -1159,7 +1232,7 @@ test('resolveRouteMeta: the shell falls back to the event, never to an empty tit
     config: siteConfig({ event: { name: '  ' } }),
     subject: null,
     path: '/nope',
-    base: 'https://example.org',
+    address: { publicBase: 'https://example.org/', origin: 'https://example.org', mount: '' },
   });
   assert.equal(meta.title, 'Event site');
   assert.equal(meta.noindex, true);
@@ -1171,7 +1244,7 @@ test('resolveRouteMeta: the shell falls back to the event, never to an empty tit
 test('fetchTemplate: a stalled hosting connection aborts and serves the held copy', async () => {
   resetTemplateCacheForTest();
   await fetchTemplate({
-    publicUrl: 'https://example.org',
+    publicBase: 'https://example.org/',
     fetchImpl: async () => etagRes('"v1"', 'HELD'),
     now: () => 0,
   });
@@ -1196,7 +1269,7 @@ test('fetchTemplate: a stalled hosting connection aborts and serves the held cop
 
   const startedAt = Date.now();
   const served = await fetchTemplate({
-    publicUrl: 'https://example.org',
+    publicBase: 'https://example.org/',
     fetchImpl: stalled,
     now: () => 60 * 1000,
     timeoutMs: 25,
@@ -1217,7 +1290,7 @@ test('fetchTemplate: a stall with nothing ever fetched throws rather than hangin
     });
   });
   await assert.rejects(() => fetchTemplate({
-    publicUrl: 'https://example.org',
+    publicBase: 'https://example.org/',
     fetchImpl: stalled,
     timeoutMs: 25,
   }));
@@ -1227,7 +1300,7 @@ test('fetchTemplate: the deadline defaults to the named constant, not to nothing
   resetTemplateCacheForTest();
   let timedOut = null;
   await fetchTemplate({
-    publicUrl: 'https://example.org',
+    publicBase: 'https://example.org/',
     fetchImpl: async (url, init) => {
       timedOut = init.signal;
       return etagRes('"v1"', 'HELD');

@@ -64,6 +64,8 @@ const { pathToFileURL } = require('node:url');
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { contentLanguages } = require('shared/contentLanguages');
+const { parseEventPublicBase } = require('shared/config/publicBase');
+const { stripEventMount } = require('shared/config/publicPath');
 const { buildSiteArtifacts, buildWebManifest } = require('./lib/site-manifest.cjs');
 const { writeAppIcons } = require('./lib/app-icons.cjs');
 
@@ -103,15 +105,15 @@ const EXCLUDED_ROUTE_REASONS = Object.freeze({
  * Refuse a sitemap that lists a review-only route.
  *
  * @param {string} sitemapXml
- * @param {string[]} [routes]
+ * @param {string} [mount]
  * @returns {string[]} the offending routes, empty when the sitemap is clean
  */
-function excludedRoutesFound(sitemapXml, routes = NEVER_IN_SITEMAP) {
-  const text = String(sitemapXml ?? '');
-  return routes.filter((route) => {
-    const inLoc = new RegExp(`<loc>[^<]*${route}(?:/[^<]*)?</loc>`, 'u');
-    return inLoc.test(text);
-  });
+function excludedRoutesFound(sitemapXml, mount = '') {
+  const appPaths = Array.from(sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/gu), ([, location]) => {
+    const url = URL.parse(location);
+    return url && stripEventMount(url.pathname, mount);
+  }).filter(Boolean);
+  return NEVER_IN_SITEMAP.filter((route) => appPaths.some((path) => path === route || path.startsWith(`${route}/`)));
 }
 
 /**
@@ -265,14 +267,16 @@ async function main(argv, { importModule = importGenerated, log = console, fetch
   }
 
   let artifacts;
+  let mount;
   try {
+    ({ mount } = parseEventPublicBase(parsed['public-url']));
     artifacts = buildSiteArtifacts({ ...snapshot, publicUrl: parsed['public-url'], hashRouter });
   } catch (err) {
     log.error(`write-site-files: ${err.message}`);
     return 4;
   }
 
-  const listed = excludedRoutesFound(artifacts.sitemapXml);
+  const listed = excludedRoutesFound(artifacts.sitemapXml, mount);
   if (listed.length > 0) {
     log.error(`write-site-files: ${excludedRouteMessage(listed, snapshot.pages)}`);
     return 4;

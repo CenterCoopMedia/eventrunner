@@ -1,5 +1,8 @@
 'use strict';
 
+const { parseEventPublicBase } = require('shared/config/publicBase');
+const { joinEventPath } = require('shared/config/publicPath');
+
 /**
  * The two server-rendered metadata functions. `updatesMeta` (below) covers
  * `/updates/**`; `routeMeta` (further down, M7 issue 4) covers every other
@@ -98,7 +101,7 @@ function lastKnownTemplate() {
  * `forceRefresh` skips both the floor and the conditional request (used by
  * tests, and available to an operator debugging a stale-template report).
  *
- * @param {{ publicUrl: string, now?: () => number, forceRefresh?: boolean,
+ * @param {{ publicBase: string, now?: () => number, forceRefresh?: boolean,
  *           fetchImpl?: typeof fetch }} args
  * @returns {Promise<string>}
  * @throws only when nothing has ever been fetched — a first request that
@@ -106,7 +109,7 @@ function lastKnownTemplate() {
  *   one
  */
 async function fetchTemplate({
-  publicUrl,
+  publicBase,
   now = Date.now,
   forceRefresh = false,
   fetchImpl = fetch,
@@ -115,7 +118,6 @@ async function fetchTemplate({
   if (!forceRefresh && templateCache && now() - templateCache.loadedAt < TEMPLATE_REVALIDATE_FLOOR_MS) {
     return templateCache.html;
   }
-  const base = typeof publicUrl === 'string' ? publicUrl.replace(/\/+$/, '') : '';
   const conditional = !forceRefresh && templateCache && isNonEmptyString(templateCache.etag);
   const init = {
     // A connection that stalls rather than fails is the worst case here: a
@@ -129,7 +131,7 @@ async function fetchTemplate({
 
   let res;
   try {
-    res = await fetchImpl(`${base}/index.html`, init);
+    res = await fetchImpl(joinEventPath(publicBase, '/index.html'), init);
   } catch (err) {
     // Includes the abort above: a stalled hosting connection is a failed
     // one as far as this function is concerned.
@@ -262,7 +264,7 @@ function buildOgHtml({ template, meta }) {
 
 /** Update id from the request: `/updates/:id` path, or `?id=`. */
 function requestedUpdateId(req) {
-  const pathMatch = typeof req.path === 'string' ? req.path.match(/\/updates\/([^/?#]+)/) : null;
+  const pathMatch = typeof req.path === 'string' ? req.path.match(/^\/updates\/([^/?#]+)/) : null;
   let id = req.query?.id;
   if (pathMatch) {
     try {
@@ -316,8 +318,8 @@ function createUpdatesMetaHandler({
         return notFound(res, 'Updates are not enabled for this event.');
       }
 
-      const publicUrl = config?.tierA?.publicUrl;
-      if (!isNonEmptyString(publicUrl)) {
+      const { publicBase, origin, mount } = parseEventPublicBase(config?.tierA?.publicUrl ?? undefined);
+      if (!publicBase) {
         return internal(res, 'The site is not configured with a public URL.');
       }
 
@@ -333,14 +335,14 @@ function createUpdatesMetaHandler({
         if (snap.exists && snap.data()?.visible === true) update = snap.data();
       }
 
-      const base = publicUrl.replace(/\/+$/, '');
-      const path = id ? `/updates/${encodeURIComponent(id)}` : '';
+      const path = id ? `/updates/${encodeURIComponent(id)}` : '/';
       const urls = publicRouteUrls(path, update, 'update', config.event);
-      const meta = resolveMeta({ event: config.event, update, canonicalUrl: `${base}${urls.en}` });
+      const canonicalUrl = !id && !mount ? origin : joinEventPath(publicBase, urls.en);
+      const meta = resolveMeta({ event: config.event, update, canonicalUrl });
       meta.language = selectContentLanguage(config.event, requestedContentLanguage(req));
       meta.canonical = Boolean(update);
 
-      const template = await fetchTemplateFn({ publicUrl, now });
+      const template = await fetchTemplateFn({ publicBase, now });
       const html = buildOgHtml({ template, meta });
 
       res.status(200);
@@ -428,6 +430,9 @@ function routeMetaRuntimeOptions(region) {
 /**
  * The route path a request names, normalized: no query, no fragment, no
  * repeated or trailing separators, each segment percent-decoded.
+ *
+ * Hosting receives the app-relative path after the client router strips the
+ * mount. An app route can begin with the same segment as the mount.
  *
  * Case is preserved. A `cmsSchedule` doc id may carry capitals, and a page
  * `path` is matched exactly against the stored value.
@@ -576,10 +581,10 @@ async function readRouteSpanishSections({ db, event, path, subject }) {
  * and no image tag is written at all.
  *
  * @param {unknown} value
- * @param {{ base: string, bucket: string|null }} args
+ * @param {{ publicBase: string|null, bucket: string|null }} args
  * @returns {string|null}
  */
-function brandingObjectUrl(value, { base, bucket }) {
+function brandingObjectUrl(value, { publicBase, bucket }) {
   if (typeof value !== 'string') return null;
   const path = value.trim();
   if (path.length === 0) return null;
@@ -589,7 +594,7 @@ function brandingObjectUrl(value, { base, bucket }) {
       ? `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(path)}?alt=media`
       : null;
   }
-  return `${base}/${path}`;
+  return joinEventPath(publicBase ?? '/', `/${path}`);
 }
 
 /**
@@ -633,20 +638,20 @@ function imageTypeFor(objectPath) {
  * An operator who uploads a PNG or a JPEG gets theirs, and its dimensions
  * are left unstated because nothing here has measured it.
  *
- * @param {{ config: object, base: string }} args
+ * @param {{ config: object, publicBase: string|null }} args
  * @returns {{ url: string, type: string|null, width: number|null, height: number|null }|null}
  */
-function resolveCardImage({ config, base }) {
+function resolveCardImage({ config, publicBase }) {
   const bucket = config?.tierA?.storageBucket || null;
   const candidates = [config?.theme?.logos?.ogDefault, config?.event?.seo?.defaultOgImagePath];
   for (const candidate of candidates) {
     if (!isNonEmptyString(candidate)) continue;
     const type = imageTypeFor(candidate);
     if (type === null) continue; // an SVG, or a shape no crawler decodes
-    const url = brandingObjectUrl(candidate, { base, bucket });
+    const url = brandingObjectUrl(candidate, { publicBase, bucket });
     if (url) return { url, type, width: null, height: null };
   }
-  const url = brandingObjectUrl(DEFAULT_CARD_IMAGE.path, { base, bucket });
+  const url = brandingObjectUrl(DEFAULT_CARD_IMAGE.path, { publicBase, bucket });
   return url
     ? {
       url,
@@ -817,15 +822,16 @@ function speakerName(speaker) {
  * itself failed. That route keeps the plain shell but is NOT marked
  * noindex — a Firestore outage must not deindex a site.
  *
- * @param {{ config: object, subject: object|null, path: string, base: string,
+ * @param {{ config: object, subject: object|null, path: string, address?: ReturnType<typeof parseEventPublicBase>,
  *           requestedLanguage?: unknown, spanishSections?: Set<string>, degraded?: boolean }} args
  */
-function resolveRouteMeta({ config, subject, path, base, requestedLanguage, spanishSections, degraded = false }) {
+function resolveRouteMeta({ config, subject, path, address, requestedLanguage, spanishSections, degraded = false }) {
   const event = (config && config.event) || null;
   const language = selectContentLanguage(event, requestedLanguage);
   const siteName = isNonEmptyString(event?.name) ? event.name.trim() : 'Event site';
   const eventDescription = eventMetaDescription(event);
-  const image = resolveCardImage({ config, base });
+  const { publicBase, origin, mount } = address ?? {};
+  const image = resolveCardImage({ config, publicBase });
   const shell = {
     title: siteName,
     description: eventDescription,
@@ -846,12 +852,12 @@ function resolveRouteMeta({ config, subject, path, base, requestedLanguage, span
   const urls = publicRouteUrls(canonicalPath, subject.doc, subject.kind, event, spanishSections);
   const described = {
     ...shell,
-    url: `${base}${urls[language] ?? urls.en}`,
+    url: joinEventPath(publicBase, urls[language] ?? urls.en),
     alternates: urls.es
-      ? Object.entries(urls).map(([locale, href]) => ({ locale, href: `${base}${href}` }))
+      ? Object.entries(urls).map(([locale, href]) => ({ locale, href: joinEventPath(publicBase, href) }))
       : [],
     noindex: false,
-    jsonLd: buildEventJsonLd({ event, url: base, imageUrl: image ? image.url : null }),
+    jsonLd: buildEventJsonLd({ event, url: mount ? publicBase : origin, imageUrl: image ? image.url : null }),
   };
 
   if (subject.kind === 'session') {
@@ -991,26 +997,25 @@ function createRouteMetaHandler({
       // records that a route WOULD have had tags, so it is not marked
       // noindex the way a route that genuinely does not exist is.
       let config = null;
+      let address;
       let degraded = false;
       try {
         config = await getConfig();
+        address = parseEventPublicBase(config?.tierA?.publicUrl ?? undefined);
+        if (!address.publicBase) throw new Error('A public URL is required');
       } catch (err) {
         degraded = true;
         log.error('routeMeta could not read the configuration', err);
       }
 
-      const publicUrl = config?.tierA?.publicUrl;
-      const base = isNonEmptyString(publicUrl) ? publicUrl.replace(/\/+$/, '') : '';
+      const publicBase = address?.publicBase;
       let template = null;
-      if (isNonEmptyString(publicUrl)) {
+      if (publicBase) {
         try {
-          template = await fetchTemplateFn({ publicUrl, now });
+          template = await fetchTemplateFn({ publicBase, now });
         } catch (err) {
           log.error('routeMeta could not fetch the template', err);
         }
-      } else if (!degraded) {
-        degraded = true;
-        log.error('routeMeta has no configured public URL');
       }
       // Whatever this container last held, including across a failed
       // config read that left no URL to fetch with.
@@ -1023,7 +1028,7 @@ function createRouteMetaHandler({
 
       const path = requestedRoutePath(req);
       let subject = null;
-      if (config && base) {
+      if (config && publicBase) {
         try {
           subject = await resolveRouteSubject({ db, config, path });
         } catch (err) {
@@ -1035,7 +1040,7 @@ function createRouteMetaHandler({
       const spanishSections = await readRouteSpanishSections({ db, event: config?.event, path, subject })
         .catch((err) => { log.error('routeMeta could not resolve translated page blocks', err); });
       const meta = resolveRouteMeta({
-        config, subject, path, base, requestedLanguage: requestedContentLanguage(req), spanishSections, degraded,
+        config, subject, path, address, requestedLanguage: requestedContentLanguage(req), spanishSections, degraded,
       });
       res.status(200);
       res.set('Content-Type', 'text/html; charset=utf-8');

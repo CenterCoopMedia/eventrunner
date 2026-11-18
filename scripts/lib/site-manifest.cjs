@@ -26,6 +26,8 @@
 const { configuredThemeColor } = require('./shared-theme.cjs');
 const { assertNoPitchPageCollisions } = require('./pitch-route-check.cjs');
 const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
+const { parseEventPublicBase } = require('shared/config/publicBase');
+const { joinEventPath } = require('shared/config/publicPath');
 const { isPublicPage, pageFeatureGate } = require('shared/page');
 const { publicRouteUrls, publishedSpanishSections } = require('shared/contentLanguages');
 const { APP_ICON_SIZES, appIconPath } = require('./app-icons.cjs');
@@ -343,35 +345,6 @@ function collectPublicRoutes({ pages, features, sessions, speakers, organization
 }
 
 /**
- * The configured public URL, normalized to `origin + pathname` with no
- * trailing slash, tolerant of surrounding whitespace.
- *
- * `EVENT_PUBLIC_URL` is trimmed only FOR VALIDATION by `validateDeployEnv`
- * (packages/shared/src/config/deploy.cjs) — the raw, possibly padded value
- * is what callers actually receive back — so this has to trim it again
- * itself rather than trust it arrives clean. Routing the value through
- * `new URL` also drops a query string or hash a misconfigured value might
- * carry, neither of which belongs in a sitemap or robots.txt base.
- *
- * @param {string} publicUrl
- * @returns {string}
- */
-function normalizedBaseUrl(publicUrl) {
-  if (typeof publicUrl !== 'string') return '';
-  const trimmed = publicUrl.trim();
-  if (!trimmed) return '';
-  try {
-    const url = new URL(trimmed);
-    return `${url.origin}${url.pathname}`.replace(/\/+$/, '');
-  } catch {
-    // Not a parseable URL at all — fall back to the plain trim-and-strip
-    // this function always did, rather than silently emptying every
-    // artifact's base over a value `validateDeployEnv` already accepted.
-    return trimmed.replace(/\/+$/, '');
-  }
-}
-
-/**
  * Percent-encode a route path one segment at a time, so a session id,
  * speaker slug, or update id containing a space, `&`, or a non-ASCII
  * character produces a valid URL instead of a broken or double-escaped
@@ -414,7 +387,8 @@ function buildSitemapXml({
   publicUrl, event, pages, features, sessions = [], speakers = [], organizations = [], updates = [], blocks = [],
 }) {
   assertNoPitchPageCollisions(pages);
-  const base = normalizedBaseUrl(publicUrl);
+  const { publicBase } = parseEventPublicBase(publicUrl);
+  if (!publicBase) throw new Error('A public URL is required for the sitemap.');
   const publicRoutes = collectPublicRoutes({
     pages, features, sessions, speakers, organizations, updates,
   });
@@ -423,7 +397,7 @@ function buildSitemapXml({
   let hasAlternates = false;
   const urls = sorted.flatMap((route) => {
     const versions = publicRouteUrls(encodeRoutePath(route.path), route.doc, route.kind, event, spanishSections);
-    const locations = Object.entries(versions).map(([language, path]) => [language, escapeXml(`${base}${path}`)]);
+    const locations = Object.entries(versions).map(([language, path]) => [language, escapeXml(joinEventPath(publicBase, path))]);
     const alternateLinks = [];
     if (versions.es) {
       hasAlternates = true;
@@ -466,17 +440,23 @@ function buildSitemapXml({
  * the exact URL that matters through. These two get the plain, unanchored
  * prefix rule instead, which covers the bare path, the token form, and
  * anything else under it in one line.
+ *
+ * For a mounted event, the shared host owner combines the Disallow lines
+ * into its wildcard group at the origin-root /robots.txt and includes the
+ * event's Sitemap line. The fragment leaves host-wide Allow rules to that owner.
  */
 function buildRobotsTxt({ publicUrl, pages, features }) {
-  const base = normalizedBaseUrl(publicUrl);
+  const { publicBase, mount, assetBase } = parseEventPublicBase(publicUrl);
+  if (!publicBase) throw new Error('A public URL is required for robots.txt.');
   const { excluded } = classifyPages({ pages, features });
   const disallowLines = new Set();
   for (const route of excluded) {
-    disallowLines.add(route.tokenBearing ? `Disallow: ${route.path}` : `Disallow: ${route.path}$`);
-    if (route.hasChildren) disallowLines.add(`Disallow: ${route.path}/*`);
+    const path = joinEventPath(assetBase, route.path);
+    disallowLines.add(route.tokenBearing ? `Disallow: ${path}` : `Disallow: ${path}$`);
+    if (route.hasChildren) disallowLines.add(`Disallow: ${path}/*`);
   }
-  const lines = ['User-agent: *', 'Allow: /', ...[...disallowLines].sort()];
-  lines.push('', `Sitemap: ${base}/sitemap.xml`, '');
+  const lines = ['User-agent: *', ...(mount ? [] : ['Allow: /']), ...[...disallowLines].sort()];
+  lines.push('', `Sitemap: ${joinEventPath(publicBase, '/sitemap.xml')}`, '');
   return lines.join('\n');
 }
 
@@ -582,6 +562,6 @@ module.exports = {
   buildWebManifest,
   buildSiteArtifacts,
   internals: {
-    escapeXml, normalizedBaseUrl, routeAccess, encodeRoutePath,
+    escapeXml, routeAccess, encodeRoutePath,
   },
 };
