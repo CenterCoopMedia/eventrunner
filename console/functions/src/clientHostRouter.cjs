@@ -190,7 +190,7 @@ function createClientHostRouter({ loadHost, handleHostRequest = () => null, fetc
       phase = 'hosting-fetch';
       return await forwardEvent(request, `${path}${query}`, route, host.routes, fetchUpstream, fail);
     } catch {
-      return fail(phase);
+      return request.signal.aborted ? unavailable(method) : fail(phase);
     }
   };
 }

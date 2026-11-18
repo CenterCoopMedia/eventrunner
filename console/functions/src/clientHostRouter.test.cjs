@@ -204,8 +204,10 @@ test('bad redirects, origin-to-public loops and failed upstreams do not reach a 
   assert.deepEqual(loop.calls.map(({ url }) => url), [`${conference}/one`, `${conference}/two`]);
 
   const failed = setup((url) => {
-    if (url === `${conference}/throw`) throw new Error('synthetic network failure');
-    return url.startsWith(conference) ? new Response('upstream detail', { status: 502 }) : new Response('sibling');
+    const { origin: upstream, pathname } = new URL(url);
+    if (upstream !== conference) return new Response('sibling');
+    if (pathname === '/throw') throw new Error('synthetic network failure');
+    return new Response('upstream detail', { status: 502 });
   });
   assert.equal((await failed.request('/conference/throw?sig=fixture-private')).status, 503);
   const retry = await failed.request('/conference/');
