@@ -143,7 +143,7 @@ export default function ScrollReset() {
       lastRun.current = { key, pathname, samePage: lastRun.current.pathname === pathname };
     }
     const { samePage } = lastRun.current;
-    if (samePage && state?.languageSwitch && navigationType !== 'POP') return undefined;
+    if (samePage && state?.languageSwitch && navigationType === 'PUSH') return undefined;
     const id = fragmentId(hash);
 
     /**

@@ -43,7 +43,10 @@ test.beforeAll(async () => {
   create('cmsPages', 'language-test', {
     path: route, label: 'Language test', title: 'Event information',
     translations: { es: { label: 'Información', title: 'Información del evento' } },
-    sections: [{ id: 'language-links', label: 'Links', translations: { es: { label: 'Enlaces' } } }],
+    sections: [{
+      id: 'language-links', label: 'Links', description: 'Editor guidance for placing links.',
+      translations: { es: { label: 'Enlaces', description: 'Orientación para editar enlaces.' } },
+    }],
   });
   const block = (field, blockType, order, data) => create('cmsContent', `language-links__${field}`,
     { section: 'language-links', field, blockType, order, ...data });
@@ -55,6 +58,8 @@ test.beforeAll(async () => {
   });
   block('first', 'list_item', 3, { text: 'First note', translations: { es: { text: 'Primera nota' } } });
   block('second', 'list_item', 4, { text: 'Second note' });
+  block('quote-first', 'quote', 5, { text: 'A map is a place to start.', translations: { es: { text: 'Un mapa es un punto de partida.' } } });
+  block('quote-second', 'quote', 6, { text: 'Every street has a story.' });
   const baseSession = { dayId, type: 'Workshop', startTime: session.startTime, endTime: session.endTime, location: session.room };
   create('cmsSchedule', session.id, {
     ...baseSession, title: session.title, description: session.description, translations: { es: { title: session.titleEs } },
@@ -136,6 +141,9 @@ test('the hosted phone and desktop reader marks mixed language and retains keybo
     await expect(page).toHaveTitle(/Información del evento/);
     await expect(page.getByRole('listitem').filter({ hasText: 'Primera nota' })).toHaveAttribute('lang', 'es');
     await expect(page.getByRole('listitem').filter({ hasText: 'Second note' })).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('blockquote').filter({ hasText: 'Un mapa es un punto de partida.' })).toHaveAttribute('lang', 'es');
+    await expect(page.getByRole('blockquote').filter({ hasText: 'Every street has a story.' })).toHaveAttribute('lang', 'en');
+    await expect(page.getByText(/Orientación para editar enlaces|Editor guidance for placing links/)).toHaveCount(0);
     const header = await page.getByRole('banner').ariaSnapshot();
     expect(header).toContain('button "Español" [pressed]');
     expect(header).toContain('group "Idioma del sitio"');
@@ -162,6 +170,9 @@ test('the hosted phone and desktop reader marks mixed language and retains keybo
 });
 
 test('session units fall back together and live removal takes effect while the page is open', async ({ page }) => {
+  await page.goto('/schedule?lang=es');
+  await expect(page.getByRole('heading', { name: session.title, level: 3 })).toHaveAttribute('lang', 'en');
+  await expect(page.getByRole('heading', { name: 'Clínica de mapas', level: 3 })).toHaveAttribute('lang', 'es');
   await page.goto(`/schedule/${session.id}?lang=es&preview=1`);
   const heading = page.getByRole('heading', { name: session.title, level: 1 });
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');

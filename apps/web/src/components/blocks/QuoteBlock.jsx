@@ -18,10 +18,10 @@ function text(value) {
 }
 
 /** The plain quotation: body copy with a rule, for a page's second quote. */
-function PlainQuote({ line, attribution }) {
+function PlainQuote({ line, attribution, lang }) {
   return (
-    <figure lang={block.publicLanguage} className="quote-plain max-w-prose">
-      <blockquote>
+    <figure className="quote-plain max-w-prose">
+      <blockquote lang={lang}>
         <p className="text-body text-text-primary text-pretty">“{line}”</p>
       </blockquote>
       {attribution ? (
@@ -36,6 +36,6 @@ export default function QuoteBlock({ block }) {
   const line = text(block?.text);
   if (!line) return null;
   const attribution = text(block.attribution) ?? undefined;
-  if (!pull) return <PlainQuote line={line} attribution={attribution} />;
-  return <PullQuote attribution={attribution}>{line}</PullQuote>;
+  if (!pull) return <PlainQuote line={line} attribution={attribution} lang={block.publicLanguage} />;
+  return <PullQuote attribution={attribution} lang={block.publicLanguage}>{line}</PullQuote>;
 }

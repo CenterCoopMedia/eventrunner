@@ -96,7 +96,6 @@ function SlotSections({ pageId, sections, getSectionBlocks, renderSection, arran
             {/* The head runs to the stage whatever the arrangement: a
                 section boundary is the width of the page it opens. */}
             <SectionHead level={2} id={`section-${section.id}`} title={section.label} lang={section.publicLanguage} action={editLink} />
-            {section.description ? <p lang={section.publicLanguage} className="mt-xs text-text-secondary">{section.description}</p> : null}
             {/* THE ARRANGEMENT ON THE STAGE (2026-09-10 vocabulary
                 expansion): `grid` gives the section the stage's own
                 columns, `list` sets it on the text measure — which is what

@@ -44,9 +44,10 @@ function text(value) {
  *   children: import('react').ReactNode,   // the quoted sentence
  *   attribution?: string,                  // who said it, and in what role
  *   className?: string,
+ *   lang?: string,
  * }} props
  */
-export default function PullQuote({ children, attribution, className = '' }) {
+export default function PullQuote({ children, attribution, className = '', lang }) {
   if (children === null || children === undefined || children === '') return null;
   const credit = text(attribution);
   return (
@@ -54,7 +55,7 @@ export default function PullQuote({ children, attribution, className = '' }) {
       <span aria-hidden="true" className="pull-quote__mark">
         “
       </span>
-      <blockquote>
+      <blockquote lang={lang}>
         <Callout>
           <span aria-hidden="true" className="pull-quote__quote">
             “

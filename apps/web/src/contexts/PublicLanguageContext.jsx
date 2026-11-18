@@ -36,7 +36,8 @@ function savePreference(language) {
 function hasApprovedSpanish(content, event, features) {
   const translated = (record, kind) => resolveContentVariant(record, kind, 'es', event).language === 'es';
   return content.pages?.some((page) => isPublicPage(page, features)
-    && (translated(page, 'page') || page.sections?.some((section) => translated(section, 'section'))))
+    && (translated(page, 'page')
+      || (Array.isArray(page.sections) && page.sections.some((section) => translated(section, 'section')))))
     || Object.values(content.siteContent ?? {}).some((block) => isDrawable(block) && translated(block, 'block'))
     || (features?.schedule && content.scheduleData?.some((session) => session.visible && translated(session, 'session')));
 }
@@ -90,7 +91,7 @@ export function PublicLanguageProvider({ children }) {
   useEffect(() => {
     if (isAdmin || !hydrated || !configReady || !multilingual || explicit || !savedLanguage) return;
     navigate(withContentLanguage(createPath(location), savedLanguage), {
-      replace: true, state: { ...location.state, languageSwitch: true },
+      replace: true, state: location.state,
     });
   }, [isAdmin, hydrated, configReady, multilingual, explicit, savedLanguage, location, navigate]);
 
@@ -144,7 +145,8 @@ export function usePublicContent() {
     const page = (record) => {
       if (!record) return record;
       const translated = project(record, 'page');
-      return { ...translated, sections: record.sections?.map((section) => project(section, 'section')) };
+      if (!Array.isArray(record.sections)) return translated;
+      return { ...translated, sections: record.sections.map((section) => project(section, 'section')) };
     };
     return {
       ...content,

@@ -423,7 +423,6 @@ export default function ContentPage() {
                   action={<SectionEditLink pageId={page.id} sectionId={section.id} label={section.label} />}
                 />
               )}
-              {section.description ? <p lang={section.publicLanguage} className="mt-xs text-text-secondary">{section.description}</p> : null}
               <div className={index === 0 ? undefined : 'mt-md'}>
                 {/* The long read opening (expansion record §3.1): the first
                     block of the first section of a page that STATES the
