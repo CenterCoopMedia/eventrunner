@@ -3,8 +3,9 @@
 // computer does not outlive the tab. A draft from the one-page form
 // (`session-pitch-draft-v1`) is read once and carried into the new shape.
 import { newSubmissionKey } from './submissionKey.js';
+import { eventStorageKey, mountedProjectId } from './eventBrowserState.js';
 
-export const DRAFT_KEY = 'session-pitch-draft-v2';
+export const DRAFT_KEY = eventStorageKey('session-pitch-draft-v2');
 const LEGACY_KEY = 'session-pitch-draft-v1';
 const KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
 const TEXT_FIELDS = ['title', 'summary', 'description', 'organization', 'format', 'track',
@@ -56,6 +57,8 @@ export function restorePitch(given) {
     const storage = tabStorage(given);
     const current = shapeOf(JSON.parse(storage.getItem(DRAFT_KEY)));
     if (current) return current;
+    // The old form predates path hosting, so it can only belong to a root site.
+    if (mountedProjectId) return blankPitch();
     const legacy = shapeOf(JSON.parse(storage.getItem(LEGACY_KEY)));
     if (legacy) {
       storage.removeItem(LEGACY_KEY);

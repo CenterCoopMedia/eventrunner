@@ -1,8 +1,9 @@
 import { startTransition } from 'react';
 import { appCheckEnabled } from './firebaseSettings.js';
 import { eventAppPath } from './eventPath.js';
+import { eventStorageKey } from './eventBrowserState.js';
 
-const SIGNED_IN_HINT = 'eventrunner:signed-in';
+const SIGNED_IN_HINT = eventStorageKey('eventrunner:signed-in');
 let runtime;
 let startup;
 let loading = false;

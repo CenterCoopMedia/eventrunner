@@ -1,5 +1,6 @@
 import { functionsOrigin } from './firebaseSettings.js';
 import { appCheckHeaders } from './firebaseLoader.js';
+import { eventStorageKey } from './eventBrowserState.js';
 
 const ID_RE = /^[A-Za-z0-9_-]{1,160}$/;
 
@@ -101,7 +102,7 @@ export function newTicketingRequestId() {
   return globalThis.crypto.randomUUID();
 }
 
-function attemptKey(uid) { return `eventrunner.ticket-checkout.${uid}`; }
+function attemptKey(uid) { return eventStorageKey(`eventrunner.ticket-checkout.${uid}`); }
 
 /** Store identifiers only: never attendee details, a Checkout URL, or a payment secret. */
 export function readCheckoutAttempt(uid) {

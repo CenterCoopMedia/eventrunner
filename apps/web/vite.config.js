@@ -53,10 +53,13 @@ function staticImportGraph(context, entry = entryModule) {
 }
 
 function eventAssetBase(mode) {
-  const env = loadEnv(mode, here, ['VITE_EVENT_PUBLIC_URL', 'VITE_DEMO_MODE']);
-  return isDemoModeFlag(env.VITE_DEMO_MODE)
-    ? undefined
-    : parseEventPublicBase(env.VITE_EVENT_PUBLIC_URL).assetBase;
+  const env = loadEnv(mode, here, ['VITE_EVENT_PUBLIC_URL', 'VITE_DEMO_MODE', 'VITE_FIREBASE_PROJECT_ID']);
+  if (isDemoModeFlag(env.VITE_DEMO_MODE)) return undefined;
+  const { mount, assetBase } = parseEventPublicBase(env.VITE_EVENT_PUBLIC_URL);
+  if (mount && !env.VITE_FIREBASE_PROJECT_ID?.trim()) {
+    throw new Error('VITE_FIREBASE_PROJECT_ID is required for a mounted event');
+  }
+  return assetBase;
 }
 
 export default defineConfig(({ isSsrBuild, mode }) => ({

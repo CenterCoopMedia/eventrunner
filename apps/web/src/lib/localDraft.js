@@ -1,6 +1,9 @@
 // Browser-only recovery copies. The server draft remains the saved record.
-const PREFIX = 'eventrunner:admin-draft:';
-const SIGN_OUT_PREFIX = 'eventrunner:admin-draft-signout:';
+import { eventStorageKey } from './eventBrowserState.js';
+
+const PREFIX = eventStorageKey('eventrunner:admin-draft:');
+const SIGN_OUT_PREFIX = eventStorageKey('eventrunner:admin-draft-signout:');
+export const LOCAL_DRAFTS_CLEARED = eventStorageKey('admin-drafts-cleared');
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 const generations = new Map();
 
@@ -36,7 +39,7 @@ export function clearLocalDrafts(accountId) {
   mark();
   removeCopies();
   if (!marked) { mark(); removeCopies(); }
-  window.dispatchEvent(new Event('admin-drafts-cleared'));
+  window.dispatchEvent(new Event(LOCAL_DRAFTS_CLEARED));
 }
 
 export function openLocalDraft(accountId, docPath, version) {
@@ -104,7 +107,7 @@ export function openLocalDraft(accountId, docPath, version) {
   return {
     read, write, clear, revoked,
     restore: (copy) => { writeVersion = copy.version; },
-    isSignOutEvent: (event) => event.type === 'admin-drafts-cleared'
+    isSignOutEvent: (event) => event.type === LOCAL_DRAFTS_CLEARED
       || event.key === signOutKey(accountId),
   };
 }
