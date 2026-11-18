@@ -1,5 +1,3 @@
-import { withContentLanguage } from 'shared/languageUrls';
-
 // The public schedule PDF (issue #166, spec §9).
 //
 // The programme is public, so `buildSchedulePdf` is an unauthenticated GET
@@ -36,7 +34,8 @@ export async function downloadSchedulePdf({ origin, language, fetchImpl, documen
   }
   let response;
   try {
-    response = await doFetch(`${origin}${withContentLanguage('/buildSchedulePdf', language)}`);
+    const query = language ? `?${new URLSearchParams({ lang: language })}` : '';
+    response = await doFetch(`${origin}/buildSchedulePdf${query}`);
   } catch {
     throw new SchedulePdfError('We could not reach the server. Check your connection and try again.');
   }

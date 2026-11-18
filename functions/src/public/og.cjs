@@ -286,8 +286,10 @@ const {
   systemPageIdForPath,
 } = require('shared/routing');
 const { pageHeading, isPublicPage } = require('shared/page');
-const { metaExcerpt: excerpt, eventMetaDescription, publicRouteUrls, publishedSpanishSections } = require('shared/pageMetadata');
-const { contentLanguages, resolveContentVariant, selectContentLanguage } = require('shared/contentLanguages');
+const { metaExcerpt: excerpt, eventMetaDescription } = require('shared/pageMetadata');
+const {
+  contentLanguages, resolveContentVariant, selectContentLanguage, publicRouteUrls, publishedSpanishSections,
+} = require('shared/contentLanguages');
 const { isValidDocId } = require('../cms/store.cjs');
 
 /**

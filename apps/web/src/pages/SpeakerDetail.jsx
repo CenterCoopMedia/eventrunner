@@ -34,7 +34,6 @@ import Rule from '../components/editorial/Rule.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
-import { useDocumentDescription } from '../lib/useDocumentDescription.js';
 import { sortSessions } from '../lib/scheduleView.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
@@ -71,9 +70,7 @@ export default function SpeakerDetail() {
   // speaker over that page would advertise what the event has turned off.
   // The server refuses the same route for the same reason.
   const speaker = speakers.find((candidate) => candidate.slug === slug);
-  const affiliation = [text(speaker?.jobTitle), text(speaker?.organization)].filter(Boolean).join(', ');
   useDocumentTitle(features.speakers && speaker ? text(speaker.displayName) : null);
-  useDocumentDescription(eventConfig, features.speakers ? text(speaker?.bio).trim() || affiliation : null);
 
   if (!features.speakers) {
     return (
@@ -91,6 +88,7 @@ export default function SpeakerDetail() {
 
   if (!speaker) return <NotFoundState />;
 
+  const affiliation = [text(speaker.jobTitle), text(speaker.organization)].filter(Boolean).join(', ');
   // Gated on features.schedule (issue #22 review finding P2-6): the
   // schedule itself is a feature a deployment can turn off, and a session
   // list here would be a working cross-link into a part of the site that

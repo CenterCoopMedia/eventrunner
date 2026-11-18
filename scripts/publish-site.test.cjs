@@ -458,11 +458,14 @@ test('live publisher and generated snapshot use the same block-only language alt
   const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
   const event = { ...SITE_DOCS.event, contentLanguages: { default: 'en', available: ['en', 'es'] } };
   const pages = SITE_DOCS.pages.map((page) => page.id === 'travel' ? { ...page, sections: [{ id: 'travel-body' }] } : page);
-  const block = { id: 'travel-details', visible: true, section: 'travel-body', blockType: 'text',
-    value: 'Travel details', translations: { es: { value: 'Detalles del viaje' } } };
-  const db = fakeSiteDb({ ...SITE_DOCS, event, pages, updates: [], blocks: [block, { ...block, id: 'private', visible: false }] });
+  const block = { id: 'travel-details', visible: true, section: 'travel-body', blockType: 'stat',
+    value: '0', label: 'Trips', translations: { es: { label: 'Viajes' } } };
+  // A legacy seed flag can survive an operator edit. The public projection
+  // treats an operator's zero as published data in both input shapes.
+  const storedBlock = { ...block, seeded: true, publishedBy: 'fixture-editor' };
+  const db = fakeSiteDb({ ...SITE_DOCS, event, pages, updates: [], blocks: [storedBlock, { ...block, id: 'private', visible: false }] });
   const live = await readSiteDocs({ db });
-  assert.deepEqual(live.blocks, [block]);
+  assert.deepEqual(live.blocks, [storedBlock]);
   const modules = {
     'eventConfig.js': { eventConfig: event, features: live.features, theme: live.theme },
     'pagesData.js': { pagesData: pages },

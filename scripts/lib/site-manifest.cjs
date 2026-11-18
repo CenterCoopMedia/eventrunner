@@ -27,7 +27,7 @@ const { configuredThemeColor } = require('./shared-theme.cjs');
 const { assertNoPitchPageCollisions } = require('./pitch-route-check.cjs');
 const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
 const { isPublicPage, pageFeatureGate } = require('shared/page');
-const { publicRouteUrls, publishedSpanishSections } = require('shared/pageMetadata');
+const { publicRouteUrls, publishedSpanishSections } = require('shared/contentLanguages');
 const { APP_ICON_SIZES, appIconPath } = require('./app-icons.cjs');
 
 /**

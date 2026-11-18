@@ -21,7 +21,6 @@ import { publishDateLabel, toPublishDate } from '../lib/updateDates.js';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
-import { useDocumentDescription } from '../lib/useDocumentDescription.js';
 
 function NotFoundState() {
   return (
@@ -48,7 +47,6 @@ export default function UpdateDetail() {
   // renders "not available", and the tab must not name a post over it.
   const update = updates.find((u) => u.id === id && u.visible !== false);
   useDocumentTitle(features.updates ? update?.title : null);
-  useDocumentDescription(eventConfig, features.updates && update?.title ? update.body : null);
 
   if (!features.updates) {
     return (
