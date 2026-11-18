@@ -5,6 +5,8 @@ const { test } = require('node:test');
 const { consentEventMount, manageEventMount } = require('./clientHostEnrollment.cjs');
 const { closeApplication, declineApplication } = require('./reviewDecisions.cjs');
 const { withdrawApplication } = require('./applicationStatus.cjs');
+const { getApplication } = require('./applications.cjs');
+const { recordAppliedPublicBase } = require('./clientHostRecords.cjs');
 const { saveApplicationStep } = require('./applicationSave.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
 const { ana, application, deps, ops, seeded } = require('./fakeReview.cjs');
@@ -77,10 +79,41 @@ test('an existing web-address holder enrolls first, then a separately owned even
   assert.equal(d.db.read('console_event_mounts/a2').consent.by, otherOwner.uid);
   assert.equal(d.db.read(`console_client_hosts/${host}`).authority.reference, verified.authorityReference);
   assert.equal((await manage(d, 'get')).body.route.state, 'enrolled');
-  await assert.rejects(manage(d, 'publish', { confirm: true }), { code: 'bad-request' });
   await assert.rejects(consent(d, { url: `https://${host}/another/` }), { code: 'mount-conflict' });
   assert.deepEqual(stable.map(d.db.read), before);
   assert.equal(d.mailer.sent.length, 0);
+});
+
+test('publication and removal change only the selected event’s public address', async () => {
+  const d = setup();
+  await consent(d);
+  await consent(d, { appId: 'a2', orgId: 'o2', url: siblingBase, user: otherOwner });
+  await manage(d, 'enroll', verified);
+  await manage(d, 'enroll', { appId: 'a2', publicBase: siblingBase });
+  const ownerView = async () => (await getApplication(d, { body: { orgId: 'o1', appId: 'a1' }, user: ana })).body.application;
+  assert.equal((await ownerView()).publicBase, undefined);
+  await assert.rejects(manage(d, 'publish'), { code: 'confirm-required' });
+  await assert.rejects(manage(d, 'publish', { confirm: true }, ana), { code: 'not-operator' });
+  await manage(d, 'publish', { confirm: true });
+  await manage(d, 'publish', { appId: 'a2', publicBase: siblingBase, confirm: true });
+  assert.equal((await ownerView()).publicBase, undefined);
+  const identity = { appId: 'a1', projectId: 'er-summit', site: 'summit-host', domain: host };
+  await recordAppliedPublicBase(d.db, identity, publicBase);
+  assert.equal((await ownerView()).publicBase, publicBase);
+  const sibling = d.db.read('console_event_mounts/a2');
+  await manage(d, 'remove', { confirm: true });
+  assert.equal((await ownerView()).publicBase, publicBase);
+  await recordAppliedPublicBase(d.db, identity, 'https://summit-host.web.app');
+  assert.equal((await ownerView()).publicBase, 'https://summit-host.web.app');
+  assert.equal(d.db.read('console_event_mounts/a1').publicBase, publicBase);
+  assert.deepEqual(d.db.read('console_event_mounts/a2'), sibling);
+  await assert.rejects(manage(d, 'publish', { confirm: true }), { code: 'mount-conflict' });
+  await d.db.doc('organizations/o1/members/ana').update({ role: 'editor' });
+  await assert.rejects(manage(d, 'enroll'), { code: 'forbidden' });
+  await consent(d, { user: { uid: 'bo', email: 'bo@example.org' } });
+  const renewed = (await manage(d, 'enroll')).body.route;
+  assert.equal(renewed.state, 'enrolled');
+  assert.equal(renewed.consent.by, 'bo');
 });
 
 test('reserved paths, overlapping mounts and incompatible hosts are refused', async () => {

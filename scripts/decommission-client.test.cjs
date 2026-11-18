@@ -302,6 +302,31 @@ test('purge scrubs one enrollment and retains its path reservation', async () =>
   assert.deepEqual(s.db.read('console_event_mounts/a2'), sibling);
 });
 
+test('archive, restore and purge change only the selected event’s route', async () => {
+  const reservation = {
+    host: DOMAIN, mount: '/first', appId: 'a1', publicBase: `https://${DOMAIN}/first/`, projectId: PROJECT,
+    hostingOrigin: `https://${SITE}.web.app`,
+  };
+  const route = { ...reservation, state: 'published', publishedAt: new Date(NOW) };
+  const sibling = { ...route, mount: '/second', appId: 'a2', publicBase: `https://${DOMAIN}/second/` };
+  const s = setup({ seed: {
+    'console_event_mounts/a1': route,
+    'console_event_mounts/a2': sibling,
+    [`console_client_hosts/${DOMAIN}`]: { revision: 2 },
+  } });
+  assert.equal(await s.run('archive'), 0);
+  assert.deepEqual(s.db.read('console_event_mounts/a1'), { ...route, state: 'retired' });
+  assert.equal(await s.run('restore'), 0);
+  assert.deepEqual(s.db.read('console_event_mounts/a1'), route);
+  assert.equal(await s.run('purge', true), 0);
+  assert.deepEqual(s.db.read('console_event_mounts/a1'), { ...reservation, state: 'removed' });
+  assert.deepEqual(s.db.read('console_event_mounts/a2'), sibling);
+  assert.deepEqual(s.db.read(`console_client_hosts/${DOMAIN}`), { revision: 2 });
+  assert.ok(s.state.dns.some(({ name }) => name === DOMAIN), 'the original address now serves the shared host');
+  assert.ok(s.state.dns.some(({ name }) => name === `_acme-challenge.${DOMAIN}`), 'the shared host retains its certificate records');
+  assert.ok(!s.state.dns.some(({ name }) => name === `fixture._domainkey.${DOMAIN}`), 'the retired event’s mail record is removed');
+});
+
 test('archive accepts failed builds and closed requests whose build began, and refuses active builds', async () => {
   const failed = setup({ app: { status: 'building', buildStart: { state: 'failed', at: new Date(NOW) } }, build: { state: 'failed' } });
   assert.equal(await failed.run('archive'), 0);

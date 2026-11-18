@@ -18,7 +18,7 @@ name: Provision client
 # after a build reach each built site's operator and staff lists. It lives in
 # this workflow because the provisioner's Workload Identity condition names it.
 
-run-name: ${{ inputs.sync_access && format('Sync access {0}', inputs.application_id) || inputs.application_id && format('Provision {0}', inputs.application_id) || 'Sync client teams' }}
+run-name: ${{ inputs.sync_access && format('Sync access {0}', inputs.application_id) || inputs.sync_event_mount && format('Sync event mount {0}', inputs.application_id) || inputs.application_id && format('Provision {0}', inputs.application_id) || 'Sync client teams' }}
 
 on:
   workflow_dispatch:
@@ -34,6 +34,11 @@ on:
         default: false
       sync_access:
         description: Repair configured support signer access on one completed client.
+        required: false
+        type: boolean
+        default: false
+      sync_event_mount:
+        description: Apply the published or standalone address with a full deploy for one completed event.
         required: false
         type: boolean
         default: false
@@ -79,6 +84,7 @@ jobs:
         env:
           APPLICATION_ID: ${{ inputs.application_id }}
           SYNC_ACCESS: ${{ inputs.sync_access }}
+          SYNC_EVENT_MOUNT: ${{ inputs.sync_event_mount }}
           TEST_MODE: ${{ inputs.test_mode }}
         run: |
           if ! printf '%s' "$APPLICATION_ID" | grep -Eq '^[A-Za-z0-9_-]{1,200}$'; then
@@ -87,6 +93,10 @@ jobs:
           fi
           if [ "$SYNC_ACCESS" = "true" ] && [ "$TEST_MODE" = "true" ]; then
             echo "::error::Access sync cannot run in test mode." >&2
+            exit 1
+          fi
+          if [ "$SYNC_EVENT_MOUNT" = "true" ] && { [ "$TEST_MODE" = "true" ] || [ "$SYNC_ACCESS" = "true" ]; }; then
+            echo "::error::Event mount sync is a separate operation." >&2
             exit 1
           fi
 
@@ -127,6 +137,7 @@ jobs:
           EVENT_SUPPORT_ADMIN_EMAILS: ${{ vars.EVENT_SUPPORT_ADMIN_EMAILS || 'jamditis@gmail.com,amditisjunk@gmail.com' }}
           APPLICATION_ID: ${{ inputs.application_id }}
           SYNC_ACCESS: ${{ inputs.sync_access }}
+          SYNC_EVENT_MOUNT: ${{ inputs.sync_event_mount }}
           TEST_MODE: ${{ inputs.test_mode }}
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
           CONSOLE_PUBLIC_URL: ${{ vars.CONSOLE_PUBLIC_URL }}
@@ -142,6 +153,8 @@ jobs:
         run: |
           if [ "$SYNC_ACCESS" = "true" ]; then
             node scripts/provision-client.cjs --application "$APPLICATION_ID" --sync-access
+          elif [ "$SYNC_EVENT_MOUNT" = "true" ]; then
+            node scripts/provision-client.cjs --application "$APPLICATION_ID" --sync-event-mount
           elif [ "$TEST_MODE" = "true" ]; then
             node scripts/provision-client.cjs --application "$APPLICATION_ID" --test-mode
           else
@@ -150,7 +163,7 @@ jobs:
       - name: Record a run that stopped
         # A timeout or a cancel never reaches the script's own failure record.
         # This also runs after a failure the script recorded, and then does nothing.
-        if: ${{ (failure() || cancelled()) && steps.auth.outcome == 'success' && !inputs.sync_access }}
+        if: ${{ (failure() || cancelled()) && steps.auth.outcome == 'success' && !inputs.sync_access && !inputs.sync_event_mount }}
         env:
           APPLICATION_ID: ${{ inputs.application_id }}
           CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
@@ -162,7 +175,7 @@ jobs:
   enroll-auto-deploy:
     name: Enroll automatic deployments
     needs: provision
-    if: ${{ github.event_name == 'workflow_dispatch' && needs.provision.result == 'success' && !inputs.test_mode && !inputs.sync_access }}
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.provision.result == 'success' && !inputs.test_mode && !inputs.sync_access && !inputs.sync_event_mount }}
     permissions:
       contents: read
       id-token: write

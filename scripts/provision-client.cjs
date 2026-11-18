@@ -12,6 +12,7 @@
  *   node scripts/provision-client.cjs --application <id> --remove-auto-deploy [--confirm-site <name> | --if-purge-due]
  *   node scripts/provision-client.cjs --application <id> --restore-auto-deploy
  *   node scripts/provision-client.cjs --application <id> --sync-access
+ *   node scripts/provision-client.cjs --application <id> --sync-event-mount
  *   node scripts/provision-client.cjs --sync-teams
  *
  * Each step reads the current state and does nothing when it is already right,
@@ -35,6 +36,9 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { toMillis } = require('../console/functions/src/access.cjs');
+const {
+  eventMountRef, recordAppliedPublicBase, recordStandalonePublicBase, resolveEventPublicBase,
+} = require('../console/functions/src/clientHostRecords.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, normalizeProjectId, readConsoleSettings } = require('../console/functions/src/consoleSettings.cjs');
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
@@ -1043,6 +1047,9 @@ async function stepTickets(ctx) {
 /** The deploy settings, including the account identifier masked through an Environment secret. */
 function deployVariables(ctx) {
   const { domain, name, projectId, region, site, bucket, web } = ctx;
+  const base = ctx.publicConfig || resolveEventPublicBase(null, ctx);
+  const rootUrl = `https://${domain}`;
+  const hostingUrl = `https://${site}.web.app`;
   return {
     [OWNER_VARIABLE]: ctx.appId,
     WIF_PROVIDER: ctx.wifProvider,
@@ -1051,9 +1058,7 @@ function deployVariables(ctx) {
     EVENT_FIREBASE_PROJECT_ID: projectId,
     EVENT_FIREBASE_REGION: region,
     EVENT_HOSTING_SITE: site,
-    EVENT_PUBLIC_URL: `https://${domain}`,
     EVENT_STORAGE_BUCKET: bucket,
-    EVENT_ALLOWED_ORIGINS: `https://${domain},https://${site}.web.app`,
     EVENT_EMAIL_PROVIDER: 'postmark',
     EVENT_OPERATOR_NOTIFIER: 'email',
     EVENT_APP_CHECK_ENFORCED: 'false',
@@ -1066,13 +1071,26 @@ function deployVariables(ctx) {
     VITE_FIREBASE_STORAGE_BUCKET: web.storageBucket || bucket,
     VITE_FIREBASE_MESSAGING_SENDER_ID: web.messagingSenderId,
     VITE_FIREBASE_APP_ID: web.appId,
-    VITE_EVENT_PUBLIC_URL: `https://${domain}`,
+    ...(base.mount ? mountedVariables(base, ctx.allowedOrigins, rootUrl, hostingUrl) : {
+      EVENT_ALLOWED_ORIGINS: `${rootUrl},${hostingUrl}`,
+      VITE_EVENT_PUBLIC_URL: base.publicBase,
+      EVENT_PUBLIC_URL: base.publicBase,
+    }),
   };
 }
 
-/** GITHUB_TOKEN cannot create an Environment, so this uses the provisioner's App. */
-async function stepEnvironment(ctx) {
-  const { deps: { env, fetch, now }, settings: { environment } } = ctx;
+function mountedVariables(base, existingOrigins, rootUrl, hostingUrl) {
+  const origins = (existingOrigins || '').split(',').map((origin) => origin.trim()).filter(Boolean);
+  return {
+    EVENT_ALLOWED_ORIGINS: [...new Set([...origins, rootUrl, hostingUrl, base.origin])].join(','),
+    VITE_EVENT_PUBLIC_URL: base.publicBase,
+    EVENT_PUBLIC_URL: base.publicBase,
+  };
+}
+
+/** GITHUB_TOKEN cannot manage an Environment, so use the provisioner's App. */
+async function readEnvironment(ctx, environment) {
+  const { env, fetch, now } = ctx.deps;
   const repository = env.GITHUB_REPOSITORY;
   const token = await installationToken({
     appId: env.PROVISIONER_APP_ID,
@@ -1085,8 +1103,6 @@ async function stepEnvironment(ctx) {
   });
   const headers = { ...GITHUB_HEADERS, Authorization: `Bearer ${token}` };
   const base = `${GITHUB}/repos/${repository}/environments/${encodeURIComponent(environment)}`;
-  const notes = [];
-
   const existing = await call(ctx, 'read the Environment', base, { headers, allow: [404] });
   const stored = new Map();
   for (let page = 1; existing; page += 1) {
@@ -1094,6 +1110,29 @@ async function stepEnvironment(ctx) {
     for (const variable of listed.variables || []) stored.set(variable.name, variable.value);
     if ((listed.variables || []).length < 30) break;
   }
+  return { headers, base, existing, stored };
+}
+
+async function writeEnvironmentVariables(ctx, { headers, base, stored }, variables) {
+  let written = 0;
+  for (const [name, value] of Object.entries(variables)) {
+    if (stored.get(name) === value) continue;
+    if (stored.has(name)) {
+      await call(ctx, `update ${name}`, `${base}/variables/${name}`, { method: 'PATCH', headers, json: { name, value } });
+    } else {
+      await call(ctx, `create ${name}`, `${base}/variables`, { method: 'POST', headers, json: { name, value } });
+    }
+    written += 1;
+  }
+  return written;
+}
+
+async function stepEnvironment(ctx) {
+  ctx.eventMount = (await eventMountRef(ctx.deps.db, ctx.appId).get()).data();
+  const { environment } = ctx.settings;
+  const env = await readEnvironment(ctx, environment);
+  const { headers, base, existing, stored } = env;
+  const notes = [];
   // Nothing else proves whose an unowned Environment is. The claim is written
   // before creating one, so a run lost at any point can be retried.
   const ours = stored.get(OWNER_VARIABLE) === ctx.appId
@@ -1122,6 +1161,12 @@ async function stepEnvironment(ctx) {
     notes.push('added the main-only rule');
   }
 
+  ctx.allowedOrigins = stored.get('EVENT_ALLOWED_ORIGINS');
+  const { appId, projectId, site, domain } = ctx;
+  ctx.publicConfig = resolveEventPublicBase(ctx.eventMount, {
+    appId, projectId, site, domain, existingPublicUrl: stored.get('EVENT_PUBLIC_URL'),
+  });
+  await recordStandalonePublicBase(ctx.deps.db, appId, ctx.publicConfig);
   ctx.vars = deployVariables(ctx);
   const { EVENT_STRIPE_ACCOUNT_ID: stripeAccountId, ...variables } = ctx.vars;
   if (stripeAccountId) {
@@ -1142,18 +1187,50 @@ async function stepEnvironment(ctx) {
       notes.push('wrote the masked Stripe account identifier');
     }
   }
-  let written = 0;
-  for (const [name, value] of Object.entries(variables)) {
-    if (stored.get(name) === value) continue;
-    if (stored.has(name)) {
-      await call(ctx, `update ${name}`, `${base}/variables/${name}`, { method: 'PATCH', headers, json: { name, value } });
-    } else {
-      await call(ctx, `create ${name}`, `${base}/variables`, { method: 'POST', headers, json: { name, value } });
-    }
-    written += 1;
-  }
+  const written = await writeEnvironmentVariables(ctx, env, variables);
   if (written > 0) notes.push(`wrote ${written} variables`);
   return summary(notes);
+}
+
+/** Apply the effective address for a completed event through a full ordinary deploy. */
+async function syncEventMount({ appId, deps }) {
+  const { db, log } = deps;
+  if (!APP_ID_RE.test(appId)) throw new Error('invalid application id');
+  const [app, build, mount] = await Promise.all([
+    db.collection('applications').doc(appId).get(),
+    db.collection(BUILD_COLLECTION).doc(appId).get(),
+    eventMountRef(db, appId).get(),
+  ]);
+  const { projectId, site, environment, domain } = build.data()?.resources || {};
+  if (!CONSOLE_REQUEST_GROUPS.built.includes(app.data()?.status) || !projectId || !site || !environment || !domain) {
+    throw new Error('the event must have a completed deployment');
+  }
+  const route = mount.data();
+  if (!route) throw new Error('the event has no mount reservation');
+  if (route.state !== 'published' && !route.standalonePublicBase) {
+    log.log('provision-client: the event is still using its standalone settings');
+    return 0;
+  }
+  const ctx = { appId, deps, app: app.data(), settings: { environment }, projectId, site, domain };
+  const target = await readEnvironment(ctx, environment);
+  const { existing, stored } = target;
+  if (!existing || stored.get(OWNER_VARIABLE) !== appId || stored.get('EVENT_FIREBASE_PROJECT_ID') !== projectId
+      || stored.get('EVENT_HOSTING_SITE') !== site) {
+    throw new Error('the deployment environment does not match the event request, project and Hosting site');
+  }
+  const base = resolveEventPublicBase(route, { ...ctx, existingPublicUrl: stored.get('EVENT_PUBLIC_URL') });
+  await recordStandalonePublicBase(db, appId, base);
+  const rootUrl = `https://${domain}`;
+  const variables = base.mount
+    ? mountedVariables(base, stored.get('EVENT_ALLOWED_ORIGINS'), rootUrl, `https://${site}.web.app`)
+    : { VITE_EVENT_PUBLIC_URL: base.publicBase, EVENT_PUBLIC_URL: base.publicBase };
+  const written = await writeEnvironmentVariables(ctx, target, variables);
+  if (written || route.appliedPublicBase !== base.publicBase) {
+    await deploy(ctx, { bootstrap: false, after: deps.now(), fresh: true });
+    await recordAppliedPublicBase(db, ctx, base.publicBase);
+  }
+  log.log('provision-client: event public URL applied');
+  return 0;
 }
 
 /** The shared serialized workflow is the only automatic list writer. */
@@ -1265,7 +1342,7 @@ async function deploymentHasRevision(ctx, run) {
  * this run's code revision cannot count.
  * New requests and retries therefore inherit the patches on main.
  */
-async function deploy(ctx, { bootstrap, after }) {
+async function deploy(ctx, { bootstrap, after, fresh = Boolean(ctx.publicConfig?.mount) }) {
   const { deps: { env, sleep }, settings: { environment } } = ctx;
   const applicationCreatedAt = toMillis(ctx.app.createdAt);
   if (!Number.isFinite(applicationCreatedAt)) throw new Error('the request has no valid creation time');
@@ -1275,16 +1352,20 @@ async function deploy(ctx, { bootstrap, after }) {
   const headers = { ...GITHUB_HEADERS, Authorization: `Bearer ${env.GITHUB_TOKEN}` };
   const workflow = `${GITHUB}/repos/${env.GITHUB_REPOSITORY}/actions/workflows/deploy.yml`;
   const title = `Deploy ${environment}${bootstrap ? ' (bootstrap)' : ''}`;
+  const runTitle = env.GITHUB_RUN_ID ? `${title} [build ${env.GITHUB_RUN_ID}]` : title;
   let dispatches = 0;
   let previous = null;
   for (let poll = 0; poll < DEPLOY_POLLS; poll += 1) {
     const listed = await call(ctx, 'read the deploy runs', `${workflow}/runs?event=workflow_dispatch&branch=main&per_page=50`, { headers });
-    const latest = (listed.workflow_runs || []).find((run) => run.display_title === title ||
-      (run.display_title?.startsWith(`${title} [build `) && /^\d+\]$/.test(run.display_title.slice(title.length + 8)))) || null;
+    const latest = (listed.workflow_runs || []).find(({ display_title: name }) => fresh
+      ? name === runTitle
+      : name === title || (name?.startsWith(`${title} [build `) && /^\d+\]$/.test(name.slice(title.length + 8)))) || null;
     const createdAt = Date.parse(latest?.created_at);
     const current = Number.isFinite(createdAt) && createdAt >= earliest;
     const containsRevision = await deploymentHasRevision(ctx, latest);
-    const counts = latest && current && containsRevision && (dispatches === 0 || latest.id !== previous);
+    // An older run at this revision can have different public URL settings.
+    const counts = latest && current && containsRevision
+      && (dispatches === 0 ? !fresh : latest.id !== previous);
     if (counts && latest.status !== 'completed') {
       await sleep(DEPLOY_WAIT_MS);
     } else if (counts && latest.conclusion === 'success') {
@@ -1554,7 +1635,7 @@ async function stepReady(ctx) {
       appId: ctx.appId,
       status: 'ready',
       eventName: ctx.eventName,
-      adminLink: `https://${ctx.domain}/admin`,
+      adminLink: new URL('admin', ctx.vars.EVENT_PUBLIC_URL).href,
       note: 'Automatic ticket approval is off. Review ticket holders in Attendees, or enable Automatic ticket approval in Settings after you review the access policy.',
     });
     ctx.ownersEmailedAt = new Date(ctx.deps.now());
@@ -1564,6 +1645,14 @@ async function stepReady(ctx) {
   if (!(await moveStatus(ctx, 'building', 'ready'))) throw new Error('the request is no longer building');
   notes.push('the site is ready');
   return summary(notes);
+}
+
+async function stepFullDeploy(ctx) {
+  const result = await deploy(ctx, { bootstrap: false, after: toMillis(ctx.ticketsChangedAt) });
+  if (ctx.eventMount?.publishedAt) {
+    await recordAppliedPublicBase(ctx.deps.db, ctx, ctx.publicConfig.publicBase);
+  }
+  return result;
 }
 
 const STEPS = Object.freeze([
@@ -1578,7 +1667,7 @@ const STEPS = Object.freeze([
   { id: 'first-deploy', label: 'First deploy', run: (ctx) => deploy(ctx, { bootstrap: true }) },
   { id: 'mail-webhooks', label: 'Email delivery updates', run: stepMailWebhooks },
   { id: 'seed', label: 'Site content and team', run: stepSeed },
-  { id: 'full-deploy', label: 'Full deploy', run: (ctx) => deploy(ctx, { bootstrap: false, after: toMillis(ctx.ticketsChangedAt) }) },
+  { id: 'full-deploy', label: 'Full deploy', run: stepFullDeploy },
   { id: 'ready', label: 'Tell the Owners', run: stepReady },
 ]);
 
@@ -1947,6 +2036,7 @@ function parseArgs(argv) {
     else if (argv[i] === '--remove-auto-deploy') args.removeAutoDeploy = true;
     else if (argv[i] === '--restore-auto-deploy') args.restoreAutoDeploy = true;
     else if (argv[i] === '--sync-access') args.syncAccess = true;
+    else if (argv[i] === '--sync-event-mount') args.syncEventMount = true;
     else if (argv[i] === '--if-purge-due') args.removeDue = true;
     else if (argv[i] === '--confirm-site') args.confirmSite = argv[++i] || '';
     else return null;
@@ -1955,7 +2045,9 @@ function parseArgs(argv) {
   const enrollment = modes > 0;
   return APP_ID_RE.test(args.appId) && !(enrollment && (args.testMode || args.markStopped))
     && modes <= 1
-    && !(args.syncAccess && (args.testMode || args.markStopped || enrollment || args.removeDue || args.confirmSite !== undefined))
+    && !((args.syncAccess || args.syncEventMount)
+      && (args.testMode || args.markStopped || enrollment || args.removeDue || args.confirmSite !== undefined))
+    && !(args.syncAccess && args.syncEventMount)
     && (!args.removeDue || args.removeAutoDeploy)
     && (args.confirmSite === undefined || (args.removeAutoDeploy && Boolean(args.confirmSite))) ? args : null;
 }
@@ -2009,7 +2101,7 @@ function realDeps(env) {
 async function main(argv = process.argv.slice(2), env = process.env, makeDeps = realDeps) {
   const args = parseArgs(argv);
   if (!args) {
-    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped | --enroll-auto-deploy | --remove-auto-deploy [--confirm-site <name>] | --restore-auto-deploy | --sync-access] | --sync-teams');
+    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped | --enroll-auto-deploy | --remove-auto-deploy [--confirm-site <name>] | --restore-auto-deploy | --sync-access | --sync-event-mount] | --sync-teams');
     return 2;
   }
   const deps = makeDeps(env);
@@ -2017,6 +2109,7 @@ async function main(argv = process.argv.slice(2), env = process.env, makeDeps = 
   if (args.markStopped) return markStopped({ appId: args.appId, runId: env.GITHUB_RUN_ID, deps });
   if (args.enrollAutoDeploy || args.removeAutoDeploy || args.restoreAutoDeploy) return enrollAutoDeploy({ appId: args.appId, remove: args.removeAutoDeploy, removeDue: args.removeDue, restore: args.restoreAutoDeploy, confirmSite: args.confirmSite, deps });
   if (args.syncAccess) return syncAccess({ appId: args.appId, deps });
+  if (args.syncEventMount) return syncEventMount({ appId: args.appId, deps });
   return provision({ appId: args.appId, testMode: args.testMode, deps });
 }
 
@@ -2030,4 +2123,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { COMPUTE_ROLES, INVOKER_PERMISSIONS, SERVICES, STEPS, brandingProblem, deployVariables, main, markStopped, parseArgs, provision, requiredRecords, syncAccess, syncTeams };
+module.exports = { COMPUTE_ROLES, INVOKER_PERMISSIONS, SERVICES, STEPS, brandingProblem, deployVariables, main, markStopped, parseArgs, provision, requiredRecords, syncAccess, syncEventMount, syncTeams };

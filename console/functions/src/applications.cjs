@@ -30,6 +30,7 @@ const { connectionsForClient } = require('./connectionState.cjs');
 const { siteAddress } = require('./siteNames.cjs');
 const { LAUNCH_OWNERS } = require('./organizations.cjs');
 const { readSignupTerms } = require('./consoleSettings.cjs');
+const { eventMountRef } = require('./clientHostRecords.cjs');
 
 const COLLECTION = 'applications';
 const { CONSOLE_REQUEST_GROUPS } = require('shared/consoleRequest');
@@ -96,17 +97,19 @@ function stepProgress(errors, data) {
 }
 
 /** What the browser gets. The operator also gets who did each change and the review. */
-function applicationForClient(id, data, { role, operator, ownersNeeded, signups, available, build, testMode = false }) {
+function applicationForClient(id, data, { role, operator, ownersNeeded, signups, available, build, publicBase, testMode = false }) {
   const answers = withDefaults(data.answers);
   const errors = checkAnswers(answers, data.connections, { testMode });
   const draft = data.status === 'draft';
   const owner = role === 'owner';
+  const address = answers.webAddress.name ? siteAddress(answers.webAddress.name) : null;
   const body = {
     id,
     orgId: data.orgId,
     status: data.status,
     answers,
-    address: answers.webAddress.name ? siteAddress(answers.webAddress.name) : null,
+    address,
+    ...(publicBase && publicBase !== `https://${address}` ? { publicBase } : {}),
     note: currentNote(data),
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
@@ -166,7 +169,9 @@ async function getApplication({ db, connectionsAvailable, consoleTestMode, now =
   const { ref, data } = await readApplication((r) => r.get(), db, orgId, appId);
   const ownersNeeded = Math.max(0, LAUNCH_OWNERS - await countOwners(db, orgId));
   const { open } = await readSignupTerms((r) => r.get(), db);
+  const route = data.eventMountConsent ? (await eventMountRef(db, ref.id).get()).data() : null;
   const record = RETRY_STATUSES.includes(data.status) ? await readBuild((r) => r.get(), db, ref.id) : null;
+  const publicBase = route?.appliedPublicBase || route?.standalonePublicBase;
   return {
     body: {
       application: applicationForClient(ref.id, data, {
@@ -175,6 +180,7 @@ async function getApplication({ db, connectionsAvailable, consoleTestMode, now =
         signups: { open },
         available: connectionsAvailable,
         build: buildForClient(data, record, now(), { testMode: consoleTestMode }),
+        publicBase,
         testMode: consoleTestMode,
       }),
     },

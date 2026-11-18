@@ -123,6 +123,13 @@ describe('ApplicationStatus', () => {
     expect(screen.queryByText('You can close this page')).not.toBeInTheDocument();
   });
 
+  it('shows the mounted admin link after the route is published', async () => {
+    serveStatus({ status: 'ready', publicBase: 'https://client.example.test/events/summit/', canEdit: false, canWithdraw: false });
+    page();
+    expect(await screen.findByRole('link', { name: 'Open your admin panel' }))
+      .toHaveAttribute('href', 'https://client.example.test/events/summit/admin');
+  });
+
   it('names the progress panel and keeps the agreement separate from the main action', async () => {
     serveStatus({ status: 'ready', canEdit: false, canWithdraw: false, acceptance: { name: 'Ana Owner', at: '2026-11-04T15:00:00.000Z' } });
     page();
