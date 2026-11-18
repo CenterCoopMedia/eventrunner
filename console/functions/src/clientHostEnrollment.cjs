@@ -7,7 +7,7 @@ const { requireOwner } = require('./access.cjs');
 const { NOT_FOUND, applicationRef, requireAppId, requireOperator } = require('./reviewAccess.cjs');
 const { readBuild, canRetryBuild } = require('./buildState.cjs');
 const { normalizeProjectId } = require('./consoleSettings.cjs');
-const { MOUNTS, clientHostRef, eventMountRef, hostingOrigin } = require('./clientHostRecords.cjs');
+const { MOUNTS, clientHostRef, eventMountRef, hostingOrigin, resolveEventPublicBase } = require('./clientHostRecords.cjs');
 const { COLLECTION: SITE_NAMES, SITE_DOMAIN, RESERVED } = require('./siteNames.cjs');
 
 const DNS_LABEL = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
@@ -72,7 +72,7 @@ async function consentEventMount({ db, now = Date.now }, { body, user }) {
     requireOpen(app);
     const route = (await get(eventMountRef(db, appId))).data();
     if (route && route.publicBase !== base.publicBase) throw conflict('This event already has a reserved public address.');
-    if (!route) tx.update(ref, { eventMountConsent: { ...base, by: user.uid, at } });
+    if (!route || route.state === 'removed') tx.update(ref, { eventMountConsent: { ...base, by: user.uid, at } });
   });
   return { body: { appId, publicBase: base.publicBase } };
 }
@@ -103,7 +103,7 @@ async function enroll(tx, db, { appId, app, ref, route, body, user, at }) {
   const base = parseEnrollmentBase(body.publicBase);
   if (route) {
     if (route.publicBase !== base.publicBase) throw conflict('This event already has a reserved public address.');
-    return route;
+    if (route.state !== 'removed') return route;
   }
   const consent = app.eventMountConsent;
   if (consent?.publicBase !== base.publicBase) throw conflict('An Owner of this event must approve this exact address.');
@@ -115,6 +115,14 @@ async function enroll(tx, db, { appId, app, ref, route, body, user, at }) {
     throw conflict('Wait until this event’s build finishes or is ready to retry.');
   }
   const record = enrolledRoute({ appId, app, build, consent, base, user, at });
+  if (route) {
+    if (route.projectId !== record.projectId || route.hostingOrigin !== record.hostingOrigin) {
+      throw conflict('The event must keep its original Firebase project and Hosting site.');
+    }
+    const revised = { consent: record.consent, state: 'enrolled', changedAt: at, changedBy: user.uid };
+    tx.update(ref, revised);
+    return { ...route, ...revised };
+  }
   const hostRef = clientHostRef(db, base.host);
   const approved = (await get(hostRef)).data();
   if (!approved) {
@@ -153,9 +161,31 @@ async function manageEventMount({ db, now = Date.now }, { body, user }) {
     await requireOperator(db, user, get);
     const route = (await get(ref)).data();
     if (body.action === 'get') return route || null;
-    if (body.action !== 'enroll') throw new ConsoleError(400, 'bad-request', 'Choose an enrollment action.');
-    const app = requireApplication(await get(applicationRef(db, appId)));
-    return enroll(tx, db, { appId, app, ref, route, body, user, at });
+    if (body.action === 'enroll') {
+      const app = requireApplication(await get(applicationRef(db, appId)));
+      return enroll(tx, db, { appId, app, ref, route, body, user, at });
+    }
+    if (!['publish', 'remove'].includes(body.action) || body.confirm !== true) {
+      throw new ConsoleError(400, 'confirm-required', 'Choose and confirm a route change.');
+    }
+    if (!route) throw new ConsoleError(404, 'not-found', 'No event route was enrolled.');
+    const state = body.action === 'publish' ? 'published' : 'removed';
+    if (state === 'published') {
+      const app = requireApplication(await get(applicationRef(db, appId)));
+      const build = await readBuild(get, db, appId);
+      if (!['enrolled', 'published'].includes(route.state) || !CONSOLE_REQUEST_GROUPS.built.includes(app.status)
+          || build?.state === 'running' || parseEnrollmentBase(body.publicBase).publicBase !== route.publicBase) {
+        throw conflict('Confirm the approved public address for a completed event.');
+      }
+      resolveEventPublicBase({ ...route, state }, { ...build?.resources, appId });
+    }
+    if (route.state === state) return route;
+    const updated = {
+      state, changedBy: user.uid, changedAt: at,
+      ...(state === 'published' ? { publishedAt: route.publishedAt || at } : {}),
+    };
+    tx.update(ref, updated);
+    return { ...route, ...updated };
   });
   return { body: { route: result } };
 }

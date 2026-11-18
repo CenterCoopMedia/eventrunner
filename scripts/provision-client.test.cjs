@@ -12,13 +12,15 @@ const { createHash, generateKeyPairSync } = require('node:crypto');
 const test = require('node:test');
 const { makeFakeDb, makeFakeSecrets } = require('../console/functions/src/fakes.cjs');
 const { fakeMailer, quietLog } = require('../console/functions/src/testData.cjs');
-const { application, seeded, NOW } = require('../console/functions/src/fakeReview.cjs');
+const { ana, application, ops, seeded, NOW } = require('../console/functions/src/fakeReview.cjs');
+const { consentEventMount, manageEventMount } = require('../console/functions/src/clientHostEnrollment.cjs');
 const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs');
 const { resolveAdminTier } = require('../functions/src/core/auth.cjs');
 const { acceptInvite, inviteMember } = require('../console/functions/src/invites.cjs');
 const { changeMemberRole, removeMember } = require('../console/functions/src/members.cjs');
-const { SERVICES, STEPS, brandingProblem, main, markStopped, parseArgs, provision, syncAccess, syncTeams } = require('./provision-client.cjs');
+const { SERVICES, STEPS, brandingProblem, main, markStopped, parseArgs, provision, syncAccess, syncEventMount, syncTeams } = require('./provision-client.cjs');
 const { STEPS: DECOMMISSION_STEPS } = require('./decommission-client.cjs');
+const { buildPlan, resolvePublisherEnv } = require('./publish-site.cjs');
 
 const { privateKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048,
@@ -1766,6 +1768,114 @@ test('a retry after a code update redeploys bootstrap and full site instead of r
   assert.equal(fake.state.runs.length, 4);
   assert.ok(fake.state.runs.slice(2).every((run) => run.head_sha === patched));
   assert.ok(fake.calls.filter((c) => c.url.endsWith('/dispatches')).every((c) => c.body.ref === 'main'));
+});
+
+const MOUNT = 'https://client.example.test/events/summit/';
+
+async function enrollMountedEvent(db, publicBase = MOUNT) {
+  await consentEventMount({ db }, { body: { appId: 'a1', orgId: 'o1', publicBase, confirm: true }, user: ana });
+  await manageEventMount({ db }, { body: {
+    action: 'enroll', appId: 'a1', publicBase, authorityReference: 'fixture-approval', confirmAuthority: true,
+  }, user: ops });
+}
+
+test('provision retries keep the root while staged and preserve the published base for both builds', async () => {
+  const fake = setup();
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  await fake.db.doc('console_builds/a1').update({ state: 'failed', ownersEmailedAt: null });
+  fake.mailer.sent.length = 0;
+  await enrollMountedEvent(fake.db);
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  const variables = fake.state.variables;
+  assert.equal(variables.EVENT_PUBLIC_URL, `https://${DOMAIN}`);
+  assert.equal(variables.VITE_EVENT_PUBLIC_URL, `https://${DOMAIN}`);
+  assert.equal(fake.mailer.sent.find(({ status }) => status === 'ready').adminLink, `https://${DOMAIN}/admin`);
+
+  await manageEventMount({ db: fake.db }, { body: { action: 'publish', appId: 'a1', publicBase: MOUNT, confirm: true }, user: ops });
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  await fake.db.doc('console_builds/a1').update({ state: 'failed', ownersEmailedAt: null });
+  fake.mailer.sent.length = 0;
+  const previousRuns = fake.state.runs.length;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fake.state.runs.length, previousRuns + 2);
+  assert.equal(variables.EVENT_PUBLIC_URL, MOUNT);
+  assert.equal(variables.VITE_EVENT_PUBLIC_URL, MOUNT);
+  assert.equal(variables.VITE_FIREBASE_AUTH_DOMAIN, `${PROJECT}.firebaseapp.com`);
+  assert.equal(variables.EVENT_ALLOWED_ORIGINS, `https://${DOMAIN},https://${PROJECT}.web.app,https://client.example.test`);
+  const publisher = resolvePublisherEnv({ ...variables, EVENT_STRIPE_ACCOUNT_ID: 'acct_1' });
+  assert.equal(publisher.ok, true, publisher.message);
+  const plan = buildPlan({ env: publisher.resolved, generatedDir: '/fixture/generated' });
+  assert.equal(plan.find(({ stage }) => stage === 'build').env.VITE_EVENT_PUBLIC_URL, MOUNT);
+  assert.equal(plan.find(({ stage }) => stage === 'build').env.VITE_FIREBASE_AUTH_DOMAIN, `${PROJECT}.firebaseapp.com`);
+  assert.ok(plan.at(-1).args.includes(PROJECT));
+  assert.equal(fake.db.read('console_event_mounts/a1').hostingOrigin, `https://${PROJECT}.web.app`);
+  assert.equal(fake.db.read('console_event_mounts/a1').appliedPublicBase, MOUNT);
+  const ready = fake.mailer.sent.find(({ status }) => status === 'ready');
+  assert.equal(ready.adminLink, `${MOUNT}admin`);
+});
+
+test('sync preserves a custom standalone address through mounted publication and rollback', async () => {
+  const fake = setup();
+  await existingSite(fake, { record: { resources: { site: PROJECT, domain: DOMAIN, environment: 'nclocal' } } });
+  const publicBase = `https://${DOMAIN}/events/summit/`;
+  const standalone = 'https://annual-summit.example.test';
+  await enrollMountedEvent(fake.db, publicBase);
+  fake.state.environment = { name: 'nclocal' };
+  fake.state.variables = {
+    EVENTRUNNER_REQUEST_ID: 'a2',
+    EVENT_FIREBASE_PROJECT_ID: PROJECT,
+    EVENT_HOSTING_SITE: PROJECT,
+    EVENT_ALLOWED_ORIGINS: 'https://additional.example.test',
+    EVENT_PUBLIC_URL: standalone,
+    VITE_EVENT_PUBLIC_URL: standalone,
+    VITE_FIREBASE_AUTH_DOMAIN: `${PROJECT}.firebaseapp.com`,
+  };
+  const sync = () => syncEventMount({ appId: 'a1', deps: fake.deps });
+  assert.equal(await sync(), 0);
+  assert.equal(fake.calls.length, 0);
+  assert.equal(fake.state.variables.EVENT_PUBLIC_URL, standalone);
+  await manageEventMount({ db: fake.db }, { body: { action: 'publish', appId: 'a1', publicBase, confirm: true }, user: ops });
+  await assert.rejects(sync(), /deployment environment does not match/);
+  fake.state.variables.EVENTRUNNER_REQUEST_ID = 'a1';
+  const old = { ...fake.state.variables };
+  assert.equal(await sync(), 0);
+  assert.deepEqual(fake.state.variables, {
+    ...old,
+    EVENT_ALLOWED_ORIGINS: `https://additional.example.test,https://${DOMAIN},https://${PROJECT}.web.app`,
+    EVENT_PUBLIC_URL: publicBase,
+    VITE_EVENT_PUBLIC_URL: publicBase,
+  });
+  assert.equal(fake.db.read('console_event_mounts/a1').standalonePublicBase, standalone);
+  assert.equal(fake.db.read('console_event_mounts/a1').appliedPublicBase, publicBase);
+  const writes = fake.calls.filter(({ method, url }) => method === 'PATCH' && url.includes('/environments/')).length;
+  assert.equal(await sync(), 0);
+  assert.equal(fake.calls.filter(({ method, url }) => method === 'PATCH' && url.includes('/environments/')).length, writes);
+  assert.equal(fake.state.runs.length, 1);
+  assert.equal(fake.mailer.sent.length, 0);
+  await manageEventMount({ db: fake.db }, { body: { action: 'remove', appId: 'a1', confirm: true }, user: ops });
+  assert.equal(await sync(), 0);
+  assert.equal(fake.state.variables.EVENT_PUBLIC_URL, standalone);
+  assert.equal(fake.state.variables.VITE_EVENT_PUBLIC_URL, standalone);
+  assert.equal(fake.state.variables.VITE_FIREBASE_AUTH_DOMAIN, old.VITE_FIREBASE_AUTH_DOMAIN);
+  assert.equal(fake.db.read('console_event_mounts/a1').publicBase, publicBase);
+  assert.equal(fake.db.read('console_event_mounts/a1').appliedPublicBase, standalone);
+  assert.equal(fake.state.runs.length, 2);
+});
+
+test('a failed full deploy keeps the previously applied address', async () => {
+  const fake = setup({ cloud: { deployFailures: 3 } });
+  await existingSite(fake, { record: { resources: { site: PROJECT, domain: DOMAIN, environment: 'nclocal' } } });
+  await enrollMountedEvent(fake.db);
+  await manageEventMount({ db: fake.db }, { body: { action: 'publish', appId: 'a1', publicBase: MOUNT, confirm: true }, user: ops });
+  fake.state.environment = { name: 'nclocal' };
+  fake.state.variables = {
+    EVENTRUNNER_REQUEST_ID: 'a1', EVENT_FIREBASE_PROJECT_ID: PROJECT, EVENT_HOSTING_SITE: PROJECT,
+    EVENT_PUBLIC_URL: `https://${DOMAIN}`, VITE_EVENT_PUBLIC_URL: `https://${DOMAIN}`,
+  };
+  await assert.rejects(syncEventMount({ appId: 'a1', deps: fake.deps }), /the deploy failed/);
+  assert.equal(fake.db.read('console_event_mounts/a1').appliedPublicBase, undefined);
+  assert.equal(fake.db.read('console_event_mounts/a1').standalonePublicBase, `https://${DOMAIN}`);
 });
 
 for (const bootstrap of [true, false]) {

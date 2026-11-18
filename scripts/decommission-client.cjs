@@ -4,7 +4,7 @@
 /** The site builder's inverse. All I/O is injected. See runbook §12.6. */
 const { createHash } = require('node:crypto');
 const { toMillis } = require('../console/functions/src/access.cjs');
-const { eventMountRef, purgeEventMount } = require('../console/functions/src/clientHostRecords.cjs');
+const { changeMountForApplication, clientHostRef, eventMountRef, purgeEventMount } = require('../console/functions/src/clientHostRecords.cjs');
 const { historyEntry } = require('../console/functions/src/applications.cjs');
 const { BUILD_COLLECTION, canRetryBuild } = require('../console/functions/src/buildState.cjs');
 const { approvalDefaults, readConsoleSettings, normalizeProjectId } = require('../console/functions/src/consoleSettings.cjs');
@@ -339,6 +339,7 @@ async function archive(ctx) {
     // began: it may own a project, and console retention keeps it for this.
     if (![...CONSOLE_REQUEST_GROUPS.built, 'draft', 'declined'].includes(app.status) && !failedBuild(app, build, ctx.deps.now())) throw new Error(`archive: status ${app.status} is not allowed`);
     const at = instant(ctx.deps);
+    await changeMountForApplication(tx, ctx.deps.db, ctx.appId, 'retire');
     tx.update(appRef(ctx), {
       status: 'archived', archivedAt: at, purgeAfter: new Date(at.getTime() + RECOVERY_MS),
       archive: { previousStatus: app.status, versionName, pending: true },
@@ -396,6 +397,7 @@ async function restore(ctx) {
     if (tomb.exists) throw new Error('restore: purge has started');
     if (data?.status !== 'archived' || !data.archive?.restoring) throw new Error('restore: the application changed');
     const at = instant(ctx.deps);
+    await changeMountForApplication(tx, ctx.deps.db, ctx.appId, 'restore');
     tx.update(appRef(ctx), {
       status: previous.previousStatus, archivedAt: null, purgeAfter: null, archive: null,
       updatedAt: at, updatedBy: 'decommission', history: [...(data.history || []), historyEntry(previous.previousStatus, at, 'decommission', 'Restored the site')],
@@ -627,14 +629,19 @@ async function customDomain(ctx) {
 }
 
 async function dnsRecords(ctx) {
-  const { env } = ctx.deps;
+  const { db, env } = ctx.deps;
+  const { domain, dnsRecords: inventory } = ctx.resources;
   const base = `https://api.cloudflare.com/client/v4/zones/${env.CLOUDFLARE_ZONE_ID}/dns_records`;
   const headers = { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` };
   const found = [];
   const all = [];
-  const names = [...new Set(ctx.resources.dnsRecords.map((r) => hostName(r.name)))].filter(Boolean);
+  const names = [...new Set(inventory.map((r) => hostName(r.name)))].filter(Boolean);
+  // A standalone site address can become a shared host. Its address and
+  // certificate records then belong to the host, even if this event made them.
+  const shared = domain && names.length && (await clientHostRef(db, domain).get()).exists;
   for (const name of names) {
-    if (name !== ctx.resources.domain && !name.endsWith(`.${ctx.resources.domain}`)) throw new Error('DNS: unsafe verification name');
+    if (name !== domain && !name.endsWith(`.${domain}`)) throw new Error('DNS: unsafe verification name');
+    if (shared && (name === domain || name === `_acme-challenge.${domain}`)) continue;
     for (let page = 1; ; page += 1) {
       const query = new URLSearchParams({ name, per_page: '100', page: String(page) });
       const data = await call(ctx, 'DNS: list', `${base}?${query}`, { headers });
@@ -642,7 +649,7 @@ async function dnsRecords(ctx) {
       for (const record of data.result || []) {
         if (hostName(record.name) !== name) continue;
         all.push(record);
-        if (ctx.resources.dnsRecords.some((r) => (!r.id || r.id === record.id) && hostName(r.name) === name && r.type === record.type && dnsValue(r.content) === dnsValue(record.content))) found.push(record);
+        if (inventory.some((r) => (!r.id || r.id === record.id) && hostName(r.name) === name && r.type === record.type && dnsValue(r.content) === dnsValue(record.content))) found.push(record);
       }
       if (page >= (data.result_info?.total_pages || 1)) break;
     }
@@ -828,6 +835,7 @@ async function purge(ctx, now, confirmSite) {
       const app = snap.data();
       if (tomb.exists) throw new Error('purge: another run has started');
       checkPurge(ctx, app, buildSnap.data() || {}, now, confirmSite);
+      await changeMountForApplication(tx, ctx.deps.db, ctx.appId, 'remove');
       ctx.tomb = {
         siteAddress: ctx.resources.domain || null, projectId: ctx.resources.projectId || null,
         createdAt: app.createdAt || null, archivedAt: app.archivedAt || null, purgeAfter: app.purgeAfter || null,

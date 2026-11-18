@@ -311,6 +311,8 @@ export default function ApplicationStatus() {
   const canReconnect = Boolean(reconnectProvider) && app.myRole === 'owner';
   const underway = CONSOLE_REQUEST_GROUPS.building.includes(app.status) && !recoverable;
   const live = CONSOLE_REQUEST_GROUPS.built.includes(app.status);
+  const webUrl = app.publicBase === undefined && app.address ? `https://${app.address}` : app.publicBase;
+  const webAddress = app.publicBase ? app.publicBase.slice('https://'.length) : app.address;
   return (
     <section aria-labelledby="status-title" className="console-workspace application-workspace">
       <div className={`application-layout${closed ? ' application-closed' : ''}`}>
@@ -320,8 +322,8 @@ export default function ApplicationStatus() {
             <p className="lead application-state">{buildWaiting ? 'Waiting for your web address' : buildFailed ? BUILD_FAILED_LABEL : STATUS_LABELS[app.status]}</p>
           </header>
           {/* The address shows once the site answers there, so nobody opens it to a hosting error page mid-build. */}
-          {live && app.address ? (
-            <p className="application-address"><span>Web address</span><strong><a href={`https://${app.address}`}>{app.address}</a></strong></p>
+          {live && webUrl ? (
+            <p className="application-address"><span>Web address</span><strong><a href={webUrl}>{webAddress}</a></strong></p>
           ) : null}
 
           <ConnectionNotice message={state?.connectionMessage} />
@@ -343,8 +345,8 @@ export default function ApplicationStatus() {
           ) : null}
 
           <div className="application-actions">
-            {live && app.address ? (
-              <p><a className="button primary" href={`https://${app.address}/admin`}>Open your admin panel</a></p>
+            {live && webUrl ? (
+              <p><a className="button primary" href={new URL('admin', app.publicBase || `${webUrl}/`).href}>Open your admin panel</a></p>
             ) : null}
             {app.canEdit ? (
               <p><Link className="button primary" to={setupPath(orgId, appId, stepById(ANSWER_STEPS.find((id) => !app.progress[id]) || 'review'))}>Continue the setup</Link></p>
