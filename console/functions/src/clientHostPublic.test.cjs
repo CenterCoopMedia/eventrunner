@@ -55,10 +55,14 @@ test('the public host root links only approved titles and serves an empty state 
   assert.equal((await request('/', { method: 'POST' })).status, 405);
   assert.equal(upstreams.length, 0);
 
+  replaceMap([{ ...conference, publicTitle: null }, archive]);
+  assert.doesNotMatch(await (await request('/')).text(), /href="\/conference\//);
+  assert.equal(await (await request('/conference/')).text(), 'event origin');
+  assert.equal(upstreams.at(-1), `${conference.hostingOrigin}/`);
   replaceMap([archive]);
   assert.equal((await request('/conference/updates/retired')).status, 404);
   assert.equal(await (await request('/events/workshops/')).text(), 'event origin');
-  assert.equal(upstreams[0], `${archive.hostingOrigin}/`);
+  assert.equal(upstreams.at(-1), `${archive.hostingOrigin}/`);
   replaceMap([]);
   assert.match(await (await request('/')).text(), /No public events are listed/);
   assert.equal((await request('https://unregistered.example.test/')).status, 404);

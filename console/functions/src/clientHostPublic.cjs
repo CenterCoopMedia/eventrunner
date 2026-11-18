@@ -8,7 +8,7 @@ function escapeHtml(value) {
 }
 
 function eventIndex(routes) {
-  const events = routes.map(({ assetBase, publicTitle }) =>
+  const events = routes.filter(({ publicTitle }) => publicTitle !== null).map(({ assetBase, publicTitle }) =>
     `<li><a href="${assetBase}">${escapeHtml(publicTitle)}</a></li>`);
   return `<!doctype html>
 <html lang="en">

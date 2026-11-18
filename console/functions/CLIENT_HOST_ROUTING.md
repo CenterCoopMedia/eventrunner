@@ -20,6 +20,6 @@ The shared-host rehearsal in #1063 covers the order that keeps both windows shor
 
 The Worker entry point is `client-host-worker.mjs`. Its `CLIENT_ROUTE_MAP_BUCKET` binding identifies the dedicated bucket holding the Console’s public projection. The exact request hostname selects `<host>.json`. The Worker reads that object without caching. The Console retains the writer identity.
 
-The Worker lists public event titles and links at `/`. `/.well-known/eventrunner-route-map` reports the `version` and `exportedAt` of the map currently in use. An approved map with zero published mounts serves the empty index. Unmatched mounts return 404. An optional `CLIENT_HOST_FALLBACK` service preserves existing responses on reserved host paths, including root Firebase helper paths.
+The Worker lists public event titles and links at `/` once the mounted deployment is confirmed. A map with zero confirmed listings serves the empty index. `/.well-known/eventrunner-route-map` reports the `version` and `exportedAt` of the map currently in use. Unmatched mounts return 404. An optional `CLIENT_HOST_FALLBACK` service preserves existing responses on reserved host paths, including root Firebase helper paths.
 
 The hosted fixtures use synthetic maps and upstreams. Raw ingress normalization, cache rules, bucket permissions, supported browsers and provider setup are part of the shared-host rehearsal.
