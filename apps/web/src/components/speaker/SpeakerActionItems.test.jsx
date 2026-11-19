@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 const listMaterials = vi.fn();
@@ -40,7 +40,65 @@ beforeEach(() => {
     Promise.resolve(sessionId === 'two' ? [{ reviewStatus: 'pending' }] : [{ reviewStatus: 'rejected' }]));
 });
 
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
 describe('speaker action items', () => {
+  it('explains a pending check outside busy content without repeating its reads', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let finish;
+    const pending = new Promise((resolve) => { finish = resolve; });
+    listMaterials.mockReturnValue(pending);
+    render(view());
+
+    const status = screen.getByRole('status', { name: 'Checking your next steps…' });
+    const region = screen.getByRole('region', { name: 'Speaker checklist' });
+    expect(status.closest('[aria-busy="true"]')).toBeNull();
+    expect(region).toHaveAttribute('aria-busy', 'true');
+    expect(status.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'initial');
+    act(() => vi.advanceTimersByTime(999));
+    expect(status.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'initial');
+    act(() => vi.advanceTimersByTime(1));
+    expect(status.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'active');
+    act(() => vi.advanceTimersByTime(9000));
+    expect(status).toHaveTextContent('This is taking longer than usual.');
+    act(() => vi.advanceTimersByTime(50000));
+    expect(status).toHaveTextContent('We haven’t received a result after a minute.');
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(listMaterials).toHaveBeenCalledTimes(2);
+
+    await act(async () => finish([{ reviewStatus: 'approved' }]));
+    expect(screen.queryByRole('status', { name: 'Checking your next steps…' })).toBeNull();
+    expect(region).toHaveAttribute('aria-busy', 'false');
+    expect(screen.getByRole('progressbar', { name: '2 of 4 items complete' })).toBeInTheDocument();
+  });
+
+  it('shows a fast result immediately and starts a new clock for a different account', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let finish;
+    const pending = new Promise((resolve) => { finish = resolve; });
+    listMaterials.mockReturnValue(pending);
+    const { rerender } = render(view());
+    act(() => vi.advanceTimersByTime(300));
+    await act(async () => finish([{ reviewStatus: 'approved' }]));
+    expect(screen.queryByRole('status', { name: 'Checking your next steps…' })).toBeNull();
+    expect(screen.getByRole('progressbar', { name: '2 of 4 items complete' })).toBeInTheDocument();
+
+    listMaterials.mockReturnValue(new Promise(() => {}));
+    rerender(view({ user: { uid: 'account-two' } }));
+    act(() => vi.advanceTimersByTime(10000));
+    expect(screen.getByRole('status')).toHaveTextContent('This is taking longer than usual.');
+    rerender(view({ user: { uid: 'account-three' } }));
+    const status = screen.getByRole('status', { name: 'Checking your next steps…' });
+    expect(status.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'initial');
+    expect(status).not.toHaveTextContent('This is taking longer than usual.');
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(status.closest('.loading-state')).toHaveAttribute('data-loading-stage', 'active');
+  });
+
   it('checks only assigned visible sessions and links each actual gap to its fixer', async () => {
     render(view());
 
