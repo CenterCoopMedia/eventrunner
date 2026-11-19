@@ -28,4 +28,30 @@ describe('DeferredPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reload the page' })).toBeInTheDocument();
   });
+
+  it('drops an abandoned route clock and paints a fast replacement without a ring', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let abandoned;
+    let finish;
+    const Slow = lazy(() => new Promise((resolve) => { abandoned = () => resolve({ default: () => <h1>Old page</h1> }); }));
+    const Fast = lazy(() => new Promise((resolve) => { finish = () => resolve({ default: () => <h1>New page</h1> }); }));
+    const view = render(<DeferredPage component={Slow} label="old page" routeKey="/old" handoff />);
+    try {
+      act(() => vi.advanceTimersByTime(9_999));
+      expect(screen.getByRole('status').closest('.loading-status')).toHaveAttribute('data-loading-stage', 'active');
+      view.rerender(<DeferredPage component={Fast} label="new page" routeKey="/new" handoff />);
+      act(() => vi.advanceTimersByTime(300));
+      expect(screen.getByRole('status')).toHaveAccessibleName('Loading new page…');
+      expect(view.container.querySelector('.loading-status__activity')).toBeNull();
+      await act(async () => finish());
+      expect(screen.getByRole('heading', { name: 'New page' })).toBeInTheDocument();
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+      await act(async () => abandoned());
+      expect(screen.queryByRole('heading', { name: 'Old page' })).toBeNull();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
 });

@@ -22,6 +22,7 @@ class RenderErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    this.props.onFailure?.();
     if (!IS_DEMO && isClientErrorReportingEnabled()) {
       void reportClientError({
         message: error?.message || String(error),

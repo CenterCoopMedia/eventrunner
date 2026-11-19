@@ -1,15 +1,17 @@
 // MySchedule — personal schedule view at /schedule/mine (issue #16). No
 // Firebase, no network (spec §8.1); useMyBookmarks is mocked directly so
 // tests drive the bookmarked-id set without a Firestore listener.
+import { lazy } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { Link, MemoryRouter, useLocation } from 'react-router';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../contexts/ToastContext.jsx';
 import MySchedule from './MySchedule.jsx';
+import DeferredPage from '../components/DeferredPage.jsx';
 import { getDeviceBookmarks, removeDeviceBookmarks, setDeviceBookmarked } from '../lib/deviceBookmarks.js';
 
 const useMyBookmarksMock = vi.fn();
@@ -116,9 +118,11 @@ function myScheduleElement({
   auth = { user: { uid: 'u1' }, loading: false },
   profile = { attendeeAccess: true },
   eventConfig = fixtureConfig,
+  route = <MySchedule />,
+  initialEntries,
 } = {}) {
   return (
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <EventConfigContext.Provider
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
@@ -136,7 +140,7 @@ function myScheduleElement({
                   getBlock: () => null,
                 }}
               >
-                <MySchedule />
+                {route}
               </ContentContext.Provider>
             </ToastProvider>
           </ProfileContext.Provider>
@@ -376,4 +380,80 @@ describe('MySchedule', () => {
       expect(screen.getAllByText(/Transfer from/)).toHaveLength(1);
     });
   });
+});
+
+function ScheduleProgram() {
+  return <h1>Program</h1>;
+}
+
+function ScheduleRoutes({ personalSchedule }) {
+  const { pathname } = useLocation();
+  const personal = pathname === '/schedule/mine';
+  return (
+    <>
+      <Link to="/schedule/mine">Open my schedule</Link>
+      <DeferredPage component={personal ? personalSchedule : ScheduleProgram}
+        label={personal ? 'your schedule' : 'schedule'} shape="schedule" routeKey={pathname} handoff={personal} />
+    </>
+  );
+}
+
+it.each([800, 10_000])('carries a %i ms code wait through account and bookmark loading', async (codeWait) => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  const heldUp = vi.fn();
+  window.addEventListener('eventrunner:held-up', heldUp);
+  let finish;
+  const PersonalSchedule = lazy(() => new Promise((resolve) => { finish = () => resolve({ default: MySchedule }); }));
+  const route = <ScheduleRoutes personalSchedule={PersonalSchedule} />;
+  const auth = { user: null, loading: true };
+  useMyBookmarksMock.mockReturnValue({ bookmarkedIds: new Set(), loading: true });
+  const view = render(myScheduleElement({ route, auth, initialEntries: ['/schedule'] }));
+  const tick = (ms) => act(() => vi.advanceTimersByTime(ms));
+  const status = () => screen.getByRole('status', { name: 'Loading your schedule…' });
+  const stage = () => status().closest('.loading-status');
+  try {
+    expect(screen.getByRole('heading', { name: 'Program' })).toBeInTheDocument();
+    await act(async () => fireEvent.click(screen.getByRole('link', { name: 'Open my schedule' })));
+    expect(status()).toHaveTextContent('Loading your schedule…');
+    expect(status()).toHaveAttribute('aria-live', 'polite');
+    expect(stage()).toHaveAttribute('data-loading-stage', 'initial');
+    expect(view.container.querySelectorAll('.loading-state__row')).toHaveLength(3);
+    tick(codeWait);
+    if (codeWait === 10_000) expect(status()).toHaveTextContent('longer than usual');
+    await act(async () => finish());
+    expect(view.container.querySelectorAll('.loading-state__row')).toHaveLength(3);
+
+    if (codeWait === 800) {
+      tick(199);
+      expect(stage()).toHaveAttribute('data-loading-stage', 'initial');
+      expect(view.container.querySelector('.loading-status__activity')).toBeNull();
+      tick(1);
+      expect(stage()).toHaveAttribute('data-loading-stage', 'active');
+      expect(view.container.querySelector('.loading-status__activity')).toBeInTheDocument();
+      tick(600);
+      view.rerender(myScheduleElement({ route, auth: { user: { uid: 'u1' }, loading: false }, profile: { profileReady: false } }));
+      expect(stage()).toHaveAttribute('data-loading-stage', 'active');
+      tick(8_400);
+    }
+    expect(status()).toHaveTextContent('longer than usual');
+    view.rerender(myScheduleElement({ route }));
+    expect(screen.getByRole('heading', { name: 'My schedule' })).toBeInTheDocument();
+    expect(status()).toHaveTextContent('longer than usual');
+    expect(view.container.querySelectorAll('.loading-state__row')).toHaveLength(3);
+    expect(heldUp).toHaveBeenCalledTimes(1);
+
+    useMyBookmarksMock.mockReturnValue({ bookmarkedIds: new Set(), loading: false });
+    view.rerender(myScheduleElement({ route }));
+    expect(screen.getByRole('heading', { name: 'No bookmarked sessions yet' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading your schedule…' })).toBeNull();
+    expect(view.container.querySelector('.loading-status__activity')).toBeNull();
+
+    useMyBookmarksMock.mockReturnValue({ bookmarkedIds: new Set(), loading: true });
+    view.rerender(myScheduleElement({ route }));
+    expect(stage()).toHaveAttribute('data-loading-stage', 'initial');
+  } finally {
+    view.unmount();
+    window.removeEventListener('eventrunner:held-up', heldUp);
+    vi.useRealTimers();
+  }
 });

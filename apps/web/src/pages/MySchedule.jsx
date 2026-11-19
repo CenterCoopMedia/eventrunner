@@ -28,6 +28,7 @@ import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from '../lib/scheduleView.js';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
 import { downloadMySchedulePdf } from '../lib/schedulePdf.js';
+import { useRouteLoadingAttempt } from '../lib/routeLoading.jsx';
 import { sessionMovement } from 'shared/venue';
 import { primaryActionClass, quietActionClass } from '../components/controlClasses.js';
 
@@ -57,6 +58,11 @@ export default function MySchedule() {
   const { bookmarkedIds: accountBookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
   const device = useDeviceBookmarks();
   const deviceOnly = !user || !attendeeAccess;
+  const available = features.schedule && features.sessionBookmarks;
+  const checkingAccount = authLoading || profileLoading;
+  const loadingSchedule = loading || (!deviceOnly && bookmarksLoading);
+  const routePending = available && (checkingAccount || ((user || device.available) && loadingSchedule));
+  const routeAttempt = useRouteLoadingAttempt(!routePending);
   const bookmarkedIds = useMemo(() => new Set([
     ...(deviceOnly ? [] : accountBookmarkedIds), ...device.ids,
   ]), [deviceOnly, accountBookmarkedIds, device.ids]);
@@ -119,7 +125,7 @@ export default function MySchedule() {
   const mySessions = useMemo(() => Array.from(myByDay.values()).flat(), [myByDay]);
   const accountSessions = useMemo(() => mySessions.filter((session) => accountBookmarkedIds.has(session.id)), [mySessions, accountBookmarkedIds]);
 
-  if (!features.schedule || !features.sessionBookmarks) {
+  if (!available) {
     return (
       <EmptyState
         title="This event doesn’t have a personal schedule"
@@ -133,10 +139,10 @@ export default function MySchedule() {
     );
   }
 
-  if (authLoading || profileLoading) {
+  if (checkingAccount) {
     return (
       <div className="mt-lg">
-        <LoadingState shape="schedule" label="Loading your schedule…" />
+        <LoadingState shape="schedule" label="Loading your schedule…" routeAttempt={routeAttempt} />
       </div>
     );
   }
@@ -211,9 +217,9 @@ export default function MySchedule() {
         </div>
       </header>
 
-      {loading || (!deviceOnly && bookmarksLoading) ? (
+      {loadingSchedule ? (
         <div className="mt-lg">
-          <LoadingState shape="schedule" label="Loading your schedule…" />
+          <LoadingState shape="schedule" label="Loading your schedule…" routeAttempt={routeAttempt} />
         </div>
       ) : mySessions.length === 0 ? (
         <div className="mt-lg">

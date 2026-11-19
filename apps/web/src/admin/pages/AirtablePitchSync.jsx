@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { subscribeAdminDoc } from '../adminSource.js';
 import { formatPublishedAt } from '../versionHistory.js';
-import { StatusBadge } from '../components/adminChrome.jsx';
+import { AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import { Notice, SaveStatus, TextField, SelectField, ServerErrorSummary,
   secondaryButtonClass } from '../components/formControls.jsx';
 
@@ -80,7 +80,7 @@ function summary(counts = {}) {
 }
 
 function RunStatus({ status, timeZone }) {
-  if (status === undefined) return <p className="text-admin-sm text-admin-ink-secondary">Loading the refresh status…</p>;
+  if (status === undefined) return <AdminLoadingState label="Loading the refresh status…" />;
   const run = status?.lastRun;
   const running = status?.running;
   return <div className="space-y-sm" aria-label="Airtable refresh status">

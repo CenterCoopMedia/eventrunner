@@ -126,10 +126,10 @@ export function AdminEmptyState({ title, description, action = null }) {
  * pending. It is decorative, static under reduced motion, and unmounts
  * with the loading state (brief §2.2, asynchronous-work amendment).
  *
- * @param {{ label: string }} props
+ * @param {{ label: string, routeAttempt?: object }} props
  */
-export function AdminLoadingState({ label }) {
-  const { stage } = useLoadingStage();
+export function AdminLoadingState({ label, routeAttempt }) {
+  const { stage } = useLoadingStage({ routeAttempt });
   return (
     <div className="admin-loading-state py-md text-admin-sm text-admin-ink-secondary">
       <LoadingStatus label={label} stage={stage} />
