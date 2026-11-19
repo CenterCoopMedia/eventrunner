@@ -144,7 +144,21 @@ async function checkBrowser(page, id, mode, updateId, updateTitle) {
   await page.reload();
   await heading.waitFor({ state: 'visible' });
   const update = new URL(`updates/${updateId}`, base);
-  const rendered = await page.goto(update.href);
+  // The update heading can appear before the router replaces its history
+  // entry. Wait for that same-document commit before leaving for sign-in.
+  let committedUpdate = false;
+  const [, rendered] = await Promise.all([
+    page.waitForEvent('framenavigated', {
+      predicate(frame) {
+        if (frame !== page.mainFrame() || frame.url() !== update.href) return false;
+        if (committedUpdate) return true;
+        committedUpdate = true;
+        return false;
+      },
+      timeout: 30_000,
+    }),
+    page.goto(update.href),
+  ]);
   check(rendered?.ok() && page.url() === update.href, 'Direct update did not stay on the event');
   await page.getByRole('heading', { name: updateTitle, exact: true }).waitFor({ state: 'visible' });
   const html = await rendered.text();
