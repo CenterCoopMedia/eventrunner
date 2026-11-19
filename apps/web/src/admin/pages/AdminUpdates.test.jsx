@@ -189,7 +189,9 @@ describe('the updates list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
 
     await waitFor(() => expect(callsTo('cmsPublish')).toHaveLength(1));
-    expect(bodyOf(callsTo('cmsPublish')[0])).toEqual({ collection: 'cmsUpdates', docIds: ['edited', 'fresh'] });
+    expect(bodyOf(callsTo('cmsPublish')[0])).toEqual({
+      collection: 'cmsUpdates', docIds: ['edited', 'fresh'], requestId: expect.any(String),
+    });
     expect(await screen.findByText('Published.', { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 

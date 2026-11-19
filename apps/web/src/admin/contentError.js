@@ -7,6 +7,7 @@ export function contentError(error, { labels = {}, fallback = 'The change could 
     'permission-denied': 'You do not have access to make this change. Ask an event admin for help.',
     forbidden: 'You do not have access to make this change. Ask an event admin for help.',
     network: 'The connection failed. Check your connection and try again.',
+    'request-id-in-use': 'Check Recent publishes for the status of this publish.',
   };
   const fieldErrors = (error?.fieldErrors ?? []).filter((item) => labels[item.field]).map((item) => ({
     field: item.field,

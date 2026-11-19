@@ -19,6 +19,8 @@ import { useAdminApi } from '../adminApi.js';
 import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminOrganizations } from '../useAdminOrganizations.js';
+import usePublishRun from '../usePublishRun.js';
+import PublishRunProgress from '../components/PublishRunProgress.jsx';
 import { useOrganizationRepresentatives } from '../useOrganizationRepresentatives.js';
 import { orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
@@ -54,6 +56,7 @@ export default function AdminOrganizationsList() {
   // A representative's edit waiting for review (issue #334) is named on its row.
   const { hasRequest } = useOrganizationRepresentatives();
   const call = useAdminApi();
+  const { publish, run } = usePublishRun(call);
   const { showToast } = useToast();
   const draft = useDraftOrder(rows);
   const [publishing, setPublishing] = useState(null);
@@ -134,7 +137,7 @@ export default function AdminOrganizationsList() {
     setNotice(null);
     setResume(null);
     try {
-      reportPublish(await call('cmsPublish', { collection: 'cmsOrganizations', docIds: ids }), ids);
+      reportPublish(await publish({ collection: 'cmsOrganizations', docIds: ids }), ids);
     } catch (err) {
       reportFailure(err, ids);
     } finally {
@@ -145,7 +148,7 @@ export default function AdminOrganizationsList() {
   async function resumePublish() {
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId: resume.queueId });
+      const response = await publish({ queueId: resume.queueId });
       setResume(null);
       reportPublish(response, resume.ids);
     } catch (err) {
@@ -201,6 +204,7 @@ export default function AdminOrganizationsList() {
           </>
         }
       />
+      <PublishRunProgress run={run} />
 
       <PlannerFeatureControls choices={[{ key: 'sponsors', label: 'Sponsor list' }]} />
       <DeletedRecordResult />

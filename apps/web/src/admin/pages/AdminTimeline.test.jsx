@@ -237,7 +237,9 @@ describe('the timeline list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsPublish');
-    expect(bodyOf(0)).toEqual({ collection: 'cmsTimeline', docIds: ['edition-2019', 'edition-2025'] });
+    expect(bodyOf(0)).toEqual({
+      collection: 'cmsTimeline', docIds: ['edition-2019', 'edition-2025'], requestId: expect.any(String),
+    });
     expect(await screen.findAllByText('Published.')).not.toHaveLength(0);
   });
 

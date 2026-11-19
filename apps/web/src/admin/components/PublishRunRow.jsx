@@ -4,6 +4,7 @@ import { versionAuthor } from '../pages/versionDisplay.js';
 import { rowMetaClass, secondaryButtonClass } from './formControls.jsx';
 import { ActionFeedback } from './ActionFeedback.jsx';
 import { StatusBadge } from './adminChrome.jsx';
+import PublishRunProgress from './PublishRunProgress.jsx';
 
 function RunWord({ summary }) {
   if (summary.tone === 'done') {
@@ -12,7 +13,7 @@ function RunWord({ summary }) {
   return <StatusBadge tone={summary.tone}>{summary.word}</StatusBadge>;
 }
 
-export default function RunRow({ row, timeZone, busyKey, controlProps, notice, resultRef }) {
+export default function RunRow({ row, timeZone, busyKey, controlProps, notice, resultRef, progressRun }) {
   const summary = runSummary(row);
   const key = `resume:${row.id}`;
   const failed = row.status === 'failed';
@@ -37,6 +38,7 @@ export default function RunRow({ row, timeZone, busyKey, controlProps, notice, r
           </button>
         </div>
       ) : null}
+      {progressRun ? <PublishRunProgress run={progressRun} /> : null}
       <div ref={resultRef} tabIndex={-1} className="empty:hidden">
         <ActionFeedback message={notice?.message} tone={notice?.tone} />
       </div>

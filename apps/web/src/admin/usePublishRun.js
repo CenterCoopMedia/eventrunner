@@ -10,9 +10,14 @@ export default function usePublishRun(call) {
   useEffect(() => {
     if (!active) return undefined;
     return subscribePublishRun(active.id, (row) => {
-      setRun((current) => current?.pending && current.attempt === active
-        ? { ...current, counts: publishRunCounts(row) }
-        : current);
+      const counts = publishRunCounts(row);
+      const receivedAt = performance.now();
+      setRun((current) => {
+        if (!current?.pending || current.attempt !== active) return current;
+        const changed = counts.published !== (current.counts?.published ?? 0)
+          || counts.skipped !== (current.counts?.skipped ?? 0);
+        return { ...current, counts, countChangedAt: changed ? receivedAt : current.countChangedAt };
+      });
     });
   }, [active]);
 
@@ -26,6 +31,7 @@ export default function usePublishRun(call) {
         attempt,
         pending: true,
         counts: previous ?? (resumeRow ? publishRunCounts(resumeRow) : null),
+        countChangedAt: attempt.startedAt,
       };
     });
     try {

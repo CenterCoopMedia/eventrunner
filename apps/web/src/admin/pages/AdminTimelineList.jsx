@@ -18,6 +18,8 @@ import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminTimeline } from '../useAdminTimeline.js';
+import usePublishRun from '../usePublishRun.js';
+import PublishRunProgress from '../components/PublishRunProgress.jsx';
 import {
   Notice,
   Panel,
@@ -42,7 +44,7 @@ const text = (value) => (typeof value === 'string' && value.trim() ? value.trim(
 export default function AdminTimelineList() {
   const { rows, loading, error } = useAdminTimeline();
   const { getPage } = useContent();
-  const call = useAdminApi();
+  const { publish, run } = usePublishRun(useAdminApi());
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -72,7 +74,7 @@ export default function AdminTimelineList() {
     setNotice(null);
     setResume(null);
     try {
-      reportPublish(await call('cmsPublish', { collection: COLLECTION, docIds: ids }), ids);
+      reportPublish(await publish({ collection: COLLECTION, docIds: ids }), ids);
     } catch (err) {
       reportFailure(err, ids);
     } finally {
@@ -85,7 +87,7 @@ export default function AdminTimelineList() {
     const { queueId, ids } = resume;
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId });
+      const response = await publish({ queueId });
       setResume(null);
       reportPublish(response, ids);
     } catch (err) {
@@ -135,6 +137,7 @@ export default function AdminTimelineList() {
           </>
         }
       />
+      <PublishRunProgress run={run} />
 
       <DeletedRecordResult />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}

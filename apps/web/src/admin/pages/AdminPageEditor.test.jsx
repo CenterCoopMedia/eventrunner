@@ -346,7 +346,7 @@ describe('page list', () => {
     expect(urlOf(0)).toMatch(/\/cmsPublish$/);
     // 'faq' is already published with no dirty draft — republishing it would
     // bump its revision for nothing.
-    expect(bodyOf(0)).toEqual({ collection: 'cmsPages', docIds: ['scholarships'] });
+    expect(bodyOf(0)).toEqual({ collection: 'cmsPages', docIds: ['scholarships'], requestId: expect.any(String) });
   });
 
   it('disables page moves while publish is running', async () => {
