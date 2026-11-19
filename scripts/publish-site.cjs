@@ -79,6 +79,7 @@ const { validateDeployEnv } = require('../packages/shared/src/config/deploy.cjs'
 const { contentLanguages } = require('shared/contentLanguages');
 const { buildSiteArtifacts } = require('./lib/site-manifest.cjs');
 const { writeAppIcons } = require('./lib/app-icons.cjs');
+const { npmCommand } = require('./prepare-functions.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const DIST_DIR = path.join(ROOT, 'apps', 'web', 'dist');
@@ -146,7 +147,6 @@ function resolvePublisherEnv(env) {
  */
 function buildPlan({ env, generatedDir }) {
   const projectId = env.EVENT_FIREBASE_PROJECT_ID;
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   return [
     {
@@ -165,12 +165,11 @@ function buildPlan({ env, generatedDir }) {
     {
       stage: 'build',
       label: 'Build the web app against the generated snapshot',
-      command: npm,
-      args: ['run', 'build', '-w', 'apps/web'],
-      // Mirrors deploy-client.yml's `build` step exactly. A key that is
-      // set there and not here ships a bundle that differs from the one
-      // CI produced, which is the hardest class of bug to see.
+      ...npmCommand(['run', 'build', '-w', 'apps/web']),
+      // Match deploy-client.yml's production build and client settings.
       env: {
+        // The image installs Vite and other devDependencies in development mode.
+        NODE_ENV: 'production',
         GENERATED_DIR: generatedDir,
         VITE_FIREBASE_API_KEY: env.VITE_FIREBASE_API_KEY,
         VITE_FIREBASE_AUTH_DOMAIN: env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -540,7 +539,7 @@ function defaultRunStep(step, { env }) {
   const result = spawnSync(step.command, step.args, {
     cwd: ROOT,
     stdio: 'inherit',
-    env: { ...process.env, ...env },
+    env: { ...process.env, ...env, ...step.env },
   });
   return { status: result.error ? 1 : result.status, error: result.error };
 }
