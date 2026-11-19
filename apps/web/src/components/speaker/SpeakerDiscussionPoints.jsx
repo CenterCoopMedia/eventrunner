@@ -3,6 +3,7 @@ import { MAX_DISCUSSION_POINTS_LENGTH, validateDiscussionPoints } from 'shared/s
 import { getSpeakerDiscussionPoints, saveSpeakerDiscussionPoints } from '../../lib/speakerDiscussionApi.js';
 import { TextAreaField, focusFirstError } from '../forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from '../controlClasses.js';
+import LoadingState from '../LoadingState.jsx';
 
 const INITIAL = {
   phase: 'loading', draft: '', submission: null, revision: null,
@@ -149,7 +150,7 @@ export default function SpeakerDiscussionPoints({ discussion }) {
   const waiting = phase === 'loading' || phase === 'saving';
   const canSave = ['ready', 'saved', 'uncertain'].includes(phase);
   const draftMatchesSaved = submission?.text === draft.replace(/\r\n?/g, '\n').trim();
-  return (
+  const form = (
     <form onSubmit={save} aria-label="Speaker discussion points" aria-busy={waiting} className="space-y-md">
       <p className="text-body text-text-secondary">
         These notes are private to you and the organizers. One submission covers all your sessions.
@@ -160,7 +161,6 @@ export default function SpeakerDiscussionPoints({ discussion }) {
         hint={`Enter 1 to ${MAX_DISCUSSION_POINTS_LENGTH.toLocaleString('en-US')} characters. Line breaks are allowed.`}
         error={fieldError} disabled={revision === null}
       />
-      {phase === 'loading' ? <p role="status" className="text-body text-text-secondary">Loading saved discussion points…</p> : null}
       {error ? <p role="alert" className="text-body text-danger">{error}</p> : null}
       {submission ? (
         <div className="space-y-xs">
@@ -192,5 +192,11 @@ export default function SpeakerDiscussionPoints({ discussion }) {
         ) : null}
       </div>
     </form>
+  );
+  return (
+    <>
+      {phase === 'loading' ? <LoadingState label="Loading saved discussion points…" rows={0} /> : null}
+      {form}
+    </>
   );
 }
