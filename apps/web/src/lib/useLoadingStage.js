@@ -4,18 +4,14 @@ import { reportHeldUp } from './fieldVitals.js';
 const STAGES = [[1000, 'active'], [10000, 'slow'], [60000, 'prolonged']];
 const stageAt = (elapsed) => STAGES.findLast(([at]) => elapsed >= at)?.[1] ?? 'initial';
 
-function createClock(inheritNavigation) {
+export function createLoadingClock(inheritNavigation) {
   // Only a wait created while the HTML fallback is present shares its start.
   const boot = Boolean(inheritNavigation && globalThis.document?.getElementById('app-boot'));
   return { boot, startedAt: boot ? 0 : performance.now() };
 }
 
-export function createLoadingAttempt() {
-  return { clock: createClock(true) };
-}
-
 function beginWait(active, shared, inheritNavigation) {
-  const clock = shared ?? createClock(inheritNavigation);
+  const clock = shared || createLoadingClock(inheritNavigation);
   const stage = active ? stageAt(performance.now() - clock.startedAt) : 'initial';
   return { active, shared, clock, stage };
 }
@@ -25,7 +21,7 @@ function beginWait(active, shared, inheritNavigation) {
  * remove the loader (or set active=false) as soon as it finishes.
  */
 export default function useLoadingStage({ active = true, routeAttempt } = {}) {
-  const shared = routeAttempt?.settled ? null : routeAttempt?.clock;
+  const shared = !routeAttempt?.settled && routeAttempt?.clock;
   const [wait, setWait] = useState(() => beginWait(active, shared, true));
   if (wait.active !== active || wait.shared !== shared) {
     setWait(beginWait(active, shared));
@@ -50,7 +46,7 @@ export default function useLoadingStage({ active = true, routeAttempt } = {}) {
   }, [active, stage, clock]);
 
   function restart() {
-    if (shared) routeAttempt.clock = createClock();
+    if (shared) routeAttempt.clock = createLoadingClock();
     setWait(beginWait(active, shared && routeAttempt.clock));
   }
 

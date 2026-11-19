@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { StrictMode } from 'react';
-import useLoadingStage, { createLoadingAttempt } from './useLoadingStage.js';
+import useLoadingStage, { createLoadingClock } from './useLoadingStage.js';
 
 beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] }));
 afterEach(() => {
@@ -89,7 +89,7 @@ describe('useLoadingStage', () => {
   });
 
   it('shares the fresh clock with a route loader that follows an explicit retry', () => {
-    const routeAttempt = createLoadingAttempt();
+    const routeAttempt = { clock: createLoadingClock() };
     const first = renderHook(() => useLoadingStage({ routeAttempt }));
     act(() => vi.advanceTimersByTime(60_000));
     expect(first.result.current.stage).toBe('prolonged');

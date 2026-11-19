@@ -1,11 +1,11 @@
 import { Suspense, useMemo } from 'react';
 import LoadingState from './LoadingState.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
-import { createLoadingAttempt } from '../lib/useLoadingStage.js';
+import { createLoadingClock } from '../lib/useLoadingStage.js';
 
 export default function DeferredPage({ component: Component, label, shape = 'rows', routeKey }) {
   const { text } = usePublicLanguage();
-  const attempt = useMemo(() => routeKey ? createLoadingAttempt() : null, [routeKey]);
+  const attempt = useMemo(() => routeKey ? { clock: createLoadingClock(true) } : null, [routeKey]);
   // A scoped route shows its fallback while switching from a revealed page.
   return (
     <Suspense
