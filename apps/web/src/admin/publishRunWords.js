@@ -28,6 +28,15 @@ function countProgress(progress, key) {
   );
 }
 
+export function publishRunCounts(row) {
+  return {
+    requested: countIds(row?.request),
+    published: countProgress(row?.progress, 'published'),
+    skipped: countProgress(row?.progress, 'skipped'),
+    measured: row?.plannedChunks > 1,
+  };
+}
+
 const RUN_WORDS = Object.freeze({
   done: { word: 'Done', tone: 'done' },
   running: { word: 'Running', tone: 'info' },
@@ -42,20 +51,18 @@ const RUN_WORDS = Object.freeze({
  * @returns {{ id: string, word: string, tone: string, sentence: string|null }}
  */
 export function runSummary(row) {
-  const requested = countIds(row?.request);
-  const published = countProgress(row?.progress, 'published');
-  const skipped = countProgress(row?.progress, 'skipped');
+  const { requested, published, skipped } = publishRunCounts(row);
   const known = RUN_WORDS[row?.status];
   if (!known) return { id: row?.id, word: 'Unknown', tone: 'neutral', sentence: null };
   let sentence;
   if (row.status === 'done') {
     sentence = `${published} of ${requested} published.`;
-    if (skipped > 0) sentence += ` ${skipped} skipped.`;
   } else if (row.status === 'running') {
     sentence = `${published} of ${requested} published so far.`;
   } else {
     sentence = `${published} of ${requested} published before it stopped.`;
   }
+  if (skipped > 0) sentence += ` ${skipped} skipped.`;
   return { id: row.id, word: known.word, tone: known.tone, sentence };
 }
 
