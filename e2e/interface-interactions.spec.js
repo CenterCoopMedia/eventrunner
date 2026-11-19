@@ -307,7 +307,7 @@ test('a pending Schedule request keeps its motion across the one-minute boundary
     pending.resolve();
     await page.clock.resume();
   }
-  await expect(page.getByRole('heading', { level: 1, name: 'Schedule', exact: true })).toBeVisible();
+  await expect(page.locator('[data-schedule-results]')).toBeVisible();
   await expect(loading).toHaveCount(0);
   await expect(indicator).toHaveCount(0);
 });
