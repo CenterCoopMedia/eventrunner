@@ -4,7 +4,7 @@
 // Editorial base restyle (design brief §2.1, §5.1): the day head is the same
 // folio-on-a-rule SectionHead device Schedule.jsx uses, and the page actions
 // are ruled rectangles rather than filled pill buttons.
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useLayoutEffect, useMemo, useState } from 'react';
 import { PublicLink as Link } from '../components/PublicLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { functionsOrigin } from '../lib/firebaseSettings.js';
@@ -47,7 +47,7 @@ import { primaryActionClass, quietActionClass } from '../components/controlClass
 // Where nothing was recorded the gap says nothing, which is what an
 // unrecorded route honestly looks like.
 
-export default function MySchedule() {
+export default function MySchedule({ routeAttempt }) {
   const { language, text } = usePublicLanguage();
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
@@ -57,6 +57,13 @@ export default function MySchedule() {
   const { bookmarkedIds: accountBookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
   const device = useDeviceBookmarks();
   const deviceOnly = !user || !attendeeAccess;
+  const available = features.schedule && features.sessionBookmarks;
+  const checkingAccount = authLoading || profileLoading;
+  const loadingSchedule = loading || (!deviceOnly && bookmarksLoading);
+  const routePending = available && (checkingAccount || ((user || device.available) && loadingSchedule));
+  useLayoutEffect(() => {
+    if (routeAttempt && !routePending) routeAttempt.settled = true;
+  }, [routeAttempt, routePending]);
   const bookmarkedIds = useMemo(() => new Set([
     ...(deviceOnly ? [] : accountBookmarkedIds), ...device.ids,
   ]), [deviceOnly, accountBookmarkedIds, device.ids]);
@@ -119,7 +126,7 @@ export default function MySchedule() {
   const mySessions = useMemo(() => Array.from(myByDay.values()).flat(), [myByDay]);
   const accountSessions = useMemo(() => mySessions.filter((session) => accountBookmarkedIds.has(session.id)), [mySessions, accountBookmarkedIds]);
 
-  if (!features.schedule || !features.sessionBookmarks) {
+  if (!available) {
     return (
       <EmptyState
         title="This event doesn’t have a personal schedule"
@@ -133,10 +140,10 @@ export default function MySchedule() {
     );
   }
 
-  if (authLoading || profileLoading) {
+  if (checkingAccount) {
     return (
       <div className="mt-lg">
-        <LoadingState shape="schedule" label="Loading your schedule…" />
+        <LoadingState shape="schedule" label="Loading your schedule…" routeAttempt={routeAttempt} />
       </div>
     );
   }
@@ -211,9 +218,9 @@ export default function MySchedule() {
         </div>
       </header>
 
-      {loading || (!deviceOnly && bookmarksLoading) ? (
+      {loadingSchedule ? (
         <div className="mt-lg">
-          <LoadingState shape="schedule" label="Loading your schedule…" />
+          <LoadingState shape="schedule" label="Loading your schedule…" routeAttempt={routeAttempt} />
         </div>
       ) : mySessions.length === 0 ? (
         <div className="mt-lg">

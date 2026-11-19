@@ -6,18 +6,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import { lazyPage } from '../lib/routePage.jsx';
 import { RELOAD_FLAG } from '../lib/chunkReload.js';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
+import { adminRoute } from '../routes.jsx';
 
 let pageRenderFails = false;
 let pageRenderPending = null;
+let overviewRenderPending = null;
 vi.mock('./pages/AdminPagesList.jsx', async (importOriginal) => {
   const actual = await importOriginal();
   return { ...actual, default: (props) => {
     if (pageRenderFails) throw new Error('Synthetic admin page render failure');
     if (pageRenderPending) throw pageRenderPending;
+    return <actual.default {...props} />;
+  } };
+});
+vi.mock('./pages/AdminOverview.jsx', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, default: (props) => {
+    if (overviewRenderPending) throw overviewRenderPending;
     return <actual.default {...props} />;
   } };
 });
@@ -160,6 +169,7 @@ async function renderAt(path) {
 beforeEach(() => {
   pageRenderFails = false;
   pageRenderPending = null;
+  overviewRenderPending = null;
   sessionStorage.removeItem(RELOAD_FLAG);
   adminProbeShouldSucceed = true;
   operatorProbeShouldSucceed = true;
@@ -175,6 +185,39 @@ beforeEach(() => {
 });
 
 describe('admin route gating', () => {
+  it('keeps one wait through admin entry, access and the lazy leaf', async () => {
+    const original = adminRoute.Component;
+    const entry = await import('./AdminApp.jsx');
+    await import('./pages/AdminOverview.jsx');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    let finishEntry;
+    let finishOverview;
+    let view;
+    adminRoute.Component = lazy(() => new Promise((resolve) => { finishEntry = () => resolve(entry); }));
+    overviewRenderPending = new Promise((resolve) => { finishOverview = resolve; });
+    pendingProbe = {};
+    try {
+      view = render(<MemoryRouter initialEntries={['/admin']}><App /></MemoryRouter>);
+      const stage = (name) => screen.getByRole('status', { name }).closest('.loading-status');
+      expect(stage('Loading admin…')).toHaveAttribute('data-loading-stage', 'initial');
+      act(() => vi.advanceTimersByTime(800));
+      await act(async () => finishEntry());
+      expect(stage('Checking your access…')).toHaveAttribute('data-loading-stage', 'initial');
+      act(() => vi.advanceTimersByTime(200));
+      expect(stage('Checking your access…')).toHaveAttribute('data-loading-stage', 'active');
+      act(() => vi.advanceTimersByTime(9_000));
+      await act(async () => pendingProbe.resolve({ docs: [] }));
+      expect(stage('Loading overview…')).toHaveAttribute('data-loading-stage', 'slow');
+      await act(async () => { overviewRenderPending = null; finishOverview(); });
+      expect(screen.getByRole('heading', { name: 'Overview', exact: true })).toBeInTheDocument();
+      expect(screen.queryByRole('status', { name: 'Loading overview…' })).toBeNull();
+    } finally {
+      view?.unmount();
+      adminRoute.Component = original;
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the real rail and recovers when an admin page throws', async () => {
     const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {

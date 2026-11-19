@@ -22,13 +22,14 @@ import { IS_DEMO } from './lib/demoMode.js';
 import FieldVitals from './components/FieldVitals.jsx';
 
 export function AppRoutes() {
+  const { pathname } = useLocation();
   useEffect(() => installDeferredRoutePrefetch(document, prefetchRoutes, IS_DEMO), []);
   return useRoutes([
     {
       path: adminRoute.path,
       element: (
         <ErrorBoundary appearance="admin" title="Admin could not open">
-          <DeferredPage component={adminRoute.Component} label="admin" />
+          <DeferredPage component={adminRoute.Component} label="admin" routeKey={pathname} />
         </ErrorBoundary>
       ),
     },
@@ -39,7 +40,8 @@ export function AppRoutes() {
         children: [
           { index: true, element: <Home /> },
           ...publicRoutes.map(({ path, Component, label, shape }) => ({
-            path, element: <DeferredPage component={Component} shape={shape} label={label} />,
+            path, element: <DeferredPage component={Component} shape={shape} label={label}
+              routeKey={path === 'schedule/mine' ? pathname : undefined} />,
           })),
         ],
       }],

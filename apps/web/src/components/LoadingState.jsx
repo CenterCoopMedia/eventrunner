@@ -52,8 +52,8 @@ export function LoadingStateView({
 }
 
 /** Retry is available only when a caller supplies an explicit, safe request. */
-export default function LoadingState({ onRetry, ...props }) {
-  const { stage, restart } = useLoadingStage();
+export default function LoadingState({ onRetry, routeAttempt, ...props }) {
+  const { stage, restart } = useLoadingStage({ routeAttempt });
   const retry = typeof onRetry === 'function' ? () => {
     onRetry();
     restart();

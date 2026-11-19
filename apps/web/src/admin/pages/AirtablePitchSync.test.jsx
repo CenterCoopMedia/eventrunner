@@ -8,6 +8,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 let collections = {};
 let listeners = {};
 let operator = false;
+let holdStatus = false;
 const call = vi.fn();
 vi.mock('../../lib/pitchSource.js', () => ({
   subscribePitchCall: (onNext) => { onNext({ enabled: false, closesAt: '2027-01-31T23:59:59Z', externalFormUrl: null }); return () => {}; },
@@ -15,10 +16,11 @@ vi.mock('../../lib/pitchSource.js', () => ({
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext) => { listeners[name] = onNext; onNext(collections[name] || []); return () => {}; },
   // A one-document read, served from the same collection fixture.
-  subscribeAdminDoc: (path, onNext) => {
+  subscribeAdminDoc: (path, onNext, onError) => {
     const [name, id] = path.split('/');
     listeners[name] = (docs) => onNext(docs.find((doc) => doc.id === id) ?? null);
-    listeners[name](collections[name] || []);
+    listeners[`${name}:error`] = onError;
+    if (name !== 'session_pitch_sync' || !holdStatus) listeners[name](collections[name] || []);
     return () => {};
   },
 }));
@@ -61,11 +63,36 @@ beforeEach(() => {
   collections = {};
   listeners = {};
   operator = false;
+  holdStatus = false;
   call.mockReset();
 });
 afterEach(cleanup);
 
 describe('Airtable refresh status and action', () => {
+  it('replaces the pending and reconnecting status without disturbing unsaved settings', () => {
+    operator = true;
+    holdStatus = true;
+    open();
+    const loading = screen.getByRole('status', { name: 'Loading the refresh status…' });
+    expect(loading.closest('.admin-loading-state')).toBeInTheDocument();
+    expect(loading).toHaveAttribute('aria-live', 'polite');
+    fireEvent.click(screen.getByText('Connection settings'));
+    const table = screen.getByLabelText('Table name');
+    fireEvent.change(table, { target: { value: 'Unsaved test table' } });
+
+    act(() => listeners['session_pitch_sync:error'](new Error('offline')));
+    expect(screen.getByText('Cannot load the refresh status. Reconnecting…')).toBeInTheDocument();
+    expect(loading).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Table name')).toBe(table);
+
+    act(() => listeners.session_pitch_sync([{ id: 'airtable', lastRun }]));
+    expect(screen.getByLabelText('Airtable refresh status')).toHaveTextContent('Completed');
+    expect(screen.queryByText('Cannot load the refresh status. Reconnecting…')).toBeNull();
+    expect(table).toHaveValue('Unsaved test table');
+    expect(screen.getByLabelText('Table name')).toBe(table);
+    expect(call).not.toHaveBeenCalled();
+  });
+
   it('shows staff the last run, its counts and why records were skipped, without the settings', () => {
     collections.session_pitch_sync = [{ id: 'airtable', running: null, lastRun }];
     open();

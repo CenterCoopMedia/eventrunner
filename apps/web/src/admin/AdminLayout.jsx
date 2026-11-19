@@ -72,6 +72,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
 import { useMediaQuery } from '../lib/viewport.js';
 import { reloadOnce } from '../lib/chunkReload.js';
+import { useRouteLoadingAttempt } from '../lib/routeLoading.jsx';
 import { AdminEmptyState } from './components/adminChrome.jsx';
 import AdminIcon from './components/AdminIcon.jsx';
 import AdminIconControl from './components/AdminIconControl.jsx';
@@ -552,6 +553,7 @@ function AdminDesk() {
   const docket = docketForTier(tierKnown ? adminTier : 'staff');
   const required = sectionTier(pathname);
   const refused = tierKnown && required !== null && !tierReaches(adminTier, required);
+  useRouteLoadingAttempt(refused);
   const section = adminSection(pathname);
   const activeSection = docket
     .flatMap((group) => group.items)

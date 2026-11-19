@@ -13,10 +13,11 @@
 // from answering before the probe has. Which TIER the admin holds is
 // AdminLayout's concern: each docket item declares the tier it needs, and
 // the layout hides the rest and refuses their routes (issue #186).
-import { Suspense, useContext, useEffect } from 'react';
+import { Suspense, useContext, useEffect, useState } from 'react';
 import { lazyPage as lazy } from '../lib/routePage.jsx';
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { clearReloadFlag } from '../lib/chunkReload.js';
+import { RouteLoadingContext, RouteLoadingReady, useRouteLoadingAttempt } from '../lib/routeLoading.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
 import AdminLayout, { AdminRecoveryReadyContext } from './AdminLayout.jsx';
@@ -117,7 +118,12 @@ const AdminInvoiceSettings = lazy(() => import('./pages/AdminInvoiceSettings.jsx
 const AdminAnnouncements = lazy(() => import('./pages/AdminAnnouncements.jsx'));
 
 function DeferredAdminPage({ children, label }) {
-  return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
+  const routeAttempt = useRouteLoadingAttempt();
+  return (
+    <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} routeAttempt={routeAttempt} />}>
+      <RouteLoadingReady>{children}</RouteLoadingReady>
+    </Suspense>
+  );
 }
 
 // A static leaf can re-arm recovery after its children commit and the shell's
@@ -125,22 +131,35 @@ function DeferredAdminPage({ children, label }) {
 function StaticAdminPage({ children }) {
   const { key } = useLocation();
   const ready = useContext(AdminRecoveryReadyContext);
+  useRouteLoadingAttempt(true);
   useEffect(() => { if (ready) clearReloadFlag(); }, [key, ready]);
   return children;
+}
+
+function AdminPageBoundary() {
+  const attempt = useRouteLoadingAttempt();
+  return (
+    <ErrorBoundary appearance="admin" title="This admin page could not be shown"
+      onFailure={() => { if (attempt) attempt.settled = true; }}>
+      <Outlet />
+    </ErrorBoundary>
+  );
 }
 
 export function AdminGate({ children }) {
   const { user, adminStatus, loading } = useAuth();
   const location = useLocation();
+  const checkingAccess = loading || (user && adminStatus === 'unknown');
+  const routeAttempt = useRouteLoadingAttempt(!checkingAccess && (!user || adminStatus !== 'admin'));
 
   // Two waits, not one: `loading` is the auth handshake, and it finishes
   // BEFORE the admin probe answers. Rendering the denial in that gap would
   // flash "you don't have admin access" at every admin on every load.
-  if (loading || (user && adminStatus === 'unknown')) {
+  if (checkingAccess) {
     return (
       <div className="admin-room min-h-screen min-h-svh bg-admin-ground font-admin-ui text-admin-ink">
         <div className="w-full px-md py-lg">
-          <AdminLoadingState label="Checking your access…" />
+          <AdminLoadingState label="Checking your access…" routeAttempt={routeAttempt} />
         </div>
       </div>
     );
@@ -173,13 +192,19 @@ export function AdminGate({ children }) {
   return children;
 }
 
-export default function AdminApp() {
-  return (
+export default function AdminApp({ routeAttempt }) {
+  const { pathname } = useLocation();
+  // The admin index redirects lead into the same pending navigation.
+  const key = pathname.replace(/^\/admin(?:\/(reminders))?\/?$/, (_, reminders) =>
+    reminders ? '/admin/reminders/scheduled' : '/admin/overview');
+  const [route, setRoute] = useState(() => ({ key, attempt: routeAttempt }));
+  if (route.key !== key) setRoute({ key, attempt: routeAttempt });
+  const page = (
     <AdminGate>
       <AdminWebMcpRegistration />
       <Routes>
         <Route element={<AdminLayout />}>
-          <Route element={<ErrorBoundary appearance="admin" title="This admin page could not be shown"><Outlet /></ErrorBoundary>}>
+          <Route element={<AdminPageBoundary />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route
             path="overview"
@@ -391,4 +416,5 @@ export default function AdminApp() {
       </Routes>
     </AdminGate>
   );
+  return <RouteLoadingContext.Provider value={route.attempt}>{page}</RouteLoadingContext.Provider>;
 }
