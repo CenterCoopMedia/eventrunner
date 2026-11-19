@@ -42,14 +42,14 @@ const Panel = ({ children }) => (
 function PreparingAccount({ retryPath }) {
   const retryHref = useHref(retryPath);
   const { stage } = useLoadingStage();
+  const prolonged = stage === 'prolonged';
+  const label = prolonged
+    ? 'Setting up your account. Check your connection and reload this page, or contact the organizers if this continues.'
+    : 'Setting up your account…';
   return (
     <Panel>
-      <LoadingStatus
-        label="Setting up your account…"
-        stage={stage}
-        prolongedHint="Check your connection and reload this page, or contact the organizers if this continues."
-      />
-      {stage === 'prolonged' ? (
+      <LoadingStatus label={label} stage={stage} />
+      {prolonged ? (
         <a href={retryHref} className={primaryActionClass}>Reload claim page</a>
       ) : null}
     </Panel>

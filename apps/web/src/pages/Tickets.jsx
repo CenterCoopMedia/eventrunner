@@ -670,14 +670,14 @@ export default function Tickets() {
       {waitLabel ? (
         <LoadingState key={waitLabel} label={waitLabel} rows={0} onRetry={catalogPending ? retryCatalog : undefined} />
       ) : null}
-      <section aria-label="Ticket information" aria-busy={Boolean(waitLabel)} className={stripeCatalog ? 'space-y-lg' : 'space-y-md'}>
+      <div role="region" aria-label="Ticket information" aria-busy={Boolean(waitLabel)} className={stripeCatalog ? 'space-y-lg' : 'space-y-md'}>
         {loadError ? (
           <>
             <p role="alert" className="text-danger">{loadError}</p>
             <button type="button" className={secondaryActionClass} onClick={retryCatalog}>Retry ticket information</button>
           </>
         ) : stripeCatalog ? renderStripeTickets() : catalog ? renderRegistrationDetails() : null}
-      </section>
+      </div>
     </article>
   );
 }
