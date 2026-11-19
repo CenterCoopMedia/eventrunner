@@ -37,6 +37,7 @@ import { newSubmissionKey } from '../lib/submissionKey.js';
 import { blankPitch, clearPitch, restorePitch, savePitch, submissionOf } from '../lib/pitchDraft.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { IS_DEMO } from '../lib/demoMode.js';
+import LoadingState from '../components/LoadingState.jsx';
 
 const hrefFor = (step) => `/pitch/${step.slug}`;
 const FORM_STEPS = PITCH_STEPS.filter((step) => step.slug !== 'review');
@@ -93,6 +94,7 @@ export default function SessionPitch() {
   const open = !configError && isPitchCallOpen(settings, now);
   const externalForm = readPitchFormUrl(settings?.externalFormUrl);
   const modeKnown = IS_DEMO || Boolean(settings);
+  const checkingCall = !modeKnown && !configError;
   const options = readPitchFormOptions(settings);
   const email = user?.emailVerified ? user.email : null;
   const body = submissionOf(draft, options);
@@ -154,10 +156,15 @@ export default function SessionPitch() {
       <p className="max-w-prose text-lead text-text-secondary">Share an idea for {event.shortName}. Tell the organizers what people will learn and how you will involve them.</p>
       <section className="space-y-xs border-t-hairline border-rule-hairline pt-sm" aria-labelledby="pitch-call-heading">
         <h2 id="pitch-call-heading" className="sr-only">Call for sessions</h2>
-        <p role="status" className="font-semibold">{IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Checking your connection…' : !settings ? 'Checking submissions…' : open ? 'Submissions are open' : 'Submissions are closed'}</p>
-        {Number.isFinite(deadline) ? <p className="text-caption text-text-secondary">Deadline: <time dateTime={settings.closesAt}>{new Date(deadline).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time> ({Intl.DateTimeFormat().resolvedOptions().timeZone})</p>
-          : open ? <p className="text-caption text-text-secondary">There is no set deadline. The organizers close submissions when they are ready.</p> : null}
-        <p className="text-caption text-text-secondary">{externalForm ? 'You do not need a ticket to pitch a session.' : 'A verified email address is required to submit. You do not need a ticket or attendee approval.'}</p>
+        {checkingCall ? <LoadingState label="Checking submissions…" rows={0} /> : null}
+        <p role="status" className={checkingCall ? 'sr-only' : 'font-semibold'}>
+          {checkingCall ? null : IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Checking your connection…' : open ? 'Submissions are open' : 'Submissions are closed'}
+        </p>
+        <div role="region" aria-label="Submission availability" aria-busy={checkingCall} className="space-y-xs">
+          {Number.isFinite(deadline) ? <p className="text-caption text-text-secondary">Deadline: <time dateTime={settings.closesAt}>{new Date(deadline).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time> ({Intl.DateTimeFormat().resolvedOptions().timeZone})</p>
+            : open ? <p className="text-caption text-text-secondary">There is no set deadline. The organizers close submissions when they are ready.</p> : null}
+          <p className="text-caption text-text-secondary">{externalForm ? 'You do not need a ticket to pitch a session.' : 'A verified email address is required to submit. You do not need a ticket or attendee approval.'}</p>
+        </div>
       </section>
     </header>
   );
@@ -227,9 +234,12 @@ export default function SessionPitch() {
           {review ? (
             <section className="space-y-sm border-t-hairline border-rule-hairline pt-sm" aria-labelledby="pitch-identity-heading">
               <h3 id="pitch-identity-heading" className="font-heading text-h3 font-semibold">Your sign-in</h3>
-              {loading ? <p role="status">Checking your sign-in…</p>
-                : email ? <><p className="break-all text-caption text-text-secondary">Submitting as {email}</p><button type="button" className={secondaryButtonClass} onClick={signOut}>Use another account</button></>
-                  : <><p className="text-caption text-text-secondary">{user ? 'We need to confirm your email. Sign out, then sign in with an emailed code.' : 'Sign in to submit. Your answers stay here.'}</p>{user ? <button type="button" className={secondaryButtonClass} onClick={signOut}>Sign out</button> : <SignInPanel />}</>}
+              {loading ? <LoadingState label="Checking your sign-in…" rows={0} /> : null}
+              <div role="region" aria-label="Pitch account" aria-busy={loading} className="space-y-sm">
+                {loading ? null
+                  : email ? <><p className="break-all text-caption text-text-secondary">Submitting as {email}</p><button type="button" className={secondaryButtonClass} onClick={signOut}>Use another account</button></>
+                    : <><p className="text-caption text-text-secondary">{user ? 'We need to confirm your email. Sign out, then sign in with an emailed code.' : 'Sign in to submit. Your answers stay here.'}</p>{user ? <button type="button" className={secondaryButtonClass} onClick={signOut}>Sign out</button> : <SignInPanel />}</>}
+              </div>
             </section>
           ) : null}
           <StepPager

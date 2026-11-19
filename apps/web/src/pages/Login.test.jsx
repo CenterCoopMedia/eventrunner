@@ -2,7 +2,7 @@
 // auth (see src/test/setup.js). Covers send→verify→custom-token happy path,
 // 429 rate-limit copy, error focus handling, and the never-block-paste rule.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import App from '../App.jsx';
@@ -75,6 +75,24 @@ describe('functions origin convention', () => {
 });
 
 describe('emailed-code sign-in', () => {
+  it('announces the pending auth check outside the region that receives the sign-in options', async () => {
+    let finishAuth;
+    vi.mocked(onAuthStateChanged).mockImplementationOnce((_auth, next) => {
+      finishAuth = next;
+      return () => {};
+    });
+    renderSignIn();
+    const region = await screen.findByRole('region', { name: 'Sign-in options' });
+    const status = screen.getByRole('status', { name: 'Checking your sign-in…' });
+    expect(status.closest('[aria-busy="true"]')).toBeNull();
+    expect(region).toHaveAttribute('aria-busy', 'true');
+    await waitFor(() => expect(finishAuth).toBeTypeOf('function'));
+    await act(async () => finishAuth(null));
+    expect(region).toHaveAttribute('aria-busy', 'false');
+    expect(status).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Email address')).toBeInTheDocument();
+  });
+
   it('opens the mounted signin route and sends the code request to the event API', async () => {
     const base = '/events/conference/';
     const api = 'https://api.example.test';

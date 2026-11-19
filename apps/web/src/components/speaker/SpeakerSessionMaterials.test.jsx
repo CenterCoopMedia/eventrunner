@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 let authUser;
 const listMaterials = vi.fn();
@@ -37,6 +37,50 @@ beforeEach(() => {
 });
 
 describe('SpeakerSessionMaterials', () => {
+  it('retries a slow materials read for the same session and keeps both drafts', async () => {
+    const element = <SpeakerSessionMaterials sessionId="session-one" speakerId="speaker-one" />;
+    const view = render(element);
+    await screen.findByText(/No materials have been sent/);
+    const url = screen.getByRole('textbox', { name: 'Link URL' });
+    fireEvent.change(url, { target: { value: 'https://example.org/draft' } });
+    const fileInput = screen.getByLabelText('File');
+    const file = new File(['synthetic handout'], 'handout.txt', { type: 'text/plain' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    const slow = deferred();
+    const retry = deferred();
+    listMaterials.mockReturnValueOnce(slow.promise).mockReturnValueOnce(retry.promise);
+
+    vi.useFakeTimers();
+    try {
+      authUser = { ...authUser };
+      view.rerender(<SpeakerSessionMaterials sessionId="session-one" speakerId="speaker-one" />);
+      const region = screen.getByRole('region', { name: 'Session materials' });
+      const status = screen.getByRole('status', { name: 'Loading materials…' });
+      expect(region).toHaveAttribute('aria-busy', 'true');
+      expect(status.closest('[aria-busy="true"]')).toBeNull();
+      expect(fileInput).not.toBeVisible();
+      act(() => vi.advanceTimersByTime(59_999));
+      expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1));
+      fireEvent.click(screen.getByRole('button', { name: 'Try loading again' }));
+      expect(listMaterials).toHaveBeenCalledTimes(3);
+      expect(listMaterials).toHaveBeenLastCalledWith({ user: authUser, sessionId: 'session-one' });
+      expect(screen.getByRole('status', { name: 'Loading materials…' }).parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      await act(async () => retry.resolve([]));
+      await act(async () => slow.resolve([{ id: 'old', type: 'file', filename: 'Outdated handout' }]));
+      expect(screen.queryByText('Outdated handout')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status', { name: 'Loading materials…' })).not.toBeInTheDocument();
+      expect(region).toHaveAttribute('aria-busy', 'false');
+      expect(screen.getByRole('textbox', { name: 'Link URL' })).toHaveValue('https://example.org/draft');
+      expect(screen.getByLabelText('File')).toBe(fileInput);
+      expect(fileInput.files[0]).toBe(file);
+      expect(addLink).not.toHaveBeenCalled();
+      expect(uploadFile).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('lists review state and locks reviewed and co-speaker items', async () => {
     listMaterials.mockResolvedValueOnce([
       {
