@@ -210,7 +210,7 @@ The public loading component supports rows, schedule, and directory placeholders
 
 `apps/web/src/lib/motionContract.test.js` discovers every stylesheet under `apps/web/src` except generated and test fixtures, and scans shipped class strings. It checks motion preference guards, transform/opacity keyframes, explicit transition properties, token durations, hover guards, flat paint, and scoped waiting loops. Compact shared controls retain their explicit paint transitions. `console/web/src/motionContract.test.js`, included in `npm run test:console`, checks every non-generated console stylesheet for motion guards, transform/opacity keyframes, and loops restricted to the existing waiting indicators. Hosted browser checks verify computed motion, focus, viewport fit, and static reduced-motion behavior.
 
-The web specimen test currently expects a static ring at sixty seconds with motion allowed. [#613](https://github.com/CenterCoopMedia/eventrunner/issues/613) tracks rotation through completion. Some admin actions display their ring immediately when they become busy. [#618](https://github.com/CenterCoopMedia/eventrunner/issues/618) covers the timing of busy controls.
+Some admin actions display their ring immediately when they become busy. [#618](https://github.com/CenterCoopMedia/eventrunner/issues/618) covers the timing of busy controls.
 
 These checks support source review; they do not prove screen-reader behavior, real-device usability, or all visual states. Verify consequential flows with keyboard input, narrow layouts, zoom, slow responses, and failure recovery.
 

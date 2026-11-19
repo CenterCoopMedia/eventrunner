@@ -100,7 +100,7 @@ const pendingLoop = (decl) => {
   const selector = decl.parent.selector ?? '';
   return (stylesheetFile(decl) === 'components/loadingState.css'
     && decl.value === 'loading-status-turn 1.2s linear infinite'
-    && selector.split(',').every((part) => /^\.loading-status\[data-loading-stage='(?:active|slow)'\] \.loading-status__activity$/.test(part.trim())))
+    && selector.split(',').every((part) => /^\.loading-status\[data-loading-stage='(?:active|slow|prolonged)'\] \.loading-status__activity$/.test(part.trim())))
     || (stylesheetFile(decl) === 'admin/components/adminInteraction.css'
       && selector === '.admin-busy-mark'
       && decl.value === 'admin-request-spin 900ms linear infinite');
@@ -339,7 +339,8 @@ describe('adversarial stylesheet fixtures', () => {
     const from = path.join(SRC, 'components/loadingState.css');
     const rule = `
       .loading-status[data-loading-stage='active'] .loading-status__activity,
-      .loading-status[data-loading-stage='slow'] .loading-status__activity {
+      .loading-status[data-loading-stage='slow'] .loading-status__activity,
+      .loading-status[data-loading-stage='prolonged'] .loading-status__activity {
         animation: loading-status-turn 1.2s linear infinite;
       }
     `;
@@ -515,14 +516,7 @@ describe.each(INTERACTION_STYLES)('shared interaction motion: %s', (file) => {
     const offenders = [];
     for (const decl of declarations) {
       if (!/^animation(?:-|$)/.test(decl.prop) || !decl.value.includes('infinite')) continue;
-      const selector = decl.parent.selector;
-      const sharedRing = file === 'components/loadingState.css'
-        && decl.value === 'loading-status-turn 1.2s linear infinite'
-        && selector.split(',').every((part) => /^\.loading-status\[data-loading-stage='(?:active|slow)'\] \.loading-status__activity$/.test(part.trim()));
-      const actionRing = file === 'admin/components/adminInteraction.css'
-        && selector === '.admin-busy-mark'
-        && decl.value === 'admin-request-spin 900ms linear infinite';
-      if (!sharedRing && !actionRing) offenders.push(place(decl));
+      if (!pendingLoop(decl)) offenders.push(place(decl));
     }
     expect(offenders, 'ambient loops are not pending feedback').toEqual([]);
   });
