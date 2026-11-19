@@ -12,7 +12,7 @@ export default function DeferredPage({ component: Component, label, shape = 'row
       key={attempt ? 'route' : undefined}
       fallback={<LoadingState label={text(`Loading ${label}…`, 'Cargando…')} shape={shape} routeAttempt={attempt} />}
     >
-      {attempt ? <Component routeAttempt={attempt} /> : <Component />}
+      <Component routeAttempt={attempt} />
     </Suspense>
   );
 }
