@@ -14,7 +14,7 @@ The route-map projection takes the enrollment's `published` state so the mounted
 
 From route publication until the mounted build reaches Hosting, the standalone address works and the mount may fail to render because its origin still serves the root-based build. Once the mounted build replaces that build on Hosting, the mount becomes the visitor address. The old standalone origin serves the mounted bundle from that point, including the window before smoke and the applied receipt finish.
 
-The shared-host rehearsal in #1063 covers the order that keeps both windows short, the redirect or notice at the old visitor address, and recovery after a failed deployment or smoke step. Recovery restores the affected event’s standalone build and its matching route and URL settings together.
+The [shared-host rehearsal](CLIENT_HOST_REHEARSAL.md) covers the order that keeps both windows short, the redirect or notice at the old visitor address, and recovery after a failed deployment or smoke step. Recovery restores the affected event’s standalone build and its matching route and URL settings together.
 
 ## Worker runtime
 
