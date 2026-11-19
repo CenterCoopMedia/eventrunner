@@ -76,7 +76,10 @@ function browserFixture({ escapedAsset = false } = {}) {
   const update = base + 'updates/rehearsal-update';
   let address;
   let listener;
+  let navigate;
+  let replacedHistory = false;
   const observations = [];
+  const mainFrame = { url: () => address };
   const page = {
     observations,
     on(event, callback) {
@@ -84,9 +87,27 @@ function browserFixture({ escapedAsset = false } = {}) {
       listener = callback;
     },
     url: () => address,
+    mainFrame: () => mainFrame,
+    waitForEvent(event, { predicate }) {
+      assert.equal(event, 'framenavigated');
+      return new Promise((resolve) => {
+        navigate = (frame) => {
+          if (predicate(frame)) resolve(frame);
+        };
+      });
+    },
     async goto(url) {
       address = url;
       observations.push(url);
+      if (url === update) {
+        navigate?.(mainFrame);
+        navigate?.({ url: () => update });
+        setImmediate(() => {
+          replacedHistory = true;
+          navigate?.(mainFrame);
+        });
+      }
+      if (url === base + 'signin') assert(replacedHistory, 'sign-in started before the update replaced its history');
       if (url === base + 'rehearsal-details') {
         listener({ url: () => base + 'assets/index-abcd.js', ok: () => true });
         listener({ url: () => (escapedAsset ? HOST + '/' : base) + 'assets/ContentPage-hash.js', ok: () => true });
