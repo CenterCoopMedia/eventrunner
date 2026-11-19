@@ -24,6 +24,8 @@ import { useAdminApi } from '../adminApi.js';
 import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
+import usePublishRun from '../usePublishRun.js';
+import PublishRunProgress from '../components/PublishRunProgress.jsx';
 import { toEditablePage, toPagePayload } from '../pageDoc.js';
 import { orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
@@ -157,6 +159,7 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
 export default function AdminPagesList() {
   const { rows, loading, error } = useAdminPages();
   const call = useAdminApi();
+  const { publish, run } = usePublishRun(call);
   const { showToast } = useToast();
   const { features } = useEventConfig();
   const draft = useDraftOrder(rows);
@@ -227,7 +230,7 @@ export default function AdminPagesList() {
       // Only the pages with something to publish: cmsPublish republishes any
       // doc that has a draft, bumping its revision, so sending clean pages
       // would churn revisions for no change.
-      const response = await call('cmsPublish', {
+      const response = await publish({
         collection: 'cmsPages',
         docIds: ids,
       });
@@ -260,7 +263,7 @@ export default function AdminPagesList() {
     const { queueId, ids } = resume;
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId });
+      const response = await publish({ queueId });
       setResume(null);
       reportPublish(response, ids);
     } catch (err) {
@@ -314,6 +317,7 @@ export default function AdminPagesList() {
           </>
         }
       />
+      <PublishRunProgress run={run} />
 
       <DeletedRecordResult />
       <OrderAnnouncement message={spoken} />

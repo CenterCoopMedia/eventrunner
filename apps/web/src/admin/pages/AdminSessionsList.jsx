@@ -8,6 +8,8 @@ import { useAdminApi } from '../adminApi.js';
 import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminSessions } from '../useAdminSessions.js';
+import usePublishRun from '../usePublishRun.js';
+import PublishRunProgress from '../components/PublishRunProgress.jsx';
 import {
   Notice,
   Panel,
@@ -28,7 +30,7 @@ import SessionPopularityPanel from '../components/SessionPopularityPanel.jsx';
 export default function AdminSessionsList() {
   const { eventConfig } = useEventConfig();
   const { groups, rows, loading, error } = useAdminSessions();
-  const call = useAdminApi();
+  const { publish, run } = usePublishRun(useAdminApi());
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -57,7 +59,7 @@ export default function AdminSessionsList() {
     setNotice(null);
     setResume(null);
     try {
-      const response = await call('cmsPublish', {
+      const response = await publish({
         collection: 'cmsSchedule',
         docIds: ids,
       });
@@ -74,7 +76,7 @@ export default function AdminSessionsList() {
     const { queueId, ids } = resume;
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId });
+      const response = await publish({ queueId });
       setResume(null);
       reportPublish(response, ids);
     } catch (err) {
@@ -118,6 +120,7 @@ export default function AdminSessionsList() {
           </>
         }
       />
+      <PublishRunProgress run={run} />
       <DeletedRecordResult />
       <PlannerFeatureControls choices={[{ key: 'schedule', label: 'Public schedule' }, { key: 'sessionBookmarks', label: 'Save sessions' }]} />
 

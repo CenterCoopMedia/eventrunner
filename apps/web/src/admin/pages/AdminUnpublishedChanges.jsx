@@ -91,7 +91,7 @@ function Head({ children }) {
   );
 }
 
-function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice, resultRef }) {
+function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice, resultRef, progressRun }) {
   const { choice, rows } = group;
   const key = `collection:${choice.id}`;
   // Past the server's cap the control stays, unavailable, and names why:
@@ -112,6 +112,7 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps, notice
         </button>
       ) : null}
     >
+      {progressRun ? <PublishRunProgress run={progressRun} /> : null}
       <div ref={resultRef} tabIndex={-1} className="admin-row-result">
         <ActionFeedback message={notice?.message} tone={notice?.tone} />
       </div>
@@ -362,7 +363,7 @@ export default function AdminUnpublishedChanges() {
           </>
         }
       />
-      <PublishRunProgress run={run} />
+      {!localResult && run ? <PublishRunProgress run={run} /> : null}
 
       {!ready ? (
         error ? (
@@ -398,6 +399,7 @@ export default function AdminUnpublishedChanges() {
               controlProps={controlProps}
               notice={notice?.key === `collection:${group.choice.id}` ? notice : null}
               resultRef={resultKey === `collection:${group.choice.id}` ? resultRef : undefined}
+              progressRun={resultKey === `collection:${group.choice.id}` ? run : null}
             />
           ))}
         </>
@@ -419,7 +421,8 @@ export default function AdminUnpublishedChanges() {
             {runs.runs.map((row) => (
               <RunRow key={row.id} row={row} timeZone={timeZone} busyKey={busyKey} controlProps={controlProps}
                 notice={notice?.key === `resume:${row.id}` ? notice : null}
-                resultRef={resultKey === `resume:${row.id}` ? resultRef : undefined} />
+                resultRef={resultKey === `resume:${row.id}` ? resultRef : undefined}
+                progressRun={resultKey === `resume:${row.id}` ? run : null} />
             ))}
           </ol>
         )}

@@ -24,6 +24,8 @@ import { DeletedRecordResult } from '../deletionUndo.jsx';
 import { contentError } from '../contentError.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminUpdates } from '../useAdminUpdates.js';
+import usePublishRun from '../usePublishRun.js';
+import PublishRunProgress from '../components/PublishRunProgress.jsx';
 import {
   NEW_UPDATE_PATH,
   UPDATES_ROOT,
@@ -57,7 +59,7 @@ const CELL_CLASS = 'px-sm py-xs align-top';
 export default function AdminUpdatesList() {
   const { rows, loading, error } = useAdminUpdates();
   const { eventConfig } = useEventConfig();
-  const call = useAdminApi();
+  const { publish, run } = usePublishRun(useAdminApi());
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -96,7 +98,7 @@ export default function AdminUpdatesList() {
     setResume(null);
     const ids = dirtyIds;
     try {
-      reportPublish(await call('cmsPublish', { collection: 'cmsUpdates', docIds: ids }), ids);
+      reportPublish(await publish({ collection: 'cmsUpdates', docIds: ids }), ids);
     } catch (err) {
       reportFailure(err, ids);
     } finally {
@@ -108,7 +110,7 @@ export default function AdminUpdatesList() {
     if (publishing) return;
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId: resume.queueId });
+      const response = await publish({ queueId: resume.queueId });
       setResume(null);
       reportPublish(response, resume.ids);
     } catch (err) {
@@ -158,6 +160,7 @@ export default function AdminUpdatesList() {
           </>
         }
       />
+      <PublishRunProgress run={run} />
 
       <DeletedRecordResult />
       <FeatureSwitch featureKeys={['updates']} />

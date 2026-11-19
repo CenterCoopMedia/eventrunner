@@ -191,7 +191,9 @@ describe('the organizations list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(endpointOf(0)).toBe('cmsPublish');
-    expect(bodyOf(0)).toEqual({ collection: 'cmsOrganizations', docIds: ['tide-media', 'new-grant'] });
+    expect(bodyOf(0)).toEqual({
+      collection: 'cmsOrganizations', docIds: ['tide-media', 'new-grant'], requestId: expect.any(String),
+    });
     // Stated in place, and repeated by the toast.
     expect(await screen.findAllByText('Published. The public site picks it up live.')).not.toHaveLength(0);
   });
