@@ -329,9 +329,8 @@ jobs:
             # Presence-of-config gate for the site publisher (spec §8.4):
             # cms/publisher.cjs treats an unset EVENT_SITE_PUBLISHER_JOB as
             # "this deployment has no publisher" and skips cleanly. The key
-            # is written ONLY for a client whose publisher job this workflow
-            # actually creates, so a client without one never invokes a job
-            # that does not exist. The value is the fixed job name — see
+            # is written only for a client with the publisher enabled. The
+            # value is the fixed job name — see
             # SITE_PUBLISHER_JOB_NAME in packages/shared/src/config/deploy.cjs
             # and the `publisher` job below.
             if [ "${EVENT_SITE_PUBLISHER_ENABLED:-false}" = "true" ]; then
@@ -368,13 +367,11 @@ jobs:
         run: node scripts/migrate-ticket-dates.cjs
 
   publisher:
-    name: Provision the site-publisher Cloud Run job
+    name: Update the site-publisher Cloud Run job
     needs: [guard, shared, validate-env]
     # Off unless the client's Environment opts in. The job needs an
-    # Artifact Registry repository, the Cloud Run and Artifact Registry
-    # APIs, and a dedicated runtime service account, none of which exist
-    # in a project that has not been through docs/DEPLOY_RUNBOOK.md §9 —
-    # so an existing client deploys exactly as it did before phase 5.
+    # Artifact Registry repository and a pre-provisioned job with a dedicated
+    # runtime service account (docs/DEPLOY_RUNBOOK.md §9.1).
     # Skipped on a bootstrap run for the same reason `content` is: a fresh
     # project has no config/event, so the job would have nothing to
     # snapshot on its first execution anyway.
@@ -400,30 +397,30 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Ensure the Artifact Registry repository exists
-        # Per client, in the CLIENT'S OWN project. A shared operator
-        # registry would put a read grant on one image path into every
-        # client project and make each Cloud Run job pull across a project
-        # boundary — §8.4 is explicit that the job runs "under the project's
-        # own service account", and the image it pulls is part of that
-        # boundary. describe-then-create rather than `create || true`, so a
-        # genuine failure (no permission, API not enabled) still fails the
-        # run instead of being swallowed by a shell fallback.
+      - name: Check site-publisher provisioning
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
           EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
+          EVENT_FUNCTIONS_SERVICE_ACCOUNT: ${{ vars.EVENT_FUNCTIONS_SERVICE_ACCOUNT }}
         run: |
           set -euo pipefail
           region="${EVENT_FIREBASE_REGION:-us-central1}"
-          if gcloud artifacts repositories describe run-of-show \
-              --location "$region" --project "$EVENT_FIREBASE_PROJECT_ID" >/dev/null 2>&1; then
-            echo "artifact registry: run-of-show already exists in $region"
-          else
-            gcloud artifacts repositories create run-of-show \
-              --repository-format=docker \
-              --location "$region" \
-              --project "$EVENT_FIREBASE_PROJECT_ID" \
-              --description="Run of Show site-publisher images"
+          if ! gcloud artifacts repositories describe run-of-show \
+              --location "$region" --project "$EVENT_FIREBASE_PROJECT_ID" >/dev/null; then
+            echo '::error::Cannot read the publisher registry. Complete Deploy Runbook §9.1.' >&2
+            exit 1
+          fi
+          runtime_sa="${EVENT_FUNCTIONS_SERVICE_ACCOUNT:-}"
+          if [ -z "$runtime_sa" ]; then
+            project_number="$(gcloud projects describe "$EVENT_FIREBASE_PROJECT_ID" --format='value(projectNumber)')"
+            runtime_sa="${project_number}-compute@developer.gserviceaccount.com"
+          fi
+          if ! gcloud run jobs get-iam-policy site-publisher \
+              --region "$region" --project "$EVENT_FIREBASE_PROJECT_ID" --format=json \
+              | jq -e --arg member "serviceAccount:${runtime_sa}" \
+                'any(.bindings[]?; .role == "roles/run.jobsExecutorWithOverrides" and (.condition == null) and (.members | index($member) != null))' >/dev/null; then
+            echo '::error::Cannot verify the functions runtime grant on site-publisher. Complete Deploy Runbook §9.1.' >&2
+            exit 1
           fi
       - name: Build and push the site-publisher image
         # Built on the runner and pushed straight to Artifact Registry
@@ -534,10 +531,7 @@ jobs:
               VITE_EVENT_PUBLIC_URL: $EVENT_PUBLIC_URL
             }' > "$RUNNER_TEMP/publisher-env.json"
           echo "wrote $(jq -r 'keys | length' "$RUNNER_TEMP/publisher-env.json") variables"
-      - name: Create or update the Cloud Run job
-        # `gcloud run jobs deploy` is create-or-update, so this is the same
-        # command on a first provision and on every deploy after it.
-        #
+      - name: Update the Cloud Run job
         # --service-account is the whole least-privilege story: the job runs
         # as an account scoped to this one project's Firestore, Storage, and
         # Hosting (docs/DEPLOY_RUNBOOK.md §9), never as the deploy identity
@@ -557,8 +551,9 @@ jobs:
         run: |
           set -euo pipefail
           region="${EVENT_FIREBASE_REGION:-us-central1}"
-          gcloud run jobs deploy site-publisher \
+          gcloud run jobs update site-publisher \
             --image "$PUBLISHER_IMAGE" \
+            --command="" \
             --region "$region" \
             --project "$EVENT_FIREBASE_PROJECT_ID" \
             --service-account "$EVENT_PUBLISHER_SERVICE_ACCOUNT" \
@@ -569,39 +564,6 @@ jobs:
             --tasks=1 \
             --cpu=2 \
             --memory=4Gi
-      - name: Grant the functions runtime service account the job executor role
-        # The narrowest grant that lets cmsPublish start this job: one role,
-        # on this ONE job resource, for one identity — not project-level,
-        # and not on every Cloud Run resource in the project. cmsPublish
-        # passes PUBLISH_QUEUE_ID as a container override, which needs
-        # run.jobs.runWithOverrides; roles/run.invoker lacks it. add-iam-
-        # policy-binding is idempotent, so re-running a deploy is a no-op.
-        #
-        # The default is the project's default COMPUTE service account —
-        # what Cloud Functions v2 runs as unless a function sets
-        # `serviceAccount` (none in this repo do), and the same identity
-        # docs/DEPLOY_RUNBOOK.md §3 binds secretAccessor to. It is derived
-        # from the project number, not the project id, so it is looked up
-        # rather than guessed. EVENT_FUNCTIONS_SERVICE_ACCOUNT overrides it
-        # for a project that does pin a runtime account.
-        env:
-          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
-          EVENT_FIREBASE_REGION: ${{ vars.EVENT_FIREBASE_REGION }}
-          EVENT_FUNCTIONS_SERVICE_ACCOUNT: ${{ vars.EVENT_FUNCTIONS_SERVICE_ACCOUNT }}
-        run: |
-          set -euo pipefail
-          region="${EVENT_FIREBASE_REGION:-us-central1}"
-          runtime_sa="${EVENT_FUNCTIONS_SERVICE_ACCOUNT:-}"
-          if [ -z "$runtime_sa" ]; then
-            project_number="$(gcloud projects describe "$EVENT_FIREBASE_PROJECT_ID" --format='value(projectNumber)')"
-            runtime_sa="${project_number}-compute@developer.gserviceaccount.com"
-          fi
-          gcloud run jobs add-iam-policy-binding site-publisher \
-            --region "$region" \
-            --project "$EVENT_FIREBASE_PROJECT_ID" \
-            --member "serviceAccount:${runtime_sa}" \
-            --role roles/run.jobsExecutorWithOverrides
-          echo "run.jobsExecutorWithOverrides granted to ${runtime_sa} on site-publisher"
 
   content:
     name: Generate content snapshot
