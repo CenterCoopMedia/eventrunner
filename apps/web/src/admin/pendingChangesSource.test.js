@@ -37,7 +37,9 @@ const snapshotOf = (docs) => ({
 describe('the unpublished changes reads', () => {
   it('keeps the publish run reads out of the module the shell loads', () => {
     expect(Object.keys(drafts).sort()).toEqual(['listenWithRetry', 'subscribeDirtyDrafts']);
-    expect(Object.keys(runs).sort()).toEqual(['subscribeFailedPublishRuns', 'subscribeRecentPublishRuns']);
+    expect(Object.keys(runs).sort()).toEqual([
+      'subscribeFailedPublishRuns', 'subscribePublishRun', 'subscribeRecentPublishRuns',
+    ]);
   });
 
   it('reads the dirty drafts of one collection with the listDirty predicate', () => {
