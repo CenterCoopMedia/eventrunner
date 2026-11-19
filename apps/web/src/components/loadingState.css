@@ -210,7 +210,8 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .loading-status[data-loading-stage='active'] .loading-status__activity,
-  .loading-status[data-loading-stage='slow'] .loading-status__activity {
+  .loading-status[data-loading-stage='slow'] .loading-status__activity,
+  .loading-status[data-loading-stage='prolonged'] .loading-status__activity {
     animation: loading-status-turn 1.2s linear infinite;
   }
 

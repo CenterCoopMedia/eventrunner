@@ -269,11 +269,48 @@ for (const width of [1440, 390, 320]) {
     await stage.selectOption('prolonged');
     await expect(preview.getByRole('status')).toContainText('after a minute');
     await expect(preview.getByRole('button')).toHaveCount(0);
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await expect(indicator).toHaveCSS('animation-name', 'none');
     await capture(page, `loading-continued-wait-${width}`);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(indicator).toHaveCSS('animation-name', 'loading-status-turn');
   });
 }
+
+test('a pending Schedule request keeps its motion across the one-minute boundary', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.clock.install({ time: new Date('2026-11-01T12:00:00.000Z') });
+  const pending = deferred();
+  await page.route(/\/src\/pages\/Schedule\.jsx(?:\?|$)/, async (route) => {
+    await pending.promise;
+    await route.continue();
+  });
+  const loading = page.getByRole('status', { name: 'Loading schedule…', exact: true });
+  const indicator = page.locator('.loading-status__activity');
+
+  try {
+    await page.goto('/');
+    const schedule = page.getByRole('navigation', { name: 'Main' }).locator('a[href="/schedule"]');
+    await expect(schedule).toBeVisible();
+    await page.clock.pauseAt(new Date('2026-11-01T12:10:00.000Z'));
+    await schedule.press('Enter');
+    await expect(loading).toBeVisible();
+    await page.clock.fastForward(59_999);
+    await expect(loading).toContainText('This is taking longer than usual.');
+    await expect(indicator).toHaveCSS('animation-name', 'loading-status-turn');
+
+    await page.clock.fastForward(1);
+    await expect(loading).toContainText('You can keep waiting.');
+    await expect(indicator).toHaveCSS('animation-name', 'loading-status-turn');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(indicator).toHaveCSS('animation-name', 'none');
+  } finally {
+    pending.resolve();
+    await page.clock.resume();
+  }
+  await expect(page.getByRole('heading', { level: 1, name: 'Schedule', exact: true })).toBeVisible();
+  await expect(loading).toHaveCount(0);
+  await expect(indicator).toHaveCount(0);
+});
 
 test('shared public controls keep readable edges across generated presets and modes', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
