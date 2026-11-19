@@ -9,7 +9,6 @@ import { MemoryRouter } from 'react-router';
 import { lazy, Suspense } from 'react';
 import { lazyPage } from '../lib/routePage.jsx';
 import { RELOAD_FLAG } from '../lib/chunkReload.js';
-import { firebaseReady } from '../lib/firebaseLoader.js';
 import ErrorBoundary from '../components/ErrorBoundary.jsx';
 import { adminRoute } from '../routes.jsx';
 
@@ -190,7 +189,6 @@ describe('admin route gating', () => {
     const original = adminRoute.Component;
     const entry = await import('./AdminApp.jsx');
     await import('./pages/AdminOverview.jsx');
-    await firebaseReady();
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
     let finishEntry;
     let finishOverview;

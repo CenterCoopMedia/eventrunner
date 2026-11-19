@@ -1,31 +1,24 @@
-import { Suspense, useState } from 'react';
+import { Suspense, createContext, useState } from 'react';
 import LoadingState from './LoadingState.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { createLoadingAttempt } from '../lib/useLoadingStage.js';
-import { RouteLoadingContext } from '../lib/routeLoading.jsx';
 
-function DeferredContent({ component: Component, label, shape = 'rows', routeAttempt }) {
+export const RouteLoadingContext = createContext(null);
+
+function startRoute(key) {
+  return { key, attempt: key ? createLoadingAttempt() : null };
+}
+
+export default function DeferredPage({ component: Component, label, shape = 'rows', routeKey }) {
   const { text } = usePublicLanguage();
-  return (
-    <Suspense fallback={<LoadingState label={text(`Loading ${label}…`, 'Cargando…')} shape={shape} routeAttempt={routeAttempt} />}>
+  const [route, setRoute] = useState(() => startRoute(routeKey));
+  if (route.key !== routeKey) setRoute(startRoute(routeKey));
+  const page = (
+    <Suspense fallback={<LoadingState label={text(`Loading ${label}…`, 'Cargando…')} shape={shape} routeAttempt={route.attempt} />}>
       <Component />
     </Suspense>
   );
-}
-
-// A route with a data handoff owns its clock above the code fallback.
-// Its distinct boundary also lets React replace the previous public page
-// with the pending route's status on navigation.
-function RouteHandoff({ routeKey, ...props }) {
-  const [route, setRoute] = useState(() => ({ key: routeKey, attempt: createLoadingAttempt() }));
-  if (route.key !== routeKey) setRoute({ key: routeKey, attempt: createLoadingAttempt() });
-  return (
-    <RouteLoadingContext.Provider value={route.attempt}>
-      <DeferredContent {...props} routeAttempt={route.attempt} />
-    </RouteLoadingContext.Provider>
-  );
-}
-
-export default function DeferredPage({ routeKey, handoff, ...props }) {
-  return handoff ? <RouteHandoff routeKey={routeKey} {...props} /> : <DeferredContent {...props} />;
+  // The scoped boundary can replace an already revealed public page while
+  // its next route suspends. Ordinary public routes keep their existing tree.
+  return route.attempt ? <RouteLoadingContext.Provider value={route.attempt}>{page}</RouteLoadingContext.Provider> : page;
 }

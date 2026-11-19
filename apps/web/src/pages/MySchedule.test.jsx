@@ -393,7 +393,7 @@ function ScheduleRoutes({ personalSchedule }) {
     <>
       <Link to="/schedule/mine">Open my schedule</Link>
       <DeferredPage component={personal ? personalSchedule : ScheduleProgram}
-        label={personal ? 'your schedule' : 'schedule'} shape="schedule" routeKey={pathname} handoff={personal} />
+        label={personal ? 'your schedule' : 'schedule'} shape="schedule" routeKey={personal ? pathname : undefined} />
     </>
   );
 }

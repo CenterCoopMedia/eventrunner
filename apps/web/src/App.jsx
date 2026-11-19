@@ -31,7 +31,7 @@ export function AppRoutes() {
       path: adminRoute.path,
       element: (
         <ErrorBoundary appearance="admin" title="Admin could not open">
-          <DeferredPage component={adminRoute.Component} label="admin" routeKey={adminRouteKey} handoff />
+          <DeferredPage component={adminRoute.Component} label="admin" routeKey={adminRouteKey} />
         </ErrorBoundary>
       ),
     },
@@ -43,7 +43,7 @@ export function AppRoutes() {
           { index: true, element: <Home /> },
           ...publicRoutes.map(({ path, Component, label, shape }) => ({
             path, element: <DeferredPage component={Component} shape={shape} label={label}
-              routeKey={pathname} handoff={path === 'schedule/mine'} />,
+              routeKey={path === 'schedule/mine' ? pathname : undefined} />,
           })),
         ],
       }],

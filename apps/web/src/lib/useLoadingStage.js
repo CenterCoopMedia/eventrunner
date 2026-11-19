@@ -14,10 +14,10 @@ export function createLoadingAttempt() {
   return { clock: createClock(true), settled: false };
 }
 
-function beginWait(active, attempt, inheritNavigation = false) {
-  const clock = attempt?.clock ?? createClock(inheritNavigation);
+function beginWait(active, shared, inheritNavigation = false) {
+  const clock = shared ?? createClock(inheritNavigation);
   const stage = active ? stageAt(performance.now() - clock.startedAt) : 'initial';
-  return { active, attempt, clock, stage };
+  return { active, shared, clock, stage };
 }
 
 /**
@@ -25,10 +25,10 @@ function beginWait(active, attempt, inheritNavigation = false) {
  * remove the loader (or set active=false) as soon as it finishes.
  */
 export default function useLoadingStage({ active = true, routeAttempt = null } = {}) {
-  const attempt = routeAttempt?.settled ? null : routeAttempt;
-  const [wait, setWait] = useState(() => beginWait(active, attempt, true));
-  if (wait.active !== active || wait.attempt !== attempt || (attempt && wait.clock !== attempt.clock)) {
-    setWait(beginWait(active, attempt));
+  const shared = routeAttempt?.settled ? null : routeAttempt?.clock;
+  const [wait, setWait] = useState(() => beginWait(active, shared, true));
+  if (wait.active !== active || wait.shared !== shared) {
+    setWait(beginWait(active, shared));
   }
   const { clock, stage } = wait;
 
@@ -50,9 +50,10 @@ export default function useLoadingStage({ active = true, routeAttempt = null } =
   }, [active, stage, clock]);
 
   const restart = useCallback(() => {
-    if (attempt) attempt.clock = createClock();
-    setWait(beginWait(active, attempt));
-  }, [active, attempt]);
+    const next = createClock();
+    if (shared) routeAttempt.clock = next;
+    setWait({ active, shared: shared && next, clock: next, stage: 'initial' });
+  }, [active, routeAttempt, shared]);
 
   return { stage: active ? stage : 'initial', restart };
 }
