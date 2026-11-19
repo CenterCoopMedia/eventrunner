@@ -18,6 +18,7 @@ const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP
 
 const NOW = 1_750_000_000_000;
 const now = () => NOW;
+const REQUEST_ID = '12d4b840-52b0-4af5-8f88-d40836151a48';
 const ADMIN = { uid: 'admin1', email: 'admin@example.org', email_verified: true };
 const USER = { uid: 'user1', email: 'user@example.org', email_verified: true };
 
@@ -103,6 +104,49 @@ test('cmsPublish { collection, docIds } publishes, marks the queue row done, and
   assert.equal(db.read('cmsContent', 'hero__title').revision, 1);
   assert.equal(db.read('cmsContent_drafts', 'hero__title').status, 'clean');
   assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('cmsPublish accepts a new request ID and refuses to overwrite its row', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/first': { value: 'one', status: 'dirty' },
+    'cmsContent_drafts/second': { value: 'two', status: 'dirty' },
+  });
+  const handler = createCmsPublishHandler({ ...deps(db), env: {} });
+  const body = { collection: 'cmsContent', requestId: REQUEST_ID };
+  const first = fakeRes();
+  await handler(req({ body: { ...body, docIds: ['first'], requestedBy: USER.email } }), first);
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.body.queueId, REQUEST_ID);
+  const row = db.read('cmsPublishQueue', REQUEST_ID);
+  assert.equal(row.requestedBy, ADMIN.email);
+  assert.deepEqual(row.request, { cmsContent: ['first'] });
+
+  const writes = db.writes.length;
+  const duplicate = fakeRes();
+  await handler(req({ body: { ...body, docIds: ['second'] } }), duplicate);
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(duplicate.body.error.code, 'request-id-in-use');
+  assert.equal(duplicate.body.queueId, undefined);
+  assert.equal(db.writes.length, writes);
+  assert.deepEqual(db.read('cmsPublishQueue', REQUEST_ID), row);
+  assert.equal(db.read('cmsContent', 'second'), undefined);
+});
+
+test('cmsPublish validates new request IDs and keeps them separate from resume', async () => {
+  const db = makeFakeDb();
+  const handler = createCmsPublishHandler(deps(db));
+  for (const body of [
+    { requestId: null },
+    { requestId: 'queue/other' },
+    { requestId: REQUEST_ID.toUpperCase() },
+    { requestId: `${REQUEST_ID}\n` },
+    { requestId: REQUEST_ID, queueId: 'existing' },
+  ]) {
+    const res = fakeRes();
+    await handler(req({ body: { collection: 'cmsContent', docIds: ['first'], ...body } }), res);
+    assert.equal(res.statusCode, 400, JSON.stringify(body));
+  }
+  assert.equal(db.writes.length, 0);
 });
 
 test('cmsPublish { all: true } publishes every dirty draft across collections, skipping clean ones', async () => {
