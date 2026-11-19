@@ -263,6 +263,7 @@ test('archive disables Hosting, preserves resources, and sets a seven-day deadli
   assert.equal(app.purgeAfter.getTime(), NOW + RECOVERY_MS);
   assert.equal(app.archive.previousStatus, 'ready');
   assert.equal(app.archive.versionName, VERSION);
+  assert.equal(app.archive.autoDeploy, false);
   assert.equal(app.history.at(-1).status, 'archived');
   assert.equal(s.state.release.type, 'SITE_DISABLE');
   assert.equal(s.db.read('console_builds/a1').decommission.state, 'done');
@@ -276,12 +277,14 @@ test('archive disables Hosting, preserves resources, and sets a seven-day deadli
   assert.equal(mutations(s).length, 1);
 });
 
-test('restore re-releases the saved version and restores the previous status', async () => {
-  const s = setup({ app: { status: 'launched' } });
+test('restore re-releases the saved version, restores the status, and hands off prior enrollment', async () => {
+  const s = setup({ app: { status: 'launched', archive: { autoDeploy: true } } });
   assert.equal(await s.run('archive'), 0);
   assert.equal(await s.run('restore'), 0);
   assert.equal(s.db.read('applications/a1').status, 'launched');
   assert.equal(s.db.read('applications/a1').purgeAfter, null);
+  assert.equal(s.db.read('applications/a1').archive, null);
+  assert.equal(s.db.read('console_builds/a1').decommission.autoDeploy, true);
   assert.equal(s.state.release.type, 'DEPLOY');
   assert.equal(s.state.release.version.name, VERSION);
   const writes = s.db.writes.length;
@@ -615,6 +618,7 @@ test('a restore started in time blocks purge and can finish after a lost respons
   assert.equal(mutations(s).length, count);
   assert.equal(await s.run('restore'), 0);
   assert.equal(s.db.read('applications/a1').status, 'ready');
+  assert.equal(s.db.read('console_builds/a1').decommission.autoDeploy, false);
   assert.equal(mutations(s).length, count);
 });
 

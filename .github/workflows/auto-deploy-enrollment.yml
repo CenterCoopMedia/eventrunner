@@ -62,9 +62,10 @@ jobs:
         run: |
           if [ "$OPERATION" = "enroll" ]; then
             node scripts/provision-client.cjs --application "$APPLICATION_ID" --enroll-auto-deploy
-          elif [ "$OPERATION" = "remove" ] || [ "$OPERATION" = "remove-due" ]; then
+          elif [ "$OPERATION" = "remove" ] || [ "$OPERATION" = "remove-due" ] || [ "$OPERATION" = "archive" ]; then
             args=(--application "$APPLICATION_ID" --remove-auto-deploy)
             if [ "$OPERATION" = "remove-due" ]; then args+=(--if-purge-due); fi
+            if [ "$OPERATION" = "archive" ]; then args+=(--for-archive); fi
             if [ -n "$CONFIRM_SITE" ]; then args+=(--confirm-site "$CONFIRM_SITE"); fi
             node scripts/provision-client.cjs "${args[@]}"
           elif [ "$OPERATION" = "restore" ]; then

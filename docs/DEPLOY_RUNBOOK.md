@@ -1694,8 +1694,10 @@ job requests Variables write permission.
   archived, subject to the existing active-build and connection-change guards.
   Once purge starts, restore is refused.
 
-A successful restore uses the same serialized job to enroll a non-rehearsal site again.
-It requires this run's completed restore record and the original completed full build.
+A successful restore uses the same serialized job to enroll a non-rehearsal site again
+when the archive recorded prior enrollment. It requires this run's completed restore record
+and the original completed full build. Sites with no recorded prior enrollment stay out
+of the automatic deployment list.
 Retry a failed enrollment with **Re-run failed jobs**; the restored site keeps serving.
 
 Purge removes resources in this order: Ticket webhooks; Postmark webhooks,

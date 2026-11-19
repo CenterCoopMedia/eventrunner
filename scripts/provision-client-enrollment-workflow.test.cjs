@@ -51,7 +51,8 @@ test('decommission holds the per-application lock through automatic removal and 
   const removal = application.match(/\n {2}remove-auto-deploy:\n([\s\S]*?)(?=\n {2}decommission:)/)?.[1] || '';
   assert.match(removal, /inputs.event_name == 'schedule'.*inputs.mode == 'archive'.*inputs.mode == 'purge-now'/);
   assert.match(removal, /uses: \.\/\.github\/workflows\/auto-deploy-enrollment.yml/);
-  assert.ok(removal.includes("inputs.event_name == 'schedule' && 'remove-due' || 'remove'"));
+  assert.ok(removal.includes("inputs.event_name == 'schedule' && 'remove-due' || inputs.mode == 'archive' && 'archive' || 'remove'"));
+  assert.match(writer, /if \[ "\$OPERATION" = "archive" \]; then args\+=\(--for-archive\); fi/);
   assert.ok(removal.includes("inputs.mode == 'purge-now' && inputs.confirm_site"));
   const destructive = application.slice(application.indexOf('\n  decommission:'), application.indexOf('\n  restore-auto-deploy:'));
   assert.match(destructive, /needs: remove-auto-deploy/);
