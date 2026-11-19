@@ -245,7 +245,7 @@ the normal main push can start client deployments. Do not print the value or put
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | from Firebase Console → Project settings → your web app's SDK config |
 | `VITE_FIREBASE_MEASUREMENT_ID` | optional; Firebase omits it when Google Analytics is disabled, and Eventrunner does not use it |
 | `VITE_FIREBASE_APP_CHECK_SITE_KEY` | reCAPTCHA v3 site key; set this before enabling App Check enforcement |
-| `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. `true` provisions the site-publisher Cloud Run job — do §9 first |
+| `EVENT_SITE_PUBLISHER_ENABLED` | `false` by default. Set to `true` after provisioning the site-publisher Cloud Run job (§9.1) |
 | `EVENT_PUBLISHER_SERVICE_ACCOUNT` | required when the publisher is enabled; the job's own runtime identity (§9) |
 | `EVENT_FUNCTIONS_SERVICE_ACCOUNT` | optional; overrides the default compute service account that receives `run.jobsExecutorWithOverrides` on the publisher job (§9) |
 | `EVENT_AIRTABLE_ENABLED` | `false` by default. `true` lets staff refresh session pitches from Airtable and binds the `AIRTABLE_API_TOKEN` secret. Create the secret first ([session pitches](operator/session-pitches.md#refresh-pitches-from-airtable)) |
@@ -967,6 +967,8 @@ publishes work, and the crawler snapshot refreshes at the next deploy.
 
 ### 9.1 One-time setup per client
 
+Run this section as the client project provisioner before enabling the publisher.
+
 Enable the two APIs the job needs (`run.googleapis.com` is already in §2's list):
 
 ```sh
@@ -1017,9 +1019,8 @@ not push images; the deploy service account does that), no `iam.serviceAccountUs
 `secretmanager.secretAccessor` — the job needs no secrets.
 
 The deploy service account (§2) already carries `artifactregistry.writer` and `run.developer`, which
-is what the `publisher` job needs to push the image and create the Cloud Run job. It also needs
-`iam.serviceAccountUser` **on the publisher account** in order to deploy a job that runs as it —
-§2's project-level `iam.serviceAccountUser` covers this, but the narrower binding is better:
+let the workflow push the image and update the Cloud Run job. Give it
+`iam.serviceAccountUser` on the publisher account so it can deploy a job that runs as that account:
 
 ```sh
 gcloud iam service-accounts add-iam-policy-binding "${PUBLISHER_SA_EMAIL}" \
@@ -1027,6 +1028,45 @@ gcloud iam service-accounts add-iam-policy-binding "${PUBLISHER_SA_EMAIL}" \
   --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
   --role="roles/iam.serviceAccountUser"
 ```
+
+Create the registry and job in the client's project and region. Set `EVENT_FIREBASE_REGION` and
+`EVENT_FUNCTIONS_SERVICE_ACCOUNT` in your shell to match the client's GitHub Environment if it
+overrides either default. The initial container exits with an error if invoked. The first Deploy
+installs the publisher image and uses its entrypoint.
+
+```sh
+(
+  set -eu
+  project="<GCP_PROJECT_ID>"
+  region="${EVENT_FIREBASE_REGION:-us-central1}"
+  if ! gcloud artifacts repositories describe run-of-show \
+      --location "$region" --project "$project" >/dev/null; then
+    gcloud artifacts repositories create run-of-show \
+      --repository-format=docker --location "$region" --project "$project" \
+      --description="Run of Show site-publisher images"
+  fi
+  if ! gcloud run jobs describe site-publisher --region "$region" --project "$project" >/dev/null; then
+    gcloud run jobs create site-publisher \
+      --image us-docker.pkg.dev/cloudrun/container/job:latest --command=/bin/false \
+      --max-retries=0 --service-account "$PUBLISHER_SA_EMAIL" \
+      --region "$region" --project "$project"
+  fi
+  runtime_sa="${EVENT_FUNCTIONS_SERVICE_ACCOUNT:-}"
+  if [ -z "$runtime_sa" ]; then
+    project_number="$(gcloud projects describe "$project" --format='value(projectNumber)')"
+    runtime_sa="${project_number}-compute@developer.gserviceaccount.com"
+  fi
+  gcloud run jobs add-iam-policy-binding site-publisher \
+    --region "$region" --project "$project" \
+    --member="serviceAccount:${runtime_sa}" --role=roles/run.jobsExecutorWithOverrides
+)
+```
+
+`cmsPublish` needs `roles/run.jobsExecutorWithOverrides` on this job to pass `PUBLISH_QUEUE_ID`
+as a container override. The binding belongs to the functions runtime identity and applies only
+to this job.
+For an enabled client with an existing registry and job, this block keeps both
+resources and adds the executor binding if it is missing.
 
 Then set the two GitHub Environment variables from §3:
 
@@ -1038,16 +1078,11 @@ Then set the two GitHub Environment variables from §3:
 `validateDeployEnv` fails the deploy if the flag is `true` and the account is unset — there is
 deliberately no default, because a blank would hand the job whatever identity Cloud Run picks.
 
-The next deploy from `main` provisions everything else automatically: the `run-of-show` Artifact
-Registry repository in this project, the image (tagged with the commit SHA), the `site-publisher`
-Cloud Run job with this client's environment, and `roles/run.jobsExecutorWithOverrides` for the functions runtime
-account **on that one job**. `cmsPublish` starts the job with a `PUBLISH_QUEUE_ID` container override, and `roles/run.invoker` does not allow overrides. Nothing is granted project-wide.
+The next deploy from `main` checks the registry and the job's executor grant, then pushes an image
+tagged with the commit SHA and updates the job with this client's environment.
 
 **Ordering on the first enable.** The `publisher` job and the `functions` job run independently in
-the same workflow run, so for a short window the deployed `cmsPublish` may know the job's name
-before the job exists. A publish in that window still succeeds — the invoke fails soft, records
-`publisher.invoke.status: 'failed'` on the queue row, and raises an operator alert. Re-publish
-after the run completes.
+the same workflow run. Wait for the run to complete before publishing through the CMS.
 
 ### 9.2 Verifying it
 

@@ -213,8 +213,9 @@ test('the publisher image is built into the client\'s own Artifact Registry, tag
 });
 
 test('the Cloud Run job runs as the client\'s own publisher service account', () => {
-  const deploy = step('Create or update the Cloud Run job');
+  const deploy = step('Update the Cloud Run job');
   assert.match(deploy, /--service-account "\$EVENT_PUBLISHER_SERVICE_ACCOUNT"/);
+  assert.match(deploy, /--command=""/);
   assert.match(deploy, /--task-timeout=30m/);
   // publish-site.cjs is idempotent, but a silent retry would hide a
   // flapping publish; cmsPublish already records and alerts on failure.
@@ -230,21 +231,22 @@ test('the job environment is written with jq, because EVENT_ALLOWED_ORIGINS cont
 
   // gcloud's --set-env-vars parser splits on commas, which would shred
   // EVENT_ALLOWED_ORIGINS; the job must be deployed from the file instead.
-  const deploy = step('Create or update the Cloud Run job');
+  const deploy = step('Update the Cloud Run job');
   assert.match(deploy, /--env-vars-file "\$RUNNER_TEMP\/publisher-env\.json"/);
   assert.doesNotMatch(deploy, /--set-env-vars/);
 });
 
-test('the job executor role is granted on the one job, not project-wide', () => {
-  const grant = step('Grant the functions runtime service account the job executor role');
-  assert.match(grant, /gcloud run jobs add-iam-policy-binding site-publisher/);
-  // cmsPublish starts the job with a PUBLISH_QUEUE_ID container override.
-  assert.match(grant, /--role roles\/run\.jobsExecutorWithOverrides/);
-  // The default runtime identity is derived from the project NUMBER (the
-  // default compute service account), not guessed from the project id.
-  assert.match(grant, /-compute@developer\.gserviceaccount\.com/);
-  assert.match(grant, /gcloud projects describe .* --format='value\(projectNumber\)'/);
-  assert.doesNotMatch(grant, /projects add-iam-policy-binding/);
+test('publisher deployment checks the pre-provisioned registry and job executor grant before pushing', () => {
+  const publisher = job('publisher');
+  const check = step('Check site-publisher provisioning');
+  assert.match(check, /gcloud artifacts repositories describe run-of-show/);
+  assert.match(check, /gcloud run jobs get-iam-policy site-publisher/);
+  assert.match(check, /roles\/run\.jobsExecutorWithOverrides/);
+  assert.match(check, /--arg member "serviceAccount:\$\{runtime_sa\}"/);
+  assert.match(check, /-compute@developer\.gserviceaccount\.com/);
+  assert.match(check, /gcloud projects describe .* --format='value\(projectNumber\)'/);
+  assert(publisher.indexOf('Check site-publisher provisioning') < publisher.indexOf('Build and push the site-publisher image'));
+  assert.doesNotMatch(publisher, /repositories create|run jobs (create|deploy|add-iam-policy-binding|set-iam-policy)/);
 });
 
 test('the functions runtime learns about the publisher only when the client enabled it', () => {
@@ -274,7 +276,7 @@ test('Airtable pitch intake is validated and reaches both functions env writers,
 test('the job name in the workflow matches the one the shared config pins', () => {
   const { SITE_PUBLISHER_JOB_NAME } = require('../packages/shared/src/config/deploy.cjs');
   assert.match(workflow, new RegExp(`EVENT_SITE_PUBLISHER_JOB=${SITE_PUBLISHER_JOB_NAME}`));
-  assert.match(workflow, new RegExp(`gcloud run jobs deploy ${SITE_PUBLISHER_JOB_NAME}`));
+  assert.match(workflow, new RegExp(`gcloud run jobs update ${SITE_PUBLISHER_JOB_NAME}`));
 });
 
 test('no continue-on-error key anywhere, publisher included (spec §8.1)', () => {

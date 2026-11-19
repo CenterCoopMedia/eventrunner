@@ -4,4 +4,4 @@
 
 ### Fixed
 
-- The site publisher job grants the functions runtime `roles/run.jobsExecutorWithOverrides`, which a publish needs to pass its queue id. `roles/run.invoker` does not allow that call; it worked only through the Editor role (#669).
+- The functions runtime uses `roles/run.jobsExecutorWithOverrides` on the site publisher job to pass its queue ID without relying on the Editor role (#669).
