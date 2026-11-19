@@ -149,12 +149,15 @@ jobs:
     needs: guard
     environment: ${{ inputs.client }}
     runs-on: ubuntu-latest
+    outputs:
+      publisher-enabled: ${{ steps.validate.outputs.publisher-enabled }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Validate Tier A environment (spec §2.1) before touching GCP
+        id: validate
         # An unset GitHub Environment variable renders as an empty string
         # in this env: block, not as absent — validateDeployEnv is what
         # catches that and names the exact key, instead of the vars
@@ -199,7 +202,13 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
           VITE_EVENT_PUBLIC_URL: ${{ vars.EVENT_PUBLIC_URL }}
-        run: node scripts/validate-deploy-env.cjs
+        run: |
+          node scripts/validate-deploy-env.cjs
+          enabled=false
+          if [ "$EVENT_SITE_PUBLISHER_ENABLED" = "true" ]; then
+            enabled=true
+          fi
+          echo "publisher-enabled=$enabled" >> "$GITHUB_OUTPUT"
 
   provision:
     name: Provision Firestore rules/indexes and Storage rules
@@ -369,7 +378,7 @@ jobs:
     # Skipped on a bootstrap run for the same reason `content` is: a fresh
     # project has no config/event, so the job would have nothing to
     # snapshot on its first execution anyway.
-    if: vars.EVENT_SITE_PUBLISHER_ENABLED == 'true' && inputs.bootstrap != true
+    if: needs.validate-env.outputs.publisher-enabled == 'true' && inputs.bootstrap != true
     environment: ${{ inputs.client }}
     runs-on: ubuntu-latest
     steps:

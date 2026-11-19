@@ -192,8 +192,15 @@ test('deploy validation receives the site-publisher variables before GCP is touc
 });
 
 test('the publisher job is opt-in per client and skipped on a bootstrap run', () => {
+  const validation = job('validate-env');
+  assert.match(validation, /environment: \$\{\{ inputs\.client \}\}/);
+  assert.match(validation, /publisher-enabled: \$\{\{ steps\.validate\.outputs\.publisher-enabled \}\}/);
+  const validationStep = step('Validate Tier A environment (spec §2.1) before touching GCP');
+  assert.match(validationStep, /id: validate\n/);
+  assert.match(validationStep, /if \[ "\$EVENT_SITE_PUBLISHER_ENABLED" = "true" \]; then/);
+  assert.match(validationStep, /echo "publisher-enabled=\$enabled" >> "\$GITHUB_OUTPUT"/);
   const publisher = job('publisher');
-  assert.match(publisher, /if: vars\.EVENT_SITE_PUBLISHER_ENABLED == 'true' && inputs\.bootstrap != true/);
+  assert.match(publisher, /if: needs\.validate-env\.outputs\.publisher-enabled == 'true' && inputs\.bootstrap != true/);
   assert.match(publisher, /needs: \[[^\]\n]*validate-env[^\]\n]*\]/);
 });
 
