@@ -6,7 +6,7 @@ const WAITING_DETAILS = {
 };
 
 /** One stable live region; the decorative activity cue never announces. */
-export default function LoadingStatus({ label = 'Loading…', stage = 'initial' }) {
+export default function LoadingStatus({ label = 'Loading…', stage = 'initial', prolongedHint }) {
   const detail = WAITING_DETAILS[stage];
   return (
     <div className="loading-status" data-loading-stage={stage}>
@@ -33,6 +33,7 @@ export default function LoadingStatus({ label = 'Loading…', stage = 'initial' 
       >
         <span className="loading-status__label">{label}</span>
         {detail ? <span className="loading-status__detail">{detail}</span> : null}
+        {stage === 'prolonged' && prolongedHint ? <span className="loading-status__detail">{prolongedHint}</span> : null}
       </p>
     </div>
   );

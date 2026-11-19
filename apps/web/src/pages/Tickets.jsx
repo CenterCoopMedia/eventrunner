@@ -25,6 +25,7 @@ import { activeQuestions, answerText, checkAnswers, readRegistrationForm } from 
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
+import LoadingState from '../components/LoadingState.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { Checkbox } from '../components/forms/Choice.jsx';
 import { TextField, SelectField, focusFirstError } from '../components/forms/publicForm.jsx';
@@ -151,8 +152,10 @@ export default function Tickets() {
     if (demo) return undefined;
     const controller = new AbortController();
     setLoadError('');
-    ticketingRequest('ticketingCatalog', { signal: controller.signal }).then(setCatalog).catch((err) => {
-      if (err?.name !== 'AbortError') setLoadError(err.message);
+    ticketingRequest('ticketingCatalog', { signal: controller.signal }).then((nextCatalog) => {
+      if (!controller.signal.aborted) setCatalog(nextCatalog);
+    }).catch((err) => {
+      if (!controller.signal.aborted && err?.name !== 'AbortError') setLoadError(err.message);
     });
     return () => controller.abort();
   }, [demo, loadVersion]);
@@ -370,6 +373,7 @@ export default function Tickets() {
   }
 
   const heading = <h1 className="font-heading text-h1 font-semibold text-text-primary">Get tickets</h1>;
+  const retryCatalog = () => setLoadVersion((value) => value + 1);
   if (demo) return (
     <article className="space-y-md">
       {heading}
@@ -377,18 +381,22 @@ export default function Tickets() {
       <Link to="/schedule" className={secondaryActionClass}>Read the schedule</Link>
     </article>
   );
-  if (loadError) return (
-    <article className="space-y-md">
-      {heading}<p role="alert" className="text-danger">{loadError}</p>
-      <button type="button" className={secondaryActionClass} onClick={() => setLoadVersion((value) => value + 1)}>Retry ticket information</button>
-    </article>
-  );
-  if (!catalog) return <article className="space-y-md">{heading}<p role="status">Loading ticket information…</p></article>;
-  if (catalog.provider !== 'stripe') {
+
+  const stripeCatalog = !loadError && catalog?.provider === 'stripe';
+  const catalogPending = !loadError && !catalog;
+  const canShowPurchase = stripeCatalog && catalog.salesEnabled && !authLoading && user?.emailVerified && !attempt;
+  const visible = STEPS.filter((step) => step.slug !== 'questions' || asksQuestions);
+  const { index: current, unknown } = resolveStep(visible, stepSlug, 0);
+  let waitLabel;
+  if (catalogPending) waitLabel = 'Loading ticket information…';
+  else if (stripeCatalog && catalog.salesEnabled && authLoading) waitLabel = 'Checking your sign-in…';
+  else if (canShowPurchase && form === undefined) waitLabel = 'Loading registration questions…';
+  else if (canShowPurchase && unknown && formStale) waitLabel = 'Loading the updated questions…';
+
+  function renderRegistrationDetails() {
     const registrationAction = resolveRegistrationAction(eventConfig);
     return (
-      <article className="space-y-md">
-        {heading}
+      <>
         {/* No tickets are sold here. The register-interest link is the
             way in where the organizers set one; otherwise the page says
             so plainly rather than offering a claim for a ticket nobody
@@ -402,13 +410,12 @@ export default function Tickets() {
         {catalog.provider && catalog.provider !== 'none' ? (
           <p><Link to="/ticket/claim" className="underline">Claim a ticket you already have</Link></p>
         ) : null}
-      </article>
+      </>
     );
   }
 
   function renderPurchase() {
-    if (form === undefined) return <p role="status">Loading ticket information…</p>;
-    const visible = STEPS.filter((step) => step.slug !== 'questions' || asksQuestions);
+    if (unknown) return <Navigate to={stepSlug === 'questions' ? hrefFor(REVIEW_STEP) : '/tickets'} replace />;
     const formSteps = visible.filter((step) => step.slug !== 'review');
     const firstOpen = formSteps.findIndex((step) => hasErrors(stepErrors(step.slug)));
     const steps = visible.map((step, index) => {
@@ -416,12 +423,6 @@ export default function Tickets() {
       const done = step.slug !== 'review' && passed.includes(step.slug) && !hasErrors(stepErrors(step.slug));
       return { ...step, state: done ? 'done' : 'todo' };
     });
-    const { index: current, unknown } = resolveStep(steps, stepSlug, 0);
-    if (unknown) {
-      // The Questions step can be named before the newer form arrives.
-      if (formStale) return <p role="status">Loading the updated questions…</p>;
-      return <Navigate to={stepSlug === 'questions' ? hrefFor(REVIEW_STEP) : '/tickets'} replace />;
-    }
     const step = steps[current];
     if (step.state === 'locked') return <Navigate to={hrefFor(steps[firstOpen])} replace />;
     const review = step.slug === 'review';
@@ -618,13 +619,8 @@ export default function Tickets() {
     );
   }
 
-  return (
-    <article className="min-w-0 space-y-lg text-body text-text-primary">
-      <div className="space-y-xs">
-        {heading}
-        <p className="text-lead">{catalog.eventName || eventConfig.name}</p>
-        {catalog.mode === 'test' ? <p className="border-hairline border-rule-hairline bg-surface-alt p-sm">Test mode. These tickets do not represent a live purchase.</p> : null}
-      </div>
+  function renderStripeTickets() {
+    return <>
       {!attempt && requestError ? <p ref={errorRef} tabIndex={-1} role="alert" className="text-danger">{requestError}</p> : null}
 
       {attempt ? (
@@ -647,7 +643,7 @@ export default function Tickets() {
           <p>{catalog.closedReason || 'The organizers are not accepting new ticket orders right now.'}</p>
           <Link to="/tickets/mine" className={secondaryActionClass}>View your tickets</Link>
         </section>
-      ) : authLoading ? <p role="status">Checking your sign-in…</p> : !user ? (
+      ) : waitLabel ? null : !user ? (
         <section aria-labelledby="ticket-signin-heading" className="space-y-sm">
           <SectionHead title="Sign in to buy tickets" id="ticket-signin-heading" />
           <p>Your verified account keeps your order private. You can assign each ticket to a different attendee after signing in.</p>
@@ -661,6 +657,27 @@ export default function Tickets() {
         </section>
       ) : !attempt ? renderPurchase() : null}
       <p className="no-print"><Link to="/tickets/mine" className="underline">View tickets assigned to you</Link> · <Link to="/ticket/claim" className="underline">Claim an existing ticket</Link></p>
+    </>;
+  }
+
+  return (
+    <article className={stripeCatalog ? 'min-w-0 space-y-lg text-body text-text-primary' : 'space-y-md'}>
+      <div className="space-y-xs">
+        {heading}
+        {stripeCatalog ? <p className="text-lead">{catalog.eventName || eventConfig.name}</p> : null}
+        {stripeCatalog && catalog.mode === 'test' ? <p className="border-hairline border-rule-hairline bg-surface-alt p-sm">Test mode. These tickets do not represent a live purchase.</p> : null}
+      </div>
+      {waitLabel ? (
+        <LoadingState key={waitLabel} label={waitLabel} rows={0} onRetry={catalogPending ? retryCatalog : undefined} />
+      ) : null}
+      <section aria-label="Ticket information" aria-busy={Boolean(waitLabel)} className={stripeCatalog ? 'space-y-lg' : 'space-y-md'}>
+        {loadError ? (
+          <>
+            <p role="alert" className="text-danger">{loadError}</p>
+            <button type="button" className={secondaryActionClass} onClick={retryCatalog}>Retry ticket information</button>
+          </>
+        ) : stripeCatalog ? renderStripeTickets() : catalog ? renderRegistrationDetails() : null}
+      </section>
     </article>
   );
 }

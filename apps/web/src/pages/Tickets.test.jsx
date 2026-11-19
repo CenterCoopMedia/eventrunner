@@ -44,7 +44,8 @@ const CATALOG = {
 const WIDE_SALES_WINDOW = { salesStartAt: '2030-05-01T14:00:00.000Z', salesEndAt: '2030-06-03T20:00:00.000Z' };
 const NARROW_SALES_WINDOW = { salesStartAt: '2030-05-02T15:00:00.000Z', salesEndAt: '2030-06-01T18:00:00.000Z' };
 function Location() { const location = useLocation(); return <p>Location: {location.pathname}{location.search}</p>; }
-function mount() { return render(<MemoryRouter initialEntries={['/tickets']}><Routes><Route path="/tickets" element={<Tickets />} /><Route path="*" element={<Location />} /></Routes></MemoryRouter>); }
+function ticketRoute() { return <MemoryRouter initialEntries={['/tickets']}><Routes><Route path="/tickets" element={<Tickets />} /><Route path="*" element={<Location />} /></Routes></MemoryRouter>; }
+function mount() { return render(ticketRoute()); }
 const FORM = {
   standard: { organization: { enabled: true, required: true }, photoConsent: { enabled: true, required: false } },
   custom: [],
@@ -89,6 +90,73 @@ describe('attendee ticket selection', () => {
     state.event = { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} };
     ticketingRequest.mockReset();
     ticketingRequest.mockImplementation(async (name) => name === 'ticketingCatalog' ? CATALOG : { orderId: 'order-synthetic', status: 'pending', paymentStatus: 'pending', checkoutUrl: null });
+  });
+  it('retries only the catalog read after a minute, then offers the original saved order', async () => {
+    const reference = 'ord_1234567890abcdef1234567890abcdef12345678';
+    sessionStorage.setItem('eventrunner.ticket-checkout.purchaser-a', JSON.stringify({ orderId: reference }));
+    const reads = [];
+    ticketingRequest.mockImplementation((name, { signal } = {}) => {
+      if (name !== 'ticketingCatalog') throw new Error(`Unexpected request: ${name}`);
+      return new Promise((resolve, reject) => reads.push({ signal, resolve, reject }));
+    });
+    vi.useFakeTimers();
+    try {
+      mount();
+      const region = screen.getByRole('region', { name: 'Ticket information' });
+      const status = screen.getByRole('status', { name: 'Loading ticket information…' });
+      expect(status.closest('[aria-busy="true"]')).toBeNull();
+      expect(region).toHaveAttribute('aria-busy', 'true');
+      act(() => vi.advanceTimersByTime(999));
+      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      act(() => vi.advanceTimersByTime(1));
+      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'active');
+      act(() => vi.advanceTimersByTime(9000));
+      expect(status).toHaveTextContent('This is taking longer than usual.');
+      act(() => vi.advanceTimersByTime(49_999));
+      expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1));
+      expect(status).toHaveTextContent('We haven’t received a result after a minute.');
+      fireEvent.click(screen.getByRole('button', { name: 'Try loading again' }));
+      expect(reads).toHaveLength(2);
+      expect(reads[0].signal.aborted).toBe(true);
+      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      await act(async () => reads[0].reject(new Error('Stale catalog failure')));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      await act(async () => reads[1].resolve(CATALOG));
+      expect(status).not.toBeInTheDocument();
+      expect(region).toHaveAttribute('aria-busy', 'false');
+      expect(screen.getByRole('link', { name: 'View order status' })).toHaveAttribute('href', `/tickets/status?orderId=${reference}`);
+      expect(screen.getByRole('button', { name: 'Resume existing checkout' })).toBeInTheDocument();
+      expect(checkoutCalls()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears a failed catalog wait and starts fresh sign-in and registration waits', async () => {
+    const buyer = state.auth.user;
+    state.auth = { user: null, loading: true };
+    state.form = undefined;
+    ticketingRequest.mockRejectedValueOnce(new Error('Ticket information is unavailable.'));
+    const view = mount();
+    const region = screen.getByRole('region', { name: 'Ticket information' });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ticket information is unavailable.');
+    expect(region).toHaveAttribute('aria-busy', 'false');
+    expect(screen.queryByRole('status', { name: 'Loading ticket information…' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry ticket information' }));
+    const authWait = await screen.findByRole('status', { name: 'Checking your sign-in…' });
+    expect(authWait.closest('[aria-busy="true"]')).toBeNull();
+    state.auth = { user: buyer, loading: false };
+    view.rerender(ticketRoute());
+    const questions = screen.getByRole('status', { name: 'Loading registration questions…' });
+    expect(questions.parentElement).toHaveAttribute('data-loading-stage', 'initial');
+    expect(questions.closest('[aria-busy="true"]')).toBeNull();
+    expect(authWait).not.toBeInTheDocument();
+    act(() => state.pushForm(null));
+    expect(region).toHaveAttribute('aria-busy', 'false');
+    expect(questions).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Quantity — General admission')).toBeInTheDocument();
+    expect(checkoutCalls()).toHaveLength(0);
   });
   it.each(['sold-out', 'rate-limited', 'account-not-ready'])('requires renewed terms acceptance when a %s refresh returns another revision', async (code) => {
     const changed = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Updated refund policy requires organizer approval.',
@@ -282,7 +350,7 @@ describe('attendee ticket selection', () => {
     ] }] });
     expect(JSON.stringify(body)).not.toMatch(/unitAmount|currency|priceId|entitlement/);
   });
-  it('retries an uncertain request with the same frozen id, accepted revision, and selections', async () => {
+  it.each([false, true])('retries the original frozen request after an uncertain response (storage refuses writes: %s)', async (storageRefused) => {
     let liveCatalog = CATALOG;
     ticketingRequest.mockImplementation(async (name) => {
       if (name === 'ticketingCatalog') return liveCatalog;
@@ -290,16 +358,31 @@ describe('attendee ticket selection', () => {
     });
     mount();
     await fill();
-    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
-    await screen.findByText('Connection interrupted');
-    liveCatalog = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Updated refund policy.' };
-    expect(screen.queryByLabelText('Quantity — General admission')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Resume existing checkout' }));
-    await waitFor(() => expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(2));
-    const calls = ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout');
-    expect(calls[0][1].body).toEqual(calls[1][1].body);
-    expect(calls[1][1].body.catalogRevision).toBe(1);
-    expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).not.toContain('attendee-1@example.test');
+    const storage = storageRefused ? vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage unavailable', 'SecurityError');
+    }) : null;
+    try {
+      fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+      await screen.findByText('Connection interrupted');
+      liveCatalog = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Updated refund policy.' };
+      expect(screen.queryByLabelText('Quantity — General admission')).not.toBeInTheDocument();
+      vi.useFakeTimers();
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
+      expect(checkoutCalls()).toHaveLength(1);
+      vi.useRealTimers();
+      fireEvent.click(screen.getByRole('button', { name: 'Resume existing checkout' }));
+      await waitFor(() => expect(checkoutCalls()).toHaveLength(2));
+      const [first, second] = checkoutCalls();
+      expect(second[1].body).toEqual(first[1].body);
+      expect(second[1].body.catalogRevision).toBe(1);
+      const saved = sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a');
+      if (storageRefused) expect(saved).toBeNull();
+      else expect(saved).not.toContain('attendee-1@example.test');
+    } finally {
+      vi.useRealTimers();
+      storage?.mockRestore();
+    }
   });
   it('requires renewed acceptance after changed prices or terms and waits for the refreshed catalog', async () => {
     const changed = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Refunds are available until May 1.',
@@ -608,6 +691,27 @@ describe('registration questions in the ticket stepper', () => {
     expect(second.formRevision).toBe(5);
     expect(second.lines[0].attendees[0].answers).toEqual({ organization: 'Synthetic Org', jobTitle: 'Reporter' });
     expect(second.requestId).not.toBe(first.requestId);
+  });
+
+  it('waits for the existing listener when a refused checkout adds a Questions step', async () => {
+    state.form = { ...FORM, standard: {} };
+    ticketingRequest.mockImplementation(async (name) => {
+      if (name === 'ticketingCatalog') return CATALOG;
+      throw new TicketingRequestError('form-changed', 'The registration questions changed.', 409);
+    });
+    mount();
+    await fill();
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    const status = await screen.findByRole('status', { name: 'Loading the updated questions…' });
+    const region = screen.getByRole('region', { name: 'Ticket information' });
+    expect(status.closest('[aria-busy="true"]')).toBeNull();
+    expect(region).toHaveAttribute('aria-busy', 'true');
+    expect(checkoutCalls()).toHaveLength(1);
+    act(() => state.pushForm({ ...FORM, revision: 5 }));
+    expect(screen.getByLabelText('Organization (required)')).toBeInTheDocument();
+    expect(status).not.toBeInTheDocument();
+    expect(region).toHaveAttribute('aria-busy', 'false');
+    expect(checkoutCalls()).toHaveLength(1);
   });
 
   it('maps a server answer error to that attendee’s field, numbering lines sorted by ticket type id', async () => {
