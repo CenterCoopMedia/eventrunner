@@ -33,12 +33,13 @@ vi.mock('../lib/profileSource.js', () => ({
 }));
 
 let currentUser = null;
+let authPending = false;
 const authListeners = new Set();
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},
   onAuthStateChanged: (_auth, next) => {
     authListeners.add(next);
-    next(currentUser);
+    if (!authPending) next(currentUser);
     return () => authListeners.delete(next);
   },
   signInWithCustomToken: vi.fn(),
@@ -112,6 +113,7 @@ async function submitSignInCode(email = signedInUser.email) {
 beforeEach(() => {
   vi.clearAllMocks();
   currentUser = null;
+  authPending = false;
   profileAvailable = true;
   globalThis.fetch = vi.fn();
   vi.mocked(signInWithCustomToken).mockImplementation(async () => {
@@ -122,6 +124,24 @@ beforeEach(() => {
 });
 
 describe('signed out', () => {
+  it('names the auth check outside the busy claim region and retains the incoming reference', async () => {
+    authPending = true;
+    const entry = '/ticket/claim?order=group-order-123&source=confirmation';
+    renderClaim(entry);
+    const region = await screen.findByRole('region', { name: 'Ticket claim' });
+    const waiting = screen.getByRole('status', { name: 'Checking your sign-in…' });
+    expect(waiting.closest('[aria-busy="true"]')).toBeNull();
+    expect(region).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
+
+    await act(async () => setAuthUser(signedInUser));
+    expect(screen.getByLabelText('Order number')).toHaveValue('group-order-123');
+    expect(region).toHaveAttribute('aria-busy', 'false');
+    expect(waiting).not.toBeInTheDocument();
+    expect(screen.getByTestId('current-route')).toHaveTextContent(entry);
+    expect(claimRequests()).toHaveLength(0);
+  });
+
   it('offers the shared sign-in form in place without requesting or claiming the order', async () => {
     renderClaim();
     await screen.findByText('Sign in to claim your ticket');
@@ -230,35 +250,45 @@ describe('signed in', () => {
   });
 
   it.each(['/', '/conference/'])('preserves the claim link at %s while waiting for the current account', async (base) => {
-    profileAvailable = false;
-    const timeout = vi.spyOn(globalThis, 'setTimeout');
+    const entry = `${base}ticket/claim?order=group-order-123&source=confirmation&tag=one&tag=two`;
+    renderClaim(entry, base);
+    fireEvent.change(await screen.findByLabelText('Order number'), { target: { value: 'edited & verified' } });
     const heldUp = vi.fn();
     globalThis.addEventListener('eventrunner:held-up', heldUp);
-    const entry = `${base}ticket/claim?order=group-order-123&source=confirmation`;
-    renderClaim(entry, base);
-    await screen.findByText(/Setting up your account/);
-    expect(screen.queryByRole('button', { name: 'Claim ticket' })).not.toBeInTheDocument();
+    vi.useFakeTimers();
+    try {
+      act(() => profileListeners.get(signedInUser.uid)({ id: 'previous-account' }));
+      const status = screen.getByRole('status', { name: 'Setting up your account…' });
+      const region = screen.getByRole('region', { name: 'Ticket claim' });
+      expect(status.closest('[aria-busy="true"]')).toBeNull();
+      expect(region).toHaveAttribute('aria-busy', 'true');
+      expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
 
-    // The context may still carry the previous account during an auth change.
-    await act(async () => profileListeners.get(signedInUser.uid)({ id: 'previous-account' }));
-    expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
-    const waitingDeadline = timeout.mock.calls.find(([, delay]) => delay === 15_000)?.[0];
-    expect(waitingDeadline).toBeTypeOf('function');
-    expect(heldUp).not.toHaveBeenCalled();
-    act(() => waitingDeadline());
-    expect(screen.getByRole('alert')).toHaveTextContent('Your account is taking longer to load.');
-    expect(screen.getByRole('link', { name: 'Reload claim page' })).toHaveAttribute('href', entry);
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-    expect(heldUp).toHaveBeenCalledOnce();
-    globalThis.removeEventListener('eventrunner:held-up', heldUp);
-    timeout.mockRestore();
+      act(() => vi.advanceTimersByTime(999));
+      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      act(() => vi.advanceTimersByTime(1));
+      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'active');
+      act(() => vi.advanceTimersByTime(9000));
+      expect(status).toHaveTextContent('This is taking longer than usual.');
+      expect(heldUp).toHaveBeenCalledOnce();
+      act(() => vi.advanceTimersByTime(49_999));
+      expect(screen.queryByRole('link', { name: 'Reload claim page' })).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1));
+      expect(status).toHaveTextContent('We haven’t received a result after a minute.');
+      expect(status).toHaveTextContent('Check your connection and reload this page, or contact the organizers if this continues.');
+      expect(screen.getByRole('link', { name: 'Reload claim page' })).toHaveAttribute(
+        'href', `${base}ticket/claim?order=edited+%26+verified&source=confirmation&tag=one&tag=two`,
+      );
 
-    // The existing subscription can recover after that deadline, still without
-    // automatically submitting the preserved reference.
-    await act(async () => profileListeners.get(signedInUser.uid)({ id: signedInUser.uid }));
-    expect(await screen.findByLabelText('Order number')).toHaveValue('group-order-123');
-    expect(screen.queryByText(/Your account is taking longer/)).not.toBeInTheDocument();
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+      await act(async () => profileListeners.get(signedInUser.uid)({ id: signedInUser.uid }));
+      expect(screen.getByLabelText('Order number')).toHaveValue('edited & verified');
+      expect(region).toHaveAttribute('aria-busy', 'false');
+      expect(status).not.toBeInTheDocument();
+      expect(claimRequests()).toHaveLength(0);
+    } finally {
+      globalThis.removeEventListener('eventrunner:held-up', heldUp);
+      vi.useRealTimers();
+    }
   });
 
   it('does not start a claim after its account signs out while the ID token is being obtained', async () => {

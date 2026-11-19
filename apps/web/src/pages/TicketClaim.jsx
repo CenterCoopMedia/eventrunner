@@ -27,9 +27,11 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
+import LoadingState from '../components/LoadingState.jsx';
+import LoadingStatus from '../components/LoadingStatus.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
-import { reportHeldUp } from '../lib/fieldVitals.js';
+import useLoadingStage from '../lib/useLoadingStage.js';
 
 const Panel = ({ children }) => (
   <div className="mt-lg space-y-md border-hairline border-rule-hairline bg-surface-alt p-lg">
@@ -37,26 +39,19 @@ const Panel = ({ children }) => (
   </div>
 );
 
-// Keep listening through the existing ProfileContext retry path. A bounded
-// wait also gives the attendee a recovery action without losing the reference.
 function PreparingAccount({ retryPath }) {
   const retryHref = useHref(retryPath);
-  const [takingLonger, setTakingLonger] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setTakingLonger(true);
-      reportHeldUp();
-    }, 15_000);
-    return () => clearTimeout(timer);
-  }, []);
+  const { stage } = useLoadingStage();
+  const prolonged = stage === 'prolonged';
+  const label = prolonged
+    ? 'Setting up your account. Check your connection and reload this page, or contact the organizers if this continues.'
+    : 'Setting up your account…';
   return (
     <Panel>
-      <p role={takingLonger ? 'alert' : 'status'} className="text-text-primary">
-        {takingLonger
-          ? 'Your account is taking longer to load. Check your connection and reload this page, or contact the organizers if this continues.'
-          : 'Setting up your account. The claim form will appear when your account is ready.'}
-      </p>
-      {takingLonger ? <a href={retryHref} className={primaryActionClass}>Reload claim page</a> : null}
+      <LoadingStatus label={label} stage={stage} />
+      {prolonged ? (
+        <a href={retryHref} className={primaryActionClass}>Reload claim page</a>
+      ) : null}
     </Panel>
   );
 }
@@ -71,41 +66,43 @@ export default function TicketClaim() {
   const [orderNumber, setOrderNumber] = useState(() => (searchParams.get('order') || '').slice(0, 160));
   const [reauthenticate, setReauthenticate] = useState(null);
   const identity = user ? `${user.uid}:${user.email || ''}` : null;
-  if (authLoading) return null;
-
   const needsSignIn = !user || !user.emailVerified || reauthenticate === identity;
-  if (needsSignIn) {
-    return (
-      <article className="mx-auto max-w-md">
-        <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
-        <p className="my-md text-text-secondary" role={reauthenticate === identity && user ? 'alert' : undefined}>
-          {!user
-            ? 'Sign in to claim your ticket'
-            : reauthenticate === identity
-              ? 'Your sign-in could not be verified. Sign in again before claiming your ticket.'
-              : 'Verify your email before claiming your ticket. Sign in with an emailed code below.'}
-        </p>
-        <SignInPanel key={identity || 'signed-out'} initialEmail={user?.email || ''} onSignedIn={() => setReauthenticate(null)} />
-      </article>
-    );
-  }
-
   // A fresh sign-in can precede the auth trigger that creates users/{uid}.
   // Also reject a prior account's profile during the subscription transition.
-  if (status !== 'ready' || profile?.id !== user.uid) {
+  const preparing = !authLoading && !needsSignIn && (status !== 'ready' || profile?.id !== user.uid);
+  const waiting = authLoading || preparing;
+  let feedback;
+  if (authLoading) {
+    feedback = <LoadingState label="Checking your sign-in…" rows={0} />;
+  } else if (preparing) {
     const retryParams = new URLSearchParams(searchParams);
     if (orderNumber || retryParams.has('order')) retryParams.set('order', orderNumber);
-    return (
-      <article className="mx-auto max-w-md">
-        <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
-        <PreparingAccount key={identity} retryPath={`/ticket/claim?${retryParams.toString()}`} />
-      </article>
-    );
+    feedback = <PreparingAccount key={identity} retryPath={`/ticket/claim?${retryParams.toString()}`} />;
   }
 
-  // Mount submission state per verified account. Signing out, switching
-  // accounts or losing the account document discards any old result.
-  return <ClaimForm key={identity} user={user} orderNumber={orderNumber} setOrderNumber={setOrderNumber} onRequireSignIn={() => setReauthenticate(identity)} />;
+  return (
+    <article className="mx-auto max-w-md">
+      {(waiting || needsSignIn) ? <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1> : null}
+      {feedback}
+      <section aria-label="Ticket claim" aria-busy={waiting}>
+        {waiting ? null : needsSignIn ? (
+          <>
+            <p className="my-md text-text-secondary" role={reauthenticate === identity && user ? 'alert' : undefined}>
+              {!user
+                ? 'Sign in to claim your ticket'
+                : reauthenticate === identity
+                  ? 'Your sign-in could not be verified. Sign in again before claiming your ticket.'
+                  : 'Verify your email before claiming your ticket. Sign in with an emailed code below.'}
+            </p>
+            <SignInPanel key={identity || 'signed-out'} initialEmail={user?.email || ''} onSignedIn={() => setReauthenticate(null)} />
+          </>
+        ) : (
+          // Mount submission state only for the current verified account.
+          <ClaimForm key={identity} user={user} orderNumber={orderNumber} setOrderNumber={setOrderNumber} onRequireSignIn={() => setReauthenticate(identity)} />
+        )}
+      </section>
+    </article>
+  );
 }
 
 function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
@@ -168,7 +165,7 @@ function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
 
   if (result) {
     return (
-      <article className="mx-auto max-w-md">
+      <>
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Ticket claimed</h1>
         <Panel>
           <p role="status" className="text-text-primary">
@@ -180,12 +177,12 @@ function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
             View and print your tickets
           </Link>
         </Panel>
-      </article>
+      </>
     );
   }
 
   return (
-    <article className="mx-auto max-w-md">
+    <>
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
       <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
         You are signed in{user.email ? ` as ${user.email}` : ''}. Enter the order number from
@@ -226,6 +223,6 @@ function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
           </button>
         </form>
       </Panel>
-    </article>
+    </>
   );
 }
