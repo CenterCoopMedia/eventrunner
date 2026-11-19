@@ -57,7 +57,7 @@ Record each step in the rehearsal receipt with UTC times, identity, expected and
 
 ### 2. Prepare edge, TLS, projection and provider settings
 
-- In the approved hosted release environment install the repo's locked dependencies using `npm run prepare:functions` and `npm ci`. Save this reviewed Wrangler configuration as `wrangler.er1063.toml` in the checkout root and run `wrangler deploy --config wrangler.er1063.toml`. Verify the Worker deployment ID, public DNS and verified TLS with `curl --silent --show-error --output /dev/null --write-out '%{http_code} %{ssl_verify_result}\n' https://er1063-rehearsal.eventrunner.org/`. Before enrollment a missing map can return 404. The TLS result must be 0.
+- In the approved hosted release environment use Node 22.23.5, as pinned in `.nvmrc`. Install the repo's locked dependencies using `npm run prepare:functions` and `npm ci`. Save the following configuration as `wrangler.er1063.toml` in the checkout root.
 
   ```toml
   name = "er1063-client-host"
@@ -70,6 +70,22 @@ Record each step in the rehearsal receipt with UTC times, identity, expected and
   [vars]
   CLIENT_ROUTE_MAP_BUCKET = "er1063-public-route-maps"
   ```
+
+  Bootstrap Wrangler 4.160.1 with `npx` from a temporary directory outside the checkout. This keeps the repository lockfile untouched. The npm cutoff keeps dependency resolution within the versions available after that release on November 11, 2026. Record the emitted CLI version in the browser/proxy receipt. [Pinned Wrangler release](https://www.npmjs.com/package/wrangler/v/4.160.1) · [npm resolution cutoff](https://docs.npmjs.com/cli/v10/using-npm/config#before)
+
+  ```sh
+  ER1063_CHECKOUT="$PWD"
+  ER1063_TOOLS="$(mktemp -d)"
+  (
+    set -e
+    cd "$ER1063_TOOLS"
+    export npm_config_before=2026-11-11T16:00:00Z
+    npx --yes wrangler@4.160.1 --version
+    npx --yes wrangler@4.160.1 deploy --cwd "$ER1063_CHECKOUT" --config wrangler.er1063.toml
+  )
+  ```
+
+  Verify the Worker deployment ID, public DNS and verified TLS with `curl --silent --show-error --output /dev/null --write-out '%{http_code} %{ssl_verify_result}\n' https://er1063-rehearsal.eventrunner.org/`. Before enrollment a missing map can return 404. The TLS result must be 0.
 - In Cloudflare **Security → WAF → Custom rules**, block the expression below for this ASCII-only fixture host. The conservative percent check leaves encoded query values alone. Customer ingress must preserve supported encoded path characters and enforce the router's precise [raw-path contract](CLIENT_HOST_ROUTING.md). Verify any custom rules before allowing paths.
 
   ```text
@@ -155,7 +171,18 @@ Use distinct signed fixture recipients for confirmation and RFC 8058 testing, an
 
 In an approved HTTP probe session request `/conference-other/`, `/events/workshop-other/`, `/unknown-event/`, `/__/auth/handler` and `/.well-known/nonexistent`. Expect host fallback or 404 with each one kept off the event projects. Use `curl --path-as-is --head --silent --show-error` on these exact test-host paths: `/conference//rehearsal-details`, `/conference/../events/workshop/`, `/conference/%2Frehearsal-details`, `/conference/%5crehearsal-details` and `/conference/%252frehearsal-details`. Expect the raw ingress rule to refuse them before a route is selected. Prove malformed enrollment by submitting a base with a query or empty segment against a synthetic application after saving its current record. The Console must reject it before mutation.
 
-Exercise unavailable origin and redirect loop with the hosted fault fixtures in `console/functions/src/clientHostRouter.test.cjs`. For live ingress evidence, use the separately approved test-only entry [client-host-rehearsal-faults.mjs](../../scripts/dev/client-host-rehearsal-faults.mjs) with `wrangler deploy scripts/dev/client-host-rehearsal-faults.mjs --config wrangler.er1063.toml`. Request `/conference/rehearsal-origin-unavailable` and `/conference/rehearsal-origin-loop` on the test hostname using `curl --head --silent --show-error`. Expect 503 on both and a working B. Restore the reviewed deployment using **Workers & Pages → er1063-client-host → Deployments → Rollback**. Record exact revisions and the fact that these were injected origin responses.
+Exercise unavailable origin and redirect loop with the hosted fault fixtures in `console/functions/src/clientHostRouter.test.cjs`. For live ingress evidence, use the separately approved test-only entry [client-host-rehearsal-faults.mjs](../../scripts/dev/client-host-rehearsal-faults.mjs) with the same pinned CLI and scratch directory.
+
+```sh
+(
+  set -e
+  cd "$ER1063_TOOLS"
+  export npm_config_before=2026-11-11T16:00:00Z
+  npx --yes wrangler@4.160.1 deploy scripts/dev/client-host-rehearsal-faults.mjs --cwd "$ER1063_CHECKOUT" --config wrangler.er1063.toml
+)
+```
+
+Request `/conference/rehearsal-origin-unavailable` and `/conference/rehearsal-origin-loop` on the test hostname using `curl --head --silent --show-error`. Expect 503 on both and a working B. Restore the reviewed deployment using **Workers & Pages → er1063-client-host → Deployments → Rollback**. Record exact revisions and the fact that these were injected origin responses.
 
 With both addresses healthy, dispatch `gh workflow run decommission-client.yml --repo CenterCoopMedia/eventrunner --ref main -f application_id="$APP_ID" -f mode=archive` for A only after approval. Verify A's mount is retired and absent from discovery, its prior release is recorded, and B still serves. Restore A immediately inside the job's recovery window with the same command using `mode=restore`. Verify its saved route, opening page and preserved data. To finish, roll both addresses back to standalone with step 4, then remove temporary provider and edge changes using the resource table in reverse dependency order. Preserve both projects and original domains.
 
@@ -174,6 +201,6 @@ With both addresses healthy, dispatch `gh workflow run decommission-client.yml -
 | 7. Operator procedure | Steps 1–8, both timed cutover windows, old-address behavior, recovery before/after release |
 | 8. Exact revisions and unrun checks | Three separate files below |
 
-Attach `source-ci` (commit, hosted run, source fixtures and static preview), `browser-proxy` (test host and TLS, exact Worker/Hosting revisions, route-map version/export time for each phase, browser/device, CMS release, timestamps and before/after recovery) and `provider` (sanitized domain settings, origin checks, synthetic role/callback and capture-boundary evidence). Record which checks remain unrun and who must authorize or supply their prerequisites. Exclude live signed URLs, messages, tokens and personal details. Keep #335, #560 and #1063 open until their execution receipts exist.
+Attach `source-ci` (commit, hosted run, source fixtures and static preview), `browser-proxy` (test host and TLS, Wrangler version, exact Worker/Hosting revisions, route-map version/export time for each phase, browser/device, CMS release, timestamps and before/after recovery) and `provider` (sanitized domain settings, origin checks, synthetic role/callback and capture-boundary evidence). Record which checks remain unrun and who must authorize or supply their prerequisites. Exclude live signed URLs, messages, tokens and personal details. Keep #335, #560 and #1063 open until their execution receipts exist.
 
 During preparation only the inventory and reviewed source changes are available. All browser/proxy, map application, provider, mail capture, cutover, retirement and recovery steps remain unrun.
