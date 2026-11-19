@@ -135,7 +135,11 @@ vi.mock('@/admin/publishRunsSource.js', () => {
     onNext([]);
     return () => {};
   };
-  return { subscribeRecentPublishRuns: vi.fn(empty), subscribeFailedPublishRuns: vi.fn(empty) };
+  return {
+    subscribeRecentPublishRuns: vi.fn(empty),
+    subscribeFailedPublishRuns: vi.fn(empty),
+    subscribePublishRun: vi.fn(() => () => {}),
+  };
 });
 
 // jsdom implements <dialog> as markup and nothing else: it ships the

@@ -42,6 +42,7 @@ vi.mock('../pendingChangesSource.js', () => ({
   },
 }));
 vi.mock('../publishRunsSource.js', () => ({
+  subscribePublishRun: vi.fn(() => () => {}),
   subscribeRecentPublishRuns: (count, onNext, onError) => {
     runs.recent = { count, onNext, onError };
     return () => {
@@ -267,7 +268,9 @@ describe('the Unpublished changes page', () => {
     fireEvent.click(button);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/cmsPublish$/);
-    expect(bodyOf(0)).toEqual({ collection: 'cmsContent', docIds: ['hero__subtitle'] });
+    expect(bodyOf(0)).toEqual({
+      collection: 'cmsContent', docIds: ['hero__subtitle'], requestId: expect.any(String),
+    });
     const notice = await within(main()).findByText('Published.');
     expect(notice).toHaveAttribute('role', 'status');
     // The control is still here until the listener says the draft is clean.
@@ -308,7 +311,7 @@ describe('the Unpublished changes page', () => {
     fetch.mockResolvedValueOnce(ok({ queueId: 'q-open', status: 'done', results: {} }));
     fireEvent.click(within(main()).getByRole('button', { name: 'Open the site' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0)).toEqual({ all: true });
+    expect(bodyOf(0)).toEqual({ all: true, requestId: expect.any(String) });
     expect(await within(main()).findByText('The site is open. Visitors now see the full site.')).toBeInTheDocument();
   });
 
@@ -328,7 +331,7 @@ describe('the Unpublished changes page', () => {
     button.focus();
     fireEvent.click(button);
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(bodyOf(0)).toEqual({ all: true });
+    expect(bodyOf(0)).toEqual({ all: true, requestId: expect.any(String) });
     expect(await within(main()).findByText('Published.')).toBeInTheDocument();
     pushDrafts();
     expect(document.activeElement).toBe(within(main()).getByText('Published.').parentElement);

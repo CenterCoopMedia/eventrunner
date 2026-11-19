@@ -24,6 +24,7 @@ import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useDirtyDrafts } from '../useDirtyDrafts.js';
+import usePublishRun from '../usePublishRun.js';
 import { subscribeFailedPublishRuns, subscribeRecentPublishRuns } from '../publishRunsSource.js';
 import { countWords } from '../collectionWords.js';
 import { summarizePublish } from '../publishResult.js';
@@ -55,6 +56,7 @@ import AdminPageHeader, {
 } from '../components/adminChrome.jsx';
 import AdminTableScroll from '../components/AdminTableScroll.jsx';
 import RunRow from '../components/PublishRunRow.jsx';
+import PublishRunProgress from '../components/PublishRunProgress.jsx';
 
 /** cmsPublish takes at most this many ids for one collection (publish.cjs MAX_DOC_IDS). */
 const MAX_COLLECTION_IDS = 2000;
@@ -72,6 +74,7 @@ const STILL_RUNNING =
 /** Give a recovery action without exposing server diagnostics. */
 function errorText(err) {
   if (err?.queueId) return PART_WAY;
+  if (err?.code === 'request-id-in-use') return 'Check Recent publishes for the status of this publish.';
   if (err?.status === 409) return STILL_RUNNING;
   return 'The changes could not be published. Try again.';
 }
@@ -223,6 +226,7 @@ export default function AdminUnpublishedChanges() {
   // Publish all, so the site gets its own control to open it.
   const comingSoon = useComingSoon();
   const call = useAdminApi();
+  const { publish: publishTracked, run } = usePublishRun(call);
   const { showToast } = useToast();
 
   const [busyKey, setBusyKey] = useState(null);
@@ -277,7 +281,8 @@ export default function AdminUnpublishedChanges() {
     setNotice(null);
     let result;
     try {
-      const response = await call('cmsPublish', body);
+      const resumeRow = body.queueId ? runs.runs.find((row) => row.id === body.queueId) : null;
+      const response = await publishTracked(body, resumeRow);
       result = read(response);
     } catch (err) {
       result = { ok: false, message: errorText(err) };
@@ -357,6 +362,7 @@ export default function AdminUnpublishedChanges() {
           </>
         }
       />
+      <PublishRunProgress run={run} />
 
       {!ready ? (
         error ? (

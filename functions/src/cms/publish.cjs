@@ -22,7 +22,7 @@
  *
  * Queue row shape:
  *   { status: 'running'|'done'|'failed', request: { [collection]: docIds },
- *     progress: { [collection]: { published, skipped, chunksCommitted } },
+ *     progress: { [collection]: { published, skipped, chunksCommitted } }, plannedChunks,
  *     requestedBy, requestedAt, updatedAt, finishedAt?, error?, note? }
  *
  * Because publishDocs records progress per committed chunk and skips
@@ -33,7 +33,7 @@
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/errors.cjs');
 const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
-const { listDirty, publishDocs, logAdminAction, isValidDocId, isAlreadyExistsError } = require('./store.cjs');
+const { listDirty, publishDocs, logAdminAction, isValidDocId, isAlreadyExistsError, internals } = require('./store.cjs');
 const { requestSitePublish } = require('./publisher.cjs');
 const { checkSchedulePublishSet } = require('../schedule/sessions.cjs');
 const { isComingSoon, openSiteOnFirstPublish } = require('./launch.cjs');
@@ -43,6 +43,12 @@ const QUEUE_LIST_DEFAULT = 20;
 const QUEUE_LIST_MAX = 50;
 const SETTABLE_STATUSES = Object.freeze(['failed', 'done']);
 const REQUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function countPlannedChunks(request) {
+  return Object.values(request).reduce((total, ids) => (
+    total + (Array.isArray(ids) ? Math.ceil(ids.length / internals.DOCS_PER_CHUNK) : 0)
+  ), 0);
+}
 
 /** Shared admin-POST preamble; sends the response itself on failure. */
 async function gateAdminPost({ auth, db, getConfig }, req, res) {
@@ -179,7 +185,12 @@ function createCmsPublishHandler({
         const current = await tx.get(queueRef);
         const status = current.exists ? current.data()?.status : undefined;
         if (status === 'running' || status === 'done') return status;
-        tx.set(queueRef, { status: 'running', error: null, updatedAt: new Date(now()) }, { merge: true });
+        tx.set(queueRef, {
+          status: 'running',
+          error: null,
+          plannedChunks: countPlannedChunks(request),
+          updatedAt: new Date(now()),
+        }, { merge: true });
         return 'claimed';
       });
       if (claim === 'done') {
@@ -216,6 +227,7 @@ function createCmsPublishHandler({
           status: openingOnly ? 'done' : 'running',
           request,
           progress: {},
+          plannedChunks: countPlannedChunks(request),
           requestedBy: actor.email,
           requestedAt: timestamp,
           updatedAt: timestamp,

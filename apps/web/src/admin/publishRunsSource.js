@@ -1,14 +1,23 @@
-// The publish runs the Unpublished changes page lists beside the drafts
-// (issue #196): the cmsPublishQueue rows cmsPublish writes. They are the
-// progress and failure record of each publish, never the count of
-// unpublished work, and only the page reads them, so this module loads with
-// the page rather than in the admin entry chunk.
+// The queue rows record each publish's progress and failure. Bulk publish
+// controls listen to their own row while Recent publishes lists past runs.
 //
 // firestore.rules let either admin tier read cmsPublishQueue; a
 // non-admin's listener errors, which is the fail-soft path.
-import { collection, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { db } from '../firebase.js';
+import { afterServerConfirms, SERVER_CONFIRMATION, subscribeWithRetry } from '../lib/retrySubscription.js';
 import { listenWithRetry } from './pendingChangesSource.js';
+
+export function subscribePublishRun(id, onNext) {
+  return subscribeWithRetry((onError) => onSnapshot(
+    doc(db, 'cmsPublishQueue', id),
+    SERVER_CONFIRMATION,
+    afterServerConfirms((snapshot) => {
+      if (snapshot.exists()) onNext(snapshot.data());
+    }),
+    onError,
+  ));
+}
 
 /**
  * The most recent publish runs, newest first.
