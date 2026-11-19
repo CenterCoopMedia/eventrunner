@@ -23,8 +23,9 @@ import FieldVitals from './components/FieldVitals.jsx';
 
 export function AppRoutes() {
   const { pathname } = useLocation();
-  // The admin index redirects to overview after access has settled.
-  const adminRouteKey = /^\/admin\/?$/.test(pathname) ? '/admin/overview' : pathname;
+  // These admin indexes redirect before the first leaf can render.
+  const adminRouteKey = pathname.replace(/^\/admin(?:\/(reminders))?\/?$/, (_, reminders) =>
+    reminders ? '/admin/reminders/scheduled' : '/admin/overview');
   useEffect(() => installDeferredRoutePrefetch(document, prefetchRoutes, IS_DEMO), []);
   return useRoutes([
     {
