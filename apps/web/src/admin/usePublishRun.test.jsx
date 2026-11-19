@@ -53,3 +53,63 @@ it('keeps confirmed counts on failure and starts a resume from the same row', as
   await act(async () => { resumed.resolve({ queueId: requestId }); });
   expect(result.current.run).toBeNull();
 });
+
+it('keeps two tabs publishing as the same staff member on separate queue documents', async () => {
+  const listeners = new Map();
+  vi.mocked(onSnapshot).mockImplementation((ref, options, onNext) => {
+    expect(options).toEqual({ includeMetadataChanges: true });
+    const [collection, id] = ref.path;
+    expect(collection).toBe('cmsPublishQueue');
+    listeners.set(id, onNext);
+    return () => listeners.delete(id);
+  });
+  const pending = new Map();
+  const call = vi.fn((_name, { requestId }) => {
+    const response = Promise.withResolvers();
+    pending.set(requestId, response);
+    return response.promise;
+  });
+  const first = renderHook(() => usePublishRun(call));
+  const second = renderHook(() => usePublishRun(call));
+  const body = { all: true };
+  let secondResult;
+  await act(async () => {
+    void first.result.current.publish(body);
+    secondResult = second.result.current.publish(body).catch((error) => error);
+  });
+
+  const [firstId, secondId] = call.mock.calls.map(([name, input]) => {
+    expect(name).toBe('cmsPublish');
+    expect(input).toEqual({ ...body, requestId: expect.any(String) });
+    return input.requestId;
+  });
+  expect(firstId).not.toBe(secondId);
+  expect([...listeners.keys()]).toEqual([firstId, secondId]);
+
+  const row = {
+    requestedBy: 'organizer@example.test',
+    plannedChunks: 2,
+    request: { cmsContent: ['title'], cmsPages: ['home'] },
+    progress: { cmsContent: { published: ['title'], skipped: [] } },
+  };
+  act(() => listeners.get(firstId)(documentSnapshot(row, true)));
+  expect(first.result.current.run.counts).toBeNull();
+  act(() => listeners.get(firstId)(documentSnapshot(null)));
+  expect(first.result.current.run.counts).toBeNull();
+  act(() => listeners.get(firstId)(documentSnapshot(row)));
+  expect(first.result.current.run.counts).toEqual({ requested: 2, published: 1, skipped: 0, measured: true });
+  expect(second.result.current.run.counts).toBeNull();
+  act(() => listeners.get(secondId)(documentSnapshot({ ...row, progress: {} })));
+  expect(second.result.current.run.counts.published).toBe(0);
+
+  await act(async () => { pending.get(firstId).resolve({ queueId: firstId }); });
+  expect(first.result.current.run).toBeNull();
+  expect([...listeners.keys()]).toEqual([secondId]);
+  const unrelatedFailure = Object.assign(new Error('Different publish failed.'), { queueId: firstId });
+  await act(async () => {
+    pending.get(secondId).reject(unrelatedFailure);
+    expect(await secondResult).toBe(unrelatedFailure);
+  });
+  expect(second.result.current.run).toBeNull();
+  expect(listeners.size).toBe(0);
+});

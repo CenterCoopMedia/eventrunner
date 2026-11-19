@@ -241,6 +241,58 @@ test('cmsPublish failure mid-way → 500 with queueId, row failed; resume with {
   assert.equal(db.ids('cmsVersionHistory').length, 134); // nothing re-published
 });
 
+test('the correlated row advances with committed chunks and keeps skips distinct through resume', async () => {
+  const ids = Array.from({ length: 134 }, (_, index) => `block-${index}`);
+  const db = makeFakeDb(Object.fromEntries(ids.slice(1).map((id) => [
+    `cmsContent_drafts/${id}`, { value: id, status: 'dirty' },
+  ])));
+  db.failAtCommit = 2;
+  const snapshots = [];
+  const originalBatch = db.batch.bind(db);
+  db.batch = () => {
+    const batch = originalBatch();
+    const commit = batch.commit.bind(batch);
+    batch.commit = async () => {
+      const before = db.read('cmsPublishQueue', REQUEST_ID);
+      await commit();
+      const after = db.read('cmsPublishQueue', REQUEST_ID);
+      snapshots.push({ before, after, live: db.ids('cmsContent') });
+    };
+    return batch;
+  };
+  const handler = createCmsPublishHandler({ ...deps(db), env: {} });
+  const failed = fakeRes();
+  await handler(req({ body: { collection: 'cmsContent', docIds: ids, requestId: REQUEST_ID } }), failed);
+
+  assert.equal(failed.statusCode, 500);
+  assert.equal(failed.body.queueId, REQUEST_ID);
+  assert.equal(snapshots.length, 1);
+  const [first] = snapshots;
+  assert.deepEqual(first.before.request, { cmsContent: ids });
+  assert.equal(first.before.plannedChunks, 2);
+  assert.deepEqual(first.before.progress, {});
+  assert.equal(first.after.status, 'running');
+  assert.deepEqual(first.after.progress.cmsContent, {
+    published: ids.slice(1, 132), skipped: [{ docId: ids[0], reason: 'no-draft' }], chunksCommitted: 1,
+  });
+  assert.deepEqual(first.live, ids.slice(1, 132));
+  assert.equal(db.read('cmsPublishQueue', REQUEST_ID).status, 'failed');
+  assert.deepEqual(db.read('cmsPublishQueue', REQUEST_ID).progress, first.after.progress);
+
+  const resumed = fakeRes();
+  await handler(req({ body: { queueId: REQUEST_ID } }), resumed);
+  assert.equal(resumed.statusCode, 200);
+  assert.equal(resumed.body.queueId, REQUEST_ID);
+  assert.equal(snapshots.length, 2);
+  assert.deepEqual(snapshots[1].before.progress, first.after.progress);
+  const final = db.read('cmsPublishQueue', REQUEST_ID);
+  assert.equal(final.status, 'done');
+  assert.deepEqual(final.request, { cmsContent: ids });
+  assert.deepEqual(final.progress.cmsContent.published, ids.slice(1));
+  assert.deepEqual(final.progress.cmsContent.skipped, [{ docId: ids[0], reason: 'no-draft' }]);
+  assert.equal(db.ids('cmsVersionHistory').length, 133);
+});
+
 test('cmsPublish resume of an unknown queueId → 404', async () => {
   const res = fakeRes();
   await createCmsPublishHandler(deps(makeFakeDb()))(req({ body: { queueId: 'nope' } }), res);
@@ -340,6 +392,7 @@ test('cmsPublish: two resumes of one failed row at once publish it only once', a
   assert.equal(db.ids('cmsVersionHistory').length, 1, 'one history row, not two');
   assert.equal(db.read('cmsContent', 'a').revision, 1, 'no double bump');
   assert.equal(db.read('cmsPublishQueue', 'q1').status, 'done');
+  assert.equal(db.read('cmsPublishQueue', 'q1').plannedChunks, 1);
 });
 
 // --- site-publisher hook (spec §8.4 phase 5, issue #36) -------------------------
@@ -419,14 +472,18 @@ test('a publisher invoke failure never fails the publish response', async () => 
 test('a publish with nothing dirty creates no row and never invokes the publisher', async () => {
   const db = makeFakeDb();
   let invoked = false;
-  const res = fakeRes();
-  await createCmsPublishHandler({
+  const handler = createCmsPublishHandler({
     ...deps(db),
     env: PUBLISHER_ENV,
     fetchImpl: async () => { invoked = true; throw new Error('must not be called'); },
-  })(req({ body: { all: true } }), res);
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.queueId, null);
+  });
+  for (const body of [{ all: true }, { all: true, requestId: REQUEST_ID }]) {
+    const res = fakeRes();
+    await handler(req({ body }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.queueId, null);
+  }
+  assert.deepEqual(db.ids('cmsPublishQueue'), []);
   assert.equal(invoked, false);
 });
 

@@ -5,7 +5,7 @@
 // publish run still reads Failed, and the banner and the page never
 // disagree. The browser half of each clause is here; the E2E spec
 // (e2e/cms-unpublished.spec.js) proves the same on the emulators.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
@@ -34,7 +34,7 @@ vi.mock('../adminSource.js', () => ({
 // The page's two seams: the dirty drafts per collection, and the two run
 // reads. Callbacks are kept so each test delivers what a listener would.
 const drafts = new Map();
-const runs = { recent: null, failed: null };
+const runs = { recent: null, failed: null, active: new Map() };
 vi.mock('../pendingChangesSource.js', () => ({
   subscribeDirtyDrafts: (collection, onNext, onError) => {
     drafts.set(collection, { onNext, onError });
@@ -42,7 +42,10 @@ vi.mock('../pendingChangesSource.js', () => ({
   },
 }));
 vi.mock('../publishRunsSource.js', () => ({
-  subscribePublishRun: vi.fn(() => () => {}),
+  subscribePublishRun: (id, onNext) => {
+    runs.active.set(id, onNext);
+    return () => runs.active.delete(id);
+  },
   subscribeRecentPublishRuns: (count, onNext, onError) => {
     runs.recent = { count, onNext, onError };
     return () => {
@@ -196,11 +199,14 @@ beforeEach(() => {
   drafts.clear();
   runs.recent = null;
   runs.failed = null;
+  runs.active.clear();
   staff = false;
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe('the Unpublished changes page', () => {
   it('waits for every collection, then says nothing is waiting', async () => {
@@ -335,6 +341,116 @@ describe('the Unpublished changes page', () => {
     expect(await within(main()).findByText('Published.')).toBeInTheDocument();
     pushDrafts();
     expect(document.activeElement).toBe(within(main()).getByText('Published.').parentElement);
+  });
+
+  it('labels committed counts, explains a stalled count, and resumes the same measured publish', async () => {
+    await renderAt('/admin/unpublished');
+    pushDrafts({ cmsContent: [block('subtitle')], cmsPages: [{ id: 'home', status: 'dirty' }] });
+    pushRuns();
+    let answer;
+    fetch.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' })); });
+    expect(screen.getByRole('button', { name: 'Publishing…' })).toBeInTheDocument();
+    const { requestId } = bodyOf(0);
+    expect([...runs.active.keys()]).toEqual([requestId]);
+    const row = {
+      id: requestId,
+      status: 'running',
+      plannedChunks: 2,
+      request: { cmsContent: ['hero__subtitle', 'hero__title'], cmsPages: ['home'] },
+      progress: {},
+    };
+    act(() => runs.active.get(requestId)(row));
+    act(() => vi.advanceTimersByTime(999));
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    act(() => vi.advanceTimersByTime(1));
+    const bar = screen.getByRole('progressbar', { name: '0 of 3 changes published.' });
+    const status = document.getElementById(bar.getAttribute('aria-labelledby')).closest('[role="status"]');
+    expect(status).toHaveAttribute('aria-atomic', 'true');
+    expect(bar.closest('[aria-live], [role="status"]')).toBeNull();
+    expect(bar).toHaveAttribute('value', '0');
+    expect(bar).toHaveAttribute('max', '3');
+
+    const partial = {
+      ...row,
+      progress: { cmsContent: { published: ['hero__subtitle'], skipped: [{ docId: 'hero__title' }], chunksCommitted: 1 } },
+    };
+    act(() => runs.active.get(requestId)(partial));
+    expect(bar).toHaveAccessibleName('1 of 3 changes published. 1 skipped.');
+    expect(bar).toHaveAttribute('value', '1');
+    act(() => vi.advanceTimersByTime(9999));
+    expect(status).not.toHaveTextContent('The count has not changed');
+    act(() => runs.active.get(requestId)({ ...partial }));
+    act(() => vi.advanceTimersByTime(1));
+    expect(status).toHaveTextContent('The count has not changed for ten seconds.');
+
+    const failed = { ...partial, status: 'failed' };
+    pushRuns([failed], [failed]);
+    await act(async () => { answer(refused(500, { error: { code: 'publish-failed' }, queueId: requestId })); });
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.getByText('1 of 3 changes published before the run stopped. 1 skipped.')).toBeInTheDocument();
+    expect(runs.active.size).toBe(0);
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Resume publish' })); });
+    expect(bodyOf(1)).toEqual({ queueId: requestId });
+    expect([...runs.active.keys()]).toEqual([requestId]);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByRole('progressbar', { name: '1 of 3 changes published. 1 skipped.' })).toHaveAttribute('value', '1');
+    const results = {
+      cmsContent: { published: ['hero__subtitle', 'hero__title'], skipped: [] },
+      cmsPages: { published: ['home'], skipped: [] },
+    };
+    act(() => runs.active.get(requestId)({ ...row, status: 'done', progress: results }));
+    expect(screen.getByRole('progressbar', { name: '3 of 3 changes published.' })).toHaveAttribute('value', '3');
+    await act(async () => { answer(ok({ queueId: requestId, status: 'done', results })); });
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(within(main()).getByText('Published.')).toBeInTheDocument();
+    expect(runs.active.size).toBe(0);
+  });
+
+  it('keeps small, fast, and no-op publishes free of a progress bar', async () => {
+    await renderAt('/admin/unpublished');
+    pushDrafts({ cmsPages: [{ id: 'home', status: 'dirty' }] });
+    let answer;
+    fetch.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Publish 1 page' })); });
+    const { requestId } = bodyOf(0);
+    act(() => runs.active.get(requestId)({ plannedChunks: 1, request: { cmsPages: ['home'] }, progress: {} }));
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.getByText(/taking longer than usual/)).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(50_000));
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.getByText(/a minute has passed without a final result/i)).toBeInTheDocument();
+    await act(async () => {
+      answer(ok({ queueId: requestId, status: 'done', results: { cmsPages: { published: ['home'], skipped: [] } } }));
+    });
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' })); });
+    const fastId = bodyOf(1).requestId;
+    expect(fastId).not.toBe(requestId);
+    act(() => runs.active.get(fastId)({
+      plannedChunks: 2, request: { cmsPages: ['home'], cmsContent: ['hero__title'] }, progress: {},
+    }));
+    act(() => vi.advanceTimersByTime(999));
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    await act(async () => {
+      answer(ok({ queueId: fastId, status: 'done', results: {
+        cmsPages: { published: ['home'] }, cmsContent: { published: ['hero__title'] },
+      } }));
+    });
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' })); });
+    expect(bodyOf(2).requestId).not.toBe(fastId);
+    await act(async () => { answer(ok({ queueId: null, status: 'done', results: {} })); });
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.queryByText(/taking longer than usual|a minute has passed/i)).toBeNull();
+    expect(runs.active.size).toBe(0);
   });
 
   it('(c) keeps a failed run listed as Failed with its error and one Resume, however many finished runs follow it', async () => {
