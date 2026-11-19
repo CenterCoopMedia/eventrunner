@@ -42,7 +42,7 @@ import HelpTooltip from './HelpTooltip.jsx';
 //
 // THE PREVIEW renders the server's HTML only through buildPreviewDoc in an
 // <iframe sandbox="">, as the email log does, with the plain text beside it.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -223,7 +223,7 @@ function SendDetail({ send, state, regionId }) {
 }
 
 function SendHistory({
-  sends, timeZone, onReuse, onRetry, onContinue, continuingId, openId, details, onToggle, rowRefs, onCompose,
+  sends, timeZone, onReuse, onRetry, onContinue, continuingId, sending, openId, details, onToggle, rowRefs, onCompose,
 }) {
   if (sends.length === 0) {
     return <div className="flex flex-col items-start gap-xs"><p className="text-admin-sm text-admin-ink-secondary">Write an announcement to keep attendees informed.</p><button type="button" className={secondaryButtonClass} onClick={onCompose}>Write announcement</button></div>;
@@ -276,8 +276,8 @@ function SendHistory({
                 <button
                   type="button"
                   className={linkButtonClass}
-                  aria-disabled={continuingId !== null || send.busy ? 'true' : undefined}
-                  onClick={() => { if (continuingId === null && !send.busy) onContinue(send); }}
+                  aria-disabled={sending || send.busy ? 'true' : undefined}
+                  onClick={() => { if (!sending && !send.busy) onContinue(send); }}
                 >
                   {continuingId === send.id ? 'Sending…' : 'Continue sending'}
                 </button>
@@ -288,6 +288,51 @@ function SendHistory({
         );
       })}
     </ul>
+  );
+}
+
+/** One live sentence per server batch; the native bar adds no live region. */
+function SendProgress({ send }) {
+  const lineId = useId();
+  const active = send !== null;
+  const [showBar, setShowBar] = useState(false);
+  const processed = send?.processed ?? 0;
+  const total = send?.total ?? 0;
+  const countKey = send ? `${send.id}:${processed}` : null;
+  const [count, setCount] = useState({ key: countKey, stalled: false });
+  if (count.key !== countKey) setCount({ key: countKey, stalled: false });
+
+  useEffect(() => {
+    setShowBar(false);
+    if (!active) return undefined;
+    // A measured send can run normally for minutes; it is not a held-up read.
+    const timer = setTimeout(() => setShowBar(true), 1000);
+    return () => clearTimeout(timer);
+  }, [active]);
+
+  useEffect(() => {
+    if (countKey === null) return undefined;
+    const timer = setTimeout(() => {
+      setCount((current) => current.key === countKey ? { ...current, stalled: true } : current);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [countKey]);
+
+  return (
+    <div className={send ? 'flex flex-col gap-2xs' : 'sr-only'}>
+      <p id={lineId} role="status" className="text-admin-sm text-admin-ink">
+        {send ? `Sending. ${plural(processed, 'address', 'addresses')} of ${total.toLocaleString('en-US')} handled.` : ''}
+        {send && count.stalled ? ' The count has not changed for ten seconds. Keep this page open while sending continues.' : ''}
+      </p>
+      {send && total > 0 && showBar ? (
+        <progress
+          aria-labelledby={lineId}
+          value={Math.min(processed, total)}
+          max={total}
+          className="h-2 w-full max-w-xl accent-admin-action"
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -480,10 +525,10 @@ export default function AnnouncementEmailComposer() {
   }
 
   async function confirmSend() {
-    if (busy || !preview) return;
+    if (busy || continuingId !== null || !preview) return;
     setBusy('send');
     setError(null);
-    setProgress({ processed: 0, total: preview.recipientCount, counts: {}, status: 'sending' });
+    setProgress({ id: preview.sendId, processed: 0, total: preview.recipientCount, counts: {}, status: 'sending' });
     try {
       const send = await drive({
         sendId: preview.sendId,
@@ -513,14 +558,17 @@ export default function AnnouncementEmailComposer() {
   }
 
   async function continueSend(send) {
+    if (busy === 'send' || continuingId !== null) return;
     setContinuingId(send.id);
     setError(null);
+    setProgress(send);
     try {
       setResult(await drive({ sendId: send.id }, send.id));
     } catch (err) {
       setError(err);
     } finally {
       setContinuingId(null);
+      setProgress(null);
       loadHistory();
     }
   }
@@ -756,7 +804,7 @@ export default function AnnouncementEmailComposer() {
                       type="button"
                       className={primaryButtonClass}
                       aria-busy={busy === 'send' ? 'true' : undefined}
-                      aria-disabled={busy ? 'true' : undefined}
+                      aria-disabled={busy || continuingId !== null ? 'true' : undefined}
                       onClick={confirmSend}
                     >
                       {busy === 'send' ? 'Sending…' : `Send to ${recipients(count)}`}
@@ -791,9 +839,7 @@ export default function AnnouncementEmailComposer() {
         </Panel>
       </div>
 
-      <p role="status" className={progress ? 'text-admin-sm text-admin-ink' : 'sr-only'}>
-        {progress ? `Sending. ${plural(progress.processed ?? 0, 'address', 'addresses')} of ${(progress.total ?? 0).toLocaleString('en-US')} handled.` : ''}
-      </p>
+      <SendProgress send={progress} />
 
       {result ? (
         <div ref={resultRef} tabIndex={-1} className="focus:outline-none">
@@ -832,6 +878,7 @@ export default function AnnouncementEmailComposer() {
             onRetry={retryFailed}
             onContinue={continueSend}
             continuingId={continuingId}
+            sending={busy === 'send' || continuingId !== null}
             openId={openId}
             details={details}
             onToggle={toggleDetail}
