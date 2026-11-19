@@ -49,6 +49,8 @@ export default function PublishRunProgress({ run }) {
       : 'This is taking longer than usual. We’re still waiting for a response.';
   }
 
+  if (!active && !countMessage) return null;
+
   return (
     <div className={countMessage || detail ? 'flex flex-col gap-2xs' : 'sr-only'}>
       <p role="status" aria-atomic="true" className="text-admin-sm text-admin-ink">
