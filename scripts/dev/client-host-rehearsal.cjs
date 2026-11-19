@@ -202,7 +202,7 @@ async function cli([command, ...args]) {
     eventBase(id, mode);
     check(['chromium', 'webkit'].includes(engine) && ['desktop', 'phone'].includes(form), 'Choose the browser and form factor');
     const playwright = require('@playwright/test');
-    const browser = await playwright[engine].launch(engine === 'chromium' ? { chromiumSandbox: true } : {});
+    const browser = await playwright[engine].launch(engine === 'chromium' ? { channel: 'chrome', chromiumSandbox: true } : {});
     try {
       const device = engine === 'webkit' ? 'iPhone 13' : 'Pixel 7';
       const context = await browser.newContext({ ...(form === 'phone' ? playwright.devices[device] : {}), locale: 'en-US' });
