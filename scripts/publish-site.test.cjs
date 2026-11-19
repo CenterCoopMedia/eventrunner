@@ -1,13 +1,9 @@
 'use strict';
 
 /**
- * The container itself cannot run in CI (no Docker, no GCP), so everything
- * about the publisher that CAN be pinned without one is pinned here: the
- * exact argv of every stage, the per-stage exit codes, the firebase.json
- * region patch, and the cmsPublishQueue status lifecycle. What remains
- * operator-verified is only the parts a test cannot reach — that the image
- * builds, that ADC on Cloud Run authenticates firebase-tools, and that the
- * hosting release lands (docs/DEPLOY_RUNBOOK.md §9).
+ * Exercise the publisher's web build without Cloud Run. Stub the Firebase
+ * interactions to test stage exit codes, the firebase.json region patch,
+ * and the cmsPublishQueue status lifecycle.
  */
 
 const test = require('node:test');
@@ -26,6 +22,7 @@ const {
   readSiteDocs,
   generateSiteFiles,
   EXIT,
+  internals: { defaultRunStep },
 } = require('./publish-site.cjs');
 const { readPlaceholderIcons } = require('./lib/app-icons.cjs');
 const { decodePng, encodePng } = require('./lib/png.cjs');
@@ -186,7 +183,7 @@ test('generation writes out of tree and reads this project only', () => {
 
 test('the build stage passes the same VITE_ keys as deploy-client.yml', () => {
   const build = buildPlan({ env: ENV, generatedDir: '/scratch/generated' })[1];
-  assert.deepEqual(build.args, ['run', 'build', '-w', 'apps/web']);
+  assert.deepEqual(build.args.slice(-4), ['run', 'build', '-w', 'apps/web']);
   assert.equal(build.env.GENERATED_DIR, '/scratch/generated');
   assert.equal(build.env.VITE_EVENT_PUBLIC_URL, ENV.EVENT_PUBLIC_URL);
   // The bundle's functions origin is built from the region; an unset value
@@ -195,6 +192,24 @@ test('the build stage passes the same VITE_ keys as deploy-client.yml', () => {
   for (const key of Object.keys(ENV).filter((k) => k.startsWith('VITE_FIREBASE_'))) {
     assert.equal(build.env[key], ENV[key], `${key} must reach the build`);
   }
+});
+
+test('the publisher build passes the client specimen boundary in a development image', (t) => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-site-build-'));
+  t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
+  const generatedDir = path.join(scratch, 'generated');
+  const outDir = path.join(scratch, 'dist');
+  fs.cpSync(path.join(__dirname, '../apps/web/src/generated'), generatedDir, { recursive: true });
+
+  const { resolved: env } = resolvePublisherEnv({ ...ENV, NODE_ENV: 'development', VITE_DEMO_MODE: '0' });
+  const build = buildPlan({ env, generatedDir }).find((step) => step.stage === 'build');
+  build.args.push('--', '--outDir', outDir, '--logLevel', 'error');
+  const result = defaultRunStep(build, { env });
+
+  // Vite's real specimenBoundary plugin fails the build if specimen code is emitted.
+  assert.ifError(result.error);
+  assert.equal(result.status, 0);
+  assert.ok(fs.existsSync(path.join(outDir, 'index.html')));
 });
 
 test('the deploy stage targets this client site and never prompts', () => {
