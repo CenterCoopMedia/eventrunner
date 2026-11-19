@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PublicLink as Link } from '../PublicLink.jsx';
 import Progress from '../Progress.jsx';
+import LoadingState from '../LoadingState.jsx';
 import { secondaryActionClass } from '../controlClasses.js';
 import { speakerCompletion } from '../../lib/speakerCompletion.js';
 import { listSpeakerSessionMaterials } from '../../lib/speakerMaterialsApi.js';
@@ -54,32 +55,34 @@ export default function SpeakerActionItems({ speaker, scheduleData, eventConfig,
       <h2 id="speaker-action-items-heading" className="font-heading text-h3 font-semibold text-text-primary">
         Your next steps
       </h2>
-      {completion ? (
-        <Progress value={completion.completed} max={completion.total} unit="items" done="complete" className="mt-sm" />
-      ) : null}
       {loading ? (
-        <p role="status" className="mt-md text-body text-text-secondary">Checking your next steps…</p>
+        <LoadingState key={`${scope}:${attempt}`} label="Checking your next steps…" rows={0} />
       ) : null}
-      {load.scope === scope && load.status === 'error' ? (
-        <div className="mt-md">
-          <p role="alert" className="text-body text-danger">{load.error}</p>
-          <button type="button" className={`${secondaryActionClass} mt-sm`} onClick={() => setAttempt((value) => value + 1)}>
-            Try again
-          </button>
-        </div>
-      ) : null}
-      {completion?.outstanding.length === 0 ? (
-        <p className="mt-md text-body text-text-secondary">Your speaker checklist is complete.</p>
-      ) : completion ? (
-        <ul className="mt-md divide-y divide-rule-hairline">
-          {completion.outstanding.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-center justify-between gap-xs py-xs first:pt-0 last:pb-0">
-              <span className="wrap-anywhere min-w-0 text-body text-text-primary">{item.label}</span>
-              <Link to={item.to} aria-label={`Open ${item.label}`} className={secondaryActionClass}>Open</Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <div role="region" aria-label="Speaker checklist" aria-busy={loading}>
+        {completion ? (
+          <Progress value={completion.completed} max={completion.total} unit="items" done="complete" className="mt-sm" />
+        ) : null}
+        {load.scope === scope && load.status === 'error' ? (
+          <div className="mt-md">
+            <p role="alert" className="text-body text-danger">{load.error}</p>
+            <button type="button" className={`${secondaryActionClass} mt-sm`} onClick={() => setAttempt((value) => value + 1)}>
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {completion?.outstanding.length === 0 ? (
+          <p className="mt-md text-body text-text-secondary">Your speaker checklist is complete.</p>
+        ) : completion ? (
+          <ul className="mt-md divide-y divide-rule-hairline">
+            {completion.outstanding.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-xs py-xs first:pt-0 last:pb-0">
+                <span className="wrap-anywhere min-w-0 text-body text-text-primary">{item.label}</span>
+                <Link to={item.to} aria-label={`Open ${item.label}`} className={secondaryActionClass}>Open</Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </section>
   );
 }
