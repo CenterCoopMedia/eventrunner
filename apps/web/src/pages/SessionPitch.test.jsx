@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 // `undefined` keeps the subscription waiting for its first snapshot.
 let pitchCall;
 let user;
+let authLoading;
 let listener;
 const call = vi.fn();
 vi.mock('../lib/pitchSource.js', () => ({
@@ -17,7 +18,7 @@ vi.mock('../lib/pitchSource.js', () => ({
   },
 }));
 vi.mock('../contexts/AuthContext.jsx', () => ({
-  useAuth: () => ({ user, loading: false, signOut: vi.fn() }),
+  useAuth: () => ({ user, loading: authLoading, signOut: vi.fn() }),
 }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig: { shortName: 'Example Summit' } }),
@@ -46,16 +47,18 @@ function Where() {
   return null;
 }
 
-function renderPitch(path = '/pitch') {
-  return render(
+function pitchRoute(path) {
+  return (
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/pitch" element={<><SessionPitch /><Where /></>} />
         <Route path="/pitch/:stepSlug" element={<><SessionPitch /><Where /></>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
+
+function renderPitch(path = '/pitch') { return render(pitchRoute(path)); }
 
 const stepHeading = () => document.getElementById('pitch-step-heading');
 const next = () => fireEvent.click(screen.getByRole('button', { name: /^Next:/ }));
@@ -63,6 +66,7 @@ const type = (label, value) => fireEvent.change(screen.getByLabelText(label), { 
 
 beforeEach(() => {
   user = null;
+  authLoading = false;
   location = null;
   call.mockReset();
   sessionStorage.clear();
@@ -118,12 +122,36 @@ describe('SessionPitch with an external form', () => {
 });
 
 describe('SessionPitch before the call is known', () => {
-  it('shows neither the stepper nor a link while the first snapshot loads', () => {
+  it('stages the call check outside the busy region and clears it on a listener error', () => {
     pitchCall = undefined;
-    renderPitch();
-    expect(screen.getByRole('status')).toHaveTextContent('Checking submissions…');
-    expect(screen.queryByLabelText(/Session title/)).toBeNull();
-    expect(screen.queryByRole('link', { name: /Open the pitch form/ })).toBeNull();
+    vi.useFakeTimers();
+    try {
+      renderPitch();
+      const status = screen.getByRole('status', { name: 'Checking submissions…' });
+      const result = screen.getByRole('status', { name: '' });
+      const region = screen.getByRole('region', { name: 'Submission availability' });
+      expect(status.closest('[aria-busy="true"]')).toBeNull();
+      expect(result.closest('[aria-busy="true"]')).toBeNull();
+      expect(region).toHaveAttribute('aria-busy', 'true');
+      expect(screen.queryByLabelText(/Session title/)).toBeNull();
+      expect(screen.queryByRole('link', { name: /Open the pitch form/ })).toBeNull();
+      act(() => vi.advanceTimersByTime(10_000));
+      expect(status).toHaveTextContent('This is taking longer than usual.');
+
+      act(() => listener.onError(new Error('offline')));
+      expect(status).not.toBeInTheDocument();
+      expect(region).toHaveAttribute('aria-busy', 'false');
+      expect(result).toHaveTextContent('Checking your connection…');
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
+
+      act(() => listener.onNext(NATIVE));
+      expect(result).toHaveTextContent('Submissions are open');
+      expect(screen.getByLabelText(/Session title/)).toBeInTheDocument();
+      expect(call).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -273,6 +301,29 @@ describe('the pitch stepper', () => {
     renderPitch('/pitch/review');
     expect(screen.getByText('Sign-in panel')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Submit pitch' })).toBeNull();
+  });
+
+  it('keeps the Review draft and submission key while its account check settles', () => {
+    pitchCall = NATIVE;
+    authLoading = true;
+    const draft = { title: 'Local news in the library', description: 'A full description.', leadName: 'Ada', submissionKey: 'stable-draft-key' };
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    const view = renderPitch('/pitch/review');
+    const status = screen.getByRole('status', { name: 'Checking your sign-in…' });
+    const region = screen.getByRole('region', { name: 'Pitch account' });
+    expect(status.closest('[aria-busy="true"]')).toBeNull();
+    expect(region).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText(draft.title)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Submit pitch' })).not.toBeInTheDocument();
+
+    authLoading = false;
+    user = SIGNED_IN;
+    view.rerender(pitchRoute('/pitch/review'));
+    expect(region).toHaveAttribute('aria-busy', 'false');
+    expect(status).not.toBeInTheDocument();
+    expect(screen.getByText('Submitting as ada@example.org')).toBeInTheDocument();
+    expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY))).toMatchObject(draft);
+    expect(call).not.toHaveBeenCalled();
   });
 
   it('keeps the answers and says so when the server refuses the pitch', async () => {

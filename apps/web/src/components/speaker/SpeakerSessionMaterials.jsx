@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import LoadingState from '../LoadingState.jsx';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import {
   addSpeakerMaterialLink,
@@ -131,7 +132,7 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
   const requestIdRef = useRef(0);
   const fileInputRef = useRef(null);
   const [attempt, setAttempt] = useState(0);
-  const [load, setLoad] = useState({ status: 'loading', materials: [], error: null });
+  const [load, setLoad] = useState(null);
   const [link, setLink] = useState({ url: '', label: '' });
   const [linkState, setLinkState] = useState({ busy: false, error: null });
   const [file, setFile] = useState(null);
@@ -142,6 +143,11 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
   const scopeKey = `${userId ?? ''}:${speakerId ?? ''}:${sessionId ?? ''}`;
   const scopeKeyRef = useRef(scopeKey);
   scopeKeyRef.current = scopeKey;
+  const canRead = Boolean(user && sessionId && speakerId);
+  const current = load?.scope === scopeKey && load.user === user && load.attempt === attempt;
+  const loading = !current || load.status === 'loading';
+  const ready = !loading && load.status === 'ready';
+  const retryRead = () => setAttempt((value) => value + 1);
   useEffect(() => {
     requestIdRef.current += 1;
     setLink({ url: '', label: '' });
@@ -154,20 +160,21 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
 
   useEffect(() => {
     const requestId = ++requestIdRef.current;
-    setLoad({ status: 'loading', materials: [], error: null });
-    if (!user || !sessionId || !speakerId) return undefined;
+    const request = { scope: scopeKey, user, attempt };
+    setLoad({ ...request, status: 'loading' });
+    if (!canRead) return undefined;
 
     listSpeakerSessionMaterials({ user, sessionId }).then(
       (materials) => {
         if (requestIdRef.current === requestId) {
-          setLoad({ status: 'ready', materials, error: null });
+          setLoad({ ...request, status: 'ready', materials });
         }
       },
       (error) => {
         if (requestIdRef.current === requestId) {
           setLoad({
+            ...request,
             status: 'error',
-            materials: [],
             error: errorMessage(error, 'Your materials could not be loaded.'),
           });
         }
@@ -176,7 +183,7 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
     return () => {
       if (requestIdRef.current === requestId) requestIdRef.current += 1;
     };
-  }, [user, sessionId, speakerId, attempt]);
+  }, [user, sessionId, scopeKey, canRead, attempt]);
 
   function refresh(message = '', expectedScope = scopeKey) {
     if (scopeKeyRef.current !== expectedScope) return;
@@ -187,7 +194,7 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
 
   async function submitLink(event) {
     event.preventDefault();
-    if (linkState.busy) return;
+    if (!ready || linkState.busy) return;
     const operationScope = scopeKey;
     setLinkState({ busy: true, error: null });
     try {
@@ -209,7 +216,7 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
 
   async function submitFile(event) {
     event.preventDefault();
-    if (fileState.busy) return;
+    if (!ready || fileState.busy) return;
     const operationScope = scopeKey;
     setFileState({ busy: true, error: null });
     try {
@@ -225,101 +232,99 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId, onMateri
     }
   }
 
-  if (load.status === 'loading') {
-    return <p role="status" className="text-body text-text-secondary">Loading materials…</p>;
-  }
-  if (load.status === 'error') {
-    return (
-      <div>
-        <p role="alert" className="text-body text-danger">{load.error}</p>
-        <button type="button" className={`${secondaryActionClass} mt-sm`} onClick={() => setAttempt((value) => value + 1)}>
-          Try again
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="grid gap-lg">
-      <section aria-labelledby="submitted-materials-heading">
-        <h3 id="submitted-materials-heading" className="font-heading text-h3 font-semibold text-text-primary">
-          Submitted materials
-        </h3>
-        {notice ? <p role="status" className="mt-xs text-caption text-text-secondary">{notice}</p> : null}
-        {load.materials.length === 0 ? (
-          <p className="mt-sm text-body text-text-secondary">No materials have been sent for this session.</p>
-        ) : (
-          <ul className="mt-sm divide-y divide-rule-hairline">
-            {load.materials.map((material) => (
-              <MaterialRow
-                key={material.id}
-                material={material}
-                speakerId={speakerId}
-                user={user}
-                onSaved={() => refresh('Material updated.', scopeKey)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+    <>
+      {loading ? <LoadingState key={`${scopeKey}:${attempt}`} label="Loading materials…" rows={0} onRetry={canRead ? retryRead : undefined} /> : null}
+      <div role="region" aria-label="Session materials" aria-busy={loading} className="grid gap-lg">
+        {!loading && load.status === 'error' ? (
+          <div>
+            <p role="alert" className="text-body text-danger">{load.error}</p>
+            <button type="button" className={`${secondaryActionClass} mt-sm`} onClick={retryRead}>
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {ready ? <section aria-labelledby="submitted-materials-heading">
+          <h3 id="submitted-materials-heading" className="font-heading text-h3 font-semibold text-text-primary">
+            Submitted materials
+          </h3>
+          {notice ? <p role="status" className="mt-xs text-caption text-text-secondary">{notice}</p> : null}
+          {load.materials.length === 0 ? (
+            <p className="mt-sm text-body text-text-secondary">No materials have been sent for this session.</p>
+          ) : (
+            <ul className="mt-sm divide-y divide-rule-hairline">
+              {load.materials.map((material) => (
+                <MaterialRow
+                  key={material.id}
+                  material={material}
+                  speakerId={speakerId}
+                  user={user}
+                  onSaved={() => refresh('Material updated.', scopeKey)}
+                />
+              ))}
+            </ul>
+          )}
+        </section> : null}
 
-      <div className="grid gap-lg md:grid-cols-2">
-        <form onSubmit={submitLink} className="grid content-start gap-sm border-t-hairline border-rule-hairline pt-sm">
-          <h3 className="font-heading text-h3 font-semibold text-text-primary">Add a link</h3>
-          <TextField
-            label="Link URL"
-            type="url"
-            value={link.url}
-            onChange={(url) => setLink((current) => ({ ...current, url }))}
-            required
-          />
-          <TextField
-            label="Display name"
-            value={link.label}
-            onChange={(label) => setLink((current) => ({ ...current, label }))}
-            hint="Optional. If blank, the item is called External link."
-          />
-          {linkState.error ? <p role="alert" className="text-caption text-danger">{linkState.error}</p> : null}
-          <button
-            type="submit"
-            className={primaryActionClass}
-            aria-disabled={linkState.busy ? 'true' : undefined}
-            aria-busy={linkState.busy ? 'true' : undefined}
-          >
-            {linkState.busy ? 'Sending…' : 'Send link'}
-          </button>
-        </form>
-
-        <form onSubmit={submitFile} className="grid content-start gap-sm border-t-hairline border-rule-hairline pt-sm">
-          <h3 className="font-heading text-h3 font-semibold text-text-primary">Upload a file</h3>
-          <div className="flex flex-col gap-2xs">
-            <label htmlFor={`speaker-material-file-${sessionId}`} className="font-data text-caption font-semibold text-text-primary">
-              File
-            </label>
-            <p id={`speaker-material-file-${sessionId}-hint`} className="text-caption text-text-secondary">
-              The file limit is 9 MB.
-            </p>
-            <input
-              ref={fileInputRef}
-              id={`speaker-material-file-${sessionId}`}
-              type="file"
-              className={inputClass}
-              aria-describedby={`speaker-material-file-${sessionId}-hint`}
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+        {/* Keep the browser's file selection through a read or retry. */}
+        <div hidden={!ready} className={ready ? 'grid gap-lg md:grid-cols-2' : undefined}>
+          <form onSubmit={submitLink} className="grid content-start gap-sm border-t-hairline border-rule-hairline pt-sm">
+            <h3 className="font-heading text-h3 font-semibold text-text-primary">Add a link</h3>
+            <TextField
+              label="Link URL"
+              type="url"
+              value={link.url}
+              onChange={(url) => setLink((current) => ({ ...current, url }))}
               required
             />
-          </div>
-          {fileState.error ? <p role="alert" className="text-caption text-danger">{fileState.error}</p> : null}
-          <button
-            type="submit"
-            className={primaryActionClass}
-            aria-disabled={fileState.busy ? 'true' : undefined}
-            aria-busy={fileState.busy ? 'true' : undefined}
-          >
-            {fileState.busy ? 'Uploading…' : 'Upload file'}
-          </button>
-        </form>
+            <TextField
+              label="Display name"
+              value={link.label}
+              onChange={(label) => setLink((current) => ({ ...current, label }))}
+              hint="Optional. If blank, the item is called External link."
+            />
+            {linkState.error ? <p role="alert" className="text-caption text-danger">{linkState.error}</p> : null}
+            <button
+              type="submit"
+              className={primaryActionClass}
+              aria-disabled={linkState.busy ? 'true' : undefined}
+              aria-busy={linkState.busy ? 'true' : undefined}
+            >
+              {linkState.busy ? 'Sending…' : 'Send link'}
+            </button>
+          </form>
+
+          <form onSubmit={submitFile} className="grid content-start gap-sm border-t-hairline border-rule-hairline pt-sm">
+            <h3 className="font-heading text-h3 font-semibold text-text-primary">Upload a file</h3>
+            <div className="flex flex-col gap-2xs">
+              <label htmlFor={`speaker-material-file-${sessionId}`} className="font-data text-caption font-semibold text-text-primary">
+                File
+              </label>
+              <p id={`speaker-material-file-${sessionId}-hint`} className="text-caption text-text-secondary">
+                The file limit is 9 MB.
+              </p>
+              <input
+                ref={fileInputRef}
+                id={`speaker-material-file-${sessionId}`}
+                type="file"
+                className={inputClass}
+                aria-describedby={`speaker-material-file-${sessionId}-hint`}
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                required
+              />
+            </div>
+            {fileState.error ? <p role="alert" className="text-caption text-danger">{fileState.error}</p> : null}
+            <button
+              type="submit"
+              className={primaryActionClass}
+              aria-disabled={fileState.busy ? 'true' : undefined}
+              aria-busy={fileState.busy ? 'true' : undefined}
+            >
+              {fileState.busy ? 'Uploading…' : 'Upload file'}
+            </button>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

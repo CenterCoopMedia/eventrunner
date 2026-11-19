@@ -33,33 +33,14 @@ export default function Login() {
   const readOnlyDemo = isReadOnlyDemo(eventConfig);
   const returnPath = adminReturnPath(location.state?.from);
   const [reauthenticateUid, setReauthenticateUid] = useState(null);
+  const panelOnly = (readOnlyDemo && !returnPath) || authError;
+  const checkingSignIn = !panelOnly && loading;
 
-  if (readOnlyDemo && !returnPath) {
-    return (
-      <article className="mx-auto max-w-md">
-        <h1 className="font-heading text-h1 font-semibold text-text-primary">{text('Sign in', 'Iniciar sesión')}</h1>
-        <div className="mt-lg"><SignInPanel /></div>
-      </article>
-    );
-  }
-
-  if (authError) {
-    return <article className="mx-auto max-w-md">
-      <h1 className="font-heading text-h1 font-semibold text-text-primary">{text('Sign in', 'Iniciar sesión')}</h1>
-      <div className="mt-lg"><SignInPanel /></div>
-    </article>;
-  }
-
-  if (loading) {
-    return (
-      <LoadingState label={text('Checking your sign-in…', 'Comprobando el inicio de sesión…')} rows={0} onRetry={retryAuth} />
-    );
-  }
-
-  if (user) {
-    return (
-      <article className="mx-auto max-w-md">
-        <h1 className="font-heading text-h1 font-semibold text-text-primary">{text('Sign in', 'Iniciar sesión')}</h1>
+  function renderSignInContent() {
+    if (panelOnly) return <div className="mt-lg"><SignInPanel /></div>;
+    if (checkingSignIn) return null;
+    if (user) return (
+      <>
         <div className="mt-lg space-y-md border-hairline border-rule-hairline bg-surface-alt p-lg">
           <p className="text-text-primary">
             {user.email ? text(`You are signed in as ${user.email}.`, `Iniciaste sesión como ${user.email}.`) : text('You are signed in.', 'Iniciaste sesión.')}
@@ -81,24 +62,34 @@ export default function Login() {
             <SignInPanel initialEmail={user.email} onSignedIn={() => navigate(localize(returnPath || '/'), { replace: true })} />
           </div>
         ) : null}
-      </article>
+      </>
+    );
+    return (
+      <>
+        <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
+          {readOnlyDemo
+            ? text('Use the Google account for your admin email. This demo does not send email codes.', 'Usa la cuenta de Google de tu correo de administración. Esta demostración no envía códigos por correo.')
+            : eventConfig?.auth?.googleProviderEnabled === true
+              ? text('Use your Google account, or get a one-time code by email. No password needed.', 'Usa tu cuenta de Google o recibe un código de un solo uso por correo. No necesitas contraseña.')
+              : text('Get a one-time code by email. No password needed.', 'Recibe un código de un solo uso por correo. No necesitas contraseña.')}
+        </p>
+
+        <div className="mt-lg">
+          <SignInPanel onSignedIn={() => navigate(localize(returnPath || '/'), { replace: true })} />
+        </div>
+      </>
     );
   }
 
   return (
     <article className="mx-auto max-w-md">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">{text('Sign in', 'Iniciar sesión')}</h1>
-      <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
-        {readOnlyDemo
-          ? text('Use the Google account for your admin email. This demo does not send email codes.', 'Usa la cuenta de Google de tu correo de administración. Esta demostración no envía códigos por correo.')
-          : eventConfig?.auth?.googleProviderEnabled === true
-            ? text('Use your Google account, or get a one-time code by email. No password needed.', 'Usa tu cuenta de Google o recibe un código de un solo uso por correo. No necesitas contraseña.')
-            : text('Get a one-time code by email. No password needed.', 'Recibe un código de un solo uso por correo. No necesitas contraseña.')}
-      </p>
-
-      <div className="mt-lg">
-        <SignInPanel onSignedIn={() => navigate(localize(returnPath || '/'), { replace: true })} />
-      </div>
+      {checkingSignIn ? (
+        <LoadingState label={text('Checking your sign-in…', 'Comprobando el inicio de sesión…')} rows={0} onRetry={retryAuth} />
+      ) : null}
+      <section aria-label={text('Sign-in options', 'Opciones de inicio de sesión')} aria-busy={checkingSignIn}>
+        {renderSignInContent()}
+      </section>
     </article>
   );
 }

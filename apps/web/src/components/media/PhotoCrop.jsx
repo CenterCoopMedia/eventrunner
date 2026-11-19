@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CROP_OUTPUT_SIZE, clampOffset, coverLayout, cropRectangle } from '../../lib/photoCrop.js';
 import { primaryActionClass, quietActionClass } from '../controlClasses.js';
+import LoadingState from '../LoadingState.jsx';
 
 const VIEWPORT = 224; // px, the frame on screen
 const PAN_STEP = 12; // px per arrow press
@@ -152,12 +153,14 @@ export default function PhotoCrop({ file, label, onApply, onCancel }) {
 
   return (
     <div className="mt-sm flex flex-col gap-sm">
+      {image ? null : <LoadingState label="Loading the image…" rows={0} />}
       <div className="flex flex-wrap items-start gap-md">
         {/* The frame. One tab stop; the instructions are its accessible
             description, and every arrow is a real, stated move. */}
         <div
           role="application"
           aria-label={`Position the crop for ${label}`}
+          aria-busy={!image}
           aria-describedby={`crop-instructions-${file.name.length}`}
           tabIndex={0}
           onKeyDown={onKeyDown}
@@ -184,11 +187,7 @@ export default function PhotoCrop({ file, label, onApply, onCancel }) {
                 top: `calc(50% + ${offset.y}px - ${layout ? layout.drawHeight / 2 : 0}px)`,
               }}
             />
-          ) : (
-            <span className="flex h-full items-center justify-center font-data text-caption text-text-secondary">
-              Loading…
-            </span>
-          )}
+          ) : null}
         </div>
         <p id={`crop-instructions-${file.name.length}`} className="max-w-prose text-body text-text-secondary">
           Use the arrow keys to move the picture inside the square — hold Shift to move faster —

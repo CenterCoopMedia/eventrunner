@@ -3,7 +3,7 @@
 // canvas, so the test stands in for each of those and asserts what the
 // component does with them.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import PhotoCrop from './PhotoCrop.jsx';
 
 function aFile(name = 'photo.jpg') {
@@ -59,6 +59,47 @@ afterEach(() => {
 });
 
 describe('PhotoCrop', () => {
+  it.each([false, true])('keeps the loading feedback outside the crop frame until decode finishes (failure: %s)', (fail) => {
+    let finish;
+    vi.stubGlobal('Image', class extends FakeImage {
+      set src(value) {
+        this.srcValue = value;
+        finish = () => (fail ? this.onerror() : this.onload());
+      }
+      get src() { return this.srcValue; }
+    });
+    vi.useFakeTimers();
+    try {
+      const { onApply, onCancel } = renderCrop();
+      const frame = screen.getByRole('application', { name: 'Position the crop for your profile photo' });
+      const status = screen.getByRole('status', { name: 'Loading the image…' });
+      expect(frame).toHaveStyle({ width: '224px', height: '224px' });
+      expect(frame).toHaveAttribute('aria-busy', 'true');
+      expect(status.closest('[aria-busy="true"]')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Use this crop' })).toBeDisabled();
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(status).toHaveTextContent('We haven’t received a result after a minute.');
+      expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
+      expect(URL.createObjectURL).toHaveBeenCalledOnce();
+      expect(onApply).not.toHaveBeenCalled();
+
+      act(() => finish());
+      expect(status).not.toBeInTheDocument();
+      if (fail) {
+        expect(screen.getByRole('alert')).toHaveTextContent('That picture could not be opened.');
+        fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+        expect(onCancel).toHaveBeenCalledOnce();
+      } else {
+        expect(frame).toHaveAttribute('aria-busy', 'false');
+        expect(screen.getByRole('button', { name: 'Use this crop' })).toBeEnabled();
+      }
+      expect(onApply).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('the arrow keys move the crop, and Shift moves it faster', async () => {
     renderCrop();
     const box = await screen.findByRole('application');
