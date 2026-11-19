@@ -262,6 +262,95 @@ describe('AnnouncementEmailComposer', () => {
     expect(screen.queryByRole('button', { name: /Send to/ })).not.toBeInTheDocument();
   });
 
+  it('shows measured batches after one second and explains a stalled count without restarting the send', async () => {
+    const pending = [];
+    respond({
+      listAnnouncementSends: listResponse([]),
+      previewAnnouncementEmail: { ...PREVIEW, recipientCount: 400 },
+      sendAnnouncementEmail: () => new Promise((resolve) => pending.push(resolve)),
+    });
+    await renderLoaded();
+    fillDraft();
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await screen.findByRole('heading', { name: 'Preview' });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to 400 recipients' }));
+    const confirm = await screen.findByRole('heading', { name: 'Send this email to 400 recipients?' });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    await act(async () => {
+      fireEvent.click(within(confirm.closest('section')).getByRole('button', { name: 'Send to 400 recipients' }));
+    });
+    const status = screen.getByText('Sending. 0 addresses of 400 handled.');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(999); });
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    const bar = screen.getByRole('progressbar', { name: status.textContent });
+    expect(bar).toHaveAttribute('max', '400');
+    expect(bar).toHaveAttribute('value', '0');
+    expect(bar).toHaveAttribute('aria-labelledby', status.id);
+    expect(bar.closest('[aria-live], [role="status"]')).toBeNull();
+
+    const batch = { ...SENT, id: PREVIEW.sendId, status: 'sending', total: 400,
+      processed: 200, counts: { sent: 180, failed: 5, skipped: 15 } };
+    await act(async () => { pending.shift()({ send: batch }); });
+    expect(status).toHaveTextContent('Sending. 200 addresses of 400 handled.');
+    expect(bar).toHaveAttribute('value', '200');
+    await act(async () => { vi.advanceTimersByTime(9999); });
+    expect(status).not.toHaveTextContent('The count has not changed');
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(status).toHaveTextContent('The count has not changed for ten seconds.');
+    // A repeated server count does not restart the no-change clock.
+    await act(async () => { pending.shift()({ send: batch }); });
+    expect(status).toHaveTextContent('The count has not changed for ten seconds.');
+    await act(async () => { pending.shift()({ send: { ...batch, processed: 300 } }); });
+    expect(status).toHaveTextContent('Sending. 300 addresses of 400 handled.');
+    expect(status).not.toHaveTextContent('The count has not changed');
+    expect(bar).toHaveAttribute('value', '300');
+    await act(async () => {
+      pending.shift()({ send: { ...batch, status: 'sent', processed: 400, counts: { sent: 380, failed: 5, skipped: 15 } } });
+    });
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(status).toBeEmptyDOMElement();
+    expect(screen.getByText(/The send is complete\. Sent to 380 recipients of 400 addresses\./)).toBeInTheDocument();
+    const sends = call.mock.calls.filter(([name]) => name === 'sendAnnouncementEmail');
+    expect(sends).toHaveLength(4);
+    expect(sends.slice(1).map(([, body]) => body)).toEqual(Array(3).fill({ sendId: PREVIEW.sendId }));
+  });
+
+  it('starts continued progress at the saved count and clears it on error before a fresh continuation', async () => {
+    const partial = { ...SENT, id: 'send-part', status: 'sending', total: 400, processed: 200, counts: { sent: 200 } };
+    const pending = [];
+    respond({
+      listAnnouncementSends: listResponse([partial]),
+      sendAnnouncementEmail: () => new Promise((resolve, reject) => pending.push({ resolve, reject })),
+    });
+    await renderLoaded();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continue sending' })); });
+    const status = screen.getByText('Sending. 200 addresses of 400 handled.');
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(10000); });
+    expect(screen.getByRole('progressbar')).toHaveAttribute('value', '200');
+    expect(status).toHaveTextContent('The count has not changed for ten seconds.');
+    await act(async () => { pending.shift().reject(new Error('Connection interrupted')); });
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(status).toBeEmptyDOMElement();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continue sending' })); });
+    expect(status).toHaveTextContent('Sending. 200 addresses of 400 handled.');
+    expect(status).not.toHaveTextContent('The count has not changed');
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(screen.getByRole('progressbar')).toHaveAttribute('value', '200');
+    await act(async () => {
+      pending.shift().resolve({ send: { ...partial, status: 'sent', processed: 400, counts: { sent: 400 } } });
+    });
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(status).toBeEmptyDOMElement();
+    expect(call.mock.calls.filter(([name]) => name === 'sendAnnouncementEmail').map(([, body]) => body))
+      .toEqual([{ sendId: partial.id }, { sendId: partial.id }]);
+  });
+
   it('sends a test to the signed-in address', async () => {
     respond({
       listAnnouncementSends: listResponse([]),
