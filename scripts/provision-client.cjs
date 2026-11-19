@@ -9,7 +9,7 @@
  *   node scripts/provision-client.cjs --application <id> [--test-mode]
  *   node scripts/provision-client.cjs --application <id> --mark-stopped
  *   node scripts/provision-client.cjs --application <id> --enroll-auto-deploy
- *   node scripts/provision-client.cjs --application <id> --remove-auto-deploy [--confirm-site <name> | --if-purge-due]
+ *   node scripts/provision-client.cjs --application <id> --remove-auto-deploy [--confirm-site <name> | --if-purge-due | --for-archive]
  *   node scripts/provision-client.cjs --application <id> --restore-auto-deploy
  *   node scripts/provision-client.cjs --application <id> --sync-access
  *   node scripts/provision-client.cjs --application <id> --sync-event-mount
@@ -1236,11 +1236,12 @@ async function syncEventMount({ appId, deps }) {
 }
 
 /** The shared serialized workflow is the only automatic list writer. */
-async function enrollAutoDeploy({ appId, remove = false, removeDue = false, restore = false, confirmSite = '', deps }) {
+async function enrollAutoDeploy({ appId, remove = false, removeDue = false, forArchive = false, restore = false, confirmSite = '', deps }) {
   const { db, env, fetch, now, log } = deps;
   try {
+    const appRef = db.collection('applications').doc(appId);
     const [application, build, tombstone] = await Promise.all([
-      db.collection('applications').doc(appId).get(),
+      appRef.get(),
       db.collection(BUILD_COLLECTION).doc(appId).get(),
       ...(remove ? [db.collection('console_deleted_sites').doc(appId).get()] : []),
     ]);
@@ -1254,8 +1255,13 @@ async function enrollAutoDeploy({ appId, remove = false, removeDue = false, rest
       log.log('auto-deploy: this run has no completed full build to enroll');
       return 0;
     }
+    if (restore && record.decommission.autoDeploy !== true) {
+      log.log('auto-deploy: the archive has no prior enrollment to restore');
+      return 0;
+    }
     const resources = tombstone?.data()?.resources || record?.resources;
     if (remove) {
+      if (forArchive && tombstone.exists) throw new Error('purge has started');
       const purgeAfter = toMillis(application.data()?.purgeAfter);
       if (removeDue && (application.data()?.status !== 'archived' || application.data()?.archive?.restoring
         || !Number.isFinite(purgeAfter) || purgeAfter > now())) {
@@ -1291,6 +1297,19 @@ async function enrollAutoDeploy({ appId, remove = false, removeDue = false, rest
     }
     const clients = resolveClients({ eventName: 'push', autoDeployEnvironments: current?.value });
     const present = clients.some((client) => client.toLowerCase() === environment);
+    if (forArchive && application.data().status !== 'archived') {
+      // Save before the GitHub write. A retry after a lost response sees an
+      // absent entry and must keep the original enrollment.
+      await db.runTransaction(async (tx) => {
+        const app = (await tx.get(appRef)).data();
+        if (!app) throw new Error('the application is missing');
+        if (app.status === 'archived') return;
+        const autoDeploy = present || app.archive?.autoDeploy === true;
+        if (app.archive?.autoDeploy !== autoDeploy) {
+          tx.update(appRef, { archive: { ...app.archive, autoDeploy } });
+        }
+      });
+    }
     if (present !== remove) {
       log.log(`auto-deploy: ${environment} is already ${remove ? 'absent' : 'enrolled'}`);
       return 0;
@@ -2040,6 +2059,7 @@ function parseArgs(argv) {
     else if (argv[i] === '--sync-access') args.syncAccess = true;
     else if (argv[i] === '--sync-event-mount') args.syncEventMount = true;
     else if (argv[i] === '--if-purge-due') args.removeDue = true;
+    else if (argv[i] === '--for-archive') args.forArchive = true;
     else if (argv[i] === '--confirm-site') args.confirmSite = argv[++i] || '';
     else return null;
   }
@@ -2051,6 +2071,7 @@ function parseArgs(argv) {
       && (args.testMode || args.markStopped || enrollment || args.removeDue || args.confirmSite !== undefined))
     && !(args.syncAccess && args.syncEventMount)
     && (!args.removeDue || args.removeAutoDeploy)
+    && (!args.forArchive || (args.removeAutoDeploy && !args.removeDue && args.confirmSite === undefined))
     && (args.confirmSite === undefined || (args.removeAutoDeploy && Boolean(args.confirmSite))) ? args : null;
 }
 
@@ -2105,13 +2126,13 @@ function realDeps(env) {
 async function main(argv = process.argv.slice(2), env = process.env, makeDeps = realDeps) {
   const args = parseArgs(argv);
   if (!args) {
-    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped | --enroll-auto-deploy | --remove-auto-deploy [--confirm-site <name>] | --restore-auto-deploy | --sync-access | --sync-event-mount] | --sync-teams');
+    console.error('Usage: provision-client.cjs --application <id> [--test-mode | --mark-stopped | --enroll-auto-deploy | --remove-auto-deploy [--confirm-site <name> | --if-purge-due | --for-archive] | --restore-auto-deploy | --sync-access | --sync-event-mount] | --sync-teams');
     return 2;
   }
   const deps = makeDeps(env);
   if (args.syncTeams) return syncTeams({ deps });
   if (args.markStopped) return markStopped({ appId: args.appId, runId: env.GITHUB_RUN_ID, deps });
-  if (args.enrollAutoDeploy || args.removeAutoDeploy || args.restoreAutoDeploy) return enrollAutoDeploy({ appId: args.appId, remove: args.removeAutoDeploy, removeDue: args.removeDue, restore: args.restoreAutoDeploy, confirmSite: args.confirmSite, deps });
+  if (args.enrollAutoDeploy || args.removeAutoDeploy || args.restoreAutoDeploy) return enrollAutoDeploy({ appId: args.appId, remove: args.removeAutoDeploy, removeDue: args.removeDue, forArchive: args.forArchive, restore: args.restoreAutoDeploy, confirmSite: args.confirmSite, deps });
   if (args.syncAccess) return syncAccess({ appId: args.appId, deps });
   if (args.syncEventMount) return syncEventMount({ appId: args.appId, deps });
   return provision({ appId: args.appId, testMode: args.testMode, deps });

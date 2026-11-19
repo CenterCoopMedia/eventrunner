@@ -31,7 +31,7 @@ jobs:
     uses: ./.github/workflows/auto-deploy-enrollment.yml
     with:
       application_id: ${{ inputs.application_id }}
-      operation: ${{ inputs.event_name == 'schedule' && 'remove-due' || 'remove' }}
+      operation: ${{ inputs.event_name == 'schedule' && 'remove-due' || inputs.mode == 'archive' && 'archive' || 'remove' }}
       confirm_site: ${{ inputs.mode == 'purge-now' && inputs.confirm_site || '' }}
     secrets: inherit
 

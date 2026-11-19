@@ -344,7 +344,7 @@ async function archive(ctx) {
     await changeMountForApplication(tx, ctx.deps.db, ctx.appId, 'retire');
     tx.update(appRef(ctx), {
       status: 'archived', archivedAt: at, purgeAfter: new Date(at.getTime() + RECOVERY_MS),
-      archive: { previousStatus: app.status, versionName, pending: true },
+      archive: { previousStatus: app.status, versionName, pending: true, autoDeploy: app.archive?.autoDeploy === true },
       updatedAt: at, updatedBy: 'decommission', history: [...(app.history || []), historyEntry('archived', at, 'decommission')],
     });
   });
@@ -405,7 +405,9 @@ async function restore(ctx) {
       status: previous.previousStatus, archivedAt: null, purgeAfter: null, archive: null,
       updatedAt: at, updatedBy: 'decommission', history: [...(data.history || []), historyEntry(previous.previousStatus, at, 'decommission', 'Restored the site')],
     });
-    tx.set(buildRef(ctx), { decommission: runRecord(ctx, 'restore', 'done') }, { merge: true });
+    tx.set(buildRef(ctx), {
+      decommission: runRecord(ctx, 'restore', 'done', { autoDeploy: data.archive.autoDeploy === true }),
+    }, { merge: true });
   });
 }
 

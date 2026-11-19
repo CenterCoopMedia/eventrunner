@@ -670,7 +670,7 @@ test('a lost enrollment write response reconciles from the variable without anot
   assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, 'nclocal');
 });
 
-test('removal preserves other clients, removes case variants, and reconciles a lost response', async () => {
+test('archive records enrollment before removal and keeps it after a lost response', async () => {
   const fake = setup({ cloud: { autoDeployEnvironments: 'demo,NCLOCAL,old-client,nclocal' } });
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   const fetch = fake.deps.fetch;
@@ -683,17 +683,20 @@ test('removal preserves other clients, removes case variants, and reconciles a l
     }
     return response;
   };
-  assert.equal(await removeEnrollment(fake), 1);
+  assert.equal(await removeEnrollment(fake, ['--for-archive']), 1);
   assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, 'demo,old-client');
-  assert.equal(await removeEnrollment(fake), 0);
+  assert.equal(fake.db.read('applications/a1').archive.autoDeploy, true);
+  assert.equal(await removeEnrollment(fake, ['--for-archive']), 0);
+  assert.equal(fake.db.read('applications/a1').archive.autoDeploy, true);
   assert.equal(fake.state.enrollmentWrites, 1);
 });
 
-test('removal deletes the final variable and confirms absence; an absent entry needs no write', async () => {
+test('archive records absent enrollment and deletes the variable only for the final client', async () => {
   for (const value of ['nclocal', 'demo', undefined]) {
     const fake = setup({ cloud: { autoDeployEnvironments: value } });
     assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
-    assert.equal(await removeEnrollment(fake), 0);
+    assert.equal(await removeEnrollment(fake, ['--for-archive']), 0);
+    assert.equal(fake.db.read('applications/a1').archive.autoDeploy, value === 'nclocal');
     assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, value === 'nclocal' ? undefined : value);
     assert.equal(fake.state.enrollmentWrites, value === 'nclocal' ? 1 : 0);
     if (value === 'nclocal') {
@@ -733,17 +736,22 @@ test('removal skips unbuilt requests and refuses missing requests or mismatched 
   assert.equal(fake.state.enrollmentWrites, 0);
 });
 
-test('restore enrollment requires this run to have completed a restore and excludes rehearsals', async () => {
-  for (const state of ['done', 'running', 'foreign', 'rehearsal']) {
+test('restore enrollment requires prior enrollment and this run to have completed a non-rehearsal restore', async () => {
+  for (const state of ['done', 'running', 'foreign', 'rehearsal', 'unenrolled', 'unrecorded']) {
     const fake = setup();
     assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
     fake.deps.env.GITHUB_RUN_ID = 'restore-run';
     await fake.db.doc('console_builds/a1').update({
       testMode: state === 'rehearsal',
-      decommission: { mode: 'restore', state: state === 'running' ? 'running' : 'done', runId: state === 'foreign' ? 'other' : 'restore-run' },
+      decommission: {
+        mode: 'restore',
+        state: state === 'running' ? 'running' : 'done',
+        runId: state === 'foreign' ? 'other' : 'restore-run',
+        ...(state === 'unrecorded' ? {} : { autoDeploy: state !== 'unenrolled' }),
+      },
     });
     assert.equal(await main(['--application', 'a1', '--restore-auto-deploy'], fake.deps.env, () => fake.deps), 0);
-    assert.equal(fake.state.enrollmentWrites, state === 'done' ? 1 : 0);
+    assert.equal(fake.state.repositoryVariables.AUTO_DEPLOY_ENVIRONMENTS, state === 'done' ? 'nclocal' : undefined);
   }
 });
 
@@ -2403,6 +2411,9 @@ test('the id is checked before anything reads it', async () => {
   assert.equal(parseArgs(['--application', 'a1', '--remove-auto-deploy', '--confirm-site']), null);
   assert.equal(parseArgs(['--application', 'a1', '--confirm-site', 'nclocal']), null);
   assert.equal(parseArgs(['--application', 'a1', '--if-purge-due']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--for-archive']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--remove-auto-deploy', '--if-purge-due', '--for-archive']), null);
+  assert.equal(parseArgs(['--application', 'a1', '--remove-auto-deploy', '--for-archive']).forArchive, true);
   assert.equal(parseArgs(['--application', 'a1', '--remove-auto-deploy', '--confirm-site', 'nclocal']).confirmSite, 'nclocal');
   for (const argv of [[], ['--sync-teams', '--application', 'a1'], ['--application'], ['--application', 'a;rm -rf /'], ['--application', '../x'], ['--application', 'a', '--nope']]) {
     assert.equal(parseArgs(argv), null, argv.join(' '));
