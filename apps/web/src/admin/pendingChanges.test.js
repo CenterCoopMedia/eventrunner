@@ -199,6 +199,10 @@ describe('runSummary', () => {
     expect(runSummary({ id: 'q5', status: 'failed', request: { cmsContent: ['a'] } }).sentence).toBe(
       '0 of 1 published before it stopped.',
     );
+    expect(runSummary({
+      id: 'q6', status: 'failed', request,
+      progress: { cmsContent: { published: ['a'], skipped: [{ docId: 'b', reason: 'conflict' }] } },
+    }).sentence).toBe('1 of 4 published before it stopped. 1 skipped.');
   });
 
   it('says Unknown for any other status', () => {

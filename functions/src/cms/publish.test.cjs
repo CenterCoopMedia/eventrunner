@@ -98,6 +98,7 @@ test('cmsPublish { collection, docIds } publishes, marks the queue row done, and
   assert.equal(row.status, 'done');
   assert.equal(row.requestedBy, ADMIN.email);
   assert.deepEqual(row.request, { cmsContent: ['hero__title'] });
+  assert.equal(row.plannedChunks, 1);
   assert.deepEqual(row.progress.cmsContent.published, ['hero__title']);
   assert.equal(row.finishedAt instanceof Date, true);
 
@@ -160,6 +161,7 @@ test('cmsPublish { all: true } publishes every dirty draft across collections, s
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.results.cmsContent.published, ['a']);
   assert.deepEqual(res.body.results.cmsPages.published, ['home']);
+  assert.equal(db.read('cmsPublishQueue', res.body.queueId).plannedChunks, 2);
   assert.equal(db.read('cmsContent', 'a').revision, 1);
   assert.equal(db.read('cmsContent', 'b'), undefined); // clean draft not published
   assert.equal(db.read('cmsPages', 'home').revision, 1);

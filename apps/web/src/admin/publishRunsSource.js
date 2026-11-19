@@ -9,14 +9,17 @@ import { afterServerConfirms, SERVER_CONFIRMATION, subscribeWithRetry } from '..
 import { listenWithRetry } from './pendingChangesSource.js';
 
 export function subscribePublishRun(id, onNext) {
-  return subscribeWithRetry((onError) => onSnapshot(
-    doc(db, 'cmsPublishQueue', id),
-    SERVER_CONFIRMATION,
-    afterServerConfirms((snapshot) => {
-      if (snapshot.exists()) onNext(snapshot.data());
-    }),
-    onError,
-  ));
+  return subscribeWithRetry(
+    (onError) => onSnapshot(
+      doc(db, 'cmsPublishQueue', id),
+      SERVER_CONFIRMATION,
+      afterServerConfirms((snapshot) => {
+        if (snapshot.exists()) onNext(snapshot.data());
+      }),
+      onError,
+    ),
+    (error) => console.warn('cmsPublishQueue active admin subscription failed; retrying.', error),
+  );
 }
 
 /**

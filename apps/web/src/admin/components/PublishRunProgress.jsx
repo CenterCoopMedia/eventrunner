@@ -15,8 +15,9 @@ export default function PublishRunProgress({ run }) {
   let message = '';
   if (counts?.requested > 0 && (!active || (active === visibleAttempt && counts.measured))) {
     const { published, requested, skipped } = counts;
+    const noun = requested === 1 ? 'change' : 'changes';
     const ending = active ? '.' : ' before the run stopped.';
-    message = `${published} of ${requested} changes published${ending}`;
+    message = `${published} of ${requested} ${noun} published${ending}`;
     if (skipped > 0) message += ` ${skipped} skipped.`;
   }
 
