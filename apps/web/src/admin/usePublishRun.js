@@ -17,10 +17,11 @@ export default function usePublishRun(call) {
   }, [active]);
 
   async function publish(body, resumeRow) {
-    const id = body.queueId ?? globalThis.crypto.randomUUID();
+    const { queueId } = body;
+    const id = queueId ?? globalThis.crypto.randomUUID();
     const attempt = { id, startedAt: performance.now() };
     setRun((current) => {
-      const previous = current?.attempt.id === body.queueId ? current.counts : null;
+      const previous = queueId && current?.attempt.id === queueId ? current.counts : null;
       return {
         attempt,
         pending: true,
@@ -28,7 +29,7 @@ export default function usePublishRun(call) {
       };
     });
     try {
-      const response = await call('cmsPublish', body.queueId ? body : { ...body, requestId: id });
+      const response = await call('cmsPublish', queueId ? body : { ...body, requestId: id });
       setRun((current) => current?.attempt === attempt ? null : current);
       return response;
     } catch (error) {
