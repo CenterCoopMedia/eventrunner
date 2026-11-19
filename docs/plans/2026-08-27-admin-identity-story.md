@@ -24,11 +24,10 @@ with three changes that come from the brief:
 
 - **The admin has one fixed identity.** It ignores `data-theme`. It obeys `data-mode`, and both
   modes are fully designed (§5.2, §3.3).
-- **The admin gets no expressive interaction.** The one-per-surface slot for expressive motion is
-  spent on the public site's schedule grid (§2.2). The admin's motion budget is functional motion
-  only: 120–200ms, `transform` and `opacity`, `ease-out`, wrapped in
-  `@media (prefers-reduced-motion: no-preference)`. There is no admin signature interaction, and
-  part 3 below names none.
+- **The admin uses functional motion.** The [current animation rules](../interface-guidelines.md#animation)
+  cover compact control feedback, dialog entrances, and the component-owned cycles for waiting
+  indicators. All motion is gated by `@media (prefers-reduced-motion: no-preference)`. The public
+  schedule grid uses the signature interaction slot.
 - **Part 6 is a token contract, not an option list.** The admin is not configurable, so there is
   nothing for a picker to pick. Part 6 states the `admin-*` token families PR2 must ship instead.
 
@@ -210,9 +209,12 @@ preference — see part 5.
 - **Refuses accent spread.** Two places. A third use of `--admin-client-accent` is a review failure
   with no discussion, because the accent is an arbitrary client value and every additional use is one
   more contrast surface nobody tested.
-- **Refuses expressive motion entirely.** No page transitions, no skeleton shimmer (a shimmer is
-  ambient animation, which is banned), no animated save checkmark, no number that counts up. Loading
-  is a stated line: "Loading sessions". Saving is a stated line. The room does not perform.
+- **Refuses decorative motion.** Page transitions, skeleton shimmer, animated save checkmarks,
+  and decorative count-ups remain banned. State pending work immediately ("Loading sessions",
+  "Saving…"). An indicator may appear at one second. Update the words at ten and sixty seconds.
+  Keep the indicator static under reduced motion and remove it in the same render as the result,
+  with no exit motion. Offer a retry only when the caller supplies a safe repeat. See
+  [Waiting and progress](../interface-guidelines.md#waiting-and-progress).
 - **Refuses disappearing confirmation.** A result is stated in place, next to the control that caused
   it, and it stays. A toast may repeat it; a toast may never be the only record of what happened.
 - **Refuses eyebrows.** No label text above any title, in any panel, at any size — including the
@@ -347,7 +349,7 @@ Bind: No `--admin-font-*` token is ever writable from `config/theme`. The pairin
 | §5.2 live-preview editor | Moment 2 keeps the split view, the real-page preview, draft/publish, per-mode tabs, `applyThemePreview`, and the logo slots. It adds the two editing depths and states the contrast failure as a publish-time error. |
 | §5.2 publish path | The shared resolver writes the resolved legacy colors map into `config/theme` on publish, so email and PDF keep rendering with no overrides stored. |
 | §2.1 devices | Rules, folios, and the stat contract carry over. The nameplate and the drop cap do not apply to tooling and are declined. |
-| §2.2 motion | Functional only. No expressive moment claimed. No shimmer, no transitions, no ambient anything. Reduced motion is an instant swap. |
+| §2.2 motion | Functional control and dialog feedback plus scoped waiting indicators. Navigation stays instant. No shimmer or ambient motion. Reduced motion keeps waiting indicators static and shows results immediately. |
 | §2.3 motifs | None on this surface, in any slot. |
 | §2.4 anti-patterns | Part 5 names the pills, the icon rail, the KPI tiles, the pulse dots, the shadows, the tan canvas, the coloured edges, and the eyebrows individually. |
 | §3.1 tiers | Part 6 ships semantic `admin-*` tokens plus two component tokens. No component reads a primitive. |

@@ -228,16 +228,15 @@ These rules bind both classes:
 - Wrap every motion rule in `@media (prefers-reduced-motion: no-preference)` (interface
   guidelines, Accessibility).
 
-**Asynchronous-work indicators (owner direction, 2026-11-05).** A small spinner may loop
-while an operator CMS or client-console request is pending, or while the server reports that
-a site build is active. This is functional feedback, including the hosting team's client lists
-and settings. Keep the explanatory status text, hide the decorative ring from assistive
-technology, and remove it when the operation succeeds, fails, or stops. Never invent a progress
-percentage or keep a completed or failed build spinning. Use only a restrained `transform`
-rotation, a component-owned cycle of about 1.2 seconds, and the no-preference query above;
-reduced motion shows the same label and a static ring. This narrow exception supersedes the
-earlier no-spinner rule and the short state-transition duration limit for these indicators.
-It does not permit shimmer, pulse, bounce, or other decorative loops.
+#### Waiting and progress
+
+A waiting indicator is functional feedback. The public site, admin, and client console must follow these stages. State the operation immediately, including the busy words inside a pressed control. For a wait shorter than one second, show no decorative indicator. At one second, show an indicator if work is still pending. At ten seconds, say the wait is longer than expected. At sixty seconds, say that no result has arrived and the person can keep waiting. Announce only meaningful stage changes. Show determinate progress only when a real total or server-reported progress is available.
+
+Under `prefers-reduced-motion: no-preference`, a waiting indicator may use a component-owned cycle outside the short transition timings. Keep it moving for the entire pending operation. Remove it in the same render that shows the result or ends the wait, with no exit motion. Under reduced motion, the indicator stays static and the words change only at the stated stages. Hide the decorative indicator from assistive technology and keep the status words visible. Shimmer and other ambient animation remain banned.
+
+Offer a retry only when the caller supplies a safe repeat of the operation. The shared loading component offers that retry at sixty seconds. Do not repeat an unresolved write, reload an editor, or delay an available result. Route changes remain immediate.
+
+A server-reported active build may keep its existing console indicator while it runs. See the [interface guidelines](../interface-guidelines.md#waiting-and-progress) for the waiting components and their verification.
 
 **React Bits.** [React Bits](https://reactbits.dev) is an allowed source for a signature
 interaction. It is not a source for general UI. Before you use a component from it, apply all six
