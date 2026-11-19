@@ -116,7 +116,7 @@
     "--font-mono": "var(--font-data)"
   },
 
-  "$motion-note": "Brief §2.2. Functional motion runs 120ms to 200ms. One expressive signature per surface finishes under 600ms. Each step has one job: --motion-fast is the exit, --motion-base is the enter, --motion-slow is the press, and --motion-signature is the one signature a surface owns. An exit is faster than the enter that brought the element in. There is ONE curve: enter and exit both take --motion-ease, and the asymmetry is carried by duration alone.",
+  "$motion-note": "Brief §2.2. Functional state transitions run 120ms to 200ms. One expressive signature per surface finishes under 600ms. --motion-fast is the exit, --motion-base is the enter, --motion-slow is the press, and --motion-signature is reserved for the signature interaction. Enter and exit both take --motion-ease, with the exit shorter. Waiting cycles belong to the component. The shared public and admin loading ring uses 1.2-second linear rotation in the active and slow stages. The admin action ring uses 900-millisecond linear rotation. Both rotation rules require no-preference.",
   "motion": {
     "fast": "var(--er-duration-fast)",
     "base": "var(--er-duration-base)",

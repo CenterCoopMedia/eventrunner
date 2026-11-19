@@ -335,6 +335,20 @@ describe('adversarial stylesheet fixtures', () => {
       ]);
     },
   );
+  it('requires no-preference even for the allowed loading status loop', () => {
+    const from = path.join(SRC, 'components/loadingState.css');
+    const rule = `
+      .loading-status[data-loading-stage='active'] .loading-status__activity,
+      .loading-status[data-loading-stage='slow'] .loading-status__activity {
+        animation: loading-status-turn 1.2s linear infinite;
+      }
+    `;
+    expect(motionProblems(postcss.parse(rule, { from }), pendingLoop)).toEqual([
+      expect.stringContaining('motion preference:'),
+    ]);
+    const guarded = `@media (prefers-reduced-motion: no-preference) { ${rule} }`;
+    expect(motionProblems(postcss.parse(guarded, { from }), pendingLoop)).toEqual([]);
+  });
   it('rejects layout animation, including prefixed keyframes', () => {
     for (const name of ['keyframes', '-webkit-keyframes']) {
       expect(motionProblems(postcss.parse(`@${name} x { to { height: 20px; } }`)))

@@ -36,7 +36,7 @@ Every control and every interactive row defines these states, in both modes, on 
 | Active (pressed) | Scale 0.98 over 200ms ease-out; static under reduced motion | The pressed action ground; no scale |
 | Selected or current | Weight plus a rule or a filled ground plus `aria-pressed`, `aria-current`, or `aria-selected` | The rail's four signals; a filled row marker elsewhere |
 | Disabled | Native `disabled` on a control that must not act, with the disabled ink; `aria-disabled="true"` only on a control that must stay focusable to explain itself, and then its handler suppresses every activation path and a test proves it. A submit control is never disabled before the request starts. Never a removed control | The same |
-| Busy | `aria-busy="true"` and a stated word beside or inside the control ("Saving…"); never a spinner, never a shimmer | The same, and the result stays in place after |
+| Busy | `aria-busy="true"` and immediate words inside the control ("Saving…"). Reject duplicate activation immediately. A decorative indicator may appear at one second if work is still pending | The same, and the result stays in place after |
 | Error | `aria-invalid="true"`, the alarm rule, a message under the field named by `aria-describedby`, focus moved to the first error on submit | The same |
 | Success | A stated line in place that stays, in a `role="status"` region so it is announced; a toast may repeat it visually, and then the toast carries no live role, so one result is announced once | The same |
 | Empty | A sentence that names what was searched or filtered, plus one action | The desk's empty state |
@@ -47,7 +47,7 @@ Dialogs trap focus, mark the page behind them `inert`, return focus to the opene
 
 ### 2.2 Motion
 
-The brief allows two classes. This record assigns each class its tokens and its choreography.
+The brief allows two classes. The table records public choreography. The [current animation rules](../interface-guidelines.md#animation) govern motion across all surfaces, including compact control feedback and dialog entrances.
 
 | Move | Duration token | Easing | Properties | Where |
 |---|---|---|---|---|
@@ -56,6 +56,7 @@ The brief allows two classes. This record assigns each class its tokens and its 
 | Press | `--motion-slow` (200ms) | `--motion-ease` (ease-out) | transform (scale 0.98) | public only |
 | Filter or sort resolve | `--motion-base` | ease-out | opacity of the list; the count updates in place | public only |
 | Signature | `--motion-signature` (560ms) | ease-out | transform, opacity | public only, one per style |
+| Waiting indicator | component-owned cycle | component-owned | transform, opacity | public, admin, console while work is pending |
 | Mode swap | none | none | transitions disabled for the swap | both |
 | Navigation, route change, focus move | none | none | instant | both |
 
@@ -63,11 +64,11 @@ Bind these:
 
 - Every animated rule sits inside `@media (prefers-reduced-motion: no-preference)`. The reduced state is static and complete: the element is already in its end state.
 - Enter and exit are asymmetric in duration only: exit is faster than enter, and both use the one ease-out curve the brief names. No second easing token ships.
-- The admin has no enter, exit, or press motion. Its state changes are instant, as the admin story binds; the one existing resolve of the proof tint stays as the desk record documents it. A shared device such as the toast renders without motion inside the admin.
+- Admin control and dialog motion follows the [current animation rules](../interface-guidelines.md#animation). The resolve of the proof tint stays as the desk record documents it.
 - Nothing moves more than 8px on enter. Nothing scales beyond 0.98 to 1.
-- Nothing loops. Nothing starts from scroll position. Nothing counts up.
+- Only the scoped indicators in [Waiting and progress](../interface-guidelines.md#waiting-and-progress) may loop during pending work. A real progress count may update as work advances. Decorative count-ups, shimmer, ambient loops, and scroll-triggered motion remain banned.
 - `@starting-style` and `transition-behavior: allow-discrete` may be used for dialogs and toasts as an enhancement. Their absence must leave the element in its end state.
-- A test reads `apps/web/src/index.css` and every class string and rejects: `transition: all`, a duration outside the token set, an animated property outside `transform` and `opacity`, a hover rule outside the hover query, and any `animate-pulse`, `animate-spin`, or infinite keyframe. The interface guidelines' icon cross-fade line, which names a blur, is corrected in the same wave to opacity and scale only.
+- The motion test checks shipped web stylesheets and class strings for motion preference and hover guards, token durations, transform and opacity keyframes, explicit transition properties, and scoped waiting loops. Stock `animate-pulse`, `animate-spin`, `animate-bounce`, and `animate-ping` utilities remain banned.
 
 The public site's one signature is the schedule column coming forward, in every style; Atlas draws it as the traced line. Zine's stamp peek stays functional motion at the timing the brief fixes and never takes the signature token. The admin owns none.
 
@@ -197,7 +198,7 @@ Every wave is one pull request, stacked on the wave below, regenerated on its ow
 
 The brief's §2.4 list stands. This record adds the mechanical checks that a wave must leave green:
 
-- No `transition: all`, no `animate-pulse`, no infinite keyframe, no hover rule outside the hover query, no duration outside the token set (the motion test).
+- The motion test enforces explicit transitions, hover guards, token timings, the stock animation utility ban, and the exact exceptions for component-owned waiting loops.
 - No `rounded-full` on any element but the ring of a focus outline (the tag test, widened).
 - No decorative eyebrow text node directly above a heading, following the caption, nameplate and form-label cases in brief §2.4 (the eyebrow test, widened to the new devices).
 - No zero-padded sequence number rendered by any device (the schedule number test, widened).
