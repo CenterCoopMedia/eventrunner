@@ -64,13 +64,18 @@ it('keeps two tabs publishing as the same staff member on separate queue documen
     return () => listeners.delete(id);
   });
   const pending = new Map();
-  const call = vi.fn((_name, { requestId }) => new Promise((resolve) => { pending.set(requestId, resolve); }));
+  const call = vi.fn((_name, { requestId }) => {
+    const response = Promise.withResolvers();
+    pending.set(requestId, response);
+    return response.promise;
+  });
   const first = renderHook(() => usePublishRun(call));
   const second = renderHook(() => usePublishRun(call));
   const body = { all: true };
+  let secondResult;
   await act(async () => {
     void first.result.current.publish(body);
-    void second.result.current.publish(body);
+    secondResult = second.result.current.publish(body).catch((error) => error);
   });
 
   const [firstId, secondId] = call.mock.calls.map(([name, input]) => {
@@ -97,9 +102,14 @@ it('keeps two tabs publishing as the same staff member on separate queue documen
   act(() => listeners.get(secondId)(documentSnapshot({ ...row, progress: {} })));
   expect(second.result.current.run.counts.published).toBe(0);
 
-  await act(async () => { pending.get(firstId)({ queueId: firstId }); });
+  await act(async () => { pending.get(firstId).resolve({ queueId: firstId }); });
   expect(first.result.current.run).toBeNull();
   expect([...listeners.keys()]).toEqual([secondId]);
-  await act(async () => { pending.get(secondId)({ queueId: secondId }); });
+  const unrelatedFailure = Object.assign(new Error('Different publish failed.'), { queueId: firstId });
+  await act(async () => {
+    pending.get(secondId).reject(unrelatedFailure);
+    expect(await secondResult).toBe(unrelatedFailure);
+  });
+  expect(second.result.current.run).toBeNull();
   expect(listeners.size).toBe(0);
 });

@@ -392,6 +392,7 @@ test('cmsPublish: two resumes of one failed row at once publish it only once', a
   assert.equal(db.ids('cmsVersionHistory').length, 1, 'one history row, not two');
   assert.equal(db.read('cmsContent', 'a').revision, 1, 'no double bump');
   assert.equal(db.read('cmsPublishQueue', 'q1').status, 'done');
+  assert.equal(db.read('cmsPublishQueue', 'q1').plannedChunks, 1);
 });
 
 // --- site-publisher hook (spec §8.4 phase 5, issue #36) -------------------------
