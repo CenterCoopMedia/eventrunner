@@ -13,11 +13,11 @@
 // from answering before the probe has. Which TIER the admin holds is
 // AdminLayout's concern: each docket item declares the tier it needs, and
 // the layout hides the rest and refuses their routes (issue #186).
-import { Suspense, useContext, useEffect } from 'react';
+import { Suspense, useContext, useEffect, useState } from 'react';
 import { lazyPage as lazy } from '../lib/routePage.jsx';
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { clearReloadFlag } from '../lib/chunkReload.js';
-import { RouteLoadingReady, useRouteLoadingAttempt } from '../lib/routeLoading.jsx';
+import { RouteLoadingContext, RouteLoadingReady, useRouteLoadingAttempt } from '../lib/routeLoading.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
 import AdminLayout, { AdminRecoveryReadyContext } from './AdminLayout.jsx';
@@ -192,8 +192,14 @@ export function AdminGate({ children }) {
   return children;
 }
 
-export default function AdminApp() {
-  return (
+export default function AdminApp({ routeAttempt }) {
+  const { pathname } = useLocation();
+  // The admin index redirects lead into the same pending navigation.
+  const key = pathname.replace(/^\/admin(?:\/(reminders))?\/?$/, (_, reminders) =>
+    reminders ? '/admin/reminders/scheduled' : '/admin/overview');
+  const [route, setRoute] = useState(() => ({ key, attempt: routeAttempt }));
+  if (route.key !== key) setRoute({ key, attempt: routeAttempt });
+  const page = (
     <AdminGate>
       <AdminWebMcpRegistration />
       <Routes>
@@ -410,4 +416,5 @@ export default function AdminApp() {
       </Routes>
     </AdminGate>
   );
+  return <RouteLoadingContext.Provider value={route.attempt}>{page}</RouteLoadingContext.Provider>;
 }

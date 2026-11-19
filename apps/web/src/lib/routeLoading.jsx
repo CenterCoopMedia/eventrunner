@@ -1,5 +1,6 @@
-import { useContext, useLayoutEffect } from 'react';
-import { RouteLoadingContext } from '../components/DeferredPage.jsx';
+import { createContext, useContext, useLayoutEffect } from 'react';
+
+export const RouteLoadingContext = createContext(null);
 
 // Only route blockers read this attempt. Panel loaders use their own clocks.
 export function useRouteLoadingAttempt(ready = false) {

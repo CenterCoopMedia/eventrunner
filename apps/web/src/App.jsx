@@ -23,16 +23,13 @@ import FieldVitals from './components/FieldVitals.jsx';
 
 export function AppRoutes() {
   const { pathname } = useLocation();
-  // These admin indexes redirect before the first leaf can render.
-  const adminRouteKey = pathname.replace(/^\/admin(?:\/(reminders))?\/?$/, (_, reminders) =>
-    reminders ? '/admin/reminders/scheduled' : '/admin/overview');
   useEffect(() => installDeferredRoutePrefetch(document, prefetchRoutes, IS_DEMO), []);
   return useRoutes([
     {
       path: adminRoute.path,
       element: (
         <ErrorBoundary appearance="admin" title="Admin could not open">
-          <DeferredPage component={adminRoute.Component} label="admin" routeKey={adminRouteKey} />
+          <DeferredPage component={adminRoute.Component} label="admin" routeKey={pathname} />
         </ErrorBoundary>
       ),
     },

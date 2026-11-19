@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { reportHeldUp } from './fieldVitals.js';
 
 const STAGES = [[1000, 'active'], [10000, 'slow'], [60000, 'prolonged']];
@@ -49,11 +49,10 @@ export default function useLoadingStage({ active = true, routeAttempt = null } =
     reportHeldUp(clock.boot);
   }, [active, stage, clock]);
 
-  const restart = useCallback(() => {
-    const next = createClock();
-    if (shared) routeAttempt.clock = next;
-    setWait({ active, shared: shared && next, clock: next, stage: 'initial' });
-  }, [active, routeAttempt, shared]);
+  function restart() {
+    if (shared) routeAttempt.clock = createClock();
+    setWait(beginWait(active, shared && routeAttempt.clock));
+  }
 
   return { stage: active ? stage : 'initial', restart };
 }
