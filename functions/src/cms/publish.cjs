@@ -223,7 +223,7 @@ function createCmsPublishHandler({
         });
       } catch (err) {
         if (!isAlreadyExistsError(err)) throw err;
-        return sendError(res, 409, 'already-exists', 'That publish request ID is already in use. Start a new publish.');
+        return sendError(res, 409, 'request-id-in-use', 'That publish request ID is already in use. Check Recent publishes for its status.');
       }
     }
 
