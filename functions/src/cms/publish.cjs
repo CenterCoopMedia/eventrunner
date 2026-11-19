@@ -12,7 +12,8 @@
  *                          overlapping runs can never double-bump
  *                          revisions). Creates/reuses a cmsPublishQueue
  *                          row, runs the chunked publish, marks the row
- *                          done or failed.
+ *                          done or failed. New requests can supply a
+ *                          requestId (UUID v4) to name their new row.
  *   cmsGetPublishQueue     admin POST { queueId? , limit? }
  *   cmsUpdatePublishStatus admin POST { queueId, status, note? } — e.g.
  *                          mark a stranded 'running' row failed (the
@@ -32,7 +33,7 @@
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed } = require('../core/errors.cjs');
 const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
-const { listDirty, publishDocs, logAdminAction, isValidDocId } = require('./store.cjs');
+const { listDirty, publishDocs, logAdminAction, isValidDocId, isAlreadyExistsError } = require('./store.cjs');
 const { requestSitePublish } = require('./publisher.cjs');
 const { checkSchedulePublishSet } = require('../schedule/sessions.cjs');
 const { isComingSoon, openSiteOnFirstPublish } = require('./launch.cjs');
@@ -41,6 +42,7 @@ const MAX_DOC_IDS = 2000;
 const QUEUE_LIST_DEFAULT = 20;
 const QUEUE_LIST_MAX = 50;
 const SETTABLE_STATUSES = Object.freeze(['failed', 'done']);
+const REQUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 /** Shared admin-POST preamble; sends the response itself on failure. */
 async function gateAdminPost({ auth, db, getConfig }, req, res) {
@@ -126,15 +128,24 @@ function createCmsPublishHandler({
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
 
+    const { queueId, requestId } = req.body || {};
+    if (requestId !== undefined) {
+      if (queueId !== undefined) return badRequest(res, 'Use queueId alone to resume a publish.');
+      if (typeof requestId !== 'string' || requestId.length !== 36 || !REQUEST_ID_PATTERN.test(requestId)) {
+        return badRequest(res, 'requestId must be a lowercase UUID v4.');
+      }
+    }
+
     let queueRef;
     let request;
-    if (req.body?.queueId !== undefined) {
+    let openingOnly = false;
+    if (queueId !== undefined) {
       // Resume: the stored request is authoritative; progress on the row
       // makes the re-run skip whatever already committed.
-      if (!isValidDocId(req.body.queueId)) {
+      if (!isValidDocId(queueId)) {
         return badRequest(res, 'queueId must be a single publish-queue doc id.');
       }
-      queueRef = db.collection('cmsPublishQueue').doc(req.body.queueId);
+      queueRef = db.collection('cmsPublishQueue').doc(queueId);
       const snap = await queueRef.get();
       if (!snap.exists) return notFound(res, 'No such publish queue row.');
       const row = snap.data();
@@ -182,7 +193,8 @@ function createCmsPublishHandler({
       const resolved = await resolveRequest({ db }, req.body);
       if (!resolved.ok) return badRequest(res, resolved.message);
       request = resolved.request;
-      if (Object.keys(request).length === 0) {
+      openingOnly = Object.keys(request).length === 0;
+      if (openingOnly) {
         // Nothing dirty: no queue row for a no-op. A team that publishes a
         // new site without changing anything still means to open it, and
         // the deployed snapshot still says coming soon, so that one case
@@ -193,34 +205,26 @@ function createCmsPublishHandler({
         if (!(await isComingSoon({ db, log }))) {
           return res.status(200).json({ queueId: null, status: 'done', results: {} });
         }
-        const openRef = db.collection('cmsPublishQueue').doc();
-        await openRef.set({
-          status: 'done',
-          request: {},
-          progress: {},
-          requestedBy: actor.email,
-          requestedAt: new Date(now()),
-          finishedAt: new Date(now()),
-          updatedAt: new Date(now()),
-        });
-        await logAdminAction({ db, action: 'cms-publish', docPath: openRef.path, actor, now, log });
-        await openSiteOnFirstPublish({ db, now, log });
-        const publisher = await requestSitePublish({
-          db, queueId: openRef.id, env, fetchImpl, notifyOperator, now, log,
-        });
-        return res.status(200).json({ queueId: openRef.id, status: 'done', results: {}, publisher });
       }
       const refusal = await structuralRefusal({ db }, request);
       if (refusal) return badRequest(res, refusal);
-      queueRef = db.collection('cmsPublishQueue').doc();
-      await queueRef.set({
-        status: 'running',
-        request,
-        progress: {},
-        requestedBy: actor.email,
-        requestedAt: new Date(now()),
-        updatedAt: new Date(now()),
-      });
+      const queue = db.collection('cmsPublishQueue');
+      queueRef = requestId === undefined ? queue.doc() : queue.doc(requestId);
+      const timestamp = new Date(now());
+      try {
+        await queueRef.create({
+          status: openingOnly ? 'done' : 'running',
+          request,
+          progress: {},
+          requestedBy: actor.email,
+          requestedAt: timestamp,
+          updatedAt: timestamp,
+          ...(openingOnly ? { finishedAt: timestamp } : {}),
+        });
+      } catch (err) {
+        if (!isAlreadyExistsError(err)) throw err;
+        return sendError(res, 409, 'already-exists', 'That publish request ID is already in use. Start a new publish.');
+      }
     }
 
     const results = {};
@@ -247,7 +251,9 @@ function createCmsPublishHandler({
       });
     }
 
-    await queueRef.set({ status: 'done', finishedAt: new Date(now()), updatedAt: new Date(now()) }, { merge: true });
+    if (!openingOnly) {
+      await queueRef.set({ status: 'done', finishedAt: new Date(now()), updatedAt: new Date(now()) }, { merge: true });
+    }
     await logAdminAction({ db, action: 'cms-publish', docPath: queueRef.path, actor, now, log });
     // Before the snapshot refresh below, so the rebuilt bundle reads the
     // site as open.
