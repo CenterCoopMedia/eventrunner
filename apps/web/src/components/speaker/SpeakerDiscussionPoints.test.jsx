@@ -163,9 +163,33 @@ describe('speaker-wide private discussion draft', () => {
     expect(await screen.findByText(/may already have saved/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Replace saved discussion points' })).toBeDisabled();
     const current = { ...STORED, text: 'A newer saved question.', revision: 6 };
-    fetch.mockResolvedValueOnce(response({ submission: current }));
-    fireEvent.click(screen.getByRole('button', { name: 'Load current submission' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Replace saved discussion points' })).toBeEnabled());
+    const pendingRead = deferred();
+    fetch.mockReturnValueOnce(pendingRead.promise);
+    const form = screen.getByRole('form', { name: 'Speaker discussion points' });
+    const field = screen.getByRole('textbox', { name: 'Discussion points' });
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Load current submission' }));
+      const status = screen.getByRole('status', { name: 'Loading saved discussion points…' });
+      expect(status.closest('[aria-busy="true"]')).toBeNull();
+      expect(form).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('textbox', { name: 'Discussion points' })).toBe(field);
+      act(() => vi.advanceTimersByTime(999));
+      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'initial');
+      act(() => vi.advanceTimersByTime(1));
+      expect(status.parentElement).toHaveAttribute('data-loading-stage', 'active');
+      act(() => vi.advanceTimersByTime(9000));
+      expect(status).toHaveTextContent('This is taking longer than usual.');
+      act(() => vi.advanceTimersByTime(50_000));
+      expect(status).toHaveTextContent('We haven’t received a result after a minute.');
+      expect(screen.queryByRole('button', { name: 'Try loading again' })).not.toBeInTheDocument();
+      await act(async () => pendingRead.resolve(response({ submission: current })));
+      expect(status).not.toBeInTheDocument();
+      expect(form).toHaveAttribute('aria-busy', 'false');
+      expect(screen.getByRole('button', { name: 'Replace saved discussion points' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
     expect(screen.getByRole('textbox')).toHaveValue('Keep my text.');
     expect(screen.getByRole('status')).toHaveTextContent(/^Last confirmed submission:/);
     expect(fetch).toHaveBeenCalledTimes(3);
