@@ -139,7 +139,7 @@ const SECTIONS = Object.freeze([
       jsonFile('content/timeline.json', 'cmsTimeline', publicRecord, 'Live timeline entries. visible is false for an entry the site hides.'),
       jsonFile('content/announcements.json', 'announcements', publicRecord, 'Announcements with their display windows.'),
       jsonFile('content/live-updates.json', 'live_updates', publicRecord, 'Live updates posted during the event, each with its category and its audience (everyone, attendees, or speakers).'),
-      jsonFile('content/media.json', 'media_assets', mediaRecord, 'The media library index: each uploaded file\'s Storage path, type, size, alt text and title. The files themselves stay in Storage.'),
+      jsonFile('content/media.json', 'media_assets', mediaRecord, 'The media library index includes each file\'s Storage path, type, size, alt text, title, caption and credit. Files stay in Storage.'),
     ],
   },
   {

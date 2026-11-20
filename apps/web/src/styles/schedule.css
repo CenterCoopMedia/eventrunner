@@ -78,7 +78,7 @@
 }
 
 @media screen {
-  .event-hero--compact .event-hero__figure {
+  .event-hero--compact .event-hero__figure:not(.image-figure) {
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
@@ -88,6 +88,10 @@
   .event-hero--compact .event-hero__media {
     position: relative;
     block-size: 6rem;
+  }
+  .event-hero--compact .event-hero__figure.image-figure > .event-hero__media {
+    block-size: auto;
+    min-block-size: 6rem;
   }
 
   .event-hero--compact .event-hero__art {
@@ -116,6 +120,7 @@
 
 @media screen and (max-width: 639px) {
   .event-hero--compact .event-hero__media { block-size: 7rem; }
+  .event-hero--compact .event-hero__figure.image-figure > .event-hero__media { min-block-size: 7rem; }
   .schedule-search {
     flex-basis: 100%;
   }

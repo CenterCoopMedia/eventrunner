@@ -314,6 +314,7 @@ beforeAll(async () => {
       uploadedBy: ADMIN_EMAIL,
       createdAt: new Date(),
     });
+    await setDoc(doc(db, "media_captions/asset-1"), { caption: "In the courtyard", credit: "Dana Lee" });
 
     for (const [uid, account] of Object.entries(ATTENDEES)) {
       await setDoc(doc(db, `users/${uid}`), {
@@ -624,6 +625,17 @@ describe("media_assets", () => {
     }
     await assertFails(updateDoc(doc(admin(), "media_assets/asset-1"), { alt: "x" }));
     await assertFails(deleteDoc(doc(admin(), "media_assets/asset-1")));
+  });
+});
+
+describe("media_captions", () => {
+  it("allows a direct public read and denies enumeration and client writes", async () => {
+    const reference = "media_captions/asset-1";
+    const read = await assertSucceeds(getDoc(doc(anon(), reference)));
+    expect(read.data()).toEqual({ caption: "In the courtyard", credit: "Dana Lee" });
+    await assertFails(getDocs(collection(anon(), "media_captions")));
+    await assertFails(getDocs(collection(admin(), "media_captions")));
+    await assertFails(updateDoc(doc(admin(), reference), { caption: "Unapproved change" }));
   });
 });
 

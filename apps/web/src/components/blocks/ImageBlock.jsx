@@ -15,7 +15,8 @@
 import { IMAGE_SIZE_WIDTHS } from 'shared/imageSizes';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
 import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
-import { useSizedImageSources } from '../LeadImage.jsx';
+import { useSizedImageSources } from '../../lib/useImageSizeSrcSet.js';
+import ImageFigure from '../media/ImageFigure.jsx';
 
 const [small, medium, large, full] = IMAGE_SIZE_WIDTHS;
 const widths = new Map(Object.entries({ small, medium, large, full }));
@@ -40,16 +41,14 @@ export default function ImageBlock({ block }) {
       style={sources.pending ? { visibility: 'hidden' } : undefined}
     />
   );
-  if (!block.caption && !hasLayout) return image;
   return (
-    <figure lang={block.publicLanguage} className={hasLayout ? `w-fit max-w-full wrap-anywhere ${alignmentClass}` : undefined}
-      style={width ? { maxWidth: `min(100%, ${width}px)` } : undefined}>
+    <ImageFigure
+      placement={block}
+      assetPath={sources.path}
+      className={hasLayout ? `w-fit max-w-full wrap-anywhere ${alignmentClass}` : undefined}
+      style={width ? { maxWidth: `min(100%, ${width}px)` } : undefined}
+    >
       {image}
-      {block.caption ? (
-        <figcaption className="mt-2xs font-data text-caption text-text-secondary">
-          {block.caption}
-        </figcaption>
-      ) : null}
-    </figure>
+    </ImageFigure>
   );
 }

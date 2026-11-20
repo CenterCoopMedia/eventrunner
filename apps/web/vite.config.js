@@ -143,6 +143,7 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       'shared/speakerReadiness',
       'shared/invoice',
       'shared/imageSizes',
+      'shared/imageCaption',
       'shared/ticketCommerce',
       'shared/ticketAccess',
       'shared/webVitals',

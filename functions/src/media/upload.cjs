@@ -445,7 +445,10 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
         // delete) must not strand its row in the library forever.
         await bucket.file(path).delete({ ignoreNotFound: true });
       }
-      await ref.delete();
+      const batch = db.batch();
+      batch.delete(ref);
+      batch.delete(db.collection('media_captions').doc(assetId));
+      await batch.commit();
     } catch (err) {
       log.error('mediaDelete failed', err);
       return internal(res, 'The file could not be deleted. Keep this page open and contact support for help.');

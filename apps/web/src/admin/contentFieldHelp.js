@@ -7,7 +7,9 @@ const FIELD_HINTS = Object.freeze({
   image: {
     url: 'Choose or upload the picture for this content block.',
     alt: 'Describe the picture for people who cannot see it.',
-    caption: 'Add a short caption displayed with the picture.',
+    caption: 'Leave this blank to use the caption from the media library.',
+    captionMode: 'Choose how the caption is shown here. Touch screens always show captions set to hover or focus. The credit stays below the image.',
+    captionAlign: 'Align the caption and credit at this placement.',
     focalX: 'Choose the part of the picture to keep across a crop: 0 is the left edge and 100 is the right.',
     focalY: 'Choose the part of the picture to keep down a crop: 0 is the top edge and 100 is the bottom.',
     size: 'Set how wide the image can appear. It can shrink to fit the page on a smaller screen.',

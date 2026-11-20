@@ -4,55 +4,11 @@
 //
 // The device and its rules: docs/interface-guidelines.md, Editorial devices.
 import { isSafeHref } from '../lib/sanitizeHtml.js';
-import { imageBlockSources } from '../lib/mediaSource.js';
-import { useImageSizeSrcSet } from '../lib/useImageSizeSrcSet.js';
-
-/** Where the crop centres when the block states no focal point. */
-const CENTRE = 50;
-
-/**
- * The `object-position` for one image block. A stored coordinate is CMS data
- * and may be any type or out of range, so each axis is clamped to a
- * percentage and anything unusable falls back to the centre.
- *
- * @param {object} block a cmsContent image block
- * @returns {string} an `object-position` value
- */
-export function focalPosition(block) {
-  const axis = (value) =>
-    typeof value === 'number' && Number.isFinite(value)
-      ? Math.max(0, Math.min(100, value))
-      : CENTRE;
-  return `${axis(block?.focalX)}% ${axis(block?.focalY)}%`;
-}
+import { focalPosition, useSizedImageSources } from '../lib/useImageSizeSrcSet.js';
+import ImageFigure from './media/ImageFigure.jsx';
 
 /** The lead image is the full column on a phone and a fixed token width beside the copy. */
 const LEAD_IMAGE_SIZES = '(min-width: 64rem) 22rem, 100vw';
-
-/**
- * The src, srcset and error handler for an image block's url (issue #333).
- *
- * A picked library path resolves to the bucket and offers its display
- * sizes at the real widths its manifest states. The src waits for the
- * manifest, so the original is not downloaded first. If a size fails to
- * load, the srcset goes and the original loads. The event hero uses this
- * too, so the two image devices stay in step.
- *
- * @param {unknown} url a block's url, already through isSafeHref
- * @returns {{ src: unknown, srcSet: string|undefined, pending: boolean, onError: () => void }}
- */
-export function useSizedImageSources(url) {
-  const { src, path } = imageBlockSources(url);
-  const display = useImageSizeSrcSet(path, Boolean(path));
-  return {
-    src: display.pending ? undefined : src,
-    srcSet: display.srcSet,
-    pending: display.pending,
-    onError: () => {
-      display.onError();
-    },
-  };
-}
 
 /**
  * @param {{ block: object, className?: string }} props
@@ -64,11 +20,8 @@ export default function LeadImage({ block, className = '' }) {
   const image = useSizedImageSources(block?.url);
   if (!block?.url || !isSafeHref(block.url) || !alt) return null;
 
-  const caption =
-    typeof block.caption === 'string' && block.caption.trim() ? block.caption.trim() : null;
-
   return (
-    <figure className={['lead-image-slot', className].filter(Boolean).join(' ')}>
+    <ImageFigure placement={block} assetPath={image.path} className={['lead-image-slot', className].filter(Boolean).join(' ')}>
       <img
         src={image.src}
         srcSet={image.srcSet}
@@ -82,11 +35,6 @@ export default function LeadImage({ block, className = '' }) {
           ...(image.pending ? { visibility: 'hidden' } : null),
         }}
       />
-      {caption ? (
-        <figcaption className="mt-2xs font-data text-caption text-text-secondary">
-          {caption}
-        </figcaption>
-      ) : null}
-    </figure>
+    </ImageFigure>
   );
 }

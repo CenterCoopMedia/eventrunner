@@ -248,12 +248,24 @@ describe('the stylesheet', () => {
     const offenders = [];
     for (const decl of DECLARATIONS) {
       for (const gradient of gradients(decl.value)) {
-        if (shades(gradient)) offenders.push(`${place(decl)} → ${gradient}`);
+        if (shades(gradient) && !captionContrastGradient(decl, gradient)) offenders.push(`${place(decl)} → ${gradient}`);
       }
     }
     expect(offenders, 'no gradient blob, no gradient as a background event').toEqual([]);
   });
 });
+
+function captionContrastGradient(decl, gradient) {
+  if (stylesheetFile(decl) !== 'components/media/captionedImageFigure.css'
+      || decl.parent.selector !== '.image-figure--overlay .image-figure__text'
+      || decl.prop !== 'background') return false;
+  const stops = topLevelParts(gradient);
+  return stops.length === 2 && stops.every((stop) => {
+    const match = /^rgb\(0 0 0 \/ ([\d.]+)\)$/.exec(stop);
+    const opacity = Number(match?.[1]);
+    return opacity >= .85 && opacity <= 1;
+  });
+}
 
 /** Every gradient function in a value, as its argument text. */
 function gradients(value) {

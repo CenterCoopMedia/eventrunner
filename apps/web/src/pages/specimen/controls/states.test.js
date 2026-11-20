@@ -28,6 +28,8 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const INDEX_CSS = path.resolve(here, '..', '..', '..', 'index.css');
 const root = postcss.parse(fs.readFileSync(INDEX_CSS, 'utf8'), { from: INDEX_CSS });
+const CAPTION_CSS = path.resolve(here, '..', '..', '..', 'components', 'media', 'captionedImageFigure.css');
+const captionStyles = postcss.parse(fs.readFileSync(CAPTION_CSS, 'utf8'), { from: CAPTION_CSS });
 
 /** Every declaration of one selector, as `prop: value` in source order. */
 function declarationsOf(selector) {
@@ -42,13 +44,15 @@ function declarationsOf(selector) {
 /** Every outline declaration on a rule whose selector carries :focus-visible. */
 function focusVisibleOutlines() {
   const found = [];
-  root.walkRules((rule) => {
-    if (!rule.selector.includes(':focus-visible')) return;
-    rule.walkDecls((decl) => {
-      if (!decl.prop.startsWith('outline')) return;
-      found.push({ selector: rule.selector, prop: decl.prop, value: decl.value });
+  for (const stylesheet of [root, captionStyles]) {
+    stylesheet.walkRules((rule) => {
+      if (!rule.selector.includes(':focus-visible')) return;
+      rule.walkDecls((decl) => {
+        if (!decl.prop.startsWith('outline')) return;
+        found.push({ selector: rule.selector, prop: decl.prop, value: decl.value });
+      });
     });
-  });
+  }
   return found;
 }
 

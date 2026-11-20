@@ -65,6 +65,8 @@ const BLOCK_TYPES = Object.freeze({
       field('url', 'url', true),
       field('alt', 'string', true),
       field('caption', 'string', false),
+      field('captionMode', 'string', false),
+      field('captionAlign', 'string', false),
       field('focalX', 'number', false),
       field('focalY', 'number', false),
       field('size', 'string', false, ['full', 'small', 'medium', 'large']),

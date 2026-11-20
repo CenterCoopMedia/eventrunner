@@ -25,6 +25,7 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { BLOCK_TYPES, draftCollectionFor, requiredBlockErrors } = require('./blockTypes.cjs');
 const { builtInSectionBlockTypes, sectionBlockTypes } = require('shared/page');
+const { captionPlacementErrors } = require('shared/imageCaption');
 const {
   writeDraft,
   deleteBoth,
@@ -290,6 +291,7 @@ function sponsorPackageErrors(fields) {
 function checkBlockContract({ collection, fields }) {
   const errors = collectionVariantErrors(fields, collection);
   if (collection === 'cmsContent') errors.push(...requiredBlockErrors(fields), ...sponsorPackageErrors(fields));
+  if (collection === 'cmsContent' && fields.blockType === 'image') errors.push(...captionPlacementErrors(fields));
   if (errors.length > 0) return { ok: false, message: errors.join('; ') };
   return { ok: true };
 }

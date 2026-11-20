@@ -57,6 +57,7 @@ import { summarizePublish } from '../publishResult.js';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 import GalleryFields from '../components/GalleryFields.jsx';
 import BlockTypePicker from '../components/BlockTypePicker.jsx';
+import { ImagePlacementFields, ImagePlacementPreview } from '../components/media/ImagePlacementEditor.jsx';
 import {
   CheckboxField,
   DestructiveConfirm,
@@ -151,7 +152,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
   }
   return (
     <div className="admin-content-fields grid items-end gap-sm sm:grid-cols-2">
-      {fields.map((field) => {
+      {fields.filter((field) => field.id !== 'captionMode' && field.id !== 'captionAlign').map((field) => {
         const name = editorialFieldLabel(blockTypeId, field.id);
         const label = field.required || field.id === 'useEventVenue' ? name : `${name} (optional)`;
         const value = values[field.id];
@@ -269,6 +270,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
           />
         );
       })}
+      {blockTypeId === 'image' ? <ImagePlacementFields values={values} onChange={onChange} errorFor={errorFor} /> : null}
     </div>
   );
 }
@@ -677,6 +679,13 @@ export default function AdminContentBlockEditor({ mode }) {
       />
       {content.blockType === 'map' ? (
         <MapBlock block={content.values} preview />
+      ) : null}
+      {content.blockType === 'image' ? (
+        <ImagePlacementPreview
+          image={toContentFields(content)}
+          hero={sectionId === 'hero' && ['home', 'schedule'].includes(pageId) ? pageId : undefined}
+          eventName={eventConfig.name}
+        />
       ) : null}
       <ContentTranslations kind="block" record={{ ...content.values, blockType: content.blockType, translations: content.translations }}
         onChange={(translations) => setContent((current) => ({ ...current, translations }))}

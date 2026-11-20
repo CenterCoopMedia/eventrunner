@@ -53,6 +53,7 @@
     "./imageSizes": { "require": "./src/imageSizes.cjs", "import": "./src/imageSizes.mjs" },
     "./screenshots": { "require": "./src/screenshots.cjs", "import": "./src/screenshots.mjs" },
     "./operatorAlert": { "require": "./src/operatorAlert.cjs", "import": "./src/operatorAlert.mjs" },
+    "./imageCaption": { "require": "./src/imageCaption.cjs", "import": "./src/imageCaption.mjs" },
     "./consoleRequest": { "require": "./src/consoleRequest.cjs", "import": "./src/consoleRequest.mjs" },
     "./webVitals": { "require": "./src/webVitals.cjs", "import": "./src/webVitals.mjs" },
     "./contentLanguages": { "require": "./src/contentLanguages.cjs", "import": "./src/contentLanguages.mjs" },

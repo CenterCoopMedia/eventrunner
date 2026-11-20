@@ -301,6 +301,8 @@ function mediaRecord(id, data) {
     size: numberOrNull(source.size),
     alt: text(source.alt),
     title: text(source.title),
+    ...(typeof source.caption === 'string' ? { caption: source.caption } : {}),
+    ...(typeof source.credit === 'string' ? { credit: source.credit } : {}),
     createdAt: toIso(source.createdAt),
     updatedAt: toIso(source.updatedAt),
   });

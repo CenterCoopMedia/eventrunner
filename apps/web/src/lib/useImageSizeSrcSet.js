@@ -9,7 +9,7 @@
 // or a browser without WebP) calls `onError`, which drops the srcset; the
 // original then loads as the src.
 import { useEffect, useState } from 'react';
-import { imageSizeSrcSet, peekImageSizeSrcSet } from './mediaSource.js';
+import { imageBlockSources, imageSizeSrcSet, peekImageSizeSrcSet } from './mediaSource.js';
 
 /**
  * @param {unknown} path the original's object path
@@ -43,6 +43,51 @@ export function useImageSizeSrcSet(path, enabled = true) {
       if (!offer) return false;
       setFailedFor(path);
       return true;
+    },
+  };
+}
+
+/** Where the crop centres when the block states no focal point. */
+const CENTRE = 50;
+
+/**
+ * The `object-position` for one image block. A stored coordinate is CMS data
+ * and may be any type or out of range, so each axis is clamped to a
+ * percentage and anything unusable falls back to the centre.
+ *
+ * @param {object} block a cmsContent image block
+ * @returns {string} an `object-position` value
+ */
+export function focalPosition(block) {
+  const axis = (value) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.max(0, Math.min(100, value))
+      : CENTRE;
+  return `${axis(block?.focalX)}% ${axis(block?.focalY)}%`;
+}
+
+/**
+ * The src, srcset and error handler for an image block's url (issue #333).
+ *
+ * A picked library path resolves to the bucket and offers its display
+ * sizes at the real widths its manifest states. The src waits for the
+ * manifest, so the original is not downloaded first. If a size fails to
+ * load, the srcset goes and the original loads. The event hero uses this
+ * too, so the two image devices stay in step.
+ *
+ * @param {unknown} url a block's url, already through isSafeHref
+ * @returns {{ path: string|null, src: unknown, srcSet: string|undefined, pending: boolean, onError: () => void }}
+ */
+export function useSizedImageSources(url) {
+  const { src, path } = imageBlockSources(url);
+  const display = useImageSizeSrcSet(path, Boolean(path));
+  return {
+    path,
+    src: display.pending ? undefined : src,
+    srcSet: display.srcSet,
+    pending: display.pending,
+    onError: () => {
+      display.onError();
     },
   };
 }

@@ -2,12 +2,12 @@
 
 /**
  * `mediaUpdateMetadata` (spec §1.3 media/) — the editable half of an asset
- * row: alt text and title.
+ * row: alt text, title, caption and credit.
  *
  * Alt text is the reason this endpoint exists rather than being folded into
  * upload: an image is usually uploaded in a hurry and described later, and
  * the issue's done-when is "the library round-trips uploads with alt text".
- * Nothing else on the row is editable — `path`, `contentType`, `size`,
+ * Object identity stays fixed: `path`, `contentType`, `size`,
  * `uploadedBy`, and `createdAt` describe an object in the bucket, and a row
  * that could be pointed at a different path would be an authorization
  * bypass wearing a metadata form: the object path is what every rule and
@@ -19,13 +19,20 @@ const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
 const { internals: uploadInternals } = require('./upload.cjs');
 const { scanUsage } = require('./usage.cjs');
+const { MAX_CAPTION_LENGTH, MAX_CREDIT_LENGTH } = require('shared/imageCaption');
 
 const {
   MAX_ALT_LENGTH, MAX_TITLE_LENGTH, trimmedText, isBrandingAsset, referencedByBranding, BRANDING_REFUSAL,
 } = uploadInternals;
 
 /** Fields a client may change on an existing row. */
-const EDITABLE_FIELDS = Object.freeze(['alt', 'title']);
+const FIELD_LIMITS = Object.freeze({
+  alt: MAX_ALT_LENGTH,
+  title: MAX_TITLE_LENGTH,
+  caption: MAX_CAPTION_LENGTH,
+  credit: MAX_CREDIT_LENGTH,
+});
+const EDITABLE_FIELDS = Object.freeze(Object.keys(FIELD_LIMITS));
 
 /**
  * The patch for one metadata request. Absent keys are left alone (a form
@@ -47,13 +54,10 @@ function validateMetadata(body) {
     };
   }
   const patch = {};
-  if ('alt' in body) {
-    if (typeof body.alt !== 'string') return { ok: false, message: 'alt: must be a string' };
-    patch.alt = trimmedText(body.alt, MAX_ALT_LENGTH);
-  }
-  if ('title' in body) {
-    if (typeof body.title !== 'string') return { ok: false, message: 'title: must be a string' };
-    patch.title = trimmedText(body.title, MAX_TITLE_LENGTH);
+  for (const [field, limit] of Object.entries(FIELD_LIMITS)) {
+    if (!Object.hasOwn(body, field)) continue;
+    if (typeof body[field] !== 'string') return { ok: false, message: `${field}: must be a string` };
+    patch[field] = trimmedText(body[field], limit);
   }
   if (Object.keys(patch).length === 0) {
     return { ok: false, message: `body: nothing to update (${EDITABLE_FIELDS.join(', ')})` };
@@ -61,7 +65,7 @@ function validateMetadata(body) {
   return { ok: true, patch };
 }
 
-/** `mediaUpdateMetadata`: POST `{ assetId, alt?, title? }`. */
+/** `mediaUpdateMetadata`: POST `{ assetId, alt?, title?, caption?, credit? }`. */
 function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
@@ -109,7 +113,16 @@ function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now,
       if (referencedByBranding(references)) return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
     }
     try {
-      await ref.update({ ...verdict.patch, updatedAt: at, updatedBy: actor.email });
+      const { caption, credit } = verdict.patch;
+      const batch = db.batch();
+      batch.update(ref, { ...verdict.patch, updatedAt: at, updatedBy: actor.email });
+      if (caption !== undefined || credit !== undefined) {
+        batch.set(db.collection('media_captions').doc(assetId), {
+          ...(caption !== undefined ? { caption } : {}),
+          ...(credit !== undefined ? { credit } : {}),
+        }, { merge: true });
+      }
+      await batch.commit();
     } catch (err) {
       log.error('mediaUpdateMetadata failed', err);
       return internal(res, 'The asset could not be updated. Keep this page open and contact support for help.');
