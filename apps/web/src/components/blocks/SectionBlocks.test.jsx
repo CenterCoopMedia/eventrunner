@@ -1,6 +1,9 @@
 // Section layout (issue #1153): two columns split the section's blocks in
 // reading order, the first half on the left and the rest on the right.
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render } from '@testing-library/react';
 import SectionBlocks from './SectionBlocks.jsx';
 
@@ -12,6 +15,15 @@ function columnTexts(container) {
 }
 
 describe('SectionBlocks layout', () => {
+  it('sizes a run of stats by its column: the column rule reaches each run grid', () => {
+    const css = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'SectionBlocks.css'), 'utf8');
+    const selector = css.match(/^(\.section-blocks--columns[^{]*\.grid) \{/m)?.[1];
+    expect(selector).toBeTruthy();
+    const stat = (n) => ({ id: `s${n}`, blockType: 'stat', value: String(n), label: `Stat ${n}` });
+    const { container } = render(<SectionBlocks layout="columns" blocks={[stat(1), stat(2), stat(3), stat(4)]} />);
+    expect(container.querySelectorAll(selector)).toHaveLength(2);
+  });
+
   it('puts the first half on the left and the rest on the right', () => {
     const { container } = render(
       <SectionBlocks layout="columns" blocks={[text('One'), text('Two'), text('Three')]} />,
