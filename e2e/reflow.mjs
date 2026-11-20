@@ -7,8 +7,8 @@ export const REFLOW_PROFILES = [
   { name: '720 CSS px with a 32px root (synthetic text enlargement)', width: 720, rootSize: 32 },
 ];
 
-export async function setReflowProfile(page, { width, rootSize }) {
-  await page.setViewportSize({ width, height: 800 });
+export async function setReflowProfile(page, { width, height = 800, rootSize }) {
+  await page.setViewportSize({ width, height });
   const html = page.locator('html');
   await html.evaluate((element, size) => {
     if (size) element.style.setProperty('font-size', `${size}px`, 'important');
@@ -74,4 +74,13 @@ export async function expectControlFits(control, target = 44) {
   expect(width, String(control)).toBeGreaterThanOrEqual(target);
   expect(height, String(control)).toBeGreaterThanOrEqual(target);
   if (await control.isEnabled()) await control.click({ trial: true });
+}
+
+export async function expectNoOverlap(first, second) {
+  await expect(first).toBeVisible();
+  await expect(second).toBeVisible();
+  const [a, b] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+  const width = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+  const height = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+  expect(Math.min(width, height), `${first} and ${second} do not overlap`).toBeLessThanOrEqual(1);
 }

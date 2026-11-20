@@ -3,6 +3,7 @@
 // steps, sees them on Review, and the reminder goes away.
 import { test, expect } from '@playwright/test';
 import { adminDb, ensureUser, signIn } from './helpers.mjs';
+import { REFLOW_PROFILES, expectControlFits, expectNoOverlap, expectPageFits, expectTextFits, setReflowProfile } from './reflow.mjs';
 
 test('a ticket holder answers the registration questions from the dashboard reminder', async ({ page }) => {
   const db = adminDb();
@@ -28,9 +29,26 @@ test('a ticket holder answers the registration questions from the dashboard remi
 
     await expect(page.getByRole('heading', { level: 2, name: 'Your answers' })).toBeVisible();
     // The shared check names a missing answer before anything is sent.
-    await page.getByRole('button', { name: 'Next: Review' }).click();
-    await expect(page.getByText('Answer this question.').first()).toBeVisible();
-    await page.getByLabel('Organization (required)').fill('Example News');
+    const next = page.getByRole('button', { name: 'Next: Review' });
+    await next.press('Enter');
+    const validation = page.getByText('Answer this question.').first();
+    await expect(validation).toBeVisible();
+    const organization = page.getByLabel('Organization (required)');
+    await expect(organization).toBeFocused();
+    const viewport = page.viewportSize();
+    for (const profile of REFLOW_PROFILES) {
+      await test.step(`Registration validation at ${profile.name}`, async () => {
+        await setReflowProfile(page, profile);
+        await expectTextFits(page.getByText('Which track interests you most?', { exact: false }));
+        await expectTextFits(validation);
+        await expectControlFits(next);
+        await expectTextFits(next);
+        await expectNoOverlap(validation, next);
+        await expectPageFits(page);
+      });
+    }
+    await setReflowProfile(page, viewport);
+    await organization.fill('Example News');
     const phone = page.getByLabel('Phone number (required)');
     await expect(phone).toHaveAttribute('type', 'tel');
     await expect(phone).toHaveAttribute('autocomplete', 'tel');
