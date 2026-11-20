@@ -293,7 +293,7 @@ test('moves a Google Maps paste from Paragraphs to a Map block and publishes it 
     await visitor.route('https://www.google.com/maps/embed?*', stubMap);
     await signIn(page, ADMIN_EMAIL);
     await page.goto(`/admin/content/travel/${section}/_new`);
-    await page.getByRole('radio', { name: 'Paragraphs', exact: true }).check();
+    await page.getByRole('radio', { name: 'Text', exact: true }).check();
     const richText = page.getByRole('textbox', { name: 'Text', exact: true });
     await richText.fill('Keep these directions.');
     await richText.evaluate((editor, source) => {
