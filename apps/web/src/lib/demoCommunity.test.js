@@ -12,9 +12,15 @@ import { subscribeContentCollection } from './contentSource.js';
 import { subscribeDirectory, fetchPublicProfile } from './profileSource.js';
 
 describe('static demo community data', () => {
-  it('returns local announcements without a Firestore listener', () => {
+  it('loads local announcements on demand without a Firestore listener', async () => {
+    const cancelled = vi.fn();
+    const cancel = subscribeContentCollection('cmsUpdates', 'published', cancelled);
+    cancel();
     const next = vi.fn();
     const unsubscribe = subscribeContentCollection('cmsUpdates', 'published', next);
+    expect(next).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(next).toHaveBeenCalledOnce());
+    expect(cancelled).not.toHaveBeenCalled();
     const updates = next.mock.calls[0][0];
     expect(updates).toHaveLength(1);
     for (const update of updates) {

@@ -15,5 +15,3 @@ export const demoAttendees = speakers
     badges: [],
     customBadges: [],
   }));
-
-export { default as demoUpdates } from '../../../../scripts/lib/demo-updates.json';

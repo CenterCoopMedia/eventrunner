@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import UpdateContent, { UpdateImage } from './UpdateContent.jsx';
-import { demoUpdates } from '../lib/demoCommunity.js';
+import demoUpdates from '../../../../scripts/lib/demo-updates.json';
 
 const poll = { type: 'practicePoll', question: 'Choose a workshop', options: ['Reporting', 'Revenue'] };
 describe('UpdateContent', () => {

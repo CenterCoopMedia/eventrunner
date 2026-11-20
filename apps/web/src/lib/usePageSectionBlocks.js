@@ -21,7 +21,9 @@ export function usePageSectionBlocks(sections, features) {
       unsubscribe = subscribeLatestUpdates((resolveBlock) => {
         if (active) setWithUpdates(() => resolveBlock);
       });
-    }, () => {});
+    }, (error) => {
+      if (active) console.warn('Latest updates block could not load.', error);
+    });
     return () => {
       active = false;
       unsubscribe?.();
