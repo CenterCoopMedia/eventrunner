@@ -276,29 +276,52 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
   });
 });
 
-test('publishes a Google Maps embed from the editor to the Travel page', async ({ page, browser }) => {
+test('moves a Google Maps paste from Paragraphs to a Map block and publishes it on Travel', async ({ page, browser }) => {
   const label = `Map of Test Hall ${Date.now()}`;
   const address = '1 Test Way';
   const src = 'https://www.google.com/maps/embed?pb=fixture&hl=en';
+  const embedMarkup = `<iframe width="600" src="${src.replaceAll('&', '&amp;')}" height="450"></iframe>`;
   const section = 'travel_map';
   const field = editorialId(label);
   const docId = `${section}__${field}`;
   const idToken = await adminIdToken();
   const visitor = await browser.newContext();
   const stubMap = (route) => route.fulfill({ contentType: 'text/html', body: '<p>Map fixture</p>' });
+  let mapPage;
   try {
-    await page.route('https://www.google.com/maps/embed?*', stubMap);
+    await page.context().route('https://www.google.com/maps/embed?*', stubMap);
     await visitor.route('https://www.google.com/maps/embed?*', stubMap);
     await signIn(page, ADMIN_EMAIL);
     await page.goto(`/admin/content/travel/${section}/_new`);
-    await page.getByRole('radio', { name: 'Map', exact: true }).check();
+    await page.getByRole('radio', { name: 'Paragraphs', exact: true }).check();
+    const richText = page.getByRole('textbox', { name: 'Text', exact: true });
+    await richText.fill('Keep these directions.');
+    await richText.evaluate((editor, source) => {
+      const data = new globalThis.DataTransfer();
+      data.setData('text/plain', source);
+      editor.dispatchEvent(new globalThis.ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    }, embedMarkup);
+    await expect(page.getByRole('status').filter({ hasText: 'Pasted HTML won’t appear on the page.' })).toBeVisible();
+    await expect(richText).toHaveText('Keep these directions.');
 
-    const embedField = page.getByRole('textbox', { name: 'Google Maps embed' });
-    await embedField.fill(`<iframe width="600" src="${src.replaceAll('&', '&amp;')}" height="450"></iframe>`);
+    const mapAction = page.getByRole('link', { name: /Add a Map block with this map/ });
+    await richText.press('Tab');
+    await expect(mapAction).toBeFocused();
+    [mapPage] = await Promise.all([
+      page.context().waitForEvent('page'),
+      mapAction.press('Enter'),
+    ]);
+    await expect(mapPage).toHaveURL((url) => url.pathname === `/admin/content/travel/${section}/_new`);
+    await expect(mapPage.getByRole('radio', { name: 'Map', exact: true })).toBeChecked();
+    await expect(richText).toHaveText('Keep these directions.');
+
+    const embedField = mapPage.getByRole('textbox', { name: 'Google Maps embed' });
     await expect(embedField).toHaveValue(src);
-    await page.getByRole('textbox', { name: 'Map label' }).fill(label);
-    await page.getByRole('textbox', { name: 'Address (optional)' }).fill(address);
-    await expect(page.getByRole('region', { name: 'Map preview' }).getByTitle(label)).toHaveAttribute('src', src);
+    await embedField.fill(embedMarkup);
+    await expect(embedField).toHaveValue(src);
+    await mapPage.getByRole('textbox', { name: 'Map label' }).fill(label);
+    await mapPage.getByRole('textbox', { name: 'Address (optional)' }).fill(address);
+    await expect(mapPage.getByRole('region', { name: 'Map preview' }).getByTitle(label)).toHaveAttribute('src', src);
 
     const travel = await visitor.newPage();
     await travel.goto('/travel');
@@ -317,10 +340,10 @@ test('publishes a Google Maps embed from the editor to the Travel page', async (
       head.append(meta);
     }, framePolicy);
 
-    const published = page.waitForResponse((res) =>
+    const published = mapPage.waitForResponse((res) =>
       res.url().endsWith('/cmsPublish') && res.request().method() === 'POST',
     );
-    await page.getByRole('button', { name: 'Save and publish', exact: true }).click();
+    await mapPage.getByRole('button', { name: 'Save and publish', exact: true }).click();
     expect((await published).ok()).toBe(true);
     const live = (await adminDb().doc(`cmsContent/${docId}`).get()).data();
     expect(live).toMatchObject({ blockType: 'map', embedUrl: src, label, address });
@@ -332,6 +355,7 @@ test('publishes a Google Maps embed from the editor to the Travel page', async (
     await expect(travel.frameLocator(`iframe[title="${label}"]`).getByText('Map fixture')).toBeVisible();
     await expect(travel.getByText(address, { exact: true })).toBeVisible();
   } finally {
+    await mapPage?.close();
     await visitor.close();
     await callFunction('cmsDeleteContent', { section, field }, idToken);
   }

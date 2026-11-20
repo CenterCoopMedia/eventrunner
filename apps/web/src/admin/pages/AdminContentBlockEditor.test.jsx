@@ -439,6 +439,32 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(JSON.parse(call[1].body).fields.value).toBe('<p><strong>Formatted</strong> body</p>');
   });
 
+  it('opens the Map form with the carried URL and saves a new block in the same section', async () => {
+    pagesLive = [{
+      ...HOME_PAGE,
+      id: 'travel',
+      path: '/travel',
+      sections: [{ ...HOME_PAGE.sections[0], id: 'travel_map', allowedBlocks: [] }],
+    }];
+    const mapUrl = 'https://www.google.com/maps/embed?pb=fixture&hl=en';
+    await renderAt(`/admin/content/travel/travel_map/_new?${new URLSearchParams({ mapEmbed: mapUrl })}`);
+
+    expect(await screen.findByRole('radio', { name: 'Map' })).toBeChecked();
+    expect(screen.getByRole('textbox', { name: 'Google Maps embed' })).toHaveValue(mapUrl);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Map label' }), { target: { value: 'Directions' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => {
+      const [, request] = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent')) ?? [];
+      expect(request).toBeDefined();
+      expect(JSON.parse(request.body)).toMatchObject({
+        pageId: 'travel',
+        section: 'travel_map',
+        fields: { blockType: 'map', embedUrl: mapUrl, label: 'Directions' },
+      });
+    });
+  });
+
   it('loads and saves the FAQ rich-text answer from the existing draft', async () => {
     pagesLive = [{
       id: 'faq',

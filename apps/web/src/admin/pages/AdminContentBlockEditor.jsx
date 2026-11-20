@@ -18,7 +18,7 @@
 import { sectionBlockTypes } from 'shared/page';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useParams } from 'react-router';
+import { Link, useHref, useParams, useSearchParams } from 'react-router';
 import { isStarterContent } from 'shared/seed';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import MapBlock from '../../components/blocks/MapBlock.jsx';
@@ -131,7 +131,7 @@ function linkTargetWarning(blockTypeId, fieldId, value, features, pageRows) {
 }
 
 /** One control per registry field, chosen by the field's declared type. */
-function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, pageRows, fixedHero }) {
+function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, pageRows, fixedHero, newMapBlockHref }) {
   const fields = valueFieldsOf(blockTypeId);
   if (!blockTypeFor(blockTypeId)) {
     return (
@@ -184,6 +184,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
                   onChange={(next) => onChange(field.id, next)}
                   error={error}
                   required={field.required}
+                  newMapBlockHref={newMapBlockHref}
                 />
               </Suspense>
             </div>
@@ -265,6 +266,8 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
 
 export default function AdminContentBlockEditor({ mode }) {
   const { pageId, sectionId, field: fieldParam } = useParams();
+  const newBlockHref = useHref('../_new', { relative: 'path' });
+  const [searchParams] = useSearchParams();
   const call = useAdminApi();
   const reportDeleted = useDeletedRecord();
   const { eventConfig, features } = useEventConfig();
@@ -280,6 +283,9 @@ export default function AdminContentBlockEditor({ mode }) {
   // Stable reference across renders (unless the section's own list changes)
   // so the create-defaults effect below does not re-run every render.
   const allowed = useMemo(() => sectionBlockTypes(page?.current, section, BLOCK_TYPE_IDS), [page, section]);
+  const canAddMap = section && allowed.includes('map') && contentReady && (
+    !Number.isFinite(section.maxBlocks) || contentRows.filter((row) => row.current?.section === sectionId).length < section.maxBlocks
+  );
   const existingRow =
     mode === 'edit'
       ? contentRows.find(
@@ -343,16 +349,20 @@ export default function AdminContentBlockEditor({ mode }) {
     // and only if the operator has not already picked one.
     if (mode !== 'create') return;
     if (loadedKeyRef.current === 'create-defaults') return;
-    if (pagesLoading) return;
+    if (pagesLoading || !contentReady) return;
     // A section's own type (an FAQ item in the FAQ list) still leads: its
     // listed types on older sites, else the type of its starter block.
     const own = [...(section?.allowedBlocks ?? []), ...(section?.defaultBlocks ?? []).map((entry) => entry.blockType)];
-    const fallback = own.find((type) => allowed.includes(type)) ?? allowed[0] ?? BLOCK_TYPE_IDS[0];
+    const mapUrl = canAddMap ? mapEmbedInput(searchParams.get('mapEmbed') ?? '') : '';
+    const fallback = mapUrl ? 'map' : (own.find((type) => allowed.includes(type)) ?? allowed[0] ?? BLOCK_TYPE_IDS[0]);
     const baseline = createFormBaseline({ fieldId, content, fallbackType: fallback });
     loadedKeyRef.current = 'create-defaults';
     setSavedEdit(baseline.snapshot);
-    if (baseline.nextContent) setContent(baseline.nextContent);
-  }, [mode, allowed, section, content.blockType, pagesLoading, content, fieldId]);
+    if (baseline.nextContent) {
+      const next = baseline.nextContent;
+      setContent(mapUrl ? { ...next, values: { ...next.values, embedUrl: mapUrl } } : next);
+    }
+  }, [mode, allowed, section, pagesLoading, contentReady, canAddMap, searchParams, content, fieldId]);
 
   useEffect(() => {
     // Strict mode runs this cleanup once during development, then the setup
@@ -654,6 +664,7 @@ export default function AdminContentBlockEditor({ mode }) {
         features={features}
         pageRows={pagesLoading ? null : pageRows}
         fixedHero={sectionId === 'hero' && page?.current?.path === '/'}
+        newMapBlockHref={canAddMap ? newBlockHref : undefined}
       />
       {content.blockType === 'map' ? (
         <MapBlock block={content.values} preview />
