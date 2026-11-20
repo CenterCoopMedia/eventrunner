@@ -769,7 +769,12 @@ describe('creating and editing a block', () => {
     await waitFor(() => {
       expect(within(picker).getAllByRole('radio').map((radio) => radio.value)).toEqual(BLOCK_TYPE_IDS);
     });
-    for (const radio of within(picker).getAllByRole('radio')) expect(radio).toBeEnabled();
+    for (const radio of within(picker).getAllByRole('radio')) {
+      expect(radio).toBeEnabled();
+      expect(radio).toHaveAccessibleDescription(/\S/);
+      expect(radio.closest('label').querySelector('.admin-block-picker__example')).not.toBeEmptyDOMElement();
+    }
+    expect(await within(picker).findByText('The program is out')).toBeInTheDocument();
 
     // Switching the block type swaps the value fields the registry declares.
     fireEvent.click(within(picker).getByRole('radio', { name: 'Paragraphs' }));

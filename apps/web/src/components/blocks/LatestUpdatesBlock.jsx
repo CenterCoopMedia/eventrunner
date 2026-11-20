@@ -1,4 +1,20 @@
+import { DEFAULT_LATEST_UPDATES_COUNT, validLatestUpdatesCount } from 'shared/update';
+import { subscribeContentCollection } from '../../lib/contentSource.js';
+import { latestPublishedUpdates } from '../../lib/updateDates.js';
 import { PublicLink } from '../PublicLink.jsx';
+
+export function subscribeLatestUpdates(onNext) {
+  // Draft pages also link to published posts. One listener supplies all
+  // Latest updates blocks on the current page.
+  return subscribeContentCollection('cmsUpdates', 'published', (docs) => {
+    const updates = latestPublishedUpdates(docs);
+    onNext((block) => {
+      if (!updates.length) return [];
+      const count = validLatestUpdatesCount(block.count) ? block.count : DEFAULT_LATEST_UPDATES_COUNT;
+      return [{ ...block, updates: updates.slice(0, count) }];
+    });
+  });
+}
 
 export default function LatestUpdatesBlock({ block }) {
   if (!block.updates?.length) return null;
