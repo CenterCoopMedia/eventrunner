@@ -41,6 +41,7 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'), 'AdminSessionPitches');
 const AdminPageEditor = lazy(() => import('./pages/AdminPageEditor.jsx'), 'AdminPageEditor');
+const AdminNavigationLinkEditor = lazy(() => import('./pages/AdminNavigationLinkEditor.jsx'), 'AdminNavigationLinkEditor');
 const AdminWebAddress = lazy(() => import('./pages/AdminWebAddress.jsx'), 'AdminWebAddress');
 const AdminSessionPitch = lazy(() => import('./pages/AdminSessionPitch.jsx'), 'AdminSessionPitch');
 const AdminPitchSettings = lazy(() => import('./pages/AdminPitchSettings.jsx'), 'AdminPitchSettings');
@@ -224,6 +225,7 @@ export default function AdminApp({ routeAttempt }) {
           <Route path="pitches/:pitchId" element={<DeferredAdminPage label="session pitch"><AdminSessionPitch /></DeferredAdminPage>} />
           <Route path="pages" element={<StaticAdminPage><AdminPagesList /></StaticAdminPage>} />
           <Route path="pages/new" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="create" /></DeferredAdminPage>} />
+          <Route path="pages/links/:linkId" element={<DeferredAdminPage label="navigation link editor"><AdminNavigationLinkEditor /></DeferredAdminPage>} />
           <Route path="pages/:pageId" element={<DeferredAdminPage label="page editor"><AdminPageEditor mode="edit" /></DeferredAdminPage>} />
           <Route
             path="sessions"

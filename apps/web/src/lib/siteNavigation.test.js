@@ -32,6 +32,20 @@ const ALL_ON = Object.freeze({
 const labels = (items) => items.map((item) => item.label);
 const paths = (items) => items.map((item) => item.to);
 
+it('orders visible custom links with pages and checks the destinations', () => {
+  const link = { id: 'map', label: 'Map', url: 'https://example.org/map', order: 2, visible: true, systemPage: false };
+  const alias = { ...link, id: 'visitor-info', label: 'Visitor info', url: '/travel', order: 5 };
+  const links = [link, alias, { ...link, id: 'unsafe', url: '//example.org' }, { ...link, id: 'dead', url: '/gone' },
+    { ...link, id: 'gated', url: '/schedule' }, { ...link, id: 'hidden', visible: false }];
+  expect(buildNavItems([TRAVEL, ...links, HOME, SCHEDULE], { schedule: false })).toEqual([
+    { to: '/', label: 'Home', end: true },
+    { to: 'https://example.org/map', label: 'Map', custom: true, external: true, key: 'link:map' },
+    { to: '/travel', label: 'Travel', end: true },
+    { to: '/travel', label: 'Visitor info', custom: true, external: false, key: 'link:visitor-info' },
+  ]);
+  expect(isPublicPage(link, ALL_ON)).toBe(false);
+});
+
 describe('the system page routes', () => {
   it('is keyed by the seeded document id, never by an editable path', () => {
     // The whole point of keying by id: the key is the document's identity,

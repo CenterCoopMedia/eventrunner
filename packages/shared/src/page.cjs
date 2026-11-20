@@ -8,7 +8,18 @@
 // slightly different ways. This module holds the answers more than one of
 // them needs.
 
-const { SYSTEM_PAGE_ROUTES } = require('./routing.cjs');
+const { SYSTEM_PAGE_ROUTES, isCanonicalPagePath } = require('./routing.cjs');
+const { httpsUrlHref } = require('./config/values.cjs');
+
+/** A navigation link shares a page's ordering and publish state. */
+function isNavigationLink(record) {
+  return record != null && Object.hasOwn(record, 'url');
+}
+
+function navigationLinkUrl(value) {
+  const url = typeof value === 'string' ? value.trim() : '';
+  return isCanonicalPagePath(url) ? url : httpsUrlHref(url);
+}
 
 // These sections have dedicated renderers in Home, InfoCards, and
 // FooterLinkGroups. Other sections use SectionBlocks and accept every type.
@@ -124,6 +135,7 @@ function pageFeatureGate(page) {
  */
 function isPublicPage(page, features) {
   if (!page || typeof page !== 'object') return false;
+  if (isNavigationLink(page)) return false;
   if (page.visible !== true) return false;
   const gate = pageFeatureGate(page);
   return gate === null || features?.[gate] === true;
@@ -135,4 +147,6 @@ module.exports = {
   pageHeading,
   pageFeatureGate,
   isPublicPage,
+  isNavigationLink,
+  navigationLinkUrl,
 };

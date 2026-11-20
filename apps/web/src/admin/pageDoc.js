@@ -7,7 +7,7 @@
 // down to the accepted key set before it goes back over the wire — otherwise
 // every edit of a seeded page would fail with "seeded: unknown field".
 import { lockEditorialId } from './editorialId.js';
-import { builtInSectionBlockTypes } from 'shared/page';
+import { builtInSectionBlockTypes, isNavigationLink } from 'shared/page';
 import { recordStateOf } from './recordState.js';
 import { DEFAULT_SECTION_SLOT, slotOf, statedPageLayout } from '../lib/pageLayout.js';
 import { templateOf } from '../lib/pageTemplates.js';
@@ -75,6 +75,9 @@ function pick(source, keys) {
  * @returns {object}
  */
 export function toEditablePage(doc) {
+  if (isNavigationLink(doc)) {
+    return { id: doc.id, label: doc.label, url: doc.url, order: doc.order, visible: doc.visible, systemPage: false };
+  }
   const base = pick(doc ?? {}, PAGE_KEYS);
   return {
     id: base.id ?? '',
@@ -155,6 +158,9 @@ export function blankSection() {
  */
 export function toPagePayload(page) {
   const order = Number(page.order);
+  if (isNavigationLink(page)) {
+    return { id: page.id, label: String(page.label ?? '').trim(), url: String(page.url ?? '').trim(), order, visible: Boolean(page.visible), systemPage: false };
+  }
   return {
     id: String(page.id ?? '').trim(),
     label: page.label ?? '',

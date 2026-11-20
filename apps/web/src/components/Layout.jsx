@@ -71,6 +71,7 @@ import { brandingSrc, uploadedBrandingSrc } from '../lib/mediaSource.js';
 import useAccountViews from '../hooks/useAccountViews.js';
 import BackToTop from './BackToTop.jsx';
 import FooterLinkGroups, { FOOTER_SECTION_ID, footerLinkGroups } from './FooterLinkGroups.jsx';
+import ExternalLink from './ExternalLink.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
@@ -171,6 +172,16 @@ function navClass({ isActive }) {
       ? 'border-b-rule-strong font-semibold text-text-primary'
       : 'border-b-transparent text-text-secondary hover:text-text-primary',
   ].join(' ');
+}
+
+function HeaderNavLink({ item, onClick }) {
+  if (item.external) {
+    return <ExternalLink href={item.to} rel="noopener noreferrer" className={navClass({ isActive: false })} onClick={onClick}>{item.label}</ExternalLink>;
+  }
+  if (item.custom) {
+    return <Link to={item.to} className={navClass({ isActive: false })} onClick={onClick}>{item.label}</Link>;
+  }
+  return <NavLink to={item.to} end={item.end} className={navClass} lang={item.language} onClick={onClick}>{item.label}</NavLink>;
 }
 
 // THE ACCOUNT CONTROL: ONE CONTROL, A DESTINATION FOR THIS ACCOUNT.
@@ -413,6 +424,7 @@ export default function Layout() {
   // config or content snapshot, and the list only changes when the pages or
   // the flags do.
   const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
+  const pageNavItems = navItems.filter((item) => !item.custom);
   // The home page's footer section, drawn in the footer on every page
   // (FooterLinkGroups.jsx). Its label names the landmark.
   const homePage = getPage('home') ?? getPage('/');
@@ -426,7 +438,7 @@ export default function Layout() {
   const primaryNavItems = compactHeader || navPlacement === 'side' ? navItems : navItems.slice(0, 5);
   const moreNavItems = compactHeader || navPlacement === 'side' ? [] : navItems.slice(5);
   const accountInHeader = navPlacement === 'side' && !compactHeader;
-  const moreIsActive = moreNavItems.some((item) => matchPath({ path: item.to, end: item.end }, pathname));
+  const moreIsActive = moreNavItems.some((item) => !item.custom && matchPath({ path: item.to, end: item.end }, pathname));
 
   // The event's own social accounts, if it has recorded any (M7 issue 3,
   // #231). shared/config listSocialAccounts reads them for this footer and
@@ -491,10 +503,8 @@ export default function Layout() {
         ].filter(Boolean).join(' ')}
       >
         {primaryNavItems.map((item) => (
-          <li key={item.to} className={compactHeader ? 'grid' : undefined}>
-            <NavLink to={item.to} end={item.end} className={navClass} lang={item.language}>
-              {item.label}
-            </NavLink>
+          <li key={item.key ?? item.to} className={compactHeader ? 'grid' : undefined}>
+            <HeaderNavLink item={item} />
           </li>
         ))}
         {moreNavItems.length ? (
@@ -510,10 +520,10 @@ export default function Layout() {
                 : 'border-b-transparent text-text-secondary'}`}>{text('More', 'Más')}</summary>
               <ul className="site-nav-more__links">
                 {moreNavItems.map((item) => (
-                  <li key={item.to}>
-                    <NavLink to={item.to} end={item.end} className={navClass} lang={item.language} onClick={(event) => {
+                  <li key={item.key ?? item.to}>
+                    <HeaderNavLink item={item} onClick={(event) => {
                       event.currentTarget.closest('details').open = false;
-                    }}>{item.label}</NavLink>
+                    }} />
                   </li>
                 ))}
               </ul>
@@ -683,11 +693,11 @@ export default function Layout() {
                 <Link>, not <a>: the demo runs under HashRouter, where a raw
                 href reloads a path the static host does not serve. */}
             <div className="grid gap-sm lg:grid-cols-2 lg:gap-lg">
-            {navItems.length === 0 ? null : (
+            {pageNavItems.length === 0 ? null : (
               <nav aria-label={text('Site pages', 'Páginas del sitio')} className="mt-sm">
                 <p className="font-semibold text-text-primary">Site pages</p>
                 <ul className="footer-links">
-                  {navItems.map((item) => (
+                  {pageNavItems.map((item) => (
                     <li key={item.to}>
                       <Link to={item.to} className={FOOTER_LINK_CLASS} lang={item.language}>
                         {item.label}

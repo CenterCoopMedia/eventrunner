@@ -42,6 +42,34 @@ function validPage(overrides = {}) {
   };
 }
 
+const navigationLink = { id: 'visitor-info', label: 'Visitor information', url: 'https://example.org/visit',
+  order: 3, visible: true, systemPage: false };
+
+test('navigation link drafts accept internal paths and HTTPS while keeping page identity separate', async () => {
+  for (const url of ['/schedule', '/', 'https://example.org/visit']) {
+    assert.equal(validatePageDoc({ ...navigationLink, url }).ok, true);
+  }
+  for (const url of ['//example.org', 'http://example.org', 'javascript:alert(1)', '/a/..', 'https://a:b@example.org']) {
+    assert.equal(validatePageDoc({ ...navigationLink, url }).ok, false);
+  }
+  assert.equal(validatePageDoc({ ...navigationLink, id: 'home' }).ok, false);
+  assert.equal(validatePageDoc({ ...navigationLink, path: '/visit' }).ok, false);
+
+  const fixture = deps();
+  const response = fakeRes();
+  await createSavePageHandler(fixture)(adminReq({ page: navigationLink, create: true }), response);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(fixture.store.writes[0].fields, navigationLink);
+  assert.equal(fixture.store.writes[0].collection, 'cmsPages');
+  assert.equal(fixture.store.writes[0].createOnly, true);
+
+  const existing = deps({ db: fakeDb({ 'cmsPages/visitor-info': validPage({ id: navigationLink.id }) }) });
+  const rejected = fakeRes();
+  await createSavePageHandler(existing)(adminReq({ page: navigationLink }), rejected);
+  assert.equal(rejected.statusCode, 403);
+  assert.equal(existing.store.writes.length, 0);
+});
+
 /** In-memory Firestore fake (get/set/where/batch) seeded as 'collection/id'. */
 function fakeDb(seed = {}) {
   // requireAdmin reads config/bootstrap live from this db (fails closed on
