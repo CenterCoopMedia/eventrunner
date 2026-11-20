@@ -147,12 +147,12 @@ export async function callAdminEndpoint(name, body, getIdToken) {
 export function useAdminApi() {
   const { user } = useAuth();
   return useCallback(
-    (name, body) =>
+    (name, body, { freshToken = false } = {}) =>
       callAdminEndpoint(name, body, () => {
         if (!user || typeof user.getIdToken !== 'function') {
           return Promise.reject(new Error('not signed in'));
         }
-        return user.getIdToken();
+        return freshToken ? user.getIdToken(true) : user.getIdToken();
       }),
     [user],
   );

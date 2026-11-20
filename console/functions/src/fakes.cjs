@@ -20,6 +20,7 @@ const { randomBytes } = require('node:crypto');
 
 function clone(value) {
   if (value instanceof Date) return new Date(value.getTime());
+  if (Buffer.isBuffer(value)) return Buffer.from(value);
   if (Array.isArray(value)) return value.map(clone);
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clone(v)]));

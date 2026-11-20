@@ -14,6 +14,7 @@ const READ_ACTIONS = new Set([
   'listApplicationsForReview', 'getApplicationForReview', 'getConsoleSettings',
   'listEventbriteEvents',
   'listDeployments', 'deploymentHistory',
+  'getProblemReportReceipts', 'readProblemReportScreenshot',
 ]);
 const READ_TIMEOUT_MS = 30000;
 
@@ -36,7 +37,7 @@ export class ApiError extends Error {
  * @returns {Promise<object>} the response body
  * @throws {ApiError} with a message that is safe to show
  */
-export async function callApi(name, body = {}, { keepalive = false } = {}) {
+export async function callApi(name, body = {}, { keepalive = false, freshToken = false } = {}) {
   const user = auth.currentUser;
   if (!user) throw new ApiError(401, 'unauthorized', 'Sign in to continue.');
   if (!READ_ACTIONS.has(name)) return postApi(user, name, body, keepalive);
@@ -53,16 +54,16 @@ export async function callApi(name, body = {}, { keepalive = false } = {}) {
   try {
     // The deadline also settles when token lookup or body reading ignores
     // cancellation. A late token must not start an abandoned request.
-    return await Promise.race([postApi(user, name, body, keepalive, controller.signal), deadline]);
+    return await Promise.race([postApi(user, name, body, keepalive, controller.signal, freshToken), deadline]);
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function postApi(user, name, body, keepalive, signal) {
+async function postApi(user, name, body, keepalive, signal, freshToken) {
   let token;
   try {
-    token = await user.getIdToken();
+    token = freshToken ? await user.getIdToken(true) : await user.getIdToken();
   } catch (error) {
     if (signal?.aborted) throw signal.reason;
     if (error?.code === 'auth/network-request-failed') {

@@ -19,6 +19,9 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
 import { toDate } from '../versionHistory.js';
+import FeedbackModal from '../../components/FeedbackModal.jsx';
+import RequestScreenshots from '../components/RequestScreenshots.jsx';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import {
   Notice,
   Panel,
@@ -72,8 +75,10 @@ const STATUS_LABELS = Object.freeze(
 export default function AdminFeedback() {
   const call = useAdminApi();
   const { showToast } = useToast();
+  const { features } = useEventConfig();
 
   const [rows, setRows] = useState(null);
+  const [sharing, setSharing] = useState(false);
   const [listError, setListError] = useState(null);
   const [filter, setFilter] = useState('open');
   const [updating, setUpdating] = useState(null);
@@ -186,6 +191,12 @@ export default function AdminFeedback() {
         }
       />
       <PlannerFeatureControls choices={[{ key: 'feedbackInbox', label: 'Collect feedback' }]} />
+      {features.feedbackInbox ? (
+        <div>
+          <button type="button" className={secondaryButtonClass} onClick={() => setSharing(true)}>Share feedback</button>
+        </div>
+      ) : null}
+      {sharing && features.feedbackInbox ? <FeedbackModal onClose={() => setSharing(false)} /> : null}
 
       {listError ? (
         <Notice
@@ -233,6 +244,7 @@ export default function AdminFeedback() {
                     <p className="mt-3xs whitespace-pre-wrap text-admin-base text-admin-ink">
                       {row.message}
                     </p>
+                    <RequestScreenshots row={row} source="feedback" call={call} />
                     {row.email ? (
                       <a href={feedbackMailtoHref(row.email)} className={`mt-3xs ${linkButtonClass}`}>
                         {row.email}

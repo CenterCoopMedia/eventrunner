@@ -54,6 +54,7 @@ test.beforeAll(async () => {
         return null;
       },
     }, ...consoleConfig.plugins],
+    resolve: consoleConfig.resolve,
     optimizeDeps: consoleConfig.optimizeDeps,
     define: { 'import.meta.env.VITE_CONSOLE_API_BASE': JSON.stringify('') },
     build: { outDir: directory, emptyOutDir: true, manifest: true },

@@ -128,6 +128,8 @@ test.describe.serial('change requests', () => {
     await expect(pageField).toBeFocused();
     await expect(pageField).toHaveValue('/faq');
     await visitor.keyboard.press('Tab');
+    await expect(dialog.getByLabel('Screenshots (optional)')).toBeFocused();
+    await visitor.keyboard.press('Tab');
     await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
     await visitor.keyboard.press('Tab');
     await expect(dialog.getByRole('button', { name: 'Send request' })).toBeFocused();

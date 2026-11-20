@@ -77,6 +77,12 @@ async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, e
   }));
 }
 
+async function notifyProblemReportAttachments({ db, mailer, log, publicUrl }, { id, count, project }) {
+  const recipients = await operatorEmails(db);
+  const link = `${publicUrl}/review/problem-reports?id=${encodeURIComponent(id)}`;
+  return sendAll(log, recipients.map((to) => () => mailer.sendReportAttachmentNotice({ to, id, count, project, link })));
+}
+
 const INCOMPLETE = 'Some answers need attention before you continue.';
 
 /** @throws {ConsoleError} 400 incomplete, listing the fields */
@@ -154,6 +160,7 @@ async function withdrawApplication(deps, { body, user }) {
 module.exports = {
   answersToFreeze,
   notifyOperators,
+  notifyProblemReportAttachments,
   notifyOwners,
   refuseIncomplete,
   statusLink,

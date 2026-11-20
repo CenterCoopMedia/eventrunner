@@ -7,6 +7,9 @@ import { auth } from '../../firebase.js';
 import { recentMessages } from '../../lib/recentMessages.js';
 import ModalShell from './media/ModalShell.jsx';
 import { Notice, TextAreaField, fieldLabelClass, primaryButtonClass, secondaryButtonClass } from './formControls.jsx';
+import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { encodeScreenshots, newReportSubmissionKey, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
+import AdminScreenshotField from './AdminScreenshotField.jsx';
 
 const CONSOLE_ORIGIN = (import.meta.env.VITE_CONSOLE_ORIGIN || 'https://console.eventrunner.org').replace(/\/+$/, '');
 const KINDS = [
@@ -48,6 +51,8 @@ export default function ReportProblemDialog({ onClose, returnFocusRef }) {
   const id = useId();
   const [kind, setKind] = useState('bug');
   const [description, setDescription] = useState('');
+  const screenshots = useScreenshotFiles(SIGNED_IN_SCREENSHOT_MIB);
+  const [submissionKey] = useState(newReportSubmissionKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [sent, setSent] = useState(false);
@@ -66,6 +71,7 @@ export default function ReportProblemDialog({ onClose, returnFocusRef }) {
         site: siteName(window.location.hostname),
         version: import.meta.env.VITE_BUILD_ID || '',
         consoleLogs: recentMessages(),
+        ...(screenshots.files.length ? { ...await encodeScreenshots(screenshots.files), submissionKey } : {}),
       });
       setSent(true);
     } catch (err) {
@@ -90,7 +96,7 @@ export default function ReportProblemDialog({ onClose, returnFocusRef }) {
           <div><button type="button" className={primaryButtonClass} onClick={onClose}>Close</button></div>
         </div>
       ) : (
-        <form onSubmit={send} noValidate className="flex flex-col gap-sm">
+        <form onSubmit={send} onPaste={busy ? undefined : screenshots.onPaste} noValidate className="flex flex-col gap-sm">
           <fieldset aria-label={["What is it? "].join('').trim()} disabled={busy} className="flex flex-col gap-2xs">
             <legend className={fieldLabelClass}>What is it? <HelpTooltip label="What is it?">Choose the kind of problem you want to report.</HelpTooltip></legend>
             {KINDS.map((option) => (
@@ -109,6 +115,8 @@ export default function ReportProblemDialog({ onClose, returnFocusRef }) {
             maxLength={4000}
             disabled={busy}
           />
+          <AdminScreenshotField selection={screenshots} disabled={busy}
+            data-help-skip="The field explains how to choose, paste, and drop images." />
           {error ? <Notice tone="error" message={error.message} /> : null}
           <div className="flex flex-wrap gap-xs">
             <button type="submit" className={primaryButtonClass} disabled={busy}>{busy ? 'Sending report…' : 'Send report'}</button>

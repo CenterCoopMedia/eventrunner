@@ -4,7 +4,9 @@
  * "Report a problem" relay. The console and each client site's admin panel
  * post here; the report goes on to the operator's triage service, which
  * sends it to the operator in Telegram with File, File + fix and Ignore.
- * Nothing is stored in the console: the triage service owns the record.
+ * Reports with screenshots also keep a private Console receipt for 30 days.
+ * It includes the reporter's verified address so operators can follow up
+ * when the triage relay is unavailable.
  *
  * The caller must be signed in, with a verified email, to the console or to
  * a client site this console built (or one named in CONSOLE_REPORT_PROJECTS
@@ -19,6 +21,10 @@
 const crypto = require('node:crypto');
 const { ConsoleError, sendError } = require('./http.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
+const { storeProblemReportReceipt } = require('./problemReportReceipts.cjs');
+const {
+  SIGNED_IN_SCREENSHOT_MIB, ScreenshotError, readScreenshots, renderScreenshots, screenshotBodyBytes, screenshotWireBytes,
+} = require('shared/screenshots');
 const { BUILD_COLLECTION } = require('./buildRetry.cjs');
 
 const CATEGORIES = Object.freeze(['bug', 'suggestion', 'question']);
@@ -194,6 +200,8 @@ async function forwardReport({ fetch, intake }, payload) {
  */
 function reportProblemHandler(deps) {
   const log = deps.log || console;
+  const now = deps.now || Date.now;
+  const render = deps.render || ((screenshots) => renderScreenshots(screenshots, require('sharp'), 12_000_000));
   return async (req, res) => {
     if (req.method !== 'POST') {
       res.set('Allow', 'POST');
@@ -212,8 +220,19 @@ function reportProblemHandler(deps) {
       sendError(res, 400, 'bad-request', 'The request is not valid.');
       return;
     }
+    const maxTextBytes = 96 * 1024;
+    if (req.rawBody?.length > maxTextBytes + screenshotWireBytes(SIGNED_IN_SCREENSHOT_MIB) ||
+        screenshotBodyBytes(body) > maxTextBytes) {
+      sendError(res, 413, 'payload-too-large', 'The report is too large.');
+      return;
+    }
     try {
       const report = readReport(body, deps.extraOrigins || []);
+      const screenshots = readScreenshots(body.screenshots, SIGNED_IN_SCREENSHOT_MIB);
+      if (body.submissionKey !== undefined &&
+          (typeof body.submissionKey !== 'string' || !/^[a-f0-9]{32}$/.test(body.submissionKey))) {
+        throw new ConsoleError(400, 'bad-request', 'Reload the report form and try again.');
+      }
       if (!deps.intake?.url || !deps.intake.secret || !deps.intake.accessId || !deps.intake.accessSecret) {
         throw new ConsoleError(503, 'unavailable', 'Reports are not switched on yet. Email us instead.');
       }
@@ -224,8 +243,22 @@ function reportProblemHandler(deps) {
         now: deps.now,
         message: 'You have sent several reports in the last hour. Try again later.',
       });
+      const requestId = screenshots.length && body.submissionKey
+        ? crypto.createHash('sha256').update(JSON.stringify([
+          reporter.project, reporter.uid, body.submissionKey, report.category, report.description, report.url,
+          ...screenshots.map(({ digest }) => digest),
+        ])).digest('hex').slice(0, 32)
+        : crypto.randomBytes(16).toString('hex');
+      if (screenshots.length) {
+        const created = await storeProblemReportReceipt({ db: deps.db, now }, requestId, report, reporter, () => render(screenshots));
+        if (!created) {
+          log.info('reportProblem: replay matched an existing Console receipt', requestId);
+          res.status(200).json({ id: requestId });
+          return;
+        }
+      }
       const id = await forwardReport(deps, {
-        request_id: crypto.randomBytes(16).toString('hex'),
+        request_id: requestId,
         category: report.category,
         description: report.description,
         email: reporter.email,
@@ -236,10 +269,25 @@ function reportProblemHandler(deps) {
         version: report.version,
         consoleLogs: report.consoleLogs,
       }).catch((err) => {
+        if (screenshots.length) {
+          log.error('reportProblem: forwarding failed for saved Console receipt', requestId, err.message);
+          return requestId;
+        }
         throw Object.assign(new ConsoleError(502, 'unavailable', 'The report could not be sent. Try again in a minute.'), { cause: err });
       });
-      res.status(200).json({ id });
+      if (screenshots.length) {
+        try {
+          await deps.notifyAttachments?.({ id: requestId, count: screenshots.length, project: reporter.project });
+        } catch {
+          log.error('reportProblem: screenshot notice failed for Console receipt', requestId);
+        }
+      }
+      res.status(200).json({ id: screenshots.length ? requestId : id });
     } catch (err) {
+      if (err instanceof ScreenshotError) {
+        sendError(res, 400, 'bad-request', err.message, { field: 'screenshots' });
+        return;
+      }
       if (err instanceof ConsoleError) {
         if (err.cause) log.error('reportProblem: forward failed', err.cause.message);
         if (err.retryAfterSeconds) res.set('Retry-After', String(err.retryAfterSeconds));

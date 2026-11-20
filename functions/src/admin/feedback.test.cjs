@@ -10,6 +10,7 @@ const {
   looksLikeBot,
   internals,
 } = require('./feedback.cjs');
+const { ScreenshotError } = require('shared/screenshots');
 
 // ---------------------------------------------------------------- fixtures
 
@@ -114,6 +115,31 @@ function realBody(overrides = {}) {
     ...overrides,
   };
 }
+
+test('signed-out screenshots require the feedback feature and invalid image decoding spends the existing rate limit', async () => {
+  const db = fakeDb();
+  let decodes = 0;
+  const handler = createSubmitFeedbackHandler({
+    db, now: () => NOW,
+    render: async () => { decodes += 1; throw new ScreenshotError('Choose a valid screenshot.'); },
+  });
+  const req = fakeReq({ body: realBody({ screenshots: ['AAAA'] }) });
+  const off = fakeRes();
+  await handler(req, off);
+  assert.equal(off.statusCode, 404);
+  assert.equal(decodes, 0);
+  await db.collection('config').doc('features').set({ feedbackInbox: true });
+  for (let attempt = 0; attempt < internals.RATE_LIMIT_MAX; attempt += 1) {
+    const invalid = fakeRes();
+    await handler(req, invalid);
+    assert.equal(invalid.statusCode, 400);
+  }
+  const limited = fakeRes();
+  await handler(req, limited);
+  assert.equal(limited.statusCode, 429);
+  assert.equal(decodes, internals.RATE_LIMIT_MAX);
+  assert.equal([...db.store.keys()].filter((path) => path.startsWith('feedback/')).length, 0);
+});
 
 // --------------------------------------------------------------- looksLikeBot
 

@@ -60,6 +60,10 @@ import AdminPageHeader, {
   StatusBadge,
 } from '../components/adminChrome.jsx';
 import BusyLabel from '../../components/BusyLabel.jsx';
+import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { encodeScreenshots, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
+import AdminScreenshotField from '../components/AdminScreenshotField.jsx';
+import RequestScreenshots from '../components/RequestScreenshots.jsx';
 
 /** The server's limits (functions/src/admin/changeRequests.cjs). */
 const MAX_MESSAGE_LENGTH = 2000;
@@ -134,6 +138,7 @@ export function countLine(shown, total) {
 function RequestForm({ call }) {
   const [message, setMessage] = useState('');
   const [page, setPage] = useState('');
+  const screenshots = useScreenshotFiles(SIGNED_IN_SCREENSHOT_MIB);
   const [messageError, setMessageError] = useState(null);
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
@@ -165,8 +170,13 @@ function RequestForm({ call }) {
     setSending(true);
     try {
       const request = { message: message.trim(), page: page.trim() || null };
-      await call('submitChangeRequest', { ...request, submissionKey: submissionKey.keyFor(request) });
+      await call('submitChangeRequest', {
+        ...request,
+        ...(screenshots.files.length ? await encodeScreenshots(screenshots.files) : {}),
+        submissionKey: submissionKey.keyFor({ ...request, files: screenshots.files.map(({ id }) => id) }),
+      });
       submissionKey.reset();
+      screenshots.reset();
       setMessage('');
       setPage('');
       setStatus('Request sent.');
@@ -179,7 +189,8 @@ function RequestForm({ call }) {
 
   return (
     <Panel help="Staff requests join the same list as requests from the public site." title="Request a change" description="Staff requests join the same list as requests from the public site.">
-      <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit} noValidate>
+      <form ref={formRef} className="flex flex-col gap-sm" onSubmit={submit}
+        onPaste={sending ? undefined : screenshots.onPaste} noValidate>
         <ServerErrorSummary error={error} errorRef={errorRef} title="The request was not sent" />
         <TextAreaField help="Describe the page or content that needs updating and the result you want."
           label="What should change?"
@@ -200,6 +211,8 @@ function RequestForm({ call }) {
           maxLength={MAX_PAGE_LENGTH}
           
         />
+        <AdminScreenshotField selection={screenshots} disabled={sending}
+          data-help-skip="The field explains how to choose, paste, and drop images." />
         <div className="flex flex-wrap items-center gap-sm">
           <button
             type="submit"
@@ -442,6 +455,7 @@ export default function AdminChangeRequests() {
                         <p className="mt-3xs whitespace-pre-wrap break-words text-admin-base text-admin-ink">
                           {row.message}
                         </p>
+                        <RequestScreenshots row={row} source="change_requests" call={call} />
                         <NoticeDelivery row={row} settings={settingsForRows} call={call} />
                         {status === 'done' || status === 'declined' ? (
                           // Keyed to the outcome, so a new outcome starts an empty form.

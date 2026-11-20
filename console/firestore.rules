@@ -127,6 +127,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Console handlers check the current operator allowlist on every read.
+    match /problem_report_receipts/{id} {
+      allow read, write: if false;
+    }
+    match /request_screenshots/{id} {
+      allow read, write: if false;
+    }
+
     // Operator review (ADR 0007 §5). The review functions write the
     // audit log; an operator reads it.
     match /console_audit/{entryId} {

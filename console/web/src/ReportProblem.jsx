@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { callApi } from './api.js';
 import { recentMessages } from './recentMessages.js';
 import IconControl from './IconControl.jsx';
+import ScreenshotField, { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
+import { encodeScreenshots, newReportSubmissionKey, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 
 const KINDS = [
   { value: 'bug', label: 'Something is broken' },
@@ -18,6 +20,8 @@ export default function ReportProblem() {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState('bug');
   const [description, setDescription] = useState('');
+  const screenshots = useScreenshotFiles(SIGNED_IN_SCREENSHOT_MIB);
+  const [submissionKey, setSubmissionKey] = useState(newReportSubmissionKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [sent, setSent] = useState(false);
@@ -39,6 +43,8 @@ export default function ReportProblem() {
   function start() {
     setKind('bug');
     setDescription('');
+    screenshots.reset();
+    setSubmissionKey(newReportSubmissionKey());
     setError(null);
     setSent(false);
     setOpen(true);
@@ -56,6 +62,7 @@ export default function ReportProblem() {
         url: `${window.location.origin}${window.location.pathname}`,
         version: import.meta.env.VITE_BUILD_ID || '',
         consoleLogs: recentMessages(),
+        ...(screenshots.files.length ? { ...await encodeScreenshots(screenshots.files), submissionKey } : {}),
       });
       setSent(true);
     } catch (err) {
@@ -79,7 +86,7 @@ export default function ReportProblem() {
             <p className="message success" role="status">Report sent. The hosting team will follow up by email.</p>
           </>
         ) : (
-          <form onSubmit={send} noValidate>
+          <form onSubmit={send} onPaste={busy ? undefined : screenshots.onPaste} noValidate>
             <p className="muted">Tell us what happened and what you expected. This report includes the page address and recent error messages.</p>
             <fieldset className="choices" disabled={busy}>
               <legend>What is it?</legend>
@@ -104,6 +111,7 @@ export default function ReportProblem() {
               />
               {descriptionError ? <p id={`${id}-description-error`} className="field-error" role="alert">{descriptionError}</p> : null}
             </div>
+            <ScreenshotField selection={screenshots} disabled={busy} className="report-screenshots" buttonClass="button quiet" />
             {error && !descriptionError ? <p className="message error" role="alert">{error.message}</p> : null}
             <div className="report-actions">
               <button type="submit" className="button primary" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Sending…' : 'Send'}</button>

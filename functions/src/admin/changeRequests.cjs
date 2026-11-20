@@ -97,6 +97,10 @@ const {
 } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
 const { queueAcknowledgement, queueOutcome, deliverNotice } = require('./changeRequestNotices.cjs');
+const {
+  SIGNED_IN_SCREENSHOT_MIB, ScreenshotError, readScreenshots, renderScreenshots, screenshotBodyBytes,
+  screenshotWireBytes, sameScreenshotDigests, screenshotRef, writeScreenshots,
+} = require('shared/screenshots');
 
 const COLLECTION = 'change_requests';
 const RATE_LIMIT_COLLECTION = 'change_request_rate_limits';
@@ -205,12 +209,12 @@ function readSubmission(body) {
   return { ok: true, message, page, submissionKey: rawKey === undefined ? null : rawKey };
 }
 
-/** The size of the parsed body, as JSON. An unserializable body is too large. */
+/** The size of an outcome update, whose body contains JSON only. */
 function bodyBytes(body) {
   try {
     return Buffer.byteLength(JSON.stringify(body ?? {}), 'utf8');
   } catch {
-    return MAX_BODY_BYTES + 1;
+    return Infinity;
   }
 }
 
@@ -365,11 +369,13 @@ function readResultUrl(value, publicUrl) {
  *                   { outcome: 'limited', retryAfterMs: number } |
  *                   { outcome: 'taken'|'changed'|'account-gone' }>}
  */
-async function storeRequest({ db, id, actor, message, page, nowMs }) {
+async function storeRequest({ db, id, actor, message, page, nowMs, screenshots, render }) {
   const ref = db.collection(COLLECTION).doc(id);
   const limitRef = db.collection(RATE_LIMIT_COLLECTION).doc(actor.uid);
   const accountRef = db.collection('users').doc(actor.uid);
   const bootstrapRef = db.collection('config').doc('bootstrap');
+  const digests = screenshots.map(({ digest }) => digest);
+  let rendering;
   return db.runTransaction(async (tx) => {
     // Every read first, as Firestore requires. The account read is what
     // orders this store against an account delete (see the header).
@@ -385,7 +391,7 @@ async function storeRequest({ db, id, actor, message, page, nowMs }) {
       // under which other text is stored is not this text's.
       const stored = snap.data() || {};
       if (stored.uid !== actor.uid) return { outcome: 'taken' };
-      return stored.message === message && (stored.page ?? null) === page
+      return stored.message === message && (stored.page ?? null) === page && sameScreenshotDigests(stored.screenshotDigests, digests)
         ? { outcome: 'replayed' }
         : { outcome: 'changed' };
     }
@@ -393,10 +399,23 @@ async function storeRequest({ db, id, actor, message, page, nowMs }) {
     if (recent.limited) return { outcome: 'limited', retryAfterMs: recent.retryAfterMs };
 
     const at = new Date(nowMs);
+    const spendSlot = () => tx.set(limitRef, { requests: [...recent.requests, nowMs], updatedAt: at });
+    let images = [];
+    if (screenshots.length) {
+      try {
+        rendering ??= render(screenshots);
+        images = await rendering;
+      } catch (error) {
+        if (!(error instanceof ScreenshotError)) throw error;
+        spendSlot();
+        return { outcome: 'invalid', message: error.message };
+      }
+    }
     // The last read, before the first write: the acknowledgement settings
     // and the demo policy (changeRequestNotices.cjs).
     const acknowledgement = await queueAcknowledgement({ db, tx, id, at });
-    tx.set(limitRef, { requests: [...recent.requests, nowMs], updatedAt: at });
+    spendSlot();
+    writeScreenshots(db, tx, COLLECTION, id, images, { uid: actor.uid });
     tx.create(ref, {
       message,
       page,
@@ -408,6 +427,7 @@ async function storeRequest({ db, id, actor, message, page, nowMs }) {
       updatedBy: null,
       history: [{ status: 'new', at }],
       outcome: null,
+      ...(digests.length ? { screenshotDigests: digests } : {}),
       ...(acknowledgement ? { notices: { received: acknowledgement } } : {}),
     });
     tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
@@ -424,7 +444,10 @@ async function storeRequest({ db, id, actor, message, page, nowMs }) {
  * @param {{ db: object, auth: { verifyIdToken: (t: string) => Promise<object> },
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
-function createSubmitChangeRequestHandler({ db, auth, getConfig, sendEmail, now = Date.now, log = console }) {
+function createSubmitChangeRequestHandler({
+  db, auth, getConfig, sendEmail, now = Date.now, log = console,
+  render = (screenshots) => renderScreenshots(screenshots, require('sharp'), 12_000_000),
+}) {
   return async function submitChangeRequest(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
@@ -448,7 +471,8 @@ function createSubmitChangeRequestHandler({ db, auth, getConfig, sendEmail, now 
       return sendError(res, 403, 'forbidden', 'Sign in with a verified email address to send a change request.');
     }
 
-    if (bodyBytes(req.body) > MAX_BODY_BYTES) {
+    const maxBytes = MAX_BODY_BYTES + screenshotWireBytes(SIGNED_IN_SCREENSHOT_MIB);
+    if (req.rawBody?.length > maxBytes || screenshotBodyBytes(req.body) > MAX_BODY_BYTES) {
       return sendError(res, 413, 'payload-too-large', 'The request is too large.');
     }
     const submission = readSubmission(req.body);
@@ -458,10 +482,12 @@ function createSubmitChangeRequestHandler({ db, auth, getConfig, sendEmail, now 
     const actor = { uid: decoded.uid, email };
     let result;
     try {
+      const screenshots = readScreenshots(req.body?.screenshots, SIGNED_IN_SCREENSHOT_MIB);
       result = await storeRequest({
-        db, id, actor, message: submission.message, page: submission.page, nowMs: now(),
+        db, id, actor, message: submission.message, page: submission.page, nowMs: now(), screenshots, render,
       });
     } catch (err) {
+      if (err instanceof ScreenshotError) return badRequest(res, err.message);
       log.error('submitChangeRequest: the request could not be stored', err);
       return internal(res, SAVE_FAILED_MESSAGE);
     }
@@ -475,6 +501,7 @@ function createSubmitChangeRequestHandler({ db, auth, getConfig, sendEmail, now 
       return;
     }
     if (result.outcome === 'account-gone') return sendError(res, 403, 'forbidden', ACCOUNT_GONE_MESSAGE);
+    if (result.outcome === 'invalid') return badRequest(res, result.message);
     if (result.outcome === 'taken' || result.outcome === 'changed') {
       return sendError(res, 409, 'conflict', 'submissionKey: already used. Open the form again.');
     }
@@ -728,6 +755,7 @@ function createDeleteChangeRequestHandler({ db, auth, getConfig, now = Date.now,
         const snap = await tx.get(ref);
         if (!snap.exists) return false;
         tx.delete(ref);
+        (snap.data()?.screenshotDigests ?? []).forEach((_, index) => tx.delete(screenshotRef(db, COLLECTION, id, index)));
         tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
           action: 'deleteChangeRequest',
           docPath: `${COLLECTION}/${id}`,
@@ -796,7 +824,7 @@ function buildHandlers() {
   } = require('./changeRequestNotices.cjs');
 
   return {
-    submitChangeRequest: expose(createSubmitChangeRequestHandler, { secrets }),
+    submitChangeRequest: expose(createSubmitChangeRequestHandler, { secrets, memory: '512MiB', cpu: 1, concurrency: 2 }),
     updateChangeRequestStatus: expose(createUpdateChangeRequestStatusHandler, { secrets }),
     saveChangeRequestOutcome: expose(createSaveChangeRequestOutcomeHandler),
     deleteChangeRequest: expose(createDeleteChangeRequestHandler),

@@ -22,6 +22,7 @@ const Team = lazyPage(() => import('./pages/Team.jsx'));
 const ConsoleSettings = lazyPage(() => import('./pages/review/ConsoleSettings.jsx'));
 const ReviewApplication = lazyPage(() => import('./pages/review/ReviewApplication.jsx'));
 const ReviewQueue = lazyPage(() => import('./pages/review/ReviewQueue.jsx'));
+const ProblemReportReceipts = lazyPage(() => import('./pages/review/ProblemReportReceipts.jsx'));
 const SignupLinks = lazyPage(() => import('./pages/review/SignupLinks.jsx'));
 const Deployments = lazyPage(() => import('./pages/review/Deployments.jsx'));
 
@@ -191,6 +192,7 @@ export function AppRoutes() {
           <Route path="/start/:linkId" element={<StartEvent />} />
           <Route path="/review" element={<ReviewQueue />} />
           <Route path="/review/settings" element={<ConsoleSettings />} />
+          <Route path="/review/problem-reports" element={<ProblemReportReceipts />} />
           <Route path="/review/links" element={<SignupLinks />} />
           <Route path="/review/deployments" element={<Deployments />} />
           <Route path="/review/:appId" element={<ReviewApplication />} />

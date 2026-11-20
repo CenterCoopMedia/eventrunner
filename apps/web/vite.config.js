@@ -177,6 +177,7 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
   resolve: {
     alias: {
       '@generated': generatedDir,
+      '@screenshot-ui': path.resolve(here, '../../packages/shared/src/screenshot-ui'),
       '@': path.resolve(here, 'src'),
     },
   },

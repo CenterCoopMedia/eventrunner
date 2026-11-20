@@ -600,3 +600,7 @@ h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
 .report-dialog h2 { margin-top: 0; }
 .report-dialog form { display: grid; gap: var(--space-sm); }
 .report-actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.report-screenshots { min-width: 0; border: 1px dashed rgb(var(--rule)); padding: var(--space-xs); overflow-wrap: anywhere; }
+.report-screenshots input { width: 100%; }
+.report-screenshots legend { font-weight: 600; }
+.report-description { white-space: pre-wrap; overflow-wrap: anywhere; }
