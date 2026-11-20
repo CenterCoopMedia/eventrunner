@@ -26,7 +26,7 @@ function homepageMetadata(event, blocks = []) {
   const title = hero('title');
   const subtitle = hero('subtitle');
   const config = contentLanguages(event);
-  const eventTitle = isStarterText(event?.name) ? 'Event site' : event.name.trim();
+  const eventTitle = typeof event?.name === 'string' && event.name.trim() ? event.name.trim() : 'Event site';
   const tags = (name, description) => {
     const titlePart = name && name !== eventTitle ? name : null;
     return { title: titlePart ? `${titlePart} · ${eventTitle}` : eventTitle, titlePart, description };
