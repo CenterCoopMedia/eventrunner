@@ -58,19 +58,15 @@ test.describe.serial('gallery block', () => {
   test('a carousel on a content page is used by keyboard alone', async ({ page }) => {
     test.setTimeout(90_000);
     const db = adminDb();
-    const pageRef = db.doc('cmsPages/travel');
-    const original = (await pageRef.get()).data();
-    const section = { id: 'travel_gallery', label: 'Photos', description: '', allowedBlocks: [], maxBlocks: 4, reorderable: true, defaultBlocks: [] };
-    await pageRef.set({ ...original, sections: [...original.sections, section] });
-    cleanup.push(() => pageRef.set(original));
     const field = `carousel-${stamp}`;
     cleanup.push(() => Promise.all([
-      db.doc(`cmsContent/travel_gallery__${field}`).delete(),
-      db.doc(`cmsContent_drafts/travel_gallery__${field}`).delete(),
+      db.doc(`cmsContent/travel_lodging__${field}`).delete(),
+      db.doc(`cmsContent_drafts/travel_lodging__${field}`).delete(),
     ]));
     await createAndPublish(token, {
       pageId: 'travel',
-      section: 'travel_gallery',
+      // A generic section the seeded travel page already has.
+      section: 'travel_lodging',
       field,
       fields: { blockType: 'gallery', layout: 'carousel', label: 'Venue photos', images },
     });
