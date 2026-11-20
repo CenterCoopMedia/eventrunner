@@ -286,16 +286,6 @@ test('publishes a Google Maps embed from the editor to the Travel page', async (
   try {
     await page.route('https://www.google.com/maps/embed?*', stubMap);
     await visitor.route('https://www.google.com/maps/embed?*', stubMap);
-    // The e2e server is Vite. Apply the real Hosting policy to the public document.
-    const policy = hostingConfig.hosting.headers.find(({ source }) => source === '**')
-      .headers.find(({ key }) => key === 'Content-Security-Policy').value;
-    await visitor.route('**/travel', async (route) => {
-      const response = await route.fetch();
-      await route.fulfill({
-        response,
-        headers: { ...response.headers(), 'content-security-policy': policy },
-      });
-    });
     await signIn(page, ADMIN_EMAIL);
     await page.goto(`/admin/content/travel/${section}/_new`);
     await page.getByRole('combobox', { name: 'Block type' }).selectOption('map');
@@ -307,6 +297,23 @@ test('publishes a Google Maps embed from the editor to the Travel page', async (
     await page.getByRole('textbox', { name: 'Address (optional)' }).fill(address);
     await expect(page.getByRole('region', { name: 'Map preview' }).getByTitle(label)).toHaveAttribute('src', src);
 
+    const travel = await visitor.newPage();
+    await travel.goto('/travel');
+    // The e2e server is Vite. Apply the Hosting frame policy to the real
+    // document before publishing, so the Firestore listener keeps its
+    // network address space and the browser enforces the policy on the map.
+    const policy = hostingConfig.hosting.headers.find(({ source }) => source === '**')
+      .headers.find(({ key }) => key === 'Content-Security-Policy').value;
+    const framePolicy = policy.split(';').map((directive) => directive.trim())
+      .find((directive) => directive.startsWith('frame-src '));
+    expect(framePolicy).toBeDefined();
+    await travel.locator('head').evaluate((head, content) => {
+      const meta = head.ownerDocument.createElement('meta');
+      meta.httpEquiv = 'Content-Security-Policy';
+      meta.content = content;
+      head.append(meta);
+    }, framePolicy);
+
     const published = page.waitForResponse((res) =>
       res.url().endsWith('/cmsPublish') && res.request().method() === 'POST',
     );
@@ -315,8 +322,6 @@ test('publishes a Google Maps embed from the editor to the Travel page', async (
     const live = (await adminDb().doc(`cmsContent/${docId}`).get()).data();
     expect(live).toMatchObject({ blockType: 'map', embedUrl: src, label, address });
 
-    const travel = await visitor.newPage();
-    await travel.goto('/travel');
     const frame = travel.getByTitle(label);
     await expect(frame).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
     await expect(frame).toHaveAttribute('src', live.embedUrl);
