@@ -324,6 +324,12 @@ describe('Layout header logo, issue 1167', () => {
     expect(src).not.toBe(PRIMARY);
   });
 
+  it('keeps the earlier rule when nothing is chosen: the logo leads, the name yields on phones', () => {
+    const { container } = renderShell({ primary: PRIMARY });
+    expect(headerLogo(container)).not.toBeNull();
+    expect(container.querySelector('.site-header-title').className).toContain('site-header-title--with-mark');
+  });
+
   it('shows only the name for "Name only", even with an uploaded logo and an icon', () => {
     const { container } = renderShell({ primary: PRIMARY, mark: 'branding/mark.svg' }, { themeDoc: { headerLogo: 'name' } });
     expect(headerLogo(container)).toBeNull();

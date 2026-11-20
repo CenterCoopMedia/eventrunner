@@ -62,6 +62,9 @@ const EVENT_TEMPLATE_FIELDS = Object.freeze([
 const THEME_TEMPLATE_KEYS = Object.freeze([
   'preset', 'colors', 'fonts', 'optionPicks', 'tokens', 'mode', 'header',
   'texture', 'radius', 'density', 'navPlacement', 'adminScheme', 'motifSet', 'brandColor',
+  // Where the logo shows (#1167). The logo files and their description
+  // stay behind with `logos`.
+  'headerLogo', 'footerLogo', 'heroLogo',
 ]);
 
 /** Page document keys (functions/src/cms/pages.cjs PAGE_KEYS). */

@@ -604,9 +604,11 @@ export default function Layout() {
             name={historicalDemo && markSrc && !markFailed ? '' : plate.name}
             dates={plate.dates}
             place={plate.edition}
-            // A chosen mode whose logo is missing or failed keeps the name
-            // in view; an unchosen one keeps the icon rule it always had.
-            identity={headerShowsLogo ? headerLogo : THEME_HEADER_LOGOS.includes(theme?.headerLogo) ? 'name' : 'icon'}
+            // An unchosen mode keeps the rule the header always had: the
+            // logo or icon leads and the name yields to it on phones. A
+            // chosen mode whose logo is missing or failed keeps the name.
+            identity={!THEME_HEADER_LOGOS.includes(theme?.headerLogo) ? 'icon'
+              : headerShowsLogo ? headerLogo : 'name'}
             mark={
               headerShowsLogo ? (
                 // A wide logo keeps its own proportions at the mark's height.
