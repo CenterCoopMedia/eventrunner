@@ -1046,7 +1046,7 @@ describe('Layout footer', () => {
     ]);
   });
 
-  it('gives every footer link a keyboard path at the full touch target size', () => {
+  it('gives every footer link a keyboard path and the footer target size', () => {
     const { container } = renderShell(
       {},
       {
@@ -1060,7 +1060,9 @@ describe('Layout footer', () => {
     for (const link of footer(container).querySelectorAll('a')) {
       expect(link).toHaveAttribute('href');
       expect(link.hasAttribute('tabindex')).toBe(false);
-      expect(link.className).toContain('touch-target');
+      // footer-link (index.css): a 24 px target at least, padded inside
+      // the link so the rows stay short (#1168).
+      expect(link.className).toContain('footer-link');
     }
   });
 });

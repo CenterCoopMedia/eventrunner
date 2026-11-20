@@ -273,10 +273,10 @@ const TOP_LANDMARK_ID = 'site-top';
 const FOOTER_ID = 'site-footer';
 
 // One treatment for every link in the footer: an underlined word at the
-// caption size, at the full touch target. The footer is a dense block of
-// links and a reader has to be able to hit them.
+// caption size. `footer-link` (index.css) keeps a 24 px target with a short
+// row pitch, so a ten-page list stays a compact block on a phone (#1168).
 const FOOTER_LINK_CLASS =
-  'touch-target inline-flex items-center underline underline-offset-2 hover:text-text-primary';
+  'footer-link underline underline-offset-2 hover:text-text-primary';
 
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
@@ -651,9 +651,9 @@ export default function Layout() {
                 is off cannot leave the header and stay in the footer.
                 <Link>, not <a>: the demo runs under HashRouter, where a raw
                 href reloads a path the static host does not serve. */}
-            <div className="grid gap-lg lg:grid-cols-2">
+            <div className="grid gap-sm lg:grid-cols-2 lg:gap-lg">
             {navItems.length === 0 ? null : (
-              <nav aria-label={text('Site pages', 'Páginas del sitio')} className="mt-md">
+              <nav aria-label={text('Site pages', 'Páginas del sitio')} className="mt-sm">
                 <p className="font-semibold text-text-primary">Site pages</p>
                 <ul className="footer-links">
                   {navItems.map((item) => (
@@ -673,7 +673,7 @@ export default function Layout() {
             />
             </div>
             {operatorName || supportEmail ? (
-              <p className="mt-md">
+              <p className="mt-sm">
                 {operatorName ? `Operated by ${operatorName}` : null}
                 {operatorName && supportEmail && !readOnlyDemo ? ' · ' : null}
                 {supportEmail && !readOnlyDemo ? (
@@ -686,7 +686,7 @@ export default function Layout() {
             {/* An event that has recorded no social account renders no
                 block, no heading, and no empty list. */}
             {socialLinks.length === 0 ? null : (
-              <nav aria-label="Social accounts" className="mt-md">
+              <nav aria-label="Social accounts" className="mt-sm">
                 <ul className="flex flex-wrap gap-x-md">
                   {/* Keyed on both halves: an event can record two accounts
                       that share a URL (one platform, two labels) or two
@@ -707,11 +707,11 @@ export default function Layout() {
               </nav>
             )}
             {features.feedbackInbox || canRequestChange || canSeeRequests ? (
-              <div className="mt-md flex flex-wrap gap-xs">
+              <div className="mt-sm flex flex-wrap gap-x-md">
                 {features.feedbackInbox ? (
                   <button
                     type="button"
-                    className={quietActionClass}
+                    className={FOOTER_LINK_CLASS}
                     onClick={() => setFeedbackOpen(true)}
                   >
                     Share feedback
@@ -720,7 +720,7 @@ export default function Layout() {
                 {canRequestChange ? (
                   <button
                     type="button"
-                    className={quietActionClass}
+                    className={FOOTER_LINK_CLASS}
                     onClick={() => setChangeRequestOpen(true)}
                   >
                     Request a change
@@ -728,7 +728,7 @@ export default function Layout() {
                 ) : null}
                 {/* The reader's own requests and their progress (issue #330). */}
                 {canSeeRequests ? (
-                  <Link to="/profile/change-requests" className={quietActionClass}>
+                  <Link to="/profile/change-requests" className={FOOTER_LINK_CLASS}>
                     Your change requests
                   </Link>
                 ) : null}
