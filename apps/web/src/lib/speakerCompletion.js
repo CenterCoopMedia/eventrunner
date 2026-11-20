@@ -7,18 +7,18 @@ import { materialCounts, sessionNeedsMaterials, speakerHasBio, speakerHasHeadsho
  * shows as done.
  */
 export function speakerCompletion({ speaker, sessions, materialsBySession }) {
-  const profilePath = '/speaker/profile';
+  const bioPath = '/speaker/profile/bio';
   const requirements = [
     {
       id: 'bio',
       label: 'Add your biography',
-      to: profilePath,
+      to: bioPath,
       complete: speakerHasBio(speaker),
     },
     {
       id: 'headshot',
       label: 'Add your headshot',
-      to: profilePath,
+      to: bioPath,
       complete: speakerHasHeadshot(speaker),
     },
   ];

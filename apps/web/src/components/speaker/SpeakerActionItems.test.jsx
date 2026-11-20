@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
+import AuthContext from '../../contexts/AuthContext.jsx';
+import ProfileContext from '../../contexts/ProfileContext.jsx';
+import { ToastProvider } from '../../contexts/ToastContext.jsx';
+import SpeakerProfile from '../../pages/SpeakerProfile.jsx';
 
 const listMaterials = vi.fn();
 vi.mock('../../lib/speakerMaterialsApi.js', () => ({
@@ -20,19 +24,21 @@ const scheduleData = [
   { id: 'hidden', title: 'Unpublished', visible: false, speakerIds: ['rae'] },
 ];
 
-function view(overrides = {}) {
+function checklist(overrides) {
   return (
-    <MemoryRouter>
-      <SpeakerActionItems
-        speaker={speaker}
-        scheduleData={scheduleData}
-        eventConfig={{}}
-        user={user}
-        refreshKey={0}
-        {...overrides}
-      />
-    </MemoryRouter>
+    <SpeakerActionItems
+      speaker={speaker}
+      scheduleData={scheduleData}
+      eventConfig={{}}
+      user={user}
+      refreshKey={0}
+      {...overrides}
+    />
   );
+}
+
+function view(overrides = {}) {
+  return <MemoryRouter>{checklist(overrides)}</MemoryRouter>;
 }
 
 beforeEach(() => {
@@ -111,10 +117,41 @@ describe('speaker action items', () => {
     expect(screen.queryByText('Another session')).toBeNull();
     const links = screen.getAllByRole('link');
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
-      '/speaker/profile',
-      '/speaker/profile',
+      '/speaker/profile/bio',
+      '/speaker/profile/bio',
       '/speaker/dashboard?session=one&tab=materials#speaker-sessions-heading',
     ]);
+  });
+
+  it.each(['Add your biography', 'Add your headshot'])('opens the profile fields from "%s" without a save', async (item) => {
+    const request = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true, json: async () => ({ speaker: { ...speaker, status: 'accepted' } }),
+    });
+    try {
+      render(
+        <AuthContext.Provider value={{ user: { ...user, getIdToken: async () => 'test-token' } }}>
+          <ProfileContext.Provider value={{ profile: { speakerId: speaker.speakerId }, status: 'ready' }}>
+            <ToastProvider>
+              <MemoryRouter initialEntries={['/speaker/dashboard']}>
+                <Routes>
+                  <Route path="/speaker/dashboard" element={checklist({ scheduleData: [] })} />
+                  <Route path="/speaker/profile/:stepSlug?" element={<SpeakerProfile />} />
+                </Routes>
+              </MemoryRouter>
+            </ToastProvider>
+          </ProfileContext.Provider>
+        </AuthContext.Provider>,
+      );
+
+      fireEvent.click(await screen.findByRole('link', { name: `Open ${item}` }));
+      expect(await screen.findByRole('heading', { level: 2, name: 'Bio and photo' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Biography')).toBeInTheDocument();
+      expect(screen.getByLabelText('Upload a photo')).toBeInTheDocument();
+      expect(request).toHaveBeenCalledOnce();
+      expect(request.mock.calls[0][0]).toMatch(/\/getOwnSpeakerProfile$/);
+    } finally {
+      request.mockRestore();
+    }
   });
 
   it('shows no outstanding items when every requirement is met', async () => {
