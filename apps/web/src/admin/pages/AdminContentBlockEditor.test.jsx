@@ -70,6 +70,9 @@ vi.mock('firebase/firestore', () => ({
 
 import App from '../../App.jsx';
 import { BLOCK_TYPE_IDS } from '../blockTypes.js';
+// Load route modules in setup so the first test measures the editor, without a cold transform.
+import '../AdminApp.jsx';
+import './AdminContentBlockEditor.jsx';
 
 const HOME_PAGE = {
   id: 'home',
