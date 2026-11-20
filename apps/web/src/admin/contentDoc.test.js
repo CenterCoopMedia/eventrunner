@@ -166,7 +166,7 @@ describe('Rich text block titles', () => {
   const copiedMap = '&lt;iframe src=&quot;https://www.google.com/maps/embed?pb=fixture&quot;&gt;&lt;/iframe&gt;';
   it('uses the type name when the content contains only pasted markup', () => {
     const block = { blockType: 'richtext', field: 'lt-iframe-src', value: `<p><code>${copiedMap}</code></p>` };
-    expect(contentBlockTitle(block)).toBe('Paragraphs');
+    expect(contentBlockTitle(block)).toBe('Text');
     expect(contentIdSource(block)).toBe('richtext');
   });
 
