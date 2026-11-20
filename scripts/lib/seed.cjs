@@ -657,6 +657,8 @@ function placeholderBlock(blockType, description) {
       return { question: text, answer: `<p>[Replace] Answer this question in a sentence or two.</p>` };
     case 'link_group':
       return { group: 'Links', label: text, url: 'https://example.org' };
+    case 'gallery':
+      return { layout: 'grid', images: [{ url: 'branding/og-default.svg', alt: text }] };
     case 'sponsor_package':
       return { name: text, benefits: '<p>[Replace] What this package includes.</p>' };
     default:

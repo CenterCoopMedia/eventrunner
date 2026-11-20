@@ -330,3 +330,45 @@ describe('a cleared number field', () => {
     expect('focalX' in internals.omitDeletedFields(fields)).toBe(false);
   });
 });
+
+// #1176: a gallery's pictures are a list. The form keeps each picture's path
+// and alt text, sends exactly those two keys, and names a picture with no
+// alt text before the save.
+describe('gallery content', () => {
+  const stored = {
+    section: 'details',
+    field: 'photos',
+    blockType: 'gallery',
+    layout: 'carousel',
+    images: [
+      { url: 'cms-images/a1/hall.webp', alt: 'The main hall' },
+      { url: 'cms-images/a2/panel.webp', alt: '  A panel  ', caption: 'not stored' },
+    ],
+  };
+
+  it('round-trips the pictures and layout, trimming alt text and dropping other keys', () => {
+    const editable = toEditableContent(stored);
+    expect(editable.values.images).toEqual([
+      { url: 'cms-images/a1/hall.webp', alt: 'The main hall' },
+      { url: 'cms-images/a2/panel.webp', alt: '  A panel  ' },
+    ]);
+    expect(toContentFields(editable)).toEqual({
+      blockType: 'gallery',
+      layout: 'carousel',
+      label: '',
+      images: [
+        { url: 'cms-images/a1/hall.webp', alt: 'The main hall' },
+        { url: 'cms-images/a2/panel.webp', alt: 'A panel' },
+      ],
+    });
+  });
+
+  it('starts with no pictures and requires one, a layout, and alt text on each', () => {
+    expect(blankContent('gallery').values.images).toEqual([]);
+    expect(validateRequiredContent(blankContent('gallery')).map((error) => error.field)).toEqual(['images', 'layout']);
+    const missingAlt = toEditableContent({ ...stored, images: [stored.images[0], { url: 'cms-images/a3/x.webp', alt: ' ' }] });
+    expect(validateRequiredContent(missingAlt)).toEqual([
+      { field: 'images.2.alt', message: 'Picture 2: needs alt text.' },
+    ]);
+  });
+});

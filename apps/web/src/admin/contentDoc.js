@@ -38,11 +38,25 @@ export function valueFieldsOf(blockTypeId) {
   return (type?.fields ?? []).filter((field) => field.id !== 'order');
 }
 
+function blankValue(field) {
+  if (field.type === 'boolean') return false;
+  if (field.type === 'images') return [];
+  return '';
+}
+
+/** A gallery picture as the editor holds it: a library path and its alt text. */
+function galleryImage(entry) {
+  return {
+    url: typeof entry?.url === 'string' ? entry.url : '',
+    alt: typeof entry?.alt === 'string' ? entry.alt : '',
+  };
+}
+
 /** A blank `values` map for a block type: '' for text-ish fields, false for booleans. */
 export function blankContentValues(blockTypeId) {
   const values = {};
   for (const field of valueFieldsOf(blockTypeId)) {
-    values[field.id] = field.type === 'boolean' ? false : '';
+    values[field.id] = blankValue(field);
   }
   return values;
 }
@@ -64,6 +78,7 @@ export function toEditableContent(doc, blockTypeId) {
     const raw = doc?.[field.id];
     if (field.type === 'boolean') values[field.id] = raw === true;
     else if (field.type === 'number') values[field.id] = typeof raw === 'number' ? raw : '';
+    else if (field.type === 'images') values[field.id] = Array.isArray(raw) ? raw.map(galleryImage) : [];
     else values[field.id] = typeof raw === 'string' ? raw : '';
   }
   return {
@@ -111,6 +126,11 @@ export function toContentFields(content) {
       fields[field.id] = Boolean(raw);
     } else if (field.choices) {
       fields[field.id] = raw || DELETE_FIELD_SENTINEL;
+    } else if (field.type === 'images') {
+      fields[field.id] = (Array.isArray(raw) ? raw : []).map((entry) => {
+        const image = galleryImage(entry);
+        return { url: image.url.trim(), alt: image.alt.trim() };
+      });
     } else if (field.type === 'number') {
       // A blank number is a deletion, not an omission. cmsUpdateContent
       // merges the payload onto the stored draft, so a key left out keeps
@@ -188,6 +208,7 @@ const EDITORIAL_FIELD_LABELS = Object.freeze({
   },
   fact: { label: 'Term', value: 'Fact', note: 'Note' },
   quote: { text: 'Quote', attribution: 'Attribution' },
+  gallery: { images: 'Pictures', layout: 'Layout', label: 'Gallery name' },
   list_item: { text: 'Text' },
   faq_item: { question: 'Question', answer: 'Answer' },
   link_group: { group: 'Group', label: 'Link text', url: 'Destination' },
@@ -257,13 +278,23 @@ export function validateRequiredContent(content) {
     const raw = content.values?.[field.id];
     const isEmpty = field.type === 'richtext'
       ? !hasRichTextContent(raw)
-      : raw === undefined || raw === null || String(raw).trim() === '';
+      : field.type === 'images'
+        ? !Array.isArray(raw) || raw.length === 0
+        : raw === undefined || raw === null || String(raw).trim() === '';
     if (isEmpty) {
       const name = editorialFieldLabel(content.blockType, field.id);
       errors.push({ field: field.id, message: `${name}: is required.` });
     } else if (content.blockType === 'map' && field.id === 'embedUrl' && googleMapsEmbedUrl(raw) !== raw) {
       errors.push({ field: field.id, message: 'Paste the embed code or link from Google Maps.' });
     }
+  }
+  if (content.blockType === 'gallery') {
+    const images = Array.isArray(content.values?.images) ? content.values.images : [];
+    images.forEach((image, index) => {
+      if (typeof image?.alt !== 'string' || !image.alt.trim()) {
+        errors.push({ field: `images.${index + 1}.alt`, message: `Picture ${index + 1}: needs alt text.` });
+      }
+    });
   }
   // The page draws a sponsor package's limit only when it is a whole number
   // of 1 or more (functions/src/cms/content.cjs sponsorPackageErrors), so the

@@ -29,6 +29,7 @@ export const BLOCK_TYPE_SUMMARIES = Object.freeze({
   list_item: 'One point in a bulleted list.',
   faq_item: 'A question with its answer.',
   link_group: 'One link in a named group, such as footer links.',
+  gallery: 'Several pictures as a grid, a carousel or a slideshow.',
   sponsor_package: 'A sponsorship level with its price and benefits.',
 });
 
@@ -54,6 +55,14 @@ const SAMPLE_BLOCKS = Object.freeze({
   list_item: { text: 'Hands-on workshops' },
   faq_item: { question: 'Is there parking?', answer: '<p>Yes, free on site.</p>' },
   link_group: { group: 'Resources', label: 'Travel guide', url: '/travel' },
+  gallery: {
+    layout: 'grid',
+    images: [
+      { url: 'demo/summit-gathering.webp', alt: 'Attendees at the summit' },
+      { url: 'demo/speakers/amara-okafor.webp', alt: 'A speaker' },
+      { url: 'demo/speakers/devon-achebe.webp', alt: 'A speaker' },
+    ],
+  },
   sponsor_package: { name: 'Gold', price: '$2,500', limit: 3, benefits: '<p>Logo on every page</p>' },
 });
 

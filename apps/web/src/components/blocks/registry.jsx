@@ -30,6 +30,7 @@ export const BLOCK_RENDERERS = Object.freeze({
   faq_item: lazy(() => import('./FaqItemBlock.jsx')),
   link_group: lazy(() => import('./LinkGroupBlock.jsx')),
   sponsor_package: lazy(() => import('./SponsorPackageBlock.jsx')),
+  gallery: lazy(() => import('./GalleryBlock.jsx')),
 });
 
 function MapPlaceholder({ address }) {
@@ -67,6 +68,10 @@ function BlockPlaceholder({ block }) {
         </div>
       </div>
     );
+  }
+  if (block.blockType === 'gallery') {
+    // The gallery draws its pictures in fixed boxes; hold a box's height.
+    return <div aria-hidden="true" className="invisible aspect-[3/2] w-full" />;
   }
   // Prose and quotations have variable height. Leave room for their first
   // lines while the chunk loads, without adding a wrapper to the final DOM.

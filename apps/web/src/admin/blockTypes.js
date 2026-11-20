@@ -131,6 +131,18 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'order', type: 'number', required: false },
     ],
   },
+  gallery: {
+    id: 'gallery',
+    label: 'Gallery',
+    description:
+      'Several pictures from the media library, shown as a grid, a carousel or a slideshow. ' +
+      'Every picture needs alt text. label names the gallery for screen readers.',
+    fields: [
+      { id: 'images', type: 'images', required: true },
+      { id: 'layout', type: 'string', required: true },
+      { id: 'label', type: 'string', required: false },
+    ],
+  },
   sponsor_package: {
     id: 'sponsor_package',
     label: 'Sponsor package',

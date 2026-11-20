@@ -15,7 +15,7 @@ const {
 
 const TYPE_IDS = [
   'text', 'richtext', 'image', 'cta', 'stat', 'fact', 'quote', 'list_item', 'faq_item', 'link_group',
-  'sponsor_package', 'map',
+  'gallery', 'sponsor_package', 'map',
 ];
 
 test('registry ships exactly the supported block types', () => {
@@ -85,6 +85,37 @@ test('a sponsor package names its parts, and only the name and the benefits are 
   );
   assert.equal(BLOCK_TYPES.sponsor_package.label, 'Sponsor package');
   assert.deepEqual(statContractErrors({ blockType: 'sponsor_package', name: 'Presenting' }), []);
+});
+
+// #1176: the write boundary stores only a layout from the fixed set and
+// library pictures that each carry alt text, so the page never meets a link,
+// a markup string or an unknown layout in a gallery.
+test('a gallery is written with a fixed layout and library pictures that each have alt text', () => {
+  const picture = { url: 'cms-images/a1/crowd.webp', alt: 'Attendees in the main hall' };
+  const gallery = (fields) => requiredBlockErrors({ blockType: 'gallery', layout: 'grid', images: [picture], ...fields });
+  assert.deepEqual(gallery({}), []);
+  for (const layout of ['grid', 'carousel', 'slideshow']) assert.deepEqual(gallery({ layout }), []);
+  assert.deepEqual(gallery({ layout: 'masonry' }), ['layout: must be one of grid, carousel, slideshow.']);
+  assert.deepEqual(gallery({ layout: '' }), [
+    'layout: is required for block type "gallery".',
+    'layout: must be one of grid, carousel, slideshow.',
+  ]);
+  assert.deepEqual(gallery({ images: [] }), ['images: is required for block type "gallery".']);
+  assert.deepEqual(gallery({ images: 'cms-images/a1/crowd.webp' }), [
+    'images: is required for block type "gallery".',
+    'images: must be a list of pictures.',
+  ]);
+  assert.deepEqual(gallery({ images: [{ ...picture, alt: '  ' }] }), ['images.1.alt: every picture needs alt text.']);
+  assert.deepEqual(gallery({ images: [picture, { url: picture.url }] }), ['images.2.alt: every picture needs alt text.']);
+  for (const url of ['https://example.com/a.jpg', 'javascript:alert(1)', '/hero/a.webp', 'speakers/s1/a.jpg', 'cms-images/../x', 'cms-images/flat.png']) {
+    assert.deepEqual(gallery({ images: [{ ...picture, url }] }), ['images.1.url: choose the picture from the media library.'], url);
+  }
+  assert.deepEqual(gallery({ images: [{ ...picture, href: 'https://example.com' }] }), ['images.1: unknown href.']);
+  assert.deepEqual(gallery({ images: [null] }), ['images.1: must be a picture.']);
+  assert.deepEqual(gallery({ images: [{ ...picture, alt: 'x'.repeat(501) }] }), ['images.1.alt: keep alt text under 500 characters.']);
+  const most = internals.GALLERY_MAX_IMAGES;
+  assert.deepEqual(gallery({ images: Array(most).fill(picture) }), []);
+  assert.deepEqual(gallery({ images: Array(most + 1).fill(picture) }), [`images: a gallery holds at most ${most} pictures.`]);
 });
 
 test('every block type is a well-formed contract', () => {

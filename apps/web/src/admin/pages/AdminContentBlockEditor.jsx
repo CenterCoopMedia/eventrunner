@@ -55,6 +55,7 @@ import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import ImagePicker from '../components/media/ImagePicker.jsx';
+import GalleryFields from '../components/GalleryFields.jsx';
 import BlockTypePicker from '../components/BlockTypePicker.jsx';
 import {
   CheckboxField,
@@ -138,6 +139,14 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, p
       <p className="text-admin-sm text-admin-ink-secondary">
         Choose a content type to start writing.
       </p>
+    );
+  }
+  // A gallery's pictures are a list, not one value per field.
+  if (blockTypeId === 'gallery') {
+    return (
+      <div className="admin-content-fields grid gap-sm">
+        <GalleryFields values={values} onChange={onChange} errorFor={errorFor} />
+      </div>
     );
   }
   return (
