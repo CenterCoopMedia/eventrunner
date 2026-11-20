@@ -53,6 +53,7 @@ const { readOrganizationAccess, removeOrganizationAccess } = require('./organiza
 const { sanitizeRichTextFields } = require('./richText.cjs');
 const { collectionVariantErrors } = require('shared/contentLanguages');
 const { writePendingDelta } = require('./pendingCounts.cjs');
+const { publisherNotificationSecrets, refreshSiteAfterPublish, withPublisherNotifier } = require('./publisher.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const PAGE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -670,8 +671,8 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
   };
 }
 
-/** @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps */
-function createCmsMoveContentHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+/** @param {{ db, auth, getConfig, env?: object, fetchImpl?: typeof fetch, notifyOperator?: Function, now?: () => number, log?: Console }} deps */
+function createCmsMoveContentHandler({ db, auth, getConfig, env, fetchImpl, notifyOperator, now = Date.now, log = console }) {
   return async function cmsMoveContent(req, res) {
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
@@ -686,6 +687,7 @@ function createCmsMoveContentHandler({ db, auth, getConfig, now = Date.now, log 
     const draftCollection = db.collection(draftCollectionFor(collection));
     const sourceLiveRef = liveCollection.doc(docId);
     const sourceDraftRef = draftCollection.doc(docId);
+    const queueRef = db.collection('cmsPublishQueue').doc();
     let destinationId;
     try {
       destinationId = await db.runTransaction(async (tx) => {
@@ -715,22 +717,39 @@ function createCmsMoveContentHandler({ db, auth, getConfig, now = Date.now, log 
 
         const pendingDraft = draft?.status === 'dirty';
         const keepDraft = live && pendingDraft;
+        const blockTypes = keepDraft ? [live.blockType, draft.blockType] : [source.blockType];
         const sectionRule = await checkContentCreateSection({
-          db, tx, collection, pageId, sectionId: section,
-          blockTypes: keepDraft ? [live.blockType, draft.blockType] : [source.blockType],
+          db, tx, collection, pageId, sectionId: section, blockTypes,
         });
         if (!sectionRule.ok) throw new RequestError(400, 'bad-request', sectionRule.message);
 
         const ids = new Set(sectionRule.blocks.map((block) => block.id));
         ids.add(docId);
+        const occupied = sectionRule.blocks.map((block) => block.data());
+        if (section === 'hero') {
+          const hasText = blockTypes.includes('text');
+          const textTaken = hasText && (!['title', 'subtitle'].includes(source.field) ||
+            ids.has(`hero__${source.field}`) || occupied.some((block) => block.field === source.field));
+          if (pageId !== 'home' || textTaken ||
+              (blockTypes.includes('image') && occupied.some((block) => block.blockType === 'image'))) {
+            throw new RequestError(400, 'bad-request', 'The Home hero has no open spot for this block. Choose another section.');
+          }
+          if (!hasText) {
+            ids.add('hero__title');
+            ids.add('hero__subtitle');
+          }
+        }
+        if (pageId === 'home' && section === 'sponsors' && occupied.some((block) => block.blockType === 'text')) {
+          throw new RequestError(400, 'bad-request', 'The Home sponsor section already has its introduction. Choose another section.');
+        }
         let field = source.field;
         for (let index = 2; ids.has(`${section}__${field}`); index += 1) {
           const suffix = `-${index}`;
           field = `${source.field.slice(0, 128 - suffix.length)}${suffix}`;
         }
         const newId = `${section}__${field}`;
-        const order = sectionRule.blocks.reduce((last, block) => {
-          const value = block.data().order;
+        const order = occupied.reduce((last, block) => {
+          const value = block.order;
           return Number.isSafeInteger(value) ? Math.max(last, value) : last;
         }, 0) + 1;
         const moved = { section, field, order };
@@ -756,6 +775,16 @@ function createCmsMoveContentHandler({ db, auth, getConfig, now = Date.now, log 
           basedOnRevision: revision,
         });
         tx.set(db.collection('cmsVersionHistory').doc(), publication.version);
+        tx.create(queueRef, {
+          status: 'done',
+          request: { [collection]: [newId] },
+          progress: { [collection]: { published: [newId], skipped: [], chunksCommitted: 1 } },
+          plannedChunks: 1,
+          requestedBy: actor.email,
+          requestedAt: publishedAt,
+          updatedAt: publishedAt,
+          finishedAt: publishedAt,
+        });
         tx.set(sectionRule.lock.ref, sectionRule.lock.data);
         tx.delete(sourceLiveRef);
         tx.delete(sourceDraftRef);
@@ -775,7 +804,8 @@ function createCmsMoveContentHandler({ db, auth, getConfig, now = Date.now, log 
       db, action: 'cms-move-content', docPath: `${collection}/${destinationId}`, actor, now, log,
       details: { from: `${collection}/${docId}` },
     });
-    res.status(200).json({ docId: destinationId });
+    const publisher = await refreshSiteAfterPublish({ db, queueId: queueRef.id, env, fetchImpl, notifyOperator, now, log });
+    res.status(200).json({ docId: destinationId, queueId: queueRef.id, publisher });
   };
 }
 
@@ -926,8 +956,8 @@ function buildHandlers() {
     cmsDeleteContent: onRequest({ region }, withCors(['POST'], async (req, res) => {
       await createCmsDeleteContentHandler(buildDeps())(req, res);
     })),
-    cmsMoveContent: onRequest({ region }, withCors(['POST'], async (req, res) => {
-      await createCmsMoveContentHandler(buildDeps())(req, res);
+    cmsMoveContent: onRequest({ region, secrets: publisherNotificationSecrets() }, withCors(['POST'], async (req, res) => {
+      await createCmsMoveContentHandler(withPublisherNotifier(buildDeps()))(req, res);
     })),
     getSiteContent: onRequest({ region }, withCors(['GET'], async (req, res) => {
       const { getDb } = require('../core/firestore.cjs');

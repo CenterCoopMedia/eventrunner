@@ -416,6 +416,40 @@ describe('content browsing', () => {
     expect(screen.getByText('Moved “Bring a notebook.” and published the block.', { exact: false })).toBeInTheDocument();
   });
 
+  it('offers Home destinations only when the section has a place that displays the block', async () => {
+    sources.cmsPages = [
+      SCHOLARSHIPS_PAGE,
+      {
+        ...HOME_PAGE, systemPage: true, sections: [
+          ...HOME_PAGE.sections, { id: 'sponsors', label: 'Sponsors', maxBlocks: 4 },
+        ],
+      },
+    ];
+    const text = (field, value) => ({ id: `removed__${field}`, section: 'removed', field, blockType: 'text', value });
+    sources.cmsContent = [
+      HERO_TEXT[0],
+      { ...text('lede', 'The existing sponsor introduction'), id: 'sponsors__lede', section: 'sponsors' },
+      text('body', 'Opening copy'), text('title', 'The old headline'), text('subtitle', 'The old subtitle'),
+      { id: 'removed__art', section: 'removed', field: 'art', blockType: 'image', alt: 'The old photo' },
+    ];
+    sources.cmsContent_drafts = [
+      { id: 'hero__art', section: 'hero', field: 'art', blockType: 'image', status: 'dirty' },
+    ];
+    await renderAt('/admin/content');
+    const recovery = await screen.findByRole('region', { name: 'Not on any page' });
+    for (const title of ['Opening copy', 'The old headline', 'The old subtitle', 'The old photo']) {
+      const row = within(within(recovery).getByText(title).closest('li'));
+      fireEvent.click(row.getByRole('button', { name: 'Move to section…' }));
+      expect(row.getByRole('option', { name: 'Scholarships · Intro' })).toBeInTheDocument();
+      expect(row.queryByRole('option', { name: 'Home · Sponsors' })).not.toBeInTheDocument();
+      if (title === 'The old subtitle') {
+        expect(row.getByRole('option', { name: 'Home · Hero' })).toBeInTheDocument();
+      } else {
+        expect(row.queryByRole('option', { name: 'Home · Hero' })).not.toBeInTheDocument();
+      }
+    }
+  });
+
   it('lists pages, then the sections of the one chosen, then its blocks', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];

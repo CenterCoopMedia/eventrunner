@@ -13,6 +13,20 @@ function sectionsOf(page) {
   return Array.isArray(page?.sections) ? page.sections : [];
 }
 
+function canMoveTo(row, { pageId, sectionId, allowed, hasRoom, occupied }) {
+  const source = row.live ?? row.current;
+  const blockTypes = row.live && row.draft?.status === 'dirty'
+    ? [source.blockType, row.draft.blockType] : [source.blockType];
+  if (!hasRoom || !blockTypes.every((type) => allowed.includes(type))) return false;
+  if (sectionId === 'hero') {
+    const textTaken = blockTypes.includes('text') && (!['title', 'subtitle'].includes(source.field) ||
+      occupied.some((block) => block.field === source.field || block.id === `hero__${source.field}`));
+    return pageId === 'home' && !textTaken &&
+      !(blockTypes.includes('image') && occupied.some((block) => block.blockType === 'image'));
+  }
+  return !(pageId === 'home' && sectionId === 'sponsors' && occupied.some((block) => block.blockType === 'text'));
+}
+
 function RecoveryRow({ row, destinations, onMoved }) {
   const call = useAdminApi();
   const [open, setOpen] = useState(false);
@@ -92,16 +106,19 @@ export default function OrphanedContent({ pages, pagesReady }) {
     ? rows.filter(({ live, draft }) => ![live, draft].some((block) => block?.section && ownedSections.has(block.section)))
     : [];
   const destinations = orphans.length ? pages.flatMap((page) =>
-    sectionsOf(page.current).filter((section) => section?.id).map((section) => ({
-      value: contentSectionPath(page.id, section.id),
-      pageId: page.id,
-      sectionId: section.id,
-      label: `${page.current.label || 'Untitled page'} · ${section.label || 'Untitled section'}`,
-      pageNeedsPublish: !sectionsOf(page.live).some((published) => published?.id === section.id),
-      allowed: sectionBlockTypes({ ...page.current, id: page.id }, section, BLOCK_TYPE_IDS),
-      hasRoom: Number.isInteger(section.maxBlocks) && rows.filter(({ live, draft }) =>
-        live?.section === section.id || draft?.section === section.id).length < section.maxBlocks,
-    }))) : [];
+    sectionsOf(page.current).filter((section) => section?.id).map((section) => {
+      const sectionRows = rows.filter(({ live, draft }) => live?.section === section.id || draft?.section === section.id);
+      return {
+        value: contentSectionPath(page.id, section.id),
+        pageId: page.id,
+        sectionId: section.id,
+        label: `${page.current.label || 'Untitled page'} · ${section.label || 'Untitled section'}`,
+        pageNeedsPublish: !sectionsOf(page.live).some((published) => published?.id === section.id),
+        allowed: sectionBlockTypes({ ...page.current, id: page.id }, section, BLOCK_TYPE_IDS),
+        hasRoom: Number.isInteger(section.maxBlocks) && sectionRows.length < section.maxBlocks,
+        occupied: sectionRows.flatMap(({ live, draft }) => [live, draft]).filter((block) => block?.section === section.id),
+      };
+    })) : [];
 
   return (
     <>
@@ -121,9 +138,7 @@ export default function OrphanedContent({ pages, pagesReady }) {
             <ul className="flex flex-col gap-sm" role="list">
               {orphans.map((row) => (
                 <RecoveryRow key={row.id} row={row} onMoved={setResult}
-                  destinations={destinations.filter(({ allowed, hasRoom }) => hasRoom &&
-                    allowed.includes((row.live ?? row.current).blockType) &&
-                    (row.draft?.status !== 'dirty' || allowed.includes(row.draft.blockType)))} />
+                  destinations={destinations.filter((option) => canMoveTo(row, option))} />
               ))}
             </ul>
           </Panel>
