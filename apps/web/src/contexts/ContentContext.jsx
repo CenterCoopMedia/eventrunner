@@ -137,7 +137,7 @@ function prepareSpeakerDocs(docs) {
 // collection another way, so a script-written entry never blanks the home
 // page. A hidden entry is dropped too, because the draft preview reads the
 // unfiltered drafts.
-function prepareTimelineDocs(docs) {
+export function prepareTimelineDocs(docs) {
   return docs
     .filter(
       (doc) =>
