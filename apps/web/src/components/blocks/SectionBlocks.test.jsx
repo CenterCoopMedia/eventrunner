@@ -42,6 +42,17 @@ describe('SectionBlocks layout', () => {
     expect(left).not.toContain('Question 3?');
   });
 
+  it('keeps a run of link groups in one column, one list per group', () => {
+    const link = (n, group) => ({ id: `l${n}`, blockType: 'link_group', group, label: `Link ${n}`, url: `https://example.org/${n}` });
+    const { container } = render(
+      <SectionBlocks layout="columns" blocks={[text('Intro'), link(1, 'A'), link(2, 'B'), link(3, 'A'), link(4, 'B')]} />,
+    );
+    const [left] = columnTexts(container);
+    expect(left).toBe('Intro');
+    // The four links are one run on the right: one heading per group.
+    expect([...container.querySelectorAll('.section-blocks__rest h3')].map((h) => h.textContent)).toEqual(['A', 'B']);
+  });
+
   it('keeps the long read opening on the first block only', () => {
     const rich = (n) => ({ id: `r${n}`, blockType: 'richtext', value: `<p>Paragraph ${n}.</p>` });
     const { container } = render(

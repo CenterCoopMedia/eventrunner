@@ -24,7 +24,7 @@
 // Sections carry the block contract: `allowedBlocks` is a palette drawn from
 // the BLOCK_TYPES registry, and `defaultBlocks` are the placeholders a new
 // site is seeded with. Neither is edited here; both pass through a save.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
@@ -39,6 +39,7 @@ import { useAdminPages } from '../useAdminPages.js';
 import { contentSectionPath } from '../contentBrowser.js';
 import SectionLayoutChoice from '../components/SectionLayoutChoice.jsx';
 import { withoutSwitchedOffLinks } from '../../lib/linkTargets.js';
+import ContentContext from '../../contexts/ContentContext.jsx';
 import { contentLanguages, resolveContentVariant } from 'shared/contentLanguages';
 import { buildNavItems } from '../../lib/siteNavigation.js';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
@@ -225,6 +226,9 @@ function PageEditor({ mode }) {
   const inPublicLanguage = (record, kind) => (opensInSpanish && record
     ? resolveContentVariant(record, kind, 'es', eventConfig).value
     : record);
+  // The published timeline (ContentProvider), read softly: the editor also
+  // runs where no public content is mounted.
+  const publishedTimeline = useContext(ContentContext)?.timeline ?? [];
   // The pages a link can lead to once this page is published: the
   // published pages, with this page as it is being edited in place of its
   // published record (a new path or visibility counts).
@@ -243,6 +247,8 @@ function PageEditor({ mode }) {
       // the reader's language, as PublicLanguageRuntime projects it after.
       .map((row) => (row.live ? publicContentDoc(row.live) : null))
       .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
+      // A timeline block draws only once the timeline has a published entry.
+      .filter((block) => block.blockType !== 'timeline' || publishedTimeline.length > 0)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       .map((block) => inPublicLanguage(block, 'block')),
     features,

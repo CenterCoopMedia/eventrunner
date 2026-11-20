@@ -101,12 +101,23 @@ export default function SectionBlocks({ blocks, layout = 'reading' }) {
     // then its picture, or a list of places split down the middle. The
     // right column is marked so a page's opening (the long read drop cap)
     // stays on the first block only.
-    const half = Math.ceil(blocks.length / 2);
+    // A run of link groups stays whole: its links are listed under one
+    // heading per group, so the split falls before the run (or after it,
+    // when the run opens the section).
+    let half = Math.ceil(blocks.length / 2);
+    const insideLinks = (at) => at > 0 && at < blocks.length
+      && blocks[at].blockType === 'link_group' && blocks[at - 1].blockType === 'link_group';
+    if (insideLinks(half)) {
+      let start = half;
+      while (insideLinks(start)) start -= 1;
+      if (start > 0) half = start;
+      else while (insideLinks(half)) half += 1;
+    }
     return (
       <div className="section-blocks-frame">
         <div className="section-blocks section-blocks--columns">
           <div className="space-y-lg">{renderBlocks(blocks.slice(0, half))}</div>
-          {blocks.length > 1 ? (
+          {half < blocks.length ? (
             <div className="section-blocks__rest space-y-lg">{renderBlocks(blocks.slice(half))}</div>
           ) : null}
         </div>
