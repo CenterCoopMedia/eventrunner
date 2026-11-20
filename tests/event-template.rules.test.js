@@ -112,7 +112,7 @@ describe('two event deployments from one template', () => {
     expect(event.name).toBe('Next Example Summit');
     expect(event.legal.operatorName).toBe('Example Newsroom Network');
     expect((await dbs[TARGET].doc('config/theme').get()).data().radius).toBe('round');
-    expect((await dbs[TARGET].doc('config/features').get()).data().coreWebVitals).toBe(false);
+    expect((await dbs[TARGET].doc('config/features').get()).data()).not.toHaveProperty('coreWebVitals');
     expect((await dbs[SOURCE].doc('config/features').get()).data().coreWebVitals).toBe(true);
     expect((await dbs[TARGET].doc('config/template').get()).data().status).toBe('applied');
     expect((await dbs[TARGET].doc('config/bootstrap').get()).data().adminEmails)

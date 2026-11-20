@@ -1124,14 +1124,15 @@ describe('feature flags', () => {
       expect(inputs[0]).toHaveAccessibleName();
       expect(inputs[0]).toHaveAccessibleDescription();
       const card = inputs[0].closest('.admin-feature-card');
-      expect(card).toHaveAttribute('data-enabled', key === 'schedule' ? 'true' : 'false');
-      expect(within(card).getByText(key === 'schedule' ? 'On' : 'Off')).toBeInTheDocument();
+      const enabled = key === 'schedule' || key === 'coreWebVitals';
+      expect(card).toHaveAttribute('data-enabled', enabled ? 'true' : 'false');
+      expect(within(card).getByText(enabled ? 'On' : 'Off')).toBeInTheDocument();
     }
     for (const heading of ['Public content', 'Attendees and access', 'Session tools', 'Feedback and browser tools']) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
     }
-    expect(screen.getByRole('switch', { name: 'Field performance monitoring' })).not.toBeChecked();
-    expect(screen.getByText('1 of 21 features on. Changes take effect after you save.')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Field performance monitoring' })).toBeChecked();
+    expect(screen.getByText('2 of 21 features on. Changes take effect after you save.')).toBeInTheDocument();
 
     const schedule = screen.getByRole('switch', { name: 'Public schedule' });
     fireEvent.click(screen.getByText('Show the public schedule.'));
@@ -1142,7 +1143,7 @@ describe('feature flags', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('sends every known flag, because an omitted flag means disabled', async () => {
+  it('sends every known flag with its current value', async () => {
     await renderAt('/admin/features');
     await pushConfig('features', { schedule: true, speakers: false });
 
@@ -1158,9 +1159,9 @@ describe('feature flags', () => {
     const payload = bodyOf(0).features;
     expect(payload.speakers).toBe(true);
     expect(payload.schedule).toBe(true);
-    // Flags never touched are still present, explicitly false.
+    // Untouched flags keep their defaults.
     expect(payload.badges).toBe(false);
-    expect(payload.coreWebVitals).toBe(false);
+    expect(payload.coreWebVitals).toBe(true);
     expect(Object.keys(payload).sort()).toEqual([...KNOWN_FEATURE_KEYS].sort());
     expect(Object.values(payload).every((v) => typeof v === 'boolean')).toBe(true);
   });

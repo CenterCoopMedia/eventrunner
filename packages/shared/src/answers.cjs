@@ -50,7 +50,7 @@ const {
 const { safeUrlHref } = require('./urlSafety.cjs');
 const { isEmailAddress } = require('./email.cjs');
 
-/** New-site defaults. Runtime readers keep omitted flags off on existing sites. */
+/** New-site defaults written to config/features. */
 const DEFAULT_ON_FEATURES = Object.freeze(['schedule', 'speakers', 'sponsors', 'attendeeDirectory', 'badges', 'customBadges', 'liveUpdates', 'changeRequests']);
 
 /**
@@ -272,7 +272,10 @@ function parseAnswersFile(text) {
 function buildFeatures(overrides = {}) {
   const warnings = [];
   const features = {};
-  for (const key of KNOWN_FEATURE_KEYS) features[key] = DEFAULT_ON_FEATURES.includes(key);
+  for (const key of KNOWN_FEATURE_KEYS) {
+    // Monitoring defaults on when the stored flag is absent. Write only a choice.
+    if (key !== 'coreWebVitals') features[key] = DEFAULT_ON_FEATURES.includes(key);
+  }
   for (const [key, value] of Object.entries(overrides || {})) {
     if (!KNOWN_FEATURE_KEYS.includes(key)) {
       warnings.push(`features.${key}: unknown feature key, ignored`);

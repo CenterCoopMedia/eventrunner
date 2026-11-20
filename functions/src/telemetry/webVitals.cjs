@@ -55,7 +55,8 @@ function expiryForDay(day) {
 async function featureEnabled(db) {
   try {
     const snapshot = await db.collection('config').doc('features').get();
-    return snapshot.exists === true && snapshot.data()?.[FEATURE_KEY] === true;
+    const value = snapshot.data()?.[FEATURE_KEY];
+    return snapshot.exists === true && (value === undefined || value === true);
   } catch {
     return false;
   }

@@ -124,11 +124,11 @@ export const features = {
   updates: true,
   autoApproveTicketHolders: false,
   publicAttendeeProfiles: false,
-  coreWebVitals: false,
   webmcpPublic: false,
   webmcpAdmin: false,
   changeRequests: false,
   socialFeed: false,
+  coreWebVitals: false,
 };
 
 export const theme = {

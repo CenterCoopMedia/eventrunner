@@ -247,13 +247,13 @@ admin Content editor like any other page) and an operator clears `legal.reviewRe
 complete**). Nothing in the platform ever asserts another organization's
 terms on the client's behalf; the templates are a starting point, not a finished document.
 
-The fresh Privacy policy also has conditional clauses for **Field performance monitoring**. Each
-UTC daily aggregate expires 30 days after its day starts, so one observation is scheduled to expire
-after 29 to 30 days. The feature starts off. Counsel reviews those clauses before an operator turns
-it on. On an existing site, init does not replace a privacy block that the client edited. Review and
-add the current performance notice and retention text in the Content editor before activation. The
-code release and this onboarding step do not activate monitoring for a client.
-An event template does not carry another client's monitoring opt-in.
+The Privacy policy has conditional clauses for **Field performance monitoring**, which is on by
+default for client sites. The next deploy adds the approved clauses to the public `/privacy` page
+if that site's published CMS copy lacks them. Browsers wait for the public privacy page before
+sending a beacon. Each UTC daily aggregate expires 30 days after its day starts, so one observation
+is scheduled to expire after 29 to 30 days. To disable monitoring, go to **Settings → Features**,
+switch off **Field performance monitoring**, and save. An event template leaves this choice
+to the new site.
 
 ## 4. Readiness gating (`--check`)
 

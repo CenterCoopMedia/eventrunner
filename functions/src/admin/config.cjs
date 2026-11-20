@@ -43,9 +43,8 @@
  *      not a safe absolute URL, are refused by the shared validator on
  *      the merged result. Arrays replace on merge, so `milestones: []`
  *      clears the list. To clear an optional nested value, send it explicitly null.
- *      features/theme/badges stay whole-doc replaces (their validators
- *      cover the full shape, and omitted feature flags defaulting off is
- *      the §2.2 contract). Every write stamps { updatedAt, updatedBy: email }. On
+ *      features/theme/badges stay whole-doc replaces. The admin sends every
+ *      feature's current setting. Every write stamps { updatedAt, updatedBy: email }. On
  *      config/event the verification pair is carried forward from the
  *      stored doc so a save cannot drop it — and the read is part of the
  *      write transaction, so a verify-sender-domain.cjs write landing

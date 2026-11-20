@@ -145,7 +145,7 @@ async function readDeployment({ db }) {
 
   return {
     event: config.event,
-    features: config.features,
+    features: { coreWebVitals: true, ...config.features },
     theme: config.theme,
     launch,
     pages,

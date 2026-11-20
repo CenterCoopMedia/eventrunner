@@ -622,6 +622,11 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      # Remove after all active sites have deployed this release.
+      - name: Apply the field performance default
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+        run: node scripts/migrate-web-vitals-default.cjs
       - name: Generate the content snapshot out of tree
         # --out writes to $RUNNER_TEMP, never into apps/web/src/generated
         # (spec §8.6) — the committed synthetic snapshot is untouched by

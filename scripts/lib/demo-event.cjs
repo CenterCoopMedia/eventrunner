@@ -141,7 +141,7 @@ function demoEvent() {
   if (!built.ok) throw new Error(`demo fixture no longer validates: ${built.errors.join('; ')}`);
   const config = built.docs;
   // Keep this past-event demo’s existing choices separate from new-site defaults.
-  Object.assign(config.features, { updates: true, attendeeDirectory: false, icsExport: false, badges: false, customBadges: false, liveUpdates: false, changeRequests: false });
+  Object.assign(config.features, { updates: true, attendeeDirectory: false, icsExport: false, badges: false, customBadges: false, liveUpdates: false, changeRequests: false, coreWebVitals: false });
   Object.assign(config.theme.logos, { primary: 'branding/nclocal-logo.png', mark: 'branding/nclocal-logo.png', footer: 'branding/nclocal-logo.png', ogDefault: 'branding/nclocal-og.png', favicon: 'branding/nclocal-favicon.svg' });
   Object.assign(config.event, { historicalDemo: true, announcedAt: '2026-01-01T12:00:00', archivedAt: '2026-03-28T00:00:00' });
   config.event.seo.defaultOgImagePath = 'branding/nclocal-og.png';

@@ -70,10 +70,13 @@ async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = 
     results.push(row);
     effective[docId] = decision.value;
     if (decision.action === 'skip' || dryRun) continue;
+    // An explicit answer must be distinguishable from the old seed's false default.
+    const updatedBy = docId === 'features' && Object.hasOwn(decision.value, 'coreWebVitals')
+      ? 'init-event-answers' : SEED_ACTOR.email;
     await ref.set({
       ...decision.value,
       updatedAt: new Date(now()),
-      updatedBy: SEED_ACTOR.email,
+      updatedBy,
     });
   }
   return { results, effective };

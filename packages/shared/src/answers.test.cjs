@@ -74,7 +74,11 @@ test('new sites start with the attendee feed off', () => {
   assert.equal(buildFeatures({ socialFeed: true }).features.socialFeed, true);
 });
 
-test('new sites start with field performance monitoring off', () => {
-  assert.equal(buildFeatures().features.coreWebVitals, false);
+test('new sites leave field performance monitoring to the runtime default', () => {
+  assert.equal(Object.hasOwn(buildFeatures().features, 'coreWebVitals'), false);
   assert.equal(buildFeatures({ coreWebVitals: true }).features.coreWebVitals, true);
+});
+
+test('a fresh client can explicitly disable field performance monitoring', () => {
+  assert.equal(buildFeatures({ coreWebVitals: false }).features.coreWebVitals, false);
 });

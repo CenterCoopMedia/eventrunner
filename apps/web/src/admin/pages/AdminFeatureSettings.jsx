@@ -1,7 +1,7 @@
 // Feature flags (issue #14), wired to updateFeatures.
 //
-// config/features is a WHOLE-DOC replace and an omitted flag means disabled
-// (spec §2.2), so this form always sends every known key — the key list comes
+// config/features is a whole-document replace, so this form always sends
+// every known key with its resolved value. The key list comes
 // from the shared schema (KNOWN_FEATURE_KEYS), which is the same list the
 // server validates against, so a new flag appears here the moment it is added
 // there. Until SOCIAL_FEED_RELEASED (#507 acceptance), the attendee feed has
@@ -106,7 +106,7 @@ function FeatureChoice({ featureKey, checked, onChange, error }) {
   );
 }
 
-/** Every known flag, defaulted off, overlaid with what is configured now. */
+/** The resolved Boolean value of every known flag. */
 function toForm(features) {
   const out = {};
   for (const key of KNOWN_FEATURE_KEYS) out[key] = features?.[key] === true;

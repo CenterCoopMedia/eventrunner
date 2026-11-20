@@ -160,6 +160,7 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
   // committed snapshot stands (spec §2.4 fail-soft first paint).
   const [storedOverlay, setOverlay] = useState({ readSource, ...EMPTY_OVERLAY });
   const overlay = storedOverlay.readSource === readSource ? storedOverlay : EMPTY_OVERLAY;
+  const [publicPagesConfirmed, setPublicPagesConfirmed] = useState(false);
   const sessionRef = useRef(null);
   const requestedRef = useRef(new Set());
   const neededCollections = useMemo(
@@ -176,6 +177,7 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
     // stale overlay from the other source must not linger.
     setOverlay((previous) => previous.readSource === readSource
       ? previous : { readSource, ...EMPTY_OVERLAY });
+    setPublicPagesConfirmed(false);
     const session = { active: true, subscriptions: new Map() };
     sessionRef.current = session;
     return () => {
@@ -196,9 +198,12 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
       const onNext = (docs) => {
         if (session.active) setOverlay((prev) => ({ ...prev, [key]: docs }));
       };
+      const onConfirmed = name === 'cmsPages' && readSource === 'published'
+        ? (confirmed) => { if (session.active) setPublicPagesConfirmed(confirmed); }
+        : undefined;
       const unsubscribe = name === 'speakers_public'
         ? subscribeSpeakersPublic(onNext)
-        : subscribeContentCollection(name, readSource, onNext);
+        : subscribeContentCollection(name, readSource, onNext, onConfirmed);
       session.subscriptions.set(name, unsubscribe);
     }
     // Route changes only add streams. The source lifecycle owns cleanup.
@@ -299,6 +304,7 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
 
     return {
       readSource,
+      publicPagesConfirmed: readSource === 'published' && publicPagesConfirmed,
       source: live ? 'live' : 'snapshot',
       contentSource: overlay.cmsContent != null ? 'live' : 'snapshot',
       languageRecordsReady: overlay.cmsPages != null && overlay.cmsContent != null
@@ -318,7 +324,7 @@ export function ContentProvider({ readSource = 'published', pathname, search = '
       getPage,
       getPublicPage,
     };
-  }, [readSource, overlay, languageNeedsSchedule]);
+  }, [readSource, overlay, languageNeedsSchedule, publicPagesConfirmed]);
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }
