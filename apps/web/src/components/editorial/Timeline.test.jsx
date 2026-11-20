@@ -3,6 +3,8 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import ContentContext from '../../contexts/ContentContext.jsx';
+import EventConfigContext from '../../contexts/EventConfigContext.jsx';
 import Timeline from './Timeline.jsx';
 import TimelineDetails from '../timeline/TimelineDetails.jsx';
 import { renderInEveryStyle } from '../../test/everyStyle.jsx';
@@ -49,18 +51,26 @@ describe('Timeline', () => {
     expect(screen.queryByRole('link', { name: 'Third edition' })).toBeNull();
   });
 
-  it('isolates external links and renders invalid destinations as headings', () => {
-    inRouter(<TimelineDetails timeline={[
-      { id: 'external', title: 'External recap', url: 'https://example.org/recap' },
-      { id: 'unsafe', title: 'Unsafe link', url: '//example.org/recap', image: 'https://example.org/photo.png', alt: 'An untrusted image' },
-      { id: 'undescribed', title: 'Undescribed image', image: 'cms-images/archive/photo.png' },
-    ]} />);
+  it('isolates external links, omits invalid destinations and keeps draft preview', () => {
+    inRouter(
+      <EventConfigContext.Provider value={{ features: { schedule: true } }}>
+        <ContentContext.Provider value={{ readSource: 'draft', scheduleData: [{ id: 'draft', visible: true }] }}>
+          <TimelineDetails timeline={[
+            { id: 'external', title: 'External recap', url: 'https://example.org/recap' },
+            { id: 'unsafe', title: 'Unsafe link', url: '//example.org/recap', image: 'https://example.org/photo.png', alt: 'An untrusted image' },
+            { id: 'undescribed', title: 'Undescribed image', image: 'cms-images/archive/photo.png' },
+            { id: 'preview', title: 'Session preview', url: '/schedule/draft?lang=es#session-materials' },
+          ]} />
+        </ContentContext.Provider>
+      </EventConfigContext.Provider>,
+    );
     const external = screen.getByRole('link', { name: 'External recap (opens in a new tab)', exact: true });
     expect(external).toHaveAttribute('target', '_blank');
     expect(external).toHaveAttribute('rel', 'noopener noreferrer');
     expect(external).toHaveAttribute('href', 'https://example.org/recap');
     expect(screen.getByRole('heading', { name: 'Unsafe link' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Unsafe link' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Session preview' })).toHaveAttribute('href', '/schedule/draft?lang=es&preview=1#session-materials');
     expect(screen.queryByRole('img')).toBeNull();
   });
 
