@@ -36,7 +36,9 @@
       // A slow first load says so; a fast one paints nothing. This runs in the
       // head, ahead of the app's stylesheet, so it never waits for it. React
       // replaces #console-boot on its first render, and a later tick finds
-      // nothing to change.
+      // nothing to change. At ten seconds a stylesheet that has not arrived
+      // stops blocking paint, so the delay line and Reload can show; it
+      // applies again the moment it loads.
       (() => {
         const update = () => {
           const boot = document.getElementById('console-boot');
@@ -46,7 +48,15 @@
             ? 'The console is taking longer than usual to open. You can keep waiting or reload this page.'
             : elapsed >= 1000 ? 'Opening the console…' : '';
           boot.querySelector('button').hidden = elapsed < 10000;
+          if (elapsed < 10000) return;
+          for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
+            if (link.sheet || link.media === 'print') continue;
+            link.addEventListener('load', () => { link.media = 'all'; }, { once: true });
+            link.media = 'print';
+          }
         };
+        // The body may parse after a deadline has passed; start from there.
+        document.addEventListener('DOMContentLoaded', update, { once: true });
         [1000, 10000].filter((at) => at > performance.now())
           .forEach((at) => setTimeout(update, Math.max(0, Math.ceil(at - performance.now()))));
         document.addEventListener('click', (event) => {

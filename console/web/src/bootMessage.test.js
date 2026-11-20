@@ -58,4 +58,28 @@ describe('the first-load message', () => {
     expect(doc.querySelector('link[rel="stylesheet"]')).toBeNull();
     expect(doc.body.querySelector('script:not([src])')).toBeNull();
   });
+
+  it('starts from the right line when the page arrives after both deadlines', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    vi.advanceTimersByTime(12000);
+    const boot = mountBoot();
+    expect(vi.getTimerCount()).toBe(0);
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    expect(boot.querySelector('[role="status"]').textContent).toMatch('taking longer than usual');
+    expect(boot.querySelector('button').hidden).toBe(false);
+  });
+
+  it('stops a stylesheet that has not arrived at ten seconds from holding the page, until it loads', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    mountBoot();
+    const link = Object.assign(document.createElement('link'), { rel: 'stylesheet', href: '/assets/app.css' });
+    document.head.append(link);
+    vi.advanceTimersByTime(9999);
+    expect(link.media).toBe('');
+    vi.advanceTimersByTime(1);
+    expect(link.media).toBe('print');
+    link.dispatchEvent(new Event('load'));
+    expect(link.media).toBe('all');
+    link.remove();
+  });
 });
