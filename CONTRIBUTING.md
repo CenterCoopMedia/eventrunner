@@ -205,6 +205,9 @@ HTML has drifted from a fresh render — the same freshness rule
 | `tests/*.rules.test.js` | Lint and rules emulators |
 | `console/web/**` | Lint, the dependency audit policy, web unit tests, web build, and console E2E |
 | `console/functions/**` | Lint, the dependency audit policy, shared/functions unit tests, and console E2E |
+| `console/firestore.rules` or `console/firestore.indexes.json` | Rules emulators |
+| `console/tests/*.rules.test.js` | Lint and rules emulators |
+| `console/firebase.json` | Web build and rules emulators |
 | Workflows, tool configuration, package manifests or locks, Firebase configuration, `e2e/**`, `publisher/**`, other scripts, or an unrecognized path | Full matrix: documentation checks, lint, the dependency audit policy, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
 
 Changes that match more than one row run the union of the selected tiers.
