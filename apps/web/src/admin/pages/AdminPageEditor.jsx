@@ -43,7 +43,7 @@ import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared
 import { useVenueMapImage } from '../../components/VenueMap.jsx';
 import { openStreetMapCoordinates } from '../../components/AreaMap.jsx';
 import { builtInSectionBlockTypes } from 'shared/page';
-import { isStarterContent } from 'shared/seed';
+import { isStarterContent, publicContentDoc } from 'shared/seed';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
 import { moveItem, nextStoredOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
@@ -219,7 +219,9 @@ function PageEditor({ mode }) {
   // the page a link leads to.
   const sectionPreviewBlocks = (section) => withoutSwitchedOffLinks(
     contentRows
-      .map((row) => row.live)
+      // The public shape first (shared/seed publicContentDoc), as the site's
+      // content provider does, so starter text is judged the same way.
+      .map((row) => (row.live ? publicContentDoc(row.live) : null))
       .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     features,
