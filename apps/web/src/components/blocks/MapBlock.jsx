@@ -1,11 +1,12 @@
 import { googleMapsEmbedUrl } from 'shared/urlSafety';
+import { isStarterContent } from 'shared/seed';
 import { usePublicLanguage } from '../../contexts/PublicLanguageContext.jsx';
 
 export default function MapBlock({ block, preview = false }) {
   const { language, text } = usePublicLanguage();
   const src = googleMapsEmbedUrl(block?.embedUrl);
   const label = typeof block?.label === 'string' ? block.label.trim() : '';
-  if (!src || src !== block.embedUrl || !label) return null;
+  if (!src || src !== block.embedUrl || !label || isStarterContent(block)) return null;
 
   const address = typeof block.address === 'string' ? block.address.trim() : '';
   const mapsHref = new URL('https://www.google.com/maps/search/');

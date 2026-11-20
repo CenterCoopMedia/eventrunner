@@ -73,13 +73,15 @@ describe('block renderer registry', () => {
     );
   });
 
-  it('renders nothing for an invalid stored map source or missing label', () => {
+  it('renders nothing for an invalid, unlabeled or starter map', () => {
     const { map } = SAMPLE_BLOCKS;
     const { container, rerender } = render(
       <BlockRenderer block={{ ...map, embedUrl: 'https://www.google.com/maps/search?q=fixture' }} />,
     );
     expect(container).toBeEmptyDOMElement();
     rerender(<BlockRenderer block={{ ...map, label: '' }} />);
+    expect(container).toBeEmptyDOMElement();
+    rerender(<BlockRenderer block={{ ...map, embedUrl: 'https://www.google.com/maps/embed?pb=[Replace]' }} />);
     expect(container).toBeEmptyDOMElement();
   });
 
