@@ -286,6 +286,31 @@ describe('Layout branding mark', () => {
   });
 });
 
+describe('Layout footer logo', () => {
+  it('shows the footer slot from Storage', () => {
+    const { container } = renderShell({ footer: 'branding/abc123/footer.png' });
+    const src = container.querySelector('footer img').getAttribute('src');
+    expect(src).toContain('firebasestorage.googleapis.com');
+    expect(src).toContain(encodeURIComponent('branding/abc123/footer.png'));
+  });
+
+  it('falls back to the uploaded primary logo', () => {
+    const { container } = renderShell({ primary: 'branding/abc123/logo.png', footer: 'branding/logo.svg' });
+    expect(container.querySelector('footer img').getAttribute('src')).toContain(
+      encodeURIComponent('branding/abc123/logo.png'),
+    );
+  });
+
+  it('shows no footer logo for seeded placeholders, or once the object is gone', () => {
+    const { container, unmount } = renderShell({ primary: 'branding/logo.svg', footer: 'branding/logo.svg' });
+    expect(container.querySelector('footer img')).toBeNull();
+    unmount();
+    const gone = renderShell({ footer: 'branding/abc123/deleted.png' });
+    fireEvent.error(gone.container.querySelector('footer img'));
+    expect(gone.container.querySelector('footer img')).toBeNull();
+  });
+});
+
 describe('Layout header', () => {
   it('takes the base header when the theme names none', () => {
     const { container } = renderShell({});

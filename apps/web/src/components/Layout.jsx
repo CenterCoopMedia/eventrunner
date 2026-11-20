@@ -346,11 +346,17 @@ export default function Layout() {
   const primary = typeof theme?.logos?.primary === 'string' ? theme.logos.primary.trim() : '';
   const uploadedPrimary = primary.split('/').length > 2 ? brandingSrc(primary) : null;
   const markSrc = brandingSrc(theme?.logos?.mark);
+  // The Branding tab's footer slot, falling back to the uploaded primary
+  // logo as that tab promises. A flat seeded placeholder is not a client
+  // logo, so like the header the footer shows only uploaded assets.
+  const footerSlot = typeof theme?.logos?.footer === 'string' ? theme.logos.footer.trim() : '';
+  const footerLogo = footerSlot.split('/').length > 2 ? brandingSrc(footerSlot) : uploadedPrimary;
   // A slot can point at an object that has since been deleted from the
   // bucket. The shell must degrade to the wordmark, never to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
   // The address that failed, so a newly published logo gets its own try.
   const [failedLogo, setFailedLogo] = useState(null);
+  const [failedFooterLogo, setFailedFooterLogo] = useState(null);
   // A runtime config/event doc can replace `legal` wholesale (shallow
   // overlay) with a partial or malformed object; fall back per-field so one
   // bad admin write never white-screens the shell that wraps every route.
@@ -642,6 +648,16 @@ export default function Layout() {
       <footer id={FOOTER_ID} className="bg-surface">
         <div className="stage">
           <div className="section-rule pb-xl pt-md font-data text-caption text-text-secondary">
+            {footerLogo && failedFooterLogo !== footerLogo ? (
+              <img
+                src={footerLogo}
+                alt=""
+                className="site-footer-logo mb-sm h-12 w-auto max-w-[12rem] object-contain"
+                height={48}
+                loading="lazy"
+                onError={() => setFailedFooterLogo(footerLogo)}
+              />
+            ) : null}
             <p className="font-heading text-body font-semibold text-text-primary">
               {eventConfig?.name}
             </p>
