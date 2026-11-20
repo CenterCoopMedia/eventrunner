@@ -38,6 +38,36 @@ describe('StartEvent', () => {
     expect(typeof body.timezone).toBe('string');
   });
 
+  it('lets an Owner add the event to one of their organizations instead of a new one', async () => {
+    serveApi({
+      getSignupLink: { organizationName: 'Example Press', status: 'open', organizations: [{ id: 'o1', name: 'NC Local' }] },
+      redeemSignupLink: { orgId: 'o1', appId: 'a2' },
+    });
+    page();
+    const existing = await screen.findByRole('radio', { name: 'Add to NC Local' });
+    expect(existing).toBeChecked();
+    expect(screen.queryByLabelText('Organization name')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'A new organization' }));
+    expect(screen.getByLabelText('Organization name')).toHaveValue('Example Press');
+    fireEvent.click(existing);
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+    expect(await screen.findByText('Setup page')).toBeInTheDocument();
+    const [body] = callsTo('redeemSignupLink');
+    expect(body).toMatchObject({ linkId: 'l1', token: 'tok123', orgId: 'o1' });
+    expect(body).not.toHaveProperty('organizationName');
+  });
+
+  it('shows a refusal for an organization the person no longer owns and keeps the choice open', async () => {
+    serveApi({
+      getSignupLink: { organizationName: 'Example Press', status: 'open', organizations: [{ id: 'o1', name: 'NC Local' }] },
+      redeemSignupLink: refused('forbidden', 'Only an Owner of that organization can add an event to it. Choose another or start a new organization.'),
+    });
+    page();
+    fireEvent.click(await screen.findByRole('button', { name: 'Start' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only an Owner of that organization');
+    expect(screen.getByRole('radio', { name: 'A new organization' })).toBeEnabled();
+  });
+
   it('checks the name before it spends the link', async () => {
     serveApi({ getSignupLink: { organizationName: 'Example Press', status: 'open' } });
     page();

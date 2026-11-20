@@ -144,12 +144,37 @@ function applicationForClient(id, data, { role, operator, ownersNeeded, signups,
   return body;
 }
 
-/** A new draft request, with nothing answered but what the signup form gave. */
-function newApplicationData({ orgId, organizationName, timezone, uid, at }) {
+/**
+ * What a new request in the same organization starts with: the website,
+ * mailing address and reply address of its newest request that was not
+ * withdrawn or declined. `requests` must all be that organization's.
+ * @param {object[]} requests application documents of one organization
+ * @returns {{ website: string, address: string, replyTo: string }|null}
+ */
+function carriedAnswers(requests) {
+  const latest = requests
+    .filter((data) => !CLOSED.includes(data.status))
+    .sort((a, b) => (toMillis(b.createdAt) || 0) - (toMillis(a.createdAt) || 0))[0];
+  if (!latest) return null;
+  const answers = withDefaults(latest.answers);
+  return { website: answers.organization.website, address: answers.organization.address, replyTo: answers.email.replyTo };
+}
+
+/**
+ * A new draft request, with nothing answered but what the signup form gave
+ * and, for an organization's next event, what `carriedAnswers` found.
+ */
+function newApplicationData({ orgId, organizationName, timezone, uid, at, carried = null }) {
+  const answers = emptyAnswers({ organizationName, timezone: typeof timezone === 'string' ? timezone.trim().slice(0, 64) : '' });
+  if (carried) {
+    answers.organization.website = carried.website;
+    answers.organization.address = carried.address;
+    answers.email.replyTo = carried.replyTo;
+  }
   return {
     orgId,
     status: 'draft',
-    answers: emptyAnswers({ organizationName, timezone: typeof timezone === 'string' ? timezone.trim().slice(0, 64) : '' }),
+    answers,
     frozen: null,
     createdBy: uid,
     createdAt: at,
@@ -217,6 +242,7 @@ module.exports = {
   COLLECTION,
   ARCHIVED_MESSAGE,
   WITHDRAWABLE,
+  carriedAnswers,
   getApplication,
   historyEntry,
   listApplications,

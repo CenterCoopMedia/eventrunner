@@ -3,7 +3,10 @@
 /**
  * Signup links (ADR 0007, amendment 2026-11-04): the only way in. An operator
  * issues one after an invoice is paid. It works once, for whoever opens it
- * first, and that person's organization and draft request are made together.
+ * first. That person either adds the event to an organization they are an
+ * Owner of, or makes a new organization; the draft request is made with it.
+ * Membership comes from the signed-in account, read in the redeem
+ * transaction, never from the link or the request alone.
  *
  * `signup_links/{linkId}` {
  *   organizationName, tokenHash,  // sha256 hex of the random token, never the token
@@ -20,8 +23,8 @@
 
 const { randomBytes } = require('node:crypto');
 const { ConsoleError } = require('./http.cjs');
-const { toIso, toMillis, validOrgId } = require('./access.cjs');
-const { COLLECTION: APPLICATIONS, newApplicationData } = require('./applications.cjs');
+const { requireOwner, toIso, toMillis, validOrgId } = require('./access.cjs');
+const { COLLECTION: APPLICATIONS, carriedAnswers, newApplicationData } = require('./applications.cjs');
 const { readSignupTerms } = require('./consoleSettings.cjs');
 const { hostName } = require('./hostName.cjs');
 const { hashToken, sameHash } = require('./invites.cjs');
@@ -148,34 +151,71 @@ function refuseUnlessOpen(link, at) {
 
 const usedByThisUser = (link, user) => link.status === 'used' && link.usedBy === user.uid;
 
+/** The organizations the signed-in person is an Owner of, by name. */
+async function ownedOrganizations(db, user) {
+  const memberships = await db.collectionGroup('members').where('uid', '==', user.uid).get();
+  const owned = memberships.docs.filter((doc) => doc.data().role === 'owner');
+  const orgs = await Promise.all(owned.map((doc) => doc.ref.parent.parent.get()));
+  return owned
+    .map((doc, i) => (orgs[i].exists ? { id: doc.ref.parent.parent.id, name: orgs[i].data().name } : null))
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 async function getSignupLink({ db, now = Date.now }, { body, user }) {
   const link = linkFrom(await linkRefFor(db, body).get(), body.token);
   if (usedByThisUser(link, user)) return { body: { status: 'used', orgId: link.orgId, appId: link.appId } };
   refuseUnlessOpen(link, now());
-  return { body: { organizationName: link.organizationName, status: 'open' } };
+  return { body: { organizationName: link.organizationName, status: 'open', organizations: await ownedOrganizations(db, user) } };
+}
+
+const NOT_OWNER = 'Only an Owner of that organization can add an event to it. Choose another or start a new organization.';
+
+/**
+ * The organization a redeem adds the event to: an existing one, which the
+ * caller must still be an Owner of, or a new one named in the request.
+ * Reads only, so the transaction can write after it.
+ */
+async function targetOrganization(tx, db, body, user) {
+  const get = (r) => tx.get(r);
+  if (body.orgId === undefined || body.orgId === null || body.orgId === '') {
+    return { orgRef: db.collection('organizations').doc(), organizationName: requireName(body.organizationName), carried: null, isNew: true };
+  }
+  const orgRef = db.collection('organizations').doc(body.orgId);
+  await requireOwner(db, body.orgId, user, NOT_OWNER, get);
+  const org = await get(orgRef);
+  const requests = await get(db.collection(APPLICATIONS).where('orgId', '==', body.orgId));
+  return {
+    orgRef,
+    organizationName: org.data().name,
+    carried: carriedAnswers(requests.docs.map((doc) => doc.data())),
+    isNew: false,
+  };
 }
 
 /**
- * One transaction checks the link and the terms and makes the organization,
- * its Owner and the draft request, so a refusal leaves nothing behind and two
- * clicks make one of each.
+ * One transaction checks the link, the terms and, for an existing
+ * organization, that the caller is still its Owner. It makes the draft
+ * request, and for a new organization the organization and its Owner too, so
+ * a refusal leaves nothing behind and two clicks make one of each.
  */
 async function redeemSignupLink({ db, now = Date.now }, { body, user }) {
   const ref = linkRefFor(db, body);
-  const orgRef = db.collection('organizations').doc();
   const appRef = db.collection(APPLICATIONS).doc();
   return db.runTransaction(async (tx) => {
     const link = linkFrom(await tx.get(ref), body.token);
     if (usedByThisUser(link, user)) return { status: 200, body: { orgId: link.orgId, appId: link.appId } };
     const at = new Date(now());
     refuseUnlessOpen(link, at.getTime());
-    const organizationName = requireName(body.organizationName);
+    const { orgRef, organizationName, carried, isNew } = await targetOrganization(tx, db, body, user);
     if (!(await readSignupTerms((r) => tx.get(r), db)).open) {
       throw new ConsoleError(409, 'signups-closed', 'We cannot start new event sites right now. Your link still works, so try again later.');
     }
-    tx.create(orgRef, { name: organizationName, createdAt: at, createdBy: user.uid });
-    tx.create(orgRef.collection('members').doc(user.uid), { uid: user.uid, email: user.email, role: 'owner', joinedAt: at });
-    tx.create(appRef, { ...newApplicationData({ orgId: orgRef.id, organizationName, timezone: body.timezone, uid: user.uid, at }), signupLinkId: ref.id });
+    if (isNew) {
+      tx.create(orgRef, { name: organizationName, createdAt: at, createdBy: user.uid });
+      tx.create(orgRef.collection('members').doc(user.uid), { uid: user.uid, email: user.email, role: 'owner', joinedAt: at });
+    }
+    tx.create(appRef, { ...newApplicationData({ orgId: orgRef.id, organizationName, timezone: body.timezone, uid: user.uid, at, carried }), signupLinkId: ref.id });
     tx.update(ref, { status: 'used', usedBy: user.uid, usedEmail: user.email, usedAt: at, orgId: orgRef.id, appId: appRef.id });
     return { status: 201, body: { orgId: orgRef.id, appId: appRef.id } };
   });

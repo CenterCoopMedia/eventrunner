@@ -1400,6 +1400,8 @@ A client starts from a signup link and from nowhere else. The event fee is invoi
 
 From there the client signs in, enters the details and accepts the agreement, and the build starts. No operator step follows.
 
+A client who is already an Owner of an organization can add the event to it instead of making a new one. The team carries over, and the new request starts with the website, mailing address and reply address of that organization's latest request that was not withdrawn or declined. The name you entered is then not used.
+
 A link works once and expires after 30 days. It is not tied to an email address, so a forwarded link works for the first person who uses it. The page lists each link with its status, who used it and when. Select **Revoke** on an open link that went to the wrong place. When a client says a link says it is used, expired or revoked, create a new one.
 
 If creating a link says sign-ups are closed, the message names what is missing: the agreement, the client folder, the billing account or the region. Set them at `/review/settings` (§12.1 step 9). While one is missing, an open link also refuses, and so does accepting the agreement.

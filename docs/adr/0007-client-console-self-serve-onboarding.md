@@ -299,14 +299,21 @@ a request, and nothing holds it before the build.
 to an email address, so a forwarded link works, once, for the first person with a verified address who
 uses it. That person becomes the Owner of a new organization with one draft request. Anyone holding an
 unused link can do the same, and the controls on that are single use, expiry and revocation. A person
-who finds a link already used is told to ask for a new one. Each link makes one organization and one
-request, so a client's second event needs a second link and is a second organization.
+who finds a link already used is told to ask for a new one. ~~Each link makes one organization and one
+request, so a client's second event needs a second link and is a second organization.~~ Each link makes
+one request. A signed-in person who is an Owner of an organization can add it there, so the team carries
+over; anyone can instead make a new organization and become its Owner
+([#610](https://github.com/CenterCoopMedia/eventrunner/issues/610)). The server reads the Owner
+membership in the redeem transaction; a link or a request naming an organization grants nothing. A request
+added to an existing organization starts with the website, mailing address and reply address of that
+organization's newest request that was not withdrawn or declined, never another organization's
+([#652](https://github.com/CenterCoopMedia/eventrunner/issues/652)).
 
 The record is `signup_links/{linkId}`, with no browser access. The token is 32 random bytes, stored only
 as its SHA-256, compared in constant time, and carried after `#` in the URL. A link expires 30 days
 after it is created, and an operator can revoke it while it is open. The URL appears once, in the answer
-that creates it. Using a link is one transaction, which creates the organization, the Owner and the
-draft and marks the link used. The same person repeating it gets the same organization and request.
+that creates it. Using a link is one transaction, which creates the draft, and for a new organization the
+organization and its Owner, and marks the link used. The same person repeating it gets the same organization and request.
 
 **Alternatives rejected.**
 
