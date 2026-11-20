@@ -40,14 +40,20 @@
       // stops blocking paint, so the delay line and Reload can show; it
       // applies again the moment it loads.
       (() => {
-        const update = () => {
+        const controls = () => {
           const boot = document.getElementById('console-boot');
-          if (!boot) return;
+          const status = boot?.querySelector('[role="status"]');
+          const reload = boot?.querySelector('button');
+          return status && reload ? { status, reload } : null;
+        };
+        const update = () => {
+          const found = controls();
+          if (!found) return;
           const elapsed = performance.now();
-          boot.querySelector('[role="status"]').textContent = elapsed >= 10000
+          found.status.textContent = elapsed >= 10000
             ? 'The console is taking longer than usual to open. You can keep waiting or reload this page.'
             : elapsed >= 1000 ? 'Opening the console…' : '';
-          boot.querySelector('button').hidden = elapsed < 10000;
+          found.reload.hidden = elapsed < 10000;
           if (elapsed < 10000) return;
           for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
             if (link.sheet || link.media === 'print') continue;
@@ -57,8 +63,14 @@
         };
         // The body may arrive after a deadline has passed. The parser reaches
         // #console-boot without waiting for the app's module or stylesheet, so
-        // look for it until it exists, then start from the current line.
-        const start = () => (document.getElementById('console-boot') ? update() : setTimeout(start, 50));
+        // look for its controls until they exist, then start from the current
+        // line. Stop looking once the app has replaced it.
+        const start = () => {
+          if (controls()) return update();
+          const first = document.getElementById('root')?.firstElementChild;
+          if (first && first.id !== 'console-boot') return undefined;
+          return setTimeout(start, 50);
+        };
         start();
         [1000, 10000].filter((at) => at > performance.now())
           .forEach((at) => setTimeout(update, Math.max(0, Math.ceil(at - performance.now()))));

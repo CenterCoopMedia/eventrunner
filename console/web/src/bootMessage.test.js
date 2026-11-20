@@ -89,4 +89,36 @@ describe('the first-load message', () => {
     expect(link.media).toBe('all');
     link.remove();
   });
+
+  it('waits for both controls when the fallback arrives in pieces', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    vi.advanceTimersByTime(12000);
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    // The stream pauses inside #root, then again inside the fallback.
+    document.body.innerHTML = '<div id="root"></div>';
+    new Function(doc.head.querySelector('script:not([src])').textContent)();
+    vi.advanceTimersByTime(100);
+    document.getElementById('root').innerHTML = '<div id="console-boot"></div>';
+    vi.advanceTimersByTime(200);
+    const boot = document.getElementById('console-boot');
+    boot.append(...document.importNode(doc.getElementById('console-boot'), true).children);
+    vi.advanceTimersByTime(50);
+    expect(boot.querySelector('[role="status"]').textContent).toMatch('taking longer than usual');
+    expect(boot.querySelector('button').hidden).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('stops looking once the app has replaced the fallback before the first look', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    document.body.innerHTML = '';
+    new Function(doc.head.querySelector('script:not([src])').textContent)();
+    document.body.innerHTML = '<div id="root"><h1>Your organizations</h1></div>';
+    vi.advanceTimersByTime(50);
+    // Only the two deadline ticks remain, and they find nothing to change.
+    expect(vi.getTimerCount()).toBe(2);
+    vi.advanceTimersByTime(10000);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(document.getElementById('root').textContent).toBe('Your organizations');
+  });
 });
