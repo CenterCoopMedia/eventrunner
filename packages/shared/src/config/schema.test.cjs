@@ -144,6 +144,19 @@ test('validateEventConfig: a stored registration label is never empty', () => {
   assert.ok(result.errors.some((e) => e.includes('registration.actionLabel')));
 });
 
+test('validateEventConfig applies the ticket button label and style limits', () => {
+  const validate = (settings) => validateEventConfig({
+    ...VALID_EVENT,
+    registration: { ...VALID_EVENT.registration, ...settings },
+  });
+  assert.equal(validate({ ticketButtonLabel: 'x'.repeat(30), ticketButtonStyle: 'outline' }).ok, true);
+  assert.equal(validate({ ticketButtonLabel: null, ticketButtonStyle: 'primary' }).ok, true);
+  for (const label of [' ', 'x'.repeat(31), 'Two\nlines', 12]) {
+    assert.ok(validate({ ticketButtonLabel: label }).errors.some((error) => error.startsWith('registration.ticketButtonLabel:')));
+  }
+  assert.ok(validate({ ticketButtonStyle: 'other' }).errors.some((error) => error.startsWith('registration.ticketButtonStyle:')));
+});
+
 test('validateEventConfig rejects days[] dates that are not strictly ascending', () => {
   const outOfOrder = validateEventConfig({
     ...VALID_EVENT,

@@ -48,6 +48,21 @@ describe('registration provider destination', () => {
     ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: false, catalogRevision: 0 });
     render(surface());
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2));
+    for (const link of screen.getAllByRole('link')) expect(link).toHaveClass('bg-accent');
+  });
+
+  it('shows the configured text and outline on both native ticket links', async () => {
+    state.eventConfig.registration.ticketButtonLabel = '<b>Reserve a seat</b>';
+    state.eventConfig.registration.ticketButtonStyle = 'outline';
+    ticketingRequest.mockResolvedValue(PUBLISHED);
+    const { container } = render(surface());
+    const links = await screen.findAllByRole('link', { name: '<b>Reserve a seat</b>' });
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', '/tickets');
+      expect(link).toHaveClass('bg-surface', 'border-control');
+    }
+    expect(container.querySelector('b')).toBeNull();
   });
 
   it('shows no ticket action before a Stripe catalog is published', async () => {
@@ -100,6 +115,8 @@ describe('registration provider destination', () => {
   });
 
   it.each(['manual', 'eventbrite', 'none'])('preserves the configured external action for %s', async (provider) => {
+    state.eventConfig.registration.ticketButtonLabel = 'Reserve a seat';
+    state.eventConfig.registration.ticketButtonStyle = 'outline';
     ticketingRequest.mockResolvedValue({ provider });
     render(surface());
     await waitFor(() => expect(screen.getAllByRole('link', { name: /Register externally/ })).toHaveLength(2));

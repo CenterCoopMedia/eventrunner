@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
-import { resolveRegistrationAction } from 'shared/registration';
+import { DEFAULT_TICKET_BUTTON_LABEL, resolveRegistrationAction } from 'shared/registration';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { isReadOnlyDemo } from './readOnlyDemo.js';
 import { ticketingRequest } from './ticketingCommerce.js';
@@ -86,7 +86,14 @@ export function useRegistrationLink() {
     // window is closed, so a visitor can read when sales open. An outage
     // (published is null) keeps it too: the page carries the retry control.
     if (resolved?.published === false) return null;
-    return { label: 'Get tickets', url: '/tickets', native: true };
+    const registration = eventConfig?.registration;
+    const label = typeof registration?.ticketButtonLabel === 'string' ? registration.ticketButtonLabel.trim() : '';
+    return {
+      label: label || DEFAULT_TICKET_BUTTON_LABEL,
+      style: registration?.ticketButtonStyle,
+      url: '/tickets',
+      native: true,
+    };
   }
   return resolveRegistrationLink(eventConfig);
 }

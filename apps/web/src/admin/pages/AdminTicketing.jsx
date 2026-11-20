@@ -47,6 +47,7 @@ import AdminPageHeader, {
 import AdminTableScroll from '../components/AdminTableScroll.jsx';
 import { ticketStatusLabel } from '../../lib/ticketingDetails.js';
 import TicketingConfirmation from '../components/TicketingConfirmation.jsx';
+import TicketButtonSettings from '../components/TicketButtonSettings.jsx';
 import BusyLabel from '../../components/BusyLabel.jsx';
 import CreateAccountFromTicket, { canCreateAccountFromTicket } from '../components/CreateAccountFromTicket.jsx';
 
@@ -680,9 +681,12 @@ export default function AdminTicketing() {
 
       <p className="admin-prose text-admin-sm text-admin-ink-secondary">For Stripe tickets, attendees answer the Registration form questions at checkout after you publish tickets; other attendees answer on Complete your registration.</p>
       <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} call={call} />
-      {confirmedProvider === 'stripe' ? <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
-        <StripeTicketingWorkspace call={call} />
-      </Suspense> : ['eventbrite', 'manual', 'none'].includes(confirmedProvider) ? <>
+      {confirmedProvider === 'stripe' ? <>
+        <TicketButtonSettings call={call} />
+        <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
+          <StripeTicketingWorkspace call={call} />
+        </Suspense>
+      </> : ['eventbrite', 'manual', 'none'].includes(confirmedProvider) ? <>
         <ImportPanel call={call} onImported={onImported} />
         <TicketList call={call} refreshToken={refreshToken} />
       </> : null}

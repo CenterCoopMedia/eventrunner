@@ -19,6 +19,9 @@ const { httpsUrlHref } = require('./config/values.cjs');
 
 /** The four registration statuses, in lifecycle order. */
 const REGISTRATION_STATUSES = ['pending', 'ticketed', 'approved', 'revoked'];
+const DEFAULT_TICKET_BUTTON_LABEL = 'Get tickets';
+const MAX_TICKET_BUTTON_LABEL_LENGTH = 30;
+const TICKET_BUTTON_STYLES = Object.freeze(['primary', 'outline']);
 
 // Transition table (spec §3.4), keyed "from->to" with the triggers that
 // permit each edge. `null` from-state is account creation.
@@ -132,6 +135,9 @@ function resolveRegistrationAction(eventConfig) {
 
 module.exports = {
   REGISTRATION_STATUSES,
+  DEFAULT_TICKET_BUTTON_LABEL,
+  MAX_TICKET_BUTTON_LABEL_LENGTH,
+  TICKET_BUTTON_STYLES,
   isValidTransition,
   computeEntitlement,
   hasAttendeeAccess,
