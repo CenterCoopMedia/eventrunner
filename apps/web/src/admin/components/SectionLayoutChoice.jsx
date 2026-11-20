@@ -199,7 +199,7 @@ export default function SectionLayoutChoice({ value, onChange, label, blocks, bl
         {!blocksReady ? (
           <p className="admin-section-layout__empty">Loading this section’s content…</p>
         ) : blocks.length === 0 ? (
-          <p className="admin-section-layout__empty">This section has no content yet. Add content to see the layout.</p>
+          <p className="admin-section-layout__empty">This section has no published content yet. Publish its content to see the layout.</p>
         ) : !shown ? null : (
           <div className="admin-section-layout__frames">
             <PreviewFrame width={1152} label="On a computer" scopeId={`${previewId}-computer`}>{section('computer')}</PreviewFrame>

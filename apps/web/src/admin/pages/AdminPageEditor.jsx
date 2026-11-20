@@ -208,9 +208,10 @@ function PageEditor({ mode }) {
   const { theme, eventConfig, features } = useEventConfig();
   // The count staff see is the content the section holds (both revisions of
   // one block are one block), not its seed list.
-  // What the public page would draw for a section now: its current blocks
-  // (the draft where there is one), in order, without hidden blocks or
-  // starter text the public site leaves out.
+  // What the public page draws for a section once this page is published:
+  // its published blocks (publishing the page does not publish content
+  // drafts), in order, without hidden blocks or starter text the public
+  // site leaves out.
   // A cta or link_group that leads to a section that is off, or to a page
   // that is not public, is dropped first, as the public page does
   // (lib/linkTargets.js), so the columns split the blocks the reader gets.
@@ -218,7 +219,7 @@ function PageEditor({ mode }) {
   // the page a link leads to.
   const sectionPreviewBlocks = (section) => withoutSwitchedOffLinks(
     contentRows
-      .map((row) => row.current)
+      .map((row) => row.live)
       .filter((block) => block?.section === section.id && block.visible !== false && !isStarterContent(block))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     features,
