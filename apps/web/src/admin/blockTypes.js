@@ -11,13 +11,13 @@
 export const BLOCK_TYPES = Object.freeze({
   text: {
     id: 'text',
-    label: 'Text',
+    label: 'Short text',
     description: 'A single plain-text value: Headings, labels, short copy.',
     fields: [{ id: 'value', type: 'string', required: true }],
   },
   richtext: {
     id: 'richtext',
-    label: 'Rich text',
+    label: 'Paragraphs',
     description: 'Formatted body copy rendered by the rich-text renderer.',
     fields: [{ id: 'value', type: 'richtext', required: true }],
   },
@@ -38,7 +38,7 @@ export const BLOCK_TYPES = Object.freeze({
   },
   cta: {
     id: 'cta',
-    label: 'Call to action',
+    label: 'Button',
     description: 'A button or prominent link: Label plus destination.',
     fields: [
       { id: 'label', type: 'string', required: true },
@@ -48,7 +48,7 @@ export const BLOCK_TYPES = Object.freeze({
   },
   stat: {
     id: 'stat',
-    label: 'Statistic',
+    label: 'Number',
     description:
       'A number that carries evidence: The figure and its caption, plus the four parts ' +
       'every stat must state — the finding in words, what it counts, where it came from, ' +
@@ -99,7 +99,7 @@ export const BLOCK_TYPES = Object.freeze({
   },
   faq_item: {
     id: 'faq_item',
-    label: 'FAQ item',
+    label: 'Question and answer',
     description: 'A question with its rich-text answer.',
     fields: [
       { id: 'question', type: 'string', required: true },
@@ -109,7 +109,7 @@ export const BLOCK_TYPES = Object.freeze({
   },
   link_group: {
     id: 'link_group',
-    label: 'Link group',
+    label: 'Link',
     description: 'A titled link within a named group (footers, resource lists).',
     fields: [
       { id: 'group', type: 'string', required: true },

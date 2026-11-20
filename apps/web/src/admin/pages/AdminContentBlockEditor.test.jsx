@@ -9,7 +9,7 @@
 // to them by accident.
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 // A live config/features document, when a test sets one. Null leaves the
@@ -67,6 +67,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { BLOCK_TYPE_IDS } from '../blockTypes.js';
 
 const HOME_PAGE = {
   id: 'home',
@@ -131,6 +132,11 @@ async function pasteHtml(editor, html, text) {
   await waitFor(() => expect(editor).toHaveTextContent(text));
 }
 
+/** Pick a block type the way staff do: by its radio in the picker. */
+async function chooseBlockType(label) {
+  fireEvent.click(await screen.findByRole('radio', { name: label }));
+}
+
 beforeEach(() => {
   liveFeatures = null;
   pagesLive = [HOME_PAGE];
@@ -145,19 +151,19 @@ describe('AdminContentBlockEditor value fields', () => {
   it('routes the image block’s url field through ImagePicker, not a plain text field', async () => {
     await renderAt('/admin/content/home/hero/_new');
 
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), { target: { value: 'image' } });
+    await chooseBlockType('Image');
 
     // ImagePicker's own affordance — a bare TextField never renders this.
     expect(await screen.findByRole('button', { name: /choose or upload/i })).toBeInTheDocument();
 
-    const urlInput = screen.getByLabelText('Image');
+    const urlInput = screen.getByRole('textbox', { name: 'Image' });
     expect(urlInput).not.toHaveAttribute('type', 'url');
     fireEvent.change(urlInput, { target: { value: 'cms-images/banner.jpg' } });
     expect(urlInput).toHaveValue('cms-images/banner.jpg');
 
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Banner' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
@@ -166,12 +172,30 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(body.fields.url).toBe('cms-images/banner.jpg');
   });
 
+  // The Home hero takes text, a button and an image. The picker lists those
+  // first and keeps the rest visible but disabled, with the reason.
+  it('keeps the Home hero restriction in the picker: only its own types can be chosen', async () => {
+    await renderAt('/admin/content/home/hero/_new');
+    const picker = await screen.findByRole('group', { name: 'Block type' });
+    const radios = within(picker).getAllByRole('radio');
+    expect(radios.map((radio) => radio.value)).toEqual([
+      'text', 'image', 'cta',
+      ...BLOCK_TYPE_IDS.filter((id) => !['text', 'image', 'cta'].includes(id)),
+    ]);
+    const enabled = radios.filter((radio) => !radio.disabled).map((radio) => radio.value);
+    expect(enabled).toEqual(['text', 'image', 'cta']);
+    const paragraphs = within(picker).getByRole('radio', { name: 'Paragraphs' });
+    expect(paragraphs).toBeDisabled();
+    expect(paragraphs).toHaveAccessibleDescription(/^Hero takes only short text, button and image\.$/);
+    expect(within(picker).getByRole('radio', { name: 'Button' })).toHaveAccessibleDescription(
+      'A button that takes readers to another page.',
+    );
+  });
+
   it('keeps cta.url as a plain text field, never the image picker', async () => {
     await renderAt('/admin/content/home/hero/_new');
 
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
-      target: { value: 'cta' },
-    });
+    await chooseBlockType('Button');
 
     expect(screen.queryByRole('button', { name: /choose or upload/i })).not.toBeInTheDocument();
     const urlInput = screen.getByLabelText('Destination');
@@ -184,9 +208,7 @@ describe('AdminContentBlockEditor value fields', () => {
     pagesLive = [{ ...HOME_PAGE, sections: [{ ...HOME_PAGE.sections[0], id: 'resources', allowedBlocks: [] }] }];
     await renderAt('/admin/content/home/resources/_new');
 
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
-      target: { value: 'link_group' },
-    });
+    await chooseBlockType('Link');
 
     expect(screen.queryByRole('button', { name: /choose or upload/i })).not.toBeInTheDocument();
     const urlInput = screen.getByLabelText('Destination');
@@ -200,9 +222,7 @@ describe('AdminContentBlockEditor value fields', () => {
   it('warns when a cta leads to a section that is off, and still saves it', async () => {
     liveFeatures = { schedule: false, speakers: true };
     await renderAt('/admin/content/home/hero/_new');
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
-      target: { value: 'cta' },
-    });
+    await chooseBlockType('Button');
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Explore the program' } });
     const urlInput = screen.getByLabelText('Destination');
     fireEvent.change(urlInput, { target: { value: '/speakers' } });
@@ -215,7 +235,7 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(warning).toHaveAttribute('id');
     expect(urlInput.getAttribute('aria-describedby')).toContain(warning.id);
 
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsCreateContent'))).toBe(true));
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
     expect(JSON.parse(call[1].body).fields).toMatchObject({ label: 'Explore the program', url: '/schedule' });
@@ -226,9 +246,7 @@ describe('AdminContentBlockEditor value fields', () => {
     liveFeatures = { schedule: true, speakers: false };
     pagesLive = [{ ...HOME_PAGE, sections: [{ ...HOME_PAGE.sections[0], id: 'resources', allowedBlocks: [] }] }];
     await renderAt('/admin/content/home/resources/_new');
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
-      target: { value: 'link_group' },
-    });
+    await chooseBlockType('Link');
     const urlInput = screen.getByLabelText('Destination');
     fireEvent.change(urlInput, { target: { value: '/schedule' } });
     expect(screen.queryByText(/is off/)).toBeNull();
@@ -248,9 +266,7 @@ describe('AdminContentBlockEditor value fields', () => {
       { id: 'travel', label: 'Travel', path: '/travel', order: 2, visible: true, systemPage: false, sections: [] },
     ];
     await renderAt('/admin/content/home/hero/_new');
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
-      target: { value: 'cta' },
-    });
+    await chooseBlockType('Button');
     const urlInput = screen.getByLabelText('Destination');
     fireEvent.change(urlInput, { target: { value: '/travel' } });
     expect(screen.queryByText(/does not show this link/)).toBeNull();
@@ -274,9 +290,7 @@ describe('AdminContentBlockEditor value fields', () => {
   it('announces the warning through a polite live region that is there before it appears', async () => {
     liveFeatures = { schedule: false };
     await renderAt('/admin/content/home/hero/_new');
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
-      target: { value: 'cta' },
-    });
+    await chooseBlockType('Button');
     const urlInput = screen.getByLabelText('Destination');
     const region = urlInput.parentElement.querySelector('[aria-live="polite"]');
     expect(region).not.toBeNull();
@@ -309,7 +323,7 @@ describe('AdminContentBlockEditor value fields', () => {
     }];
     await renderAt('/admin/content/sponsors/sponsor_packages/_new');
 
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), { target: { value: 'sponsor_package' } });
+    await chooseBlockType('Sponsor package');
     const limit = screen.getByLabelText('Limit (optional)');
     expect(limit).toHaveAttribute('type', 'number');
     expect(limit).toHaveAccessibleDescription('How many sponsors can take this package. Leave it empty for no limit.');
@@ -324,7 +338,7 @@ describe('AdminContentBlockEditor value fields', () => {
       '<p>Signs</p>',
       'Signs',
     );
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
@@ -356,10 +370,10 @@ describe('AdminContentBlockEditor value fields', () => {
       }],
     }];
     await renderAt('/admin/content/about/intro/_new');
-    fireEvent.change(screen.getByRole('combobox', { name: 'Block type' }), { target: { value: 'richtext' } });
+    await chooseBlockType('Paragraphs');
     const editor = await screen.findByRole('textbox', { name: 'Text' });
     await pasteHtml(editor, '<p><strong>Formatted</strong> body</p>', 'Formatted body');
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
@@ -410,7 +424,7 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(editor.querySelector('strong')).toHaveTextContent('Saved draft answer.');
     expect(editor).not.toHaveTextContent('Published answer.');
 
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
     expect(JSON.parse(call[1].body).fields.answer).toBe('<p><strong>Saved draft answer.</strong></p>');
@@ -454,7 +468,7 @@ describe('AdminContentBlockEditor value fields', () => {
     const limit = await screen.findByLabelText('Limit (optional)');
     expect(limit).toHaveValue(3);
     fireEvent.change(limit, { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
@@ -478,21 +492,21 @@ describe('content editing workspace', () => {
     const valueHeading = screen.getByRole('heading', { name: 'Content' });
     const settingsHeading = screen.getByRole('heading', { name: 'Block settings' });
     expect(valueHeading.compareDocumentPosition(settingsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText('Call to action · Visible')).toBeVisible();
+    expect(screen.getByText('Button · Visible')).toBeVisible();
     const toggle = screen.getByRole('button', { name: 'Edit block settings' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('combobox', { name: 'Block type' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Block type' })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Reserve a place' } });
     fireEvent.click(toggle);
-    expect(screen.getByRole('combobox', { name: 'Block type' })).toHaveValue('cta');
+    expect(within(screen.getByRole('group', { name: 'Block type' })).getByRole('radio', { name: 'Button' })).toBeChecked();
     expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Order')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Hide block settings' }));
-    expect(screen.getByText('Call to action · Visible')).toBeVisible();
+    expect(screen.getByText('Button · Visible')).toBeVisible();
     expect(screen.getByLabelText('Button text')).toHaveValue('Reserve a place');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsUpdateContent'))).toBe(true));
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
     expect(JSON.parse(call[1].body)).toMatchObject({
@@ -506,23 +520,21 @@ describe('content editing workspace', () => {
     const setupHeading = screen.getByRole('heading', { name: 'Content type' });
     const valueHeading = screen.getByRole('heading', { name: 'Content' });
     expect(setupHeading.compareDocumentPosition(valueHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole('combobox', { name: 'Block type' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Block type' })).toBeVisible();
     expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Block type' }), { target: { value: 'image' } });
-    fireEvent.change(screen.getByLabelText('Image'), { target: { value: 'cms-images/banner.jpg' } });
+    await chooseBlockType('Image');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Image' }), { target: { value: 'cms-images/banner.jpg' } });
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Event banner' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await screen.findByText('Draft saved. It is not public until you publish.');
     expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Block type' })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Block type' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('reuses the generated field id when the first save fails and the text changes', async () => {
     await renderAt('/admin/content/home/hero/_new');
-    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
-      target: { value: 'cta' },
-    });
+    await chooseBlockType('Button');
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Register now' } });
     fireEvent.change(screen.getByLabelText('Destination'), { target: { value: 'https://example.org/join' } });
     fetch.mockImplementationOnce(() => Promise.resolve({
@@ -530,14 +542,14 @@ describe('content editing workspace', () => {
       status: 500,
       json: async () => ({ error: { message: 'The draft service is down.' } }),
     }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByText('The change could not be saved. Try again.')).toBeInTheDocument();
     const first = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
     expect(JSON.parse(first[1].body).field).toBe('register-now');
 
     fetch.mockImplementationOnce(() => Promise.resolve(okResponse({ docId: 'hero__register-now' })));
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Join us' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await screen.findByText('Draft saved. It is not public until you publish.');
     const creates = fetch.mock.calls.filter(([url]) => String(url).includes('cmsCreateContent'));
     expect(creates).toHaveLength(2);
@@ -550,7 +562,7 @@ describe('content editing workspace', () => {
     fetch.mockImplementation((url) => Promise.resolve(String(url).includes('cmsUpdateContent')
       ? { ok: false, status: 400, json: async () => ({ error: { code: 'bad-request', message: 'order: must be a non-negative number' } }) }
       : okResponse({})));
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveFocus();
     expect(alert).toHaveTextContent('The change could not be saved. Try again.');
@@ -562,7 +574,7 @@ describe('content editing workspace', () => {
   it('keeps value validation in view without expanding unrelated settings', async () => {
     await renderAt('/admin/content/home/hero/register');
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByRole('alert')).toHaveFocus();
     expect(screen.getByLabelText('Button text')).toBeVisible();
     expect(screen.getByLabelText('Button text')).toHaveAttribute('aria-invalid', 'true');
@@ -584,7 +596,7 @@ describe('content editing workspace', () => {
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
 
     fireEvent.change(label, { target: { value: 'Reserve a place' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument());
     expect(label).toHaveValue('Reserve a place');
@@ -594,7 +606,7 @@ describe('content editing workspace', () => {
     await renderAt('/admin/content/home/hero/register');
     const label = screen.getByLabelText('Button text');
     fireEvent.change(label, { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByRole('alert')).toHaveFocus();
     expect(label).toHaveValue('');
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
@@ -606,7 +618,7 @@ describe('content editing workspace', () => {
       status: 500,
       json: async () => ({ error: { message: 'The draft service is down.' } }),
     }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByText('The change could not be saved. Try again.')).toBeInTheDocument();
     expect(label).toHaveValue('Reserve a place');
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
@@ -634,7 +646,7 @@ describe('content editing workspace', () => {
 
   it('marks a new block unsaved only after the operator edits it', async () => {
     await renderAt('/admin/content/home/hero/_new');
-    expect(await screen.findByRole('combobox', { name: /block type/i })).toHaveValue('text');
+    expect(await screen.findByRole('radio', { name: 'Short text' })).toBeChecked();
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Banner' } });
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
@@ -645,7 +657,7 @@ describe('content editing workspace', () => {
   it('still reports a saved draft after the development remount', async () => {
     await renderAt('/admin/content/home/hero/register', { strict: true });
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Reserve a place' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
   });
 
@@ -656,8 +668,8 @@ describe('content editing workspace', () => {
     }));
     await renderAt('/admin/content/home/hero/register');
     fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Reserve a place' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
-    expect(screen.getByRole('button', { name: 'Saving the block…' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(screen.getByRole('button', { name: 'Saving the draft…' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
     expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Discard changes' })).not.toBeInTheDocument();

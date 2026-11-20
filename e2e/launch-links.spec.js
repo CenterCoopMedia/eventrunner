@@ -62,7 +62,7 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/content/home/hero/_new');
     await endTour(page);
-    await page.getByLabel('Block type', { exact: true }).selectOption('cta');
+    await page.getByRole('radio', { name: 'Button', exact: true }).check();
     await page.getByLabel('Button text', { exact: true }).fill(LABEL);
     const destination = page.getByLabel('Destination', { exact: true });
     await destination.fill('/schedule');
@@ -71,7 +71,7 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     // The field names the warning, so a screen reader hears it with the field.
     const warningId = await warning.getAttribute('id');
     await expect(destination).toHaveAttribute('aria-describedby', new RegExp(warningId));
-    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await page.getByRole('button', { name: 'Save and publish', exact: true }).click();
     await expect.poll(async () => (await findCta())?.revision ?? 0, { timeout: 20_000 }).toBeGreaterThan(0);
     ctaField = (await findCta()).field;
 
@@ -104,11 +104,11 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/content/home/hero/_new');
     await endTour(page);
-    await page.getByLabel('Block type', { exact: true }).selectOption('cta');
+    await page.getByRole('radio', { name: 'Button', exact: true }).check();
     await page.getByLabel('Button text', { exact: true }).fill(NO_PAGE_LABEL);
     await page.getByLabel('Destination', { exact: true }).fill('/speaker-notes');
     await expect(page.getByText(NO_PAGE_WARNING)).toBeVisible();
-    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await page.getByRole('button', { name: 'Save and publish', exact: true }).click();
     await expect.poll(async () => (await findCta(NO_PAGE_LABEL))?.revision ?? 0, { timeout: 20_000 }).toBeGreaterThan(0);
     noPageField = (await findCta(NO_PAGE_LABEL)).field;
 

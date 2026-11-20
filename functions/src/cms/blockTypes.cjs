@@ -42,13 +42,13 @@ function blockType(def) {
 const BLOCK_TYPES = Object.freeze({
   text: blockType({
     id: 'text',
-    label: 'Text',
+    label: 'Short text',
     description: 'A single plain-text value: Headings, labels, short copy.',
     fields: [field('value', 'string', true)],
   }),
   richtext: blockType({
     id: 'richtext',
-    label: 'Rich text',
+    label: 'Paragraphs',
     description: 'Formatted body copy rendered by the rich-text renderer.',
     fields: [field('value', 'richtext', true)],
   }),
@@ -69,7 +69,7 @@ const BLOCK_TYPES = Object.freeze({
   }),
   cta: blockType({
     id: 'cta',
-    label: 'Call to action',
+    label: 'Button',
     description: 'A button or prominent link: Label plus destination.',
     fields: [
       field('label', 'string', true),
@@ -79,7 +79,7 @@ const BLOCK_TYPES = Object.freeze({
   }),
   stat: blockType({
     id: 'stat',
-    label: 'Statistic',
+    label: 'Number',
     description:
       'A number that carries evidence: The figure and its caption, plus the four parts ' +
       'every stat must state — the finding in words, what it counts, where it came from, ' +
@@ -130,7 +130,7 @@ const BLOCK_TYPES = Object.freeze({
   }),
   faq_item: blockType({
     id: 'faq_item',
-    label: 'FAQ item',
+    label: 'Question and answer',
     description: 'A question with its rich-text answer.',
     fields: [
       field('question', 'string', true),
@@ -140,7 +140,7 @@ const BLOCK_TYPES = Object.freeze({
   }),
   link_group: blockType({
     id: 'link_group',
-    label: 'Link group',
+    label: 'Link',
     description: 'A titled link within a named group (footers, resource lists).',
     fields: [
       field('group', 'string', true),
