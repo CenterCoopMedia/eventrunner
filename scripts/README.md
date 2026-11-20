@@ -52,6 +52,20 @@ does not run this command.
 An invitation is eligible only when it names a valid speaker ID and the speaker document is
 absent. Existing speakers, including those marked removed, keep their invitation records.
 
+### `client-host-worker-version.cjs`
+
+Records and restores the version of a client-host router Worker (#1125). It calls the Cloudflare
+API with `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, not Firebase credentials.
+
+```sh
+node scripts/client-host-worker-version.cjs capture <worker>
+node scripts/client-host-worker-version.cjs restore <worker> <recorded version id> <host> <mount>...
+```
+
+`capture` prints the one version serving the Worker. `restore` deploys that recorded version at
+100%, reads back the active deployment and requests each mount. The order of use is in
+[docs/runbooks/event-mount-operations.md](../docs/runbooks/event-mount-operations.md).
+
 ### `prepare-functions.cjs`
 
 Packs `packages/shared` into `functions/vendor/shared.tgz` (spec §1.1) and copies the same
