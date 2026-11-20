@@ -230,6 +230,7 @@ describe('app shell', () => {
     document.title = expected;
     renderAt('/?lang=es');
     expect(document.title).toBe(expected);
+    document.title = 'Pending fixture title';
     act(() => {
       configSubscriptions.get('event')(event);
       contentSubscriptions.get('cmsContent').onNext([
