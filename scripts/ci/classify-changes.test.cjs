@@ -231,12 +231,12 @@ test('merge groups select hosted tiers from the queue candidate range', () => {
 
 test('the required check receives the queue event and scans its commit range', () => {
   const workflow = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'ci.yml'), 'utf8');
-  assert.match(workflow, /^  merge_group:\n    types: \[checks_requested\]/m);
+  assert.match(workflow, /^ {2}merge_group:\n {4}types: \[checks_requested\]/m);
   assert.match(workflow, /GITHUB_BASE_SHA: .*github\.event\.merge_group\.base_sha/);
   assert.match(workflow, /GITHUB_HEAD_SHA: .*github\.event\.merge_group\.head_sha/);
   assert.match(workflow, /if: github\.event_name == 'pull_request' \|\| github\.event_name == 'merge_group'\s+run: \|\s+\.\/gitleaks .*--log-opts="\$GITHUB_BASE_SHA\.\.\$GITHUB_HEAD_SHA"/);
   const gate = workflow.slice(workflow.indexOf('\n  gate:'));
-  assert.match(gate, /^    name: CI gate$/m);
+  assert.match(gate, /^ {4}name: CI gate$/m);
 });
 
 test('workflow, configuration, and dependency changes select the full matrix', () => {
