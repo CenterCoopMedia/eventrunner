@@ -39,6 +39,7 @@ import {
 } from './mediaErrors.js';
 import ModalShell from './ModalShell.jsx';
 import BusyLabel from '../../../components/BusyLabel.jsx';
+import AssetReplacement from './AssetReplacement.jsx';
 
 function usageLocation(reference) {
   const [stored, id] = (reference.docPath ?? '').split('/');
@@ -101,6 +102,8 @@ export default function AssetModal({
   scanUsage,
   updateMetadata,
   remove,
+  replace,
+  renderReplacementPicker,
   operator = false,
   returnFocusRef,
 }) {
@@ -119,6 +122,9 @@ export default function AssetModal({
   const pending = useRef(false);
   const busy = Boolean(action);
   const [confirming, setConfirming] = useState(false);
+  const [replacing, setReplacing] = useState(false);
+  const replaceTrigger = useRef(null);
+  const usageHeading = useRef(null);
   const locked = !operator && (isBrandingAsset(asset) || referencedByBranding(references));
 
   useEffect(() => {
@@ -226,10 +232,29 @@ export default function AssetModal({
       )}
 
       <section className="mt-md border-admin-rule-hairline border-t-admin-hairline pt-sm">
-        <div className="flex items-center gap-2xs"><h3 className="text-admin-lg font-bold text-admin-ink">Where this is used</h3><HelpTooltip label="Where this is used">Check which content currently uses this image before changing it.</HelpTooltip></div>
+        <div className="flex items-center gap-2xs"><h3 ref={usageHeading} tabIndex={-1} className="text-admin-lg font-bold text-admin-ink">Where this is used</h3><HelpTooltip label="Where this is used">Check which content currently uses this image before changing it.</HelpTooltip></div>
         <div className="mt-2xs">
           <UsageList references={references} error={usageError} onRetry={() => setScanAttempt((attempt) => attempt + 1)} />
         </div>
+        {replacing ? (
+          <AssetReplacement
+            asset={asset}
+            scanUsage={scanUsage}
+            replace={replace}
+            renderPicker={renderReplacementPicker}
+            onBusy={(value) => { pending.current = value; setAction(value ? 'replace' : ''); }}
+            onChanged={() => setScanAttempt((attempt) => attempt + 1)}
+            onClose={() => {
+              setReplacing(false);
+              requestAnimationFrame(() => (replaceTrigger.current ?? usageHeading.current)?.focus());
+            }}
+            usageLocation={usageLocation}
+          />
+        ) : !locked && replace && renderReplacementPicker && (references?.length ?? 0) > 0 ? (
+          <button type="button" ref={replaceTrigger} className={`${secondaryButtonClass} mt-sm`} disabled={busy} onClick={() => setReplacing(true)}>
+            Replace this image
+          </button>
+        ) : null}
         {/* Moment 3: the delete states what it costs before it runs, and
             the in-use case says how many live documents lose their file.
             A locked asset offers no delete at all: the note above says whose

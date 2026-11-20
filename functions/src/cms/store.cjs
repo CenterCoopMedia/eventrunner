@@ -99,6 +99,16 @@ function contentFieldsOf(data) {
   return out;
 }
 
+/** Record a live config edit with the same stamps in its version history. */
+function writeConfigVersion({ tx, ref, historyRef, docPath, fields, at, actor }) {
+  const content = { ...fields };
+  delete content.updatedAt;
+  delete content.updatedBy;
+  const stamps = { updatedAt: at, updatedBy: actor.email };
+  tx.set(ref, { ...content, ...stamps });
+  tx.set(historyRef, { docPath, kind: 'config', fields: content, ...stamps });
+}
+
 /**
  * Write (create or replace) a draft. DRAFTS ONLY — the live doc is read
  * for `basedOnRevision` when the draft does not exist yet (editing an
@@ -528,6 +538,7 @@ module.exports = {
   ensurePendingCounts,
   logAdminAction,
   contentFieldsOf,
+  writeConfigVersion,
   isValidDocId,
   isAlreadyExistsError,
   internals: {

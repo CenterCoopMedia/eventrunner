@@ -71,6 +71,35 @@ describe('media action feedback', () => {
     expect(screen.queryByText('Description saved.')).not.toBeInTheDocument();
   });
 
+  it('lets the editor review both revisions and retry the same replacement after a partial result', async () => {
+    const published = { docPath: 'cmsContent/travel__image', field: 'url', label: 'Travel image' };
+    const draft = { ...published, docPath: 'cmsContent_drafts/travel__image' };
+    const references = [published, draft];
+    const scanUsage = vi.fn().mockResolvedValue({ [asset.path]: references });
+    const replace = vi.fn()
+      .mockResolvedValueOnce({ status: 'failed', changed: [published], failed: [{ ...draft, reason: 'Draft could not be saved.' }] })
+      .mockResolvedValueOnce({ status: 'done', changed: references, failed: [] });
+    const replacement = { id: 'file-2', path: 'cms-images/file-2/arrival.png', title: 'New arrival photo' };
+    render(<AssetModal asset={asset} operator onClose={vi.fn()} scanUsage={scanUsage} updateMetadata={vi.fn()}
+      remove={vi.fn()} replace={replace} renderReplacementPicker={({ onSelect }) => (
+        <button type="button" onClick={() => onSelect(replacement)}>Choose new arrival photo</button>
+      )} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Replace this image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose new arrival photo' }));
+    await screen.findByText(/Published · url/);
+    expect(screen.getByText(/Draft · url/)).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Keep the current description' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm replacement' }));
+    expect(await screen.findByText('Draft could not be saved.')).toBeInTheDocument();
+    const [id, input] = replace.mock.calls[0];
+    expect(input).toMatchObject({ assetId: asset.id, replacementId: replacement.id, keepDescription: true, references });
+    fireEvent.click(screen.getByRole('button', { name: 'Retry replacement' }));
+    expect(await screen.findByText('2 places changed.')).toBeInTheDocument();
+    expect(replace).toHaveBeenNthCalledWith(2, id, input);
+  });
+
   it('keeps upload inputs and dismissal consistent during a delayed upload', async () => {
     const request = deferred();
     const upload = vi.fn(() => request.promise);

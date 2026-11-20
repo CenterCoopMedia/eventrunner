@@ -1,7 +1,8 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { validUpdateImage, validUpdateContent, UPDATE_CATEGORY_MAX, validUpdateCategory } = require('./update.cjs');
+const { UPDATE_CATEGORY_MAX, validUpdateCategory } = require('./update.cjs');
+const { validUpdateImage, validUpdateContent } = require('./updateContent.cjs');
 const updates = require('../../../scripts/lib/demo-updates.json');
 test('all demo posts satisfy the rich update contract', () => {
   for (const update of updates) {

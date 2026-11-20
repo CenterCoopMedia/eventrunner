@@ -27,6 +27,7 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { replacementReferences } = require('./replacementPlacements.cjs');
 
 /**
  * Collections searched for asset references. Live + draft for every
@@ -131,6 +132,7 @@ async function scanUsage({
   collections = USAGE_COLLECTIONS,
   configDocs = USAGE_CONFIG_DOCS,
   maxDocs = null,
+  findReferences = referencesInDoc,
 }) {
   /** @type {Record<string, Array<{ docPath: string, field: string }>>} */
   const usage = {};
@@ -139,7 +141,7 @@ async function scanUsage({
 
   const record = (hits) => {
     for (const hit of hits) {
-      usage[hit.path].push({ docPath: hit.docPath, field: hit.field });
+      usage[hit.path].push({ docPath: hit.docPath, field: hit.field, ...(hit.label ? { label: hit.label } : {}) });
     }
   };
 
@@ -166,17 +168,25 @@ async function scanUsage({
       throw incomplete;
     }
     for (const doc of snapshot.docs) {
-      record(referencesInDoc(doc.data() || {}, `${name}/${doc.id}`, paths));
+      record(findReferences(doc.data() || {}, `${name}/${doc.id}`, paths));
     }
   }
 
   for (const docId of configDocs) {
     const snap = await db.collection('config').doc(docId).get();
     if (!snap.exists) continue;
-    record(referencesInDoc(snap.data() || {}, `config/${docId}`, paths));
+    record(findReferences(snap.data() || {}, `config/${docId}`, paths));
   }
 
   return usage;
+}
+
+function scanReplacementUsage({ db, paths, bucket }) {
+  const collections = USAGE_COLLECTIONS.filter((name) => /^cms(Content|Updates|Organizations)(?:_drafts)?$/.test(name));
+  return scanUsage({
+    db, paths, collections,
+    findReferences: (doc, docPath, paths) => replacementReferences(doc, docPath, paths, bucket),
+  });
 }
 
 /**
@@ -210,7 +220,7 @@ function resolveScanPaths({ requested }) {
  * Admin-gated like every other media endpoint: the response describes what
  * unpublished drafts contain, which is admin-only information (§8.4).
  */
-function createScanMediaUsageHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+function createScanMediaUsageHandler({ db, bucket, auth, getConfig, now = Date.now, log = console }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
@@ -221,7 +231,9 @@ function createScanMediaUsageHandler({ db, auth, getConfig, now = Date.now, log 
 
     let usage;
     try {
-      usage = await scanUsage({ db, paths: resolved.paths });
+      usage = req.body?.replacement === true
+        ? await scanReplacementUsage({ db, paths: resolved.paths, bucket: bucket?.name })
+        : await scanUsage({ db, paths: resolved.paths });
     } catch (err) {
       log.error('scanMediaUsage failed', err);
       return internal(res, 'The media library could not be scanned. Keep this page open and contact support for help.');
@@ -242,6 +254,7 @@ function buildHandlers() {
 module.exports = {
   createScanMediaUsageHandler,
   scanUsage,
+  scanReplacementUsage,
   get handlers() {
     return buildHandlers();
   },

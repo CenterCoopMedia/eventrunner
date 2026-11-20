@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
-import { CAPTION_ALIGNMENTS, CAPTION_MODES } from 'shared/imageCaption';
-import { isMediaLibraryPath } from 'shared/venue';
+import { CAPTION_ALIGNMENTS, CAPTION_MODES, imageCaptionAssetId } from 'shared/imageCaption';
 import { usePublicLanguage } from '../../contexts/PublicLanguageContext.jsx';
 import { subscribeToFirebase } from '../../lib/firebaseLoader.js';
 import './captionedImageFigure.css';
 
-function useImageCaption(path) {
-  const parts = isMediaLibraryPath(path) ? path.split('/') : [];
-  const assetId = parts.length > 2 ? parts[1] : null;
+function useImageCaption(assetId) {
   const [record, setRecord] = useState(null);
   useEffect(() => {
     if (!assetId) return undefined;
@@ -25,10 +22,13 @@ function text(value) {
 }
 
 export default function CaptionedImageFigure({ children, assetPath, placement, placedCaption, className, style, mediaClassName, fallback }) {
-  const asset = useImageCaption(assetPath);
+  const assetId = imageCaptionAssetId(assetPath);
+  const override = assetId && placement.descriptionOverride?.assetId === assetId
+    ? placement.descriptionOverride : undefined;
+  const asset = useImageCaption(override ? null : assetId);
   const { language: pageLanguage, text: localized } = usePublicLanguage();
-  const inheritedCaption = text(asset?.caption);
-  const credit = text(asset?.credit);
+  const inheritedCaption = text((override ?? asset)?.caption);
+  const credit = text((override ?? asset)?.credit);
   const mode = CAPTION_MODES.includes(placement.captionMode) ? placement.captionMode : undefined;
   const align = CAPTION_ALIGNMENTS.includes(placement.captionAlign) ? placement.captionAlign : undefined;
   const caption = mode === 'hidden' ? '' : placedCaption || inheritedCaption;

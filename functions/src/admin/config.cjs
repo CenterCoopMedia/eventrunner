@@ -61,7 +61,7 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { getTierA } = require('../core/config.cjs');
-const { logAdminAction } = require('../cms/store.cjs');
+const { logAdminAction, writeConfigVersion } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const {
   validateEventConfig,
@@ -603,17 +603,7 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
           ]);
         }
       }
-      tx.set(ref, { ...written, updatedAt: at, updatedBy: actor.email });
-      // cmsVersionHistory-style audit row (spec §1.3 item 4), committed
-      // atomically with the doc it describes. Config docs have no revision
-      // counter, so the row records the full written fields + stamps.
-      tx.set(historyRef, {
-        docPath: `config/${docId}`,
-        kind: 'config',
-        fields: written,
-        updatedAt: at,
-        updatedBy: actor.email,
-      });
+      writeConfigVersion({ tx, ref, historyRef, docPath: `config/${docId}`, fields: written, at, actor });
     });
   } catch (err) {
     if (err instanceof MergedConfigInvalidError) {

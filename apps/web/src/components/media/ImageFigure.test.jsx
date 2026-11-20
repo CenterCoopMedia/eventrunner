@@ -1,6 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import ImageBlock from '../blocks/ImageBlock.jsx';
+import ImageFigure from './ImageFigure.jsx';
+
+vi.mock('../../lib/firebaseLoader.js', () => ({
+  subscribeToFirebase: (subscribe) => subscribe({
+    db: {},
+    doc: () => ({}),
+    onSnapshot: (_, read) => {
+      read({ data: () => ({ caption: 'Library caption', credit: 'Library credit' }) });
+      return () => {};
+    },
+  }),
+}));
 
 const block = { url: '/test-image.webp', alt: 'A station entrance', caption: 'The entrance on Oak Street' };
 
@@ -18,6 +30,20 @@ describe('image captions', () => {
     render(<ImageBlock block={{ ...block, captionMode: 'hidden' }} />);
     expect(screen.queryByText(block.caption)).not.toBeInTheDocument();
     expect(screen.getByRole('img')).toHaveAttribute('alt', block.alt);
+  });
+
+  it('inherits library text and preserves saved blanks when the asset matches', async () => {
+    const placement = { descriptionOverride: { assetId: 'replacement', caption: '', credit: '' } };
+    const figure = (assetId) => (
+      <ImageFigure placement={placement} assetPath={`cms-images/${assetId}/image.webp`}>
+        <img src={block.url} alt={block.alt} />
+      </ImageFigure>
+    );
+    const { rerender } = render(figure('another'));
+    expect(await screen.findByText('Credit: Library credit')).toBeVisible();
+    expect(screen.getByRole('figure').querySelector('figcaption')).toHaveTextContent('Library caption');
+    rerender(figure('replacement'));
+    expect(screen.queryByRole('figure')).not.toBeInTheDocument();
   });
 
   it.each([

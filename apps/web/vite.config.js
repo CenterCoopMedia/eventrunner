@@ -136,6 +136,7 @@ export default defineConfig(({ isSsrBuild, mode }) => ({
       'shared/venue',
       'shared/venueFields',
       'shared/update',
+      'shared/updateContent',
       'shared/seed',
       'shared/slug',
       'shared/email',

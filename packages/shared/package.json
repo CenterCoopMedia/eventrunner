@@ -44,6 +44,7 @@
     "./venue": { "require": "./src/venue.cjs", "import": "./src/venue.mjs" },
     "./venueFields": { "require": "./src/venueFields.cjs", "import": "./src/venueFields.mjs" },
     "./update": { "require": "./src/update.cjs", "import": "./src/update.mjs" },
+    "./updateContent": { "require": "./src/updateContent.cjs", "import": "./src/updateContent.mjs" },
     "./answers": { "require": "./src/answers.cjs", "import": "./src/answers.mjs" },
     "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" },
     "./speakerReadiness": { "require": "./src/speakerReadiness.cjs", "import": "./src/speakerReadiness.mjs" },

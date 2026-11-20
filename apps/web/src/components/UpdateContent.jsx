@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router';
 import { PublicLink as Link } from './PublicLink.jsx';
-import { validUpdateBlock, validUpdateImage } from 'shared/update';
+import { validUpdateBlock, validUpdateImage } from 'shared/updateContent';
 import ImageBlock from './blocks/ImageBlock.jsx';
 import RichTextBlock from './blocks/RichTextBlock.jsx';
 import { primaryActionClass } from './controlClasses.js';
