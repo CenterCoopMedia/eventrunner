@@ -13,12 +13,14 @@ import Blockquote from 'quill/formats/blockquote.js';
 import CodeBlock, { Code } from 'quill/formats/code.js';
 import { hasRichTextContent, isSafeRichTextHref } from 'shared/richText';
 import { sanitizeHtml } from '../../lib/sanitizeHtml.js';
+import { mapEmbedInput } from '../mapEmbedInput.js';
 import './RichTextEditor.css';
 import {
   FieldError,
   fieldHintClass,
   fieldLabelClass,
   inputClass,
+  linkButtonClass,
   secondaryButtonClass,
 } from './formControls.jsx';
 
@@ -101,6 +103,14 @@ const toolbarButtonClass =
   'hover:text-admin-ink-link aria-pressed:border-admin-action aria-pressed:bg-admin-action-soft ' +
   'aria-pressed:text-admin-ink-link disabled:cursor-not-allowed disabled:opacity-60';
 
+const HTML_SOURCE = /^\s*<(?:!--|!doctype\b|\/?[a-z][\w:-]*(?=[\s>]|\/>))/i;
+const EMBED_TAG = /<\/?(?:iframe|script|embed|object)(?=[\s/>])/i;
+const STORED_TEXT_CLEANUP = 'Unsupported formatting was removed from this saved text. Save to store the cleaned version.';
+
+function looksLikeHtmlSource(text) {
+  return HTML_SOURCE.test(text) || EMBED_TAG.test(text);
+}
+
 function outputHtml(quill) {
   // Quill encodes ordinary spaces next to inline formats as non-breaking
   // spaces. Store regular spaces so opening an unchanged record does not
@@ -123,7 +133,7 @@ function active(format, value, formats) {
  * A controlled editor for the registry's richtext fields. The parent still
  * owns the draft value and the ordinary content-block save flow.
  */
-export default function RichTextEditor({ label, value, onChange, error, help, required = false }) {
+export default function RichTextEditor({ label, value, onChange, error, help, required = false, newMapBlockHref }) {
   const generatedId = useId();
   const editorId = `richtext-${generatedId}`;
   const labelId = `${editorId}-label`;
@@ -139,6 +149,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
   const lastSelectionRef = useRef({ index: 0, length: 0 });
   const linkButtonRef = useRef(null);
   const linkInputRef = useRef(null);
+  const mapLinkRef = useRef(null);
   const [formats, setFormats] = useState({});
   const [count, setCount] = useState(0);
   const [history, setHistory] = useState({ undo: false, redo: false });
@@ -146,6 +157,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
   const [linkValue, setLinkValue] = useState('');
   const [linkError, setLinkError] = useState('');
   const [notice, setNotice] = useState('');
+  const [pastedMapUrl, setPastedMapUrl] = useState('');
 
   onChangeRef.current = onChange;
 
@@ -181,7 +193,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
     const normalized = outputHtml(quill);
     lastValueRef.current = normalized;
     if (normalized !== supplied) {
-      setNotice('Unsupported formatting was removed from this saved text. Save to store the cleaned version.');
+      setNotice(STORED_TEXT_CLEANUP);
       onChangeRef.current(normalized);
     }
     updateToolbar({ index: 0, length: 0 });
@@ -197,32 +209,62 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
       lastValueRef.current = next;
       onChangeRef.current(next);
     };
+    const rejectHtmlPaste = (source) => {
+      setNotice('Pasted HTML won’t appear on the page.');
+      setPastedMapUrl(mapEmbedInput(source));
+    };
     const sanitizePaste = (event) => {
-      const pastedHtml = event.clipboardData?.getData('text/html');
-      if (!pastedHtml) return;
+      const pastedText = event.clipboardData?.getData('text/plain') ?? '';
+      const pastedHtml = event.clipboardData?.getData('text/html') ?? '';
+      const isSource = looksLikeHtmlSource(pastedText);
+      setPastedMapUrl('');
+      setNotice((current) => current === STORED_TEXT_CLEANUP ? current : '');
+      if (!pastedHtml && !isSource) return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      // Never let Quill fall back to inserting source markup as plain text,
+      // and leave the current selection intact when the paste is rejected.
+      if (isSource) {
+        rejectHtmlPaste(pastedText);
+        return;
+      }
       const safeHtml = sanitizeHtml(pastedHtml);
+      if (safeHtml !== pastedHtml && !hasRichTextContent(safeHtml)) {
+        rejectHtmlPaste(pastedHtml);
+        return;
+      }
+      const pasted = quill.clipboard.convert({ html: safeHtml, text: pastedText });
+      // Some clipboards carry escaped source in a formatted HTML fragment.
+      const convertedText = pasted.ops.map(({ insert }) => typeof insert === 'string' ? insert : '').join('');
+      if (looksLikeHtmlSource(convertedText)) {
+        rejectHtmlPaste(convertedText);
+        return;
+      }
       if (safeHtml !== pastedHtml) setNotice('Unsupported formatting was removed from the pasted text.');
       const range = quill.getSelection() ?? lastSelectionRef.current;
-      const pasted = quill.clipboard.convert({
-        html: safeHtml,
-        text: event.clipboardData?.getData('text/plain') ?? '',
-      });
       quill.updateContents(
         new Delta().retain(range.index).delete(range.length).concat(pasted),
         'user',
       );
       quill.setSelection(range.index + pasted.length(), 0, 'silent');
     };
+    const tabToMapLink = (event) => {
+      if (event.key !== 'Tab' || event.shiftKey || !mapLinkRef.current) return;
+      // Quill inserts a literal tab by default, so it would trap focus here.
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      mapLinkRef.current.focus();
+    };
 
     quill.on('selection-change', rememberSelection);
     quill.on('text-change', emitValue);
     quill.root.addEventListener('paste', sanitizePaste, true);
+    quill.root.addEventListener('keydown', tabToMapLink, true);
     return () => {
       quill.off('selection-change', rememberSelection);
       quill.off('text-change', emitValue);
       quill.root.removeEventListener('paste', sanitizePaste, true);
+      quill.root.removeEventListener('keydown', tabToMapLink, true);
       quillRef.current = null;
       mount.replaceChildren();
     };
@@ -241,7 +283,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
     setFormats(quill.getFormat(lastSelectionRef.current));
     setHistory({ undo: false, redo: false });
     if (normalized !== supplied) {
-      setNotice('Unsupported formatting was removed from this saved text. Save to store the cleaned version.');
+      setNotice(STORED_TEXT_CLEANUP);
       onChangeRef.current(normalized);
     }
   }, [value]);
@@ -467,10 +509,19 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
       <p id={countId} className={fieldHintClass}>
         {count.toLocaleString()} {count === 1 ? 'character' : 'characters'}
       </p>
-      {notice ? (
-        <p id={noticeId} role="status" className="text-admin-sm text-admin-state-caution">
-          {notice}
-        </p>
+      <p id={noticeId} role="status" className="text-admin-sm text-admin-state-caution">
+        {notice}
+      </p>
+      {newMapBlockHref && pastedMapUrl ? (
+        <a
+          ref={mapLinkRef}
+          className={linkButtonClass}
+          href={`${newMapBlockHref}?${new URLSearchParams({ mapEmbed: pastedMapUrl })}`}
+          target="_blank"
+          rel="noopener"
+        >
+          Add a Map block with this map<span className="sr-only"> (opens in a new tab)</span>
+        </a>
       ) : null}
       <FieldError id={errorId} message={error} />
     </div>
