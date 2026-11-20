@@ -49,7 +49,17 @@ let savedMode = null;
 let savedPresetTheme = null;
 let savedMotifSet = null;
 const previewDocuments = new Set();
-const previewTargets = new Set();
+// Every mounted framed preview, with its scoped candidate CSS. A document's
+// one preview stylesheet is rebuilt from all of them, so a second frame
+// (the block picker beside a gallery preview) never wipes the first.
+const previewTargets = new Map();
+
+function writeScopedStyles(doc) {
+  previewStyle(doc).textContent = [...previewTargets]
+    .filter(([element]) => element.ownerDocument === doc)
+    .map(([, css]) => css)
+    .join('\n');
+}
 
 function clearPreviewAttributes(element) {
   for (const attribute of ['texture', 'density', 'theme', 'motifSet', 'mode']) {
@@ -111,20 +121,11 @@ export function applyThemePreview(themeDoc, { scope = null, mode = null, scopes 
     // document so the candidate stylesheet lands beside the public CSS it
     // overrides instead of staying in the admin document where it cannot
     // cross the iframe boundary.
-    const byDocument = new Map();
-    for (const target of targets) {
-      const doc = target.element.ownerDocument;
-      if (!byDocument.has(doc)) byDocument.set(doc, []);
-      byDocument.get(doc).push(target);
-    }
-    for (const [doc, documentTargets] of byDocument) {
-      previewStyle(doc).textContent = documentTargets
-        .map((target) => scopeThemeCss(css, target.id))
-        .join('\n');
-    }
+    const documents = new Set(targets.map((target) => target.element.ownerDocument));
+    for (const target of targets) previewTargets.set(target.element, scopeThemeCss(css, target.id));
+    for (const doc of documents) writeScopedStyles(doc);
     for (const target of targets) {
       const { element } = target;
-      previewTargets.add(element);
       element.id = target.id;
       if (shape.texture) element.dataset.texture = shape.texture;
       else delete element.dataset.texture;
@@ -171,10 +172,12 @@ export function releaseThemePreviewTarget(element) {
   clearPreviewAttributes(element);
 
   const doc = element.ownerDocument;
-  const documentStillInUse = [...previewTargets].some(
+  const documentStillInUse = [...previewTargets.keys()].some(
     (target) => target.ownerDocument === doc,
   );
-  if (!documentStillInUse) {
+  if (documentStillInUse) {
+    writeScopedStyles(doc);
+  } else {
     doc.getElementById(PREVIEW_STYLE_ID)?.remove();
     previewDocuments.delete(doc);
   }
@@ -184,7 +187,7 @@ export function releaseThemePreviewTarget(element) {
 export function clearThemePreview() {
   for (const doc of previewDocuments) doc.getElementById(PREVIEW_STYLE_ID)?.remove();
   previewDocuments.clear();
-  for (const element of previewTargets) clearPreviewAttributes(element);
+  for (const element of previewTargets.keys()) clearPreviewAttributes(element);
   previewTargets.clear();
   if (savedTexture !== null) {
     if (savedTexture) document.documentElement.dataset.texture = savedTexture;
