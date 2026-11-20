@@ -8,10 +8,10 @@
 //
 // BROAD UNDERNEATH, SIMPLE AT FIRST CONTACT. Task navigation groups the
 // choices by what staff are trying to do, keeping one useful set in view:
-//   • Identity: logo, icon and main brand colour; extra image slots disclose.
-//   • Page style: complete styles, header, schedule and light/dark policy.
+//   • Identity: logo, icon and brand colours; extra image slots disclose.
+//   • Page style: complete styles, header, schedule, navigation and light/dark policy.
 //   • Workspace: the admin's own colour scheme.
-//   • Advanced: navigation, typography, illustrations, shape and overrides.
+//   • Advanced: typography, illustrations, shape and overrides.
 // All controls stay mounted, and the real preview stays beside the work.
 // A server rejection reveals the offending task and nested controls.
 //
@@ -47,10 +47,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import {
   THEME_HEADERS,
+  contrastRatio,
   getPreset,
   findThemeContrastFailures,
   resolveFontRoles,
   resolveOptionPicks,
+  resolveThemePalettes,
 } from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -302,6 +304,55 @@ const COLOR_LABELS = {
   keynote: 'Keynote',
 };
 
+const MAIN_COLOUR_FIELDS = [
+  { key: 'surfaceAlt', label: 'Background colour', hint: 'Fills the homepage hero and other alternate panels.' },
+  { key: 'accent', label: 'Accent / secondary colour', hint: 'Used for accent details in the selected site style.' },
+];
+const ADVANCED_COLOUR_KEYS = THEME_COLOR_KEYS.filter((key) => !MAIN_COLOUR_FIELDS.some((field) => field.key === key));
+
+function ColourModePicker({ mode, onChange }) {
+  return <div role="group" aria-label="Override mode" className="flex items-center gap-xs">
+    {['light', 'dark'].map((option) => (
+      <button key={option} type="button" aria-pressed={mode === option}
+        className={mode === option ? choiceButtonClass : secondaryButtonClass} onClick={() => onChange(option)}>
+        {option === 'light' ? 'Light mode' : 'Dark mode'}
+      </button>
+    ))}
+  </div>;
+}
+
+function ColourOverride({ field, value, palette, onChange, backgroundFailure, error }) {
+  const accent = field.key === 'accent';
+  const colour = palette[field.key];
+  const text = accent ? colour : palette.ink;
+  const background = accent ? palette.surface : colour;
+  const picker = toPickerHex(value) || (colour && rgbTripleToHex(colour.join(' '))) || '';
+  const accentRatio = accent && text && background ? contrastRatio(text, background) : null;
+  let warning = '';
+  if (accentRatio !== null && accentRatio < 4.5) {
+    warning = `This accent is hard to see on the page background (${accentRatio.toFixed(2)}:1). Aim for at least 4.5:1 if you use it for text.`;
+  } else if (backgroundFailure) {
+    const problem = backgroundFailure.foreground === 'control'
+      ? 'Control borders are hard to see on this colour'
+      : 'Text is hard to read on this colour';
+    warning = `${problem} (${backgroundFailure.ratio.toFixed(2)}:1). Choose a colour with at least ${backgroundFailure.min}:1 contrast.`;
+  }
+  return <div className="flex flex-col gap-xs">
+    <div className="admin-branding-color-row flex flex-wrap items-end gap-sm">
+      <input type="color" aria-label={`${field.label} picker`} value={picker}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-admin-control w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs" />
+      <div className="min-w-0 flex-1">
+        <TextField label={field.label} value={value} onChange={onChange} hint={field.hint} error={error} warning={warning} />
+      </div>
+    </div>
+    {background && text ? <p className="rounded-admin-small border-admin-hairline border-admin-rule-control px-sm py-xs text-admin-sm"
+      style={{ backgroundColor: `rgb(${background.join(' ')})`, color: `rgb(${text.join(' ')})` }}>
+      {accent ? 'Sample accent' : 'Sample text'}
+    </p> : null}
+  </div>;
+}
+
 /** The three roles the brand colour derives. Everything else is the style's. */
 const DERIVED_COLOR_KEYS = ['primary', 'primaryDark', 'primaryLight'];
 
@@ -353,8 +404,9 @@ const STORED_PALETTE_LABEL = 'Stored palette';
 /** Route a rejected field back to its task, including nested overrides. */
 function brandingTaskForField(field) {
   if (field === 'theme.brandColor' || field?.startsWith('theme.logos')) return 'identity';
+  if (/^theme\.tokens\.(light|dark)\.(surfaceAlt|accent)$/.test(field)) return 'identity';
   if (field === 'theme.adminScheme') return 'workspace';
-  if (['theme.preset', 'theme.mode', 'theme.header', 'theme.optionPicks.nameplate',
+  if (['theme.preset', 'theme.mode', 'theme.header', 'theme.navPlacement', 'theme.optionPicks.nameplate',
     'theme.optionPicks.component'].includes(field)) return 'page-style';
   return 'advanced';
 }
@@ -429,6 +481,7 @@ export default function AdminBranding() {
   // pair, the mode, and the measured ratio. Keyed by the foreground role in
   // that mode, which is the control an operator would go and change.
   const contrastFailures = useMemo(() => findThemeContrastFailures(candidate), [candidate]);
+  const colourPalettes = useMemo(() => resolveThemePalettes(candidate), [candidate]);
   const failureFor = (mode, key) =>
     contrastFailures.find((failure) => failure.mode === mode && failure.foreground === key);
 
@@ -447,6 +500,12 @@ export default function AdminBranding() {
     setSplit(next);
   };
   const accent = adminAccentVerdict(candidate, previewMode);
+
+  function setColourOverride(key, value) {
+    setForm((current) => ({ ...current, tokens: {
+      ...current.tokens, [overrideMode]: { ...current.tokens[overrideMode], [key]: value },
+    } }));
+  }
 
   /** One option group, rendered as a picker with the reason for the pick. */
   const optionField = (group, spec) => {
@@ -659,7 +718,7 @@ export default function AdminBranding() {
             {/* 3 ----------------------------------------- main brand colour */}
             <Panel
               title="Main brand colour"
-              description="One colour. The darker and lighter shades that go with it are worked out for light mode and dark mode, and they are always readable on the page they land on."
+              description="Set the main brand colour, the hero background and the accent. The brand colour supplies the lighter and darker shades for each mode."
             >
               <div className="flex flex-col gap-sm">
                 <div className="admin-branding-color-row flex flex-wrap items-end gap-sm">
@@ -693,6 +752,20 @@ export default function AdminBranding() {
                     message={`This colour reads at ${accent.ratio.toFixed(2)}:1 against the ${previewMode} admin title band, below the ${accent.floor}:1 floor a position marker needs. The mark beside the page title falls back to the admin’s own ink. The site itself is unaffected.`}
                   />
                 ) : null}
+                <ColourModePicker mode={overrideMode} onChange={(mode) => {
+                  setOverrideMode(mode);
+                  setPreviewMode(mode);
+                }} />
+                <div className="admin-branding-grid grid gap-sm">
+                  {MAIN_COLOUR_FIELDS.map((field) => {
+                    const palette = colourPalettes[overrideMode];
+                    const backgroundFailure = contrastFailures.find((pair) => pair.mode === overrideMode && pair.background === field.key);
+                    return <ColourOverride key={field.key} field={field} palette={palette}
+                      value={form.tokens[overrideMode][field.key]} onChange={(value) => setColourOverride(field.key, value)}
+                      error={fieldErrors.get(`theme.tokens.${overrideMode}.${field.key}`)}
+                      backgroundFailure={backgroundFailure} />;
+                  })}
+                </div>
               </div>
             </Panel>
 
@@ -752,6 +825,33 @@ export default function AdminBranding() {
             ) : null}
 
             {/* 6 -------------------------------------------- light or dark */}
+            <Panel title="Navigation">
+              <div className="flex flex-col gap-sm">
+                <SelectField
+                  label="Where the navigation sits"
+                  value={form.navPlacement}
+                  options={[
+                    { value: '', label: `Follow the house default — ${NAV_PLACEMENT_LABELS.top}` },
+                    ...NAV_PLACEMENT_IDS.map((id) => ({ value: id, label: NAV_PLACEMENT_LABELS[id] ?? id })),
+                  ]}
+                  onChange={(value) => setForm((current) => ({ ...current, navPlacement: value }))}
+                  hint="Down the side uses a rail on wide screens. On a phone both choices put the menu at the top."
+                  error={fieldErrors.get('theme.navPlacement')}
+                />
+                <div className="grid grid-cols-2 gap-sm" aria-hidden="true">
+                  {NAV_PLACEMENT_IDS.map((placement) => (
+                    <figure key={placement} className="m-0 flex min-w-0 flex-col gap-2xs">
+                      <div className={`flex h-16 gap-2xs rounded-admin-small border-admin-hairline border-admin-rule-control p-2xs ${placement === 'top' ? 'flex-col' : ''}`}>
+                        <span className={`block rounded-admin-small bg-admin-action ${placement === 'top' ? 'h-2.5' : 'w-4'}`} />
+                        <span className="block flex-1 rounded-admin-small bg-admin-action-soft" />
+                      </div>
+                      <figcaption className="text-admin-sm text-admin-ink-secondary">{NAV_PLACEMENT_LABELS[placement]}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              </div>
+            </Panel>
+
             <Panel title="Light or dark">
               <SelectField
                 label="Light or dark"
@@ -811,51 +911,6 @@ export default function AdminBranding() {
               description="Everything else the system can do. Nothing here is needed for a finished site."
             >
               <div className="flex flex-col gap-md">
-                {/* ------------------------------------------ navigation */}
-                {/* ONE SETTING FOR THE WHOLE SITE. The navigation is part of
-                    what the site IS, not part of what one page is about: a
-                    reader who meets a top nav on the home page and a rail on
-                    the schedule has been handed two sites, and the nav stops
-                    being furniture they can stop noticing. It sits here rather
-                    than among the six questions because almost no deployment
-                    moves it — a site that never opens this panel gets the row
-                    across the top, which is the right answer for nearly all of
-                    them.
-
-                    The words come from lib/themeRuntime.js, which is also where
-                    the page editor's per-page exception reads them, so an
-                    operator meets one name per placement. */}
-                <section aria-labelledby="admin-theme-navigation">
-                  <h3
-                    id="admin-theme-navigation"
-                    className="font-admin-ui text-admin-lg font-bold text-admin-ink"
-                  >
-                    Navigation
-                  </h3>
-                  <div className="mt-sm">
-                    <SelectField
-                      label="Where the navigation sits"
-                      value={form.navPlacement}
-                      options={[
-                        {
-                          value: '',
-                          // Blank is a real answer and not a repeat of "top":
-                          // it stores nothing, which is what leaves the
-                          // placement to the house. The label says which way
-                          // that falls so nobody has to guess.
-                          label: `Follow the house default — ${NAV_PLACEMENT_LABELS.top}`,
-                        },
-                        ...NAV_PLACEMENT_IDS.map((id) => ({
-                          value: id,
-                          label: NAV_PLACEMENT_LABELS[id] ?? id,
-                        })),
-                      ]}
-                      onChange={(value) => setForm((c) => ({ ...c, navPlacement: value }))}
-                      hint="One choice for every page. Down the side becomes a rail on wide screens; on a phone it is the same list across the top either way."
-                      error={fieldErrors.get('theme.navPlacement')}
-                    />
-                  </div>
-              </section>
               {/* ------------------------------------------- typography */}
               <section aria-labelledby="admin-theme-typography">
                 <h3
@@ -997,26 +1052,10 @@ export default function AdminBranding() {
                   you type, and publishing a failing pair is refused.
                 </p>
 
-                <div
-                  role="group"
-                  aria-label="Override mode"
-                  className="flex items-center gap-xs border-admin-rule-hairline border-b-admin-hairline pb-2xs"
-                >
-                  {['light', 'dark'].map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      aria-pressed={overrideMode === mode}
-                      className={overrideMode === mode ? choiceButtonClass : secondaryButtonClass}
-                      onClick={() => setOverrideMode(mode)}
-                    >
-                      {mode === 'light' ? 'Light mode' : 'Dark mode'}
-                    </button>
-                  ))}
-                </div>
+                <ColourModePicker mode={overrideMode} onChange={setOverrideMode} />
 
                 <div className="admin-branding-grid mt-sm grid gap-sm">
-                  {THEME_COLOR_KEYS.map((key) => {
+                  {ADVANCED_COLOUR_KEYS.map((key) => {
                     const failure = failureFor(overrideMode, key);
                     const derived = form.brandColor.trim() && DERIVED_COLOR_KEYS.includes(key);
                     return (
@@ -1024,15 +1063,7 @@ export default function AdminBranding() {
                         key={`${overrideMode}-${key}`}
                         label={`${COLOR_LABELS[key] ?? key} — ${overrideMode}`}
                         value={form.tokens[overrideMode][key]}
-                        onChange={(value) =>
-                          setForm((c) => ({
-                            ...c,
-                            tokens: {
-                              ...c.tokens,
-                              [overrideMode]: { ...c.tokens[overrideMode], [key]: value },
-                            },
-                          }))
-                        }
+                        onChange={(value) => setColourOverride(key, value)}
                         hint={
                           failure
                             ? `${failure.foreground} on ${failure.background} in ${failure.mode} mode is ${failure.ratio.toFixed(2)}:1, below the ${failure.min}:1 bar.`
@@ -1051,16 +1082,17 @@ export default function AdminBranding() {
                     trigger={`Reset the ${overrideMode} colours`}
                     title={`Reset the ${overrideMode} colours`}
                     confirmLabel="Reset these colours"
-                    consequence={`Every ${overrideMode}-mode colour you have set by hand goes, and that mode falls back to the shades worked out from the main brand colour, or to the style’s own palette where there is none.`}
+                    consequence={`This clears the advanced ${overrideMode} overrides. The background and accent choices stay in your draft.`}
                     permanence="The draft keeps everything else. Reverting to the saved theme brings them back until you publish."
                     onConfirm={() =>
                       setForm((c) => ({
                         ...c,
                         tokens: {
                           ...c.tokens,
-                          [overrideMode]: Object.fromEntries(
-                            THEME_COLOR_KEYS.map((key) => [key, '']),
-                          ),
+                          [overrideMode]: {
+                            ...c.tokens[overrideMode],
+                            ...Object.fromEntries(ADVANCED_COLOUR_KEYS.map((key) => [key, ''])),
+                          },
                         },
                       }))
                     }

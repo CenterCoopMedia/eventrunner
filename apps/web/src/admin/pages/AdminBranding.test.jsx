@@ -540,7 +540,8 @@ describe('the staff workflow', () => {
     fireEvent.change(screen.getByLabelText('Primary logo'), { target: { value: 'branding/draft.svg' } });
     expect(screen.getByText('Active site style').parentElement).toHaveTextContent('Broadsheet');
     fireEvent.click(screen.getByRole('button', { name: 'Change site style', exact: true }));
-    expect(panelTitles()).toEqual(['Site style', 'Header and schedule', 'Light or dark', 'Page preview']);
+    expect(panelTitles()).toEqual(['Site style', 'Header and schedule', 'Navigation', 'Light or dark', 'Page preview']);
+    expect(screen.getByLabelText('Where the navigation sits')).toBeVisible();
     expect(screen.getByLabelText('Primary logo')).not.toBeVisible();
     expect(screen.getByLabelText('Site style')).toBeVisible();
     expect(screen.getByLabelText('Site style')).toHaveFocus();
@@ -723,16 +724,53 @@ describe('advanced colour settings', () => {
 
   it('clears a mode’s overrides only after stating what goes', async () => {
     await renderBranding(PRESET_THEME);
+    fireEvent.change(screen.getByLabelText('Background colour'), { target: { value: hex('fffff0') } });
     openAdvanced();
     expect(screen.getByLabelText('Surface — light')).toHaveValue(hex('f7f4ee'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset the light colours' }));
-    expect(screen.getByText(/falls back to the shades worked out from the main brand colour/))
+    expect(screen.getByText(/background and accent choices stay in your draft/))
       .toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reset these colours' }));
 
     expect(screen.getByLabelText('Surface — light')).toHaveValue('');
+    expect(screen.getByLabelText('Background colour')).toHaveValue(hex('fffff0'));
   });
+});
+
+it('previews readable background and accent controls and publishes the existing theme roles', async () => {
+  const light = { surface: hex('f7f4ee'), ink: hex('112233'), inkMuted: hex('223344') };
+  await renderBranding({ ...PRESET_THEME, tokens: { light } });
+  const background = screen.getByLabelText('Background colour');
+  const picker = screen.getByLabelText('Background colour picker');
+  const accent = screen.getByLabelText('Accent / secondary colour');
+  fireEvent.change(accent, { target: { value: hex('f7f4ee') } });
+  expect(screen.getByText(/This accent is hard to see on the page background \(1.00:1\)/)).toBeVisible();
+  fireEvent.change(accent, { target: { value: hex('112233') } });
+  expect(screen.queryByText(/This accent is hard to see/)).toBeNull();
+  fireEvent.change(accent, { target: { value: '' } });
+  expect(background).toBeVisible();
+  fireEvent.change(background, { target: { value: hex('c0c0c0') } });
+  expect(screen.getByText(/Control borders are hard to see on this colour.*3:1 contrast/)).toBeVisible();
+  fireEvent.change(background, { target: { value: hex('112233') } });
+  expect(picker).toHaveValue(hex('112233'));
+  expect(screen.getByText(/Text is hard to read on this colour \(1.00:1\)/)).toBeVisible();
+  await waitFor(() => expect(previewCss()).toContain('--brand-surface-alt-rgb: 17 34 51;'));
+
+  fireEvent.change(picker, { target: { value: hex('fffff0') } });
+  expect(background).toHaveValue(hex('fffff0'));
+  fireEvent.click(screen.getByRole('button', { name: 'Dark mode' }));
+  fireEvent.change(screen.getByLabelText('Accent / secondary colour'), { target: { value: RUST } });
+  expect(screen.getByLabelText('Accent / secondary colour picker')).toHaveValue(RUST);
+  fireEvent.click(screen.getByRole('button', { name: 'Page style', exact: true }));
+  fireEvent.change(screen.getByLabelText('Where the navigation sits'), { target: { value: 'side' } });
+  fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/theme' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+  const { theme } = JSON.parse(fetch.mock.calls[0][1].body);
+  expect(theme.tokens).toEqual({ light: { ...light, surfaceAlt: hex('fffff0') }, dark: { accent: RUST } });
+  expect(theme.navPlacement).toBe('side');
 });
 
 describe('publishing the theme', () => {
