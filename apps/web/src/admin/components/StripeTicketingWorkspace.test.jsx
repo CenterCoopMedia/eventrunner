@@ -127,7 +127,7 @@ describe('complimentary tickets and online check-in', () => {
     expect(within(dialog).getByText(/guest@example.org/)).toBeInTheDocument();
     expect(call).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Issue 1 complimentary tickets' }));
-    await screen.findByText('This CSV already issued its complimentary tickets. The existing order is shown.');
+    await screen.findByText('This CSV matches an existing complimentary order. Review the current tickets in that order.');
     expect(call).toHaveBeenCalledExactlyOnceWith('ticketingCommerceAdmin', {
       action: 'issueCompCsv', ticketTypeId: 'general', reason: 'Speaker admission.', confirmed: true,
       attendees: [{ firstName: 'Guest', lastName: 'One', email: 'guest@example.org' }],

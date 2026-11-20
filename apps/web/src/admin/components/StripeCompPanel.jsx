@@ -72,7 +72,7 @@ export default function StripeCompPanel({ call, catalog, onComplete }) {
         if (inputRef.current) inputRef.current.value = '';
       } else setAttendees([{ firstName: '', lastName: '', email: '' }]);
       setReason('');
-      setNotice(result.reused ? 'This CSV already issued its complimentary tickets. The existing order is shown.' :
+      setNotice(result.reused ? 'This CSV matches an existing complimentary order. Review the current tickets in that order.' :
         `${result.tickets?.length || confirmation.attendees.length} complimentary tickets issued. No money was collected.`);
       onComplete(result.order?.orderId || result.order?.id);
     } catch (err) { setError(plannerMessage(err.message)); }
