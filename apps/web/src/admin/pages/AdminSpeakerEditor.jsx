@@ -483,7 +483,7 @@ export default function AdminSpeakerEditor({ mode }) {
             busyLabel="Deleting…"
             busy={action === 'delete'}
             disabled={saving}
-            consequence="The speaker record goes, and every session that references them is unlinked. Their profile disappears from the public directory."
+            consequence="The speaker record goes, and every session that references them is unlinked. Their profile disappears from the public directory. Their invitation records are also deleted."
             permanence="This cannot be undone. To keep the record and only hide it, mark the speaker removed instead."
             onConfirm={() => remove(false)}
           />

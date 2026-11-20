@@ -706,9 +706,9 @@ async function sendAcceptedEmail({ db, sendEmail, getConfig, speakerId, speaker,
  * the token digest, and nothing in the admin UI addresses an invitation by
  * anything other than its speaker.
  *
- * Ordered and capped IN THE QUERY, not after it. `speaker_invites` is
- * append-only over the life of an event — every send, resend, and cancel
- * leaves a row — so a collection read plus a client-side slice would grow
+ * Ordered and capped IN THE QUERY, not after it. Every send, resend, and
+ * cancel leaves a row in `speaker_invites` until the speaker is hard-deleted,
+ * so a collection read plus a client-side slice would grow
  * without bound and bill the whole history to render one screen. The
  * composite index the filtered form needs is declared in
  * firestore.indexes.json.
@@ -836,10 +836,10 @@ async function inviteSpeaker({ db, getConfig, sendEmail, speakerId, inviteType, 
   }
 
   try {
-    await db.collection(SPEAKER_INVITES).doc(minted.tokenHash).set(
-      { sentAt: new Date(now()), updatedAt: new Date(now()) },
-      { merge: true },
-    );
+    // A late delivery receipt must not recreate a hard-deleted invite.
+    await db.collection(SPEAKER_INVITES).doc(minted.tokenHash).update({
+      sentAt: new Date(now()), updatedAt: new Date(now()),
+    });
   } catch (err) {
     // Cosmetic: the invitation works either way, it just reads as
     // undelivered in the admin list.
