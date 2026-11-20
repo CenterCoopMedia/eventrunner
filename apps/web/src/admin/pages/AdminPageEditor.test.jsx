@@ -294,15 +294,15 @@ describe('page list', () => {
     const page = (id, label, order, visible = true) => ({ id, label, path: `/${id}`, order, visible, sections: [] });
     liveDocs = [
       page('faq', 'FAQ', 0), page('hidden', 'Hidden page', 2, false), page('parking', 'Parking', 3),
-      page('visit', 'Visit', 4), page('food', 'Food', 5), page('help', 'Help', 7),
+      page('visit', 'Visit', 4), page('food', 'Food', 5), page('zzz-help', 'Help', 6),
       { id: 'venue-link', label: 'Venue link', url: 'https://example.org/venue', order: 6, visible: true, systemPage: false },
     ];
     draftDocs = [{ ...page('printed-map', 'Printed map', 1), status: 'dirty' }];
     await renderAt('/admin/pages');
     const line = screen.getByText(/appear under More/).closest('li');
-    expect(line.previousElementSibling).toHaveTextContent('Venue link');
-    fireEvent.click(screen.getByRole('button', { name: 'Move Help up' }));
-    expect(screen.getByText(/appear under More/).closest('li').previousElementSibling).toHaveTextContent('Help');
+    expect(line.previousElementSibling).toHaveTextContent('Help');
+    fireEvent.click(screen.getByRole('button', { name: 'Move Venue link up' }));
+    expect(screen.getByText(/appear under More/).closest('li').previousElementSibling).toHaveTextContent('Venue link');
     expect(fetch).not.toHaveBeenCalled();
   });
 

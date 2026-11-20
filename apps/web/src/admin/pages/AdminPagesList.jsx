@@ -12,7 +12,7 @@
 // opacity — instantly under reduced motion.
 //
 // A move stays in this list until the organizer publishes the menu order.
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
 import { isNavigationLink, isPublicPage, pageFeatureGate } from 'shared/page';
@@ -27,7 +27,7 @@ import { contentError } from '../contentError.js';
 import { useAdminPages } from '../useAdminPages.js';
 import usePublishRun from '../usePublishRun.js';
 import PublishRunProgress from '../components/PublishRunProgress.jsx';
-import { useDraftOrder } from '../reorder.js';
+import { storedOrder, useDraftOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import AdminIconControl from '../components/AdminIconControl.jsx';
 import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
@@ -158,13 +158,23 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features, vis
   );
 }
 
+function menuLabel(row) {
+  const page = row.live ?? row.current;
+  const label = String(page?.label ?? '');
+  return isNavigationLink(page) ? label.trim() : label;
+}
+
 export default function AdminPagesList() {
   const { rows, ready, loading, error } = useAdminPages({ includeNavigationLinks: true });
   const call = useAdminApi();
   const { publish, run } = usePublishRun(call);
   const { showToast } = useToast();
   const { features } = useEventConfig();
-  const draft = useDraftOrder(rows);
+  // The public menu breaks ties by label. Draft labels must not move a live page.
+  const menuRows = useMemo(() => [...rows].sort((a, b) => (
+    storedOrder(a) - storedOrder(b) || menuLabel(a).localeCompare(menuLabel(b))
+  )), [rows]);
+  const draft = useDraftOrder(menuRows);
   const [publishing, setPublishing] = useState(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [notice, setNotice] = useState(null);

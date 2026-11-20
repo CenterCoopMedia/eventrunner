@@ -129,6 +129,19 @@ test('menu order refuses an incomplete list before changing any page', async () 
   assert.equal(db.writes.length, 0);
 });
 
+test('menu order logs changes to draft-only pages without starting a public publish', async () => {
+  const db = makeFakeDb({ 'cmsPages_drafts/first': { order: 0 }, 'cmsPages_drafts/second': { order: 1 } });
+  const res = fakeRes();
+  await createCmsPublishHandler({ ...deps(db), env: {} })(
+    req({ body: { menuOrder: ['second', 'first'], requestId: REQUEST_ID } }), res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsPages_drafts', 'second').order, 0);
+  assert.equal(db.ids('cmsPages').length, 0);
+  assert.equal(db.ids('cmsPublishQueue').length, 0);
+  assert.equal(db.read('admin_logs', db.ids('admin_logs')[0]).docPath, 'cmsPages_drafts');
+});
+
 test('cmsPublish { collection, docIds } publishes, marks the queue row done, and logs', async () => {
   const db = makeFakeDb({
     'cmsContent_drafts/hero__title': { value: 'v1', visible: true, status: 'dirty', basedOnRevision: null },

@@ -8,9 +8,9 @@ async function publishMenuOrder({ db, ids, queueRef, actor, now, log, publish, r
     return badRequest(res, 'The menu order could not be read. Refresh the page and try again.');
   }
 
-  let results;
+  let outcome;
   try {
-    results = await db.runTransaction(async (tx) => {
+    outcome = await db.runTransaction(async (tx) => {
       const [live, drafts, existing] = await Promise.all([
         tx.get(db.collection('cmsPages')),
         tx.get(db.collection('cmsPages_drafts')),
@@ -28,7 +28,7 @@ async function publishMenuOrder({ db, ids, queueRef, actor, now, log, publish, r
       // Reserve one write for the publish record. The order is committed as a unit.
       if (changed.length + 1 > internals.MAX_WRITES_PER_BATCH) return 'menu-too-large';
       for (const doc of changed) tx.update(doc.ref, { order: positions.get(doc.id) });
-      if (!published.length) return {};
+      if (!published.length) return { changed: changed.length > 0, results: {} };
 
       const timestamp = new Date(now());
       const progress = { cmsPages: { published, skipped: [], chunksCommitted: 1 } };
@@ -36,27 +36,29 @@ async function publishMenuOrder({ db, ids, queueRef, actor, now, log, publish, r
         status: 'done', menuOrder: true, request: { cmsPages: published }, progress, plannedChunks: 1,
         requestedBy: actor.email, requestedAt: timestamp, updatedAt: timestamp, finishedAt: timestamp,
       });
-      return progress;
+      return { changed: true, results: progress };
     });
   } catch (err) {
     log.error('cmsPublish menu order write failed', err);
     return internal(res, 'The menu order could not be confirmed. Check the page list before trying again.');
   }
 
-  if (results === 'request-id-in-use') {
-    return sendError(res, 409, results, 'Check Recent publishes for the result.');
+  if (outcome === 'request-id-in-use') {
+    return sendError(res, 409, outcome, 'Check Recent publishes for the result.');
   }
-  if (results === 'menu-list-changed') {
-    return sendError(res, 409, results, 'The page list changed. Check the list, then publish the menu order again.');
+  if (outcome === 'menu-list-changed') {
+    return sendError(res, 409, outcome, 'The page list changed. Check the list, then publish the menu order again.');
   }
-  if (results === 'menu-too-large') {
-    return sendError(res, 400, results, 'This menu has too many changes to publish together. Contact support for help.');
+  if (outcome === 'menu-too-large') {
+    return sendError(res, 400, outcome, 'This menu has too many changes to publish together. Contact support for help.');
   }
+  const { changed, results } = outcome;
   const queueId = results.cmsPages ? queueRef.id : null;
-  if (queueId) {
-    await logAdminAction({ db, action: 'cms-publish-menu-order', docPath: queueRef.path, actor, now, log });
-    await publish(queueId);
+  if (changed) {
+    const docPath = queueId ? queueRef.path : 'cmsPages_drafts';
+    await logAdminAction({ db, action: 'cms-publish-menu-order', docPath, actor, now, log });
   }
+  if (queueId) await publish(queueId);
   return res.status(200).json({ queueId, status: 'done', results });
 }
 
