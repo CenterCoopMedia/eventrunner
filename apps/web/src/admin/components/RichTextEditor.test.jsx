@@ -58,6 +58,10 @@ describe('RichTextEditor', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('<p><strong>Safe</strong></p>'));
     expect(editor.innerHTML).toBe('<p><strong>Safe</strong></p>');
     expect(screen.getByRole('status')).toHaveTextContent('Unsupported formatting was removed');
+    Quill.find(editor.parentElement).setSelection(4, 0, 'user');
+    fireEvent.paste(editor, { clipboardData: { getData: (type) => type === 'text/plain' ? ' copy' : '' } });
+    expect(editor).toHaveTextContent('Safe copy');
+    expect(screen.getByRole('status')).toHaveTextContent('Save to store the cleaned version.');
   });
 
   it('sanitizes HTML paste before Quill converts it', async () => {

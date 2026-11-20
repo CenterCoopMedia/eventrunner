@@ -105,6 +105,7 @@ const toolbarButtonClass =
 
 const HTML_SOURCE = /^\s*<(?:!--|!doctype\b|\/?[a-z][\w:-]*(?=[\s>]|\/>))/i;
 const EMBED_TAG = /<\/?(?:iframe|script|embed|object)(?=[\s/>])/i;
+const STORED_TEXT_CLEANUP = 'Unsupported formatting was removed from this saved text. Save to store the cleaned version.';
 
 function looksLikeHtmlSource(text) {
   return HTML_SOURCE.test(text) || EMBED_TAG.test(text);
@@ -192,7 +193,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
     const normalized = outputHtml(quill);
     lastValueRef.current = normalized;
     if (normalized !== supplied) {
-      setNotice('Unsupported formatting was removed from this saved text. Save to store the cleaned version.');
+      setNotice(STORED_TEXT_CLEANUP);
       onChangeRef.current(normalized);
     }
     updateToolbar({ index: 0, length: 0 });
@@ -217,7 +218,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
       const pastedHtml = event.clipboardData?.getData('text/html') ?? '';
       const isSource = looksLikeHtmlSource(pastedText);
       setPastedMapUrl('');
-      setNotice('');
+      setNotice((current) => current === STORED_TEXT_CLEANUP ? current : '');
       if (!pastedHtml && !isSource) return;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -282,7 +283,7 @@ export default function RichTextEditor({ label, value, onChange, error, help, re
     setFormats(quill.getFormat(lastSelectionRef.current));
     setHistory({ undo: false, redo: false });
     if (normalized !== supplied) {
-      setNotice('Unsupported formatting was removed from this saved text. Save to store the cleaned version.');
+      setNotice(STORED_TEXT_CLEANUP);
       onChangeRef.current(normalized);
     }
   }, [value]);
