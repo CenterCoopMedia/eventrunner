@@ -37,16 +37,20 @@ export async function expectTextFits(locator) {
     for (let text = walker.nextNode(); text; text = walker.nextNode()) {
       if (!text.data.trim() || text.parentElement.closest('[aria-hidden="true"], .sr-only, .visually-hidden')) continue;
       range.selectNodeContents(text);
+      const lineHeight = Number.parseFloat(getComputedStyle(text.parentElement).lineHeight);
       for (const line of range.getClientRects()) {
         if (line.width === 0) continue;
+        // A text range includes font ascent and descent beyond the line box.
+        const fontBleed = Number.isNaN(lineHeight) ? 0 : Math.max(0, line.height - lineHeight) / 2;
         for (let ancestor = text.parentElement; ancestor; ancestor = ancestor.parentElement) {
           const style = getComputedStyle(ancestor);
           const bounds = ancestor.getBoundingClientRect();
           const left = bounds.left + ancestor.clientLeft;
           const top = bounds.top + ancestor.clientTop;
-          if ((clips(style.overflowX) && (line.left < left - 1 || line.right > left + ancestor.clientWidth + 1))
-            || (clips(style.overflowY) && (line.top < top - 1 || line.bottom > top + ancestor.clientHeight + 1))) {
-            problems.push({ text: text.data.trim(), clippedBy: ancestor.tagName, className: ancestor.className });
+          const horizontal = clips(style.overflowX) && (line.left < left - 1 || line.right > left + ancestor.clientWidth + 1);
+          const vertical = clips(style.overflowY) && (line.top + fontBleed < top - 1 || line.bottom - fontBleed > top + ancestor.clientHeight + 1);
+          if (horizontal || vertical) {
+            problems.push({ text: text.data.trim(), clippedBy: ancestor.tagName, className: ancestor.className, horizontal, vertical });
             break;
           }
         }

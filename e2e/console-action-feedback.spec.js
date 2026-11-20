@@ -155,10 +155,11 @@ test('the guided setup reflows and all eight steps remain reachable by keyboard'
         for (const profile of REFLOW_PROFILES) {
           await test.step(profile.name, async () => {
             await setReflowProfile(page, profile);
-            await expectPageFits(page);
             await expectTextFits(heading);
             if (layout.path === 'web-address') await expect(layout.text).toHaveText('community-gathering.eventrunner.org is available.');
             await expectTextFits(layout.text);
+            await expectPageFits(page);
+            if (layout.path === 'event') await expectControlFits(page.getByLabel('Time zone', { exact: true }));
             await expectControlFits(control);
             await expectTextFits(control);
           });
