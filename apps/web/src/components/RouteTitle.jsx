@@ -15,28 +15,16 @@
 // components and would otherwise show the server's title for a moment and
 // then drop to the bare event name.
 import { useLocation } from 'react-router';
-import { languageFromSearch } from 'shared/languageUrls';
-import { isPublicPage } from 'shared/page';
-import { homepageMetadata } from 'shared/homepageMetadata';
-import { useContent } from '../contexts/ContentContext.jsx';
 import { usePublicContent } from '../contexts/PublicLanguageProvider.jsx';
 import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
-import { IS_DEMO } from '../lib/demoMode.js';
 import { routeTitlePartFor, useDerivedDocumentTitle } from '../lib/useDocumentTitle.js';
 
 export default function RouteTitle() {
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   const { pages } = usePublicContent();
-  const { getBlock } = useContent();
-  const { language, text } = usePublicLanguage();
-  const { eventConfig, features } = useEventConfig();
-  let part = routeTitlePartFor({ pathname, pages, features, pitchTitle: text('Pitch a session', 'Proponer una sesión') });
-  if (!IS_DEMO && pathname === '/' && isPublicPage(pages?.find(({ id }) => id === 'home'), features)) {
-    const home = homepageMetadata(eventConfig, [getBlock('hero', 'title'), getBlock('hero', 'subtitle')]);
-    const locale = languageFromSearch(search) ?? language;
-    part = (home.text[locale] ?? home.text.en).titlePart;
-  }
-  useDerivedDocumentTitle(part);
+  const { text } = usePublicLanguage();
+  const { features } = useEventConfig();
+  useDerivedDocumentTitle(routeTitlePartFor({ pathname, pages, features, pitchTitle: text('Pitch a session', 'Proponer una sesión') }));
   return null;
 }
