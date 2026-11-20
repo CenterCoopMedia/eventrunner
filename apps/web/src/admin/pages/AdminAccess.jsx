@@ -327,8 +327,8 @@ export default function AdminAccess() {
   const listRef = useRef(null);
 
   // Reads land in the order they started: the first answer shows at once,
-  // and an older read that answers after a newer one has landed (a retry
-  // past a read that hung) changes nothing.
+  // and an older read that answers after a newer one has landed, with a list
+  // or a failure (a retry past a read that hung), changes nothing.
   const loadRef = useRef({ started: 0, landed: 0 });
   const load = useCallback(async ({ focusList = false } = {}) => {
     const reads = loadRef.current;
@@ -343,7 +343,9 @@ export default function AdminAccess() {
       setCallerEmail(typeof response?.callerEmail === 'string' ? response.callerEmail : null);
       setLoadError(null);
     } catch (err) {
-      if (attempt >= reads.landed) setLoadError(err);
+      if (attempt < reads.landed) return;
+      reads.landed = attempt;
+      setLoadError(err);
     } finally {
       if (attempt === reads.started) setLoading(false);
     }

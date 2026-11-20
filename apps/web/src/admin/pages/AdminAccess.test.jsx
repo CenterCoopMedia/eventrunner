@@ -457,6 +457,32 @@ describe('AdminAccess', () => {
     }
   });
 
+  it('keeps a newer failed read when an older list answers after it', async () => {
+    vi.useFakeTimers();
+    try {
+      const answers = [];
+      callMock.mockImplementation((name) => {
+        if (name !== 'listAdminAccess') return Promise.resolve({});
+        if (answers.length === 0) {
+          answers.push(null);
+          return Promise.reject(serverError(500, 'internal', 'down'));
+        }
+        return new Promise((resolve, reject) => answers.push({ resolve, reject }));
+      });
+      render(<AdminAccess />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      act(() => vi.advanceTimersByTime(10000));
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await act(async () => answers[2].reject(serverError(500, 'internal', 'down again')));
+      await act(async () => answers[1].resolve(LIST));
+      expect(screen.queryByRole('table')).toBeNull();
+      expect(screen.getByRole('alert').textContent).toContain('The access list could not be loaded. Try again.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a list load that lands while a confirmation is open does not pull focus back onto the surface', async () => {
     callMock.mockImplementation((name) => (name === 'listAdminAccess'
       ? Promise.reject(serverError(500, 'internal', 'down'))
