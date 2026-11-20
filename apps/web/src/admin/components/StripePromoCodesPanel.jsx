@@ -4,7 +4,7 @@ import { plannerMessage } from '../plannerErrors.js';
 // used code cannot be deleted: its orders name it, so it is made inactive.
 import AdminIconControl from './AdminIconControl.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { formatTicketMoney, formatTicketTime } from '../../lib/ticketingCommerce.js';
+import { formatTicketMoney, formatTicketTime } from '../../lib/ticketingDetails.js';
 import { AdminLoadingState, StatusBadge } from './adminChrome.jsx';
 import { DestructiveConfirm, Notice, Panel, secondaryButtonClass } from './formControls.jsx';
 import StripePromoCodeEditor, { EMPTY_PROMO } from './StripePromoCodeEditor.jsx';

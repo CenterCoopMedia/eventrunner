@@ -4,7 +4,7 @@ import AdminIconControl from './AdminIconControl.jsx';
 import PlannerSwitch from './PlannerSwitch.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { Checkbox } from '../../components/forms/Choice.jsx';
-import { currencyDigits, formatTicketMoney } from '../../lib/ticketingCommerce.js';
+import { currencyDigits, formatTicketMoney } from '../../lib/ticketingDetails.js';
 import EventDateTimeField from './EventDateTimeField.jsx';
 import { Notice, Panel, primaryButtonClass, secondaryButtonClass, TextAreaField, TextField, SelectField, dangerButtonClass } from './formControls.jsx';
 

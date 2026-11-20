@@ -11,10 +11,11 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
+import { ticketingRequest } from '../lib/ticketingCommerce.js';
 import {
   forgetCheckoutAttempt, formatTicketMoney, formatTicketTime, readCheckoutAttempt, rememberCheckoutAttempt,
-  safeCheckoutUrl, ticketingRequest, paymentStatusLabel, refundStateLabel,
-} from '../lib/ticketingCommerce.js';
+  safeCheckoutUrl, paymentStatusLabel, refundStateLabel,
+} from '../lib/ticketingDetails.js';
 
 const COMPLETE = new Set(ORDER_COMPLETE_STATUSES);
 const TERMINAL = new Set(['failed', 'expired', 'cancelled']);

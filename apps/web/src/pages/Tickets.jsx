@@ -38,10 +38,11 @@ import { usePublicLanguage } from '../contexts/PublicLanguageContext.jsx';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { subscribeRegistrationForm } from '../lib/registrationFormSource.js';
 import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
+import { ticketingRequest } from '../lib/ticketingCommerce.js';
 import {
   forgetCheckoutAttempt, formatTicketMoney, formatTicketTime, newTicketingRequestId, readCheckoutAttempt,
-  rememberCheckoutAttempt, safeCheckoutUrl, ticketingRequest,
-} from '../lib/ticketingCommerce.js';
+  rememberCheckoutAttempt, safeCheckoutUrl,
+} from '../lib/ticketingDetails.js';
 import { EMAIL_ADDRESS_RE as EMAIL_RE } from 'shared/email';
 
 const EMPTY_CART = 'Choose at least one ticket.';

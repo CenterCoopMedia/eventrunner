@@ -8,9 +8,9 @@
 // controls are an optional disclosure on the shared stage, so readers can
 // reach the event content without first scrolling through a control panel.
 import { startTransition, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { recommendedConfiguration } from 'shared/theme';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
-import { recommendedConfiguration } from '../lib/themeRuntime.js';
 import { loadPresetRemaps } from '../lib/presetRemaps.js';
 import { quietActionClass } from './controlClasses.js';
 import LoadingState from './LoadingState.jsx';

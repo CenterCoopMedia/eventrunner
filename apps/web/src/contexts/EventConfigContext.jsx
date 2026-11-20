@@ -25,7 +25,7 @@ import {
 } from '@generated/eventConfig.js';
 import { subscribeConfigDoc } from '../lib/configSource.js';
 import { IS_DEMO } from '../lib/demoMode.js';
-import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeRuntime.js';
+import { buildRuntimeThemeCss, resolveRootAttributes } from '../lib/themeCss.js';
 import { loadPresetRemaps, presetRemapsLoaded } from '../lib/presetRemaps.js';
 import { startModeSync } from '../lib/modeRuntime.js';
 import { getRouteTitlePart, subscribeRouteTitle } from '../lib/useDocumentTitle.js';
