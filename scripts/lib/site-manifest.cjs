@@ -30,6 +30,7 @@ const { parseEventPublicBase } = require('shared/config/publicBase');
 const { joinEventPath } = require('shared/config/publicPath');
 const { isPublicPage, pageFeatureGate } = require('shared/page');
 const { publicRouteUrls, publishedSpanishSections } = require('shared/contentLanguages');
+const { homepageMetadata } = require('shared/pageMetadata');
 const { APP_ICON_SIZES, appIconPath } = require('./app-icons.cjs');
 
 /**
@@ -396,7 +397,9 @@ function buildSitemapXml({
   const spanishSections = publishedSpanishSections(blocks, event);
   let hasAlternates = false;
   const urls = sorted.flatMap((route) => {
-    const versions = publicRouteUrls(encodeRoutePath(route.path), route.doc, route.kind, event, spanishSections);
+    const versions = route.path === '/'
+      ? homepageMetadata(event, blocks).urls
+      : publicRouteUrls(encodeRoutePath(route.path), route.doc, route.kind, event, spanishSections);
     const locations = Object.entries(versions).map(([language, path]) => [language, escapeXml(joinEventPath(publicBase, path))]);
     const alternateLinks = [];
     if (versions.es) {

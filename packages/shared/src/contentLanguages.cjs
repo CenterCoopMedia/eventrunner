@@ -115,7 +115,7 @@ function resolveContentVariant(record, kind, requestedLanguage, event = {}) {
 
 /** Canonical route paths for the approved page or session versions. */
 function publicRouteUrls(path, record, kind, event, spanishSections) {
-  // Hosting uses static HTML at the root and attendee directory.
+  // The homepage uses its hero metadata. The attendee directory serves the shell.
   if (path === '/' || path === '/attendees') return { en: path };
   const config = contentLanguages(event);
   if (!config.available.includes('es')) return { en: path };

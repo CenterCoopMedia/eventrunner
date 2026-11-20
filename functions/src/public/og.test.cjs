@@ -626,7 +626,7 @@ test('mounted Hosting routes resolve app paths and publish public URLs with one 
 
     const privatePath = stripEventMount(`${mount}/admin`, mount);
     assert.deepEqual(hosting.rewrites.find(({ source }) => source === privatePath), {
-      source: '/admin', destination: '/index.html',
+      source: '/admin', destination: '/app-shell.html',
     });
     assert.deepEqual(Object.fromEntries(hosting.headers.find(({ source }) => source === privatePath).headers
       .map(({ key, value }) => [key, value])), { 'X-Robots-Tag': 'noindex', 'Cache-Control': ROUTE_CACHE_CONTROL });
@@ -768,6 +768,54 @@ test('routeMeta: the home route is titled with the event alone, never with the p
   assert.ok(res.sent.includes('<title>[Fixture] Harborlight Media Summit</title>'));
   assert.ok(!res.sent.includes('Home page'));
   assert.ok(res.sent.includes('<link rel="canonical" href="https://example.org/">'));
+});
+
+test('routeMeta: homepage requests select approved hero text and reciprocal URLs', async () => {
+  const event = { ...SITE_EVENT, contentLanguages: { default: 'en', available: ['en', 'es'] } };
+  const hero = (field, value, spanish) => ({
+    section: 'hero', field, blockType: 'text', visible: true, value, translations: { es: { value: spanish } },
+  });
+  const docs = {
+    ...SITE_DOCS,
+    'cmsContent/hero__title': hero('title', 'Local news summit', 'Cumbre de noticias locales'),
+    'cmsContent/hero__subtitle': hero('subtitle', 'Meet the newsrooms.', 'Conoce a las redacciones.'),
+    'cmsContent_drafts/hero__subtitle': hero('subtitle', 'Private draft', 'Borrador privado'),
+  };
+  const get = async (handler, locale) => {
+    const res = fakeRes();
+    await handler({ method: 'GET', path: '/', originalUrl: `/?lang=${locale}` }, res);
+    assert.equal(res.statusCode, 200);
+    return res;
+  };
+  const handler = routeHandler({ event }, docs);
+  for (const [requested, language, title, description] of [
+    ['es', 'es', 'Cumbre de noticias locales', 'Conoce a las redacciones.'],
+    ['en', 'en', 'Local news summit', 'Meet the newsrooms.'],
+    ['es', 'es', 'Cumbre de noticias locales', 'Conoce a las redacciones.'],
+    ['fr', 'en', 'Local news summit', 'Meet the newsrooms.'],
+  ]) {
+    const res = await get(handler, requested);
+    assert.equal(res.headers['Content-Language'], language);
+    assert.equal(res.headers['Cache-Control'], ROUTE_CACHE_CONTROL);
+    assert.ok(res.sent.includes(`<html lang="${language}">`));
+    assert.ok(res.sent.includes(`<title>${title}</title>`));
+    assert.ok(res.sent.includes(`<meta name="description" content="${description}">`));
+    assert.ok(res.sent.includes(`<link rel="canonical" href="https://example.org/?lang=${language}">`));
+    for (const alternate of ['en', 'es']) {
+      assert.ok(res.sent.includes(`<link rel="alternate" hreflang="${alternate}" href="https://example.org/?lang=${alternate}">`));
+    }
+    assert.ok(res.sent.includes('<div id="root"></div>'));
+    assert.ok(res.sent.includes('src="/assets/index-abc123.js"'));
+    assert.doesNotMatch(res.sent, /Private draft|Borrador privado/);
+  }
+  const partialDocs = { ...docs, 'cmsContent/hero__subtitle': hero('subtitle', 'Meet the newsrooms.', '[Replace]') };
+  for (const fallbackHandler of [routeHandler({ event }, partialDocs), routeHandler({ event: SITE_EVENT }, docs)]) {
+    const res = await get(fallbackHandler, 'es');
+    assert.equal(res.headers['Content-Language'], 'en');
+    assert.match(res.sent, /<title>Local news summit<\/title>/);
+    assert.match(res.sent, /<link rel="canonical" href="https:\/\/example.org\/">/);
+    assert.doesNotMatch(res.sent, /hreflang=|\[Replace\]/);
+  }
 });
 
 test('routeMeta: a session detail route is described by its own session', async () => {

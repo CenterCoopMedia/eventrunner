@@ -621,18 +621,18 @@ client already past step 3 never needs it again.
   template at all answers 500. A run of 500s from this function therefore means the very first
   self-fetch is failing: check `EVENT_PUBLIC_URL` and that hosting is actually serving
   `/index.html`.
-- `firebase.json`'s rewrite **order** is load-bearing. `/updates/**` goes to `updatesMeta` first;
-  then the account and staff routes (`/signin`, `/profile`, `/profile/**`, `/attendees`,
-  `/attendees/**`, `/schedule/mine`, `/speaker/**`, `/ticket/**`, `/dashboard`, `/registration`,
-  `/registration/**`, `/tickets/mine`, `/tickets/status`, `/admin`, `/admin/**`) are rewritten
-  straight to `/index.html`, because they carry nothing a crawler should index and spending a function
-  invocation to say so is waste; then the `**` catch-all goes to `routeMeta`. Adding a public route
-  needs nothing here — the catch-all already covers it. Adding an authenticated one means adding it
-  to that middle block, **above** the catch-all, and to the `headers` block below it. Hosting
-  serves an existing static file before it applies any rewrite, which is what keeps `/assets/**`,
-  `/branding/**`, and `routeMeta`'s own self-fetch of `/index.html` from re-entering the function.
-  `scripts/deploy-workflow.test.cjs` asserts the whole arrangement, so a rewrite added out of order
-  fails the suite rather than a deploy.
+- The Hosting predeploy hook renames the built `index.html` to `app-shell.html`. This lets `/`
+  reach `routeMeta` and preserves the exact shell bytes. The metadata functions still fetch
+  `/index.html`, which Hosting rewrites to `/app-shell.html` ahead of the catch-all. The
+  account and staff routes use the same static shell and retain their `noindex` headers.
+  `/updates/**` reaches `updatesMeta` before `routeMeta` handles the remaining public routes.
+  An authenticated route needs a static rewrite above the catch-all and a `noindex` header.
+  `scripts/deploy-workflow.test.cjs` checks the rewrite order.
+- The homepage uses the published hero title and subtitle for crawler metadata. Approved Spanish
+  hero text adds `/?lang=es` and `/?lang=en` to the HTML alternates and sitemap. An unavailable
+  Spanish version falls back to the English title, description and canonical. Hosting includes
+  the query string in its cache key. Check alternating requests in an approved synthetic Hosting
+  preview to verify the language, title, canonical and cache behavior together.
 - Those same private sources appear again under `hosting.headers`, setting
   `X-Robots-Tag: noindex`. The shell they serve is one file for every route, so it cannot carry a
   per-route robots meta the way a `routeMeta` response can; hosting states it in the response
