@@ -5,7 +5,7 @@ import { adminScreenWidth } from './screenWidth.js';
 
 describe('adminScreenWidth', () => {
   it('gives lists and dashboards the whole workspace', () => {
-    for (const path of ['/admin', '/admin/overview', '/admin/pages', '/admin/sessions', '/admin/speakers', '/admin/attendees', '/admin/versions', '/admin/media']) {
+    for (const path of ['/admin', '/admin/overview', '/admin/pages', '/admin/sessions', '/admin/speakers', '/admin/attendees', '/admin/versions', '/admin/media', '/admin/access', '/admin/import']) {
       expect(adminScreenWidth(path), path).toBe('wide');
     }
   });
@@ -17,7 +17,7 @@ describe('adminScreenWidth', () => {
   });
 
   it('keeps plain forms and single-record editors bounded', () => {
-    for (const path of ['/admin/settings', '/admin/features', '/admin/access', '/admin/setup/basics', '/admin/sessions/abc', '/admin/speakers/new', '/admin/organizations/acme', '/admin/invoices/settings', '/admin/versions/cmsPages/home']) {
+    for (const path of ['/admin/settings', '/admin/features', '/admin/setup/basics', '/admin/sessions/abc', '/admin/speakers/new', '/admin/organizations/acme', '/admin/invoices/settings', '/admin/versions/cmsPages/home']) {
       expect(adminScreenWidth(path), path).toBe('form');
     }
   });

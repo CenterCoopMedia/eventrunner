@@ -6,10 +6,12 @@
 // the whole workspace; plain forms and single-record editors keep 64rem.
 // Text keeps its 64ch measure on every screen (adminWorkspace.css).
 
-// Sections whose own first screen is a form, not a list.
+// Sections whose own first screen is a form, not a list. Access (the
+// accounts table) and import (the preview table) hold tables, so they take
+// the whole workspace like a list does.
 const FORM_SECTIONS = new Set([
-  'setup', 'settings', 'features', 'access', 'web-address',
-  'registration-form', 'badges', 'data-export', 'import',
+  'setup', 'settings', 'features', 'web-address',
+  'registration-form', 'badges', 'data-export',
 ]);
 // Sections whose record screens are editors that draw the site beside the
 // fields.
