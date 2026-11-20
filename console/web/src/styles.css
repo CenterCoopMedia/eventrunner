@@ -36,6 +36,8 @@
   --state-pressed-share: 10%;
   font-family: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   line-height: 1.6;
 }
 
@@ -128,7 +130,7 @@ a { color: rgb(var(--accent)); text-underline-offset: 0.15em; }
 
 .divider { font-size: 1rem; font-weight: 600; margin-top: var(--space-xl); padding-top: var(--space-md); border-top: 1px solid rgb(var(--rule)); }
 
-.field { display: grid; gap: 0.25rem; align-content: start; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.25rem; align-content: start; }
 label, legend { font-weight: 600; }
 input[type="email"], input[type="text"], input[type="url"], input[type="date"], input[type="time"], textarea, select {
   width: 100%;
