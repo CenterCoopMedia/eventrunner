@@ -6,6 +6,8 @@
 // a modal makes everything outside it inert; otherwise it lives on the body.
 // Mount it when the work starts (prepareAnnouncer), so assistive technology
 // has registered the empty region before its first line arrives.
+// It takes no role: a polite live region is enough, and a page keeps one
+// status region of its own.
 const regions = new WeakMap();
 
 export function prepareAnnouncer(node) {
@@ -13,7 +15,6 @@ export function prepareAnnouncer(node) {
   let region = regions.get(host);
   if (region?.isConnected) return region;
   region = document.createElement('div');
-  region.setAttribute('role', 'status');
   region.setAttribute('aria-live', 'polite');
   region.setAttribute('aria-atomic', 'true');
   region.dataset.announcer = '';
