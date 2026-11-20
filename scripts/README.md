@@ -31,6 +31,27 @@ one shot, which is how the scripts are smoke-tested.
 
 ## Landed
 
+### `sweep-orphan-speaker-invites.cjs`
+
+Removes invitation records left by earlier speaker deletions (#1123). From a checkout with
+dependencies installed, set `CLIENT_PROJECT_ID` to one client's Firebase project ID and use
+application-default credentials for that project.
+
+```sh
+EVENT_FIREBASE_PROJECT_ID="$CLIENT_PROJECT_ID" node scripts/sweep-orphan-speaker-invites.cjs --dry-run
+```
+
+The dry run needs Firestore read access (`roles/datastore.viewer`) and prints the orphan count.
+After that client runs the hard-delete fix from #1119, an operator with `roles/datastore.user`
+can run the same command with `--apply`. The apply command rechecks each speaker inside the
+deletion transaction and writes the deletion count to
+`data_migrations/speaker-invite-orphans-2026-11-19` as each batch commits. A retry after an
+interruption retains that count. Once complete, a repeat apply skips the sweep. Deployment
+does not run this command.
+
+An invitation is eligible only when it names a valid speaker ID and the speaker document is
+absent. Existing speakers, including those marked removed, keep their invitation records.
+
 ### `prepare-functions.cjs`
 
 Packs `packages/shared` into `functions/vendor/shared.tgz` (spec §1.1) and copies the same
