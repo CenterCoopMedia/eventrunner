@@ -231,12 +231,16 @@ function PageEditor({ mode }) {
   // the page's content provider may be showing drafts (?preview=1).
   // The published timeline only (cmsTimeline, not its drafts), visible
   // entries as the public query asks for. A listener failure stays stated
-  // until a fresh snapshot arrives, so a stale timeline is never shown as
-  // current.
+  // until a fresh snapshot arrives, and a cache-only snapshot (offline)
+  // clears the timeline until the server confirms it again, so a stale
+  // timeline is never shown as current.
   const [liveTimeline, setLiveTimeline] = useState(null);
   const [timelineError, setTimelineError] = useState(null);
   useEffect(() => subscribeAdminCollection('cmsTimeline', (docs, metadata) => {
-    if (metadata?.fromCache) return;
+    if (metadata?.fromCache) {
+      setLiveTimeline(null);
+      return;
+    }
     setLiveTimeline(docs);
     setTimelineError(null);
   }, setTimelineError), []);
@@ -244,9 +248,9 @@ function PageEditor({ mode }) {
     () => prepareTimelineDocs((liveTimeline ?? []).filter((doc) => doc?.visible === true)),
     [liveTimeline],
   );
-  // Only a section that holds a published timeline block waits for it.
+  // Only a section that holds a published, visible timeline block waits for it.
   const holdsTimeline = (section) => contentRows.some((row) => row.live?.section === section.id
-    && row.live.blockType === 'timeline');
+    && row.live.blockType === 'timeline' && row.live.visible !== false);
   // The preview draws that published timeline too, whatever the page's own
   // content provider is showing.
   const contentContext = useContext(ContentContext);
