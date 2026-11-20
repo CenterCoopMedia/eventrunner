@@ -398,6 +398,12 @@ Before each Functions deploy, the script reads the complete Functions inventory 
 `firebase-tools` backend used by `functions:list`. It rejects missing regional availability or any
 unreachable region. A failed or partial inventory stops the deploy.
 
+The client Functions deploy retires the three Airtable sync exports once they leave local code.
+It deletes only the exact deployed regional resources and the scheduled export's Cloud Scheduler
+job, then verifies the Functions inventory before continuing. A project where those Functions are
+already absent skips the retirement. Remove the step after all eight client environments complete
+a deploy with the Airtable sync exports removed.
+
 **Case 1: First deployment.** When a bootstrap inventory reports no Functions, the script discovers
 all local Functions before any deployment. It creates explicit groups of at most 50 regional
 Functions, with a 105-second wait after each completed group before the next starts. A Function in
