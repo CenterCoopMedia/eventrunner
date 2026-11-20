@@ -8,10 +8,10 @@
 //
 // BROAD UNDERNEATH, SIMPLE AT FIRST CONTACT. Task navigation groups the
 // choices by what staff are trying to do, keeping one useful set in view:
-//   • Identity: logo, icon and main brand colour; extra image slots disclose.
-//   • Page style: complete styles, header, schedule and light/dark policy.
+//   • Identity: logo, icon and brand colours; extra image slots disclose.
+//   • Page style: complete styles, header, schedule, navigation and light/dark policy.
 //   • Workspace: the admin's own colour scheme.
-//   • Advanced: navigation, typography, illustrations, shape and overrides.
+//   • Advanced: typography, illustrations, shape and overrides.
 // All controls stay mounted, and the real preview stays beside the work.
 // A server rejection reveals the offending task and nested controls.
 //
@@ -321,10 +321,20 @@ function ColourModePicker({ mode, onChange }) {
   </div>;
 }
 
-function ColourOverride({ field, value, palette, onChange, warning, error }) {
-  const background = palette[field.key];
-  const ink = palette.ink;
-  const picker = toPickerHex(value) || (background && rgbTripleToHex(background.join(' '))) || '#000000';
+function ColourOverride({ field, value, palette, onChange, backgroundFailure, error }) {
+  const accent = field.key === 'accent';
+  const colour = palette[field.key];
+  const text = accent ? colour : palette.ink;
+  const background = accent ? palette.surface : colour;
+  const picker = toPickerHex(value) || (colour && rgbTripleToHex(colour.join(' '))) || '#000000';
+  const accentRatio = accent && text && background ? contrastRatio(text, background) : null;
+  const warning = accent
+    ? accentRatio !== null && accentRatio < 4.5
+      ? `This accent is hard to see on the page background (${accentRatio.toFixed(2)}:1). Aim for at least 4.5:1 if you use it for text.`
+      : ''
+    : backgroundFailure
+      ? `Text is hard to read on this colour (${backgroundFailure.ratio.toFixed(2)}:1). Choose a colour with at least 4.5:1 contrast.`
+      : '';
   return <div className="flex flex-col gap-xs">
     <div className="admin-branding-color-row flex flex-wrap items-end gap-sm">
       <input type="color" aria-label={`${field.label} picker`} value={picker}
@@ -334,9 +344,9 @@ function ColourOverride({ field, value, palette, onChange, warning, error }) {
         <TextField label={field.label} value={value} onChange={onChange} hint={field.hint} error={error} warning={warning} />
       </div>
     </div>
-    {background && ink ? <p className="rounded-admin-small border-admin-hairline border-admin-rule-control px-sm py-xs text-admin-sm"
-      style={{ backgroundColor: `rgb(${background.join(' ')})`, color: `rgb(${ink.join(' ')})` }}>
-      Sample text
+    {background && text ? <p className="rounded-admin-small border-admin-hairline border-admin-rule-control px-sm py-xs text-admin-sm"
+      style={{ backgroundColor: `rgb(${background.join(' ')})`, color: `rgb(${text.join(' ')})` }}>
+      {accent ? 'Sample accent' : 'Sample text'}
     </p> : null}
   </div>;
 }
@@ -747,15 +757,12 @@ export default function AdminBranding() {
                 <div className="admin-branding-grid grid gap-sm">
                   {MAIN_COLOUR_FIELDS.map((field) => {
                     const palette = colourPalettes[overrideMode];
-                    const background = palette[field.key];
-                    const ratio = background && palette.ink ? contrastRatio(palette.ink, background) : null;
-                    const failure = contrastFailures.find((pair) => pair.mode === overrideMode &&
+                    const backgroundFailure = contrastFailures.find((pair) => pair.mode === overrideMode &&
                       pair.background === field.key && ['ink', 'inkMuted'].includes(pair.foreground));
-                    const lowContrast = failure?.ratio ?? (ratio !== null && ratio < 4.5 ? ratio : null);
                     return <ColourOverride key={field.key} field={field} palette={palette}
                       value={form.tokens[overrideMode][field.key]} onChange={(value) => setColourOverride(field.key, value)}
                       error={fieldErrors.get(`theme.tokens.${overrideMode}.${field.key}`)}
-                      warning={lowContrast === null ? '' : `Text is hard to read on this colour (${lowContrast.toFixed(2)}:1). Choose a colour with at least 4.5:1 contrast.`} />;
+                      backgroundFailure={backgroundFailure} />;
                   })}
                 </div>
               </div>

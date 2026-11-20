@@ -113,11 +113,13 @@ The square icon also sets the app icon. A phone or a desktop browser shows the a
 
 **Homepage hero image.** The picture at the top of your home page. In **Identity**, choose an image and add the required alt text. **Save draft** saves it without making it public. **Publish** saves and publishes it. **Publish the theme** applies theme changes right away; it does not publish this picture. You can also edit and publish the same picture in **Content → Home → Hero**.
 
-**Main brand colour.** One colour, as a hex value. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. Leave it blank to keep the site style's own colour.
+**Main brand colour.** Set the main colour with the picker or its hex value. The site style derives darker and lighter steps, rules and control boundaries from it. Set **Background colour** for the homepage hero and other alternate panels, and **Accent / secondary colour** for accent details. Both have separate light and dark settings, a preview and a contrast warning. Leave a value blank to use the site style's colour.
 
 **Five more choices sit under Advanced.** Each site style also answers **Long read opening** (a drop cap, a standfirst, or plain, for the first paragraph of a page on the Long read template), **Quote device** (how a quoted sentence is set), **Directory style** (how the speaker shelf and the attendee index are set), **Section boundary** (whether a section heading carries its folio, and where), and **Table rules** (hairline rows, a ruled head, or the full grid). Every style comes with the answer that suits it, and each choice retunes values the style already declares.
 
 **Header and schedule.** One panel holding two choices. **Header style** is how the site's identity appears at the top of every page: Each site style offers its own three — a letterhead, a masthead bar, a title page — and comes with the one that suits it. It is a site-wide choice on purpose, because the header is furniture a reader should stop noticing and it stops working the moment it differs page to page. **Schedule style** is how a session is set out on the schedule: A posted agenda, a hairline row, a departure board, and so on, depending on the style. Both retune the site style rather than inventing a value of their own, so you cannot make a combination the house has not looked at.
+
+**Navigation.** Under **Page style**, choose **Where the navigation sits** to place the menu across the top or down the side on wide screens. The menu stays at the top on phones. A page can override the site choice from the page editor.
 
 **Light or dark.** Always light, always dark, or follow the reader's own setting. Every site style defines both, so there is no wrong answer here.
 
@@ -125,11 +127,10 @@ The square icon also sets the app icon. A phone or a desktop browser shows the a
 
 **Advanced.** Everything else the system can do, behind a disclosure, and none of it is needed for a finished site:
 
-- *Navigation* — **Where the navigation sits**: Across the top, or down the leading edge on wide screens. One choice, every page, for the same reason the header is site-wide. A single page can overrule it from the page editor.
 - *Typography* — the heading face, picked from the alternates your style offers, and any of the four font roles named outright from the 23-family library.
 - *Illustrations* — a set of small drawings that carry the style's vocabulary, or none. They take the site's own ink and never carry a colour of their own, so they cannot fight your palette.
 - *Surface and shape* — the surface texture, the corners, the spacing, and any extra control your style has of its own.
-- *Advanced colour settings* — any single colour by hand, per mode, with a light tab and a dark tab holding separate values.
+- *Advanced colour settings* — edit the remaining colour roles, with a light tab and a dark tab holding separate values.
 
 **Most staff never open Advanced**, and that is the intended outcome: Every value in there is normally worked out from the site style and the one brand colour. Setting a colour by hand takes it out of that derivation permanently, so it stops moving when your brand colour moves. Open **Advanced colour settings** when a brand guide names an exact value that the derived one does not reach; not to explore.
 
@@ -189,7 +190,7 @@ Every page document (About, Travel, Conduct, and anything else seeded or added) 
 
 The individual settings behind that — header, arrangement, spacing — are still reachable under **Change the individual settings**, for the page that genuinely needs to differ. Changing one there clears the template and the template reads **Custom** from then on, because a page that no longer matches its template should not go on claiming it. A page that has never been given a template or a layout renders the defaults, so nothing changes until you change it.
 
-**Where the navigation sits is one choice for the whole site.** Across the top, or down the side on wide screens, set on the Branding tab under **Advanced → Navigation**, because a navigation that wanders between pages stops being the shell that tells a reader where they are. That is the default every page follows.
+**Where the navigation sits is one choice for the whole site.** On the Branding tab under **Page style → Navigation**, choose across the top or down the side on wide screens. That is the default every page follows.
 
 One page can still differ. **Change the individual settings** also carries **Navigation on this page**: Leave it on *Follow the site setting* — which names what the site is currently set to — or overrule it for this page alone. Use it sparingly and on purpose: A rail beside one long directory is a decision; a rail on three pages out of nine is an accident. It is not part of a template, so setting it leaves the template alone.
 
