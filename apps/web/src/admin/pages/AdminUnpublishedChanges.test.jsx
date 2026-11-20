@@ -540,14 +540,14 @@ describe('the Unpublished changes page', () => {
     // Other screens read only the count document for their banner.
     fireEvent.click(screen.getByRole('link', { name: 'Pages' }));
     await screen.findByRole('heading', { level: 1, name: 'Pages' });
-    expect(drafts.size).toBe(0);
+    await waitFor(() => expect(drafts.size).toBe(0));
     act(() => sendCounts(countDoc({ cmsContent: 1, cmsPages: 1, cmsSchedule: 1, cmsTimeline: 1 })));
     const banner = screen.getByRole('complementary', { name: 'Unpublished changes' });
     expect(banner).toHaveAttribute('data-pending-total', String(total));
     expect(banner.querySelector('p').firstChild.textContent).toBe(sentence);
     fireEvent.click(within(banner).getByRole('link', { name: 'Review unpublished changes' }));
     await screen.findByRole('heading', { level: 1, name: 'Unpublished changes' });
-    expect(drafts.size).toBe(6);
+    await waitFor(() => expect(drafts.size).toBe(6));
     expect(figure()).toBeNull();
     pushDrafts({ ...snapshots.at(-1), cmsSchedule: [{ id: 's1', title: 'One', status: 'dirty' }] });
     expect(figure()).toHaveAttribute('data-pending-total', String(total));
