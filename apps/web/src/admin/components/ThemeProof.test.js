@@ -30,20 +30,21 @@ it('keeps late styles before the proof override and releases the copies on clean
 
   const stop = syncProofStyles(app.head, proof.head);
   try {
-    expect(proof.head.querySelector('style')).toHaveTextContent(base.textContent);
+    expect(proof.head.querySelector('style')?.textContent).toBe(base.textContent);
     const deferred = app.createElement('link');
     deferred.rel = 'stylesheet';
     deferred.href = '/assets/QuoteBlock.css';
     app.head.appendChild(deferred);
     await waitFor(() => {
-      expect(override.previousElementSibling).toHaveAttribute('href', '/assets/QuoteBlock.css');
+      expect(override.previousElementSibling?.getAttribute('href')).toBe('/assets/QuoteBlock.css');
     });
     expect(proof.head.querySelectorAll('link')).toHaveLength(1);
-    expect(proof.head.querySelector('link')?.previousElementSibling).toHaveTextContent(base.textContent);
+    expect(proof.head.querySelector('link')?.previousElementSibling?.textContent).toBe(base.textContent);
   } finally {
     stop();
   }
-  expect([...proof.head.querySelectorAll('style, link')]).toEqual([override]);
+  expect(proof.head.querySelectorAll('style, link')).toHaveLength(1);
+  expect(proof.head.querySelector('style')).toBe(override);
   expect(app.head.querySelectorAll('link')).toHaveLength(1);
 });
 
