@@ -29,7 +29,8 @@
  * logAdminAction); live cmsUpdates docs are written only by cms/publish.
  */
 
-const { validUpdateImage, validUpdateContent, validUpdateCategory, UPDATE_CATEGORY_MAX } = require('shared/update');
+const { validUpdateCategory, UPDATE_CATEGORY_MAX } = require('shared/update');
+const { validUpdateImage, validUpdateContent } = require('shared/updateContent');
 const crypto = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
