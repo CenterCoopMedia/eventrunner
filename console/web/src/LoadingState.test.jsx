@@ -49,9 +49,9 @@ describe('console waiting feedback', () => {
         return () => { live = false; };
       }, [attempt]);
       if (!data) return <LoadingState onRetry={() => setAttempt((value) => value + 1)}>Loading the team.</LoadingState>;
-      return <h1>{data.name}</h1>;
+      return <h1 tabIndex={-1}>{data.name}</h1>;
     }
-    const { container } = render(<Page />);
+    const { container } = render(<main><Page /></main>);
     const indicator = () => container.querySelector('.console-loading-indicator');
     act(() => vi.advanceTimersByTime(999));
     expect(screen.getByRole('status')).toHaveAttribute('data-loading-stage', 'initial');
@@ -62,14 +62,24 @@ describe('console waiting feedback', () => {
     act(() => vi.advanceTimersByTime(1));
     expect(screen.getByRole('status')).toHaveTextContent('This is taking longer than expected.');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
     expect(read).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('status')).toHaveAttribute('data-loading-stage', 'initial');
-    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    // The same control, busy, keeps the keyboard and refuses a second press.
+    expect(retry).toHaveAccessibleName('Trying again…');
+    expect(retry).toHaveAttribute('aria-busy', 'true');
+    expect(retry).toHaveAttribute('aria-disabled', 'true');
+    expect(document.activeElement).toBe(retry);
+    fireEvent.click(retry);
+    expect(read).toHaveBeenCalledTimes(2);
 
     await act(async () => answers[1]({ name: 'The team' }));
-    // The indicator leaves in the same render that shows the content.
+    // The indicator leaves in the same render that shows the content, and
+    // focus moves from the retry to the page heading.
     expect(screen.getByRole('heading', { name: 'The team' })).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'The team' }));
     expect(indicator()).toBeNull();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     // The read that never answered in time changes nothing when it lands.
