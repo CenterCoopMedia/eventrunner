@@ -129,21 +129,31 @@ describe('signed out', () => {
   it('names the auth check outside the busy claim region and retains the incoming reference', async () => {
     authPending = true;
     const entry = '/ticket/claim?order=group-order-123&source=confirmation';
-    renderClaim(entry);
-    const region = await screen.findByRole('region', { name: 'Ticket claim' });
-    const waiting = within(screen.getByRole('main')).getByRole('status');
-    expect(waiting).toBeEmptyDOMElement();
-    expect(screen.getByText('Checking your sign-in…')).toBeVisible();
-    expect(waiting.closest('[aria-busy="true"]')).toBeNull();
-    expect(region).toHaveAttribute('aria-busy', 'true');
-    expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
+    await Promise.all([
+      loadFirebase(),
+      publicRoutes.find(({ path }) => path === 'ticket/claim').prefetch(),
+    ]);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      await act(async () => { renderClaim(entry); });
+      const region = screen.getByRole('region', { name: 'Ticket claim' });
+      const waiting = within(screen.getByRole('main')).getByRole('status');
+      expect(waiting).toBeEmptyDOMElement();
+      expect(screen.getByText('Checking your sign-in…')).toBeVisible();
+      expect(waiting.closest('[aria-busy="true"]')).toBeNull();
+      expect(region).toHaveAttribute('aria-busy', 'true');
+      expect(screen.queryByLabelText('Order number')).not.toBeInTheDocument();
 
-    await act(async () => setAuthUser(signedInUser));
-    expect(screen.getByLabelText('Order number')).toHaveValue('group-order-123');
-    expect(region).toHaveAttribute('aria-busy', 'false');
-    expect(waiting).toBeEmptyDOMElement();
-    expect(screen.getByTestId('current-route')).toHaveTextContent(entry);
-    expect(claimRequests()).toHaveLength(0);
+      act(() => vi.advanceTimersByTime(299));
+      await act(async () => setAuthUser(signedInUser));
+      expect(screen.getByLabelText('Order number')).toHaveValue('group-order-123');
+      expect(region).toHaveAttribute('aria-busy', 'false');
+      expect(waiting).toBeEmptyDOMElement();
+      expect(screen.getByTestId('current-route')).toHaveTextContent(entry);
+      expect(claimRequests()).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the original wait deadline when sign-in hands off to account setup', async () => {
