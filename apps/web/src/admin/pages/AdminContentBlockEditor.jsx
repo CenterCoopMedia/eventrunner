@@ -676,6 +676,7 @@ export default function AdminContentBlockEditor({ mode }) {
             <BlockTypePicker
               value={content.blockType}
               allowed={allowed}
+              savedType={(existingRow?.draft ?? existingRow?.live)?.blockType}
               sectionName={section?.label}
               onChange={changeBlockType}
               error={errorFor('blockType')}

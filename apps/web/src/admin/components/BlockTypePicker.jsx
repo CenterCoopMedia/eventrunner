@@ -106,19 +106,22 @@ const Example = memo(function Example({ typeId }) {
  *   value: string,
  *   onChange: (id: string) => void,
  *   allowed?: string[],
+ *   savedType?: string,
  *   sectionName?: string,
  *   error?: string,
  * }} props
  */
-export default function BlockTypePicker({ value, onChange, allowed = [], sectionName, error }) {
+export default function BlockTypePicker({ value, onChange, allowed = [], savedType, sectionName, error }) {
   const name = useId();
   const errorId = `${name}-error`;
   const [grid, setGrid] = useState(null);
   // Short text is offered only where Text is not (issue #1184): Text takes
   // links and emphasis, and staff found Short text could not. A block that
-  // is Short text already keeps it, and can be switched to Text.
+  // is Short text already keeps it, and can be switched to Text and back
+  // until the change is saved.
   const sectionTakes = allowed.length ? allowed : BLOCK_TYPE_IDS;
-  const takes = value !== 'text' && sectionTakes.includes('richtext')
+  const keepsText = value === 'text' || savedType === 'text';
+  const takes = !keepsText && sectionTakes.includes('richtext')
     ? sectionTakes.filter((id) => id !== 'text')
     : sectionTakes;
   // What the section takes comes first; the rest follow, disabled.
