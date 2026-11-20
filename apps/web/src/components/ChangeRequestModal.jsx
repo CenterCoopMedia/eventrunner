@@ -25,6 +25,7 @@ import { PublicLink as Link } from './PublicLink.jsx';
 import { submitChangeRequest } from '../lib/changeRequestApi.js';
 import { createSubmissionKey } from '../lib/submissionKey.js';
 import { markChangeRequestSent } from '../lib/changeRequestMarker.js';
+import { wrapModalTab } from '../lib/modalFocus.js';
 import { DIALOG_FRAME_CLASS } from './FeedbackModal.jsx';
 import { focusFirstError, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
@@ -32,6 +33,7 @@ import BusyLabel from './BusyLabel.jsx';
 import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
 import { encodeScreenshots, SIGNED_IN_SCREENSHOT_MIB } from '@screenshot-ui/browser.mjs';
 import PublicScreenshotField from './forms/PublicScreenshotField.jsx';
+import { DraftDismissalPrompt, useWritingDialogDraft } from './WritingDialogDraft.jsx';
 
 /** The server's limits (functions/src/admin/changeRequests.cjs). */
 export const MAX_MESSAGE_LENGTH = 2000;
@@ -44,9 +46,11 @@ export const MAX_PAGE_LENGTH = 200;
 export default function ChangeRequestModal({ onClose, user, initialPage = '' }) {
   const titleId = useId();
   const [submissionKey] = useState(createSubmissionKey);
+  const submissionStateRef = useRef('idle');
 
   const [message, setMessage] = useState('');
-  const [page, setPage] = useState(() => String(initialPage ?? '').slice(0, MAX_PAGE_LENGTH));
+  const [initialPageValue] = useState(() => String(initialPage ?? '').slice(0, MAX_PAGE_LENGTH));
+  const [page, setPage] = useState(initialPageValue);
   const screenshots = useScreenshotFiles(SIGNED_IN_SCREENSHOT_MIB);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -55,6 +59,12 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
 
   const dialogRef = useRef(null);
   const formRef = useRef(null);
+  const draft = useWritingDialogDraft({
+    dialogRef,
+    submissionStateRef,
+    dirty: message !== '' || page !== initialPageValue || screenshots.files.length > 0,
+    onClose,
+  });
   // Read at the first render: autoFocus has moved focus into the dialog by
   // the time an effect runs (FeedbackModal.jsx).
   const [opener] = useState(() => (typeof document === 'undefined' ? null : document.activeElement));
@@ -70,7 +80,7 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
 
   async function submit(event) {
     event.preventDefault();
-    if (submitting) return;
+    if (submissionStateRef.current !== 'idle' || draft.confirming) return;
     if (!message.trim()) {
       setMessageError('Say what should change.');
       setError(null);
@@ -79,6 +89,7 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
       window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
+    submissionStateRef.current = 'pending';
     setSubmitting(true);
     setError(null);
     setMessageError(null);
@@ -93,6 +104,8 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
     } catch (error) {
       result = { ok: false, error: error.message };
     }
+    draft.restoreDialog();
+    submissionStateRef.current = result.ok ? 'sent' : 'idle';
     setSubmitting(false);
     if (!result.ok) {
       setError(result.error);
@@ -107,12 +120,16 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
       ref={dialogRef}
       aria-labelledby={titleId}
       className={`public-dialog motion-enter ${DIALOG_FRAME_CLASS}`}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
+      onKeyDown={wrapModalTab}
+      onCancel={draft.handleCancel}
+      onClose={draft.handleNativeClose}
     >
-      <div>
+      <div className="flex flex-col gap-md">
+        {!sent ? (
+          <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
+            Request a change
+          </h2>
+        ) : null}
         {sent ? (
           <div className="flex flex-col gap-md">
             <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
@@ -131,18 +148,14 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
             <div>
               {/* The send control is gone, so focus moves to the one
                   control left rather than dropping to the page. */}
-              <button type="button" className={primaryActionClass} onClick={onClose} autoFocus>
+              <button type="button" className={primaryActionClass} onClick={draft.requestDismissal} autoFocus>
                 Close
               </button>
             </div>
           </div>
         ) : (
-          <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}
+          <form ref={formRef} hidden={draft.confirming} className={draft.confirming ? undefined : 'flex flex-col gap-md'} onSubmit={submit}
             onPaste={submitting ? undefined : screenshots.onPaste} noValidate>
-            <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
-              Request a change
-            </h2>
-
             {error ? (
               <p role="alert" className="rounded-brand border-hairline border-danger/40 bg-danger/10 px-sm py-xs font-data text-caption text-danger">
                 {error}
@@ -153,6 +166,7 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
               label="What should change?"
               value={message}
               onChange={(next) => {
+                if (submissionStateRef.current !== 'idle') return;
                 setMessage(next);
                 if (messageError && next.trim()) setMessageError(null);
               }}
@@ -160,20 +174,24 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
               hint="Only the event team reads your request. It is stored with your sign-in address."
               rows={5}
               maxLength={MAX_MESSAGE_LENGTH}
+              readOnly={submitting}
               required
               autoFocus
             />
             <TextField
               label="Page (optional)"
               value={page}
-              onChange={setPage}
+              onChange={(next) => {
+                if (submissionStateRef.current === 'idle') setPage(next);
+              }}
               maxLength={MAX_PAGE_LENGTH}
               hint="The page the change is about."
+              readOnly={submitting}
             />
             <PublicScreenshotField selection={screenshots} disabled={submitting} />
 
             <div className="flex flex-wrap justify-end gap-xs">
-              <button type="button" className={secondaryActionClass} onClick={onClose}>
+              <button type="button" className={secondaryActionClass} aria-disabled={submitting || undefined} onClick={draft.requestDismissal}>
                 Cancel
               </button>
               {/* State the busy action immediately. The control keeps focus
@@ -189,6 +207,7 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
             </div>
           </form>
         )}
+        {draft.confirming ? <DraftDismissalPrompt draft={draft} /> : null}
       </div>
     </dialog>
   );

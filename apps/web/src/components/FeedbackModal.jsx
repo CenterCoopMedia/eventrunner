@@ -52,6 +52,7 @@ import LoadingStatus from './LoadingStatus.jsx';
 import { useScreenshotFiles } from '@screenshot-ui/ScreenshotField.jsx';
 import { encodeScreenshots, PUBLIC_SCREENSHOT_MIB, ScreenshotReadError } from '@screenshot-ui/browser.mjs';
 import PublicScreenshotField from './forms/PublicScreenshotField.jsx';
+import { DraftDismissalPrompt, useWritingDialogDraft } from './WritingDialogDraft.jsx';
 import './PublicDialog.css';
 
 /**
@@ -88,7 +89,7 @@ export default function FeedbackModal({ onClose }) {
 
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
-  const [category, setCategory] = useState('feedback');
+  const [category, setCategory] = useState(CATEGORY_OPTIONS[0].value);
   const screenshots = useScreenshotFiles(PUBLIC_SCREENSHOT_MIB);
   const [website, setWebsite] = useState(''); // honeypot
   const [submitting, setSubmitting] = useState(false);
@@ -100,6 +101,12 @@ export default function FeedbackModal({ onClose }) {
   const dialogRef = useRef(null);
   const formRef = useRef(null);
   const receiptHeadingRef = useRef(null);
+  const draft = useWritingDialogDraft({
+    dialogRef,
+    submissionStateRef,
+    dirty: message !== '' || email !== '' || category !== CATEGORY_OPTIONS[0].value || screenshots.files.length > 0,
+    onClose,
+  });
   // Capture the opener before showModal moves focus into the dialog.
   const [opener] = useState(() => (typeof document === 'undefined' ? null : document.activeElement));
 
@@ -130,15 +137,9 @@ export default function FeedbackModal({ onClose }) {
     if (receipt) receiptHeadingRef.current?.focus();
   }, [receipt]);
 
-  function closeDialog() {
-    // Closing is not cancellation: the server may already be saving the
-    // message. Keep its result visible until the request has settled.
-    if (submissionStateRef.current !== 'pending') onClose();
-  }
-
   async function submit(event) {
     event.preventDefault();
-    if (submissionStateRef.current !== 'idle') return;
+    if (submissionStateRef.current !== 'idle' || draft.confirming) return;
     const normalizedMessage = message.trim();
     if (!normalizedMessage) {
       // The field says it, and the reader is put in front of the field.
@@ -190,6 +191,7 @@ export default function FeedbackModal({ onClose }) {
       };
     }
     if (requestAbortRef.current === controller) requestAbortRef.current = null;
+    if (mountedRef.current) draft.restoreDialog();
     submissionStateRef.current = result.ok ? 'sent' : 'idle';
     if (!mountedRef.current) return;
     setSubmitting(false);
@@ -203,33 +205,21 @@ export default function FeedbackModal({ onClose }) {
   }
 
   return (
-    // Escape reaches the dialog as `cancel`. Its default would close the
-    // element while React still believed it was open, so the close is handed
-    // to the caller instead, and the caller unmounts the dialog.
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
       tabIndex={-1}
       className={`public-dialog motion-enter ${DIALOG_FRAME_CLASS}`}
       onKeyDown={wrapModalTab}
-      onCancel={(event) => {
-        event.preventDefault();
-        closeDialog();
-      }}
-      onClose={(event) => {
-        const dialog = event.currentTarget;
-        if (!mountedRef.current || dialog.open) return;
-        // A repeated native close request can bypass cancel prevention.
-        // Keep the pending result reachable until its deadline settles it.
-        if (submissionStateRef.current === 'pending') {
-          dialog.showModal();
-          formRef.current?.querySelector('textarea')?.focus({ preventScroll: true });
-        } else {
-          onClose();
-        }
-      }}
+      onCancel={draft.handleCancel}
+      onClose={draft.handleNativeClose}
     >
-      <div>
+      <div className="flex flex-col gap-md">
+        {!receipt ? (
+          <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
+            Share feedback
+          </h2>
+        ) : null}
         {receipt ? (
           <div className="flex flex-col gap-md">
             <h2
@@ -252,17 +242,14 @@ export default function FeedbackModal({ onClose }) {
               {receipt.email ? ' If you left an email, we’ll try to send a confirmation.' : null}
             </p>
             <div>
-              <button type="button" className={primaryActionClass} onClick={closeDialog}>
+              <button type="button" className={primaryActionClass} onClick={draft.requestDismissal}>
                 Close
               </button>
             </div>
           </div>
         ) : (
-          <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit} onPaste={submitting ? undefined : screenshots.onPaste}>
-            <h2 id={titleId} className="font-heading text-h3 font-semibold text-text-primary">
-              Share feedback
-            </h2>
-
+          <form ref={formRef} hidden={draft.confirming} className={draft.confirming ? undefined : 'flex flex-col gap-md'}
+            onSubmit={submit} onPaste={submitting ? undefined : screenshots.onPaste}>
             {error ? (
               <p role="alert" className="rounded-brand border-hairline border-danger/40 bg-danger/10 px-sm py-xs font-data text-caption text-danger">
                 {error}
@@ -341,7 +328,7 @@ export default function FeedbackModal({ onClose }) {
                 type="button"
                 className={secondaryActionClass}
                 aria-disabled={submitting || undefined}
-                onClick={closeDialog}
+                onClick={draft.requestDismissal}
               >
                 Cancel
               </button>
@@ -361,6 +348,7 @@ export default function FeedbackModal({ onClose }) {
             </div>
           </form>
         )}
+        {draft.confirming ? <DraftDismissalPrompt draft={draft} /> : null}
       </div>
     </dialog>
   );
