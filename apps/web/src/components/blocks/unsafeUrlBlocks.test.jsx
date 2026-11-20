@@ -5,7 +5,9 @@
 // scheme itself, the same way sanitizeHtml.js already does for richtext
 // links.
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
+import { readyManifest, stubManifests } from '../../test/imageSizeManifests.js';
+import { resetImageSizeCacheForTest } from '../../lib/mediaSource.js';
 import { MemoryRouter } from 'react-router';
 import CtaBlock from './CtaBlock.jsx';
 import LinkGroupBlock from './LinkGroupBlock.jsx';
@@ -128,5 +130,21 @@ describe('ImageBlock', () => {
   it('renders an image for a safe url', () => {
     const { getByRole } = render(<ImageBlock block={{ url: 'https://example.org/i.png', alt: 'x' }} />);
     expect(getByRole('img')).toHaveAttribute('src', 'https://example.org/i.png');
+  });
+
+  // The picker stores this shape (admin/components/media/ImagePicker.jsx);
+  // as a relative src it fetched the site's HTML, not the picture.
+  it('resolves a library path to the bucket', async () => {
+    resetImageSizeCacheForTest();
+    stubManifests({ 'cms-images/a1b2c3/hall.jpg': readyManifest('cms-images/a1b2c3/hall.jpg', 1500) });
+    try {
+      const { container } = render(<ImageBlock block={{ url: 'cms-images/a1b2c3/hall.jpg', alt: 'x' }} />);
+      const img = container.querySelector('img');
+      await waitFor(() => expect(img).toHaveAttribute('srcset'));
+      expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
+      expect(img.getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
