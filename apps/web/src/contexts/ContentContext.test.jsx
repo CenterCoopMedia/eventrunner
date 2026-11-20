@@ -29,6 +29,7 @@ vi.mock('../lib/contentSource.js', () => ({
 }));
 
 import { ContentProvider, useContent } from './ContentContext.jsx';
+import EventConfigContext from './EventConfigContext.jsx';
 import TimelineBlock from '../components/blocks/TimelineBlock.jsx';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotPages from '@generated/pagesData.js';
@@ -104,6 +105,49 @@ describe('ContentProvider', () => {
     expect(schedule).toBeDefined();
     rerender(view(false));
     expect(subscriptions.get('cmsSchedule')).toBe(schedule);
+  });
+
+  it('keeps Timeline links in sync with the public schedule and pages', async () => {
+    render(
+      <MemoryRouter>
+        <EventConfigContext.Provider value={{ features: { schedule: true } }}>
+          <ContentProvider pathname="/" publicTools={false}>
+            <TimelineBlock />
+          </ContentProvider>
+        </EventConfigContext.Provider>
+      </MemoryRouter>,
+    );
+    expect(subscriptions.has('cmsSchedule')).toBe(false);
+    act(() => {
+      subscriptions.get('cmsPages').onNext([
+        { id: 'archive', path: '/archive', visible: true },
+        { id: 'hidden', path: '/hidden', visible: false },
+      ]);
+      subscriptions.get('cmsTimeline').onNext([
+        { year: 2021, title: 'Published session', url: '/schedule/linked?lang=es#session-materials' },
+        { year: 2022, title: 'Deleted session', url: '/schedule/deleted' },
+        { year: 2023, title: 'Invalid schedule path', url: '/schedule/linked/extra' },
+        { year: 2024, title: 'Event archive', url: '/archive' },
+        { year: 2025, title: 'Hidden archive', url: '/hidden' },
+        { year: 2026, title: 'Past event website', url: 'https://example.org/edition' },
+        { year: 2026, title: 'Personal schedule', url: '/schedule/mine' },
+        { year: 2026, title: 'Full schedule', url: '/schedule' },
+      ]);
+    });
+    expect(await screen.findByRole('link', { name: 'Full schedule' })).toHaveAttribute('href', '/schedule');
+    const schedule = subscriptions.get('cmsSchedule');
+    act(() => schedule.onNext([{ id: 'linked', visible: true }]));
+    const link = await screen.findByRole('link', { name: 'Published session' });
+    expect(link).toHaveAttribute('href', '/schedule/linked?lang=es#session-materials');
+    expect(screen.getByRole('link', { name: 'Event archive' })).toHaveAttribute('href', '/archive');
+    expect(screen.getByRole('link', { name: /Past event website/ })).toHaveAttribute('href', 'https://example.org/edition');
+    for (const name of ['Deleted session', 'Invalid schedule path', 'Hidden archive', 'Personal schedule']) {
+      expect(screen.getByRole('heading', { name })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name })).toBeNull();
+    }
+    act(() => schedule.onNext([]));
+    expect(screen.getByRole('heading', { name: 'Published session' })).toBeInTheDocument();
+    expect(link).not.toBeInTheDocument();
   });
 
   it('loads entries for a placed Timeline block on a known route and hides the empty section', () => {
